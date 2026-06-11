@@ -1,0 +1,675 @@
+'use server';
+
+import { prisma } from '@/lib/prisma';
+import { revalidatePath } from 'next/cache';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
+import { extractPublicIdFromUrl, extractResourceTypeFromUrl, destroyAsset } from '@/lib/cloudinary-cleanup';
+import { createSystemNotification } from '@/lib/notification-service';
+import { writeLimiter, getClientIp } from '@/lib/rate-limit';
+import { sanitizeText } from '@/lib/sanitize';
+
+
+export async function getTolees() {
+  try {
+    const tolees = await prisma.tolee.findMany({
+      include: {
+        members: true,
+      }
+    });
+    return { success: true, tolees };
+  } catch (error) {
+    console.error("Error fetching tolees:", error);
+    return { success: false, tolees: [] };
+  }
+}
+
+export async function getToleeBySlug(slug: string) {
+  try {
+    const session = await getServerSession(authOptions);
+    const currentUserId = (session?.user as any)?.id;
+
+    // Check if the current user is an approved member of this tolee slug
+    let isMember = false;
+    if (currentUserId) {
+      const membership = await prisma.toleeMember.findFirst({
+        where: {
+          user: { id: currentUserId },
+          tolee: { slug },
+          status: 'approved'
+        }
+      });
+      isMember = !!membership;
+    }
+
+    const tolee = await prisma.tolee.findUnique({
+      where: { slug },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        description: true,
+        avatar: true,
+        coverImage: true,
+        isPrivate: true,
+        ownerId: true,
+        owner: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+            avatar: true
+          }
+        },
+        _count: {
+          select: {
+            members: true
+          }
+        },
+        posts: {
+          take: 10,
+          where: {
+            post: currentUserId ? {
+              OR: [
+                { authorId: currentUserId },
+                { visibility: 'public' },
+                ...(isMember ? [{ visibility: 'hidden_from_public' }] : [])
+              ]
+            } : {
+              visibility: 'public'
+            }
+          },
+          include: {
+            post: {
+              select: {
+                id: true,
+                caption: true,
+                mediaUrls: true,
+                mediaTypes: true,
+                postType: true,
+                visibility: true,
+                shareCount: true,
+                createdAt: true,
+                worldProjectId: true,
+                worldProject: {
+                  select: {
+                    id: true,
+                    type: true,
+                    name: true,
+                    slug: true,
+                    description: true,
+                    bannerImage: true,
+                  }
+                },
+                author: {
+                  select: {
+                    id: true,
+                    name: true,
+                    username: true,
+                    avatar: true
+                  }
+                },
+                _count: {
+                  select: {
+                    likes: true,
+                    comments: true,
+                    reposts: true,
+                    views: true
+                  }
+                },
+                likes: {
+                  select: {
+                    userId: true
+                  }
+                },
+                savedBy: {
+                  select: {
+                    userId: true
+                  }
+                },
+                reposts: {
+                  orderBy: { createdAt: 'desc' },
+                  select: {
+                    userId: true,
+                    createdAt: true,
+                    user: {
+                      select: {
+                        id: true,
+                        name: true,
+                        username: true,
+                        avatar: true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          orderBy: {
+            post: {
+              createdAt: 'desc'
+            }
+          }
+        }
+      }
+    });
+    return { success: true, tolee };
+  } catch (error) {
+    console.error("Error fetching tolee by slug:", error);
+    return { success: false, tolee: null };
+  }
+}
+
+export async function joinTolee(toleeId: string) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !(session.user as any).id) {
+      return { success: false, error: 'Unauthorized' };
+    }
+    const userId = (session.user as any).id;
+
+    const tolee = await prisma.tolee.findUnique({
+      where: { id: toleeId }
+    });
+
+    if (!tolee) {
+      return { success: false, error: 'Tolee not found' };
+    }
+
+    const existingMember = await prisma.toleeMember.findUnique({
+      where: {
+        userId_toleeId: {
+          userId,
+          toleeId
+        }
+      }
+    });
+
+    if (existingMember) {
+      return { success: false, error: 'Already requested or joined' };
+    }
+
+    // Facebook Group Logic: Private group -> pending, Public -> approved
+    const status = tolee.isPrivate ? 'pending' : 'approved';
+
+    await prisma.toleeMember.create({
+      data: {
+        userId,
+        toleeId,
+        status,
+        role: 'member'
+      }
+    });
+
+    // Create notification for Tolee owner
+    if (tolee.ownerId && tolee.ownerId !== userId) {
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      if (user) {
+        await createSystemNotification({
+          userId: tolee.ownerId,
+          type: 'follow',
+          message: status === 'pending' 
+            ? `${user.username || user.name} requested to join ${tolee.name}.`
+            : `${user.username || user.name} joined ${tolee.name}.`,
+          link: `/t/${tolee.slug}`
+        });
+      }
+    }
+
+    revalidatePath(`/t/${tolee.slug}`);
+    return { success: true, status };
+  } catch (error) {
+    console.error("Error joining tolee:", error);
+    return { success: false, error: 'Failed to join tolee' };
+  }
+}
+
+export async function createTolee(data: { 
+  name: string, 
+  isPrivate: boolean, 
+  description?: string,
+  category?: string,
+  location?: string,
+  membershipQuestions?: string,
+  rules?: string,
+  welcomeMessage?: string,
+  pendingPostApproval?: boolean,
+  coverImage?: string,
+  coverImagePublicId?: string,
+  avatar?: string,
+  avatarPublicId?: string
+}) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !(session.user as any).id) {
+      return { success: false, error: 'Unauthorized' };
+    }
+    const userId = (session.user as any).id;
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { groupCreationRestricted: true }
+    });
+
+    if (user?.groupCreationRestricted) {
+      return { success: false, error: 'You are restricted from creating groups.' };
+    }
+
+    const ip = getClientIp();
+    if (writeLimiter.isRateLimited(ip)) {
+      return { success: false, error: 'Too many requests. Please cool down.' };
+    }
+
+    const safeName = sanitizeText(data.name || '', 80);
+    if (!safeName) {
+      return { success: false, error: 'Group name cannot be empty.' };
+    }
+    const safeDescription = sanitizeText(data.description || '', 1000);
+    const safeCategory = data.category ? sanitizeText(data.category, 50) : undefined;
+    const safeLocation = data.location ? sanitizeText(data.location, 100) : undefined;
+    const safeMembershipQuestions = data.membershipQuestions ? sanitizeText(data.membershipQuestions, 2000) : undefined;
+    const safeRules = data.rules ? sanitizeText(data.rules, 3000) : undefined;
+    const safeWelcomeMessage = data.welcomeMessage ? sanitizeText(data.welcomeMessage, 1000) : undefined;
+
+    // Generate a simple slug
+    const slug = safeName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '-' + Date.now().toString().slice(-4);
+
+    const avatarPublicId = data.avatarPublicId !== undefined 
+      ? data.avatarPublicId 
+      : (data.avatar ? extractPublicIdFromUrl(data.avatar) : null);
+      
+    const coverImagePublicId = data.coverImagePublicId !== undefined 
+      ? data.coverImagePublicId 
+      : (data.coverImage ? extractPublicIdFromUrl(data.coverImage) : null);
+
+    const tolee = await prisma.tolee.create({
+      data: {
+        name: safeName,
+        slug,
+        description: safeDescription || `Welcome to ${safeName}!`,
+        isPrivate: data.isPrivate,
+        category: safeCategory,
+        location: safeLocation,
+        membershipQuestions: safeMembershipQuestions,
+        rules: safeRules,
+        welcomeMessage: safeWelcomeMessage,
+        pendingPostApproval: data.pendingPostApproval || false,
+        coverImage: data.coverImage,
+        coverImagePublicId,
+        avatar: data.avatar,
+        avatarPublicId,
+        ownerId: userId,
+        members: {
+          create: {
+            userId,
+            status: 'approved',
+            role: 'admin'
+          }
+        }
+      }
+    });
+
+    revalidatePath('/discover');
+    revalidatePath('/feed');
+    
+    return { success: true, tolee };
+  } catch (error) {
+    console.error("Error creating tolee:", error);
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+export async function getTrendingTolees() {
+  try {
+    // Try to get trending by member count first
+    let tolees = await prisma.tolee.findMany({
+      take: 12,
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        description: true,
+        avatar: true,
+        coverImage: true,
+        price: true,
+        owner: {
+          select: {
+            name: true,
+            username: true
+          }
+        },
+        _count: {
+          select: {
+            members: true
+          }
+        }
+      },
+      orderBy: {
+        members: {
+          _count: 'desc'
+        }
+      }
+    });
+
+    // If no tolees found with members, just get the most recent ones
+    if (tolees.length === 0) {
+      tolees = await prisma.tolee.findMany({
+        take: 12,
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          description: true,
+          avatar: true,
+          coverImage: true,
+          price: true,
+          owner: {
+            select: {
+              name: true,
+              username: true
+            }
+          },
+          _count: {
+            select: {
+              members: true
+            }
+          }
+        },
+        orderBy: {
+          createdAt: 'desc'
+        }
+      });
+    }
+
+    return {
+      success: true,
+      tolees: tolees.map(t => ({
+        ...t,
+        membersCount: t._count?.members || 0,
+        adminName: t.owner?.name || t.owner?.username || 'Community'
+      }))
+    };
+  } catch (error) {
+    console.error("Error fetching trending tolees:", error);
+    return { success: false, tolees: [] };
+  }
+}
+
+export async function updateTolee(id: string, data: {
+  name?: string;
+  description?: string;
+  isPrivate?: boolean;
+  rules?: string;
+  avatar?: string;
+  avatarPublicId?: string;
+  coverImage?: string;
+  coverImagePublicId?: string;
+}) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !(session.user as any).id) {
+      return { success: false, error: 'Unauthorized' };
+    }
+    const userId = (session.user as any).id;
+
+    const tolee = await prisma.tolee.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        ownerId: true,
+        slug: true,
+        avatar: true,
+        avatarPublicId: true,
+        coverImage: true,
+        coverImagePublicId: true
+      }
+    });
+
+    if (!tolee || tolee.ownerId !== userId) {
+      return { success: false, error: 'Not authorized to manage this Tolee' };
+    }
+
+    const safeName = data.name !== undefined ? sanitizeText(data.name, 80) : undefined;
+    const safeDescription = data.description !== undefined ? sanitizeText(data.description, 1000) : undefined;
+    const safeRules = data.rules !== undefined ? sanitizeText(data.rules, 3000) : undefined;
+
+    const newAvatarPublicId = data.avatarPublicId !== undefined 
+      ? data.avatarPublicId 
+      : (data.avatar ? extractPublicIdFromUrl(data.avatar) : (data.avatar === null ? null : undefined));
+      
+    const newCoverImagePublicId = data.coverImagePublicId !== undefined 
+      ? data.coverImagePublicId 
+      : (data.coverImage ? extractPublicIdFromUrl(data.coverImage) : (data.coverImage === null ? null : undefined));
+
+    if (tolee) {
+      if (data.avatar !== undefined && tolee.avatar && tolee.avatar !== data.avatar) {
+        const deleteId = tolee.avatarPublicId || extractPublicIdFromUrl(tolee.avatar);
+        if (deleteId) {
+          await destroyAsset(deleteId, extractResourceTypeFromUrl(tolee.avatar));
+        }
+      }
+      
+      if (data.coverImage !== undefined && tolee.coverImage && tolee.coverImage !== data.coverImage) {
+        const deleteId = tolee.coverImagePublicId || extractPublicIdFromUrl(tolee.coverImage);
+        if (deleteId) {
+          await destroyAsset(deleteId, extractResourceTypeFromUrl(tolee.coverImage));
+        }
+      }
+    }
+
+    const updated = await prisma.tolee.update({
+      where: { id },
+      data: {
+        name: safeName,
+        description: safeDescription,
+        isPrivate: data.isPrivate,
+        rules: safeRules,
+        avatar: data.avatar,
+        avatarPublicId: newAvatarPublicId,
+        coverImage: data.coverImage,
+        coverImagePublicId: newCoverImagePublicId
+      }
+    });
+
+    revalidatePath(`/t/${updated.slug}`);
+    return { success: true, tolee: updated };
+  } catch (error) {
+    console.error("Error updating tolee:", error);
+    return { success: false, error: 'Failed to update tolee' };
+  }
+}
+
+export async function muteGroupNotifications(toleeId: string, duration?: '1h' | '8h' | '24h' | 'until_turned_on') {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !(session.user as any).id) {
+      return { success: false, error: 'Unauthorized' };
+    }
+    const userId = (session.user as any).id;
+
+    let mutedUntil: Date | null = null;
+    let isMuted = true;
+
+    if (duration) {
+      const now = new Date();
+      if (duration === '1h') {
+        mutedUntil = new Date(now.getTime() + 60 * 60 * 1000);
+      } else if (duration === '8h') {
+        mutedUntil = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+      } else if (duration === '24h') {
+        mutedUntil = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+      } else if (duration === 'until_turned_on') {
+        mutedUntil = null; // indefinitely
+      }
+    } else {
+      // Unmute
+      isMuted = false;
+    }
+
+    await prisma.toleeMember.update({
+      where: {
+        userId_toleeId: {
+          userId,
+          toleeId
+        }
+      },
+      data: {
+        isMuted,
+        mutedUntil
+      }
+    });
+
+    return { success: true, isMuted, mutedUntil };
+  } catch (error) {
+    console.error("Error muting tolee notifications:", error);
+    return { success: false, error: 'Failed to mute notifications' };
+  }
+}
+
+export async function leaveToleeGroup(toleeId: string) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !(session.user as any).id) {
+      return { success: false, error: 'Unauthorized' };
+    }
+    const userId = (session.user as any).id;
+
+    // Optional: check if they are the owner and handle accordingly, 
+    // for now we'll just allow leaving by deleting the membership
+    await prisma.toleeMember.delete({
+      where: {
+        userId_toleeId: {
+          userId,
+          toleeId
+        }
+      }
+    });
+
+    const group = await prisma.tolee.findUnique({ where: { id: toleeId } });
+    if (group) {
+      revalidatePath(`/t/${group.slug}`);
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error leaving tolee group:", error);
+    return { success: false, error: 'Failed to leave group' };
+  }
+}
+
+export async function getUserOwnedTolees() {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !(session.user as any).id) {
+      return { success: false, error: 'Unauthorized', tolees: [] };
+    }
+    const userId = (session.user as any).id;
+
+    const tolees = await prisma.tolee.findMany({
+      where: {
+        ownerId: userId
+      },
+      include: {
+        _count: {
+          select: {
+            members: true,
+            posts: true
+          }
+        },
+        posts: {
+          take: 1,
+          orderBy: {
+            post: {
+              createdAt: 'desc'
+            }
+          },
+          include: {
+            post: {
+              select: {
+                createdAt: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    return { success: true, tolees };
+  } catch (error) {
+    console.error("Error fetching user owned tolees:", error);
+    return { success: false, error: 'Failed to fetch your Tolees', tolees: [] };
+  }
+}
+
+export async function deleteTolee(id: string) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !(session.user as any).id) {
+      return { success: false, error: 'Unauthorized' };
+    }
+    const userId = (session.user as any).id;
+
+    const tolee = await prisma.tolee.findUnique({
+      where: { id },
+      select: {
+        ownerId: true,
+        avatar: true,
+        avatarPublicId: true,
+        coverImage: true,
+        coverImagePublicId: true
+      }
+    });
+
+    if (!tolee) {
+      return { success: false, error: 'Tolee not found' };
+    }
+
+    if (tolee.ownerId !== userId) {
+      return { success: false, error: 'Not authorized to delete this Tolee' };
+    }
+
+    // Clean up Tolee avatar and cover image assets from Cloudinary before deleting
+
+    if (tolee.avatar) {
+      const deleteId = tolee.avatarPublicId || extractPublicIdFromUrl(tolee.avatar);
+      if (deleteId) {
+        await destroyAsset(deleteId, extractResourceTypeFromUrl(tolee.avatar));
+      }
+    }
+
+    if (tolee.coverImage) {
+      const deleteId = tolee.coverImagePublicId || extractPublicIdFromUrl(tolee.coverImage);
+      if (deleteId) {
+        await destroyAsset(deleteId, extractResourceTypeFromUrl(tolee.coverImage));
+      }
+    }
+
+    // Delete course-related entries
+    const courses = await prisma.course.findMany({ where: { toleeId: id }, select: { id: true } });
+    const courseIds = courses.map(c => c.id);
+    const modules = await prisma.module.findMany({ where: { courseId: { in: courseIds } }, select: { id: true } });
+    const moduleIds = modules.map(m => m.id);
+    const lessons = await prisma.lesson.findMany({ where: { moduleId: { in: moduleIds } }, select: { id: true } });
+    const lessonIds = lessons.map(l => l.id);
+
+    await prisma.$transaction([
+      prisma.lessonProgress.deleteMany({ where: { lessonId: { in: lessonIds } } }),
+      prisma.lesson.deleteMany({ where: { moduleId: { in: moduleIds } } }),
+      prisma.module.deleteMany({ where: { courseId: { in: courseIds } } }),
+      prisma.course.deleteMany({ where: { toleeId: id } }),
+      prisma.toleeMember.deleteMany({ where: { toleeId: id } }),
+      prisma.postTolee.deleteMany({ where: { toleeId: id } }),
+      prisma.tolee.delete({ where: { id } })
+    ]);
+
+    revalidatePath('/discover');
+    revalidatePath('/feed');
+    return { success: true };
+  } catch (error) {
+    console.error("Error deleting tolee:", error);
+    return { success: false, error: 'Failed to delete Tolee' };
+  }
+}

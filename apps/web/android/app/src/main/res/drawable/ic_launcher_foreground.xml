@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Tolee App Icon — Foreground layer (adaptive icon foreground) -->
+<!-- The "X" / cross mark logo in white on transparent background -->
+<!-- Drawn to fit within the 72dp safe zone (108dp canvas, 18dp safe padding each side) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- White X / cross mark centered within safe zone (18–90 dp area) -->
+    <!-- First diagonal: top-left to bottom-right -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M30,30 L44,30 L54,44 L64,30 L78,30 L61,54 L78,78 L64,78 L54,64 L44,78 L30,78 L47,54 Z" />
+
+</vector>

@@ -1,0 +1,19 @@
+node_modules/
+.next/
+dist/
+build/
+.env
+.env.*
+!.env.example
+.vercel/
+*.log
+*.db
+apps/web/public/uploads/
+scratch/
+# Test/debug scripts (may contain cloud URLs or test data)
+test-db.js
+apps/web/download_branding.js
+# Playwright test artifacts
+test-results/
+playwright-report/
+.playwright-artifacts*/

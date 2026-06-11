@@ -1,0 +1,137 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  .animate-progress-bar {
+    animation: progress-bar 2s ease-in-out infinite;
+  }
+  .animate-shimmer {
+    background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.6s infinite linear;
+  }
+  .dark .animate-shimmer {
+    background: linear-gradient(90deg, #1c1c1e 25%, #2c2c2e 50%, #1c1c1e 75%);
+    background-size: 200% 100%;
+  }
+  .animate-typing-dot {
+    animation: typing-dot 1.2s ease-in-out infinite;
+  }
+}
+
+@keyframes progress-bar {
+  0% { transform: scaleX(0); }
+  50% { transform: scaleX(0.5); }
+  100% { transform: scaleX(1); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes typing-dot {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 180 40% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 180 40% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 180 40% 10%;
+    --primary: 181 84% 28%; /* #0a7c85 - Premium Branding Teal */
+    --primary-foreground: 0 0% 98%;
+    --secondary: 180 30% 96.1%;
+    --secondary-foreground: 181 84% 28%;
+    --muted: 180 20% 96.1%;
+    --muted-foreground: 180 15% 45.1%;
+    --accent: 174 72% 41%; /* #14b8a6 - Vibrant Teal */
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 180 15% 90%;
+    --input: 180 15% 90%;
+    --ring: 181 84% 28%;
+    --radius: 1rem;
+  }
+
+  .dark {
+    --background: 180 30% 6%; /* Deep tech slate-black */
+    --foreground: 180 20% 96%;
+    --card: 180 25% 9%;
+    --card-foreground: 180 20% 96%;
+    --popover: 180 25% 8%;
+    --popover-foreground: 180 20% 96%;
+    --primary: 181 75% 38%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 180 25% 12%;
+    --secondary-foreground: 180 20% 96%;
+    --muted: 180 20% 12%;
+    --muted-foreground: 180 10% 65.9%;
+    --accent: 174 72% 41%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 180 15% 15%;
+    --input: 180 15% 15%;
+    --ring: 181 75% 38%;
+  }
+
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Custom Utilities for Instagram Vibe */
+.story-ring {
+  background: linear-gradient(135deg, #0d9488 0%, #0ea5e9 50%, #10b981 100%);
+  padding: 2px;
+  border-radius: 50%;
+}
+
+.story-ring-tolee {
+  background: linear-gradient(135deg, #0d9488 0%, #0ea5e9 50%, #10b981 100%);
+  padding: 2px;
+  border-radius: 50%;
+}
+
+/* Hide scrollbar utility */
+.scrollbar-none::-webkit-scrollbar,
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none,
+.hide-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+/* In-Chat Search Highlight Flash Keyframes & Class */
+@keyframes highlight-flash {
+  0% { background-color: rgba(251, 191, 36, 0.4); }
+  50% { background-color: rgba(251, 191, 36, 0.6); }
+  100% { background-color: transparent; }
+}
+
+.animate-highlight-flash {
+  animation: highlight-flash 1.8s ease-out;
+}
+
+html, body {
+  max-width: 100%;
+  overflow-x: clip;
+}

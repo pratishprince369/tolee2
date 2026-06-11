@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 400" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a0b10" />
+      <stop offset="50%" stop-color="#12131c" />
+      <stop offset="100%" stop-color="#07080b" />
+    </linearGradient>
+    
+    <!-- Accent Gradient Primary -->
+    <linearGradient id="accentGrad1" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#4f46e5" stop-opacity="0.8" />
+      <stop offset="100%" stop-color="#06b6d4" stop-opacity="0.8" />
+    </linearGradient>
+
+    <!-- Accent Gradient Secondary -->
+    <linearGradient id="accentGrad2" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ec4899" stop-opacity="0.6" />
+      <stop offset="100%" stop-color="#8b5cf6" stop-opacity="0.6" />
+    </linearGradient>
+
+    <!-- Grid Pattern -->
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#ffffff" stroke-opacity="0.03" stroke-width="1" />
+    </pattern>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="400" fill="url(#bgGrad)" />
+  <rect width="1200" height="400" fill="url(#grid)" />
+
+  <!-- Ambient Glow Orbs -->
+  <circle cx="200" cy="100" r="250" fill="url(#accentGrad1)" filter="blur(80px)" opacity="0.4" />
+  <circle cx="1000" cy="300" r="300" fill="url(#accentGrad2)" filter="blur(90px)" opacity="0.3" />
+  <circle cx="600" cy="200" r="150" fill="#06b6d4" filter="blur(100px)" opacity="0.15" />
+
+  <!-- Abstract Network/Collaboration Illustration -->
+  <g stroke="#ffffff" stroke-opacity="0.1" stroke-width="1.5">
+    <!-- Connecting network lines -->
+    <line x1="450" y1="150" x2="600" y2="100" />
+    <line x1="600" y1="100" x2="750" y2="150" />
+    <line x1="750" y1="150" x2="700" y2="280" />
+    <line x1="700" y1="280" x2="500" y2="280" />
+    <line x1="500" y1="280" x2="450" y2="150" />
+    
+    <line x1="600" y1="100" x2="600" y2="220" />
+    <line x1="450" y1="150" x2="600" y2="220" />
+    <line x1="750" y1="150" x2="600" y2="220" />
+    <line x1="500" y1="280" x2="600" y2="220" />
+    <line x1="700" y1="280" x2="600" y2="220" />
+  </g>
+
+  <!-- Network Nodes (Circles) -->
+  <g>
+    <!-- Node 1 (Top Center) -->
+    <circle cx="600" cy="100" r="14" fill="#06b6d4" />
+    <circle cx="600" cy="100" r="22" fill="none" stroke="#06b6d4" stroke-opacity="0.4" stroke-width="2" />
+    
+    <!-- Node 2 (Left Mid) -->
+    <circle cx="450" cy="150" r="10" fill="#4f46e5" />
+    <circle cx="450" cy="150" r="18" fill="none" stroke="#4f46e5" stroke-opacity="0.3" stroke-width="1.5" />
+
+    <!-- Node 3 (Right Mid) -->
+    <circle cx="750" cy="150" r="12" fill="#8b5cf6" />
+    <circle cx="750" cy="150" r="20" fill="none" stroke="#8b5cf6" stroke-opacity="0.3" stroke-width="1.5" />
+
+    <!-- Node 4 (Bottom Left) -->
+    <circle cx="500" cy="280" r="11" fill="#ec4899" />
+    <circle cx="500" cy="280" r="19" fill="none" stroke="#ec4899" stroke-opacity="0.3" stroke-width="1.5" />
+
+    <!-- Node 5 (Bottom Right) -->
+    <circle cx="700" cy="280" r="10" fill="#3b82f6" />
+    <circle cx="700" cy="280" r="18" fill="none" stroke="#3b82f6" stroke-opacity="0.3" stroke-width="1.5" />
+
+    <!-- Node 6 (Center Hub) -->
+    <circle cx="600" cy="220" r="16" fill="#ffffff" />
+    <circle cx="600" cy="220" r="28" fill="none" stroke="#ffffff" stroke-opacity="0.3" stroke-dasharray="4 4" stroke-width="1.5" />
+  </g>
+
+  <!-- Typography / Brand Silhouette -->
+  <text x="600" y="360" font-family="'Inter', system-ui, sans-serif" font-size="22" font-weight="800" fill="#ffffff" fill-opacity="0.6" letter-spacing="4" text-anchor="middle">
+    TOLEE COMMUNITY
+  </text>
+</svg>

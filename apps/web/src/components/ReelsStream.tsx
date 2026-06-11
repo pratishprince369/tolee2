@@ -1,0 +1,1297 @@
+'use client';
+
+import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
+import { useSession } from 'next-auth/react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import {
+  Heart, MessageCircle, Send, MoreVertical, Music,
+  Volume2, VolumeX, ShieldCheck, Plus, Bookmark, Repeat,
+  ChevronUp, ChevronDown, Eye, Rocket
+} from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { getOrCreatePersonalChat } from '@/actions/chat';
+import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { CreatePostModal } from '@/components/CreatePostModal';
+import {
+  createPost, toggleLike, addComment, getComments,
+  toggleSavePost, toggleRepost, getReposts, recordView,
+  updatePostVisibility, deletePostPermanently, editPostCaption
+} from '@/actions/post';
+import { toggleFollow } from '@/actions/user';
+import { HLSVideo, getSoundPreference, setSoundPreference } from '@/components/HLSVideo';
+import { formatViewCount } from '@/lib/utils';
+import { ReShareModal } from '@/components/ReShareModal';
+import { ShareModal } from '@/components/ShareModal';
+import { QuickBoostModal } from '@/components/QuickBoostModal';
+import { AdTracker } from '@/components/AdTracker';
+import { fetchEligibleAds } from '@/actions/ads';
+import { isVideoUrl, getMediaThumbnail, getPosterUrl } from '@/lib/media';
+
+const getValidAvatarUrl = (url: string | null | undefined): string => {
+  if (!url || url === 'null' || url === 'undefined' || url.trim() === '') {
+    return '/default-user-avatar.svg';
+  }
+  return url;
+};
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Custom hook: tracks which .reel-container is ≥ 50% visible inside
+   a given scroll container. Returns the `data-index` of that element.
+   ═══════════════════════════════════════════════════════════════════════ */
+function useActiveReelIndex(
+  containerRef: React.RefObject<HTMLDivElement | null>,
+  reelCount: number,
+): number {
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || reelCount === 0) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // Find the entry with the highest intersection ratio that is ≥ 0.5
+        let best: IntersectionObserverEntry | null = null;
+        for (const entry of entries) {
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
+            if (!best || entry.intersectionRatio > best.intersectionRatio) {
+              best = entry;
+            }
+          }
+        }
+        if (best) {
+          const idx = Number((best.target as HTMLElement).getAttribute('data-index'));
+          if (!isNaN(idx)) setActiveIndex(idx);
+        }
+      },
+      { root: container, threshold: [0.5, 0.75, 1.0] }
+    );
+
+    const slides = container.querySelectorAll('.reel-container');
+    slides.forEach((s) => observer.observe(s));
+    return () => observer.disconnect();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reelCount]); // re-attach when reels are added/removed
+
+  return activeIndex;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   useIsDesktop — detects lg breakpoint (1024px) via matchMedia.
+   Returns false on SSR (safe default: mobile-first).
+   This is CRITICAL: both layouts are always in the DOM (just CSS-hidden).
+   We must force isActive=false in the hidden layout so its videos never play.
+   ═══════════════════════════════════════════════════════════════════════ */
+function useIsDesktop(): boolean {
+  const [isDesktop, setIsDesktop] = useState(false); // start false (mobile-first SSR safe)
+  useEffect(() => {
+    const mql = window.matchMedia('(min-width: 1024px)');
+    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    setIsDesktop(mql.matches); // set immediately on mount
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  }, []);
+  return isDesktop;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Main ReelsStream Component
+   ═══════════════════════════════════════════════════════════════════════ */
+export function ReelsStream({ initialReels }: { initialReels: any[] }) {
+  const { data: session } = useSession();
+  const router = useRouter();
+
+  const handleAdClick = async (e: React.MouseEvent, ad: any) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const advertiserId = ad.adSet?.campaign?.user?.id;
+    if (!advertiserId) {
+      if (ad.destinationUrl) window.open(ad.destinationUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    if (session?.user && (session.user as any).id === advertiserId) {
+      router.push('/ads-manager');
+      return;
+    }
+
+    try {
+      const res = await getOrCreatePersonalChat(advertiserId);
+      if (res.success && res.chatId) {
+        router.push(`/chat?id=${res.chatId}&tab=personal`);
+      } else {
+        if (ad.destinationUrl) window.open(ad.destinationUrl, '_blank', 'noopener,noreferrer');
+      }
+    } catch (err) {
+      console.error('Chat redirection error:', err);
+      if (ad.destinationUrl) window.open(ad.destinationUrl, '_blank', 'noopener,noreferrer');
+    }
+  };
+
+  const [reels, setReels] = useState(initialReels);
+  const [followStates, setFollowStates] = useState<Record<string, 'approved' | 'pending' | null>>(() => {
+    const initialStates: Record<string, 'approved' | 'pending' | null> = {};
+    initialReels.forEach((reel) => {
+      if (reel.authorId) {
+        initialStates[reel.authorId] = reel.followStatus || (reel.isFollowing ? 'approved' : null);
+      }
+    });
+    return initialStates;
+  });
+
+  const handleFollowAuthor = async (authorId: string, authorName: string) => {
+    const currentStatus = followStates[authorId] || null;
+    
+    const targetReel = reels.find(r => r.authorId === authorId);
+    const isPrivate = targetReel?.authorIsPrivate || false;
+
+    const nextStatus = currentStatus ? null : (isPrivate ? 'pending' : 'approved');
+
+    // Optimistic state update
+    setFollowStates(prev => ({ ...prev, [authorId]: nextStatus }));
+
+    const result = await toggleFollow(authorId);
+    if (!result.success) {
+      // Revert state
+      setFollowStates(prev => ({ ...prev, [authorId]: currentStatus }));
+      alert(result.error || "Failed to follow user");
+    } else {
+      const finalStatus = result.status !== undefined ? result.status : (result.isFollowing ? 'approved' : null);
+      setFollowStates(prev => ({ ...prev, [authorId]: finalStatus }));
+    }
+  };
+
+  const [isMuted, setIsMuted] = useState(() => getSoundPreference());
+
+  const handleSetIsMuted = useCallback((val: boolean | ((prev: boolean) => boolean)) => {
+    if (typeof val === 'function') {
+      setIsMuted((prev) => {
+        const next = val(prev);
+        setSoundPreference(next);
+        return next;
+      });
+    } else {
+      setIsMuted(val);
+      setSoundPreference(val);
+    }
+  }, []);
+
+  useEffect(() => {
+    const handlePrefChange = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      setIsMuted(customEvent.detail.isMuted);
+    };
+    window.addEventListener('tolee_sound_pref_change', handlePrefChange);
+    return () => {
+      window.removeEventListener('tolee_sound_pref_change', handlePrefChange);
+    };
+  }, []);
+
+  const [hiddenReelIds, setHiddenReelIds] = useState<string[]>([]);
+  // Detect screen size — used to disable isActive in the hidden layout
+  const isDesktop = useIsDesktop();
+
+  // Separate scroll containers for mobile & desktop
+  const mobileScrollRef = useRef<HTMLDivElement>(null);
+  const desktopScrollRef = useRef<HTMLDivElement>(null);
+
+  const visibleReels = reels.filter((r: any) => !hiddenReelIds.includes(r.id));
+
+  // Ads and Boost State
+  const [sponsoredAds, setSponsoredAds] = useState<any[]>([]);
+  const [isQuickBoostOpen, setIsQuickBoostOpen] = useState(false);
+  const [quickBoostType, setQuickBoostType] = useState<'post' | 'reel' | 'listing'>('reel');
+  const [quickBoostTargetId, setQuickBoostTargetId] = useState('');
+
+  // Fetch sponsored ads on mount
+  useEffect(() => {
+    fetchEligibleAds({ limit: 10 }).then((res) => {
+      if (Array.isArray(res)) {
+        setSponsoredAds(res);
+      }
+    }).catch((err) => console.error('Failed to load sponsored ads:', err));
+  }, []);
+
+  // Compute itemsToRender to interleave sponsored ads
+  const itemsToRender: any[] = [];
+  let adIndex = 0;
+  visibleReels.forEach((reel, index) => {
+    itemsToRender.push({ type: 'reel', data: reel });
+    if ((index + 1) % 4 === 0 && sponsoredAds.length > 0) {
+      itemsToRender.push({ type: 'ad', data: sponsoredAds[adIndex % sponsoredAds.length] });
+      adIndex++;
+    }
+  });
+
+  // Independent active-index tracking for each layout
+  const mobileActiveIndex = useActiveReelIndex(mobileScrollRef, itemsToRender.length);
+  const desktopActiveIndex = useActiveReelIndex(desktopScrollRef, itemsToRender.length);
+
+  /* ── Modal state ── */
+  const [activeCommentReel, setActiveCommentReel] = useState<string | null>(null);
+  const [activeRepostReel, setActiveRepostReel] = useState<string | null>(null);
+  const [activeOptionsReel, setActiveOptionsReel] = useState<any | null>(null);
+  const [modalComments, setModalComments] = useState<any[]>([]);
+  const [modalReposts, setModalReposts] = useState<any[]>([]);
+  const [isModalLoading, setIsModalLoading] = useState(false);
+  const [isRepostModalLoading, setIsRepostModalLoading] = useState(false);
+  const [commentText, setCommentText] = useState('');
+  const [reshareModalOpen, setReshareModalOpen] = useState(false);
+  const [selectedPostIdForReshare, setSelectedPostIdForReshare] = useState<string | null>(null);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [selectedReelForShare, setSelectedReelForShare] = useState<any | null>(null);
+
+  /* ── View tracking ── */
+  const trackedReels = useRef<Set<string>>(new Set());
+  const trackView = useCallback((index: number) => {
+    const item = itemsToRender[index];
+    if (item && item.type === 'reel') {
+      const reel = item.data;
+      if (!trackedReels.current.has(reel.id)) {
+        trackedReels.current.add(reel.id);
+        let fp = localStorage.getItem('device_fingerprint');
+        if (!fp) {
+          fp = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
+          localStorage.setItem('device_fingerprint', fp);
+        }
+        recordView(reel.id, 'reel', fp).catch(() => {});
+      }
+    }
+  }, [itemsToRender]);
+
+  useEffect(() => { trackView(mobileActiveIndex); }, [mobileActiveIndex, trackView]);
+  useEffect(() => { trackView(desktopActiveIndex); }, [desktopActiveIndex, trackView]);
+
+  /* ── Desktop arrow navigation ── */
+  const scrollToReel = useCallback((containerRef: React.RefObject<HTMLDivElement | null>, idx: number) => {
+    const container = containerRef.current;
+    if (!container) return;
+    const slides = container.querySelectorAll('.reel-container');
+    if (slides[idx]) {
+      (slides[idx] as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, []);
+
+  const handleNewPost = (post: any, postData: any) => {
+    const isVideo = post && post.mediaTypes && (post.mediaTypes === 'video' || post.mediaTypes.split(',')[0] === 'video');
+    if (isVideo) {
+      const firstTolee = post.tolees?.[0]?.tolee;
+      const authorId = post.author?.id || post.authorId || (session?.user as any)?.id;
+      const authorUsername = post.author?.username || (session?.user as any)?.username || session?.user?.name || 'User';
+      const authorAvatar = getValidAvatarUrl(post.author?.avatar || session?.user?.image);
+
+      setReels((prev) => [{
+        id: post.id,
+        authorId: authorId,
+        authorIsPrivate: post.author?.isPrivate || false,
+        visibility: post.visibility || 'public',
+        video: post.mediaUrls,
+        author: authorUsername,
+        authorAvatar: authorAvatar,
+        toleeName: firstTolee?.name || postData?.toleeName || null,
+        toleeSlug: firstTolee?.slug || postData?.toleeSlug || null,
+        toleeId: firstTolee?.id || null,
+        role: firstTolee?.ownerId === authorId ? 'Admin' : 'Member',
+        caption: post.caption || '',
+        likes: 0,
+        comments: 0,
+        views: 0,
+        shares: '0',
+        reposts: 0,
+        audio: 'Original Audio',
+        isVerified: post.author?.isVerified || false,
+        likedByMe: false,
+        savedByMe: false,
+        repostedByMe: false,
+        resharedByUser: null,
+        isFollowing: false,
+        followStatus: null
+      }, ...prev]);
+
+      if (authorId) {
+        setFollowStates((prev) => ({
+          ...prev,
+          [authorId]: 'approved'
+        }));
+      }
+    }
+  };
+
+  const handleLike = async (id: string, index: number) => {
+    setReels((prev) => {
+      const next = [...prev];
+      const r = { ...next[index] };
+      const wasLiked = r.likedByMe;
+      let count = parseInt(String(r.likes).replace(/k/i, '000').replace(/m/i, '000000')) || 0;
+      r.likedByMe = !wasLiked;
+      r.likes = wasLiked ? Math.max(0, count - 1) : count + 1;
+      next[index] = r;
+      return next;
+    });
+    const result = await toggleLike(id.toString());
+    if (!result.success) {
+      // Revert
+      setReels((prev) => {
+        const next = [...prev];
+        const r = { ...next[index] };
+        r.likedByMe = !r.likedByMe;
+        next[index] = r;
+        return next;
+      });
+    }
+  };
+
+  const openCommentsModal = async (id: string) => {
+    setActiveCommentReel(id);
+    setIsModalLoading(true);
+    const res = await getComments(id);
+    if (res.success) setModalComments(res.comments ?? []);
+    setIsModalLoading(false);
+  };
+
+  const openRepostsModal = async (postId: string) => {
+    setActiveRepostReel(postId);
+    setIsRepostModalLoading(true);
+    const res = await getReposts(postId);
+    if (res.success) setModalReposts(res.reposts ?? []);
+    setIsRepostModalLoading(false);
+  };
+
+  const handleCommentSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!commentText.trim() || !activeCommentReel) return;
+    const text = commentText;
+    setCommentText('');
+    const index = reels.findIndex((r) => r.id === activeCommentReel);
+    if (index !== -1) {
+      setReels((prev) => {
+        const next = [...prev];
+        const r = { ...next[index] };
+        r.comments = (parseInt(String(r.comments).replace(/k/i, '000')) || 0) + 1;
+        next[index] = r;
+        return next;
+      });
+    }
+    const tempId = 'temp-' + Date.now();
+    setModalComments((prev) => [{
+      id: tempId, content: text,
+      author: { name: session?.user?.name || 'You', username: (session?.user as any)?.username || 'me', avatar: session?.user?.image },
+      createdAt: new Date().toISOString(),
+    }, ...prev]);
+    const result = await addComment(activeCommentReel, text);
+    if (!result.success) {
+      if (index !== -1) {
+        setReels((prev) => {
+          const next = [...prev];
+          const r = { ...next[index] };
+          r.comments = Math.max(0, (parseInt(String(r.comments).replace(/k/i, '000')) || 1) - 1);
+          next[index] = r;
+          return next;
+        });
+      }
+      setModalComments((prev) => prev.filter((c) => c.id !== tempId));
+    } else {
+      setModalComments((prev) => prev.map((c) => (c.id === tempId ? result.comment : c)));
+    }
+  };
+
+  const handleSave = async (id: string, index: number) => {
+    setReels((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], savedByMe: !next[index].savedByMe };
+      return next;
+    });
+    const result = await toggleSavePost(id.toString());
+    if (!result.success) {
+      setReels((prev) => {
+        const next = [...prev];
+        next[index] = { ...next[index], savedByMe: !next[index].savedByMe };
+        return next;
+      });
+    }
+  };
+
+  const handleRepost = async (id: string, index: number) => {
+    setReels((prev) => {
+      const next = [...prev];
+      const r = { ...next[index] };
+      const wasReposted = r.repostedByMe;
+      const count = parseInt(String(r.reposts || '0')) || 0;
+      r.repostedByMe = !wasReposted;
+      r.reposts = wasReposted ? Math.max(0, count - 1) : count + 1;
+      next[index] = r;
+      return next;
+    });
+    const result = await toggleRepost(id.toString());
+    if (!result.success) {
+      setReels((prev) => {
+        const next = [...prev];
+        const r = { ...next[index] };
+        r.repostedByMe = !r.repostedByMe;
+        next[index] = r;
+        return next;
+      });
+    }
+  };
+
+  const handleShare = (reel: any) => {
+    setSelectedReelForShare(reel);
+    setShareModalOpen(true);
+  };
+
+  const handleBoost = (reelId: string) => {
+    setQuickBoostType('reel');
+    setQuickBoostTargetId(reelId);
+    setIsQuickBoostOpen(true);
+  };
+
+  /* ── Shared action prop builder ── */
+  const makeActions = (reel: any, index: number) => ({
+    onLike: () => handleLike(reel.id, index),
+    onComment: () => openCommentsModal(reel.id),
+    onReshare: () => { setSelectedPostIdForReshare(reel.id); setReshareModalOpen(true); },
+    onRepostsModal: () => { if ((reel.reposts || 0) > 0) openRepostsModal(reel.id); },
+    onShare: () => handleShare(reel),
+    onSave: () => handleSave(reel.id, index),
+    onOptions: () => setActiveOptionsReel(reel),
+    onBoost: () => handleBoost(reel.id),
+  });
+
+  /* ══════════════════════════════════════════════════════════════════ */
+  return (
+    <>
+      {/* ────────────────────────────────────────────────────────────────
+          MOBILE: full-screen fixed immersive (hidden on lg+)
+         ──────────────────────────────────────────────────────────────── */}
+      <div className="lg:hidden fixed inset-0 z-40 bg-black text-white overflow-hidden flex justify-center">
+
+        {/* Mobile top bar */}
+        <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between px-4 py-4 pointer-events-auto bg-gradient-to-b from-black/60 to-transparent">
+          <h1 className="text-xl font-bold text-white drop-shadow-md">Reels</h1>
+          <div className="flex items-center gap-3">
+            {session?.user && (
+              <CreatePostModal onPost={handleNewPost} videoOnly>
+                <button
+                  id="reels-upload-mobile"
+                  className="flex items-center justify-center w-9 h-9 rounded-full bg-white/20 hover:bg-white/30 active:bg-white/40 backdrop-blur-sm border border-white/30 transition-all"
+                >
+                  <Plus className="w-5 h-5 text-white" strokeWidth={2.5} />
+                </button>
+              </CreatePostModal>
+            )}
+            {session?.user && (
+              <Link href="/u/me">
+                <Avatar className="w-8 h-8 border border-white/50 shadow-md">
+                  <AvatarImage src={getValidAvatarUrl(session.user.image)} />
+                  <AvatarFallback>{session.user.name?.[0]}</AvatarFallback>
+                </Avatar>
+              </Link>
+            )}
+          </div>
+        </div>
+
+        {itemsToRender.length === 0 ? (
+          <EmptyState onPost={handleNewPost} />
+        ) : (
+          /* Mobile scroll container */
+          <div
+            ref={mobileScrollRef}
+            className="w-full sm:max-w-[450px] h-full overflow-y-scroll snap-y snap-mandatory hide-scrollbar"
+          >
+            {itemsToRender.map((item, index) => {
+              if (item.type === 'ad') {
+                // Find preceding reel details to attribute revenue correctly
+                let precedingReelId: string | undefined = undefined;
+                let precedingToleeId: string | undefined = undefined;
+                for (let i = index - 1; i >= 0; i--) {
+                  if (itemsToRender[i].type === 'reel') {
+                    precedingReelId = itemsToRender[i].data.id;
+                    precedingToleeId = itemsToRender[i].data.toleeId;
+                    break;
+                  }
+                }
+
+                return (
+                  <AdReelSlide
+                    key={`ad-${item.data.id}-${index}`}
+                    ad={item.data}
+                    index={index}
+                    isActive={!isDesktop && index === mobileActiveIndex}
+                    desktop={false}
+                    onAdClick={handleAdClick}
+                    contentId={precedingReelId}
+                    toleeId={precedingToleeId}
+                  />
+                );
+              }
+              const reel = item.data;
+              const originalIndex = reels.findIndex(r => r.id === reel.id);
+              return (
+                <ReelSlide
+                  key={reel.id}
+                  reel={reel}
+                  index={index}
+                  // Only activate if this layout is currently VISIBLE (not desktop)
+                  isActive={!isDesktop && index === mobileActiveIndex}
+                  isMuted={isMuted}
+                  session={session}
+                  desktop={false}
+                  onMuteToggle={() => handleSetIsMuted((m) => !m)}
+                  followStatus={followStates[reel.authorId]}
+                  onFollow={() => handleFollowAuthor(reel.authorId, reel.author)}
+                  {...makeActions(reel, originalIndex)}
+                />
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ────────────────────────────────────────────────────────────────
+          DESKTOP: inline layout — sidebar stays visible (hidden on < lg)
+         ──────────────────────────────────────────────────────────────── */}
+      <div className="hidden lg:flex flex-col h-[calc(100vh-4rem)] bg-black overflow-hidden relative">
+
+        {/* Desktop top bar */}
+        <div className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-6 py-4 bg-gradient-to-b from-black/80 to-transparent pointer-events-none">
+          <h1 className="text-2xl font-black text-white tracking-tight pointer-events-auto select-none">Reels</h1>
+          <div className="flex items-center gap-3 pointer-events-auto">
+            {session?.user && (
+              <CreatePostModal onPost={handleNewPost} videoOnly>
+                <button
+                  id="reels-upload-desktop"
+                  className="flex items-center gap-2 px-4 py-2 rounded-full bg-white text-black hover:bg-gray-100 font-bold text-sm transition-all shadow-lg hover:scale-105 active:scale-95"
+                >
+                  <Plus className="w-4 h-4" strokeWidth={2.5} />
+                  Create Reel
+                </button>
+              </CreatePostModal>
+            )}
+            <button
+              onClick={() => handleSetIsMuted((m) => !m)}
+              className="flex items-center justify-center w-9 h-9 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur-sm border border-white/20 text-white transition-all"
+            >
+              {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+            </button>
+          </div>
+        </div>
+
+        {itemsToRender.length === 0 ? (
+          <div className="flex items-center justify-center h-full">
+            <EmptyState onPost={handleNewPost} />
+          </div>
+        ) : (
+          <div className="flex items-center justify-center h-full gap-6 px-4">
+
+            {/* Prev / Next arrows */}
+            <div className="flex flex-col gap-3 shrink-0">
+              <button
+                onClick={() => scrollToReel(desktopScrollRef, desktopActiveIndex - 1)}
+                disabled={desktopActiveIndex === 0}
+                className="w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 flex items-center justify-center text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed hover:scale-105"
+              >
+                <ChevronUp className="w-5 h-5" />
+              </button>
+              <button
+                onClick={() => scrollToReel(desktopScrollRef, desktopActiveIndex + 1)}
+                disabled={desktopActiveIndex >= itemsToRender.length - 1}
+                className="w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 flex items-center justify-center text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed hover:scale-105"
+              >
+                <ChevronDown className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* 9:16 Centered reel player */}
+            <div
+              ref={desktopScrollRef}
+              className="relative flex-shrink-0 overflow-y-scroll snap-y snap-mandatory hide-scrollbar rounded-2xl shadow-2xl shadow-black/60"
+              style={{ width: 'min(380px, 40vw)', height: 'min(676px, calc(100vh - 80px))' }}
+            >
+              {itemsToRender.map((item, index) => {
+                if (item.type === 'ad') {
+                  // Find preceding reel details to attribute revenue correctly
+                  let precedingReelId: string | undefined = undefined;
+                  let precedingToleeId: string | undefined = undefined;
+                  for (let i = index - 1; i >= 0; i--) {
+                    if (itemsToRender[i].type === 'reel') {
+                      precedingReelId = itemsToRender[i].data.id;
+                      precedingToleeId = itemsToRender[i].data.toleeId;
+                      break;
+                    }
+                  }
+
+                  return (
+                    <AdReelSlide
+                      key={`ad-${item.data.id}-${index}`}
+                      ad={item.data}
+                      index={index}
+                      isActive={isDesktop && index === desktopActiveIndex}
+                      desktop={true}
+                      onAdClick={handleAdClick}
+                      contentId={precedingReelId}
+                      toleeId={precedingToleeId}
+                    />
+                  );
+                }
+                const reel = item.data;
+                const originalIndex = reels.findIndex(r => r.id === reel.id);
+                return (
+                  <ReelSlide
+                    key={reel.id}
+                    reel={reel}
+                    index={index}
+                    // Only activate if this layout is currently VISIBLE (desktop)
+                    isActive={isDesktop && index === desktopActiveIndex}
+                    isMuted={isMuted}
+                    session={session}
+                    desktop={true}
+                    onMuteToggle={() => handleSetIsMuted((m) => !m)}
+                    followStatus={followStates[reel.authorId]}
+                    onFollow={() => handleFollowAuthor(reel.authorId, reel.author)}
+                    {...makeActions(reel, originalIndex)}
+                  />
+                );
+              })}
+            </div>
+
+            {/* Desktop right-side action bar */}
+            {itemsToRender[desktopActiveIndex] && itemsToRender[desktopActiveIndex].type === 'reel' && (
+              <DesktopActionBar
+                reel={itemsToRender[desktopActiveIndex].data}
+                {...makeActions(
+                  itemsToRender[desktopActiveIndex].data,
+                  reels.findIndex(r => r.id === itemsToRender[desktopActiveIndex].data.id)
+                )}
+              />
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ══════════════ SHARED MODALS ══════════════ */}
+      <CommentsModal
+        open={!!activeCommentReel}
+        onClose={() => { setActiveCommentReel(null); setModalComments([]); }}
+        comments={modalComments}
+        isLoading={isModalLoading}
+        commentText={commentText}
+        setCommentText={setCommentText}
+        onSubmit={handleCommentSubmit}
+        session={session}
+      />
+
+      <OptionsModal
+        open={!!activeOptionsReel}
+        onClose={() => setActiveOptionsReel(null)}
+        reel={activeOptionsReel}
+        session={session}
+        setReels={setReels}
+        hiddenReelIds={hiddenReelIds}
+        setHiddenReelIds={setHiddenReelIds}
+        isMuted={isMuted}
+        setIsMuted={handleSetIsMuted}
+        handleShare={handleShare}
+      />
+
+      {/* Reposts list modal */}
+      <Dialog open={!!activeRepostReel} onOpenChange={(o) => { if (!o) { setActiveRepostReel(null); setModalReposts([]); } }}>
+        <DialogContent className="sm:max-w-[420px] bg-[#262626] border-gray-800 text-white p-0 gap-0 overflow-hidden shadow-2xl rounded-3xl">
+          <DialogHeader className="p-4 border-b border-gray-800/50 bg-[#1e1e1e]/50">
+            <DialogTitle className="text-center font-bold text-lg flex items-center justify-center gap-2">
+              <Repeat className="w-5 h-5 text-green-400" /> People who re-shared
+            </DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto p-4 space-y-5">
+            {isRepostModalLoading ? (
+              <div className="space-y-4 py-2">
+                {[1, 2, 3].map((n) => (
+                  <div key={n} className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Skeleton className="w-11 h-11 rounded-full bg-zinc-800" />
+                      <div className="space-y-2">
+                        <Skeleton className="h-4 w-28 rounded bg-zinc-800" />
+                        <Skeleton className="h-3 w-16 rounded bg-zinc-800" />
+                      </div>
+                    </div>
+                    <Skeleton className="h-8 w-24 rounded-full bg-zinc-800" />
+                  </div>
+                ))}
+              </div>
+            ) : modalReposts.length > 0 ? (
+              modalReposts.map((user: any, idx: number) => (
+                <div key={idx} className="flex items-center justify-between group">
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
+                      <Avatar className="w-11 h-11 border border-gray-700"><AvatarImage src={getValidAvatarUrl(user.avatar)} /><AvatarFallback>{user.name?.[0] || 'U'}</AvatarFallback></Avatar>
+                      <div className="absolute -bottom-1 -right-1 bg-[#1a1a1a] rounded-full p-[2px]"><div className="bg-green-500 rounded-full p-0.5"><Repeat className="w-2.5 h-2.5 text-white stroke-[2.5]" /></div></div>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="font-bold text-[15px] text-white">{user.name || user.username}</span>
+                      {user.username && <span className="text-xs text-gray-400">@{user.username}</span>}
+                      <span className="text-[10px] text-gray-500">{user.repostedAt ? new Date(user.repostedAt).toLocaleDateString() : 'ReShared'}</span>
+                    </div>
+                  </div>
+                  {user.username ? (
+                    <Link href={`/u/${user.username}`} onClick={() => setActiveRepostReel(null)}>
+                      <Button variant="outline" size="sm" className="h-8 rounded-full border-white/20 hover:bg-white/10 hover:text-white font-bold text-xs px-4 bg-transparent text-gray-300">View Profile</Button>
+                    </Link>
+                  ) : (
+                    <Button variant="outline" size="sm" disabled className="h-8 rounded-full border-gray-800 text-gray-600 font-bold text-xs px-4 bg-transparent">Anonymous</Button>
+                  )}
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-16 flex flex-col items-center gap-4">
+                <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center"><Repeat className="w-8 h-8 text-gray-600" /></div>
+                <p className="font-bold text-gray-400">No reshares yet</p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <ReShareModal
+        isOpen={reshareModalOpen}
+        onClose={() => setReshareModalOpen(false)}
+        postId={selectedPostIdForReshare || ''}
+        onSuccess={(id: string) => {
+          setReels((curr) => curr.map((r) => r.id === id ? { ...r, reposts: (r.reposts || 0) + 1, repostedByMe: true } : r));
+        }}
+      />
+
+      {selectedReelForShare && (
+        <ShareModal
+          isOpen={shareModalOpen}
+          onClose={() => { setShareModalOpen(false); setSelectedReelForShare(null); }}
+          postId={selectedReelForShare.id}
+          shareUrl={selectedReelForShare.toleeSlug ? `${window.location.origin}/t/${selectedReelForShare.toleeSlug}` : `${window.location.origin}/u/${selectedReelForShare.author}`}
+          previewText={selectedReelForShare.caption || 'Check out this reel on Tolee!'}
+          onShareSuccess={(count: number) => {
+            setReels((curr) => curr.map((r) => r.id === selectedReelForShare.id ? { ...r, shares: count.toString() } : r));
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ReelSlide — memoized so it only re-renders when its own props change.
+   This is critical: prevents ALL slides from re-rendering when only
+   activeReelIndex changes, which was causing play/pause race conditions.
+   ═══════════════════════════════════════════════════════════════════════ */
+const ReelSlide = memo(function ReelSlide({
+  reel, index, isActive, isMuted, session, desktop,
+  onMuteToggle, onLike, onComment, onReshare,
+  onRepostsModal, onShare, onSave, onOptions, onBoost,
+  followStatus, onFollow,
+}: {
+  reel: any; index: number; isActive: boolean; isMuted: boolean;
+  session: any; desktop: boolean;
+  onMuteToggle: () => void; onLike: () => void; onComment: () => void;
+  onReshare: () => void; onRepostsModal: () => void; onShare: () => void;
+  onSave: () => void; onOptions: () => void; onBoost: () => void;
+  followStatus?: 'approved' | 'pending' | null;
+  onFollow?: () => void;
+}) {
+  const isOwner = session?.user && (
+    (session.user as any).id === reel.authorId || 
+    (session.user as any).username === reel.author || 
+    session.user.name === reel.author
+  );
+
+  return (
+    <div
+      data-index={index}
+      className="reel-container w-full h-full snap-start snap-always relative flex items-center justify-center overflow-hidden bg-black"
+      style={{ scrollSnapStop: 'always' }}
+    >
+      {/* ── Video ── */}
+      <HLSVideo
+        src={reel.video}
+        className="w-full h-full object-cover"
+        poster={getPosterUrl(reel.video)}
+        isActive={isActive}
+        shouldLoad={true}
+        loop
+        muted={isMuted}
+        playsInline
+      />
+
+      {/* Gradient overlay */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
+
+      {/* Mobile volume button */}
+      {!desktop && (
+        <div className="absolute top-16 right-4 z-10">
+          <button onClick={onMuteToggle} className="text-white bg-black/30 hover:bg-black/50 p-2 rounded-full backdrop-blur-md transition-colors">
+            {isMuted ? <VolumeX className="w-6 h-6" /> : <Volume2 className="w-6 h-6" />}
+          </button>
+        </div>
+      )}
+
+      {/* Mobile right action bar */}
+      {!desktop && (
+        <div className="absolute right-3 bottom-[calc(5rem+env(safe-area-inset-bottom))] flex flex-col items-center gap-3.5 z-10 pointer-events-auto">
+          <MobileActionBar reel={reel} session={session} onLike={onLike} onComment={onComment} onReshare={onReshare} onRepostsModal={onRepostsModal} onShare={onShare} onSave={onSave} onOptions={onOptions} onBoost={onBoost} />
+        </div>
+      )}
+
+      {/* Bottom info */}
+      <div className={`absolute z-10 pointer-events-auto flex flex-col gap-2 ${desktop ? 'bottom-4 left-3 right-3' : 'bottom-[calc(5rem+env(safe-area-inset-bottom))] left-4 right-16'}`}>
+        <div className="flex items-center gap-2">
+          <Link href={`/u/${reel.author}`}>
+            <div className="relative rounded-full p-[2px] bg-gradient-to-tr from-yellow-400 via-red-500 to-fuchsia-600">
+              <Avatar className="w-8 h-8 border-2 border-black cursor-pointer">
+                <AvatarImage src={getValidAvatarUrl(reel.authorAvatar)} />
+                <AvatarFallback>{reel.author?.[0]}</AvatarFallback>
+              </Avatar>
+            </div>
+          </Link>
+          <div className="flex flex-col">
+            <div className="flex items-center gap-1 flex-wrap">
+              <Link href={`/u/${reel.author}`}>
+                <span className="font-semibold text-[14px] text-white cursor-pointer hover:underline drop-shadow">{reel.author}</span>
+              </Link>
+              {reel.isVerified && <ShieldCheck className="w-4 h-4 text-blue-400 fill-white" />}
+              {!isOwner && onFollow && (
+                <button 
+                  onClick={(e) => { e.stopPropagation(); onFollow(); }}
+                  className={`h-6 px-3 bg-transparent border rounded-lg font-semibold text-xs ml-1 transition-all duration-300 active:scale-95 ${
+                    followStatus === 'approved' 
+                      ? 'border-white/25 text-gray-300 hover:bg-white/10' 
+                      : followStatus === 'pending'
+                        ? 'border-amber-400 text-amber-400 hover:bg-amber-400/10'
+                        : 'border-white text-white hover:bg-white/20'
+                  }`}
+                >
+                  {followStatus === 'approved' ? 'Following' : followStatus === 'pending' ? 'Requested' : 'Follow'}
+                </button>
+              )}
+            </div>
+            {reel.toleeName && reel.toleeSlug && (
+              <Link href={`/t/${reel.toleeSlug}`} className="text-[11px] text-gray-300 hover:text-white hover:underline mt-0.5 w-fit" onClick={(e) => e.stopPropagation()}>
+                from <span className="font-semibold text-white">{reel.toleeName}</span>
+              </Link>
+            )}
+          </div>
+        </div>
+        <p className="text-[13px] text-white line-clamp-2 drop-shadow leading-snug">{reel.caption}</p>
+        <div className="flex items-center gap-1.5 text-[12px] text-white/80 drop-shadow">
+          <Music className="w-3 h-3" />
+          <span>{reel.audio}</span>
+        </div>
+      </div>
+    </div>
+  );
+});
+
+/* ═══════════════════════════════════════════════════════════════════════
+   AdReelSlide — renders active sponsored ads interleaved in Reels stream
+   ═══════════════════════════════════════════════════════════════════════ */
+const AdReelSlide = memo(function AdReelSlide({
+  ad,
+  index,
+  isActive,
+  desktop,
+  onAdClick,
+  contentId,
+  toleeId,
+}: {
+  ad: any;
+  index: number;
+  isActive: boolean;
+  desktop: boolean;
+  onAdClick: (e: React.MouseEvent, ad: any) => void;
+  contentId?: string;
+  toleeId?: string;
+}) {
+  const advertiserName = ad.adSet?.campaign?.user?.name || 'Tolee Sponsor';
+  const advertiserAvatar = getValidAvatarUrl(ad.adSet?.campaign?.user?.avatar || ad.adSet?.campaign?.user?.image);
+  const mediaList = ad.mediaUrls ? ad.mediaUrls.split(/,(?=https?:\/\/)/).map((u: string) => u.trim()).filter(Boolean) : [];
+  const displayMedia = mediaList[0] || null;
+  const isVideo = displayMedia ? isVideoUrl(displayMedia) : false;
+
+  return (
+    <div
+      data-index={index}
+      className="reel-container w-full h-full snap-start snap-always relative flex items-center justify-center overflow-hidden bg-[#0d0d0f]"
+      style={{ scrollSnapStop: 'always' }}
+    >
+      {/* ── Impression Tracker ── */}
+      <AdTracker adId={ad.id} type="impression" contentId={contentId} toleeId={toleeId} placementType="normal_feed" />
+
+      {/* ── Ad Media ── */}
+      {displayMedia && (
+        <AdTracker adId={ad.id} type="click" contentId={contentId} toleeId={toleeId} placementType="normal_feed" className="w-full h-full cursor-pointer absolute inset-0 z-0">
+          <div onClick={(e) => onAdClick(e, ad)} className="w-full h-full block">
+            {isVideo ? (
+              <HLSVideo
+                src={displayMedia}
+                className="w-full h-full object-cover"
+                poster={getPosterUrl(displayMedia)}
+                isActive={isActive}
+                shouldLoad={true}
+                loop
+                muted
+                playsInline
+              />
+            ) : (
+              <img
+                src={displayMedia}
+                alt={ad.headline || 'Sponsored Ad'}
+                className="w-full h-full object-cover animate-[fadeIn_0.5s_ease-out]"
+              />
+            )}
+          </div>
+        </AdTracker>
+      )}
+
+      {/* Premium Glassmorphic Gradient Overlay */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-black/75 pointer-events-none z-10" />
+
+      {/* Premium Sponsored Badge (Top Center) */}
+      <div className="absolute top-16 left-4 right-4 z-20 flex justify-between items-center pointer-events-none">
+        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/40 border border-indigo-500/30 backdrop-blur-md">
+          <Rocket className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
+          <span className="text-[10px] font-extrabold text-indigo-300 uppercase tracking-widest">
+            Sponsored Ad
+          </span>
+        </div>
+        <div className="px-2.5 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-[9px] font-bold text-emerald-400 backdrop-blur-sm">
+          Verified Brand
+        </div>
+      </div>
+
+      {/* Mobile-only action sidebar on the right */}
+      {!desktop && (
+        <div className="absolute right-3 bottom-[calc(5rem+env(safe-area-inset-bottom))] flex flex-col items-center gap-4 z-20 pointer-events-auto">
+          {/* Heart/Engagement buttons placeholders for ads to match alignment, but styled as sponsored */}
+          <div className="flex flex-col items-center gap-1 opacity-70">
+            <Heart className="w-7 h-7 text-white fill-transparent drop-shadow-[0_3px_10px_rgba(0,0,0,0.9)]" />
+            <span className="text-xs font-bold text-white drop-shadow mt-0.5">Ad</span>
+          </div>
+          <div className="flex flex-col items-center gap-1 opacity-70">
+            <MessageCircle className="w-7 h-7 text-white fill-transparent drop-shadow-[0_3px_10px_rgba(0,0,0,0.9)]" />
+            <span className="text-xs font-bold text-white drop-shadow mt-0.5">Promo</span>
+          </div>
+          <AdTracker adId={ad.id} type="lead" contentId={contentId} toleeId={toleeId} placementType="normal_feed">
+            <div onClick={(e) => onAdClick(e, ad)} className="cursor-pointer">
+              <button className="w-9 h-9 rounded-full bg-gradient-to-r from-emerald-500 via-teal-500 to-indigo-500 flex items-center justify-center shadow-lg border border-white/20 animate-bounce hover:scale-105 active:scale-95 transition-transform">
+                <Rocket className="w-4 h-4 text-white" />
+              </button>
+            </div>
+          </AdTracker>
+          <span className="text-[9px] font-extrabold text-emerald-400 drop-shadow mt-0.5 tracking-tighter uppercase">Visit</span>
+        </div>
+      )}
+
+      {/* Brand & Ad Info Bottom Overlay */}
+      <div className={`absolute z-20 pointer-events-auto flex flex-col gap-3 ${desktop ? 'bottom-4 left-3 right-3' : 'bottom-[calc(5rem+env(safe-area-inset-bottom))] left-4 right-16'}`}>
+        {/* Brand Info */}
+        <div className="flex items-center gap-2.5">
+          <Avatar className="w-9 h-9 border border-indigo-400/30 shadow-md">
+            {advertiserAvatar ? (
+              <AvatarImage src={advertiserAvatar} alt={advertiserName} />
+            ) : null}
+            <AvatarFallback className="bg-gradient-to-tr from-indigo-500 to-emerald-500 text-white font-black text-xs">
+              {advertiserName[0]?.toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex flex-col">
+            <span className="font-bold text-[14px] text-white drop-shadow">{advertiserName}</span>
+            <span className="text-[10px] text-emerald-400 font-extrabold tracking-wider uppercase drop-shadow flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping inline-block" />
+              Direct Brand Partner
+            </span>
+          </div>
+        </div>
+
+        {/* Text descriptions */}
+        <div className="space-y-1.5">
+          {ad.headline && (
+            <h4 className="text-[15px] font-black text-white leading-snug tracking-tight drop-shadow">
+              {ad.headline}
+            </h4>
+          )}
+          {ad.primaryText && (
+            <p className="text-[13px] text-gray-200 line-clamp-2 leading-relaxed drop-shadow">
+              {ad.primaryText}
+            </p>
+          )}
+          {ad.description && (
+            <p className="text-[11px] text-gray-400 line-clamp-1 leading-normal drop-shadow">
+              {ad.description}
+            </p>
+          )}
+        </div>
+
+        {/* High-visibility Call-To-Action Button */}
+        <AdTracker adId={ad.id} type="lead" contentId={contentId} toleeId={toleeId} placementType="normal_feed" className="w-full mt-1">
+          <div onClick={(e) => onAdClick(e, ad)} className="block w-full cursor-pointer">
+            <button className="w-full bg-gradient-to-r from-emerald-500 via-teal-500 to-indigo-600 hover:from-emerald-600 hover:via-teal-600 hover:to-indigo-700 text-white font-extrabold text-xs py-3 px-4 rounded-xl shadow-lg border border-white/10 hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2 group/btn active:scale-[0.98]">
+              <Rocket className="w-3.5 h-3.5 animate-pulse text-white group-hover/btn:translate-x-0.5 group-hover/btn:-translate-y-0.5 transition-transform" />
+              <span>
+                {ad.ctaButton === 'send_message' ? 'Send Message' : ad.ctaButton === 'shop_now' ? 'Shop Now' : ad.ctaButton === 'sign_up' ? 'Sign Up' : 'Learn More'}
+              </span>
+            </button>
+          </div>
+        </AdTracker>
+      </div>
+    </div>
+  );
+});
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Mobile Action Bar
+   ═══════════════════════════════════════════════════════════════════════ */
+function MobileActionBar({ reel, session, onLike, onComment, onReshare, onRepostsModal, onShare, onSave, onOptions, onBoost }: any) {
+  const sz = 'w-7 h-7';
+  const sh = 'drop-shadow-[0_3px_10px_rgba(0,0,0,0.9)]';
+  const isOwner = session?.user && (
+    (session.user as any).id === reel.authorId || 
+    (session.user as any).username === reel.author || 
+    session.user.name === reel.author
+  );
+
+  return (
+    <>
+      {isOwner && (
+        <div className="flex flex-col items-center gap-1 cursor-pointer group transition-all hover:scale-110 active:scale-90" onClick={(e) => { e.stopPropagation(); onBoost(); }}>
+          <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-emerald-500 flex items-center justify-center shadow-lg border border-white/20 hover:from-blue-600 hover:to-emerald-600 animate-pulse">
+            <Rocket className="w-4 h-4 text-white" />
+          </div>
+          <span className={`text-[10px] font-bold text-emerald-400 ${sh} mt-0.5 uppercase tracking-tighter`}>Boost</span>
+        </div>
+      )}
+      <div className="flex flex-col items-center gap-1 cursor-pointer group transition-all hover:scale-110 active:scale-90" onClick={(e) => { e.stopPropagation(); onLike(); }}>
+        <Heart className={`${sz} ${sh} transition-all ${reel.likedByMe ? 'fill-red-500 text-red-500' : 'text-white fill-transparent group-hover:text-gray-200'}`} />
+        <span className={`text-xs font-bold text-white ${sh} mt-0.5`}>{reel.likes}</span>
+      </div>
+      <div className="flex flex-col items-center gap-1 cursor-pointer group transition-all hover:scale-110 active:scale-90" onClick={(e) => { e.stopPropagation(); onComment(); }}>
+        <MessageCircle className={`${sz} text-white fill-transparent ${sh} group-hover:text-gray-200`} />
+        <span className={`text-xs font-bold text-white ${sh} mt-0.5`}>{reel.comments}</span>
+      </div>
+      <div className="flex flex-col items-center gap-1 group transition-all hover:scale-110 active:scale-90">
+        <button onClick={(e) => { e.stopPropagation(); onReshare(); }} className="focus:outline-none">
+          <Repeat className={`${sz} ${sh} transition-all hover:rotate-180 ${reel.repostedByMe ? 'text-green-500' : 'text-white group-hover:text-gray-200'}`} />
+        </button>
+        <span className={`text-xs font-bold text-white ${sh} mt-0.5 ${(reel.reposts || 0) > 0 ? 'cursor-pointer hover:underline' : ''}`} onClick={(e) => { e.stopPropagation(); onRepostsModal(); }}>{reel.reposts || '0'}</span>
+      </div>
+      <div className="flex flex-col items-center gap-1 pointer-events-none">
+        <Eye className={`${sz} text-white ${sh}`} />
+        <span className={`text-xs font-bold text-white ${sh} mt-0.5`}>{formatViewCount(reel.views || 0)}</span>
+      </div>
+      <div className="flex flex-col items-center gap-1 cursor-pointer group transition-all hover:scale-110 active:scale-90" onClick={(e) => { e.stopPropagation(); onShare(); }}>
+        <Send className={`${sz} text-white fill-transparent ${sh} group-hover:text-gray-200`} />
+        <span className={`text-xs font-bold text-white ${sh} mt-0.5`}>{reel.shares}</span>
+      </div>
+      <div className="flex flex-col items-center gap-1 cursor-pointer group transition-all hover:scale-110 active:scale-90" onClick={(e) => { e.stopPropagation(); onSave(); }}>
+        <Bookmark className={`${sz} ${sh} transition-all ${reel.savedByMe ? 'fill-white text-white' : 'text-white fill-transparent group-hover:text-gray-200'}`} />
+        <span className={`text-[10px] font-bold text-white ${sh} mt-0.5 uppercase tracking-tighter`}>{reel.savedByMe ? 'Saved' : 'Save'}</span>
+      </div>
+      <div className="cursor-pointer transition-all hover:scale-110 active:scale-90" onClick={(e) => { e.stopPropagation(); onOptions(); }}>
+        <MoreVertical className="w-6 h-6 text-white drop-shadow-[0_3px_10px_rgba(0,0,0,0.9)]" />
+      </div>
+      <div className="mt-0.5 w-8 h-8 rounded-full bg-black/60 border-2 border-white/80 overflow-hidden animate-[spin_8s_linear_infinite] shadow-lg">
+        <img src={reel.authorAvatar || '/default-user-avatar.svg'} alt="audio" className="w-full h-full object-cover rounded-full" />
+      </div>
+    </>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Desktop Action Bar (right side, outside video)
+   ═══════════════════════════════════════════════════════════════════════ */
+function DesktopActionBar({ reel, session, onLike, onComment, onReshare, onRepostsModal, onShare, onSave, onOptions, onBoost }: any) {
+  const sz = 'w-7 h-7';
+  const isOwner = session?.user && (
+    (session.user as any).id === reel.authorId || 
+    (session.user as any).username === reel.author || 
+    session.user.name === reel.author
+  );
+
+  return (
+    <div className="flex flex-col items-center gap-5 shrink-0">
+      {isOwner && (
+        <div className="flex flex-col items-center gap-1 cursor-pointer group transition-all hover:scale-110 active:scale-90" onClick={onBoost}>
+          <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-emerald-500 flex items-center justify-center shadow-lg border border-white/20 hover:from-blue-600 hover:to-emerald-600 animate-pulse">
+            <Rocket className="w-4 h-4 text-white" />
+          </div>
+          <span className="text-[10px] font-bold text-emerald-400 mt-0.5 uppercase tracking-tight">Boost</span>
+        </div>
+      )}
+      <div className="flex flex-col items-center gap-1 cursor-pointer group transition-all hover:scale-110 active:scale-90" onClick={onLike}>
+        <Heart className={`${sz} transition-all ${reel.likedByMe ? 'fill-red-500 text-red-500' : 'text-white fill-transparent group-hover:text-red-400'}`} />
+        <span className="text-xs font-bold text-gray-200">{reel.likes}</span>
+      </div>
+      <div className="flex flex-col items-center gap-1 cursor-pointer group transition-all hover:scale-110 active:scale-90" onClick={onComment}>
+        <MessageCircle className={`${sz} text-white fill-transparent group-hover:text-primary transition-colors`} />
+        <span className="text-xs font-bold text-gray-200">{reel.comments}</span>
+      </div>
+      <div className="flex flex-col items-center gap-1 group transition-all hover:scale-110 active:scale-90">
+        <button onClick={onReshare} className="focus:outline-none">
+          <Repeat className={`${sz} transition-all hover:rotate-180 ${reel.repostedByMe ? 'text-green-400' : 'text-white group-hover:text-green-400'}`} />
+        </button>
+        <span className={`text-xs font-bold text-gray-200 ${(reel.reposts || 0) > 0 ? 'cursor-pointer hover:underline' : ''}`} onClick={onRepostsModal}>{reel.reposts || '0'}</span>
+      </div>
+      <div className="flex flex-col items-center gap-1 pointer-events-none">
+        <Eye className={`${sz} text-white/70`} />
+        <span className="text-xs font-bold text-gray-400">{formatViewCount(reel.views || 0)}</span>
+      </div>
+      <div className="flex flex-col items-center gap-1 cursor-pointer group transition-all hover:scale-110 active:scale-90" onClick={onShare}>
+        <Send className={`${sz} text-white fill-transparent group-hover:text-primary transition-colors`} />
+        <span className="text-xs font-bold text-gray-200">{reel.shares}</span>
+      </div>
+      <div className="flex flex-col items-center gap-1 cursor-pointer group transition-all hover:scale-110 active:scale-90" onClick={onSave}>
+        <Bookmark className={`${sz} transition-all ${reel.savedByMe ? 'fill-white text-white' : 'text-white fill-transparent group-hover:text-yellow-300'}`} />
+        <span className="text-[10px] font-bold text-gray-300 mt-0.5 uppercase tracking-tight">{reel.savedByMe ? 'Saved' : 'Save'}</span>
+      </div>
+      <div className="cursor-pointer transition-all hover:scale-110 active:scale-90" onClick={onOptions}>
+        <MoreVertical className="w-6 h-6 text-white hover:text-gray-300 transition-colors" />
+      </div>
+      <div className="w-9 h-9 rounded-full bg-black/40 border-2 border-white/60 overflow-hidden animate-[spin_8s_linear_infinite] shadow-lg mt-1">
+        <img src={reel.authorAvatar || '/default-user-avatar.svg'} alt="audio" className="w-full h-full object-cover" />
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Empty State
+   ═══════════════════════════════════════════════════════════════════════ */
+function EmptyState({ onPost }: { onPost: (d: any) => void }) {
+  return (
+    <div className="flex flex-col items-center justify-center h-full text-center gap-4">
+      <p className="text-gray-400 text-lg">No reels found. Be the first to upload one!</p>
+      <CreatePostModal onPost={onPost} videoOnly>
+        <Button variant="outline" className="text-black bg-white hover:bg-gray-200 font-bold rounded-full border-none">
+          Upload Video
+        </Button>
+      </CreatePostModal>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Comments Modal
+   ═══════════════════════════════════════════════════════════════════════ */
+function CommentsModal({ open, onClose, comments, isLoading, commentText, setCommentText, onSubmit, session }: any) {
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="sm:max-w-[450px] w-full h-[70vh] sm:h-[600px] mt-auto sm:mt-0 mb-0 rounded-t-3xl sm:rounded-3xl bg-[#262626] border-gray-800 text-white p-0 flex flex-col overflow-hidden shadow-2xl">
+        <DialogHeader className="p-4 border-b border-gray-700/50 shrink-0 flex justify-center items-center relative">
+          <div className="absolute top-2 w-10 h-1 bg-gray-600 rounded-full sm:hidden" />
+          <DialogTitle className="text-center font-bold text-[15px] pt-2 sm:pt-0">Comments</DialogTitle>
+        </DialogHeader>
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {isLoading ? (
+            <div className="space-y-4 py-2">
+              {[1, 2, 3].map((n) => (
+                <div key={n} className="flex gap-3">
+                  <Skeleton className="w-9 h-9 rounded-full shrink-0 bg-zinc-800" />
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-center gap-2"><Skeleton className="h-3 w-20 rounded bg-zinc-800" /><Skeleton className="h-2.5 w-12 rounded bg-zinc-800" /></div>
+                    <Skeleton className="h-3.5 w-11/12 rounded bg-zinc-800" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : comments.length > 0 ? (
+            comments.map((comment: any, idx: number) => (
+              <div key={comment.id || idx} className="flex gap-3">
+                <Avatar className="w-9 h-9 shrink-0 border border-gray-700">
+                  <AvatarImage src={comment.author?.avatar || '/default-user-avatar.svg'} />
+                  <AvatarFallback>{comment.author?.name?.[0] || 'U'}</AvatarFallback>
+                </Avatar>
+                <div className="flex flex-col flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-[13px] text-gray-200">{comment.author?.username || comment.author?.name || 'User'}</span>
+                    <span className="text-[11px] text-gray-500">{comment.createdAt ? new Date(comment.createdAt).toLocaleDateString() : 'Just now'}</span>
+                  </div>
+                  <span className="text-[14px] text-gray-100 leading-snug mt-0.5">{comment.content}</span>
+                  <div className="flex gap-4 text-[12px] text-gray-500 font-medium mt-1.5">
+                    <span className="cursor-pointer hover:text-gray-300">Reply</span>
+                  </div>
+                </div>
+                <div className="flex flex-col items-center pt-2">
+                  <Heart className="w-3.5 h-3.5 text-gray-500 hover:text-red-500 cursor-pointer" />
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="text-center py-20 flex flex-col items-center gap-3">
+              <MessageCircle className="w-12 h-12 text-gray-600" />
+              <h3 className="font-bold text-lg text-gray-200">No comments yet</h3>
+              <p className="text-sm text-gray-500">Start the conversation.</p>
+            </div>
+          )}
+        </div>
+        <div className="p-3 border-t border-gray-700/50 bg-[#262626] shrink-0 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+          <div className="flex justify-between mb-3 px-1">
+            {['❤️', '🙌', '🔥', '👏', '😢', '😍', '😮', '😂'].map((emoji) => (
+              <button key={emoji} type="button" className="text-2xl hover:scale-110 transition-transform" onClick={() => setCommentText((p: string) => p + emoji)}>{emoji}</button>
+            ))}
+          </div>
+          <div className="flex items-center gap-3">
+            <Avatar className="w-8 h-8 shrink-0">
+              <AvatarImage src={session?.user?.image || '/default-user-avatar.svg'} />
+              <AvatarFallback>ME</AvatarFallback>
+            </Avatar>
+            <form onSubmit={onSubmit} className="flex-1 relative flex items-center border border-gray-600 rounded-full px-4 h-10">
+              <Input value={commentText} onChange={(e) => setCommentText(e.target.value)} placeholder="Join the conversation..." className="w-full bg-transparent border-none focus-visible:ring-0 px-0 text-[14px] placeholder:text-gray-400 h-full" autoComplete="off" />
+              {commentText.trim().length > 0 ? (
+                <button type="submit" className="text-primary font-bold text-[14px] ml-2 shrink-0">Post</button>
+              ) : (
+                <button type="button" className="text-gray-400 ml-2 shrink-0">GIF</button>
+              )}
+            </form>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Options Modal
+   ═══════════════════════════════════════════════════════════════════════ */
+function OptionsModal({ open, onClose, reel, session, setReels, hiddenReelIds, setHiddenReelIds, isMuted, setIsMuted, handleShare }: any) {
+  if (!reel) return null;
+  const isOwner = session?.user && ((session.user as any).id === reel.authorId || (session.user as any).username === reel.author);
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="sm:max-w-[400px] w-full mt-auto sm:mt-0 mb-0 rounded-t-3xl sm:rounded-3xl bg-[#262626] border-gray-800 text-white p-0 flex flex-col overflow-hidden shadow-2xl">
+        <div className="flex flex-col text-center divide-y divide-gray-700/50">
+          {isOwner ? (
+            <>
+              <div className="px-4 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wider bg-white/[0.02]">Reel Controls (Owner)</div>
+              <button onClick={async () => { const nc = window.prompt('Edit caption:', reel.caption); if (nc !== null) { const res = await editPostCaption(reel.id, nc); if (res.success) setReels((r: any[]) => r.map((x) => x.id === reel.id ? { ...x, caption: nc } : x)); } onClose(); }} className="py-4 text-white font-semibold hover:bg-white/5 w-full outline-none text-[15px]">Edit Reel</button>
+              {['hidden_from_others', 'hidden_from_public', 'only_me'].map((v) => (
+                <button key={v} onClick={async () => { const res = await updatePostVisibility(reel.id, v); if (res.success) setReels((r: any[]) => r.map((x) => x.id === reel.id ? { ...x, visibility: v } : x)); onClose(); }} className={`py-4 font-semibold hover:bg-white/5 w-full outline-none text-[15px] ${reel.visibility === v ? 'text-green-500 font-bold' : 'text-white'}`}>
+                  {v === 'hidden_from_others' ? 'Hide from Others' : v === 'hidden_from_public' ? 'Hide from Public' : 'Only Me'} {reel.visibility === v ? '✓' : ''}
+                </button>
+              ))}
+              {reel.visibility !== 'public' && <button onClick={async () => { const res = await updatePostVisibility(reel.id, 'public'); if (res.success) setReels((r: any[]) => r.map((x) => x.id === reel.id ? { ...x, visibility: 'public' } : x)); onClose(); }} className="py-4 text-white font-semibold hover:bg-white/5 w-full outline-none text-[15px]">Make Public</button>}
+              <button onClick={async () => { if (window.confirm('Delete this reel permanently?')) { const res = await deletePostPermanently(reel.id); if (res.success) setReels((r: any[]) => r.filter((x: any) => x.id !== reel.id)); } onClose(); }} className="py-4 text-red-500 font-bold hover:bg-white/5 w-full outline-none text-[15px]">Delete Permanently</button>
+              <button onClick={async () => { try { await navigator.clipboard.writeText(`${window.location.origin}/u/${reel.author}`); alert('Link copied!'); } catch {} onClose(); }} className="py-4 text-white font-semibold hover:bg-white/5 w-full outline-none text-[15px]">Copy Link</button>
+            </>
+          ) : (
+            <>
+              <button onClick={() => { setHiddenReelIds((p: string[]) => [...p, reel.id]); alert('Reported.'); onClose(); }} className="py-4 text-red-500 font-bold hover:bg-white/5 w-full outline-none text-[15px]">Report</button>
+              <button onClick={async () => { try { await navigator.clipboard.writeText(`${window.location.origin}/u/${reel.author}`); alert('Link copied!'); } catch {} onClose(); }} className="py-4 text-white font-semibold hover:bg-white/5 w-full outline-none text-[15px]">Copy Link</button>
+              <button onClick={() => { handleShare(reel); onClose(); }} className="py-4 text-white font-semibold hover:bg-white/5 w-full outline-none text-[15px]">Share To...</button>
+              <button onClick={() => { setHiddenReelIds((p: string[]) => [...p, reel.id]); alert('Noted.'); onClose(); }} className="py-4 text-white font-semibold hover:bg-white/5 w-full outline-none text-[15px]">Not Interested</button>
+            </>
+          )}
+          <button onClick={() => { setIsMuted((m: boolean) => !m); onClose(); }} className="py-4 text-white font-semibold hover:bg-white/5 w-full outline-none text-[15px]">{isMuted ? 'Unmute Audio' : 'Mute Audio'}</button>
+          <button onClick={onClose} className="py-4 text-gray-400 hover:bg-white/5 w-full outline-none text-[15px]">Cancel</button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}

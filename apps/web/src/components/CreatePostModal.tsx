@@ -1,0 +1,332 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Image as ImageIcon, Video, Paperclip, CheckCircle2, ShieldCheck, Globe, Trophy, X, Sparkles } from 'lucide-react';
+
+import { getSidebarData } from '@/actions/user';
+import { useSession } from 'next-auth/react';
+import { AIImageGeneratorModal } from '@/components/AIImageGeneratorModal';
+import { AIVideoGeneratorModal } from '@/components/AIVideoGeneratorModal';
+import { useUpload } from './UploadContext';
+
+export function CreatePostModal({ children, onPost, videoOnly = false, toleeId, toleeName, toleeSlug }: { children: React.ReactNode, onPost?: (post: any, postData?: any) => void, videoOnly?: boolean, toleeId?: string, toleeName?: string, toleeSlug?: string }) {
+  const { data: session } = useSession();
+  const [postType, setPostType] = useState('regular'); // regular, win
+  const [content, setContent] = useState('');
+  const [selectedTolees, setSelectedTolees] = useState<string[]>(toleeId ? [toleeId] : []);
+  const [mediaList, setMediaList] = useState<{ type: 'image' | 'video'; url: string; file?: File }[]>([]);
+  const [isOpen, setIsOpen] = useState(false);
+  const [aiModalOpen, setAiModalOpen] = useState(false);
+  const [videoModalOpen, setVideoModalOpen] = useState(false);
+  const [joinedTolees, setJoinedTolees] = useState<any[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { startUpload, task } = useUpload();
+
+  const isUploading = task.state === 'uploading' || task.state === 'processing';
+
+  const handleAIImageSelected = (url: string) => {
+    setMediaList(prev => [...prev, { type: 'image', url }]);
+  };
+
+  const handleAIVideoSelected = (url: string) => {
+    setMediaList(prev => [...prev, { type: 'video', url }]);
+  };
+
+  // Fetch joined Tolees from API
+  useEffect(() => {
+    if (isOpen) {
+      getSidebarData().then(res => {
+        if (res.success) {
+          const allTolees = [...(res.managedTolees || []), ...(res.joinedTolees || [])];
+          setJoinedTolees(allTolees);
+        }
+      });
+    }
+  }, [isOpen]);
+
+  const toggleTolee = (id: string) => {
+    setSelectedTolees(prev => 
+      prev.includes(id) ? prev.filter(tId => tId !== id) : [...prev, id]
+    );
+  };
+
+  const selectAll = () => {
+    if (selectedTolees.length === joinedTolees.length) {
+      setSelectedTolees([]);
+    } else {
+      setSelectedTolees(joinedTolees.map(t => t.id));
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      const newItems: typeof mediaList = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const url = URL.createObjectURL(file);
+        const fileType = file.type.startsWith('video/') ? 'video' : 'image';
+        newItems.push({ type: fileType, url, file });
+      }
+      setMediaList(prev => [...prev, ...newItems]);
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const triggerFileInput = (accept: string) => {
+    if (fileInputRef.current) {
+      fileInputRef.current.accept = accept;
+      fileInputRef.current.click();
+    }
+  };
+
+  const handlePost = async () => {
+    if (onPost && isPostReady) {
+      const firstSelectedTolee = joinedTolees.find(t => t.id === selectedTolees[0]);
+      
+      const postData = {
+        content,
+        postType,
+        toleeName: selectedTolees.length === 1 ? firstSelectedTolee?.name : `${selectedTolees.length} Tolees`,
+        toleeSlug: selectedTolees.length === 1 ? firstSelectedTolee?.slug : 'multiple',
+        selectedToleeIds: selectedTolees
+      };
+
+      // Start global upload & creation task
+      startUpload(
+        mediaList,
+        postData,
+        videoOnly ? 'reel' : 'feed',
+        onPost
+      );
+
+      // Instantly reset modal form and close it
+      setContent('');
+      setMediaList([]);
+      setSelectedTolees(toleeId ? [toleeId] : []);
+      setIsOpen(false);
+    }
+  };
+
+  const isPostReady = content.trim().length > 0 && selectedTolees.length > 0;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>
+        {children}
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[550px] p-0 bg-white dark:bg-[#121212] overflow-y-auto max-h-[90vh] rounded-2xl border-gray-200 dark:border-gray-800">
+
+        {/* Header */}
+        <DialogHeader className="p-4 border-b border-gray-100 dark:border-gray-800 flex flex-row items-center justify-between">
+          <DialogTitle className="text-xl font-bold">{videoOnly ? 'Upload Reel' : 'Create Post'}</DialogTitle>
+          {!videoOnly && (
+            <div className="flex bg-gray-100 dark:bg-gray-900 rounded-full p-1 border border-gray-200 dark:border-gray-800">
+              <button 
+                onClick={() => setPostType('regular')}
+                className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${postType === 'regular' ? 'bg-white dark:bg-black shadow-sm text-primary' : 'text-gray-500'}`}
+              >
+                Post
+              </button>
+              <button 
+                onClick={() => setPostType('win')}
+                className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all flex items-center gap-1 ${postType === 'win' ? 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-500 shadow-sm' : 'text-gray-500'}`}
+              >
+                <Trophy className="w-4 h-4" /> Win
+              </button>
+            </div>
+          )}
+        </DialogHeader>
+
+        {/* User Info */}
+        <div className="p-4 flex items-center gap-3">
+          <Avatar className="w-10 h-10">
+            <AvatarImage src={session?.user?.image || '/default-user-avatar.svg'} />
+            <AvatarFallback>{session?.user?.name?.[0] || 'ME'}</AvatarFallback>
+          </Avatar>
+          <div>
+            <h3 className="font-bold text-gray-900 dark:text-white">{session?.user?.name || 'Anonymous User'}</h3>
+            <span className="text-xs text-gray-500 flex items-center gap-1">
+              <Globe className="w-3 h-3" /> Visible to {selectedTolees.length} selected Tolees
+            </span>
+          </div>
+        </div>
+
+        {/* Text Area */}
+        <div className="px-4 pb-2">
+          <textarea
+            placeholder={postType === 'win' ? "Share your recent win with the community! 🚀" : "What do you want to share?"}
+            className="w-full min-h-[100px] bg-transparent border-none focus:ring-0 resize-none text-[17px] text-gray-900 dark:text-white placeholder:text-gray-400"
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+          ></textarea>
+        </div>
+
+        {/* Media Preview Grid */}
+        {mediaList.length > 0 && (
+          <div className="px-4 pb-4">
+            <label className="text-[11px] font-bold text-gray-500 dark:text-zinc-400 uppercase tracking-wider block mb-2">Attached Media ({mediaList.length})</label>
+            <div className="grid grid-cols-3 gap-2">
+              {mediaList.map((item, idx) => (
+                <div key={idx} className="relative aspect-square rounded-xl overflow-hidden bg-black border border-gray-200 dark:border-gray-800 group/thumb shadow-sm">
+                  <button 
+                    type="button"
+                    onClick={(e) => { 
+                      e.stopPropagation(); 
+                      setMediaList(prev => prev.filter((_, i) => i !== idx)); 
+                    }} 
+                    className="absolute top-1.5 right-1.5 z-10 bg-black/60 hover:bg-black/85 text-white rounded-full p-1 backdrop-blur-md transition-all duration-200 hover:scale-105 active:scale-90"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                  {item.type === 'image' ? (
+                    <img src={item.url} alt={`Preview ${idx}`} className="w-full h-full object-cover" />
+                  ) : (
+                    <video src={item.url} className="w-full h-full object-cover" muted playsInline />
+                  )}
+                  {/* Slide index number tag */}
+                  <div className="absolute bottom-1.5 left-1.5 bg-black/60 backdrop-blur-md rounded px-1.5 py-0.5 text-[9px] font-extrabold text-white">
+                    {idx + 1}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Attachments */}
+        <div className="px-4 py-2 border-t border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
+          <span className="text-sm font-medium text-gray-500">Add to your post</span>
+          <div className="flex gap-2 items-center">
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              onChange={handleFileChange} 
+              className="hidden" 
+              multiple
+            />
+            {!videoOnly && (
+              <>
+                <Button 
+                  type="button"
+                  onClick={() => setAiModalOpen(true)} 
+                  variant="ghost" 
+                  className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/40 rounded-xl h-9 px-2.5 font-bold text-xs flex items-center gap-1 border border-purple-200/60 dark:border-purple-800/50 bg-purple-50/30 dark:bg-purple-950/20 mr-1 shadow-sm transition-transform duration-200 hover:scale-[1.02]"
+                >
+                  <Sparkles className="w-3.5 h-3.5 fill-purple-600/10" />
+                  <span>Generate Image</span>
+                </Button>
+                {/* Commented out as requested by the user since stable/free video APIs are not available
+                <Button 
+                  type="button"
+                  onClick={() => setVideoModalOpen(true)} 
+                  variant="ghost" 
+                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-xl h-9 px-2.5 font-bold text-xs flex items-center gap-1 border border-blue-200/60 dark:border-blue-800/50 bg-blue-50/30 dark:bg-blue-950/20 mr-1 shadow-sm transition-transform duration-200 hover:scale-[1.02]"
+                >
+                  <Video className="w-3.5 h-3.5" />
+                  <span>Generate Video</span>
+                </Button>
+                */}
+              </>
+            )}
+            {!videoOnly && (
+              <Button onClick={() => triggerFileInput('image/*')} variant="ghost" size="icon" className="text-green-500 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-950 rounded-full h-10 w-10">
+                <ImageIcon className="w-6 h-6" />
+              </Button>
+            )}
+            <Button onClick={() => triggerFileInput('video/*')} variant="ghost" size="icon" className="text-blue-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-full h-10 w-10">
+              <Video className="w-6 h-6" />
+            </Button>
+            {!videoOnly && (
+              <Button onClick={() => triggerFileInput('*/*')} variant="ghost" size="icon" className="text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full h-10 w-10">
+                <Paperclip className="w-5 h-5" />
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Select Tolees Section (Point 9, 13) */}
+        <div className="p-4 bg-gray-50 dark:bg-[#1a1a1a]">
+          <div className="flex justify-between items-center mb-3">
+            <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300">
+              Post to these Tolees <span className="text-red-500">*</span>
+            </h4>
+            {joinedTolees.length > 0 && (
+              <button 
+                onClick={selectAll}
+                className="text-xs font-bold text-primary hover:underline"
+              >
+                {selectedTolees.length === joinedTolees.length ? 'Deselect All' : 'Select All'}
+              </button>
+            )}
+          </div>
+          
+          <div className="space-y-2 max-h-[160px] overflow-y-auto pr-2">
+            {joinedTolees.map((tolee) => (
+              <div 
+                key={tolee.id}
+                onClick={() => toggleTolee(tolee.id)}
+                className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${
+                  selectedTolees.includes(tolee.id) 
+                    ? 'border-primary bg-primary/5 dark:bg-primary/10' 
+                    : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-[#121212] hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-md bg-gray-200 dark:bg-gray-800 flex items-center justify-center font-bold text-xs">
+                    {tolee.name.charAt(0)}
+                  </div>
+                  <div>
+                    <h5 className="font-semibold text-sm">{tolee.name}</h5>
+                    {tolee.isPrivate && (
+                      <span className="text-[10px] text-gray-500 flex items-center gap-1 mt-0.5">
+                        <ShieldCheck className="w-3 h-3" /> Private Group
+                      </span>
+                    )}
+                  </div>
+                </div>
+                
+                {selectedTolees.includes(tolee.id) ? (
+                  <CheckCircle2 className="w-6 h-6 text-primary" />
+                ) : (
+                  <div className="w-6 h-6 rounded-full border-2 border-gray-300 dark:border-gray-700" />
+                )}
+              </div>
+            ))}
+          </div>
+          
+          {selectedTolees.length === 0 && (
+            <p className="text-xs text-red-500 mt-2 font-medium">Please select at least one Tolee.</p>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 bg-white dark:bg-[#121212] border-t border-gray-100 dark:border-gray-800">
+          <Button 
+            className="w-full h-12 text-base font-bold rounded-xl"
+            disabled={!isPostReady || isUploading}
+            onClick={handlePost}
+          >
+            {isUploading ? 'Posting...' : `Post to ${selectedTolees.length > 0 ? `${selectedTolees.length} Tolees` : 'Tolee'}`}
+          </Button>
+        </div>
+
+        {/* AI Modals */}
+        <AIImageGeneratorModal
+          isOpen={aiModalOpen}
+          setIsOpen={setAiModalOpen}
+          onSelectImage={handleAIImageSelected}
+        />
+        <AIVideoGeneratorModal
+          isOpen={videoModalOpen}
+          setIsOpen={setVideoModalOpen}
+          onSelectVideo={handleAIVideoSelected}
+        />
+      </DialogContent>
+    </Dialog>
+  );
+}

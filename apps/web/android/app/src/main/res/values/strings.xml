@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Tolee</string>
+    <string name="title_activity_main">Tolee</string>
+    <string name="package_name">in.tolee.app</string>
+    <string name="custom_url_scheme">in.tolee.app</string>
+    <!-- Google Sign-In OAuth Client ID (Web client type 3 — public by design, same as google-services.json) -->
+    <string name="google_oauth_client_id">968015582251-pd0rumj92ar9mm71mhgvhpns8jrvbq00.apps.googleusercontent.com</string>
+</resources>

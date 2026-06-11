@@ -1,0 +1,992 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id            String   @id @default(cuid())
+  username      String?  @unique
+  name          String
+  email         String   @unique
+  emailVerified DateTime?
+  passwordHash  String?
+  transferPin   String?
+  avatar        String?
+  avatarPublicId String?
+  image         String?  // NextAuth standard
+  bio           String?
+  website       String?
+  isVerified    Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  coverImage    String?
+  coverImagePublicId String?
+  location      String?
+  phone         String?  @unique
+  phoneVerified Boolean  @default(false)
+  isMobileVerified Boolean @default(false)
+  verificationStatus String? @default("pending")
+  subLocation   String?
+
+  accounts      Account[]
+  sessions      Session[]
+
+  // Gamification & Trust
+  totalPoints   Int      @default(0)
+  level         Int      @default(1)
+  trustScore    Int      @default(100)
+  blockedUntil  DateTime? // For AI 15 days block
+
+  // Super Admin Controls
+  isSuspended         Boolean  @default(false)
+  isBanned            Boolean  @default(false)
+  suspensionReason    String?
+  postingRestricted   Boolean  @default(false)
+  messagingRestricted Boolean  @default(false)
+  groupCreationRestricted Boolean @default(false)
+  commentRestricted   Boolean  @default(false)
+  reelsRestricted     Boolean  @default(false)
+  marketplaceRestricted Boolean @default(false)
+  restrictionExpiresAt DateTime?
+  lastLoginIp         String?
+  lastLoginAt         DateTime?
+  lastLoginDevice     String?
+
+  posts         Post[]
+  tolees        ToleeMember[]
+  ownedTolees   Tolee[]       @relation("ToleeOwner")
+  followers     Follow[]      @relation("Following")
+  following     Follow[]      @relation("Follower")
+  friends       Friendship[]  @relation("UserFriends")
+  friendOf      Friendship[]  @relation("UserFriendOf")
+  likes         Like[]
+  comments      Comment[]
+  notifications Notification[]
+  sentMessages  Message[]     @relation("Sender")
+  savedPosts    SavedPost[]
+  stories       Story[]
+  highlights    Highlight[]
+  reposts       Repost[]
+  views         View[]
+  
+  // New features
+  listings      Listing[]     @relation("Seller")
+  courseProgress LessonProgress[]
+  transactions  Transaction[]
+  auditLogs     AuditLog[]
+  searchHistory SearchHistory[]
+  searchClicks  SearchClickLog[]
+  worldProjects WorldProject[]
+  visitorSessions VisitorSession[]
+
+
+  pincode               String?
+  receivePromotions     Boolean           @default(true)
+  promotionalRestricted Boolean           @default(false)
+  shoots                ToleeShoot[]
+  mutedPromotions       PromotionalMute[] @relation("UserMuted")
+  blockedFromSending    PromotionalMute[] @relation("SenderMuted")
+
+  // Settings & Privacy Preferences
+  preferredLanguage     String            @default("English (US)")
+  isPrivate             Boolean           @default(false)
+  showActivityStatus    Boolean           @default(true)
+  searchEngineIndexable Boolean           @default(true)
+
+  // Notification Preferences
+  pushNotifications     Boolean           @default(true)
+  chatNotifications     Boolean           @default(true)
+  groupNotifications    Boolean           @default(true)
+  marketplaceNotifications Boolean        @default(true)
+  shootNotifications    Boolean           @default(true)
+  emailNotifications    Boolean           @default(true)
+
+  wallet        Wallet?
+  referralsMade Referral[] @relation("Referrer")
+  referralRecv  Referral?  @relation("Referee")
+  campaigns     Campaign[]
+  pushTokens    PushToken[]
+  lastActiveAt  DateTime           @default(now())
+  callsMade     Call[] @relation("CallCaller")
+  callsReceived Call[] @relation("CallReceiver")
+}
+
+model Tolee {
+  id              String   @id @default(cuid())
+  name            String
+  slug            String   @unique
+  description     String?
+  avatar          String?
+  avatarPublicId  String?
+  coverImage      String?
+  coverImagePublicId String?
+  isPrivate       Boolean  @default(false)
+  rules           String?
+  category        String?
+  location        String?
+  membershipQuestions String?
+  welcomeMessage  String?
+  
+  // Settings
+  pendingPostApproval Boolean @default(false)
+  broadcastMode   Boolean  @default(false)
+  
+  // Monetization
+  price           Float    @default(0) // 0 means free
+  paymentType     String   @default("free") // "free", "monthly", "yearly", "one-time"
+  
+  createdAt       DateTime @default(now())
+
+  ownerId         String
+  owner           User     @relation("ToleeOwner", fields: [ownerId], references: [id])
+  members         ToleeMember[]
+  posts           PostTolee[]
+  listings        ListingTolee[]
+  
+  // LMS
+  courses         Course[]
+  worldProjects   WorldProjectTolee[]
+}
+
+model ToleeMember {
+  id        String   @id @default(cuid())
+  role      String   @default("member") // "admin", "moderator", "member"
+  points    Int      @default(0) // Points earned specifically in this Tolee
+  status    String   @default("approved") // "pending", "approved", "rejected" - for private Tolee
+  joinedAt  DateTime @default(now())
+
+  // Subscription tracking
+  subscriptionStatus String @default("active") // "active", "past_due", "canceled"
+  validUntil         DateTime? 
+
+  // Notification settings
+  isMuted            Boolean  @default(false)
+  mutedUntil         DateTime?
+
+  userId    String
+  toleeId   String
+  user      User     @relation(fields: [userId], references: [id])
+  tolee     Tolee    @relation(fields: [toleeId], references: [id])
+
+  @@unique([userId, toleeId])
+}
+
+// ---------------------------------------------------------
+// FEED & POSTS ENGINE
+// ---------------------------------------------------------
+model Post {
+  id          String   @id @default(cuid())
+  caption     String?
+  mediaUrls   String?  // SQLite: comma-separated URLs
+  mediaTypes  String?  // SQLite: comma-separated types
+  mediaPublicIds String?
+  mediaResourceTypes String?
+  postType    String   @default("regular") // "regular", "poll", "event", "article", "win"
+  visibility  String   @default("public") // "public", "followers", "tolee_only"
+  shareCount  Int      @default(0)
+  location    String?
+  subLocation String?
+  
+  // AI Content Understanding (Future-ready)
+  ocrText         String?
+  audioTranscript String?
+  visualTags      String?
+  
+  // AI Moderation & Admin Control
+  status      String   @default("published") // "pending", "published", "rejected", "flagged_ai"
+  isArchived  Boolean  @default(false)
+  aiReport    String?  // details if flagged by AI
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  authorId    String
+  author      User     @relation(fields: [authorId], references: [id])
+
+  // CORE RULE: A post MUST have at least one Tolee
+  tolees      PostTolee[]
+  likes       Like[]
+  comments    Comment[]
+  savedBy     SavedPost[]
+  reposts     Repost[]
+  views       View[]
+  worldProjectId String?
+  worldProject   WorldProject? @relation(fields: [worldProjectId], references: [id], onDelete: Cascade)
+}
+
+model PostTolee {
+  postId    String
+  toleeId   String
+  isPinned  Boolean  @default(false)
+  
+  post      Post   @relation(fields: [postId], references: [id])
+  tolee     Tolee  @relation(fields: [toleeId], references: [id])
+
+  @@id([postId, toleeId])
+}
+
+// ---------------------------------------------------------
+// SKOOL MODULE: CLASSROOM / LMS
+// ---------------------------------------------------------
+model Course {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  thumbnail   String?
+  order       Int      @default(0)
+  isPublished Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  toleeId     String
+  tolee       Tolee    @relation(fields: [toleeId], references: [id])
+  
+  modules     Module[]
+}
+
+model Module {
+  id          String   @id @default(cuid())
+  title       String
+  order       Int      @default(0)
+  
+  courseId    String
+  course      Course   @relation(fields: [courseId], references: [id])
+  
+  lessons     Lesson[]
+}
+
+model Lesson {
+  id          String   @id @default(cuid())
+  title       String
+  content     String?  // Rich text or markdown
+  videoUrl    String?
+  order       Int      @default(0)
+  
+  // Drip content logic
+  unlockDays  Int      @default(0) // 0 means instantly unlocked
+  
+  moduleId    String
+  module      Module   @relation(fields: [moduleId], references: [id])
+  
+  progress    LessonProgress[]
+}
+
+model LessonProgress {
+  id          String   @id @default(cuid())
+  isCompleted Boolean  @default(false)
+  completedAt DateTime?
+
+  userId      String
+  lessonId    String
+  user        User     @relation(fields: [userId], references: [id])
+  lesson      Lesson   @relation(fields: [lessonId], references: [id])
+
+  @@unique([userId, lessonId])
+}
+
+// ---------------------------------------------------------
+// MARKETPLACE ENGINE (Local Buy/Sell)
+// ---------------------------------------------------------
+model Listing {
+  id               String   @id @default(cuid())
+  title            String
+  description      String
+  price            Float
+  currency         String   @default("INR")
+  images           String?  // Comma-separated URLs
+  imagePublicIds   String?
+  imageResourceTypes String?
+  category         String
+  condition        String?  // Optional since Jobs/Services don't have conditions
+  
+  // Advanced generic fields
+  availability     String?  // e.g. "In Stock", "Available Now"
+  tags             String?  // Search keywords
+  deliveryMethod   String?  // e.g. "Pickup Only", "Delivery Available"
+  contactPhone     String?
+  contactWhatsApp  String?
+  contactEmail     String?
+  
+  // AI Content Understanding (Future-ready)
+  visualTags       String?
+  
+  // DYNAMIC CATEGORY DATA
+  attributes       Json?    // e.g. { "propertyType": "Apartment", "bedrooms": 2, "make": "Honda" }
+  
+  locationText     String
+  latitude         Float?
+  longitude        Float?
+  
+  status           String   @default("active") // active, draft, sold, hidden
+  viewCount        Int      @default(0)
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  sellerId         String
+  seller           User     @relation("Seller", fields: [sellerId], references: [id])
+
+  tolees           ListingTolee[]
+}
+
+model ListingTolee {
+  listingId String
+  toleeId   String
+  listing   Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  tolee     Tolee   @relation(fields: [toleeId], references: [id], onDelete: Cascade)
+
+  @@id([listingId, toleeId])
+}
+
+// ---------------------------------------------------------
+// MONETIZATION / TRANSACTIONS
+// ---------------------------------------------------------
+model Transaction {
+  id            String   @id @default(cuid())
+  amount        Float
+  currency      String   @default("INR")
+  status        String   // "success", "failed", "pending"
+  paymentMethod String?
+  referenceId   String?  // Stripe/Razorpay payment ID
+  createdAt     DateTime @default(now())
+
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+}
+
+// ---------------------------------------------------------
+// SOCIAL & INTERACTIONS
+// ---------------------------------------------------------
+model Follow {
+  followerId  String
+  followingId String
+  status      String   @default("approved") // "pending" | "approved"
+  createdAt   DateTime @default(now())
+  follower    User @relation("Follower", fields: [followerId], references: [id])
+  following   User @relation("Following", fields: [followingId], references: [id])
+
+  @@id([followerId, followingId])
+}
+
+model Like {
+  userId    String
+  postId    String
+  createdAt DateTime @default(now())
+  user      User @relation(fields: [userId], references: [id])
+  post      Post @relation(fields: [postId], references: [id])
+
+  @@id([userId, postId])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  createdAt DateTime @default(now())
+  authorId  String
+  postId    String
+  parentId  String?  
+  author    User     @relation(fields: [authorId], references: [id])
+  post      Post     @relation(fields: [postId], references: [id])
+  replies   Comment[] @relation("Replies")
+  parent    Comment?  @relation("Replies", fields: [parentId], references: [id])
+}
+
+model Story {
+  id         String   @id @default(cuid())
+  mediaUrl   String
+  mediaType  String   
+  mediaPublicId String?
+  mediaResourceType String?
+  thumbnailUrl String?  // auto-generated thumbnail for videos (Cloudinary JPG)
+  expiresAt  DateTime 
+  createdAt  DateTime @default(now())
+  authorId   String
+  author     User     @relation(fields: [authorId], references: [id])
+  views      StoryView[]
+  highlights HighlightStory[]
+  caption      String?
+  overlays     String?  // JSON string containing draggable texts, stickers, brush coords, music, and filter name
+  closeFriends Boolean  @default(false)
+}
+
+model StoryView {
+  storyId   String
+  userId    String
+  viewedAt  DateTime @default(now())
+  story     Story @relation(fields: [storyId], references: [id])
+  @@id([storyId, userId])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  type      String   
+  message   String
+  isRead    Boolean  @default(false)
+  link      String?
+  createdAt DateTime @default(now())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model Message {
+  id          String   @id @default(cuid())
+  content     String
+  mediaUrl    String?
+  mediaPublicId String?
+  mediaResourceType String?
+  isRead      Boolean  @default(false)
+  isPromotion Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  senderId    String
+  chatId      String
+  sender      User     @relation("Sender", fields: [senderId], references: [id])
+  chat        Chat     @relation(fields: [chatId], references: [id])
+  shootId     String?
+  shoot       ToleeShoot? @relation(fields: [shootId], references: [id], onDelete: SetNull)
+  parentId    String?
+  parent      Message?    @relation("MessageReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies     Message[]   @relation("MessageReplies")
+
+  // Story Reply fields
+  storyId         String?
+  storyType       String?
+  storyThumbnail  String?
+  storyUploaderId String?
+  storyCreatedAt  DateTime?
+}
+
+model Chat {
+  id              String    @id @default(cuid())
+  isGroupChat     Boolean   @default(false)
+  isPromotion     Boolean   @default(false)
+  name            String?
+  createdAt       DateTime  @default(now())
+  status          String    @default("accepted") // "pending", "accepted", "declined"
+  requestSenderId String?
+  participants    ChatParticipant[]
+  messages        Message[]
+}
+
+model ChatParticipant {
+  chatId    String
+  userId    String
+  chat      Chat @relation(fields: [chatId], references: [id])
+  @@id([chatId, userId])
+}
+
+model SavedPost {
+  userId    String
+  postId    String
+  savedAt   DateTime @default(now())
+  user      User @relation(fields: [userId], references: [id])
+  post      Post @relation(fields: [postId], references: [id])
+
+  @@id([userId, postId])
+}
+
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?  @db.Text
+  access_token       String?  @db.Text
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?  @db.Text
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Repost {
+  userId    String
+  postId    String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+  post      Post     @relation(fields: [postId], references: [id])
+
+  @@id([userId, postId])
+}
+
+model View {
+  id                  String   @id @default(cuid())
+  contentId           String
+  contentType         String   // "post" or "reel"
+  
+  // Viewer identification
+  viewer_user_id      String?
+  device_fingerprint  String?
+  ip_address          String?
+  user_agent          String?
+  
+  // Unique Hash for DB-level constraint (e.g., "user_<id>" or "anon_<fingerprint>")
+  viewer_hash         String
+  
+  createdAt           DateTime @default(now())
+
+  user                User?    @relation(fields: [viewer_user_id], references: [id], onDelete: SetNull)
+  post                Post     @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  // Strictly enforce unique view per content per unique viewer
+  @@unique([contentId, viewer_hash])
+  
+  @@index([contentId])
+  @@index([viewer_user_id])
+  @@index([device_fingerprint])
+}
+
+model Friendship {
+  userId       String
+  friendUserId String
+  createdAt    DateTime @default(now())
+
+  user       User @relation("UserFriends", fields: [userId], references: [id], onDelete: Cascade)
+  friendUser User @relation("UserFriendOf", fields: [friendUserId], references: [id], onDelete: Cascade)
+
+  @@id([userId, friendUserId])
+  @@index([userId])
+  @@index([friendUserId])
+}
+
+// ---------------------------------------------------------
+// SUPER ADMIN MODELS
+// ---------------------------------------------------------
+
+model SuperAdminOTP {
+  id        String   @id @default(cuid())
+  email     String
+  otp       String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  attempts  Int      @default(0)
+  ipAddress String?
+  createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  action      String   // e.g. "block_user", "delete_post", "create_campaign"
+  target      String?  // The entity affected (userId, postId, etc.)
+  targetType  String?  // "user", "post", "tolee", "campaign"
+  details     String?  // JSON string with extra context
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+  adminId     String?
+  admin       User?    @relation(fields: [adminId], references: [id], onDelete: SetNull)
+}
+
+model AdCampaign {
+  id                String   @id @default(cuid())
+  name              String
+  type              String   @default("sponsored") // "sponsored" | "hidden_boost"
+  status            String   @default("active")    // "active" | "paused" | "ended"
+  contentId         String?  // Post/Reel/Listing ID to boost
+  contentType       String?  // "post" | "reel" | "listing"
+  customCaption     String?
+  customImageUrl    String?
+  targetGroups      String?  // JSON array of toleeIds
+  targetLocations   String?  // JSON array of location strings
+  impressionsPerUserPerDay Int @default(1)
+  totalImpressionsLimit    Int @default(10000)
+  currentImpressions       Int @default(0)
+  priorityLevel     Int      @default(1) // 1-10
+  startDate         DateTime @default(now())
+  endDate           DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model SecurityEvent {
+  id          String   @id @default(cuid())
+  type        String   // "failed_login" | "suspicious_ip" | "bot_detected" | "spam_post" | "xss_attempt" | "sql_injection"
+  severity    String   @default("low") // "low" | "medium" | "high" | "critical"
+  ipAddress   String?
+  userAgent   String?
+  endpoint    String?
+  details     String?
+  resolved    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
+
+model PhoneOTP {
+  id        String   @id @default(cuid())
+  phone     String
+  otp       String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+model SearchHistory {
+  id         String   @id @default(cuid())
+  userId     String
+  query      String
+  filters    String?
+  clickCount Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([query])
+}
+
+model SearchClickLog {
+  id          String   @id @default(cuid())
+  query       String
+  clickedId   String
+  clickedType String
+  userId      String?
+  createdAt   DateTime @default(now())
+  
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  @@index([query])
+  @@index([clickedType])
+}
+
+// ---------------------------------------------------------
+// TOLEE WORLD ECOSYSTEM MODELS
+// ---------------------------------------------------------
+
+model WorldProject {
+  id           String             @id @default(cuid())
+  type         String             // "WEBSITE" | "BLOG" | "RESTAURANT" | "STORE"
+  name         String
+  slug         String             @unique
+  description  String?
+  bannerImage  String?
+  content      Json               // JSON payload for websites, blogs, restaurants, stores
+  
+  locationText String?
+  latitude     Float?
+  longitude    Float?
+  seoTitle     String?
+  seoDesc      String?
+  seoKeywords  String?
+
+  status       String             @default("published") // "published" | "draft" | "hidden"
+  views        Int                @default(0)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  creatorId    String
+  creator      User               @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+
+  tolees       WorldProjectTolee[]
+  orders       RestaurantOrder[]
+  posts        Post[]
+}
+
+model WorldProjectTolee {
+  projectId String
+  toleeId   String
+  project   WorldProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tolee     Tolee        @relation(fields: [toleeId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, toleeId])
+}
+
+model RestaurantOrder {
+  id              String       @id @default(cuid())
+  projectId       String
+  project         WorldProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  customerName    String
+  customerContact String
+  orderDetails    String       // Stringified order items (JSON list or summary)
+  totalPrice      Float
+  status          String       @default("pending") // "pending" | "accepted" | "completed" | "cancelled"
+  createdAt       DateTime     @default(now())
+}
+
+model ToleeShoot {
+  id              String             @id @default(cuid())
+  senderId        String
+  sender          User               @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  title           String?
+  content         String
+  mediaUrl        String?
+  targetingType   String             // "GROUP" | "LOCATION" | "PINCODE"
+  targetGroups    String?            // JSON list of Tolee IDs
+  targetLocations String?            // JSON list of locations
+  targetPincodes  String?            // JSON list of pincodes
+  contentType     String             @default("TEXT") // "TEXT" | "PRODUCT" | "REEL" | "BLOG" | "RESTAURANT" | "STORE" | "MARKETPLACE"
+  contentId       String?            // ID of the listing, post, etc.
+  deliveredCount  Int                @default(0)
+  seenCount       Int                @default(0)
+  clickCount      Int                @default(0)
+  shareCount      Int                @default(0)
+  status          String             @default("sent") // "sending", "sent", "failed", "moderated"
+  createdAt       DateTime           @default(now())
+  
+  messages        Message[]
+  reports         ToleeShootReport[]
+}
+
+model ToleeShootReport {
+  id          String     @id @default(cuid())
+  shootId     String
+  shoot       ToleeShoot @relation(fields: [shootId], references: [id], onDelete: Cascade)
+  reporterId  String
+  reason      String
+  createdAt   DateTime   @default(now())
+
+  @@unique([shootId, reporterId])
+}
+
+model PromotionalMute {
+  id          String   @id @default(cuid())
+  userId      String
+  senderId    String
+  createdAt   DateTime @default(now())
+  user        User     @relation("UserMuted", fields: [userId], references: [id], onDelete: Cascade)
+  sender      User     @relation("SenderMuted", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, senderId])
+}
+
+// Singleton branding settings — always 1 row (id = "global")
+model SiteSettings {
+  id                  String   @id @default("global")
+  siteName            String   @default("tolee")
+  tagline             String   @default("Connect. Share. Discover.")
+  headerLogoUrl       String?
+  faviconUrl          String?
+  mobileLogoUrl       String?
+  splashScreenLogoUrl String?
+  activeCloudinaryIndex Int    @default(0)
+  updatedAt           DateTime @updatedAt
+}
+
+// 1. Digital Wallet System
+model Wallet {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  balance      Float    @default(2500.0) // Non-withdrawable promotional credit
+  totalEarned  Float    @default(2500.0)
+  totalSpent   Float    @default(0.0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  transactions WalletTransaction[]
+}
+
+model WalletTransaction {
+  id          String   @id @default(cuid())
+  walletId    String
+  wallet      Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  amount      Float    // negative for spend, positive for reward
+  type        String   // "welcome", "referral", "spend"
+  description String?
+  campaignId  String?  // Optional campaign ID reference
+  createdAt   DateTime @default(now())
+}
+
+// 2. Referral System
+model Referral {
+  id            String   @id @default(cuid())
+  referrerId    String
+  referrer      User     @relation("Referrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  refereeId     String   @unique
+  referee       User     @relation("Referee", fields: [refereeId], references: [id], onDelete: Cascade)
+  rewardAmount  Float    @default(500.0)
+  status        String   @default("completed")
+  createdAt     DateTime @default(now())
+}
+
+// 3. Campaign & Ads Structure (Campaign -> AdSet -> Ad)
+model Campaign {
+  id                String   @id @default(cuid())
+  name              String
+  objective         String   // "awareness", "traffic", "engagement", "leads", "app_promotion", "sales"
+  specialAdCategory String?  @default("none")
+  buyingType        String   @default("auction")
+  cboEnabled        Boolean  @default(false) // Campaign Budget Optimization
+  abTestingEnabled  Boolean  @default(false)
+  status            String   @default("pending") // "pending", "approved", "rejected", "running", "paused", "completed"
+  rejectionReason   String?
+  type              String   @default("manual") // "manual" | "boost"
+  
+  // Quick Boost references
+  postBoostId       String?  
+  reelBoostId       String?  
+  listingBoostId    String?  
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  adSets            AdSet[]
+}
+
+model AdSet {
+  id                    String   @id @default(cuid())
+  campaignId            String
+  campaign              Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  name                  String
+  conversionLocation    String?  // "website", "app", "messenger", "whatsapp", "calls"
+  performanceGoal       String?  // "impressions", "link_clicks", "leads"
+  pixelSelection        String?
+  conversionEvent       String?
+  budgetType            String   @default("daily") // "daily" | "lifetime"
+  budgetAmount          Float
+  startDate             DateTime @default(now())
+  endDate               DateTime?
+  
+  // Audience Targeting
+  targetingCountries    String?  // comma-separated
+  targetingStates       String?
+  targetingCities       String?
+  targetingPincodes     String?
+  targetingToleeIds     String?  // comma-separated tolee group targeting
+  targetingInterests    String?  // comma-separated
+  targetingBehaviors    String?
+  targetingDemographics String?
+  targetingFollowers    Boolean  @default(false)
+  targetingEngagedUsers Boolean  @default(false)
+  
+  placements            String?  // comma-separated: feed, reels, stories, marketplace, discover, chats
+  ads                   Ad[]
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+model Ad {
+  id             String   @id @default(cuid())
+  adSetId        String
+  adSet          AdSet    @relation(fields: [adSetId], references: [id], onDelete: Cascade)
+  name           String
+  format         String   // "single_image", "single_video", "carousel", "collection"
+  mediaUrls      String   // comma-separated image/video URLs
+  primaryText    String?
+  headline       String?
+  description    String?
+  ctaButton      String?  // "learn_more", "send_message", "book_now", "apply_now", "contact_us", "whatsapp", "call_now"
+  destinationUrl String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  analytics      AdAnalytics[]
+}
+
+model AdAnalytics {
+  id           String   @id @default(cuid())
+  adId         String
+  ad           Ad       @relation(fields: [adId], references: [id], onDelete: Cascade)
+  type         String   // "impression", "click", "lead", "watch_time"
+  costDeducted Float    // dynamically calculated debit amount
+  ipAddress    String?
+  userId       String?  // track who clicked (prevents fake clicks/fraud)
+  watchTime    Int?     // duration for video creatives
+  createdAt    DateTime @default(now())
+}
+
+model PushToken {
+  id         String   @id @default(cuid())
+  token      String   @unique
+  deviceType String   // "android" | "ios"
+  createdAt  DateTime @default(now())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Call {
+  id          String   @id @default(cuid())
+  callerId    String
+  receiverId  String
+  type        String   // "audio" | "video"
+  status      String   // "connected" | "missed" | "declined" | "busy"
+  duration    Int      @default(0) // call duration in seconds
+  createdAt   DateTime @default(now())
+
+  caller      User     @relation("CallCaller", fields: [callerId], references: [id], onDelete: Cascade)
+  receiver    User     @relation("CallReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+}
+
+model ContactQuery {
+  id          String   @id @default(cuid())
+  name        String
+  number      String
+  emailId     String
+  optionType  String   // "Complaint", "Query", "Career"
+  message     String   @db.Text
+  createdAt   DateTime @default(now())
+}
+
+model VisitorSession {
+  id           String           @id @default(cuid())
+  sessionId    String           @unique // Stored in client cookie
+  userId       String?          // Null for non-logged-in visitors, set once they log in
+  user         User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ipAddress    String
+  userAgent    String
+  device       String           // "Desktop" | "Mobile" | "Tablet"
+  os           String           // "Windows" | "iOS" | "Android" | "macOS" | "Linux"
+  browser      String           // "Chrome" | "Safari" | "Firefox" | "Edge"
+  country      String           @default("India")
+  state        String           @default("Maharashtra")
+  city         String           @default("Mumbai")
+  referrer     String           // e.g. "Google Search", "Instagram", "Direct"
+  utmSource    String?
+  utmMedium    String?
+  utmCampaign  String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  events       AnalyticsEvent[]
+}
+
+model AnalyticsEvent {
+  id         String         @id @default(cuid())
+  sessionId  String
+  session    VisitorSession @relation(fields: [sessionId], references: [sessionId], onDelete: Cascade)
+  eventType  String         // "page_view" | "signup" | "login" | "engagement"
+  path       String         // e.g., "/feed", "/marketplace"
+  details    String         @db.Text // JSON metadata of the event
+  createdAt  DateTime       @default(now())
+}
+
+model Highlight {
+  id        String           @id @default(cuid())
+  name      String
+  coverUrl  String?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stories   HighlightStory[]
+}
+
+model HighlightStory {
+  id          String    @id @default(cuid())
+  highlightId String
+  storyId     String
+  createdAt   DateTime  @default(now())
+  highlight   Highlight @relation(fields: [highlightId], references: [id], onDelete: Cascade)
+  story       Story     @relation(fields: [storyId], references: [id], onDelete: Cascade)
+
+  @@unique([highlightId, storyId])
+}
