@@ -95,7 +95,7 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
       .catch(() => {});
   }, []);
 
-  const isReels = pathname === '/reels';
+  const isReels = pathname === '/reels' || pathname?.endsWith('/reels');
   const [scrolled, setScrolled] = React.useState(false);
 
   React.useEffect(() => {

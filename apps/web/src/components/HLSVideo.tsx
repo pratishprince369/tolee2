@@ -29,9 +29,9 @@ export function setGlobalActiveVideo(video: HTMLVideoElement | null) {
 const SOUND_PREF_KEY = 'tolee_sound_pref';
 
 export function getSoundPreference(): boolean {
-  if (typeof window === 'undefined') return false; // Default to muted (true) on SSR
+  if (typeof window === 'undefined') return true; // Default to muted (true) on SSR
   const pref = localStorage.getItem(SOUND_PREF_KEY);
-  // Default to unmuted (sound on, i.e., muted = false) if not set or if set to 'unmuted'
+  if (pref === null) return true; // Default to muted (true) if not set
   return pref === 'muted';
 }
 
@@ -106,7 +106,13 @@ export function HLSVideo({
           setGlobalActiveVideo(video);
         }
         video.play().catch((e) => {
-          if (e.name !== 'AbortError') console.log('[HLSVideo] play blocked:', e.message);
+          if (e.name !== 'AbortError') {
+            console.log('[HLSVideo] play blocked:', e.message);
+            if (!video.muted) {
+              video.muted = true;
+              video.play().catch((err) => console.log('[HLSVideo] play failed after muting:', err.message));
+            }
+          }
         });
       }
     };
@@ -134,7 +140,9 @@ export function HLSVideo({
       video.addEventListener('loadedmetadata', onReady, { once: true });
     } else {
       // Standard mp4 / webm
-      video.src = src;
+      const isMp4 = src.toLowerCase().includes('.mp4') || src.toLowerCase().includes('video') || src.toLowerCase().includes('.mov') || src.toLowerCase().includes('.webm');
+      const finalSrc = isMp4 && !src.includes('#t=') ? `${src}#t=0.001` : src;
+      video.src = finalSrc;
       // canplay is fired earlier than loadeddata and is sufficient for play
       video.addEventListener('canplay', onReady, { once: true });
     }
@@ -165,7 +173,13 @@ export function HLSVideo({
           video.volume = 1.0;
         }
         video.play().catch((e) => {
-          if (e.name !== 'AbortError') console.log('[HLSVideo] play blocked:', e.message);
+          if (e.name !== 'AbortError') {
+            console.log('[HLSVideo] play blocked:', e.message);
+            if (!video.muted) {
+              video.muted = true;
+              video.play().catch((err) => console.log('[HLSVideo] play failed after muting:', err.message));
+            }
+          }
         });
       }
       // If not loaded yet, Effect 1's onReady will handle it via isActiveRef

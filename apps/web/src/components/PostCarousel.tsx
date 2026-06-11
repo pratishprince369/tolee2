@@ -2,7 +2,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Volume2, VolumeX, Play } from 'lucide-react';
-import Hls from 'hls.js';
 import {
   setGlobalActiveVideo,
   getGlobalActiveVideo,
@@ -24,14 +23,10 @@ interface CarouselVideoProps {
 
 function CarouselVideo({ src, isActive }: CarouselVideoProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const hlsRef = useRef<Hls | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isMuted, setIsMuted] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
-  const [isLoaded, setIsLoaded] = useState(false);
-
-  const isHLS = src.endsWith('.m3u8') || src.includes('/sp_hd/m3u8/');
 
   // Viewport detection: Visible >= 50% -> Auto Play, Hidden < 25% -> Auto Pause
   useEffect(() => {
@@ -58,59 +53,6 @@ function CarouselVideo({ src, isActive }: CarouselVideoProps) {
       observer.disconnect();
     };
   }, []);
-
-  // EFFECT: Load video source (HLS or MP4)
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video || !src) return;
-
-    setIsLoaded(false);
-
-    const teardown = () => {
-      setIsLoaded(false);
-      if (hlsRef.current) {
-        hlsRef.current.destroy();
-        hlsRef.current = null;
-      }
-      video.pause();
-      video.removeAttribute('src');
-      try { video.load(); } catch {}
-    };
-
-    const onReady = () => {
-      setIsLoaded(true);
-    };
-
-    if (isHLS && Hls.isSupported()) {
-      const hls = new Hls({
-        capLevelToPlayerSize: true,
-        maxBufferLength: 10,
-        maxMaxBufferLength: 15,
-      });
-      hlsRef.current = hls;
-      hls.loadSource(src);
-      hls.attachMedia(video);
-      hls.once(Hls.Events.MANIFEST_PARSED, onReady);
-    } else if (isHLS && video.canPlayType('application/vnd.apple.mpegurl')) {
-      // Safari native HLS
-      video.src = src;
-      if (video.readyState >= 1) {
-        onReady();
-      } else {
-        video.addEventListener('loadedmetadata', onReady, { once: true });
-      }
-    } else {
-      // Standard MP4/WebM
-      video.src = src.endsWith('.mp4') && !src.includes('#t=') ? `${src}#t=0.001` : src;
-      if (video.readyState >= 2) {
-        onReady();
-      } else {
-        video.addEventListener('canplay', onReady, { once: true });
-      }
-    }
-
-    return teardown;
-  }, [src, isHLS]);
 
   // Sync isPlaying state with actual DOM video play/pause events
   useEffect(() => {
@@ -157,11 +99,21 @@ function CarouselVideo({ src, isActive }: CarouselVideoProps) {
     const video = videoRef.current;
     if (!video) return;
 
-    if (isActive && isVisible && (isLoaded || video.readyState >= 2)) {
+    if (isActive && isVisible) {
       setGlobalActiveVideo(video);
       video.muted = getSoundPreference();
       video.play().catch((e) => {
-        if (e.name !== 'AbortError') console.log('[CarouselVideo] play blocked:', e.message);
+        if (e.name !== 'AbortError') {
+          console.log('[CarouselVideo] play blocked:', e.message);
+          if (!video.muted) {
+            video.muted = true;
+            setIsMuted(true);
+            setSoundPreference(true);
+            video.play().catch((err) => {
+              console.error('[CarouselVideo] play failed even after muting:', err.message);
+            });
+          }
+        }
       });
     } else {
       video.pause();
@@ -169,7 +121,7 @@ function CarouselVideo({ src, isActive }: CarouselVideoProps) {
         setGlobalActiveVideo(null);
       }
     }
-  }, [isActive, isVisible, isLoaded, src]);
+  }, [isActive, isVisible, src]);
 
   // Clean up on unmount
   useEffect(() => {
@@ -211,6 +163,7 @@ function CarouselVideo({ src, isActive }: CarouselVideoProps) {
     <div ref={containerRef} className="relative w-full h-full bg-black flex items-center justify-center cursor-pointer" onClick={togglePlay}>
       <video
         ref={videoRef}
+        src={(src.toLowerCase().includes('.mp4') || src.toLowerCase().includes('video') || src.toLowerCase().includes('.mov') || src.toLowerCase().includes('.webm')) && !src.includes('#t=') ? `${src}#t=0.001` : src}
         className="w-full h-full object-contain"
         loop
         muted={isMuted}
@@ -247,7 +200,7 @@ export function PostCarousel({ mediaUrls, mediaTypes, postId }: PostCarouselProp
   
   const items = urls.map((url, idx) => ({
     url,
-    type: rawTypes[idx] || (url.includes('.mp4') || url.includes('.m3u8') || url.includes('/video/') || url.includes('video') ? 'video' : 'image')
+    type: rawTypes[idx] || (url.includes('.mp4') || url.includes('video') ? 'video' : 'image')
   }));
 
   if (items.length === 0) return null;

@@ -141,7 +141,9 @@ export function AutoplayVideo({ src, postId, className, ...props }: AutoplayVide
       video.src = src;
       video.addEventListener('loadedmetadata', onReady, { once: true });
     } else {
-      video.src = src;
+      const isMp4 = src.toLowerCase().includes('.mp4') || src.toLowerCase().includes('video') || src.toLowerCase().includes('.mov') || src.toLowerCase().includes('.webm');
+      const finalSrc = isMp4 && !src.includes('#t=') ? `${src}#t=0.001` : src;
+      video.src = finalSrc;
       video.addEventListener('canplay', onReady, { once: true });
     }
 
@@ -163,7 +165,16 @@ export function AutoplayVideo({ src, postId, className, ...props }: AutoplayVide
         video.play().then(() => {
           setIsPlaying(true);
         }).catch((e) => {
-          if (e.name !== 'AbortError') console.log('[AutoplayVideo] play blocked:', e.message);
+          if (e.name !== 'AbortError') {
+            console.log('[AutoplayVideo] play blocked:', e.message);
+            if (!video.muted) {
+              video.muted = true;
+              setIsMuted(true);
+              video.play().then(() => {
+                setIsPlaying(true);
+              }).catch((err) => console.log('[AutoplayVideo] play failed after muting:', err.message));
+            }
+          }
         });
       }
     };
