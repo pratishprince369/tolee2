@@ -29,7 +29,7 @@ function CarouselVideo({ src, isActive }: CarouselVideoProps) {
   const [isMuted, setIsMuted] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
-  const isLoadedRef = useRef(false);
+  const [isLoaded, setIsLoaded] = useState(false);
 
   const isHLS = src.endsWith('.m3u8') || src.includes('/sp_hd/m3u8/');
 
@@ -64,10 +64,10 @@ function CarouselVideo({ src, isActive }: CarouselVideoProps) {
     const video = videoRef.current;
     if (!video || !src) return;
 
-    isLoadedRef.current = false;
+    setIsLoaded(false);
 
     const teardown = () => {
-      isLoadedRef.current = false;
+      setIsLoaded(false);
       if (hlsRef.current) {
         hlsRef.current.destroy();
         hlsRef.current = null;
@@ -78,7 +78,7 @@ function CarouselVideo({ src, isActive }: CarouselVideoProps) {
     };
 
     const onReady = () => {
-      isLoadedRef.current = true;
+      setIsLoaded(true);
     };
 
     if (isHLS && Hls.isSupported()) {
@@ -94,11 +94,19 @@ function CarouselVideo({ src, isActive }: CarouselVideoProps) {
     } else if (isHLS && video.canPlayType('application/vnd.apple.mpegurl')) {
       // Safari native HLS
       video.src = src;
-      video.addEventListener('loadedmetadata', onReady, { once: true });
+      if (video.readyState >= 1) {
+        onReady();
+      } else {
+        video.addEventListener('loadedmetadata', onReady, { once: true });
+      }
     } else {
       // Standard MP4/WebM
       video.src = src.endsWith('.mp4') && !src.includes('#t=') ? `${src}#t=0.001` : src;
-      video.addEventListener('canplay', onReady, { once: true });
+      if (video.readyState >= 2) {
+        onReady();
+      } else {
+        video.addEventListener('canplay', onReady, { once: true });
+      }
     }
 
     return teardown;
@@ -149,7 +157,7 @@ function CarouselVideo({ src, isActive }: CarouselVideoProps) {
     const video = videoRef.current;
     if (!video) return;
 
-    if (isActive && isVisible && (isLoadedRef.current || video.readyState >= 2)) {
+    if (isActive && isVisible && (isLoaded || video.readyState >= 2)) {
       setGlobalActiveVideo(video);
       video.muted = getSoundPreference();
       video.play().catch((e) => {
@@ -161,7 +169,7 @@ function CarouselVideo({ src, isActive }: CarouselVideoProps) {
         setGlobalActiveVideo(null);
       }
     }
-  }, [isActive, isVisible, src]);
+  }, [isActive, isVisible, isLoaded, src]);
 
   // Clean up on unmount
   useEffect(() => {
