@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import Hls from 'hls.js';
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -48,14 +48,19 @@ interface HLSVideoProps extends React.VideoHTMLAttributes<HTMLVideoElement> {
   ignoreGlobalActive?: boolean;
 }
 
-export function HLSVideo({
-  src,
-  isActive = true,
-  shouldLoad = true,
-  ignoreGlobalActive = false,
-  ...props
-}: HLSVideoProps) {
-  const videoRef = useRef<HTMLVideoElement>(null);
+export const HLSVideo = forwardRef<HTMLVideoElement, HLSVideoProps>(
+  (
+    {
+      src,
+      isActive = true,
+      shouldLoad = true,
+      ignoreGlobalActive = false,
+      ...props
+    },
+    ref
+  ) => {
+    const videoRef = useRef<HTMLVideoElement>(null);
+    useImperativeHandle(ref, () => videoRef.current as HTMLVideoElement);
   const hlsRef = useRef<Hls | null>(null);
   // Track whether video is currently "loaded" (src attached & ready)
   const loadedRef = useRef(false);
@@ -247,4 +252,7 @@ export function HLSVideo({
   }, [props.muted]);
 
   return <video ref={videoRef} {...props} />;
-}
+  }
+);
+
+HLSVideo.displayName = 'HLSVideo';

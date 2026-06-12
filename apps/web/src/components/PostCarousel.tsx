@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Volume2, VolumeX, Play } from 'lucide-react';
 import {
+  HLSVideo,
   setGlobalActiveVideo,
   getGlobalActiveVideo,
   getSoundPreference,
@@ -168,9 +169,11 @@ function CarouselVideo({ src, isActive }: CarouselVideoProps) {
 
   return (
     <div ref={containerRef} className="relative w-full h-full bg-black flex items-center justify-center cursor-pointer" onClick={togglePlay}>
-      <video
+      <HLSVideo
         ref={videoRef}
-        src={(src.toLowerCase().includes('.mp4') || src.toLowerCase().includes('video') || src.toLowerCase().includes('.mov') || src.toLowerCase().includes('.webm')) && !src.includes('#t=') ? `${src}#t=0.001` : src}
+        src={src}
+        isActive={isActive && isVisible}
+        shouldLoad={isVisible}
         className="w-full h-full object-contain"
         loop
         muted={isMuted}
