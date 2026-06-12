@@ -167,7 +167,7 @@ export function HLSVideo({
       }
 
       // STEP 2: Play this video if it has loaded
-      if (loadedRef.current || video.readyState >= 2) {
+      if (loadedRef.current || video.readyState >= 1) {
         video.muted = !!props.muted;
         if (!props.muted) {
           video.volume = 1.0;

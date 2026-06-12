@@ -105,7 +105,7 @@ function CarouselVideo({ src, isActive }: CarouselVideoProps) {
     if (!video) return;
 
     if (isActive && isVisible) {
-      if (isReady || video.readyState >= 2) {
+      if (isReady || video.readyState >= 1) {
         setGlobalActiveVideo(video);
         video.muted = getSoundPreference();
         video.play().catch((e) => {

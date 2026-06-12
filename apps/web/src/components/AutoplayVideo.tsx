@@ -161,7 +161,7 @@ export function AutoplayVideo({ src, postId, className, ...props }: AutoplayVide
     // Define standard play/pause handlers for this instance
     const playInstance = () => {
       if (manuallyPausedRef.current) return; // Do not auto-play if manually paused
-      if (isLoadedRef.current || video.readyState >= 2) {
+      if (isLoadedRef.current || video.readyState >= 1) {
         video.play().then(() => {
           setIsPlaying(true);
         }).catch((e) => {
