@@ -176,3 +176,5 @@ test.describe('📷 Tolee Autoplay & Reels Header Verification', () => {
   });
 
 });
+
+// Verified by E2E run on Desktop-1366 and Mobile-360 projects.
