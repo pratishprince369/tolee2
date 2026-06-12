@@ -39,7 +39,7 @@ test.describe('📸 Generate Store Listing Screenshots', () => {
 
     // SCREENSHOT 3: User Profile page
     console.log('Navigating to User Profile...');
-    await page.goto('/u/qatest', { waitUntil: 'domcontentloaded' });
+    await page.goto('/u/me', { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(3000);
     
     // Scroll profile slightly to show grid posts

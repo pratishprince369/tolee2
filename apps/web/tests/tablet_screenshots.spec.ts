@@ -62,7 +62,7 @@ test.describe('📸 Generate 10-Inch Tablet Screenshots (16:9 Aspect Ratio)', ()
 
     // SCREENSHOT 5: Profile Page
     console.log('Navigating to Profile...');
-    await page.goto('/u/qatest', { waitUntil: 'domcontentloaded' });
+    await page.goto('/u/me', { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(4000);
     await page.screenshot({ 
       path: 'C:/Users/ASUS/Desktop/miracle/tolee/tablet_5_profile.png',
