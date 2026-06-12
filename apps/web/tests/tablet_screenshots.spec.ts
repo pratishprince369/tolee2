@@ -4,6 +4,15 @@ import { loginViaUI } from './helpers';
 test.describe('📸 Generate 10-Inch Tablet Screenshots (16:9 Aspect Ratio)', () => {
 
   test('Capture Tablet Screens in 16:9 Aspect Ratio', async ({ page }) => {
+    test.setTimeout(180000);
+    // Collect console logs
+    page.on('console', msg => {
+      console.log(`[Browser Console] [${msg.type()}] ${msg.text()}`);
+    });
+    page.on('pageerror', err => {
+      console.error('[Browser PageError]', err.message);
+    });
+
     // Set viewport to high-res 16:9 tablet aspect ratio (1920x1080)
     await page.setViewportSize({ width: 1920, height: 1080 });
 
@@ -63,7 +72,7 @@ test.describe('📸 Generate 10-Inch Tablet Screenshots (16:9 Aspect Ratio)', ()
 
     // SCREENSHOT 6: Tolee Group Page
     console.log('Navigating to Tolee Group...');
-    await page.goto('/t/qa-test-tolee', { waitUntil: 'domcontentloaded' });
+    await page.goto('/t/tech-titans', { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(4000);
     await page.screenshot({ 
       path: 'C:/Users/ASUS/Desktop/miracle/tolee/tablet_6_group.png',

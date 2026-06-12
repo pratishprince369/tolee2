@@ -21,7 +21,7 @@ export default async function ToleePage({ params }: { params: { slug: string } }
   let dbTolee = res.tolee;
   
   // Demo Mode for landing page links
-  if (!dbTolee && ['tech-titans', 'music-soul', 'artist-hub'].includes(params.slug)) {
+  if (!dbTolee && ['tech-titans', 'music-soul', 'artist-hub', 'qa-test-tolee'].includes(params.slug)) {
     dbTolee = {
       id: 'demo-' + params.slug,
       name: params.slug.split('-').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' '),
