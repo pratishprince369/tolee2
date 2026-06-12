@@ -108,7 +108,7 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
   }, []);
 
   return (
-    <div className={cn("fixed top-0 left-0 right-0 z-50 w-full flex flex-col transition-all duration-300", isReels && "hidden lg:flex dark")}>
+    <div className={cn("fixed top-0 left-0 right-0 z-50 w-full flex flex-col transition-all duration-300", isReels && "hidden lg:flex")}>
       <GlobalUploadProgress
         task={task}
         retryUpload={retryUpload}
@@ -122,14 +122,10 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
       )}
       <header className={cn(
         "w-full h-16 flex items-center justify-between px-3 sm:px-4 lg:px-6 gap-2 sm:gap-4 select-none transition-all duration-300 border-b",
-        isReels
-          ? "bg-black/95 text-white border-zinc-900/50 shadow-md shadow-black/40"
-          : cn(
-              "bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md",
-              scrolled
-                ? "border-zinc-200/80 dark:border-zinc-800/80 shadow-md shadow-zinc-100/10 dark:shadow-black/25"
-                : "border-zinc-100 dark:border-zinc-900 shadow-none"
-            )
+        "bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md",
+        scrolled
+          ? "border-zinc-200/80 dark:border-zinc-800/80 shadow-md shadow-zinc-100/10 dark:shadow-black/25"
+          : "border-zinc-100 dark:border-zinc-900 shadow-none"
       )}>
       
       {/* Left: Compact Logo */}
