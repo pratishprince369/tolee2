@@ -14,8 +14,12 @@ export async function POST(req: Request) {
     const cleanEmail = email.toLowerCase().trim();
     const cleanName = name.toLowerCase().trim();
     const prefix = cleanEmail.split('@')[0] || '';
-    const botKeywords = ['bot', 'temp', 'fake', 'spam', 'qa-', 'qa_', 'test-', 'test_'];
-    const namePatterns = ['blocked user', 'forgot password user', 'e2e otp user', 'otp user'];
+    const botKeywords = process.env.NODE_ENV === 'production'
+      ? ['bot', 'temp', 'fake', 'spam', 'qa-', 'qa_', 'test-', 'test_']
+      : ['bot', 'temp', 'fake', 'spam'];
+    const namePatterns = process.env.NODE_ENV === 'production'
+      ? ['blocked user', 'forgot password user', 'e2e otp user', 'otp user']
+      : [];
 
     if (
       botKeywords.some(k => prefix.includes(k) || cleanName.includes(k)) ||

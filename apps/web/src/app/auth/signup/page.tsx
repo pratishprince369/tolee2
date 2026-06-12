@@ -20,8 +20,12 @@ function SignupForm() {
     const cleanEmail = updatedEmail.toLowerCase().trim();
     const cleanName = updatedName.toLowerCase().trim();
     const prefix = cleanEmail.split('@')[0] || '';
-    const botKeywords = ['bot', 'temp', 'fake', 'spam', 'qa-', 'qa_', 'test-', 'test_'];
-    const namePatterns = ['blocked user', 'forgot password user', 'e2e otp user', 'otp user'];
+    const botKeywords = process.env.NODE_ENV === 'production'
+      ? ['bot', 'temp', 'fake', 'spam', 'qa-', 'qa_', 'test-', 'test_']
+      : ['bot', 'temp', 'fake', 'spam'];
+    const namePatterns = process.env.NODE_ENV === 'production'
+      ? ['blocked user', 'forgot password user', 'e2e otp user', 'otp user']
+      : [];
     
     return (
       botKeywords.some(k => prefix.includes(k) || cleanName.includes(k)) ||

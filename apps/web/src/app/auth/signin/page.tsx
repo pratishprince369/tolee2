@@ -21,7 +21,9 @@ export default function SigninPage() {
   const checkIsBot = (emailVal: string) => {
     const cleanEmail = emailVal.toLowerCase().trim();
     const prefix = cleanEmail.split('@')[0] || '';
-    const botKeywords = ['bot', 'temp', 'fake', 'spam', 'qa-', 'qa_', 'test-', 'test_'];
+    const botKeywords = process.env.NODE_ENV === 'production'
+      ? ['bot', 'temp', 'fake', 'spam', 'qa-', 'qa_', 'test-', 'test_']
+      : ['bot', 'temp', 'fake', 'spam'];
     return botKeywords.some(keyword => prefix.includes(keyword));
   };
 
@@ -108,8 +110,7 @@ export default function SigninPage() {
         setError('Invalid email or password.');
       }
     } else {
-      router.push('/feed');
-      router.refresh();
+      window.location.href = '/feed';
     }
   };
 

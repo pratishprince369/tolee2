@@ -118,7 +118,9 @@ export const authOptions: NextAuthOptions = {
         // Bot check on standard credentials sign-in
         const cleanEmail = credentials.email.toLowerCase().trim();
         const prefix = cleanEmail.split('@')[0] || '';
-        const botKeywords = ['bot', 'temp', 'fake', 'spam', 'qa-', 'qa_', 'test-', 'test_'];
+        const botKeywords = process.env.NODE_ENV === 'production'
+          ? ['bot', 'temp', 'fake', 'spam', 'qa-', 'qa_', 'test-', 'test_']
+          : ['bot', 'temp', 'fake', 'spam'];
         if (botKeywords.some(k => prefix.includes(k))) {
           throw new Error("bot_detected");
         }

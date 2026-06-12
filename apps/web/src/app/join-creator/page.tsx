@@ -174,7 +174,9 @@ function JoinCreatorInner() {
 
       // Redirect to feed after 3 seconds
       if (signInResult?.ok) {
-        setTimeout(() => router.push('/feed'), 3000);
+        setTimeout(() => {
+          window.location.href = '/feed';
+        }, 3000);
       }
 
     } catch (e: any) {

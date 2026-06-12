@@ -76,8 +76,7 @@ function VerifyEmailForm() {
         } catch (e) {}
 
         if (!signInRes?.error) {
-          router.push('/feed');
-          router.refresh();
+          window.location.href = '/feed';
           return;
         }
       }
