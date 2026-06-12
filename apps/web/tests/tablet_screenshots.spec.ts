@@ -60,35 +60,40 @@ test.describe('📸 Generate 10-Inch Tablet Screenshots (16:9 Aspect Ratio)', ()
     });
     console.log('Chats screenshot taken.');
 
-    // SCREENSHOT 5: Profile Page
+    // SCREENSHOT 5: Group Chat Detail Page
+    console.log('Opening group chat detail...');
+    const firstChatItem = page.locator('div[class*="cursor-pointer"]').first();
+    if (await firstChatItem.isVisible()) {
+      await firstChatItem.click();
+      await page.waitForTimeout(3000); // Wait for messages to load
+    } else {
+      console.log('No chat items found to click, taking screenshot of default view.');
+    }
+    await page.screenshot({ 
+      path: 'C:/Users/ASUS/Desktop/miracle/tolee/tablet_5_groupchat.png',
+      fullPage: false
+    });
+    console.log('Group Chat detail screenshot taken.');
+
+    // SCREENSHOT 6: Profile Page
     console.log('Navigating to Profile...');
     await page.goto('/u/me', { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(4000);
     await page.screenshot({ 
-      path: 'C:/Users/ASUS/Desktop/miracle/tolee/tablet_5_profile.png',
+      path: 'C:/Users/ASUS/Desktop/miracle/tolee/tablet_6_profile.png',
       fullPage: false
     });
     console.log('Profile screenshot taken.');
 
-    // SCREENSHOT 6: Tolee Group Page
-    console.log('Navigating to Tolee Group...');
-    await page.goto('/t/tech-titans', { waitUntil: 'domcontentloaded' });
+    // SCREENSHOT 7: Search Page with Results
+    console.log('Navigating to Search page with query...');
+    await page.goto('/search?q=AI', { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(4000);
     await page.screenshot({ 
-      path: 'C:/Users/ASUS/Desktop/miracle/tolee/tablet_6_group.png',
+      path: 'C:/Users/ASUS/Desktop/miracle/tolee/tablet_7_search.png',
       fullPage: false
     });
-    console.log('Group screenshot taken.');
-
-    // SCREENSHOT 7: Marketplace Page
-    console.log('Navigating to Marketplace...');
-    await page.goto('/marketplace', { waitUntil: 'domcontentloaded' });
-    await page.waitForTimeout(4000);
-    await page.screenshot({ 
-      path: 'C:/Users/ASUS/Desktop/miracle/tolee/tablet_7_marketplace.png',
-      fullPage: false
-    });
-    console.log('Marketplace screenshot taken.');
+    console.log('Search page screenshot taken.');
 
     // SCREENSHOT 8: AI Manager Page
     console.log('Navigating to AI Manager...');
