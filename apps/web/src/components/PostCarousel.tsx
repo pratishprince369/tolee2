@@ -27,8 +27,13 @@ function CarouselVideo({ src, isActive }: CarouselVideoProps) {
   const [isMuted, setIsMuted] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
+  const [isReady, setIsReady] = useState(false);
 
-  // Viewport detection: Visible >= 50% -> Auto Play, Hidden < 25% -> Auto Pause
+  useEffect(() => {
+    setIsReady(false);
+  }, [src]);
+
+  // Viewport detection: Visible >= 30% -> Auto Play, Hidden < 15% -> Auto Pause
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -36,15 +41,15 @@ function CarouselVideo({ src, isActive }: CarouselVideoProps) {
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
-          if (entry.intersectionRatio >= 0.5) {
+          if (entry.intersectionRatio >= 0.3) {
             setIsVisible(true);
-          } else if (entry.intersectionRatio < 0.25) {
+          } else if (entry.intersectionRatio < 0.15) {
             setIsVisible(false);
           }
         }
       },
       {
-        threshold: [0.25, 0.5]
+        threshold: [0.15, 0.3]
       }
     );
 
@@ -100,28 +105,30 @@ function CarouselVideo({ src, isActive }: CarouselVideoProps) {
     if (!video) return;
 
     if (isActive && isVisible) {
-      setGlobalActiveVideo(video);
-      video.muted = getSoundPreference();
-      video.play().catch((e) => {
-        if (e.name !== 'AbortError') {
-          console.log('[CarouselVideo] play blocked:', e.message);
-          if (!video.muted) {
-            video.muted = true;
-            setIsMuted(true);
-            setSoundPreference(true);
-            video.play().catch((err) => {
-              console.error('[CarouselVideo] play failed even after muting:', err.message);
-            });
+      if (isReady || video.readyState >= 2) {
+        setGlobalActiveVideo(video);
+        video.muted = getSoundPreference();
+        video.play().catch((e) => {
+          if (e.name !== 'AbortError') {
+            console.log('[CarouselVideo] play blocked:', e.message);
+            if (!video.muted) {
+              video.muted = true;
+              setIsMuted(true);
+              setSoundPreference(true);
+              video.play().catch((err) => {
+                console.error('[CarouselVideo] play failed even after muting:', err.message);
+              });
+            }
           }
-        }
-      });
+        });
+      }
     } else {
       video.pause();
       if (getGlobalActiveVideo() === video) {
         setGlobalActiveVideo(null);
       }
     }
-  }, [isActive, isVisible, src]);
+  }, [isActive, isVisible, isReady, src]);
 
   // Clean up on unmount
   useEffect(() => {
@@ -170,6 +177,7 @@ function CarouselVideo({ src, isActive }: CarouselVideoProps) {
         playsInline
         preload="metadata"
         poster={getPosterUrl(src) || undefined}
+        onCanPlay={() => setIsReady(true)}
       />
       
       {!isPlaying && (
