@@ -479,7 +479,7 @@ export async function toggleLike(postId: string) {
   }
 }
 
-export async function addComment(postId: string, content: string) {
+export async function addComment(postId: string, content: string, parentId?: string) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user || !(session.user as any).id) {
@@ -513,7 +513,8 @@ export async function addComment(postId: string, content: string) {
       data: {
         content: safeContent,
         postId,
-        authorId: userId
+        authorId: userId,
+        parentId: parentId || null
       },
       include: {
         author: true

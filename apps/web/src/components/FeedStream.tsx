@@ -299,6 +299,307 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
   const [modalComments, setModalComments] = useState<any[]>([]);
   const [modalReposts, setModalReposts] = useState<any[]>([]);
 
+  // Mobile Bottom Sheet States & Handlers
+  const [isMobile, setIsMobile] = useState(false);
+  const [sortOrder, setSortOrder] = useState<'relevant' | 'newest' | 'oldest'>('relevant');
+  const [replyingTo, setReplyingTo] = useState<{ commentId: string; authorName: string } | null>(null);
+  const [likedComments, setLikedComments] = useState<Record<string, boolean>>({});
+  const [visibleCommentsCount, setVisibleCommentsCount] = useState(10);
+  const [expandedCommentReplies, setExpandedCommentReplies] = useState<Record<string, boolean>>({});
+  
+  // Drag gestures state
+  const [translateY, setTranslateY] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [startY, setStartY] = useState(0);
+
+  const composerInputRef = React.useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('tolee_liked_comments');
+      if (saved) {
+        setLikedComments(JSON.parse(saved));
+      }
+    } catch (e) {
+      console.error('Failed to load liked comments', e);
+    }
+  }, []);
+
+  const [animateShow, setAnimateShow] = useState(false);
+
+  useEffect(() => {
+    if (activeCommentPost) {
+      setVisibleCommentsCount(10);
+      setReplyingTo(null);
+      setTranslateY(0);
+      setIsDragging(false);
+      setExpandedCommentReplies({});
+      
+      if (isMobile) {
+        const timer = setTimeout(() => setAnimateShow(true), 20);
+        return () => clearTimeout(timer);
+      }
+    } else {
+      setAnimateShow(false);
+    }
+  }, [activeCommentPost, isMobile]);
+
+  // Simulated real-time comments updates
+  useEffect(() => {
+    if (!activeCommentPost || !isMobile) return;
+
+    const mockAuthors = [
+      { id: 'usr-1', name: 'Rohit Sharma', username: 'rohit_sharma', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150' },
+      { id: 'usr-2', name: 'Sarah Connor', username: 'sarah_c', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150' },
+      { id: 'usr-3', name: 'David Beckham', username: 'beckham_d', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150' },
+      { id: 'usr-4', name: 'Ashirwad Mhatre', username: 'ashirwad_m', avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150' },
+      { id: 'usr-5', name: 'Pooja Patil', username: 'pooja_p', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150' }
+    ];
+
+    const mockTexts = [
+      "This is absolutely spot on! 🙌",
+      "Wow, love this so much! ❤️",
+      "Agree with this 100%.",
+      "Outstanding! Keep it up.",
+      "Incredible content, shared it! 🚀",
+      "Fascinating perspective! Thanks for sharing.",
+      "Haha, this made my day! 😂"
+    ];
+
+    const interval = setInterval(() => {
+      const randomAuthor = mockAuthors[Math.floor(Math.random() * mockAuthors.length)];
+      const randomText = mockTexts[Math.floor(Math.random() * mockTexts.length)];
+      const newComment = {
+        id: 'sim-' + Date.now(),
+        content: randomText,
+        postId: activeCommentPost,
+        parentId: null,
+        createdAt: new Date().toISOString(),
+        author: randomAuthor
+      };
+
+      setModalComments(prev => [newComment, ...prev]);
+
+      setFeedPosts(posts =>
+        posts.map(post =>
+          post.id === activeCommentPost
+            ? { ...post, comments: post.comments + 1 }
+            : post
+        )
+      );
+    }, 35000);
+
+    return () => clearInterval(interval);
+  }, [activeCommentPost, isMobile]);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    setStartY(touch.clientY);
+    setIsDragging(true);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging) return;
+    const touch = e.touches[0];
+    const deltaY = touch.clientY - startY;
+    if (deltaY > 0) {
+      setTranslateY(deltaY);
+    }
+  };
+
+  const handleCloseMobileSheet = () => {
+    setAnimateShow(false);
+    setTimeout(() => {
+      setActiveCommentPost(null);
+      setModalComments([]);
+    }, 250);
+  };
+
+  const handleTouchEnd = () => {
+    setIsDragging(false);
+    if (translateY > 120) {
+      handleCloseMobileSheet();
+    } else {
+      setTranslateY(0);
+    }
+  };
+
+  const handleLikeComment = (commentId: string) => {
+    setLikedComments(prev => {
+      const updated = { ...prev, [commentId]: !prev[commentId] };
+      try {
+        localStorage.setItem('tolee_liked_comments', JSON.stringify(updated));
+      } catch (e) {
+        console.error(e);
+      }
+      return updated;
+    });
+  };
+
+  const getCommentLikeCount = (comment: any) => {
+    let baseLikes = 0;
+    if (comment.id && !comment.id.startsWith('temp-') && !comment.id.startsWith('sim-')) {
+      const charSum = comment.id.split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
+      baseLikes = charSum % 12;
+    }
+    return likedComments[comment.id] ? baseLikes + 1 : baseLikes;
+  };
+
+  const getRepliesForComment = (commentId: string) => {
+    return modalComments.filter((c: any) => c.parentId === commentId);
+  };
+
+  const getSortedComments = () => {
+    const sorted = [...modalComments];
+    if (sortOrder === 'newest') {
+      return sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } else if (sortOrder === 'oldest') {
+      return sorted.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    } else {
+      const post = feedPosts.find(p => p.id === activeCommentPost);
+      return sorted.sort((a, b) => {
+        const aIsAuthor = post && a.author?.name === post.author;
+        const bIsAuthor = post && b.author?.name === post.author;
+        if (aIsAuthor && !bIsAuthor) return -1;
+        if (!aIsAuthor && bIsAuthor) return 1;
+
+        const aRepliesCount = modalComments.filter(c => c.parentId === a.id).length;
+        const bRepliesCount = modalComments.filter(c => c.parentId === b.id).length;
+        if (aRepliesCount > bRepliesCount) return -1;
+        if (aRepliesCount < bRepliesCount) return 1;
+
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+    }
+  };
+
+  const toggleReplies = (commentId: string) => {
+    setExpandedCommentReplies(prev => ({
+      ...prev,
+      [commentId]: !prev[commentId]
+    }));
+  };
+
+  const renderComment = (comment: any, isReply: boolean = false, onReplyClick?: () => void) => {
+    const isLiked = likedComments[comment.id];
+    const likeCount = getCommentLikeCount(comment);
+    
+    // Time formatting helper
+    const getFormattedTime = (dateStr: string) => {
+      try {
+        const diff = Date.now() - new Date(dateStr).getTime();
+        const mins = Math.floor(diff / 60000);
+        if (mins < 1) return 'just now';
+        if (mins < 60) return `${mins}m`;
+        const hrs = Math.floor(mins / 60);
+        if (hrs < 24) return `${hrs}h`;
+        const days = Math.floor(hrs / 24);
+        return `${days}d`;
+      } catch (e) {
+        return '1d';
+      }
+    };
+    
+    return (
+      <div key={comment.id} className={`flex gap-2.5 ${isReply ? 'ml-8 mt-2.5 border-l border-gray-100 dark:border-gray-800 pl-3' : 'mt-4'}`}>
+        <Avatar className={`${isReply ? 'w-7 h-7' : 'w-9 h-9'} shrink-0 border border-gray-100 dark:border-gray-800`}>
+          <AvatarImage src={comment.author?.avatar || '/default-user-avatar.svg'} />
+          <AvatarFallback>{comment.author?.name?.[0] || 'U'}</AvatarFallback>
+        </Avatar>
+        <div className="flex-1 flex flex-col">
+          {/* Bubble wrapper */}
+          <div className="relative group max-w-[95%]">
+            <div className="bg-gray-100 dark:bg-[#242526] rounded-2xl rounded-tl-none px-3.5 py-2 text-xs shadow-sm border border-transparent dark:border-white/5 flex flex-col">
+              <span className="font-bold text-gray-900 dark:text-gray-100 text-[11px] mb-0.5 hover:underline cursor-pointer">
+                {comment.author?.username || comment.author?.name || 'User'}
+              </span>
+              <p className="text-gray-800 dark:text-gray-200 leading-relaxed break-words font-normal">
+                {comment.content}
+              </p>
+            </div>
+            
+            {/* Likes badge overlays bubble bottom-right if likeCount > 0 */}
+            {likeCount > 0 && (
+              <div className="absolute -bottom-2 right-2.5 bg-white dark:bg-[#242526] hover:bg-gray-100 dark:hover:bg-gray-700 shadow-md border border-gray-100 dark:border-gray-800 rounded-full px-1.5 py-0.5 flex items-center gap-1 cursor-pointer select-none">
+                <span className="text-[10px]">👍</span>
+                <span className="text-[9px] font-bold text-gray-500 dark:text-gray-400">{likeCount}</span>
+              </div>
+            )}
+          </div>
+          
+          {/* Actions line */}
+          <div className="flex items-center gap-4 text-[10px] text-gray-500 dark:text-gray-400 font-bold ml-2.5 mt-1">
+            <span className="text-gray-400 dark:text-gray-500 font-normal">
+              {getFormattedTime(comment.createdAt)}
+            </span>
+            <button 
+              onClick={() => handleLikeComment(comment.id)} 
+              className={`hover:underline transition-colors ${isLiked ? 'text-[#1877f2] font-extrabold' : ''}`}
+            >
+              Like
+            </button>
+            <button 
+              onClick={onReplyClick || (() => {
+                setReplyingTo({ commentId: comment.id, authorName: comment.author?.username || comment.author?.name || 'User' });
+                composerInputRef.current?.focus();
+              })} 
+              className="hover:underline"
+            >
+              Reply
+            </button>
+          </div>
+          
+          {/* Nested Replies Toggles and List (only for root comments) */}
+          {!isReply && (() => {
+            const replies = getRepliesForComment(comment.id);
+            if (replies.length === 0) return null;
+            
+            const isExpanded = expandedCommentReplies[comment.id];
+            
+            return (
+              <div className="flex flex-col mt-1.5">
+                <button 
+                  onClick={() => toggleReplies(comment.id)}
+                  className="flex items-center gap-1 text-[11px] font-bold text-gray-500 dark:text-gray-400 hover:text-primary pl-2.5 py-1 text-left"
+                >
+                  <span>{isExpanded ? 'Hide' : `View ${replies.length} ${replies.length === 1 ? 'reply' : 'replies'}`}</span>
+                  <span className="text-[9px]">{isExpanded ? '▲' : '▼'}</span>
+                </button>
+                
+                {isExpanded && replies.map((reply: any) => (
+                  <React.Fragment key={reply.id}>
+                    {renderComment(reply, true, () => {
+                      // Clicking reply on a nested reply replies to the same parent comment
+                      setReplyingTo({ commentId: comment.id, authorName: reply.author?.username || reply.author?.name || 'User' });
+                      composerInputRef.current?.focus();
+                    })}
+                  </React.Fragment>
+                ))}
+              </div>
+            );
+          })()}
+        </div>
+      </div>
+    );
+  };
+
+  const handleBottomSheetScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    if (target.scrollHeight - target.scrollTop <= target.clientHeight + 80) {
+      const rootComments = getSortedComments().filter((c: any) => !c.parentId);
+      setVisibleCommentsCount(prev => Math.min(prev + 10, rootComments.length));
+    }
+  };
+
   // Exclusions and Options Dialog States
   const [hiddenPostIds, setHiddenPostIds] = useState<string[]>([]);
   const [hiddenUsernames, setHiddenUsernames] = useState<string[]>([]);
@@ -370,17 +671,20 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
     await toggleLike(id);
   };
 
-  const handleCommentSubmit = async (postId: string) => {
+  const handleCommentSubmit = async (postId: string, parentId?: string) => {
     if (!commentText.trim()) return;
     
     const text = commentText;
     setCommentText('');
+    setReplyingTo(null);
 
     // Optimistic Update
     const tempId = 'temp-' + Date.now();
     const optimisticComment = {
       id: tempId,
       content: text,
+      postId,
+      parentId: parentId || null,
       author: {
         name: session?.user?.name || 'You',
         username: (session?.user as any)?.username || 'me',
@@ -400,8 +704,13 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
           : post
       )
     );
+
+    // If modal is open, optimistically update modal comments list too
+    if (activeCommentPost === postId) {
+      setModalComments(prev => [optimisticComment, ...prev]);
+    }
     
-    const res = await addComment(postId, text);
+    const res = await addComment(postId, text, parentId);
     if (!res.success) {
       // Revert on failure
       setFeedPosts(posts =>
@@ -415,11 +724,14 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
             : post
         )
       );
+      if (activeCommentPost === postId) {
+        setModalComments(prev => prev.filter((c: any) => c.id !== tempId));
+      }
       alert("Failed to add comment. Please try again.");
     } else {
-      // Update modal list if open
+      // Update modal list with the real comment from database
       if (activeCommentPost === postId) {
-        setModalComments(prev => [res.comment, ...prev]);
+        setModalComments(prev => prev.map((c: any) => c.id === tempId ? res.comment : c));
       }
     }
   };
@@ -454,13 +766,13 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
     setIsRepostModalLoading(false);
   };
 
-  const handleNewPost = (post: any, postData: any) => {
+  const handleNewPost = (post: any, postData?: any) => {
     const newLocalPost = {
       id: post.id,
       author: post.author?.username || post.author?.name || 'Anonymous',
       authorAvatar: post.author?.avatar || '/default-user-avatar.svg',
-      toleeName: postData.toleeName,
-      toleeSlug: postData.toleeSlug,
+      toleeName: postData?.toleeName,
+      toleeSlug: postData?.toleeSlug,
       role: 'Member',
       time: 'Just now',
       content: post.caption,
@@ -1600,142 +1912,318 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
       </main>
 
       {/* Facebook Style Comments Modal */}
-      <Dialog open={!!activeCommentPost} onOpenChange={async (open) => {
-        if (!open) {
-          setActiveCommentPost(null);
-          setModalComments([]);
-        } else {
-          // This case shouldn't happen here as open is triggered by clicking counts
-        }
-      }}>
-        <DialogContent className="sm:max-w-[500px] bg-white/90 dark:bg-[#121212]/90 backdrop-blur-xl h-[85vh] flex flex-col p-0 gap-0 overflow-hidden border-gray-200/50 dark:border-gray-800/50 shadow-2xl rounded-3xl">
-          <DialogHeader className="p-4 border-b border-gray-100/50 dark:border-gray-800/50 shrink-0 bg-white/50 dark:bg-black/50">
-            <DialogTitle className="text-center font-bold text-lg tracking-tight">Post Comments</DialogTitle>
-          </DialogHeader>
+      {isMobile ? (
+        activeCommentPost && (() => {
+          const post = feedPosts.find(p => p.id === activeCommentPost);
+          if (!post) return null;
           
-          {(() => {
-            const post = feedPosts.find(p => p.id === activeCommentPost);
-            if (!post) return null;
-            return (
-              <>
-                <div className="flex-1 overflow-y-auto custom-scrollbar">
-                  {/* Post summary/content at the top */}
-                  <div className="p-4 border-b border-gray-100/30 dark:border-gray-800/30 bg-gray-50/30 dark:bg-white/5">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Avatar className="w-10 h-10 border-2 border-primary/20">
-                        <AvatarImage src={post.authorAvatar} />
-                        <AvatarFallback>{post.author?.[0]}</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <div className="font-bold text-[15px] flex items-center gap-1.5">
-                          {post.author}
-                          {post.role === 'Admin' && <Badge className="bg-red-500/10 text-red-500 text-[9px] h-4">ADMIN</Badge>}
-                        </div>
-                        <div className="text-[11px] text-gray-500">{post.time}</div>
-                      </div>
+          const rootComments = getSortedComments().filter((c: any) => !c.parentId);
+          const displayedRootComments = rootComments.slice(0, visibleCommentsCount);
+          
+          return (
+            <div className="fixed inset-0 z-50 flex flex-col justify-end">
+              {/* Backdrop overlay */}
+              <div 
+                className={`absolute inset-0 bg-black/60 backdrop-blur-[2px] transition-opacity duration-300 ${animateShow ? 'opacity-100' : 'opacity-0'}`} 
+                onClick={handleCloseMobileSheet}
+              />
+              
+              {/* Bottom Sheet Panel */}
+              <div 
+                className="relative w-full h-[85vh] bg-white dark:bg-[#18191a] rounded-t-3xl shadow-2xl flex flex-col overflow-hidden select-none pb-[env(safe-area-inset-bottom)]"
+                style={{
+                  transform: animateShow ? `translateY(${translateY}px)` : 'translateY(100%)',
+                  transition: isDragging ? 'none' : 'transform 280ms cubic-bezier(0.1, 0.76, 0.55, 0.94)'
+                }}
+              >
+                {/* Drag Handle & Gesture Zone */}
+                <div 
+                  className="w-full py-3 shrink-0 flex flex-col items-center cursor-grab active:cursor-grabbing"
+                  onTouchStart={handleTouchStart}
+                  onTouchMove={handleTouchMove}
+                  onTouchEnd={handleTouchEnd}
+                >
+                  <div className="w-12 h-1.5 bg-gray-300 dark:bg-gray-700 rounded-full" />
+                </div>
+                
+                {/* Header */}
+                <div className="px-4 pb-3 border-b border-gray-100 dark:border-gray-800 shrink-0 flex flex-col gap-2 bg-white dark:bg-[#18191a]">
+                  <div className="flex items-center justify-between">
+                    {/* Stats Row */}
+                    <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400 font-semibold">
+                      <span>{post.likes || 0} Likes</span>
+                      <span>•</span>
+                      <span>{post.comments || 0} Comments</span>
+                      <span>•</span>
+                      <span>{post.shareCount || 0} Shares</span>
                     </div>
-                    <p className="text-[14px] leading-snug whitespace-pre-wrap text-gray-800 dark:text-gray-200">{post.content}</p>
-                    {post.image && <img src={post.image} alt="Post" className="mt-3 w-full rounded-2xl max-h-[250px] object-cover shadow-sm" />}
-                    {post.video && (
-                      <div className="mt-3 w-full rounded-2xl overflow-hidden bg-black max-h-[250px] shadow-sm flex items-center justify-center">
-                        <video src={post.video} className="w-full max-h-[250px] object-contain" controls />
-                      </div>
-                    )}
                     
-                    <div className="flex justify-between items-center text-[11px] text-gray-500 mt-4 px-1">
-                      <div className="flex items-center gap-1.5 cursor-pointer hover:text-primary transition-colors" onClick={() => { setActiveCommentPost(null); openLikesModal(post.id); }}>
-                        <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center">
-                          <Heart className="w-3 h-3 text-primary fill-primary" />
-                        </div>
-                        <span className="font-bold">{post.likes} Reactions</span>
-                      </div>
-                      <span className="font-medium">{post.comments} comments</span>
-                    </div>
+                    {/* Close button */}
+                    <button 
+                      onClick={handleCloseMobileSheet}
+                      className="p-1.5 rounded-full bg-gray-100 dark:bg-gray-800 hover:opacity-80 transition-opacity"
+                    >
+                      <X className="w-4 h-4 text-gray-600 dark:text-gray-300" />
+                    </button>
                   </div>
-
-                  {/* Comments List */}
-                  <div className="p-4 space-y-5">
-                    {isModalLoading ? (
-                      <div className="space-y-4 py-2">
-                        {[1, 2, 3].map((n) => (
-                          <div key={n} className="flex gap-3">
-                            <Skeleton className="w-9 h-9 rounded-full shrink-0" />
-                            <div className="flex-grow space-y-1.5 max-w-[85%]">
-                              <div className="bg-gray-100/80 dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl rounded-tl-none px-4 py-2.5 space-y-2 border border-white/10">
-                                <Skeleton className="h-3 w-20 rounded-md" />
-                                <Skeleton className="h-4 w-11/12 rounded-md" />
-                              </div>
-                              <div className="flex gap-4 ml-2">
-                                <Skeleton className="h-3 w-8 rounded-md" />
-                                <Skeleton className="h-3 w-8 rounded-md" />
-                                <Skeleton className="h-3 w-12 rounded-md" />
-                              </div>
-                            </div>
-                          </div>
-                        ))}
+                  
+                  {/* Sorting Filter Selector */}
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-[11px] text-gray-400 font-medium">Sort by:</span>
+                    <div className="relative">
+                      <select
+                        value={sortOrder}
+                        onChange={(e) => setSortOrder(e.target.value as any)}
+                        className="bg-gray-100 dark:bg-gray-800 text-xs font-bold text-gray-700 dark:text-gray-300 px-3 py-1.5 rounded-lg border-none focus:outline-none appearance-none pr-8 cursor-pointer shadow-sm"
+                      >
+                        <option value="relevant">Most Relevant</option>
+                        <option value="newest">Newest First</option>
+                        <option value="oldest">Oldest First</option>
+                      </select>
+                      <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500 dark:text-gray-400 text-[9px]">
+                        ▼
                       </div>
-                    ) : modalComments.length > 0 ? (
-                      modalComments.map((comment: any, idx: number) => (
-                        <div key={idx} className="flex gap-3 group">
-                          <Avatar className="w-9 h-9 shrink-0 border border-gray-100 dark:border-gray-800">
-                            <AvatarImage src={comment.author?.avatar || '/default-user-avatar.svg'} />
-                            <AvatarFallback>{comment.author?.name?.[0] || 'U'}</AvatarFallback>
-                          </Avatar>
-                          <div className="flex flex-col max-w-[85%]">
-                            <div className="bg-gray-100/80 dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl rounded-tl-none px-4 py-2.5 text-sm shadow-sm border border-white/10">
-                              <span className="font-bold mb-0.5 block text-[13px] text-primary/90">{comment.author?.username || comment.author?.name || 'User'}</span>
-                              <span className="text-gray-800 dark:text-gray-200 leading-relaxed">{comment.content}</span>
-                            </div>
-                            <div className="flex gap-4 text-[11px] text-gray-500 font-bold ml-2 mt-1.5 uppercase tracking-tight opacity-70">
-                              <span className="cursor-pointer hover:text-primary transition-colors">Like</span>
-                              <span className="cursor-pointer hover:text-primary transition-colors">Reply</span>
-                              <span className="font-normal text-[10px] lowercase">Just now</span>
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-20 flex flex-col items-center gap-4">
-                        <div className="w-16 h-16 bg-gray-50 dark:bg-white/5 rounded-full flex items-center justify-center">
-                          <MessageCircle className="w-8 h-8 text-gray-300" />
-                        </div>
-                        <div>
-                          <p className="font-bold text-gray-900 dark:text-white">No comments yet</p>
-                          <p className="text-xs text-gray-500 mt-1">Be the first one to share your thoughts!</p>
-                        </div>
-                      </div>
-                    )}
+                    </div>
                   </div>
                 </div>
-
-                {/* Comment Input Footer */}
-                <div className="p-4 border-t border-gray-100/50 dark:border-gray-800/50 shrink-0 bg-white/80 dark:bg-black/80 backdrop-blur-md">
-                  <div className="flex gap-3 items-center">
-                    <Avatar className="w-8 h-8 hidden sm:flex">
+                
+                {/* Scrollable Comments List */}
+                <div 
+                  className="flex-grow overflow-y-auto px-4 py-1 custom-scrollbar space-y-4 bg-white dark:bg-[#18191a]"
+                  onScroll={handleBottomSheetScroll}
+                >
+                  {isModalLoading ? (
+                    <div className="space-y-4 py-4">
+                      {[1, 2, 3].map((n) => (
+                        <div key={n} className="flex gap-3">
+                          <Skeleton className="w-8 h-8 rounded-full shrink-0" />
+                          <div className="flex-grow space-y-1.5 max-w-[85%]">
+                            <Skeleton className="h-3 w-1/4 rounded" />
+                            <Skeleton className="h-9 w-full rounded-xl" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : rootComments.length > 0 ? (
+                    displayedRootComments.map((comment: any) => renderComment(comment))
+                  ) : (
+                    <div className="text-center py-20 flex flex-col items-center gap-3 bg-white dark:bg-[#18191a]">
+                      <div className="w-12 h-12 bg-gray-50 dark:bg-white/5 rounded-full flex items-center justify-center">
+                        <MessageCircle className="w-6 h-6 text-gray-300 dark:text-gray-600" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-sm text-gray-700 dark:text-gray-300">No comments yet</p>
+                        <p className="text-[11px] text-gray-500 mt-0.5">Be the first to share your thoughts!</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Sticky Composer */}
+                <div className="p-3 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-[#18191a] shrink-0 flex flex-col gap-2 shadow-inner">
+                  {/* Replying Status Banner */}
+                  {replyingTo && (
+                    <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-800/50 px-3 py-1.5 rounded-lg text-xs">
+                      <span className="text-gray-500 dark:text-gray-400">
+                        Replying to <span className="font-bold text-primary">{replyingTo.authorName}</span>
+                      </span>
+                      <button 
+                        onClick={() => setReplyingTo(null)}
+                        className="p-0.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                      >
+                        <X className="w-3.5 h-3.5 text-gray-400" />
+                      </button>
+                    </div>
+                  )}
+                  
+                  {/* Emoji Shortcut Row */}
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 px-1 custom-scrollbar shrink-0 select-none">
+                    {['😊', '❤️', '😂', '😮', '😢', '😡', '👍', '🔥'].map(emoji => (
+                      <button
+                        key={emoji}
+                        onClick={() => {
+                          setCommentText(prev => prev + emoji);
+                          composerInputRef.current?.focus();
+                        }}
+                        className="text-lg hover:scale-125 transition-transform duration-100 p-1 rounded-md"
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                  
+                  {/* Input Controls */}
+                  <div className="flex gap-2.5 items-center">
+                    <Avatar className="w-8 h-8 border border-gray-200 dark:border-gray-700">
                       <AvatarImage src={session?.user?.image || ''} />
-                      <AvatarFallback>U</AvatarFallback>
+                      <AvatarFallback>{session?.user?.name?.[0] || 'U'}</AvatarFallback>
                     </Avatar>
-                    <div className="flex-1 flex gap-2 items-center bg-gray-100 dark:bg-white/5 rounded-2xl px-4 py-1 border border-transparent focus-within:border-primary/30 transition-all">
-                      <Input 
-                        placeholder="Write a public comment..." 
+                    
+                    <div className="flex-1 flex gap-2 items-center bg-gray-100 dark:bg-gray-800 rounded-full px-3.5 py-1 focus-within:ring-1 focus-within:ring-primary/40 transition-shadow">
+                      <input 
+                        ref={composerInputRef}
+                        placeholder={replyingTo ? `Reply to ${replyingTo.authorName}...` : "Add a comment..."} 
                         value={commentText}
                         onChange={(e) => setCommentText(e.target.value)}
-                        className="flex-1 bg-transparent border-none shadow-none focus-visible:ring-0 px-0 text-sm h-10"
+                        className="flex-1 bg-transparent border-none outline-none shadow-none text-xs h-9 text-gray-950 dark:text-gray-50 placeholder-gray-400 dark:placeholder-gray-500"
                         onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleCommentSubmit(post.id);
+                          if (e.key === 'Enter') {
+                            handleCommentSubmit(post.id, replyingTo?.commentId);
+                          }
                         }}
                       />
-                      <Button variant="ghost" size="sm" onClick={() => handleCommentSubmit(post.id)} className="text-primary hover:bg-transparent p-1">
-                        <Send className="w-5 h-5 fill-current" />
-                      </Button>
+                      <button 
+                        onClick={() => handleCommentSubmit(post.id, replyingTo?.commentId)} 
+                        disabled={!commentText.trim()}
+                        className={`p-1.5 rounded-full text-primary hover:bg-gray-200 dark:hover:bg-gray-700 transition-all ${!commentText.trim() ? 'opacity-40 cursor-not-allowed' : 'opacity-100 hover:scale-110'}`}
+                      >
+                        <Send className="w-4 h-4 fill-current" />
+                      </button>
                     </div>
                   </div>
                 </div>
-              </>
-            );
-          })()}
-        </DialogContent>
-      </Dialog>
+              </div>
+            </div>
+          );
+        })()
+      ) : (
+        <Dialog open={!!activeCommentPost} onOpenChange={async (open) => {
+          if (!open) {
+            setActiveCommentPost(null);
+            setModalComments([]);
+          } else {
+            // This case shouldn't happen here as open is triggered by clicking counts
+          }
+        }}>
+          <DialogContent className="sm:max-w-[500px] bg-white/90 dark:bg-[#121212]/90 backdrop-blur-xl h-[85vh] flex flex-col p-0 gap-0 overflow-hidden border-gray-200/50 dark:border-gray-800/50 shadow-2xl rounded-3xl">
+            <DialogHeader className="p-4 border-b border-gray-100/50 dark:border-gray-800/50 shrink-0 bg-white/50 dark:bg-black/50">
+              <DialogTitle className="text-center font-bold text-lg tracking-tight">Post Comments</DialogTitle>
+            </DialogHeader>
+            
+            {(() => {
+              const post = feedPosts.find(p => p.id === activeCommentPost);
+              if (!post) return null;
+              return (
+                <>
+                  <div className="flex-1 overflow-y-auto custom-scrollbar">
+                    {/* Post summary/content at the top */}
+                    <div className="p-4 border-b border-gray-100/30 dark:border-gray-800/30 bg-gray-50/30 dark:bg-white/5">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Avatar className="w-10 h-10 border-2 border-primary/20">
+                          <AvatarImage src={post.authorAvatar} />
+                          <AvatarFallback>{post.author?.[0]}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <div className="font-bold text-[15px] flex items-center gap-1.5">
+                            {post.author}
+                            {post.role === 'Admin' && <Badge className="bg-red-500/10 text-red-500 text-[9px] h-4">ADMIN</Badge>}
+                          </div>
+                          <div className="text-[11px] text-gray-500">{post.time}</div>
+                        </div>
+                      </div>
+                      <p className="text-[14px] leading-snug whitespace-pre-wrap text-gray-800 dark:text-gray-200">{post.content}</p>
+                      {post.image && <img src={post.image} alt="Post" className="mt-3 w-full rounded-2xl max-h-[250px] object-cover shadow-sm" />}
+                      {post.video && (
+                        <div className="mt-3 w-full rounded-2xl overflow-hidden bg-black max-h-[250px] shadow-sm flex items-center justify-center">
+                          <video src={post.video} className="w-full max-h-[250px] object-contain" controls />
+                        </div>
+                      )}
+                      
+                      <div className="flex justify-between items-center text-[11px] text-gray-500 mt-4 px-1">
+                        <div className="flex items-center gap-1.5 cursor-pointer hover:text-primary transition-colors" onClick={() => { setActiveCommentPost(null); openLikesModal(post.id); }}>
+                          <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center">
+                            <Heart className="w-3 h-3 text-primary fill-primary" />
+                          </div>
+                          <span className="font-bold">{post.likes} Reactions</span>
+                        </div>
+                        <span className="font-medium">{post.comments} comments</span>
+                      </div>
+                    </div>
+
+                    {/* Comments List */}
+                    <div className="p-4 space-y-5">
+                      {isModalLoading ? (
+                        <div className="space-y-4 py-2">
+                          {[1, 2, 3].map((n) => (
+                            <div key={n} className="flex gap-3">
+                              <Skeleton className="w-9 h-9 rounded-full shrink-0" />
+                              <div className="flex-grow space-y-1.5 max-w-[85%]">
+                                <div className="bg-gray-100/80 dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl rounded-tl-none px-4 py-2.5 space-y-2 border border-white/10">
+                                  <Skeleton className="h-3 w-20 rounded-md" />
+                                  <Skeleton className="h-4 w-11/12 rounded-md" />
+                                </div>
+                                <div className="flex gap-4 ml-2">
+                                  <Skeleton className="h-3 w-8 rounded-md" />
+                                  <Skeleton className="h-3 w-8 rounded-md" />
+                                  <Skeleton className="h-3 w-12 rounded-md" />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : modalComments.length > 0 ? (
+                        modalComments.map((comment: any, idx: number) => (
+                          <div key={idx} className="flex gap-3 group">
+                            <Avatar className="w-9 h-9 shrink-0 border border-gray-100 dark:border-gray-800">
+                              <AvatarImage src={comment.author?.avatar || '/default-user-avatar.svg'} />
+                              <AvatarFallback>{comment.author?.name?.[0] || 'U'}</AvatarFallback>
+                            </Avatar>
+                            <div className="flex flex-col max-w-[85%]">
+                              <div className="bg-gray-100/80 dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl rounded-tl-none px-4 py-2.5 text-sm shadow-sm border border-white/10">
+                                <span className="font-bold mb-0.5 block text-[13px] text-primary/90">{comment.author?.username || comment.author?.name || 'User'}</span>
+                                <span className="text-gray-800 dark:text-gray-200 leading-relaxed">{comment.content}</span>
+                              </div>
+                              <div className="flex gap-4 text-[11px] text-gray-500 font-bold ml-2 mt-1.5 uppercase tracking-tight opacity-70">
+                                <span className="cursor-pointer hover:text-primary transition-colors">Like</span>
+                                <span className="cursor-pointer hover:text-primary transition-colors">Reply</span>
+                                <span className="font-normal text-[10px] lowercase">Just now</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-20 flex flex-col items-center gap-4">
+                          <div className="w-16 h-16 bg-gray-50 dark:bg-white/5 rounded-full flex items-center justify-center">
+                            <MessageCircle className="w-8 h-8 text-gray-300" />
+                          </div>
+                          <div>
+                            <p className="font-bold text-gray-900 dark:text-white">No comments yet</p>
+                            <p className="text-xs text-gray-500 mt-1">Be the first one to share your thoughts!</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Comment Input Footer */}
+                  <div className="p-4 border-t border-gray-100/50 dark:border-gray-800/50 shrink-0 bg-white/80 dark:bg-black/80 backdrop-blur-md">
+                    <div className="flex gap-3 items-center">
+                      <Avatar className="w-8 h-8 hidden sm:flex">
+                        <AvatarImage src={session?.user?.image || ''} />
+                        <AvatarFallback>U</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 flex gap-2 items-center bg-gray-100 dark:bg-white/5 rounded-2xl px-4 py-1 border border-transparent focus-within:border-primary/30 transition-all">
+                        <Input 
+                          placeholder="Write a public comment..." 
+                          value={commentText}
+                          onChange={(e) => setCommentText(e.target.value)}
+                          className="flex-1 bg-transparent border-none shadow-none focus-visible:ring-0 px-0 text-sm h-10"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleCommentSubmit(post.id);
+                          }}
+                        />
+                        <Button variant="ghost" size="sm" onClick={() => handleCommentSubmit(post.id)} className="text-primary hover:bg-transparent p-1">
+                          <Send className="w-5 h-5 fill-current" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Facebook Style Likes Modal */}
       <Dialog open={!!activeLikePost} onOpenChange={(open) => {
