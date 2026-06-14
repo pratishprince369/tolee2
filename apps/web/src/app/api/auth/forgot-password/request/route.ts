@@ -55,17 +55,38 @@ export async function POST(req: Request) {
     });
 
     // Send email using Resend
-    await sendEmail(
+    const emailSent = await sendEmail(
       user.email,
       'Reset Your Tolee Password',
       `
-        <h2>Reset Password</h2>
-        <p>Your OTP is:</p>
-        <h1>${otp}</h1>
-        <p>This OTP is valid for 10 minutes.</p>
+        <h2 style="margin: 0 0 16px 0; font-size: 20px; font-weight: 800; color: #1e293b; line-height: 1.3; text-align: center;">
+          Reset Password
+        </h2>
+        <p style="margin: 0 0 24px 0; font-size: 15px; color: #475569; line-height: 1.6; font-weight: 500; text-align: center;">
+          We received a request to reset your password. Use the 6-digit OTP code below to set a new password.
+        </p>
+        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 24px;">
+          <tr>
+            <td align="center" style="background-color: #f1f7f8; border: 2px dashed #0a7c85; border-radius: 12px; padding: 20px; text-align: center;">
+              <div style="font-size: 11px; font-weight: 700; color: #0a7c85; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px;">
+                Reset Code
+              </div>
+              <div style="font-size: 36px; font-weight: 800; color: #0a7c85; letter-spacing: 6px; font-family: monospace, sans-serif; line-height: 1;">
+                ${otp}
+              </div>
+            </td>
+          </tr>
+        </table>
+        <p style="margin: 0; font-size: 13px; color: #64748b; line-height: 1.5; text-align: center;">
+          This code is valid for <strong>10 minutes</strong>. If you did not request this, you can safely ignore this email.
+        </p>
       `,
       'password_reset'
     );
+
+    if (!emailSent) {
+      return NextResponse.json({ message: 'Failed to send password reset code. Please try again later.' }, { status: 500 });
+    }
 
     return NextResponse.json({
       success: true,

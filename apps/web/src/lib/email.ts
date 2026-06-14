@@ -45,11 +45,70 @@ export async function sendEmail(
       throw new Error('Resend client was not properly initialized');
     }
 
+    const brandedHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${subject}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f6f9fc; font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif; -webkit-font-smoothing: antialiased;">
+  <table border="0" cellpadding="0" cellspacing="0" width="100%" style="table-layout: fixed; background-color: #f6f9fc; padding: 40px 0;">
+    <tr>
+      <td align="center">
+        <!-- Card Container -->
+        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 500px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); border: 1px solid #e8eef2;">
+          
+          <!-- Header (Brand Banner) -->
+          <tr>
+            <td align="center" style="background-color: #0a7c85; padding: 28px 20px;">
+              <table border="0" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center" style="background-color: #ffffff; width: 38px; height: 38px; border-radius: 10px; font-size: 20px; font-weight: 900; color: #0a7c85; line-height: 38px; text-align: center;">
+                    t
+                  </td>
+                  <td style="font-size: 22px; font-weight: 800; color: #ffffff; padding-left: 10px; letter-spacing: -0.5px;">
+                    Tolee
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          
+          <!-- Content Body -->
+          <tr>
+            <td style="padding: 40px 32px; background-color: #ffffff;">
+              ${html}
+            </td>
+          </tr>
+          
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 24px 32px; background-color: #f8fafc; border-top: 1px solid #f1f5f9; text-align: center;">
+              <p style="margin: 0 0 6px 0; font-size: 11px; color: #94a3b8; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
+                Tolee Social Network
+              </p>
+              <p style="margin: 0; font-size: 11px; color: #94a3b8; line-height: 1.4;">
+                Connect with local interest groups and discover what's happening around you.<br>
+                <a href="https://tolee.in" style="color: #0a7c85; text-decoration: none; font-weight: 600;">tolee.in</a>
+              </p>
+            </td>
+          </tr>
+          
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `;
+
     const { data, error } = await resend.emails.send({
       from: fromEmail,
       to,
       subject,
-      html,
+      html: brandedHtml,
     });
 
     if (error) {
