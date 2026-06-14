@@ -172,9 +172,11 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
       </div>
 
       {/* Middle: Embedded Search Bar (Fully Responsive & Dynamic) */}
-      <div className="flex-1 min-w-[90px] sm:min-w-[180px] max-w-[160px] sm:max-w-sm md:max-w-md mx-1 sm:mx-2">
-        <SearchInput />
-      </div>
+      {pathname !== '/discover' && pathname !== '/' && (
+        <div className="flex-1 min-w-[90px] sm:min-w-[180px] max-w-[160px] sm:max-w-sm md:max-w-md mx-1 sm:mx-2">
+          <SearchInput />
+        </div>
+      )}
 
       {/* Right: User Profile & Actions */}
       <div className="flex items-center justify-end gap-1 sm:gap-2 md:gap-3 flex-shrink-0">

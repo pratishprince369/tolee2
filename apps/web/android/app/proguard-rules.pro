@@ -24,6 +24,11 @@
 # Keep WebRTC
 -keep class org.webrtc.** { *; }
 
+# Ignore missing Firebase KTX classes and other optional dependencies
+-dontwarn com.google.firebase.ktx.**
+-dontwarn com.google.firebase.installations.ktx.**
+-dontwarn com.google.firebase.messaging.ktx.**
+
 # Hide original source file name in crash logs (prevents reverse engineering)
 -renamesourcefileattribute SourceFile
 -keepattributes SourceFile,LineNumberTable

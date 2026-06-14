@@ -23,11 +23,17 @@ import AnalyticsTracker from "@/components/AnalyticsTracker";
 import { Suspense } from "react";
 import { prisma } from "@/lib/prisma";
 
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
+
 export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const session = await getServerSession(authOptions);
+  const isAuthenticated = !!session?.user;
+  
   const settings = await prisma.siteSettings.findUnique({ where: { id: 'global' } }).catch(() => null);
   const initialBranding = {
     siteName: settings?.siteName || 'tolee',
@@ -62,10 +68,10 @@ export default async function RootLayout({
           
           <div className="flex flex-1 w-full relative pb-16 lg:pb-0 pt-16">
             {/* Global Sidebar - hidden on small screens, fixed on left for large */}
-            <Sidebar />
+            {isAuthenticated && <Sidebar />}
             
             {/* Main Content Area - padded left on large screens to accommodate fixed sidebar */}
-            <div className="flex-grow w-full lg:pl-64 min-w-0 overflow-x-hidden">
+            <div className={cn("flex-grow w-full min-w-0 overflow-x-hidden", isAuthenticated && "lg:pl-64")}>
               {children}
             </div>
           </div>
