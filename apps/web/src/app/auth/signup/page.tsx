@@ -10,6 +10,7 @@ function SignupForm() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [website, setWebsite] = useState('');
   const [isBot, setIsBot] = useState(false);
   const searchParams = useSearchParams();
   const urlError = searchParams.get('error');
@@ -27,7 +28,33 @@ function SignupForm() {
       ? ['blocked user', 'forgot password user', 'e2e otp user', 'otp user']
       : [];
     
+    const isBotName = (str: string) => {
+      const trimmed = str.trim();
+      if (!trimmed) return false;
+      if (!trimmed.includes(' ')) {
+        const len = trimmed.length;
+        if (len >= 12) {
+          let midUpperCount = 0;
+          for (let i = 1; i < len; i++) {
+            const code = trimmed.charCodeAt(i);
+            if (code >= 65 && code <= 90) midUpperCount++;
+          }
+          if (midUpperCount >= 2) return true;
+          
+          const vowels = (trimmed.match(/[aeiouy]/gi) || []).length;
+          if (vowels / len < 0.23) return true;
+
+          if (/[^aeiouy\s\d\W]{5,}/i.test(trimmed)) return true;
+        }
+      }
+      return false;
+    };
+
+    const dotCount = (prefix.match(/\./g) || []).length;
+    
     return (
+      dotCount >= 3 ||
+      isBotName(updatedName) ||
       botKeywords.some(k => prefix.includes(k) || cleanName.includes(k)) ||
       namePatterns.some(p => cleanName.includes(p))
     );
@@ -56,8 +83,8 @@ function SignupForm() {
     e.preventDefault();
     setError('');
 
-    if (isBot || checkBotStatus(email, name)) {
-      setError('Bot user detected. Registration is disabled.');
+    if (website || isBot || checkBotStatus(email, name)) {
+      setError('Bot user detected or invalid name formatting. Please use a proper name.');
       return;
     }
 
@@ -65,7 +92,7 @@ function SignupForm() {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password })
+        body: JSON.stringify({ name, email, password, website })
       });
       const data = await res.json();
       if (!res.ok) {
@@ -94,6 +121,18 @@ function SignupForm() {
         {error && <div className="mb-4 text-red-500 text-sm text-center">{error}</div>}
 
         <form className="space-y-4" onSubmit={handleSubmit}>
+          {/* Honeypot field */}
+          <div className="hidden" aria-hidden="true">
+            <input
+              type="text"
+              name="website"
+              value={website}
+              onChange={e => setWebsite(e.target.value)}
+              tabIndex={-1}
+              autoComplete="off"
+            />
+          </div>
+
           <div>
             <label className="block text-sm font-medium mb-1">Name</label>
             <input
@@ -109,7 +148,7 @@ function SignupForm() {
               className={`w-full px-3 py-2 border rounded-lg dark:bg-gray-900 ${isBot ? 'border-red-500 ring-1 ring-red-500' : ''}`}
               placeholder="you@example.com"
             />
-            {isBot && <p className="text-red-500 text-xs mt-1 font-semibold">⚠️ Bot pattern detected. Registration is disabled.</p>}
+            {isBot && <p className="text-red-500 text-xs mt-1 font-semibold">⚠️ Bot pattern or invalid name detected. Please use a proper name and email.</p>}
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Password</label>

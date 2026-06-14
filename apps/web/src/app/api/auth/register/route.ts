@@ -6,7 +6,13 @@ import { sendEmail } from "@/lib/email";
 
 export async function POST(req: Request) {
   try {
-    const { name, email, password } = await req.json();
+    const { name, email, password, website } = await req.json();
+    
+    // Honeypot check
+    if (website) {
+      return NextResponse.json({ message: "Registration disabled for automated/bot accounts." }, { status: 403 });
+    }
+
     if (!name || !email || !password) {
       return NextResponse.json({ message: "Missing fields" }, { status: 400 });
     }
@@ -21,7 +27,33 @@ export async function POST(req: Request) {
       ? ['blocked user', 'forgot password user', 'e2e otp user', 'otp user']
       : [];
 
+    const isBotName = (str: string) => {
+      const trimmed = str.trim();
+      if (!trimmed) return false;
+      if (!trimmed.includes(' ')) {
+        const len = trimmed.length;
+        if (len >= 12) {
+          let midUpperCount = 0;
+          for (let i = 1; i < len; i++) {
+            const code = trimmed.charCodeAt(i);
+            if (code >= 65 && code <= 90) midUpperCount++;
+          }
+          if (midUpperCount >= 2) return true;
+          
+          const vowels = (trimmed.match(/[aeiouy]/gi) || []).length;
+          if (vowels / len < 0.23) return true;
+
+          if (/[^aeiouy\s\d\W]{5,}/i.test(trimmed)) return true;
+        }
+      }
+      return false;
+    };
+
+    const dotCount = (prefix.match(/\./g) || []).length;
+
     if (
+      dotCount >= 3 ||
+      isBotName(name) ||
       botKeywords.some(k => prefix.includes(k) || cleanName.includes(k)) ||
       namePatterns.some(p => cleanName.includes(p))
     ) {
