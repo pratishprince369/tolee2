@@ -1921,7 +1921,7 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
           const displayedRootComments = rootComments.slice(0, visibleCommentsCount);
           
           return (
-            <div className="fixed inset-0 z-50 flex flex-col justify-end">
+            <div className="fixed inset-0 z-[100] flex flex-col justify-end">
               {/* Backdrop overlay */}
               <div 
                 className={`absolute inset-0 bg-black/60 backdrop-blur-[2px] transition-opacity duration-300 ${animateShow ? 'opacity-100' : 'opacity-0'}`} 
@@ -1947,16 +1947,10 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                 </div>
                 
                 {/* Header */}
-                <div className="px-4 pb-3 border-b border-gray-100 dark:border-gray-800 shrink-0 flex flex-col gap-2 bg-white dark:bg-[#18191a]">
-                  <div className="flex items-center justify-between">
-                    {/* Stats Row */}
-                    <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400 font-semibold">
-                      <span>{post.likes || 0} Likes</span>
-                      <span>•</span>
-                      <span>{post.comments || 0} Comments</span>
-                      <span>•</span>
-                      <span>{post.shareCount || 0} Shares</span>
-                    </div>
+                <div className="px-4 pb-3 border-b border-gray-100 dark:border-gray-800 shrink-0 flex flex-col gap-3.5 bg-white dark:bg-[#18191a]">
+                  <div className="flex items-center justify-between pt-1">
+                    {/* Title */}
+                    <span className="font-bold text-sm text-gray-800 dark:text-gray-200">Comments</span>
                     
                     {/* Close button */}
                     <button 
@@ -1966,9 +1960,71 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                       <X className="w-4 h-4 text-gray-600 dark:text-gray-300" />
                     </button>
                   </div>
+
+                  {/* Interactive Stats Row matching Post Footer */}
+                  <div className="flex items-center justify-between w-full pt-1.5 pb-0.5 px-0.5 border-t border-gray-150/40 dark:border-zinc-900/40">
+                    <div className="flex items-center gap-4.5">
+                      {/* 1. Like */}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleLike(post.id); }}
+                        className={`flex items-center gap-1.5 transition-all duration-200 active:scale-110 focus:outline-none ${post.likedByMe ? 'text-red-500' : 'text-zinc-500 dark:text-zinc-400'}`}
+                      >
+                        <Heart strokeWidth={1.5} className={`w-5 h-5 ${post.likedByMe ? 'fill-red-500 stroke-red-500' : 'fill-transparent'}`} />
+                        <span className="text-[12px] font-bold">{post.likes || 0}</span>
+                      </button>
+
+                      {/* 2. Comment */}
+                      <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400">
+                        <MessageCircle strokeWidth={1.5} className="w-5 h-5 fill-transparent" />
+                        <span className="text-[12px] font-bold">{post.comments || 0}</span>
+                      </div>
+
+                      {/* 3. Reshare */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedPostIdForReshare(post.id);
+                          setReshareModalOpen(true);
+                        }}
+                        className={`flex items-center gap-1.5 transition-all duration-200 active:scale-110 focus:outline-none ${post.repostedByMe ? 'text-green-500' : 'text-zinc-500 dark:text-zinc-400'}`}
+                      >
+                        <Repeat strokeWidth={1.5} className="w-5 h-5" />
+                        <span className="text-[12px] font-bold">{post.reposts || 0}</span>
+                      </button>
+
+                      {/* 4. Share */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedPostForShare(post);
+                          setShareModalOpen(true);
+                        }}
+                        className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 hover:text-primary transition-all duration-200 active:scale-110 focus:outline-none"
+                      >
+                        <Send strokeWidth={1.5} className="w-5 h-5 fill-transparent" />
+                        <span className="text-[12px] font-bold">{post.shareCount || 0}</span>
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      {/* Views */}
+                      <span className="flex items-center gap-1 text-[12px] font-bold text-zinc-400 dark:text-zinc-500">
+                        <Eye strokeWidth={1.5} className="w-4.5 h-4.5" />
+                        <span>{formatViewCount(post.views || 0)}</span>
+                      </span>
+
+                      {/* Bookmark */}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleSave(post.id); }}
+                        className="transition-all duration-200 active:scale-125 focus:outline-none text-zinc-500 dark:text-zinc-400"
+                      >
+                        <Bookmark strokeWidth={1.5} className={`w-5 h-5 ${post.savedByMe ? 'fill-primary dark:fill-white text-primary dark:text-white' : 'fill-transparent'}`} />
+                      </button>
+                    </div>
+                  </div>
                   
                   {/* Sorting Filter Selector */}
-                  <div className="flex items-center gap-2 mt-1">
+                  <div className="flex items-center gap-2">
                     <span className="text-[11px] text-gray-400 font-medium">Sort by:</span>
                     <div className="relative">
                       <select
