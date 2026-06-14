@@ -211,16 +211,16 @@ export function DiscoverGrid({ initialTolees, tolees: propTolees, isAuthenticate
                   </div>
 
                   {/* Card Content block */}
-                  <CardContent className="p-4 flex-grow flex flex-col pt-4">
-                    {/* Round Avatar and Title Row (Skool Style) */}
-                    <div className="flex items-center gap-3 mb-3 shrink-0">
-                      <Avatar className="w-10 h-10 border border-gray-100 dark:border-zinc-800 shrink-0">
+                  <CardContent className="p-4 pt-0 flex-grow flex flex-col">
+                    {/* Round Avatar and Title Row (Skool Style - Overlapping Banner) */}
+                    <div className="flex items-end gap-3 mb-3 shrink-0 -mt-7 relative z-20">
+                      <Avatar className="w-14 h-14 border-4 border-white dark:border-[#18191a] shadow-md shrink-0 rounded-full">
                         <AvatarImage src={tolee.avatar || '/default-tolee-avatar.svg'} alt={tolee.name} className="object-cover" />
-                        <AvatarFallback className="font-extrabold bg-[#0a7c85] text-white text-[13px]">
+                        <AvatarFallback className="font-extrabold bg-[#0a7c85] text-white text-base">
                           {tolee.name[0]}
                         </AvatarFallback>
                       </Avatar>
-                      <div className="min-w-0 flex-1">
+                      <div className="min-w-0 flex-1 pb-1">
                         <h3 className="font-extrabold text-sm sm:text-[15px] text-gray-900 dark:text-white line-clamp-1 group-hover:text-[#0a7c85] transition-colors leading-snug">
                           {tolee.name}
                         </h3>
