@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Home, Compass, Film, MessageCircle, Menu, User, Settings, Globe, Store, LogOut } from 'lucide-react';
+import { Home, Compass, Film, MessageCircle, Menu, User, Settings, Globe, Store, LogOut, MessageSquare } from 'lucide-react';
 import { useSession, signOut } from 'next-auth/react';
 import { getSidebarData } from '@/actions/user';
 import {
@@ -91,6 +91,10 @@ export function BottomNav() {
                 <DropdownMenuItem onClick={() => router.push('/settings')} className="cursor-pointer flex w-full items-center">
                   <Settings className="mr-2 h-4 w-4" />
                   <span>Settings</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push('/feedback')} className="cursor-pointer flex w-full items-center">
+                  <MessageSquare className="mr-2 h-4 w-4" />
+                  <span>Send Feedback</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => router.push('/my-tolees')} className="cursor-pointer flex w-full items-center">
                   <Globe className="mr-2 h-4 w-4" />

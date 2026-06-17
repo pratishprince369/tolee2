@@ -9,7 +9,7 @@ export async function sendEmail(
   to: string,
   subject: string,
   html: string,
-  emailType: 'verification' | 'password_reset' | 'creator_approval'
+  emailType: 'verification' | 'password_reset' | 'creator_approval' | 'feedback'
 ): Promise<boolean> {
   console.log(`[Email Service] Initiating send to ${to} | Subject: ${subject} | Type: ${emailType}`);
 

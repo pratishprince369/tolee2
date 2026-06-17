@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Search, Bell, MessageCircle, LogOut, User, Settings, Compass, Store, Globe, Heart, Bot, Zap } from 'lucide-react';
+import { Search, Bell, MessageCircle, LogOut, User, Settings, Compass, Store, Globe, Heart, Bot, Zap, MessageSquare } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -383,6 +383,10 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
                   <DropdownMenuItem onClick={() => router.push('/settings')} className="cursor-pointer flex w-full items-center">
                     <Settings className="mr-2 h-4 w-4" />
                     <span>Settings</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => router.push('/feedback')} className="cursor-pointer flex w-full items-center">
+                    <MessageSquare className="mr-2 h-4 w-4" />
+                    <span>Send Feedback</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => router.push('/my-tolees')} className="cursor-pointer flex w-full items-center">
                     <Globe className="mr-2 h-4 w-4" />

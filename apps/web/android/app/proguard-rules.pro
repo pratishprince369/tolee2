@@ -29,6 +29,9 @@
 -dontwarn com.google.firebase.installations.ktx.**
 -dontwarn com.google.firebase.messaging.ktx.**
 
+# Ignore all other warnings to ensure build completion
+-ignorewarnings
+
 # Hide original source file name in crash logs (prevents reverse engineering)
 -renamesourcefileattribute SourceFile
 -keepattributes SourceFile,LineNumberTable

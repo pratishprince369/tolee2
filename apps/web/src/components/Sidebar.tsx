@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Compass, Film, MessageCircle, Bell, PlusCircle, Settings, ShieldCheck, Store, Bot, Globe, Megaphone, Zap } from 'lucide-react';
+import { Home, Compass, Film, MessageCircle, Bell, PlusCircle, Settings, ShieldCheck, Store, Bot, Globe, Megaphone, Zap, MessageSquare } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { useSession } from 'next-auth/react';
@@ -165,12 +165,20 @@ export function Sidebar() {
       {/* Settings / Bottom Footer */}
       <div className="mt-auto p-4 border-t border-zinc-100 dark:border-zinc-900">
         {isAuthenticated && (
-          <Link href="/settings" className="w-full block mb-2">
-            <Button variant="ghost" className="w-full justify-start rounded-2xl h-10 text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-zinc-900/50">
-              <Settings className="w-4 h-4 mr-3 flex-shrink-0" />
-              Settings & Privacy
-            </Button>
-          </Link>
+          <>
+            <Link href="/settings" className="w-full block mb-2">
+              <Button variant="ghost" className="w-full justify-start rounded-2xl h-10 text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-zinc-900/50">
+                <Settings className="w-4 h-4 mr-3 flex-shrink-0" />
+                Settings & Privacy
+              </Button>
+            </Link>
+            <Link href="/feedback" className="w-full block mb-2">
+              <Button variant="ghost" className="w-full justify-start rounded-2xl h-10 text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-zinc-900/50">
+                <MessageSquare className="w-4 h-4 mr-3 flex-shrink-0" />
+                Send Feedback
+              </Button>
+            </Link>
+          </>
         )}
         <div className="px-3 py-1 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-gray-400 font-medium">
           <Link href="/about" className="hover:text-[#0a7c85] dark:hover:text-[#0a7c85] transition-colors">About Us</Link>
