@@ -845,7 +845,7 @@ const ReelSlide = memo(function ReelSlide({
       <div className={`absolute z-10 pointer-events-auto flex flex-col gap-2 ${desktop ? 'bottom-4 left-3 right-3' : 'bottom-[calc(5rem+env(safe-area-inset-bottom))] left-4 right-16'}`}>
         <div className="flex items-center gap-2">
           <Link href={`/u/${reel.author}`}>
-            <div className="relative rounded-full p-[2px] bg-gradient-to-tr from-yellow-400 via-red-500 to-fuchsia-600">
+            <div className={`relative rounded-full ${reel.hasActiveStory ? 'p-[2px] bg-gradient-to-tr from-yellow-400 via-red-500 to-fuchsia-600' : ''}`}>
               <Avatar className="w-8 h-8 border-2 border-black cursor-pointer">
                 <AvatarImage src={getValidAvatarUrl(reel.authorAvatar)} />
                 <AvatarFallback>{reel.author?.[0]}</AvatarFallback>

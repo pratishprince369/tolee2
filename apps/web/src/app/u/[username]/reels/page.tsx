@@ -149,6 +149,15 @@ export default async function UserProfileReels({
     }
   });
 
+  // Fetch active stories count for this profile user
+  const activeStoriesCount = await prisma.story.count({
+    where: {
+      authorId: user.id,
+      expiresAt: { gte: new Date() }
+    }
+  });
+  const hasActiveStory = activeStoriesCount > 0;
+
   const reels = userReels.map((post: any) => {
     const firstTolee = post.tolees?.[0]?.tolee;
     const likedByMe = currentUserId ? post.likes.some((like: any) => like.userId === currentUserId) : false;
@@ -175,7 +184,8 @@ export default async function UserProfileReels({
       isVerified: user.isVerified || false,
       likedByMe,
       savedByMe,
-      repostedByMe
+      repostedByMe,
+      hasActiveStory
     };
   });
 

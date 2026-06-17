@@ -40,6 +40,19 @@ export default async function ReelsPage() {
         pendingFollowAuthorIds = follows.filter(f => f.status === 'pending').map(f => f.followingId);
       }
 
+      // Query active stories for these authors
+      let authorsWithActiveStories: string[] = [];
+      if (authorIds.length > 0) {
+        const activeStories = await prisma.story.findMany({
+          where: {
+            authorId: { in: authorIds },
+            expiresAt: { gte: new Date() }
+          },
+          select: { authorId: true }
+        });
+        authorsWithActiveStories = activeStories.map(s => s.authorId);
+      }
+
       dbReels = videoPosts.map(post => {
         const firstTolee = post.tolees?.[0]?.tolee;
         const likedByMe = currentUserId ? post.likes.some((like: any) => like.userId === currentUserId) : false;
@@ -58,6 +71,8 @@ export default async function ReelsPage() {
         const followStatus = pendingFollowAuthorIds.includes(post.author.id) 
           ? 'pending' 
           : (isFollowing ? 'approved' : null);
+
+        const hasActiveStory = authorsWithActiveStories.includes(post.author.id);
         
         return {
           id: post.id,
@@ -84,7 +99,8 @@ export default async function ReelsPage() {
           repostedByMe,
           resharedByUser,
           isFollowing,
-          followStatus
+          followStatus,
+          hasActiveStory
         };
       });
     }
