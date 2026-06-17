@@ -42,36 +42,36 @@ export async function GET() {
       }
     });
 
-    // 3. Add local mock items to ensure map looks active (Mumbai / Navi Mumbai region defaults)
+    // 3. Add local mock items to ensure map looks active (Kalyan West / Khadakpada focus)
     const mockMarkers = [
       {
         id: 'mock-meetup-1',
         type: 'meetup',
-        name: 'Navi Mumbai Devs Meetup',
-        description: 'Monthly physical meetup of developers, creators, and freelancers in Tolee office area.',
-        latitude: 19.0820,
-        longitude: 72.8890,
-        locationText: 'BKC, Mumbai',
-        link: '/t/mumbai-creators'
+        name: 'Khadakpada Creators Meetup',
+        description: 'Monthly physical meetup of developers, creators, and freelancers in Kalyan.',
+        latitude: 19.2610,
+        longitude: 73.1280,
+        locationText: 'Khadakpada, Kalyan',
+        link: '/t/kalyan-creators'
       },
       {
         id: 'mock-call-1',
         type: 'live_chat',
-        name: 'Pickleball Fanatics Group Call',
-        description: 'Live audio call discussing weekend tournament lineups.',
-        latitude: 19.0650,
-        longitude: 72.8520,
-        locationText: 'Bandra, Mumbai',
-        link: '/t/pickleball'
+        name: 'Kalyan West Sports Group Call',
+        description: 'Live audio call discussing weekend badminton tournament matchups.',
+        latitude: 19.2530,
+        longitude: 73.1200,
+        locationText: 'Kalyan West, Kalyan',
+        link: '/t/sports-kalyan'
       },
       {
         id: 'mock-reels-1',
         type: 'trending_reel',
-        name: 'Street Food Vibe in Mumbai',
-        description: 'Vibrant local street food reels trending in Bandra West.',
-        latitude: 19.0580,
-        longitude: 72.8400,
-        locationText: 'Carter Road, Mumbai',
+        name: 'Riverside Sunset Walk Reel',
+        description: 'Vibrant sunset walk along the riverside road in Kalyan West.',
+        latitude: 19.2585,
+        longitude: 73.1160,
+        locationText: 'Riverside Road, Kalyan',
         link: '/reels'
       }
     ];
