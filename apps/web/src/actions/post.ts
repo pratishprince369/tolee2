@@ -101,58 +101,19 @@ export async function createPost(data: {
       }
     });
 
-    // Handle notifications for requirement posts
-    const matchLocation = data.location?.trim() || "";
-    const matchSubLocation = data.subLocation?.trim() || "";
-
-    if (data.postType === 'requirement' && (matchLocation || matchSubLocation)) {
+    // Handle advanced AI matchmaking for requirement posts
+    if (data.postType === 'requirement') {
       try {
-        const matchingUsers = await prisma.user.findMany({
-          where: {
-            id: { not: userId },
-            location: {
-              not: null,
-            },
-            OR: [
-              matchLocation ? {
-                location: {
-                  contains: matchLocation,
-                  mode: 'insensitive',
-                }
-              } : undefined,
-              matchSubLocation ? {
-                location: {
-                  contains: matchSubLocation,
-                  mode: 'insensitive',
-                }
-              } : undefined,
-            ].filter(Boolean) as any[]
-          },
-          select: {
-            id: true,
-            name: true,
-            username: true,
-          }
+        const { matchRequirement } = require('@/lib/aiMatchmaker');
+        await matchRequirement({
+          id: post.id,
+          caption: safeContent,
+          location: data.location || null,
+          authorId: userId,
+          authorName: session?.user?.name || 'User'
         });
-
-        if (matchingUsers.length > 0) {
-          const truncatedCaption = safeContent.length > 40
-            ? safeContent.substring(0, 40) + '...'
-            : safeContent;
-
-          const notificationPromises = matchingUsers.map(u => {
-            return createSystemNotification({
-              userId: u.id,
-              type: 'requirement',
-              message: `A new requirement in your location: "${truncatedCaption}"`,
-              link: `/feed`,
-            });
-          });
-
-          await Promise.all(notificationPromises);
-        }
-      } catch (notifErr) {
-        console.error("Error dispatching requirement notifications:", notifErr);
+      } catch (matchErr) {
+        console.error("Error running AI Matchmaker on new post:", matchErr);
       }
     }
 
