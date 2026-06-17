@@ -50,6 +50,21 @@ export async function createPost(data: {
       return { success: false, error: 'Post content cannot be empty.' };
     }
 
+    // AI Panchayat Content Moderation Check
+    const { moderateContent } = require('@/lib/aiPanchayat');
+    const moderation = await moderateContent({
+      userId,
+      contentType: 'post',
+      content: safeContent
+    });
+
+    if (moderation.isFlagged) {
+      return { 
+        success: false, 
+        error: `🚨 Post flagged by AI Panchayat: ${moderation.reason} Your trust score is now ${moderation.newScore}%.` 
+      };
+    }
+
     if (!data.toleeIds || data.toleeIds.length === 0) {
       return { success: false, error: 'Please select at least one Tolee.' };
     }
@@ -142,6 +157,7 @@ export async function getPosts() {
     const posts = await prisma.post.findMany({
       where: {
         isArchived: false,
+        status: 'published',
         ...(currentUserId ? {
           OR: [
             // Public author

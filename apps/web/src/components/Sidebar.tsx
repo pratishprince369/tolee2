@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Compass, Film, MessageCircle, Bell, PlusCircle, Settings, ShieldCheck, Store, Bot, Globe, Megaphone, Zap, MessageSquare } from 'lucide-react';
+import { Home, Compass, Film, MessageCircle, Bell, PlusCircle, Settings, ShieldCheck, Store, Bot, Globe, Megaphone, Zap, MessageSquare, Map } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { useSession } from 'next-auth/react';
@@ -18,23 +18,26 @@ export function Sidebar() {
     managedTolees: any[],
     joinedTolees: any[],
     unreadNotifications: number,
-    unreadMessages: number
+    unreadMessages: number,
+    isVerifiedCreator: boolean,
   }>({
     managedTolees: [],
     joinedTolees: [],
     unreadNotifications: 0,
-    unreadMessages: 0
+    unreadMessages: 0,
+    isVerifiedCreator: false,
   });
 
   React.useEffect(() => {
     if (isAuthenticated) {
-      getSidebarData().then(res => {
+      getSidebarData().then((res: any) => {
         if (res.success) {
           setData({
             managedTolees: res.managedTolees || [],
             joinedTolees: res.joinedTolees || [],
             unreadNotifications: res.unreadNotifications || 0,
-            unreadMessages: res.unreadMessages || 0
+            unreadMessages: res.unreadMessages || 0,
+            isVerifiedCreator: res.isVerifiedCreator || false,
           });
         }
       });
@@ -50,10 +53,12 @@ export function Sidebar() {
     { name: 'Notifications', href: '/notifications', icon: Bell, badge: data.unreadNotifications > 0 ? String(data.unreadNotifications) : null },
     { name: 'Marketplace', href: '/marketplace', icon: Store },
     { name: 'Tolee World', href: '/world', icon: Globe },
+    { name: 'Live Map', href: '/map', icon: Map },
     { name: 'Ads Manager', href: '/ads-manager', icon: Megaphone },
     { name: 'Creator Program', href: '/creator-program', icon: Zap, isCreator: true },
   ] : [
     { name: 'Discover', href: '/discover', icon: Compass },
+    { name: 'Live Map', href: '/map', icon: Map },
     { name: 'Creator Program', href: '/creator-program', icon: Zap, isCreator: true },
   ];
 

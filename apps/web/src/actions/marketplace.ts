@@ -154,6 +154,21 @@ export async function createListing(data: {
       safeContactEmail = data.contactEmail;
     }
 
+    // AI Panchayat Content Moderation Check
+    const { moderateContent } = require('@/lib/aiPanchayat');
+    const moderation = await moderateContent({
+      userId,
+      contentType: 'listing',
+      content: `${safeTitle} ${safeDescription} ${safeTags || ''}`
+    });
+
+    if (moderation.isFlagged) {
+      return { 
+        success: false, 
+        error: `🚨 Listing flagged by AI Panchayat: ${moderation.reason} Your trust score is now ${moderation.newScore}%.` 
+      };
+    }
+
     if (data.price < 0) {
       return { success: false, error: 'Price cannot be negative.' };
     }
