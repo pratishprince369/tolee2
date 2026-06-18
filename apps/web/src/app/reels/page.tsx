@@ -8,7 +8,7 @@ import { prisma } from '@/lib/prisma';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-export default async function ReelsPage() {
+export default async function ReelsPage({ searchParams }: { searchParams: { videoId?: string } }) {
   const session = await getServerSession(authOptions);
   
   if (!session?.user) {
@@ -79,7 +79,7 @@ export default async function ReelsPage() {
           authorId: post.author.id,
           authorIsPrivate: post.author.isPrivate || false,
           visibility: post.visibility,
-          video: post.mediaUrls,
+          video: post.mediaUrls.split(/,(?=https?:\/\/)/)[0],
           author: post.author.username,
           authorAvatar: post.author.avatar || '/default-user-avatar.svg',
           toleeName: firstTolee?.name || null,
@@ -104,6 +104,100 @@ export default async function ReelsPage() {
         };
       });
     }
+
+    // Direct target video arrangement
+    const targetVideoId = searchParams?.videoId;
+    if (targetVideoId) {
+      const targetIdx = dbReels.findIndex(r => r.id === targetVideoId);
+      if (targetIdx !== -1) {
+        const [targetReel] = dbReels.splice(targetIdx, 1);
+        dbReels.unshift(targetReel);
+      } else {
+        try {
+          const post = await prisma.post.findUnique({
+            where: { id: targetVideoId },
+            include: {
+              author: true,
+              likes: true,
+              comments: true,
+              reposts: {
+                include: { user: true }
+              },
+              tolees: {
+                include: { tolee: true }
+              },
+              _count: {
+                select: { views: true, reposts: true }
+              }
+            }
+          });
+
+          if (post && post.mediaUrls && post.mediaTypes && post.mediaTypes.split(',')[0] === 'video') {
+            const firstTolee = post.tolees?.[0]?.tolee;
+            const likedByMe = currentUserId ? post.likes.some((like: any) => like.userId === currentUserId) : false;
+            const savedByMe = currentUserId ? post.savedBy.some((save: any) => save.userId === currentUserId) : false;
+            const repostedByMe = currentUserId ? post.reposts.some((rep: any) => rep.userId === currentUserId) : false;
+            const repostsCount = post._count?.reposts || 0;
+            const mostRecentRepost = post.reposts?.[0];
+            const resharedByUser = mostRecentRepost ? {
+              username: mostRecentRepost.user.username,
+              name: mostRecentRepost.user.name,
+              avatar: mostRecentRepost.user.avatar || '/default-user-avatar.svg'
+            } : null;
+
+            let isFollowing = false;
+            let followStatus = null;
+            if (currentUserId) {
+              const follow = await prisma.follow.findFirst({
+                where: { followerId: currentUserId, followingId: post.author.id }
+              });
+              if (follow) {
+                isFollowing = follow.status === 'approved';
+                followStatus = follow.status;
+              }
+            }
+
+            const activeStory = await prisma.story.findFirst({
+              where: { authorId: post.author.id, expiresAt: { gte: new Date() } }
+            });
+            const hasActiveStory = !!activeStory;
+
+            const singleReel = {
+              id: post.id,
+              authorId: post.author.id,
+              authorIsPrivate: post.author.isPrivate || false,
+              visibility: post.visibility,
+              video: post.mediaUrls.split(/,(?=https?:\/\/)/)[0],
+              author: post.author.username,
+              authorAvatar: post.author.avatar || '/default-user-avatar.svg',
+              toleeName: firstTolee?.name || null,
+              toleeSlug: firstTolee?.slug || null,
+              toleeId: firstTolee?.id || null,
+              role: firstTolee?.ownerId === post.author.id ? 'Admin' : 'Member',
+              caption: post.caption || '',
+              likes: post.likes?.length || 0,
+              comments: post.comments?.length || 0,
+              views: post._count?.views || 0,
+              shares: '0',
+              reposts: repostsCount,
+              audio: 'Original Audio',
+              isVerified: false,
+              likedByMe,
+              savedByMe,
+              repostedByMe,
+              resharedByUser,
+              isFollowing,
+              followStatus,
+              hasActiveStory
+            };
+            dbReels.unshift(singleReel);
+          }
+        } catch (err) {
+          console.error("Failed to query direct target video for reels:", err);
+        }
+      }
+    }
+
   } catch (err) {
     console.error("Failed to load DB reels", err);
   }

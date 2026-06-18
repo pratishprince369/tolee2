@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Volume2, VolumeX, Play } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import {
   HLSVideo,
   setGlobalActiveVideo,
@@ -20,9 +21,11 @@ interface PostCarouselProps {
 interface CarouselVideoProps {
   src: string;
   isActive: boolean;
+  postId: string;
 }
 
-function CarouselVideo({ src, isActive }: CarouselVideoProps) {
+function CarouselVideo({ src, isActive, postId }: CarouselVideoProps) {
+  const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isMuted, setIsMuted] = useState(true);
@@ -144,18 +147,9 @@ function CarouselVideo({ src, isActive }: CarouselVideoProps) {
     };
   }, []);
 
-  const togglePlay = (e: React.MouseEvent) => {
+  const handleVideoClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const video = videoRef.current;
-    if (!video) return;
-
-    if (isPlaying) {
-      video.pause();
-    } else {
-      setGlobalActiveVideo(video);
-      video.muted = getSoundPreference();
-      video.play().catch(() => {});
-    }
+    router.push(`/reels?videoId=${postId}`);
   };
 
   const toggleMute = (e: React.MouseEvent) => {
@@ -168,7 +162,7 @@ function CarouselVideo({ src, isActive }: CarouselVideoProps) {
   };
 
   return (
-    <div ref={containerRef} className="relative w-full h-full bg-black flex items-center justify-center cursor-pointer" onClick={togglePlay}>
+    <div ref={containerRef} className="relative w-full h-full bg-black flex items-center justify-center cursor-pointer" onClick={handleVideoClick}>
       <HLSVideo
         ref={videoRef}
         src={src}
@@ -269,7 +263,7 @@ export function PostCarousel({ mediaUrls, mediaTypes, postId }: PostCarouselProp
         {items.map((item, idx) => (
           <div key={idx} className="h-full relative overflow-hidden flex items-center justify-center" style={{ width: `${100 / items.length}%` }}>
             {item.type === 'video' ? (
-              <CarouselVideo src={item.url} isActive={idx === activeIndex} />
+              <CarouselVideo src={item.url} isActive={idx === activeIndex} postId={postId} />
             ) : (
               <img 
                 src={item.url} 
