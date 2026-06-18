@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent, CardHeader, CardFooter } from '@/components/ui/card';
@@ -12,7 +12,8 @@ import {
   Image as ImageIcon, Video, FileText, ChevronRight,
   Trophy, Users, Calendar, BookOpen, Star, ShieldCheck,
   TrendingUp, PlayCircle, MapPin, Globe, AlertTriangle, Search, Repeat, Store,
-  UtensilsCrossed, ShoppingBag, CheckCircle2, Lock
+  UtensilsCrossed, ShoppingBag, CheckCircle2, Lock,
+  VideoOff, Mic, MicOff, Monitor, Radio, Sparkles
 } from 'lucide-react';
 
 import { CreatePostModal } from '@/components/CreatePostModal';
@@ -57,6 +58,197 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
       window.history.replaceState({ ...window.history.state, as: newUrl, url: newUrl }, '', newUrl);
     }
   }, [searchParams]);
+
+  // Masterclass Live Stage States
+  const [isLive, setIsLive] = useState(false);
+  const [isMicOn, setIsMicOn] = useState(true);
+  const [isCamOn, setIsCamOn] = useState(true);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [isUserJoined, setIsUserJoined] = useState(false);
+  const [viewerCount, setViewerCount] = useState(0);
+  const [liveChatMessages, setLiveChatMessages] = useState<any[]>([]);
+  const [liveChatInput, setLiveChatInput] = useState('');
+  
+  const cameraStreamRef = useRef<MediaStream | null>(null);
+  const screenStreamRef = useRef<MediaStream | null>(null);
+  const videoElementRef = useRef<HTMLVideoElement>(null);
+
+  const startLiveBroadcast = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true
+      });
+      cameraStreamRef.current = stream;
+      setIsLive(true);
+      setIsCamOn(true);
+      setIsMicOn(true);
+      setViewerCount(Math.floor(Math.random() * 20) + 10);
+      
+      setLiveChatMessages([
+        { sender: 'System 🤖', avatar: '', message: '🎓 MLM Live Training Masterclass has started! Join now!', time: 'Now', isSystem: true }
+      ]);
+
+      setTimeout(() => {
+        if (videoElementRef.current) {
+          videoElementRef.current.srcObject = stream;
+        }
+      }, 300);
+
+      alert("🚀 Automatic push notification simulated to all group members: 'Join live training by admin now!'");
+    } catch (err) {
+      console.error('Failed to start camera:', err);
+      alert('Camera access is required to host the Live Masterclass.');
+    }
+  };
+
+  const toggleCamera = () => {
+    if (cameraStreamRef.current) {
+      const videoTrack = cameraStreamRef.current.getVideoTracks()[0];
+      if (videoTrack) {
+        videoTrack.enabled = !videoTrack.enabled;
+        setIsCamOn(videoTrack.enabled);
+      }
+    }
+  };
+
+  const toggleMic = () => {
+    if (cameraStreamRef.current) {
+      const audioTrack = cameraStreamRef.current.getAudioTracks()[0];
+      if (audioTrack) {
+        audioTrack.enabled = !audioTrack.enabled;
+        setIsMicOn(audioTrack.enabled);
+      }
+    }
+  };
+
+  const toggleScreenShare = async () => {
+    if (isScreenSharing) {
+      if (screenStreamRef.current) {
+        screenStreamRef.current.getTracks().forEach(t => t.stop());
+        screenStreamRef.current = null;
+      }
+      setIsScreenSharing(false);
+      if (videoElementRef.current && cameraStreamRef.current) {
+        videoElementRef.current.srcObject = cameraStreamRef.current;
+      }
+    } else {
+      try {
+        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        screenStreamRef.current = stream;
+        setIsScreenSharing(true);
+        if (videoElementRef.current) {
+          videoElementRef.current.srcObject = stream;
+        }
+        stream.getVideoTracks()[0].onended = () => {
+          setIsScreenSharing(false);
+          if (videoElementRef.current && cameraStreamRef.current) {
+            videoElementRef.current.srcObject = cameraStreamRef.current;
+          }
+        };
+      } catch (err) {
+        console.error('Failed to screenshare:', err);
+      }
+    }
+  };
+
+  const stopLiveBroadcast = () => {
+    if (cameraStreamRef.current) {
+      cameraStreamRef.current.getTracks().forEach(t => t.stop());
+      cameraStreamRef.current = null;
+    }
+    if (screenStreamRef.current) {
+      screenStreamRef.current.getTracks().forEach(t => t.stop());
+      screenStreamRef.current = null;
+    }
+    setIsLive(false);
+    setIsScreenSharing(false);
+    setIsUserJoined(false);
+    setViewerCount(0);
+    setLiveChatMessages([]);
+  };
+
+  const joinLiveBroadcast = () => {
+    setIsUserJoined(true);
+    setViewerCount(Math.floor(Math.random() * 80) + 120);
+    setLiveChatMessages([
+      { sender: 'System 🤖', avatar: '', message: '👋 You joined the Live Masterclass. Hello!', time: 'Now', isSystem: true }
+    ]);
+  };
+
+  const leaveLiveBroadcast = () => {
+    setIsUserJoined(false);
+    setViewerCount(0);
+    setLiveChatMessages([]);
+  };
+
+  const sendLiveChatMessage = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!liveChatInput.trim()) return;
+    setLiveChatMessages(prev => [
+      ...prev,
+      {
+        sender: session?.user?.name || 'Me',
+        avatar: session?.user?.image || '/default-user-avatar.svg',
+        message: liveChatInput.trim(),
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }
+    ]);
+    setLiveChatInput('');
+  };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (cameraStreamRef.current) {
+        cameraStreamRef.current.getTracks().forEach(t => t.stop());
+      }
+      if (screenStreamRef.current) {
+        screenStreamRef.current.getTracks().forEach(t => t.stop());
+      }
+    };
+  }, []);
+
+  // Chat simulator
+  useEffect(() => {
+    let interval: any;
+    if (isLive || isUserJoined) {
+      const mockMessages = [
+        "Kya baath hai, sir! Kamaal ka conversion formula hai! 🔥",
+        "Sir, downline members ke lead generation ko kaise speed up karein?",
+        "Best network marketing strategy explained simply. 🚀",
+        "Team Kalyan and Khadakpada present here! 🌟",
+        "Vestige/Herbalife ke plan payouts ka details aacha bataya.",
+        "Aapka training program hamesha simple aur practical hota hai.",
+        "Agle session ke tickets kab open honge sir?",
+        "Audio and video quality is crystal clear! 👍",
+        "Next target is to reach Level 7 by next month!",
+        "Double benefits matrix plan looks amazing.",
+        "Super logic sir, main apni puri team ko share karunga."
+      ];
+      
+      const mockNames = [
+        "Rohan Patil", "Amit Sharma", "Pooja Rupawate", "Sandeep Kalyan", "Kunal G.", 
+        "Dwight K.", "Jim Halpert", "Nisha Patel", "Vikram Rathore", "Sunil Yadav"
+      ];
+
+      interval = setInterval(() => {
+        const randomMsg = mockMessages[Math.floor(Math.random() * mockMessages.length)];
+        const randomName = mockNames[Math.floor(Math.random() * mockNames.length)];
+        setLiveChatMessages(prev => [
+          ...prev,
+          {
+            sender: randomName,
+            avatar: `https://i.pravatar.cc/150?u=${randomName.replace(/\s+/g, '')}`,
+            message: randomMsg,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          }
+        ]);
+        setViewerCount(prev => prev + (Math.random() > 0.4 ? 1 : -1));
+      }, 5000);
+    }
+    return () => clearInterval(interval);
+  }, [isLive, isUserJoined]);
 
   React.useEffect(() => {
     if (currentUserId) return;
@@ -461,7 +653,7 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
 
           {/* Tolee Navigation Tabs */}
           <div className="flex overflow-x-auto hide-scrollbar border-b border-gray-100 dark:border-gray-800">
-            {['about', 'community', 'classroom', 'calendar', 'members', 'leaderboard', 'marketplace'].map((tab) => (
+            {['about', 'community', 'live', 'classroom', 'calendar', 'members', 'leaderboard', 'marketplace'].map((tab) => (
               <button 
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -471,7 +663,7 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                     : 'border-transparent text-gray-500 hover:text-gray-900 dark:hover:text-white'
                 }`}
               >
-                {tab}
+                {tab === 'live' ? 'Live Masterclass 🎓' : tab}
               </button>
             ))}
           </div>
@@ -1190,6 +1382,245 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                     );
                   });
                 })()}
+
+                {/* Live Masterclass Tab Content */}
+                {activeTab === 'live' && (
+                  <div className="space-y-6">
+                    {/* Header Banner */}
+                    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-teal-900 to-indigo-950 p-8 text-white shadow-xl border border-teal-500/20">
+                      <div className="absolute right-0 top-0 -mr-16 -mt-16 w-64 h-64 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
+                      <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
+                        <div>
+                          <div className="flex items-center gap-2 mb-3">
+                            <span className="flex h-2.5 w-2.5 relative">
+                              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isLive || isUserJoined ? 'bg-red-400' : 'bg-gray-400'}`}></span>
+                              <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isLive || isUserJoined ? 'bg-red-500' : 'bg-gray-500'}`}></span>
+                            </span>
+                            <span className="text-xs font-bold uppercase tracking-wider text-teal-400">
+                              {isLive || isUserJoined ? 'Live Broadcast' : 'Offline'}
+                            </span>
+                          </div>
+                          <h2 className="text-3xl font-extrabold tracking-tight">MLM Live Masterclass Stage</h2>
+                          <p className="text-gray-300 mt-2 max-w-xl text-sm leading-relaxed">
+                            Aapki network marketing teams ke liye direct live audio & video classes, interactive webinars aur digital screen sharing.
+                          </p>
+                        </div>
+                        
+                        {isAdmin ? (
+                          !isLive ? (
+                            <Button 
+                              onClick={startLiveBroadcast}
+                              className="bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white font-bold px-8 py-6 rounded-xl shadow-lg shadow-teal-500/25 flex items-center gap-2 transform active:scale-95 transition-all"
+                            >
+                              <Radio className="w-5 h-5 animate-pulse" />
+                              Go Live Now 🚀
+                            </Button>
+                          ) : (
+                            <Button 
+                              onClick={stopLiveBroadcast}
+                              variant="destructive"
+                              className="font-bold px-8 py-6 rounded-xl shadow-lg shadow-red-500/25 flex items-center gap-2 transform active:scale-95 transition-all"
+                            >
+                              <StopCircle className="w-5 h-5" />
+                              End Live Broadcast
+                            </Button>
+                          )
+                        ) : (
+                          // Non-admin view
+                          isLive && !isUserJoined ? (
+                            <Button 
+                              onClick={joinLiveBroadcast}
+                              className="bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white font-bold px-8 py-6 rounded-xl shadow-lg shadow-teal-500/25 flex items-center gap-2 transform active:scale-95 transition-all"
+                            >
+                              <PlayCircle className="w-5 h-5" />
+                              Join Live Training
+                            </Button>
+                          ) : isUserJoined ? (
+                            <Button 
+                              onClick={leaveLiveBroadcast}
+                              variant="outline"
+                              className="border-white/20 hover:bg-white/10 text-white font-bold px-8 py-6 rounded-xl flex items-center gap-2 transform active:scale-95 transition-all"
+                            >
+                              Leave Masterclass
+                            </Button>
+                          ) : (
+                            <div className="bg-white/5 border border-white/10 backdrop-blur-md px-6 py-4 rounded-xl text-center">
+                              <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Next Live Session</p>
+                              <p className="text-sm font-bold text-teal-400 mt-1">Starting soon by Admin</p>
+                            </div>
+                          )
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Live Screen & Sidebar Grid */}
+                    {(isLive || isUserJoined) ? (
+                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* Video Player Box */}
+                        <div className="lg:col-span-2 flex flex-col gap-4">
+                          <div className="relative aspect-video rounded-2xl bg-black overflow-hidden border border-gray-800 shadow-2xl group">
+                            
+                            {/* Live Badge */}
+                            <div className="absolute top-4 left-4 z-10 flex items-center gap-2 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
+                              <span className="h-2 w-2 rounded-full bg-red-500 animate-ping" />
+                              <span className="text-[10px] font-bold tracking-wider uppercase text-white">LIVE</span>
+                            </div>
+
+                            {/* Viewer count */}
+                            <div className="absolute top-4 right-4 z-10 flex items-center gap-2 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
+                              <Users className="w-3.5 h-3.5 text-gray-400" />
+                              <span className="text-[10px] font-bold text-white">{viewerCount} Viewers</span>
+                            </div>
+
+                            {/* Video Stream Element */}
+                            {isAdmin ? (
+                              <video 
+                                ref={videoElementRef}
+                                autoPlay 
+                                playsInline 
+                                muted 
+                                className={`w-full h-full object-cover transform ${isScreenSharing ? '' : 'scale-x-[-1]'}`}
+                              />
+                            ) : (
+                              /* Member viewing admin stream placeholder */
+                              <div className="w-full h-full relative flex items-center justify-center bg-zinc-950">
+                                <div className="absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_center,rgba(10,124,133,0.3)_0,transparent_70%)] animate-pulse" />
+                                
+                                <div className="z-10 flex flex-col items-center gap-4 text-center p-6">
+                                  <div className="w-20 h-20 rounded-full bg-teal-500/10 border border-teal-500/30 flex items-center justify-center animate-bounce">
+                                    <Radio className="w-10 h-10 text-[#0a7c85]" />
+                                  </div>
+                                  <div>
+                                    <h3 className="font-bold text-lg text-white">Admin Ka Live Stream Chal Raha Hai</h3>
+                                    <p className="text-xs text-gray-400 max-w-sm mt-1">
+                                      Screen Share ya Webcam broadcast stream settings fully active hain. Welcome to the webinar!
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Control Bar (Only for Admin host) */}
+                            {isAdmin && (
+                              <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-10 flex items-center gap-3 bg-black/80 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-white/10 shadow-lg opacity-90 hover:opacity-100 transition-opacity">
+                                <Button 
+                                  size="icon" 
+                                  variant="ghost" 
+                                  onClick={toggleMic}
+                                  className={`rounded-xl h-10 w-10 ${isMicOn ? 'text-white hover:bg-white/10' : 'text-red-500 bg-red-500/20 hover:bg-red-500/30'}`}
+                                >
+                                  {isMicOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
+                                </Button>
+                                
+                                <Button 
+                                  size="icon" 
+                                  variant="ghost" 
+                                  onClick={toggleCamera}
+                                  className={`rounded-xl h-10 w-10 ${isCamOn ? 'text-white hover:bg-white/10' : 'text-red-500 bg-red-500/20 hover:bg-red-500/30'}`}
+                                >
+                                  {isCamOn ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
+                                </Button>
+
+                                <div className="w-[1px] h-6 bg-white/10 mx-1" />
+
+                                <Button 
+                                  onClick={toggleScreenShare}
+                                  variant="ghost" 
+                                  className={`rounded-xl h-10 text-xs font-bold px-3 gap-2 ${isScreenSharing ? 'text-teal-400 bg-teal-400/20 hover:bg-teal-400/30' : 'text-white hover:bg-white/10'}`}
+                                >
+                                  <Monitor className="w-4 h-4" />
+                                  {isScreenSharing ? 'Sharing' : 'Share Screen'}
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                          
+                          <div className="flex justify-between items-center bg-gray-50 dark:bg-zinc-900/50 p-4 rounded-xl border border-gray-200 dark:border-gray-800">
+                            <div>
+                              <p className="text-xs text-gray-500 font-semibold">Broadcasting Node</p>
+                              <h4 className="font-bold text-sm text-gray-800 dark:text-white mt-0.5">Tolee Media Gateway Server-4</h4>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs font-bold text-emerald-500">
+                              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                              Active Latency: 48ms
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Interactive Chat Sidebar */}
+                        <div className="flex flex-col h-[480px] bg-white dark:bg-[#121212] rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm">
+                          <div className="p-4 border-b border-gray-100 dark:border-zinc-900 flex justify-between items-center bg-gray-50 dark:bg-zinc-900/30">
+                            <h3 className="font-bold text-sm tracking-wide text-gray-800 dark:text-white uppercase">Live Training Chat</h3>
+                            <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-1 rounded-full uppercase">Matrix Network</span>
+                          </div>
+
+                          {/* Chat Box Area */}
+                          <div className="flex-1 overflow-y-auto p-4 space-y-4 select-none hide-scrollbar">
+                            {liveChatMessages.map((msg, index) => (
+                              <div key={index} className="flex gap-2">
+                                {msg.isSystem ? (
+                                  <div className="w-full bg-teal-500/10 border border-teal-500/20 rounded-xl p-3 text-xs text-teal-600 dark:text-teal-400 font-medium text-center">
+                                    {msg.message}
+                                  </div>
+                                ) : (
+                                  <>
+                                    <Avatar className="w-8 h-8 rounded-full border border-gray-100 dark:border-zinc-800">
+                                      <AvatarImage src={msg.avatar} />
+                                      <AvatarFallback className="text-xs bg-primary/10 text-primary font-bold">{msg.sender?.[0]}</AvatarFallback>
+                                    </Avatar>
+                                    <div className="flex-1">
+                                      <div className="flex items-baseline gap-1.5">
+                                        <span className="text-xs font-bold text-gray-800 dark:text-gray-200">{msg.sender}</span>
+                                        <span className="text-[9px] text-gray-400">{msg.time}</span>
+                                      </div>
+                                      <p className="text-xs text-gray-600 dark:text-gray-300 mt-0.5 leading-relaxed">
+                                        {msg.message}
+                                      </p>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Send input */}
+                          <form onSubmit={sendLiveChatMessage} className="p-3 border-t border-gray-100 dark:border-zinc-900 bg-gray-50 dark:bg-zinc-900/30 flex gap-2">
+                            <Input 
+                              type="text" 
+                              value={liveChatInput}
+                              onChange={(e) => setLiveChatInput(e.target.value)}
+                              placeholder="Type something to join discussion..." 
+                              className="flex-1 text-xs bg-white dark:bg-zinc-950 border-gray-200 dark:border-zinc-800 rounded-xl h-10 px-3"
+                            />
+                            <Button type="submit" size="icon" className="rounded-xl h-10 w-10 bg-primary hover:bg-primary/95 text-white">
+                              <Send className="w-4 h-4" />
+                            </Button>
+                          </form>
+                        </div>
+                      </div>
+                    ) : (
+                      /* Offline Stage Information Banner */
+                      <Card className="border-gray-200 dark:border-gray-800 bg-white dark:bg-[#121212] overflow-hidden p-8 text-center flex flex-col items-center justify-center">
+                        <div className="w-20 h-20 bg-gray-100 dark:bg-zinc-900 rounded-full flex items-center justify-center mb-4 text-gray-400">
+                          <Radio className="w-10 h-10" />
+                        </div>
+                        <h3 className="font-extrabold text-xl mb-2 text-gray-900 dark:text-white">Live Masterclass Offline Hai</h3>
+                        <p className="text-sm text-gray-500 max-w-md mx-auto mb-6">
+                          Group super admin jab bhi live training program ya matrix plan calculation broadcast karenge, aapko automatic push notification alert mil jayega.
+                        </p>
+                        {isAdmin && (
+                          <Button 
+                            onClick={startLiveBroadcast}
+                            className="bg-[#0a7c85] hover:bg-[#08676f] text-white font-bold px-6 py-5 rounded-xl flex items-center gap-2"
+                          >
+                            <Radio className="w-4 h-4" />
+                            Go Live Broadcast Now
+                          </Button>
+                        )}
+                      </Card>
+                    )}
+                  </div>
+                )}
 
                 {/* Classroom Tab Content */}
                 {activeTab === 'classroom' && (
