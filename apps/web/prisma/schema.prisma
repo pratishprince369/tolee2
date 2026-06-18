@@ -127,6 +127,11 @@ model User {
   creatorStatus      String?  // "pending" | "approved" | "rejected"
   creatorTier        String?  // "creator" | "influencer" | "vip_creator" | "verified_creator" | "premium_partner"
   creatorApplication CreatorApplication?
+
+  // Agentic AI Reels configuration
+  agenticReelsEnabled  Boolean   @default(false)
+  agenticInterval      String    @default("DAILY") // "20_MINS", "1_HOUR", "DAILY"
+  agenticLastPostAt    DateTime?
 }
 
 model EmailLog {

@@ -16,6 +16,7 @@ const navItems = [
   { href: '/super-admin/branding', label: 'Branding Settings', icon: '🎨' },
   { href: '/super-admin/contacts', label: 'Contact Queries', icon: '📬' },
   { href: '/super-admin/analytics', label: 'Visitor Analytics', icon: '📈' },
+  { href: '/super-admin/agentic-ai', label: 'Agentic AI Reels', icon: '🤖' },
 ];
 
 export default function SuperAdminLayout({ children }: { children: React.ReactNode }) {
