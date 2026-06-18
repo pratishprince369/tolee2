@@ -68,13 +68,65 @@ export default function InteractiveMapPage() {
     };
     document.body.appendChild(script);
 
+    // Global listener for Leaflet popup routing clicks (Fast Next.js client-side navigation)
+    const handlePopupClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const link = target.closest('.popup-link') as HTMLAnchorElement;
+      if (link) {
+        e.preventDefault();
+        const href = link.getAttribute('href');
+        if (href) {
+          router.push(href);
+        }
+      }
+    };
+    document.addEventListener('click', handlePopupClick);
+
     return () => {
+      document.removeEventListener('click', handlePopupClick);
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
       }
     };
   }, []);
+
+  // Custom styled popup content markup string generator
+  const getPopupContent = (marker: MapMarker) => {
+    const typeLabel = marker.type.replace('_', ' ');
+    const imageHtml = marker.image 
+      ? `<img src="${marker.image}" style="width: 50px; height: 50px; border-radius: 10px; object-cover; border: 1px solid #e4e4e7; margin-top: 4px;" />` 
+      : '';
+      
+    return `
+      <div class="p-1" style="font-family: inherit; width: 230px;">
+        <div style="display: flex; justify-content: space-between; gap: 8px; align-items: start;">
+          <div style="flex: 1; min-width: 0;">
+            <span style="font-size: 8px; font-weight: 800; text-transform: uppercase; color: #065f46; background-color: #d1fae5; padding: 2px 8px; border-radius: 9999px; display: inline-block;">
+              ${typeLabel}
+            </span>
+            <h3 style="font-size: 13px; font-weight: 800; color: #09090b; margin: 6px 0 2px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+              ${marker.name}
+            </h3>
+            <p style="font-size: 10px; color: #71717a; margin: 0; display: flex; align-items: center; gap: 4px;">
+              📍 <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; width: 130px;">${marker.locationText}</span>
+            </p>
+          </div>
+          ${imageHtml}
+        </div>
+        
+        <p style="font-size: 11px; color: #3f3f46; line-height: 1.4; background-color: #f4f4f5; padding: 8px; border-radius: 8px; border: 1px solid #e4e4e7; margin: 10px 0 8px 0; max-height: 80px; overflow-y: auto;">
+          ${marker.description}
+        </p>
+        
+        <div style="margin-top: 8px;">
+          <a href="${marker.link}" class="popup-link" style="display: block; text-align: center; padding: 8px 0; border-radius: 10px; background: linear-gradient(135deg, #059669, #10b981); color: white; font-size: 11px; font-weight: 800; text-decoration: none; box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.2); transition: all 0.2s;">
+            Enter Spot 🚀
+          </a>
+        </div>
+      </div>
+    `;
+  };
 
   const initMap = async () => {
     const freshMarkers = await fetchMarkers();
@@ -103,6 +155,25 @@ export default function InteractiveMapPage() {
     L.control.zoom({
       position: 'bottomright'
     }).addTo(map);
+
+    // Listen to popup events to highlight sidebar items dynamically
+    map.on('popupopen', (e: any) => {
+      const latlng = e.popup.getLatLng();
+      if (latlng) {
+        const matched = freshMarkers.find(
+          (m: MapMarker) =>
+            Math.abs(m.latitude - latlng.lat) < 0.0001 &&
+            Math.abs(m.longitude - latlng.lng) < 0.0001
+        );
+        if (matched) {
+          setActiveMarker(matched);
+        }
+      }
+    });
+
+    map.on('popupclose', () => {
+      setActiveMarker(null);
+    });
 
     // Render markers on map
     renderMarkers(L, map, freshMarkers);
@@ -171,8 +242,13 @@ export default function InteractiveMapPage() {
 
       const mapMarker = L.marker([marker.latitude, marker.longitude], { icon: customIcon }).addTo(map);
 
+      // Bind the custom premium glassmorphic popup
+      mapMarker.bindPopup(getPopupContent(marker), {
+        maxWidth: 280,
+        className: 'premium-leaflet-popup'
+      });
+
       mapMarker.on('click', () => {
-        setActiveMarker(marker);
         map.panTo([marker.latitude, marker.longitude]);
       });
     });
@@ -182,10 +258,21 @@ export default function InteractiveMapPage() {
     const L = (window as any).L;
     if (!L || !mapInstanceRef.current) return;
     setActiveMarker(marker);
+    
     mapInstanceRef.current.setView([marker.latitude, marker.longitude], 16, {
       animate: true,
       duration: 1.2
     });
+
+    // Programmatically trigger map popup above icon
+    L.popup({
+      maxWidth: 280,
+      className: 'premium-leaflet-popup',
+      offset: [0, -32]
+    })
+    .setLatLng([marker.latitude, marker.longitude])
+    .setContent(getPopupContent(marker))
+    .openOn(mapInstanceRef.current);
   };
 
   return (
@@ -277,52 +364,6 @@ export default function InteractiveMapPage() {
         )}
       </div>
 
-      {/* Floating Bottom Details Card (Light Glassmorphic) */}
-      {activeMarker && (
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-[calc(100vw-2rem)] sm:w-[420px] bg-white/90 border border-zinc-200/80 backdrop-blur-xl rounded-2xl p-4 z-50 shadow-2xl flex flex-col gap-3 pointer-events-auto animate-fade-in animate-slide-up">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex-1 min-w-0">
-              <span className="text-[9px] uppercase font-black tracking-widest text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full">
-                {activeMarker.type.replace('_', ' ')}
-              </span>
-              <h2 className="text-sm font-black text-zinc-900 mt-2 truncate">{activeMarker.name}</h2>
-              <p className="text-[10px] text-zinc-500 flex items-center gap-1 mt-1">
-                <MapPin className="w-3 h-3 text-emerald-600 shrink-0" />
-                <span className="truncate">{activeMarker.locationText}</span>
-              </p>
-            </div>
-            {activeMarker.image && (
-              <img 
-                src={activeMarker.image} 
-                alt={activeMarker.name}
-                className="w-16 h-16 rounded-xl object-cover border border-zinc-200 shrink-0 shadow-sm"
-              />
-            )}
-          </div>
-
-          <p className="text-[11px] text-zinc-600 leading-relaxed bg-zinc-50/50 p-2.5 rounded-lg border border-zinc-100">
-            {activeMarker.description}
-          </p>
-
-          <div className="flex items-center gap-2 mt-1">
-            <button 
-              onClick={() => setActiveMarker(null)}
-              className="flex-1 py-2 rounded-xl bg-white border border-zinc-200 hover:bg-zinc-50 transition-colors text-xs font-bold text-zinc-700 shadow-sm"
-            >
-              Close Map Info
-            </button>
-            <Link href={activeMarker.link} className="flex-1">
-              <button 
-                className="w-full py-2 rounded-xl text-white text-xs font-black shadow-md hover:brightness-105 active:scale-95 transition-all"
-                style={{ background: 'linear-gradient(135deg, #059669, #10b981)' }}
-              >
-                Enter Spot 🚀
-              </button>
-            </Link>
-          </div>
-        </div>
-      )}
-
       {/* Global Map Styles & Animations */}
       <style jsx global>{`
         @keyframes pulse-ring {
@@ -345,6 +386,37 @@ export default function InteractiveMapPage() {
         .scrollbar-thin::-webkit-scrollbar-thumb {
           background: rgba(0, 0, 0, 0.1);
           border-radius: 2px;
+        }
+        /* Custom Leaflet Popup styling to match glassmorphic premium design */
+        .premium-leaflet-popup .leaflet-popup-content-wrapper {
+          background: rgba(255, 255, 255, 0.92) !important;
+          backdrop-filter: blur(12px) !important;
+          -webkit-backdrop-filter: blur(12px) !important;
+          border: 1px solid rgba(228, 228, 231, 0.7) !important;
+          border-radius: 16px !important;
+          box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+          padding: 8px 4px 4px 4px !important;
+        }
+        .premium-leaflet-popup .leaflet-popup-tip {
+          background: rgba(255, 255, 255, 0.92) !important;
+          backdrop-filter: blur(12px) !important;
+          -webkit-backdrop-filter: blur(12px) !important;
+          border-left: 1px solid rgba(228, 228, 231, 0.7) !important;
+          border-bottom: 1px solid rgba(228, 228, 231, 0.7) !important;
+          box-shadow: none !important;
+        }
+        .premium-leaflet-popup .leaflet-popup-content {
+          margin: 8px !important;
+        }
+        .premium-leaflet-popup .leaflet-popup-close-button {
+          top: 8px !important;
+          right: 8px !important;
+          color: #71717a !important;
+          font-size: 16px !important;
+        }
+        .premium-leaflet-popup .leaflet-popup-close-button:hover {
+          color: #09090b !important;
+          background: transparent !important;
         }
       `}</style>
     </div>
