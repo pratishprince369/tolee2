@@ -86,7 +86,7 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
       setViewerCount(Math.floor(Math.random() * 20) + 10);
       
       setLiveChatMessages([
-        { sender: 'System 🤖', avatar: '', message: '🎓 MLM Live Training Masterclass has started! Join now!', time: 'Now', isSystem: true }
+        { sender: 'System 🤖', avatar: '', message: '🎓 Live Training Masterclass & Meeting has started! Join now!', time: 'Now', isSystem: true }
       ]);
 
       setTimeout(() => {
@@ -215,15 +215,15 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
     if (isLive || isUserJoined) {
       const mockMessages = [
         "Kya baath hai, sir! Kamaal ka conversion formula hai! 🔥",
-        "Sir, downline members ke lead generation ko kaise speed up karein?",
-        "Best network marketing strategy explained simply. 🚀",
+        "Sir, team projects ke documentation ko kaise speed up karein?",
+        "Best team management strategy explained simply. 🚀",
         "Team Kalyan and Khadakpada present here! 🌟",
-        "Vestige/Herbalife ke plan payouts ka details aacha bataya.",
+        "Presentation slides aur metrics details aacha bataya.",
         "Aapka training program hamesha simple aur practical hota hai.",
         "Agle session ke tickets kab open honge sir?",
         "Audio and video quality is crystal clear! 👍",
         "Next target is to reach Level 7 by next month!",
-        "Double benefits matrix plan looks amazing.",
+        "This screen share presentation looks amazing.",
         "Super logic sir, main apni puri team ko share karunga."
       ];
       
@@ -1400,9 +1400,9 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                               {isLive || isUserJoined ? 'Live Broadcast' : 'Offline'}
                             </span>
                           </div>
-                          <h2 className="text-3xl font-extrabold tracking-tight">MLM Live Masterclass Stage</h2>
+                          <h2 className="text-3xl font-extrabold tracking-tight">Group & Student Meetings Stage</h2>
                           <p className="text-gray-300 mt-2 max-w-xl text-sm leading-relaxed">
-                            Aapki network marketing teams ke liye direct live audio & video classes, interactive webinars aur digital screen sharing.
+                            Aapki teams ke liye direct live audio & video meetings (Group Meetings, Student Classes aur Board Meetings), interactive webinars aur digital screen sharing.
                           </p>
                         </div>
                         
@@ -1550,8 +1550,8 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                         {/* Interactive Chat Sidebar */}
                         <div className="flex flex-col h-[480px] bg-white dark:bg-[#121212] rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm">
                           <div className="p-4 border-b border-gray-100 dark:border-zinc-900 flex justify-between items-center bg-gray-50 dark:bg-zinc-900/30">
-                            <h3 className="font-bold text-sm tracking-wide text-gray-800 dark:text-white uppercase">Live Training Chat</h3>
-                            <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-1 rounded-full uppercase">Matrix Network</span>
+                            <h3 className="font-bold text-sm tracking-wide text-gray-800 dark:text-white uppercase">Live Meeting Chat</h3>
+                            <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-1 rounded-full uppercase">Live Network</span>
                           </div>
 
                           {/* Chat Box Area */}
@@ -1604,9 +1604,9 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                         <div className="w-20 h-20 bg-gray-100 dark:bg-zinc-900 rounded-full flex items-center justify-center mb-4 text-gray-400">
                           <Radio className="w-10 h-10" />
                         </div>
-                        <h3 className="font-extrabold text-xl mb-2 text-gray-900 dark:text-white">Live Masterclass Offline Hai</h3>
+                        <h3 className="font-extrabold text-xl mb-2 text-gray-900 dark:text-white">Live Meeting Offline Hai</h3>
                         <p className="text-sm text-gray-500 max-w-md mx-auto mb-6">
-                          Group super admin jab bhi live training program ya matrix plan calculation broadcast karenge, aapko automatic push notification alert mil jayega.
+                          Group super admin jab bhi live training program ya meeting broadcast karenge, aapko automatic push notification alert mil jayega.
                         </p>
                         {isAdmin && (
                           <Button 
