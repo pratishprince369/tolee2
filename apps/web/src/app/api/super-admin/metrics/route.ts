@@ -28,7 +28,8 @@ export async function GET(req: NextRequest) {
       unresolvedSecurityEvents, totalAuditLogs,
       totalCampaigns, activeCampaigns,
       totalEmailsSent, failedEmailDeliveries, passwordResetEmails, verificationEmailsSent,
-      verifiedUserCount, unverifiedUserCount
+      verifiedUserCount, unverifiedUserCount,
+      appInstalls, appInstallsToday
     ] = await Promise.all([
       prisma.user.count().catch(() => 0),
       prisma.user.count({ where: { lastLoginAt: { gte: todayStart } } }).catch(() => 0),
@@ -56,6 +57,8 @@ export async function GET(req: NextRequest) {
       prisma.emailLog.count({ where: { emailType: 'verification' } }).catch(() => 0),
       prisma.user.count({ where: { email_verified: true } }).catch(() => 0),
       prisma.user.count({ where: { email_verified: false } }).catch(() => 0),
+      prisma.auditLog.count({ where: { action: 'app_installed_click' } }).catch(() => 0),
+      prisma.auditLog.count({ where: { action: 'app_installed_click', createdAt: { gte: todayStart } } }).catch(() => 0),
     ]);
 
     // Top communities using correct Prisma syntax (select only)
@@ -323,7 +326,9 @@ export async function GET(req: NextRequest) {
         newToday, 
         newThisMonth, 
         verifiedUsers, 
-        suspendedUsers 
+        suspendedUsers,
+        appInstalls,
+        appInstallsToday
       },
       communities: { totalTolees, toleeToday, topTolees },
       content: { 

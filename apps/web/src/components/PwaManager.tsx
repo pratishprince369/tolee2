@@ -10,14 +10,41 @@ export function PwaManager() {
   const [isIos, setIsIos] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);
 
+  // Helper to send installation track log to DB and set localStorage
+  const trackInstallClick = async (platform: string) => {
+    try {
+      await fetch('/api/promo/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'app_installed_click',
+          details: {
+            platform,
+            userAgent: typeof window !== 'undefined' ? window.navigator.userAgent : '',
+            screen: 'pwa_banner'
+          }
+        })
+      });
+    } catch (err) {
+      console.error('Failed to track install click:', err);
+    }
+    // Store in localStorage that user has installed, so we don't show the banner anymore!
+    localStorage.setItem('tolee_app_installed', 'true');
+  };
+
   useEffect(() => {
-    // 1. Detect if already installed/running in standalone mode
+    // 1. Detect if already installed/running in standalone mode or Capacitor app
     const checkStandalone = () => {
       const isStandaloneMode = 
         window.matchMedia('(display-mode: standalone)').matches || 
-        (window.navigator as any).standalone === true;
-      setIsStandalone(isStandaloneMode);
-      return isStandaloneMode;
+        (window.navigator as any).standalone === true ||
+        (typeof window !== 'undefined' && !!(window as any).Capacitor);
+      
+      const isAlreadyInstalled = localStorage.getItem('tolee_app_installed') === 'true';
+      const shouldHide = isStandaloneMode || isAlreadyInstalled;
+      
+      setIsStandalone(shouldHide);
+      return shouldHide;
     };
 
     const standalone = checkStandalone();
@@ -38,8 +65,8 @@ export function PwaManager() {
       e.preventDefault();
       setDeferredPrompt(e);
       
-      // Check if dismissed in this session
-      const dismissed = sessionStorage.getItem('tolee_pwa_dismissed');
+      // Check if dismissed permanently
+      const dismissed = localStorage.getItem('tolee_pwa_dismissed');
       if (!dismissed && !checkStandalone()) {
         // Delay showing banner by 3 seconds for better UX
         const timer = setTimeout(() => {
@@ -60,7 +87,7 @@ export function PwaManager() {
       setIsIos(isIosDevice);
 
       // Show iOS help prompt if they are on iOS Safari and not standalone
-      const dismissed = sessionStorage.getItem('tolee_pwa_dismissed');
+      const dismissed = localStorage.getItem('tolee_pwa_dismissed');
       if (isIosDevice && isSafari && !dismissed && !checkStandalone()) {
         const timer = setTimeout(() => {
           setShowBanner(true);
@@ -79,6 +106,9 @@ export function PwaManager() {
   const handleInstallClick = async () => {
     if (!deferredPrompt) return;
 
+    // Track click on PWA install
+    await trackInstallClick('android_chrome');
+
     // Show native browser install dialog
     deferredPrompt.prompt();
 
@@ -91,8 +121,12 @@ export function PwaManager() {
     setShowBanner(false);
   };
 
+  const handleIosInstallClick = async () => {
+    await trackInstallClick('ios');
+  };
+
   const handleDismiss = () => {
-    sessionStorage.setItem('tolee_pwa_dismissed', 'true');
+    localStorage.setItem('tolee_pwa_dismissed', 'true');
     setShowBanner(false);
   };
 
@@ -119,6 +153,7 @@ export function PwaManager() {
             /* iOS Custom Instruction Trigger */
             <div className="relative group">
               <Button
+                onClick={handleIosInstallClick}
                 size="sm"
                 className="bg-[#0a7c85] hover:bg-[#08636a] text-white text-xs font-bold rounded-xl h-9 px-3 flex items-center gap-1.5"
               >
