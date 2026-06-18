@@ -16,17 +16,26 @@ export async function GET(req: NextRequest) {
 
   try {
     if (searchOnly && q) {
-      // Search for users to add/enable
-      const users = await prisma.user.findMany({
-        where: {
-          isSuspended: false,
-          isBanned: false,
+      // Search for users to add/enable (split search query into words for smart matching)
+      const terms = q.trim().split(/\s+/).filter(Boolean);
+      
+      const searchWhere: any = {
+        isSuspended: false,
+        isBanned: false,
+      };
+
+      if (terms.length > 0) {
+        searchWhere.AND = terms.map(term => ({
           OR: [
-            { name: { contains: q, mode: 'insensitive' } },
-            { email: { contains: q, mode: 'insensitive' } },
-            { username: { contains: q, mode: 'insensitive' } }
+            { name: { contains: term, mode: 'insensitive' } },
+            { email: { contains: term, mode: 'insensitive' } },
+            { username: { contains: term, mode: 'insensitive' } }
           ]
-        },
+        }));
+      }
+
+      const users = await prisma.user.findMany({
+        where: searchWhere,
         select: {
           id: true,
           name: true,
