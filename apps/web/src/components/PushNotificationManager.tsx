@@ -341,7 +341,7 @@ export function PushNotificationManager() {
       const channels: ChannelDef[] = [
         {
           id: 'messages',
-          name: 'Direct Messages',
+          name: 'Tolee Messages',
           description: 'Instant direct messages from other users',
           importance: 5, // Max Importance: Forces Heads-Up Slide-Down Banners and Vibration
           sound: 'default',
@@ -350,7 +350,7 @@ export function PushNotificationManager() {
         },
         {
           id: 'groups',
-          name: 'Group Chats',
+          name: 'Tolee Messages',
           description: 'New updates and chat messages inside Tolee groups',
           importance: 5, // Max Importance: Heads-Up Alerting
           sound: 'default',
@@ -359,7 +359,7 @@ export function PushNotificationManager() {
         },
         {
           id: 'social',
-          name: 'Social Activity',
+          name: 'Tolee Activity',
           description: 'Alerts when people like, comment, repost or follow you',
           importance: 5, // Max Importance: slide-down banner
           sound: 'default',
@@ -368,7 +368,7 @@ export function PushNotificationManager() {
         },
         {
           id: 'marketplace',
-          name: 'Marketplace Deals',
+          name: 'Tolee Activity',
           description: 'New offers, product inquiries, and regional listing alerts',
           importance: 5, // Max Importance
           sound: 'default',
@@ -377,7 +377,7 @@ export function PushNotificationManager() {
         },
         {
           id: 'promotions',
-          name: 'Promotions & Shoots',
+          name: 'Tolee Alerts',
           description: 'Sponsored updates, exclusive coupons, and special broadcasts',
           importance: 4, // High importance
           sound: 'default',
@@ -386,7 +386,7 @@ export function PushNotificationManager() {
         },
         {
           id: 'default',
-          name: 'General Alerts',
+          name: 'Tolee Alerts',
           description: 'General system notifications and updates from Tolee',
           importance: 5,
           sound: 'default',

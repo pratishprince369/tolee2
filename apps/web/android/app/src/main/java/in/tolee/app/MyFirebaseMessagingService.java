@@ -159,10 +159,135 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
     }
 
 
+    private void createNotificationChannels(Context context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (manager == null) return;
+
+            // 1. Tolee Messages (Direct Chats)
+            NotificationChannel msgChannel = new NotificationChannel(
+                    "messages",
+                    "Tolee Messages",
+                    NotificationManager.IMPORTANCE_HIGH
+            );
+            msgChannel.setDescription("Direct chat messages");
+            msgChannel.enableVibration(true);
+            msgChannel.setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION), new AudioAttributes.Builder()
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                    .build());
+            manager.createNotificationChannel(msgChannel);
+
+            // 2. Tolee Messages (Group Chats)
+            NotificationChannel groupChannel = new NotificationChannel(
+                    "groups",
+                    "Tolee Messages",
+                    NotificationManager.IMPORTANCE_HIGH
+            );
+            groupChannel.setDescription("Group updates and mentions");
+            groupChannel.enableVibration(true);
+            groupChannel.setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION), new AudioAttributes.Builder()
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                    .build());
+            manager.createNotificationChannel(groupChannel);
+
+            // 3. Tolee Activity (Social activity like likes, comments, follows)
+            NotificationChannel socialChannel = new NotificationChannel(
+                    "social",
+                    "Tolee Activity",
+                    NotificationManager.IMPORTANCE_HIGH
+            );
+            socialChannel.setDescription("Likes, comments, follows, and other updates");
+            socialChannel.enableVibration(true);
+            socialChannel.setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION), new AudioAttributes.Builder()
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                    .build());
+            manager.createNotificationChannel(socialChannel);
+
+            // 4. Tolee Activity (Marketplace listings)
+            NotificationChannel marketplaceChannel = new NotificationChannel(
+                    "marketplace",
+                    "Tolee Activity",
+                    NotificationManager.IMPORTANCE_HIGH
+            );
+            marketplaceChannel.setDescription("Marketplace alerts and product inquiries");
+            marketplaceChannel.enableVibration(true);
+            marketplaceChannel.setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION), new AudioAttributes.Builder()
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                    .build());
+            manager.createNotificationChannel(marketplaceChannel);
+
+            // 5. Tolee Alerts (General Alerts & default fallback)
+            NotificationChannel defaultChannel = new NotificationChannel(
+                    "default",
+                    "Tolee Alerts",
+                    NotificationManager.IMPORTANCE_HIGH
+            );
+            defaultChannel.setDescription("General alerts and system updates");
+            defaultChannel.enableVibration(true);
+            defaultChannel.setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION), new AudioAttributes.Builder()
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                    .build());
+            manager.createNotificationChannel(defaultChannel);
+
+            // 6. Tolee Alerts (Promotions & Shoots)
+            NotificationChannel promotionsChannel = new NotificationChannel(
+                    "promotions",
+                    "Tolee Alerts",
+                    NotificationManager.IMPORTANCE_HIGH
+            );
+            promotionsChannel.setDescription("Special offers and regional shoots");
+            promotionsChannel.enableVibration(true);
+            promotionsChannel.setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION), new AudioAttributes.Builder()
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                    .build());
+            manager.createNotificationChannel(promotionsChannel);
+
+            // 7. Tolee Alerts (Critical Alerts)
+            NotificationChannel criticalChannel = new NotificationChannel(
+                    "critical_alerts",
+                    "Tolee Alerts",
+                    NotificationManager.IMPORTANCE_HIGH
+            );
+            criticalChannel.setDescription("Important security and account alerts");
+            criticalChannel.enableVibration(true);
+            criticalChannel.setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION), new AudioAttributes.Builder()
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                    .build());
+            manager.createNotificationChannel(criticalChannel);
+
+            // 8. Other Notifications (Old channel mapping to Tolee Alerts)
+            NotificationChannel otherChannel = new NotificationChannel(
+                    "other_notifications",
+                    "Tolee Alerts",
+                    NotificationManager.IMPORTANCE_LOW
+            );
+            otherChannel.setDescription("Other updates and general logs");
+            manager.createNotificationChannel(otherChannel);
+
+            // 9. Silent Notifications (For system syncing tasks)
+            NotificationChannel silentChannel = new NotificationChannel(
+                    "silent_notifications",
+                    "Silent Notifications",
+                    NotificationManager.IMPORTANCE_MIN
+            );
+            silentChannel.setDescription("Silent system syncs and logs");
+            silentChannel.setSound(null, null);
+            manager.createNotificationChannel(silentChannel);
+        }
+    }
+
     private void handleStandardNotification(RemoteMessage remoteMessage) {
         String title = null;
         String body = null;
         String url = null;
+        String channelId = null;
 
         if (remoteMessage.getData().size() > 0) {
             Map<String, String> data = remoteMessage.getData();
@@ -170,19 +295,26 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
             body = data.get("message");
             if (body == null) body = data.get("body");
             url = data.get("url");
+            channelId = data.get("channelId");
         }
 
         if (remoteMessage.getNotification() != null) {
             if (title == null) title = remoteMessage.getNotification().getTitle();
             if (body == null) body = remoteMessage.getNotification().getBody();
+            if (channelId == null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                channelId = remoteMessage.getNotification().getChannelId();
+            }
         }
 
         if (title != null && body != null) {
-            sendNotification(title, body, url);
+            sendNotification(title, body, url, channelId);
         }
     }
 
-    private void sendNotification(String title, String messageBody, String targetUrl) {
+    private void sendNotification(String title, String messageBody, String targetUrl, String channelId) {
+        // Ensure standard channels exist
+        createNotificationChannels(this);
+
         Intent intent = new Intent(this, MainActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         if (targetUrl != null) intent.putExtra("url", targetUrl);
@@ -190,10 +322,11 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         PendingIntent pendingIntent = PendingIntent.getActivity(this, (int) System.currentTimeMillis(), intent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
-        // Decide channel based on keywords (Simplified categorization like WhatsApp)
-        String channelId = "messages";
-        if (title != null && (title.toLowerCase().contains("alert") || title.toLowerCase().contains("critical"))) {
-            channelId = "critical_alerts";
+        if (channelId == null || channelId.trim().isEmpty()) {
+            channelId = "default";
+            if (title != null && (title.toLowerCase().contains("alert") || title.toLowerCase().contains("critical"))) {
+                channelId = "critical_alerts";
+            }
         }
 
         Uri defaultSoundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);

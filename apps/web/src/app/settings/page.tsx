@@ -559,6 +559,51 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
+                  {/* Native Mobile App Notification Settings */}
+                  {typeof window !== 'undefined' && ((window as any).AndroidBridge || (window as any).ToleeNative) && (
+                    <div className="pt-6 space-y-4 border-t border-zinc-100 dark:border-zinc-800/50">
+                      <div className="space-y-1">
+                        <h4 className="text-sm font-bold uppercase tracking-wider text-indigo-500 dark:text-indigo-400">
+                          Android Notification Settings
+                        </h4>
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                          Configure OS-level sounds, vibration patterns, channel categories, and lock-screen privacy settings directly in Android.
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                        <Button 
+                          variant="outline" 
+                          className="w-full text-xs font-bold py-2.5 rounded-xl dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800 flex items-center justify-center gap-1.5"
+                          onClick={() => {
+                            const bridge = (window as any).AndroidBridge || (window as any).ToleeNative;
+                            if (bridge && typeof bridge.openNotificationSettings === 'function') {
+                              bridge.openNotificationSettings();
+                            } else {
+                              alert("Notification settings are not available.");
+                            }
+                          }}
+                        >
+                          🔔 Manage Categories
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          className="w-full text-xs font-bold py-2.5 rounded-xl dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800 flex items-center justify-center gap-1.5"
+                          onClick={() => {
+                            const bridge = (window as any).AndroidBridge || (window as any).ToleeNative;
+                            if (bridge && typeof bridge.openChannelSettings === 'function') {
+                              bridge.openChannelSettings("messages");
+                            } else {
+                              alert("Vibration and sounds settings are not available.");
+                            }
+                          }}
+                        >
+                          🔊 Sound & Vibration
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
                 </CardContent>
               </Card>
             )}
