@@ -1613,7 +1613,10 @@ export async function getReels(skip = 0, take = 20) {
         resharedByUser,
         isFollowing,
         followStatus,
-        hasActiveStory
+        hasActiveStory,
+        location: post.location || null,
+        subLocation: post.subLocation || null,
+        createdAt: post.createdAt,
       };
     });
 

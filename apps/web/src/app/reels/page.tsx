@@ -36,8 +36,8 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
           },
           select: { followingId: true, status: true }
         });
-        followedAuthorIds = follows.filter(f => f.status === 'approved').map(f => f.followingId);
-        pendingFollowAuthorIds = follows.filter(f => f.status === 'pending').map(f => f.followingId);
+        followedAuthorIds = follows.filter((f: any) => f.status === 'approved').map((f: any) => f.followingId);
+        pendingFollowAuthorIds = follows.filter((f: any) => f.status === 'pending').map((f: any) => f.followingId);
       }
 
       // Query active stories for these authors
@@ -50,7 +50,7 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
           },
           select: { authorId: true }
         });
-        authorsWithActiveStories = activeStories.map(s => s.authorId);
+        authorsWithActiveStories = activeStories.map((s: any) => s.authorId);
       }
 
       dbReels = videoPosts.map(post => {
@@ -100,7 +100,10 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
           resharedByUser,
           isFollowing,
           followStatus,
-          hasActiveStory
+          hasActiveStory,
+          location: post.location || null,
+          subLocation: post.subLocation || null,
+          createdAt: post.createdAt,
         };
       });
     }
@@ -188,7 +191,10 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
               resharedByUser,
               isFollowing,
               followStatus,
-              hasActiveStory
+              hasActiveStory,
+              location: post.location || null,
+              subLocation: post.subLocation || null,
+              createdAt: post.createdAt,
             };
             dbReels.unshift(singleReel);
           }

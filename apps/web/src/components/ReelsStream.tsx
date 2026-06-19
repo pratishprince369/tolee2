@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import {
   Heart, MessageCircle, Send, MoreVertical, Music,
   Volume2, VolumeX, ShieldCheck, Plus, Bookmark, Repeat,
-  ChevronUp, ChevronDown, Eye, Rocket
+  ChevronUp, ChevronDown, Eye, Rocket, MapPin, Smile, X
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
@@ -447,7 +447,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
     setIsRepostModalLoading(false);
   };
 
-  const handleCommentSubmit = async (e?: React.FormEvent) => {
+  const handleCommentSubmit = async (e?: React.FormEvent, parentId?: string) => {
     if (e) e.preventDefault();
     if (!commentText.trim() || !activeCommentReel) return;
     const text = commentText;
@@ -464,11 +464,13 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
     }
     const tempId = 'temp-' + Date.now();
     setModalComments((prev) => [{
-      id: tempId, content: text,
+      id: tempId,
+      content: text,
+      parentId: parentId || null,
       author: { name: session?.user?.name || 'You', username: (session?.user as any)?.username || 'me', avatar: session?.user?.image },
       createdAt: new Date().toISOString(),
     }, ...prev]);
-    const result = await addComment(activeCommentReel, text);
+    const result = await addComment(activeCommentReel, text, parentId);
     if (!result.success) {
       if (index !== -1) {
         setReels((prev) => {
@@ -754,13 +756,33 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
                 )}
               />
             )}
+
+            {/* Desktop Side Panel for Comments & Description */}
+            {isDesktop && activeCommentReel && reels.find(r => r.id === activeCommentReel) && (
+              <ReelsSidePanel
+                reel={reels.find(r => r.id === activeCommentReel)}
+                onClose={() => { setActiveCommentReel(null); setModalComments([]); }}
+                comments={modalComments}
+                isLoading={isModalLoading}
+                commentText={commentText}
+                setCommentText={setCommentText}
+                onSubmit={handleCommentSubmit}
+                session={session}
+                followStatus={followStates[reels.find(r => r.id === activeCommentReel)?.authorId]}
+                onFollow={() => {
+                  const authorId = reels.find(r => r.id === activeCommentReel)?.authorId;
+                  const authorName = reels.find(r => r.id === activeCommentReel)?.author;
+                  if (authorId) handleFollowAuthor(authorId, authorName);
+                }}
+              />
+            )}
           </div>
         )}
       </div>
 
       {/* ══════════════ SHARED MODALS ══════════════ */}
       <CommentsModal
-        open={!!activeCommentReel}
+        open={!!activeCommentReel && !isDesktop}
         onClose={() => { setActiveCommentReel(null); setModalComments([]); }}
         comments={modalComments}
         isLoading={isModalLoading}
@@ -768,6 +790,13 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
         setCommentText={setCommentText}
         onSubmit={handleCommentSubmit}
         session={session}
+        reel={reels.find(r => r.id === activeCommentReel)}
+        followStatus={activeCommentReel ? followStates[reels.find(r => r.id === activeCommentReel)?.authorId] : null}
+        onFollow={() => {
+          const authorId = reels.find(r => r.id === activeCommentReel)?.authorId;
+          const authorName = reels.find(r => r.id === activeCommentReel)?.author;
+          if (authorId) handleFollowAuthor(authorId, authorName);
+        }}
       />
 
       <OptionsModal
@@ -966,7 +995,33 @@ const ReelSlide = memo(function ReelSlide({
             )}
           </div>
         </div>
-        <p className="text-[13px] text-white line-clamp-2 drop-shadow leading-snug">{reel.caption}</p>
+        {(() => {
+          if (!reel.caption) return null;
+          const lines = reel.caption.split('\n');
+          const maxLines = 2;
+          const isLongCaption = lines.length > maxLines || reel.caption.length > 120;
+          
+          if (isLongCaption) {
+            let displayCaption = lines.slice(0, maxLines).join('\n');
+            if (displayCaption.length > 110) {
+              displayCaption = displayCaption.substring(0, 110).trim();
+            }
+            return (
+              <p className="text-[13px] text-white drop-shadow leading-snug whitespace-pre-wrap">
+                {displayCaption}...
+                <button
+                  onClick={(e) => { e.stopPropagation(); onComment(); }}
+                  className="font-extrabold text-white ml-1.5 opacity-90 hover:opacity-100 hover:underline focus:outline-none cursor-pointer"
+                >
+                  more
+                </button>
+              </p>
+            );
+          }
+          return (
+            <p className="text-[13px] text-white drop-shadow leading-snug whitespace-pre-wrap">{reel.caption}</p>
+          );
+        })()}
         <div className="flex items-center gap-1.5 text-[12px] text-white/80 drop-shadow">
           <Music className="w-3 h-3" />
           <span>{reel.audio}</span>
@@ -1264,22 +1319,276 @@ function EmptyState({ onPost }: { onPost: (d: any) => void }) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
-   Comments Modal
+   ReelsDetailsContent (Shared Details & Comments Component)
    ═══════════════════════════════════════════════════════════════════════ */
-function CommentsModal({ open, onClose, comments, isLoading, commentText, setCommentText, onSubmit, session }: any) {
+interface ReelsDetailsContentProps {
+  reel: any;
+  comments: any[];
+  isLoading: boolean;
+  commentText: string;
+  setCommentText: React.Dispatch<React.SetStateAction<string>>;
+  onSubmit: (e?: React.FormEvent, parentId?: string) => Promise<void>;
+  session: any;
+  followStatus: 'approved' | 'pending' | null;
+  onFollow: () => void;
+}
+
+function ReelsDetailsContent({
+  reel,
+  comments,
+  isLoading,
+  commentText,
+  setCommentText,
+  onSubmit,
+  session,
+  followStatus,
+  onFollow
+}: ReelsDetailsContentProps) {
+  const [replyingTo, setReplyingTo] = useState<{ commentId: string; authorName: string } | null>(null);
+  const [expandedReplies, setExpandedReplies] = useState<Record<string, boolean>>({});
+  const composerInputRef = useRef<HTMLInputElement>(null);
+
+  const [likedComments, setLikedComments] = useState<Record<string, boolean>>(() => {
+    if (typeof window === 'undefined') return {};
+    try {
+      const saved = localStorage.getItem('tolee_liked_comments');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const handleLikeComment = (commentId: string) => {
+    setLikedComments(prev => {
+      const updated = { ...prev, [commentId]: !prev[commentId] };
+      try {
+        localStorage.setItem('tolee_liked_comments', JSON.stringify(updated));
+      } catch (e) {
+        console.error(e);
+      }
+      return updated;
+    });
+  };
+
+  const getCommentLikeCount = (comment: any) => {
+    let baseLikes = 0;
+    if (comment.id && !comment.id.startsWith('temp-') && !comment.id.startsWith('sim-')) {
+      const charSum = comment.id.split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
+      baseLikes = charSum % 12;
+    }
+    return likedComments[comment.id] ? baseLikes + 1 : baseLikes;
+  };
+
+  const getRepliesForComment = (commentId: string) => {
+    return comments.filter((c: any) => c.parentId === commentId);
+  };
+
+  const toggleReplies = (commentId: string) => {
+    setExpandedReplies(prev => ({
+      ...prev,
+      [commentId]: !prev[commentId]
+    }));
+  };
+
+  const getFormattedTime = (dateStr: string) => {
+    try {
+      const diff = Date.now() - new Date(dateStr).getTime();
+      const mins = Math.floor(diff / 60000);
+      if (mins < 1) return 'now';
+      if (mins < 60) return `${mins}m`;
+      const hrs = Math.floor(mins / 60);
+      if (hrs < 24) return `${hrs}h`;
+      const days = Math.floor(hrs / 24);
+      if (days < 7) return `${days}d`;
+      const weeks = Math.floor(days / 7);
+      return `${weeks}w`;
+    } catch (e) {
+      return '1d';
+    }
+  };
+
+  const getFormattedDate = (dateStr: string) => {
+    try {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
+    } catch (e) {
+      return 'Recently';
+    }
+  };
+
+  const formatCaption = (text: string) => {
+    if (!text) return '';
+    const parts = text.split(/(\s+)/);
+    return parts.map((part, i) => {
+      if (part.startsWith('#')) {
+        return (
+          <span key={i} className="text-blue-400 font-medium hover:underline cursor-pointer">
+            {part}
+          </span>
+        );
+      }
+      if (part.startsWith('@')) {
+        const username = part.slice(1).replace(/[^\w]/g, '');
+        return (
+          <Link key={i} href={`/u/${username}`} className="text-blue-400 font-medium hover:underline">
+            {part}
+          </Link>
+        );
+      }
+      return part;
+    });
+  };
+
+  const handleComposerSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!commentText.trim()) return;
+    await onSubmit(e, replyingTo?.commentId);
+    setReplyingTo(null);
+  };
+
+  const rootComments = comments.filter((c: any) => !c.parentId);
+
+  const renderCommentItem = (comment: any, isReply = false) => {
+    const isLiked = likedComments[comment.id];
+    const likeCount = getCommentLikeCount(comment);
+    const replies = !isReply ? getRepliesForComment(comment.id) : [];
+    const isExpanded = expandedReplies[comment.id];
+
+    return (
+      <div key={comment.id} className={`flex flex-col ${isReply ? 'ml-10 mt-3' : 'mt-4'}`}>
+        <div className="flex gap-3 items-start">
+          <Avatar className={`${isReply ? 'w-7 h-7' : 'w-8 h-8'} shrink-0 border border-gray-700`}>
+            <AvatarImage src={getValidAvatarUrl(comment.author?.avatar)} />
+            <AvatarFallback>{comment.author?.username?.[0] || comment.author?.name?.[0] || 'U'}</AvatarFallback>
+          </Avatar>
+          <div className="flex-1 flex flex-col min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-[13px] text-gray-200 truncate hover:underline cursor-pointer">
+                {comment.author?.username || comment.author?.name || 'User'}
+              </span>
+              <span className="text-[11px] text-gray-500 shrink-0">
+                {comment.createdAt ? getFormattedTime(comment.createdAt) : 'Just now'}
+              </span>
+            </div>
+            <span className="text-[13.5px] text-gray-100 leading-snug mt-0.5 break-words">
+              {formatCaption(comment.content)}
+            </span>
+            <div className="flex items-center gap-4 text-[11px] text-gray-500 font-semibold mt-1.5">
+              <button 
+                onClick={() => {
+                  setReplyingTo({ commentId: comment.id, authorName: comment.author?.username || comment.author?.name || 'User' });
+                  composerInputRef.current?.focus();
+                }} 
+                className="hover:text-gray-300"
+              >
+                Reply
+              </button>
+            </div>
+          </div>
+          <button 
+            onClick={() => handleLikeComment(comment.id)} 
+            className="flex flex-col items-center gap-0.5 justify-center shrink-0 min-w-[24px] pt-1"
+          >
+            <Heart className={`w-3.5 h-3.5 transition-all ${isLiked ? 'fill-red-500 text-red-500' : 'text-gray-500 hover:text-gray-300'}`} />
+            {likeCount > 0 && <span className="text-[10px] text-gray-500 font-medium">{likeCount}</span>}
+          </button>
+        </div>
+
+        {!isReply && replies.length > 0 && (
+          <div className="flex flex-col">
+            <button 
+              onClick={() => toggleReplies(comment.id)}
+              className="flex items-center gap-1.5 text-[12px] font-bold text-gray-400 hover:text-white pl-11 py-2 text-left w-fit"
+            >
+              <span className="w-6 h-[1px] bg-gray-700 inline-block mr-1"></span>
+              {isExpanded ? 'Hide replies' : `View ${replies.length} ${replies.length === 1 ? 'reply' : 'replies'}`}
+            </button>
+            {isExpanded && (
+              <div className="space-y-1">
+                {replies.map((reply: any) => renderCommentItem(reply, true))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const isOwner = session?.user && (
+    (session.user as any).id === reel.authorId || 
+    (session.user as any).username === reel.author || 
+    session.user.name === reel.author
+  );
+
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="sm:max-w-[450px] w-full h-[70vh] sm:h-[600px] mt-auto sm:mt-0 mb-0 rounded-t-3xl sm:rounded-3xl bg-[#262626] border-gray-800 text-white p-0 flex flex-col overflow-hidden shadow-2xl">
-        <DialogHeader className="p-4 border-b border-gray-700/50 shrink-0 flex justify-center items-center relative">
-          <div className="absolute top-2 w-10 h-1 bg-gray-600 rounded-full sm:hidden" />
-          <DialogTitle className="text-center font-bold text-[15px] pt-2 sm:pt-0">Comments</DialogTitle>
-        </DialogHeader>
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+    <div className="flex flex-col h-full bg-[#262626] text-white overflow-hidden">
+      {/* Scrollable Main Area */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {/* Reel Author & Description */}
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Avatar className="w-10 h-10 border border-gray-700">
+                <AvatarImage src={getValidAvatarUrl(reel.authorAvatar)} />
+                <AvatarFallback>{reel.author?.[0]}</AvatarFallback>
+              </Avatar>
+              <div className="flex flex-col">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-bold text-[14px] text-white hover:underline cursor-pointer">{reel.author}</span>
+                  {reel.isVerified && <ShieldCheck className="w-4 h-4 text-blue-400 fill-white" />}
+                </div>
+                <div className="flex items-center gap-1.5 text-[12px] text-gray-400 mt-0.5">
+                  <Music className="w-3.5 h-3.5" />
+                  <span>{reel.audio}</span>
+                </div>
+              </div>
+            </div>
+            {!isOwner && onFollow && (
+              <button 
+                onClick={(e) => { e.stopPropagation(); onFollow(); }}
+                className={`h-7 px-4 rounded-lg font-bold text-xs transition-all duration-300 active:scale-95 border ${
+                  followStatus === 'approved' 
+                    ? 'border-gray-600 text-gray-300 hover:bg-white/5' 
+                    : followStatus === 'pending'
+                      ? 'border-amber-400/55 text-amber-400 hover:bg-amber-400/5'
+                      : 'bg-white text-black border-transparent hover:bg-gray-200'
+                }`}
+              >
+                {followStatus === 'approved' ? 'Following' : followStatus === 'pending' ? 'Requested' : 'Follow'}
+              </button>
+            )}
+          </div>
+
+          {/* Description details */}
+          <div className="space-y-2 mt-1">
+            <p className="text-[14px] text-gray-100 leading-relaxed whitespace-pre-wrap break-words">
+              {formatCaption(reel.caption)}
+            </p>
+            {reel.location && (
+              <div className="flex items-center gap-1.5 text-[12.5px] font-medium text-gray-300">
+                <MapPin className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                <span>📍 {reel.location}{reel.subLocation ? ` · ${reel.subLocation}` : ''}</span>
+              </div>
+            )}
+            <div className="text-[11.5px] text-gray-500 font-semibold mt-1">
+              {getFormattedDate(reel.createdAt)}
+            </div>
+          </div>
+        </div>
+
+        {/* Divider */}
+        <div className="border-b border-gray-800/80 my-3" />
+
+        {/* Comments section header */}
+        <h3 className="font-bold text-[14px] text-gray-300 tracking-tight">Comments</h3>
+
+        {/* Comments List */}
+        <div className="space-y-4">
           {isLoading ? (
             <div className="space-y-4 py-2">
               {[1, 2, 3].map((n) => (
                 <div key={n} className="flex gap-3">
-                  <Skeleton className="w-9 h-9 rounded-full shrink-0 bg-zinc-800" />
+                  <Skeleton className="w-8 h-8 rounded-full shrink-0 bg-zinc-800" />
                   <div className="flex-1 space-y-2">
                     <div className="flex items-center gap-2"><Skeleton className="h-3 w-20 rounded bg-zinc-800" /><Skeleton className="h-2.5 w-12 rounded bg-zinc-800" /></div>
                     <Skeleton className="h-3.5 w-11/12 rounded bg-zinc-800" />
@@ -1287,56 +1596,148 @@ function CommentsModal({ open, onClose, comments, isLoading, commentText, setCom
                 </div>
               ))}
             </div>
-          ) : comments.length > 0 ? (
-            comments.map((comment: any, idx: number) => (
-              <div key={comment.id || idx} className="flex gap-3">
-                <Avatar className="w-9 h-9 shrink-0 border border-gray-700">
-                  <AvatarImage src={comment.author?.avatar || '/default-user-avatar.svg'} />
-                  <AvatarFallback>{comment.author?.name?.[0] || 'U'}</AvatarFallback>
-                </Avatar>
-                <div className="flex flex-col flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-[13px] text-gray-200">{comment.author?.username || comment.author?.name || 'User'}</span>
-                    <span className="text-[11px] text-gray-500">{comment.createdAt ? new Date(comment.createdAt).toLocaleDateString() : 'Just now'}</span>
-                  </div>
-                  <span className="text-[14px] text-gray-100 leading-snug mt-0.5">{comment.content}</span>
-                  <div className="flex gap-4 text-[12px] text-gray-500 font-medium mt-1.5">
-                    <span className="cursor-pointer hover:text-gray-300">Reply</span>
-                  </div>
-                </div>
-                <div className="flex flex-col items-center pt-2">
-                  <Heart className="w-3.5 h-3.5 text-gray-500 hover:text-red-500 cursor-pointer" />
-                </div>
-              </div>
-            ))
+          ) : rootComments.length > 0 ? (
+            rootComments.map((comment: any) => renderCommentItem(comment))
           ) : (
-            <div className="text-center py-20 flex flex-col items-center gap-3">
-              <MessageCircle className="w-12 h-12 text-gray-600" />
-              <h3 className="font-bold text-lg text-gray-200">No comments yet</h3>
-              <p className="text-sm text-gray-500">Start the conversation.</p>
+            <div className="text-center py-16 flex flex-col items-center gap-3">
+              <MessageCircle className="w-10 h-10 text-gray-600" />
+              <h4 className="font-bold text-[15px] text-gray-300">No comments yet</h4>
+              <p className="text-xs text-gray-500">Start the conversation by posting a comment.</p>
             </div>
           )}
         </div>
-        <div className="p-3 border-t border-gray-700/50 bg-[#262626] shrink-0 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-          <div className="flex justify-between mb-3 px-1">
-            {['❤️', '🙌', '🔥', '👏', '😢', '😍', '😮', '😂'].map((emoji) => (
-              <button key={emoji} type="button" className="text-2xl hover:scale-110 transition-transform" onClick={() => setCommentText((p: string) => p + emoji)}>{emoji}</button>
-            ))}
+      </div>
+
+      {/* Composer Section at Bottom */}
+      <div className="p-3 border-t border-gray-800/80 bg-[#262626] shrink-0 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+        {/* Replying Status banner */}
+        {replyingTo && (
+          <div className="flex items-center justify-between px-2 py-1 bg-white/5 border border-white/5 rounded-md mb-2 text-xs text-gray-400">
+            <span>Replying to <span className="font-bold text-gray-200">@{replyingTo.authorName}</span></span>
+            <button onClick={() => setReplyingTo(null)} className="hover:text-white">
+              <X className="w-3.5 h-3.5" />
+            </button>
           </div>
-          <div className="flex items-center gap-3">
-            <Avatar className="w-8 h-8 shrink-0">
-              <AvatarImage src={session?.user?.image || '/default-user-avatar.svg'} />
-              <AvatarFallback>ME</AvatarFallback>
-            </Avatar>
-            <form onSubmit={onSubmit} className="flex-1 relative flex items-center border border-gray-600 rounded-full px-4 h-10">
-              <Input value={commentText} onChange={(e) => setCommentText(e.target.value)} placeholder="Join the conversation..." className="w-full bg-transparent border-none focus-visible:ring-0 px-0 text-[14px] placeholder:text-gray-400 h-full" autoComplete="off" />
+        )}
+
+        {/* Emoji Shortcuts */}
+        <div className="flex justify-between mb-3 px-1">
+          {['❤️', '🙌', '🔥', '👏', '😢', '😍', '😮', '😂'].map((emoji) => (
+            <button 
+              key={emoji} 
+              type="button" 
+              className="text-2xl hover:scale-125 transition-transform duration-150" 
+              onClick={() => setCommentText((p) => p + emoji)}
+            >
+              {emoji}
+            </button>
+          ))}
+        </div>
+
+        {/* Comment input form */}
+        <div className="flex items-center gap-2.5">
+          <Avatar className="w-8 h-8 shrink-0">
+            <AvatarImage src={session?.user?.image || '/default-user-avatar.svg'} />
+            <AvatarFallback>ME</AvatarFallback>
+          </Avatar>
+          <form onSubmit={handleComposerSubmit} className="flex-1 relative flex items-center border border-gray-700/80 rounded-full px-4 h-10 bg-black/10 focus-within:border-gray-600 transition-all duration-200">
+            <input 
+              ref={composerInputRef}
+              value={commentText} 
+              onChange={(e) => setCommentText(e.target.value)} 
+              placeholder={replyingTo ? `Reply to @${replyingTo.authorName}...` : "What do you think of this?"} 
+              className="w-full bg-transparent border-none focus:outline-none focus:ring-0 px-0 text-[13.5px] placeholder:text-gray-500 text-white h-full" 
+              autoComplete="off" 
+            />
+            <div className="flex items-center gap-2 ml-2 shrink-0">
+              <button 
+                type="button" 
+                className="text-gray-400 hover:text-white transition-colors p-1"
+                onClick={() => setCommentText((p) => p + ' 👾')}
+              >
+                <Smile className="w-4 h-4" />
+              </button>
               {commentText.trim().length > 0 ? (
-                <button type="submit" className="text-primary font-bold text-[14px] ml-2 shrink-0">Post</button>
+                <button type="submit" className="text-primary font-bold text-[13.5px] hover:text-primary/80 transition-colors">Post</button>
               ) : (
-                <button type="button" className="text-gray-400 ml-2 shrink-0">GIF</button>
+                <button 
+                  type="button" 
+                  className="text-gray-400 hover:text-white transition-colors text-[11px] font-bold border border-gray-700 px-1.5 py-0.5 rounded"
+                  onClick={() => alert("GIF selection is not available, but you can post emojis & text!")}
+                >
+                  GIF
+                </button>
               )}
-            </form>
-          </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ReelsSidePanel (Desktop Comments Side Panel)
+   ═══════════════════════════════════════════════════════════════════════ */
+function ReelsSidePanel({ reel, onClose, comments, isLoading, commentText, setCommentText, onSubmit, session, followStatus, onFollow }: any) {
+  if (!reel) return null;
+  return (
+    <div 
+      className="w-[360px] max-w-[360px] h-full bg-[#262626] border border-gray-800 text-white flex flex-col overflow-hidden shadow-2xl relative rounded-2xl"
+      style={{ height: 'min(676px, calc(100vh - 80px))' }}
+    >
+      {/* Side Panel Header */}
+      <div className="p-4 border-b border-gray-800/80 bg-[#1e1e1e]/60 flex items-center justify-between shrink-0">
+        <h2 className="font-bold text-[15px]">Comments</h2>
+        <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors p-1 rounded-full hover:bg-white/5">
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-hidden">
+        <ReelsDetailsContent
+          reel={reel}
+          comments={comments}
+          isLoading={isLoading}
+          commentText={commentText}
+          setCommentText={setCommentText}
+          onSubmit={onSubmit}
+          session={session}
+          followStatus={followStatus}
+          onFollow={onFollow}
+        />
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   CommentsModal (Mobile Details & Comments Bottom Sheet)
+   ═══════════════════════════════════════════════════════════════════════ */
+function CommentsModal({ open, onClose, comments, isLoading, commentText, setCommentText, onSubmit, session, reel, followStatus, onFollow }: any) {
+  if (!reel) return null;
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="sm:max-w-[450px] w-full h-[75vh] sm:h-[600px] mt-auto sm:mt-0 mb-0 rounded-t-3xl sm:rounded-3xl bg-[#262626] border-gray-800 text-white p-0 flex flex-col overflow-hidden shadow-2xl">
+        <DialogHeader className="p-4 border-b border-gray-800/85 shrink-0 flex justify-between items-center relative">
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 w-9 h-1 bg-gray-600 rounded-full sm:hidden" />
+          <DialogTitle className="text-center font-bold text-[15px] pt-1 sm:pt-0 mx-auto">Comments</DialogTitle>
+          <button onClick={onClose} className="absolute right-4 top-3 text-gray-400 hover:text-white transition-colors p-1 rounded-full hover:bg-white/5 sm:hidden">
+            <X className="w-4 h-4" />
+          </button>
+        </DialogHeader>
+        <div className="flex-1 overflow-hidden">
+          <ReelsDetailsContent
+            reel={reel}
+            comments={comments}
+            isLoading={isLoading}
+            commentText={commentText}
+            setCommentText={setCommentText}
+            onSubmit={onSubmit}
+            session={session}
+            followStatus={followStatus}
+            onFollow={onFollow}
+          />
         </div>
       </DialogContent>
     </Dialog>
