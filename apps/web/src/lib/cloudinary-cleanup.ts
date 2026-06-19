@@ -131,7 +131,7 @@ export async function destroyAsset(publicIdOrUrl: string, resourceType: string =
       cloud_name: account.cloudName,
       api_key: account.apiKey,
       api_secret: account.apiSecret,
-    });
+    } as any);
     
     console.log(`[CLOUDINARY CLEANUP] Success for "${publicId}":`, result);
     return result.result === 'ok' || result.result === 'not_found';

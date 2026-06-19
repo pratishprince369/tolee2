@@ -3,11 +3,13 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 import { 
   Heart, Share2, MapPin, Eye, Phone, MessageSquare, Mail, 
-  Trash2, Edit, AlertCircle, ArrowLeft, ChevronLeft, ChevronRight, CheckCircle2, ShieldCheck, Copy, Rocket
+  Trash2, Edit, AlertCircle, ArrowLeft, ChevronLeft, ChevronRight, CheckCircle2, ShieldCheck, Copy, Rocket,
+  Image as ImageIcon
 } from 'lucide-react';
 import { deleteListing, updateListingStatus } from '@/actions/marketplace';
 import { QuickBoostModal } from './QuickBoostModal';
@@ -148,7 +150,7 @@ export function ListingDetailView({ listing, currentUserId, relatedListings = []
             {/* Thumbnails */}
             {images.length > 1 && (
               <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
-                {images.map((img, idx) => (
+                {images.map((img: string, idx: number) => (
                   <button 
                     key={idx} 
                     onClick={() => setActiveImageIndex(idx)}
@@ -240,7 +242,7 @@ export function ListingDetailView({ listing, currentUserId, relatedListings = []
                         return (
                           <div key={key} className="bg-blue-50/30 dark:bg-blue-900/10 p-3 rounded-2xl border border-blue-50/50 dark:border-blue-900/20">
                             <span className="text-[10px] text-blue-500 dark:text-blue-400 font-bold uppercase tracking-wider">{label}</span>
-                            <p className="text-sm font-extrabold text-gray-800 dark:text-gray-200 mt-0.5">{value}</p>
+                            <p className="text-sm font-extrabold text-gray-800 dark:text-gray-200 mt-0.5">{typeof value === 'object' ? JSON.stringify(value) : String(value)}</p>
                           </div>
                         );
                       })}
@@ -300,39 +302,30 @@ export function ListingDetailView({ listing, currentUserId, relatedListings = []
                 {/* Contact Seller Action triggers */}
                 <div className="pt-2 space-y-2">
                   {listing.contactPhone && (
-                    <Button 
-                      asChild 
-                      className="w-full rounded-xl h-11 bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
+                    <a 
+                      href={`tel:${listing.contactPhone}`}
+                      className={cn(buttonVariants({ variant: "default" }), "w-full rounded-xl h-11 bg-emerald-600 hover:bg-emerald-700 text-white font-bold inline-flex items-center justify-center")}
                     >
-                      <a href={`tel:${listing.contactPhone}`}>
-                        <Phone className="w-4 h-4 mr-2" /> Call Seller
-                      </a>
-                    </Button>
+                      <Phone className="w-4 h-4 mr-2" /> Call Seller
+                    </a>
                   )}
                   {listing.contactWhatsApp && (
-                    <Button 
-                      asChild 
-                      className="w-full rounded-xl h-11 bg-green-500 hover:bg-green-600 text-white font-bold"
+                    <a 
+                      href={`https://wa.me/${listing.contactWhatsApp.replace(/[^0-9]/g, '')}`}
+                      target="_blank" 
+                      rel="noreferrer"
+                      className={cn(buttonVariants({ variant: "default" }), "w-full rounded-xl h-11 bg-green-500 hover:bg-green-600 text-white font-bold inline-flex items-center justify-center")}
                     >
-                      <a 
-                        href={`https://wa.me/${listing.contactWhatsApp.replace(/[^0-9]/g, '')}`}
-                        target="_blank" 
-                        rel="noreferrer"
-                      >
-                        <MessageSquare className="w-4 h-4 mr-2" /> Chat on WhatsApp
-                      </a>
-                    </Button>
+                      <MessageSquare className="w-4 h-4 mr-2" /> Chat on WhatsApp
+                    </a>
                   )}
                   {listing.contactEmail && (
-                    <Button 
-                      asChild 
-                      variant="outline" 
-                      className="w-full rounded-xl h-11 font-bold border-gray-200 dark:border-zinc-800"
+                    <a 
+                      href={`mailto:${listing.contactEmail}`}
+                      className={cn(buttonVariants({ variant: "outline" }), "w-full rounded-xl h-11 font-bold border-gray-200 dark:border-zinc-800 inline-flex items-center justify-center")}
                     >
-                      <a href={`mailto:${listing.contactEmail}`}>
-                        <Mail className="w-4 h-4 mr-2" /> Email Seller
-                      </a>
-                    </Button>
+                      <Mail className="w-4 h-4 mr-2" /> Email Seller
+                    </a>
                   )}
                   {!listing.contactPhone && !listing.contactWhatsApp && !listing.contactEmail && (
                     <Button 

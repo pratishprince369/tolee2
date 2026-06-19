@@ -100,7 +100,7 @@ export async function sendPushNotification(
       return;
     }
 
-    const tokens = pushTokens.map((t) => t.token);
+    const tokens = pushTokens.map((t: any) => t.token);
     const badgeCount = await getUnreadBadgeCount(userId);
 
     const isCall = data?.type === 'incoming_call';

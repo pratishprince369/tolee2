@@ -19,7 +19,7 @@ import { CreatePostModal } from '@/components/CreatePostModal';
 import {
   createPost, toggleLike, addComment, getComments,
   toggleSavePost, toggleRepost, getReposts, recordView,
-  updatePostVisibility, deletePostPermanently, editPostCaption
+  updatePostVisibility, deletePostPermanently, editPostCaption, getReels
 } from '@/actions/post';
 import { toggleFollow } from '@/actions/user';
 import { HLSVideo, getSoundPreference, setSoundPreference } from '@/components/HLSVideo';
@@ -143,6 +143,83 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
     return initialStates;
   });
 
+  const isLoadingMore = useRef(false);
+  const isExhausted = useRef(false);
+  const skipRef = useRef(initialReels.length);
+  const loopCountRef = useRef(0);
+  const originalReelsRef = useRef<any[]>(initialReels);
+
+  // Sync originalReelsRef with newly added reels
+  useEffect(() => {
+    const seen = new Set(originalReelsRef.current.map(r => r.id));
+    initialReels.forEach(r => {
+      if (!seen.has(r.id)) {
+        originalReelsRef.current.push(r);
+        seen.add(r.id);
+      }
+    });
+  }, [initialReels]);
+
+  const loadMoreReels = useCallback(async () => {
+    if (isLoadingMore.current) return;
+    isLoadingMore.current = true;
+
+    try {
+      if (isExhausted.current) {
+        // Existed database reels are exhausted. Repeat from the beginning.
+        loopCountRef.current += 1;
+        const loopedReels = originalReelsRef.current.map((reel) => ({
+          ...reel,
+          id: `${reel.id}-loop-${loopCountRef.current}-${Math.random()}`
+        }));
+        setReels((prev) => [...prev, ...loopedReels]);
+        isLoadingMore.current = false;
+        return;
+      }
+
+      const res = await getReels(skipRef.current, 20);
+      if (res.success && res.reels && res.reels.length > 0) {
+        const newReels = res.reels;
+
+        // Add to original pool of reels
+        const seenIds = new Set(originalReelsRef.current.map((r: any) => r.id));
+        newReels.forEach((r: any) => {
+          if (!seenIds.has(r.id)) {
+            originalReelsRef.current.push(r);
+          }
+        });
+
+        // Append to state
+        setReels((prev) => {
+          const existingIds = new Set(prev.map((r: any) => r.id));
+          const filteredNewReels = newReels.filter((r: any) => !existingIds.has(r.id));
+          return [...prev, ...filteredNewReels];
+        });
+
+        skipRef.current += newReels.length;
+
+        // If we got fewer than 20 reels, database is exhausted
+        if (res.reels.length < 20) {
+          isExhausted.current = true;
+        }
+      } else {
+        isExhausted.current = true;
+        if (originalReelsRef.current.length > 0) {
+          loopCountRef.current += 1;
+          const loopedReels = originalReelsRef.current.map((reel) => ({
+            ...reel,
+            id: `${reel.id}-loop-${loopCountRef.current}-${Math.random()}`
+          }));
+          setReels((prev) => [...prev, ...loopedReels]);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load more reels:', err);
+    } finally {
+      isLoadingMore.current = false;
+    }
+  }, []);
+
   const handleFollowAuthor = async (authorId: string, authorName: string) => {
     const currentStatus = followStates[authorId] || null;
     
@@ -160,7 +237,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
       setFollowStates(prev => ({ ...prev, [authorId]: currentStatus }));
       alert(result.error || "Failed to follow user");
     } else {
-      const finalStatus = result.status !== undefined ? result.status : (result.isFollowing ? 'approved' : null);
+      const finalStatus = (result.status !== undefined ? result.status : (result.isFollowing ? 'approved' : null)) as 'approved' | 'pending' | null;
       setFollowStates(prev => ({ ...prev, [authorId]: finalStatus }));
     }
   };
@@ -266,6 +343,15 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
   useEffect(() => { trackView(mobileActiveIndex); }, [mobileActiveIndex, trackView]);
   useEffect(() => { trackView(desktopActiveIndex); }, [desktopActiveIndex, trackView]);
 
+  const activeIndex = isDesktop ? desktopActiveIndex : mobileActiveIndex;
+
+  useEffect(() => {
+    // When the user approaches the end of the loaded reels (e.g. index is reels.length - 6, i.e. 5 remaining reels)
+    if (reels.length > 0 && activeIndex >= reels.length - 6) {
+      loadMoreReels();
+    }
+  }, [activeIndex, reels.length, loadMoreReels]);
+
   /* ── Desktop arrow navigation ── */
   const scrollToReel = useCallback((containerRef: React.RefObject<HTMLDivElement | null>, idx: number) => {
     const container = containerRef.current;
@@ -276,7 +362,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
     }
   }, []);
 
-  const handleNewPost = (post: any, postData: any) => {
+  const handleNewPost = (post: any, postData?: any) => {
     const isVideo = post && post.mediaTypes && (post.mediaTypes === 'video' || post.mediaTypes.split(',')[0] === 'video');
     if (isVideo) {
       const firstTolee = post.tolees?.[0]?.tolee;
@@ -532,7 +618,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
               const originalIndex = reels.findIndex(r => r.id === reel.id);
               return (
                 <ReelSlide
-                  key={reel.id}
+                  key={`reel-${reel.id}-${index}`}
                   reel={reel}
                   index={index}
                   // Only activate if this layout is currently VISIBLE (not desktop)
@@ -641,7 +727,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
                 const originalIndex = reels.findIndex(r => r.id === reel.id);
                 return (
                   <ReelSlide
-                    key={reel.id}
+                    key={`reel-${reel.id}-${index}`}
                     reel={reel}
                     index={index}
                     // Only activate if this layout is currently VISIBLE (desktop)

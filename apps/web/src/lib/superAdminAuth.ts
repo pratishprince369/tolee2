@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.SUPER_ADMIN_JWT_SECRET;
+const JWT_SECRET = process.env.SUPER_ADMIN_JWT_SECRET as string;
 if (!JWT_SECRET) {
   throw new Error('SUPER_ADMIN_JWT_SECRET environment variable is not set. Server cannot start securely.');
 }

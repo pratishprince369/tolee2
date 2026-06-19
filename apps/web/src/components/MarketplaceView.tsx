@@ -477,14 +477,10 @@ export function MarketplaceView({ initialListings }: { initialListings: any[] })
                       {/* Three-Dot Menu Overlay (Top Right) */}
                       <div className="absolute top-3.5 right-3.5 z-20">
                         <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button 
-                              size="icon" 
-                              variant="ghost" 
-                              className="h-8 w-8 rounded-full bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-primary shadow-md border border-zinc-100 flex items-center justify-center"
-                            >
-                              <MoreVertical className="w-4 h-4" />
-                            </Button>
+                          <DropdownMenuTrigger
+                            className="h-8 w-8 rounded-full bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-primary shadow-md border border-zinc-100 flex items-center justify-center"
+                          >
+                            <MoreVertical className="w-4 h-4" />
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-44 bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800/60 rounded-2xl p-1.5 shadow-xl z-30">
                             {isOwner ? (

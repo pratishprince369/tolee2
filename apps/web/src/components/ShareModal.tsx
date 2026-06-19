@@ -201,7 +201,7 @@ export function ShareModal({
             </div>
           </button>
 
-          {typeof window !== 'undefined' && typeof navigator !== 'undefined' && navigator.share && (
+          {typeof window !== 'undefined' && typeof navigator !== 'undefined' && typeof navigator.share === 'function' && (
             <button
               onClick={handleWebShare}
               className="flex-1 flex items-center justify-between p-3.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 border border-indigo-500/20 hover:from-blue-700 hover:to-indigo-700 text-white transition-all duration-200 shadow-md group active:scale-[0.98]"

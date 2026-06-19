@@ -11,7 +11,7 @@ import {
   Heart, MessageCircle, Send, Bookmark, MoreHorizontal, 
   Image as ImageIcon, Video, FileText, ChevronRight,
   Trophy, Users, Calendar, BookOpen, Star, ShieldCheck,
-  TrendingUp, PlayCircle, MapPin, Globe, AlertTriangle, Search, Repeat, Store,
+  TrendingUp, PlayCircle, StopCircle, MapPin, Globe, AlertTriangle, Search, Repeat, Store,
   UtensilsCrossed, ShoppingBag, CheckCircle2, Lock,
   VideoOff, Mic, MicOff, Monitor, Radio, Sparkles
 } from 'lucide-react';
@@ -284,7 +284,7 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
     return <div className="min-h-screen flex items-center justify-center text-white">Tolee not found</div>;
   }
 
-  const [localPosts, setLocalPosts] = React.useState(posts || []);
+  const [localPosts, setLocalPosts] = React.useState<any[]>(posts || []);
   React.useEffect(() => {
     setLocalPosts(posts || []);
   }, [posts]);
@@ -619,10 +619,8 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                 </Button>
               )}
               <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="w-10 h-10 rounded-full border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-zinc-800 text-gray-700 dark:text-gray-300 shadow-md flex items-center justify-center p-0 cursor-pointer flex-shrink-0">
-                    <MoreHorizontal className="w-5 h-5" />
-                  </Button>
+                <DropdownMenuTrigger className="w-10 h-10 rounded-full border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-zinc-800 text-gray-700 dark:text-gray-300 shadow-md flex items-center justify-center p-0 cursor-pointer flex-shrink-0">
+                  <MoreHorizontal className="w-5 h-5" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48 bg-white dark:bg-zinc-950 border border-gray-100 dark:border-zinc-900 rounded-xl p-1.5 shadow-lg">
                   <DropdownMenuItem onClick={handleCopyLink} className="flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-900 cursor-pointer">

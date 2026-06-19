@@ -17,6 +17,8 @@
         "name": "next"
       }
     ],
+    "target": "es2020",
+    "downlevelIteration": true,
     "paths": {
       "@/*": ["./src/*"]
     }

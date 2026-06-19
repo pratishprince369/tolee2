@@ -21,9 +21,9 @@ const muteListeners = new Set<(muted: boolean) => void>();
 
 const setGlobalMuted = (muted: boolean) => {
   globalMuted = muted;
-  for (const listener of muteListeners) {
+  muteListeners.forEach((listener) => {
     listener(muted);
-  }
+  });
 };
 
 // Coordinates which single video should play based on visibility in viewport
@@ -31,27 +31,27 @@ const coordinateAutoplay = () => {
   let highestRatio = 0;
   let activeId: string | null = null;
 
-  for (const [id, inst] of activeVideoInstances.entries()) {
+  activeVideoInstances.forEach((inst, id) => {
     if (inst.ratio > highestRatio) {
       highestRatio = inst.ratio;
       activeId = id;
     }
-  }
+  });
 
   // Play the most visible video if it is at least 50% visible, pause all others
   if (activeId && highestRatio >= 0.5) {
-    for (const [id, inst] of activeVideoInstances.entries()) {
+    activeVideoInstances.forEach((inst, id) => {
       if (id === activeId) {
         inst.play();
       } else {
         inst.pause();
       }
-    }
+    });
   } else {
     // If no video is sufficiently visible, pause everything
-    for (const inst of activeVideoInstances.values()) {
+    activeVideoInstances.forEach((inst) => {
       inst.pause();
-    }
+    });
   }
 };
 

@@ -10,12 +10,13 @@ import { extractPublicIdFromUrl, extractResourceTypeFromUrl, destroyMultipleAsse
 import { createSystemNotification, createSystemNotificationsMany } from '@/lib/notification-service';
 
 export async function createPost(data: {
-  content: string;
+  content?: string;
   postType: string;
   media?: { type: string; url: string } | null;
-  toleeIds: string[];
+  toleeIds?: string[];
   location?: string | null;
   subLocation?: string | null;
+  status?: string;
 }) {
   try {
     const session = await getServerSession(authOptions);
@@ -43,29 +44,32 @@ export async function createPost(data: {
       return { success: false, error: 'Too many requests. Please cool down.' };
     }
 
+    const isDraft = data.status?.toLowerCase() === 'draft';
     const { sanitizeText } = require('@/lib/sanitize');
     const safeContent = sanitizeText(data.content || '', 5000);
 
-    if (!safeContent) {
+    if (!isDraft && !safeContent) {
       return { success: false, error: 'Post content cannot be empty.' };
     }
 
-    // AI Panchayat Content Moderation Check
-    const { moderateContent } = require('@/lib/aiPanchayat');
-    const moderation = await moderateContent({
-      userId,
-      contentType: 'post',
-      content: safeContent
-    });
+    if (!isDraft && safeContent) {
+      // AI Panchayat Content Moderation Check
+      const { moderateContent } = require('@/lib/aiPanchayat');
+      const moderation = await moderateContent({
+        userId,
+        contentType: 'post',
+        content: safeContent
+      });
 
-    if (moderation.isFlagged) {
-      return { 
-        success: false, 
-        error: `🚨 Post flagged by AI Panchayat: ${moderation.reason} Your trust score is now ${moderation.newScore}%.` 
-      };
+      if (moderation.isFlagged) {
+        return { 
+          success: false, 
+          error: `🚨 Post flagged by AI Panchayat: ${moderation.reason} Your trust score is now ${moderation.newScore}%.` 
+        };
+      }
     }
 
-    if (!data.toleeIds || data.toleeIds.length === 0) {
+    if (!isDraft && (!data.toleeIds || data.toleeIds.length === 0)) {
       return { success: false, error: 'Please select at least one Tolee.' };
     }
 
@@ -91,7 +95,7 @@ export async function createPost(data: {
 
     const post = await prisma.post.create({
       data: {
-        caption: safeContent,
+        caption: safeContent || '',
         postType: data.postType,
         mediaUrls: data.media ? data.media.url : null,
         mediaTypes: data.media ? data.media.type : null,
@@ -99,12 +103,13 @@ export async function createPost(data: {
         mediaResourceTypes,
         location: data.location || null,
         subLocation: data.subLocation || null,
+        status: isDraft ? 'DRAFT' : 'published',
         authorId: userId,
-        tolees: {
+        tolees: data.toleeIds && data.toleeIds.length > 0 ? {
           create: data.toleeIds.map(id => ({
             toleeId: id
           }))
-        }
+        } : undefined
       },
       include: {
         author: true,
@@ -132,10 +137,12 @@ export async function createPost(data: {
       }
     }
 
-    const tolees = await prisma.tolee.findMany({
-      where: { id: { in: data.toleeIds } },
-      select: { slug: true }
-    });
+    const tolees = data.toleeIds && data.toleeIds.length > 0
+      ? await prisma.tolee.findMany({
+          where: { id: { in: data.toleeIds } },
+          select: { slug: true }
+        })
+      : [];
 
     revalidatePath('/feed');
     tolees.forEach(t => {
@@ -1308,6 +1315,312 @@ export async function getArchivedPosts() {
   } catch (error) {
     console.error("Error fetching archived posts:", error);
     return { success: false, error: 'Failed to fetch archived posts.', posts: [] };
+  }
+}
+
+export async function getDraftPosts() {
+  try {
+    const session = await getServerSession(authOptions);
+    const userId = (session?.user as any)?.id;
+
+    if (!userId) {
+      return { success: false, error: 'Unauthorized', posts: [] };
+    }
+
+    const posts = await prisma.post.findMany({
+      where: {
+        authorId: userId,
+        status: 'DRAFT',
+      },
+      orderBy: {
+        createdAt: 'desc'
+      },
+      include: {
+        author: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+            image: true,
+            isVerified: true
+          }
+        },
+        tolees: {
+          select: {
+            id: true,
+            name: true,
+            slug: true
+          }
+        }
+      }
+    });
+
+    return { success: true, posts };
+  } catch (error) {
+    console.error("Error fetching draft posts:", error);
+    return { success: false, error: 'Failed to fetch draft posts.', posts: [] };
+  }
+}
+
+export async function publishDraftPost(postId: string) {
+  try {
+    const session = await getServerSession(authOptions);
+    const userId = (session?.user as any)?.id;
+
+    if (!userId) {
+      return { success: false, error: 'Unauthorized' };
+    }
+
+    // Verify ownership
+    const existingPost = await prisma.post.findFirst({
+      where: {
+        id: postId,
+        authorId: userId
+      },
+      select: {
+        id: true,
+        tolees: {
+          select: {
+             slug: true
+          }
+        }
+      }
+    });
+
+    if (!existingPost) {
+      return { success: false, error: 'Post not found or unauthorized' };
+    }
+
+    const updatedPost = await prisma.post.update({
+      where: { id: postId },
+      data: {
+        status: 'published',
+        createdAt: new Date() // reset published date to now
+      }
+    });
+
+    revalidatePath('/feed');
+    existingPost.tolees.forEach(t => {
+      revalidatePath(`/t/${t.slug}`);
+    });
+
+    return { success: true, post: updatedPost };
+  } catch (error) {
+    console.error("Error publishing draft post:", error);
+    return { success: false, error: 'Failed to publish draft.' };
+  }
+}
+
+export async function getReels(skip = 0, take = 20) {
+  try {
+    const session = await getServerSession(authOptions);
+    const currentUserId = (session?.user as any)?.id;
+
+    const posts = await prisma.post.findMany({
+      where: {
+        isArchived: false,
+        status: 'published',
+        mediaTypes: 'video',
+        mediaUrls: { not: null },
+        ...(currentUserId ? {
+          OR: [
+            // Public author
+            {
+              author: { isPrivate: false },
+              visibility: 'public'
+            },
+            // My own posts
+            {
+              authorId: currentUserId
+            },
+            // Posts from private users I follow (approved)
+            {
+              author: {
+                isPrivate: true,
+                followers: {
+                  some: {
+                    followerId: currentUserId,
+                    status: 'approved'
+                  }
+                }
+              },
+              visibility: 'public'
+            }
+          ]
+        } : {
+          visibility: 'public',
+          author: {
+            isPrivate: false
+          }
+        })
+      },
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take,
+      select: {
+        id: true,
+        caption: true,
+        postType: true,
+        mediaUrls: true,
+        mediaTypes: true,
+        visibility: true,
+        shareCount: true,
+        location: true,
+        subLocation: true,
+        createdAt: true,
+        worldProjectId: true,
+        worldProject: {
+          select: {
+            id: true,
+            type: true,
+            name: true,
+            slug: true,
+            description: true,
+            bannerImage: true,
+          }
+        },
+        author: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+            avatar: true,
+            isPrivate: true
+          }
+        },
+        tolees: {
+          select: {
+            tolee: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+                ownerId: true
+              }
+            }
+          }
+        },
+        likes: {
+          select: {
+            userId: true
+          }
+        },
+        savedBy: {
+          select: {
+            userId: true
+          }
+        },
+        reposts: {
+          orderBy: { createdAt: 'desc' },
+          select: {
+            userId: true,
+            createdAt: true,
+            user: {
+              select: {
+                id: true,
+                name: true,
+                username: true,
+                avatar: true
+              }
+            }
+          }
+        },
+        _count: {
+          select: {
+            likes: true,
+            comments: true,
+            reposts: true,
+            views: true
+          }
+        }
+      }
+    });
+
+    const authorIds = posts.map(p => p.author.id);
+
+    // Query follow statuses of these authors for the current user
+    let followedAuthorIds: string[] = [];
+    let pendingFollowAuthorIds: string[] = [];
+    if (currentUserId && authorIds.length > 0) {
+      const follows = await prisma.follow.findMany({
+        where: {
+          followerId: currentUserId,
+          followingId: { in: authorIds }
+        },
+        select: { followingId: true, status: true }
+      });
+      followedAuthorIds = follows.filter(f => f.status === 'approved').map(f => f.followingId);
+      pendingFollowAuthorIds = follows.filter(f => f.status === 'pending').map(f => f.followingId);
+    }
+
+    // Query active stories for these authors
+    let authorsWithActiveStories: string[] = [];
+    if (authorIds.length > 0) {
+      const activeStories = await prisma.story.findMany({
+        where: {
+          authorId: { in: authorIds },
+          expiresAt: { gte: new Date() }
+        },
+        select: { authorId: true }
+      });
+      authorsWithActiveStories = activeStories.map(s => s.authorId);
+    }
+
+    const reels = posts.map(post => {
+      const firstTolee = post.tolees?.[0]?.tolee;
+      const likedByMe = currentUserId ? post.likes.some((like: any) => like.userId === currentUserId) : false;
+      const savedByMe = currentUserId ? post.savedBy.some((save: any) => save.userId === currentUserId) : false;
+      const repostedByMe = currentUserId ? post.reposts.some((rep: any) => rep.userId === currentUserId) : false;
+      const repostsCount = post._count?.reposts || 0;
+
+      const mostRecentRepost = post.reposts?.[0];
+      const resharedByUser = mostRecentRepost ? {
+        username: mostRecentRepost.user.username,
+        name: mostRecentRepost.user.name,
+        avatar: mostRecentRepost.user.avatar || '/default-user-avatar.svg'
+      } : null;
+
+      const isFollowing = followedAuthorIds.includes(post.author.id);
+      const followStatus = pendingFollowAuthorIds.includes(post.author.id) 
+        ? 'pending' 
+        : (isFollowing ? 'approved' : null);
+
+      const hasActiveStory = authorsWithActiveStories.includes(post.author.id);
+      
+      return {
+        id: post.id,
+        authorId: post.author.id,
+        authorIsPrivate: post.author.isPrivate || false,
+        visibility: post.visibility,
+        video: post.mediaUrls ? post.mediaUrls.split(/,(?=https?:\/\/)/)[0] : '',
+        author: post.author.username || 'user',
+        authorAvatar: post.author.avatar || '/default-user-avatar.svg',
+        toleeName: firstTolee?.name || null,
+        toleeSlug: firstTolee?.slug || null,
+        toleeId: firstTolee?.id || null,
+        role: firstTolee?.ownerId === post.author.id ? 'Admin' : 'Member',
+        caption: post.caption || '',
+        likes: post.likes?.length || 0,
+        comments: post.comments?.length || 0,
+        views: post._count?.views || 0,
+        shares: '0',
+        reposts: repostsCount,
+        audio: 'Original Audio',
+        isVerified: false,
+        likedByMe,
+        savedByMe,
+        repostedByMe,
+        resharedByUser,
+        isFollowing,
+        followStatus,
+        hasActiveStory
+      };
+    });
+
+    return { success: true, reels };
+  } catch (error) {
+    console.error("Error fetching reels:", error);
+    return { success: false, error: 'Failed to fetch reels.', reels: [] };
   }
 }
 
