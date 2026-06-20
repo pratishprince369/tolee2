@@ -42,6 +42,12 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
   const { data: session } = useSession();
   const router = useRouter();
 
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Stories state
   const [storyGroups, setStoryGroups] = useState<any[]>([]);
   const [activeStoryGroupIndex, setActiveStoryGroupIndex] = useState<number | null>(null);
@@ -830,13 +836,14 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
             <div className="flex gap-4 overflow-x-auto pb-4 pt-2 shrink-0 border border-gray-100 dark:border-zinc-900 bg-white dark:bg-[#121212] p-4 rounded-3xl shadow-sm select-none scrollbar-none scroll-smooth">
               {/* Render Own Story Bubble First */}
               {(() => {
-                const myGroup = storyGroups.find(g => g.user.id === (session?.user as any)?.id);
+                const myGroup = mounted ? storyGroups.find(g => g.user.id === (session?.user as any)?.id) : undefined;
                 const hasMyStories = myGroup && myGroup.stories.length > 0;
                 
                 return (
                   <div className="flex flex-col items-center flex-shrink-0 relative group">
                     <div 
                       onClick={() => {
+                        if (!mounted) return;
                         if (hasMyStories) {
                           const idx = storyGroups.findIndex(g => g.user.id === (session?.user as any)?.id);
                           if (idx !== -1) {
@@ -859,9 +866,9 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                       }`}>
                         <div className="w-full h-full rounded-full bg-white dark:bg-black p-[2.5px]">
                           <Avatar className="w-full h-full">
-                            <AvatarImage src={session?.user?.image || (session?.user as any)?.avatar} />
+                            <AvatarImage src={mounted && session?.user ? (session.user.image || (session.user as any).avatar) : undefined} />
                             <AvatarFallback className="bg-zinc-200 dark:bg-zinc-800 text-sm font-bold">
-                              {session?.user?.name?.charAt(0)}
+                              {mounted && session?.user?.name ? session.user.name.charAt(0) : 'U'}
                             </AvatarFallback>
                           </Avatar>
                         </div>
@@ -883,7 +890,7 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
 
               {/* Render Other Followed Users' Stories */}
               {storyGroups
-                .filter(group => group.user.id !== (session?.user as any)?.id)
+                .filter(group => !mounted || !session?.user || group.user.id !== (session.user as any).id)
                 .map((group) => {
                   const globalIdx = storyGroups.findIndex(g => g.user.id === group.user.id);
                   return (
@@ -1134,7 +1141,7 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
 
                 const post = item.data;
                 const postFollowState = post.authorId ? followStates[post.authorId] : null;
-                const isPostAuthorMe = !!(
+                const isPostAuthorMe = mounted && !!(
                   session?.user &&
                   (
                     ((session.user as any).id && post.authorId && (session.user as any).id === post.authorId) ||
@@ -1571,7 +1578,7 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
 
                           <div className="flex items-center gap-2">
                             {(() => {
-                              const isOwner = session?.user && (
+                              const isOwner = mounted && session?.user && (
                                 (session.user as any).id === post.authorId || 
                                 (session.user as any).username === post.author
                               );
@@ -1681,7 +1688,7 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                               let avatarUrl = "";
                               let profileUsername = "";
 
-                              if (post.repostedByMe && session?.user) {
+                              if (mounted && post.repostedByMe && session?.user) {
                                 displayName = session.user.name || (session.user as any).username || "You";
                                 avatarUrl = session.user.image || "";
                                 profileUsername = (session.user as any).username || "";
@@ -2353,7 +2360,7 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
       }}>
         <DialogContent className="sm:max-w-[400px] w-full bg-[#1c1c1e] text-white p-0 gap-0 overflow-hidden border border-gray-800 shadow-2xl rounded-3xl">
           <div className="flex flex-col text-center divide-y divide-gray-800/80">
-            {session?.user && activeOptionsPost && (
+            {mounted && session?.user && activeOptionsPost && (
               ((session.user as any).id === activeOptionsPost.authorId || 
                (session.user as any).username === activeOptionsPost.author)
             ) ? (
@@ -2814,7 +2821,7 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
         onClose={() => setIsStoryViewerOpen(false)}
         storyGroups={storyGroups}
         initialGroupIndex={activeStoryGroupIndex || 0}
-        currentUserId={(session?.user as any)?.id}
+        currentUserId={mounted ? (session?.user as any)?.id : undefined}
         onStoryViewed={handleStoryViewed}
         onStoryDeleted={handleStoryDeleted}
       />
@@ -2825,8 +2832,8 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
         onClose={() => setIsStoryEditorOpen(false)}
         mediaUrl={storyMediaUrl}
         mediaType={storyMediaType}
-        userAvatar={session?.user?.image || undefined}
-        userName={session?.user?.name || undefined}
+        userAvatar={mounted ? (session?.user?.image || undefined) : undefined}
+        userName={mounted ? (session?.user?.name || undefined) : undefined}
         onStoryPublished={() => {
           setStoryMediaUrl('');
           setStoryThumbnailUrl(undefined);

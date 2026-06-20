@@ -36,8 +36,8 @@ export default async function GlobalFeedPage() {
           },
           select: { followingId: true, status: true }
         });
-        followedAuthorIds = follows.filter(f => f.status === 'approved').map(f => f.followingId);
-        pendingFollowAuthorIds = follows.filter(f => f.status === 'pending').map(f => f.followingId);
+        followedAuthorIds = follows.filter((f: any) => f.status === 'approved').map((f: any) => f.followingId);
+        pendingFollowAuthorIds = follows.filter((f: any) => f.status === 'pending').map((f: any) => f.followingId);
       }
 
       dbPosts = res.posts.map(post => {
