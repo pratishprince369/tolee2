@@ -74,7 +74,12 @@ export default async function ToleePage({ params }: { params: { slug: string } }
       admin: { name: dbTolee.owner?.username || 'Admin' },
       isPrivate: dbTolee.isPrivate,
       pendingPostApproval: dbTolee.pendingPostApproval,
-      rules: dbTolee.rules || '1. Be respectful\n2. No spam or self-promotion\n3. Stay on topic'
+      rules: dbTolee.rules || '1. Be respectful\n2. No spam or self-promotion\n3. Stay on topic',
+      isLive: dbTolee.isLive,
+      liveHostId: dbTolee.liveHostId,
+      liveSessionType: dbTolee.liveSessionType,
+      liveStartedAt: dbTolee.liveStartedAt,
+      liveViewerCount: dbTolee.liveViewerCount
     },
     posts: dbTolee.posts.map((p: any) => {
       const authorName = p.post.author.username || p.post.author.name || 'Unknown User';

@@ -132,6 +132,7 @@ model User {
   agenticReelsEnabled  Boolean   @default(false)
   agenticInterval      String    @default("DAILY") // "20_MINS", "1_HOUR", "DAILY"
   agenticLastPostAt    DateTime?
+  liveJoinRequests     LiveJoinRequest[]
 }
 
 model EmailLog {
@@ -178,6 +179,14 @@ model Tolee {
   // LMS
   courses         Course[]
   worldProjects   WorldProjectTolee[]
+
+  // Live Session Status
+  isLive               Boolean             @default(false)
+  liveHostId           String?
+  liveSessionType      String?             // "public" | "private"
+  liveStartedAt        DateTime?
+  liveViewerCount      Int                 @default(0)
+  liveJoinRequests     LiveJoinRequest[]
 }
 
 model ToleeMember {
@@ -1092,5 +1101,18 @@ model PublicCreatorLead {
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+}
+
+model LiveJoinRequest {
+  id        String   @id @default(cuid())
+  toleeId   String
+  userId    String
+  status    String   @default("pending") // "pending" | "approved" | "rejected"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tolee     Tolee    @relation(fields: [toleeId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([toleeId, userId])
 }
 

@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { extractPublicIdFromUrl, extractResourceTypeFromUrl, destroyAsset } from '@/lib/cloudinary-cleanup';
-import { createSystemNotification } from '@/lib/notification-service';
+import { createSystemNotification, createSystemNotificationsMany } from '@/lib/notification-service';
 import { writeLimiter, getClientIp } from '@/lib/rate-limit';
 import { sanitizeText } from '@/lib/sanitize';
 
@@ -53,6 +53,11 @@ export async function getToleeBySlug(slug: string) {
         coverImage: true,
         isPrivate: true,
         ownerId: true,
+        isLive: true,
+        liveHostId: true,
+        liveSessionType: true,
+        liveStartedAt: true,
+        liveViewerCount: true,
         owner: {
           select: {
             id: true,
@@ -671,5 +676,259 @@ export async function deleteTolee(id: string) {
   } catch (error) {
     console.error("Error deleting tolee:", error);
     return { success: false, error: 'Failed to delete Tolee' };
+  }
+}
+
+export async function startLiveSession(toleeId: string, type: 'public' | 'private') {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !(session.user as any).id) {
+      return { success: false, error: 'Unauthorized' };
+    }
+    const userId = (session.user as any).id;
+
+    const tolee = await prisma.tolee.findUnique({
+      where: { id: toleeId },
+      include: {
+        members: {
+          where: { status: 'approved' }
+        }
+      }
+    });
+
+    if (!tolee) {
+      return { success: false, error: 'Tolee not found' };
+    }
+
+    if (tolee.ownerId !== userId) {
+      return { success: false, error: 'Only the admin/owner can start a live session' };
+    }
+
+    // Update Tolee live state
+    await prisma.tolee.update({
+      where: { id: toleeId },
+      data: {
+        isLive: true,
+        liveHostId: userId,
+        liveSessionType: type,
+        liveStartedAt: new Date()
+      }
+    });
+
+    // Notify all other members of the group
+    const otherMembers = tolee.members.filter(m => m.userId !== userId);
+    if (otherMembers.length > 0) {
+      const hostName = session.user.name || 'Admin';
+      const notifications = otherMembers.map(m => ({
+        userId: m.userId,
+        type: 'chat', // Use chat notification type to reuse group/chat channels
+        message: `🔴 Live Now\n\n${tolee.name} has started a live session. Tap to join.`,
+        link: `/t/${tolee.slug}?tab=live`
+      }));
+      await createSystemNotificationsMany(notifications, { groupName: tolee.name });
+    }
+
+    revalidatePath(`/t/${tolee.slug}`);
+    return { success: true };
+  } catch (error) {
+    console.error("Error starting live session:", error);
+    return { success: false, error: 'Failed to start live session' };
+  }
+}
+
+export async function endLiveSession(toleeId: string) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !(session.user as any).id) {
+      return { success: false, error: 'Unauthorized' };
+    }
+    const userId = (session.user as any).id;
+
+    const tolee = await prisma.tolee.findUnique({
+      where: { id: toleeId }
+    });
+
+    if (!tolee) {
+      return { success: false, error: 'Tolee not found' };
+    }
+
+    if (tolee.ownerId !== userId) {
+      return { success: false, error: 'Only the admin/owner can end a live session' };
+    }
+
+    await prisma.$transaction([
+      prisma.tolee.update({
+        where: { id: toleeId },
+        data: {
+          isLive: false,
+          liveHostId: null,
+          liveSessionType: null,
+          liveStartedAt: null,
+          liveViewerCount: 0
+        }
+      }),
+      prisma.liveJoinRequest.deleteMany({
+        where: { toleeId }
+      })
+    ]);
+
+    revalidatePath(`/t/${tolee.slug}`);
+    return { success: true };
+  } catch (error) {
+    console.error("Error ending live session:", error);
+    return { success: false, error: 'Failed to end live session' };
+  }
+}
+
+export async function requestToJoinLive(toleeId: string) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !(session.user as any).id) {
+      return { success: false, error: 'Unauthorized' };
+    }
+    const userId = (session.user as any).id;
+
+    // Check if membership is approved
+    const membership = await prisma.toleeMember.findUnique({
+      where: {
+        userId_toleeId: {
+          userId,
+          toleeId
+        }
+      }
+    });
+
+    if (!membership || membership.status !== 'approved') {
+      return { success: false, error: 'You must be a member of this Tolee to join the live session' };
+    }
+
+    // Create or update join request
+    const request = await prisma.liveJoinRequest.upsert({
+      where: {
+        toleeId_userId: {
+          toleeId,
+          userId
+        }
+      },
+      update: {
+        status: 'pending'
+      },
+      create: {
+        toleeId,
+        userId,
+        status: 'pending'
+      }
+    });
+
+    return { success: true, request };
+  } catch (error) {
+    console.error("Error requesting to join live:", error);
+    return { success: false, error: 'Failed to request to join live session' };
+  }
+}
+
+export async function handleLiveJoinRequest(requestId: string, approve: boolean) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !(session.user as any).id) {
+      return { success: false, error: 'Unauthorized' };
+    }
+    const userId = (session.user as any).id;
+
+    const request = await prisma.liveJoinRequest.findUnique({
+      where: { id: requestId },
+      include: {
+        tolee: true,
+        user: true
+      }
+    });
+
+    if (!request) {
+      return { success: false, error: 'Request not found' };
+    }
+
+    if (request.tolee.ownerId !== userId) {
+      return { success: false, error: 'Only the admin/owner can handle join requests' };
+    }
+
+    const updatedRequest = await prisma.liveJoinRequest.update({
+      where: { id: requestId },
+      data: {
+        status: approve ? 'approved' : 'rejected'
+      }
+    });
+
+    return { success: true, request: updatedRequest };
+  } catch (error) {
+    console.error("Error handling live join request:", error);
+    return { success: false, error: 'Failed to handle live join request' };
+  }
+}
+
+export async function getLiveJoinRequests(toleeId: string) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !(session.user as any).id) {
+      return { success: false, error: 'Unauthorized' };
+    }
+    const userId = (session.user as any).id;
+
+    const tolee = await prisma.tolee.findUnique({
+      where: { id: toleeId }
+    });
+
+    if (!tolee) {
+      return { success: false, error: 'Tolee not found' };
+    }
+
+    if (tolee.ownerId !== userId) {
+      return { success: false, error: 'Only the admin/owner can view join requests' };
+    }
+
+    const requests = await prisma.liveJoinRequest.findMany({
+      where: {
+        toleeId,
+        status: 'pending'
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+            avatar: true
+          }
+        }
+      }
+    });
+
+    return { success: true, requests };
+  } catch (error) {
+    console.error("Error fetching live join requests:", error);
+    return { success: false, requests: [] };
+  }
+}
+
+export async function getMemberLiveStatus(toleeId: string) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !(session.user as any).id) {
+      return { success: false, error: 'Unauthorized' };
+    }
+    const userId = (session.user as any).id;
+
+    const request = await prisma.liveJoinRequest.findUnique({
+      where: {
+        toleeId_userId: {
+          toleeId,
+          userId
+        }
+      }
+    });
+
+    return { success: true, status: request?.status || null };
+  } catch (error) {
+    console.error("Error fetching member live status:", error);
+    return { success: false, status: null };
   }
 }

@@ -491,6 +491,58 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Tolee Live Broadcasting Event Handlers
+  socket.on('join-tolee-room', ({ toleeId, userId }) => {
+    socket.join(`tolee-${toleeId}`);
+    console.log(`[Live signaling] Socket ${socket.id} joined tolee room tolee-${toleeId} for user ${userId}`);
+  });
+
+  socket.on('tolee-live-started', ({ toleeId, type }) => {
+    console.log(`[Live signaling] Tolee ${toleeId} live started with type ${type}`);
+    io.to(`tolee-${toleeId}`).emit('tolee-live-started', { toleeId, type });
+  });
+
+  socket.on('tolee-live-ended', ({ toleeId }) => {
+    console.log(`[Live signaling] Tolee ${toleeId} live ended`);
+    io.to(`tolee-${toleeId}`).emit('tolee-live-ended', { toleeId });
+  });
+
+  socket.on('tolee-join-request', ({ toleeId, userId, name, avatar }) => {
+    console.log(`[Live signaling] User ${name} (${userId}) requesting to join live in Tolee ${toleeId}`);
+    io.to(`tolee-${toleeId}`).emit('tolee-join-request', { toleeId, userId, name, avatar });
+  });
+
+  socket.on('tolee-join-response', ({ toleeId, userId, approved }) => {
+    console.log(`[Live signaling] Admin response for user ${userId} in Tolee ${toleeId}: ${approved}`);
+    io.to(`tolee-${toleeId}`).emit('tolee-join-response', { toleeId, userId, approved });
+  });
+
+  socket.on('tolee-participant-joined', ({ toleeId, userId, name, avatar }) => {
+    console.log(`[Live signaling] Participant ${name} joined live in Tolee ${toleeId}`);
+    io.to(`tolee-${toleeId}`).emit('tolee-participant-joined', { toleeId, userId, name, avatar });
+  });
+
+  socket.on('tolee-participant-left', ({ toleeId, userId, name }) => {
+    console.log(`[Live signaling] Participant ${name} left live in Tolee ${toleeId}`);
+    io.to(`tolee-${toleeId}`).emit('tolee-participant-left', { toleeId, userId, name });
+  });
+
+  socket.on('tolee-live-chat', ({ toleeId, sender, avatar, message, time }) => {
+    io.to(`tolee-${toleeId}`).emit('tolee-live-chat', { sender, avatar, message, time });
+  });
+
+  socket.on('tolee-live-reaction', ({ toleeId, emoji }) => {
+    io.to(`tolee-${toleeId}`).emit('tolee-live-reaction', { emoji });
+  });
+
+  socket.on('tolee-live-hand-raise', ({ toleeId, userId, name, avatar }) => {
+    io.to(`tolee-${toleeId}`).emit('tolee-live-hand-raise', { userId, name, avatar });
+  });
+
+  socket.on('tolee-live-speak-action', ({ toleeId, userId, action }) => {
+    io.to(`tolee-${toleeId}`).emit('tolee-live-speak-action', { userId, action });
+  });
+
   // 8. Disconnect Cleanup
   socket.on('disconnect', () => {
     const userId = socketToUser.get(socket.id);

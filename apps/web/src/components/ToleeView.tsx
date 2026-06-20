@@ -20,7 +20,16 @@ import { CreatePostModal } from '@/components/CreatePostModal';
 import { PostCarousel } from '@/components/PostCarousel';
 import { ManageToleeModal } from '@/components/ManageToleeModal';
 import { createPost, toggleLike, addComment, getLikes, getComments, toggleSavePost, toggleRepost, getReposts, updatePostVisibility, deletePostPermanently, editPostCaption } from '@/actions/post';
-import { joinTolee, leaveToleeGroup } from '@/actions/tolee';
+import { joinTolee, leaveToleeGroup, startLiveSession, endLiveSession, requestToJoinLive, handleLiveJoinRequest, getLiveJoinRequests, getMemberLiveStatus } from '@/actions/tolee';
+import { io } from 'socket.io-client';
+
+function getSocketUrl() {
+  if (process.env.NEXT_PUBLIC_SOCKET_URL) return process.env.NEXT_PUBLIC_SOCKET_URL;
+  if (typeof window === 'undefined') return 'http://localhost:4000';
+  const h = window.location.hostname;
+  const isLocal = h === 'localhost' || h === '127.0.0.1' || h.startsWith('192.168.') || h.startsWith('10.') || h.startsWith('172.');
+  return isLocal ? `http://${h}:4000` : 'https://api.tolee.in';
+}
 import { 
   DropdownMenu, 
   DropdownMenuTrigger, 
@@ -43,6 +52,7 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
   const { data: session } = useSession();
   const router = useRouter();
   const { tolee, posts, leaderboard, membershipStatus, role } = toleeData || {};
+  const isAdmin = role === 'admin';
   const isMember = membershipStatus === 'approved';
   
   const [activeTab, setActiveTab] = useState(isMember ? 'community' : 'about');
@@ -60,7 +70,17 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
   }, [searchParams]);
 
   // Masterclass Live Stage States
-  const [isLive, setIsLive] = useState(false);
+  const [isLive, setIsLive] = useState(tolee?.isLive || false);
+  const [liveSessionType, setLiveSessionType] = useState<'public' | 'private' | null>(tolee?.liveSessionType || null);
+  const [liveHostId, setLiveHostId] = useState<string | null>(tolee?.liveHostId || null);
+  const [liveViewerCount, setLiveViewerCount] = useState(tolee?.liveViewerCount || 0);
+  const [liveStartedAt, setLiveStartedAt] = useState<string | null>(tolee?.liveStartedAt ? new Date(tolee.liveStartedAt).toISOString() : null);
+  const [myLiveRequestStatus, setMyLiveRequestStatus] = useState<string | null>(null);
+  const [liveJoinRequests, setLiveJoinRequests] = useState<any[]>([]);
+  const [floatingEmojis, setFloatingEmojis] = useState<{ id: number, emoji: string, style: React.CSSProperties }[]>([]);
+  const emojiIdCounter = useRef(0);
+  const socketRef = useRef<any>(null);
+
   const [isMicOn, setIsMicOn] = useState(true);
   const [isCamOn, setIsCamOn] = useState(true);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
@@ -73,20 +93,51 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
   const screenStreamRef = useRef<MediaStream | null>(null);
   const videoElementRef = useRef<HTMLVideoElement>(null);
 
+  const triggerFloatingEmoji = (emoji: string) => {
+    const id = emojiIdCounter.current++;
+    const randomX = Math.floor(Math.random() * 80) + 10;
+    const randomSize = Math.floor(Math.random() * 20) + 20;
+    const style: React.CSSProperties = {
+      position: 'absolute',
+      bottom: '0px',
+      left: `${randomX}%`,
+      fontSize: `${randomSize}px`,
+      zIndex: 50,
+      pointerEvents: 'none',
+      animation: 'floatUp 3s ease-out forwards',
+    };
+    setFloatingEmojis(prev => [...prev, { id, emoji, style }]);
+    setTimeout(() => {
+      setFloatingEmojis(prev => prev.filter(item => item.id !== id));
+    }, 3000);
+  };
+
   const startLiveBroadcast = async () => {
     try {
+      const type = window.confirm("Do you want to host a Public Live Session? (Press OK for Public, Cancel for Private)") ? 'public' : 'private';
+
       const stream = await navigator.mediaDevices.getUserMedia({
         video: true,
         audio: true
       });
       cameraStreamRef.current = stream;
+      
+      const res = await startLiveSession(tolee.id, type);
+      if (!res.success) {
+        alert("Failed to start live session: " + res.error);
+        stream.getTracks().forEach(t => t.stop());
+        return;
+      }
+
       setIsLive(true);
+      setLiveSessionType(type);
+      setLiveHostId(currentUserId);
       setIsCamOn(true);
       setIsMicOn(true);
-      setViewerCount(Math.floor(Math.random() * 20) + 10);
+      setViewerCount(1);
       
       setLiveChatMessages([
-        { sender: 'System 🤖', avatar: '', message: '🎓 Live Training Masterclass & Meeting has started! Join now!', time: 'Now', isSystem: true }
+        { sender: 'System 🤖', avatar: '', message: `🔴 Live Masterclass started as ${type} session!`, time: 'Now', isSystem: true }
       ]);
 
       setTimeout(() => {
@@ -95,7 +146,10 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
         }
       }, 300);
 
-      alert("🚀 Automatic push notification simulated to all group members: 'Join live training by admin now!'");
+      if (socketRef.current?.connected) {
+        socketRef.current.emit('tolee-live-started', { toleeId: tolee.id, type });
+        socketRef.current.emit('tolee-participant-joined', { toleeId: tolee.id, userId: currentUserId, name: session?.user?.name || 'Admin', avatar: session?.user?.image || '' });
+      }
     } catch (err) {
       console.error('Failed to start camera:', err);
       alert('Camera access is required to host the Live Masterclass.');
@@ -152,7 +206,7 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
     }
   };
 
-  const stopLiveBroadcast = () => {
+  const stopLiveBroadcast = async () => {
     if (cameraStreamRef.current) {
       cameraStreamRef.current.getTracks().forEach(t => t.stop());
       cameraStreamRef.current = null;
@@ -161,43 +215,257 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
       screenStreamRef.current.getTracks().forEach(t => t.stop());
       screenStreamRef.current = null;
     }
+    
+    await endLiveSession(tolee.id);
+
     setIsLive(false);
+    setLiveSessionType(null);
+    setLiveHostId(null);
     setIsScreenSharing(false);
     setIsUserJoined(false);
     setViewerCount(0);
     setLiveChatMessages([]);
+    setLiveJoinRequests([]);
+
+    if (socketRef.current?.connected) {
+      socketRef.current.emit('tolee-live-ended', { toleeId: tolee.id });
+    }
+  };
+
+  const handleJoinLiveClick = async () => {
+    if (liveSessionType === 'public') {
+      joinLiveBroadcast();
+    } else {
+      const res = await requestToJoinLive(tolee.id);
+      if (res.success) {
+        setMyLiveRequestStatus('pending');
+        if (socketRef.current?.connected) {
+          socketRef.current.emit('tolee-join-request', {
+            toleeId: tolee.id,
+            userId: currentUserId,
+            name: session?.user?.name || 'User',
+            avatar: session?.user?.image || ''
+          });
+        }
+        alert("Join request sent to Admin. Please wait for approval.");
+      } else {
+        alert("Request failed: " + res.error);
+      }
+    }
   };
 
   const joinLiveBroadcast = () => {
     setIsUserJoined(true);
-    setViewerCount(Math.floor(Math.random() * 80) + 120);
     setLiveChatMessages([
       { sender: 'System 🤖', avatar: '', message: '👋 You joined the Live Masterclass. Hello!', time: 'Now', isSystem: true }
     ]);
+    if (socketRef.current?.connected) {
+      socketRef.current.emit('tolee-participant-joined', {
+        toleeId: tolee.id,
+        userId: currentUserId,
+        name: session?.user?.name || 'User',
+        avatar: session?.user?.image || ''
+      });
+    }
   };
 
   const leaveLiveBroadcast = () => {
     setIsUserJoined(false);
-    setViewerCount(0);
     setLiveChatMessages([]);
+    if (socketRef.current?.connected) {
+      socketRef.current.emit('tolee-participant-left', {
+        toleeId: tolee.id,
+        userId: currentUserId,
+        name: session?.user?.name || 'User'
+      });
+    }
+  };
+
+  const raiseHand = () => {
+    if (socketRef.current?.connected) {
+      socketRef.current.emit('tolee-live-hand-raise', {
+        toleeId: tolee.id,
+        userId: currentUserId,
+        name: session?.user?.name || 'User',
+        avatar: session?.user?.image || ''
+      });
+      alert("Hand raised! Request sent to Admin to speak.");
+    }
+  };
+
+  const sendReaction = (emoji: string) => {
+    if (socketRef.current?.connected) {
+      socketRef.current.emit('tolee-live-reaction', { toleeId: tolee.id, emoji });
+    } else {
+      triggerFloatingEmoji(emoji);
+    }
   };
 
   const sendLiveChatMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (!liveChatInput.trim()) return;
-    setLiveChatMessages(prev => [
-      ...prev,
-      {
-        sender: session?.user?.name || 'Me',
-        avatar: session?.user?.image || '/default-user-avatar.svg',
-        message: liveChatInput.trim(),
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      }
-    ]);
+    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const sender = session?.user?.name || 'User';
+    const avatar = session?.user?.image || '/default-user-avatar.svg';
+    const message = liveChatInput.trim();
+
+    if (socketRef.current?.connected) {
+      socketRef.current.emit('tolee-live-chat', {
+        toleeId: tolee.id,
+        sender,
+        avatar,
+        message,
+        time
+      });
+    } else {
+      setLiveChatMessages(prev => [...prev, { sender, avatar, message, time }]);
+    }
     setLiveChatInput('');
   };
 
-  // Cleanup on unmount
+  // Socket Connection and initial state sync effects
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    const SOCKET_URL = getSocketUrl();
+    console.log('[Live View Socket] Connecting to:', SOCKET_URL);
+    const socket = io(SOCKET_URL, {
+      transports: ['websocket', 'polling']
+    });
+    socketRef.current = socket;
+
+    socket.on('connect', () => {
+      console.log('[Live View Socket] Connected!', socket.id);
+      socket.emit('join-tolee-room', { toleeId: tolee.id, userId: currentUserId });
+      if (isLive && isUserJoined) {
+        socket.emit('tolee-participant-joined', {
+          toleeId: tolee.id,
+          userId: currentUserId,
+          name: session?.user?.name || 'User',
+          avatar: session?.user?.image || ''
+        });
+      }
+    });
+
+    socket.on('tolee-live-started', ({ type }: { type: 'public' | 'private' }) => {
+      setIsLive(true);
+      setLiveSessionType(type);
+      setMyLiveRequestStatus(null);
+      setLiveChatMessages([
+        { sender: 'System 🤖', avatar: '', message: `🔴 Live session has started!`, time: 'Now', isSystem: true }
+      ]);
+    });
+
+    socket.on('tolee-live-ended', () => {
+      setIsLive(false);
+      setLiveSessionType(null);
+      setLiveHostId(null);
+      setIsUserJoined(false);
+      setMyLiveRequestStatus(null);
+      setLiveChatMessages([]);
+      alert("The host has ended the live session.");
+    });
+
+    socket.on('tolee-join-request', ({ userId, name, avatar }: any) => {
+      if (isAdmin) {
+        setLiveJoinRequests(prev => {
+          if (prev.some(r => r.userId === userId)) return prev;
+          return [...prev, { id: `temp-${userId}`, userId, user: { name, username: name, avatar } }];
+        });
+        setLiveChatMessages(prev => [
+          ...prev,
+          { sender: 'System 🤖', avatar: '', message: `🔔 ${name} wants to join this live session.`, time: 'Now', isSystem: true }
+        ]);
+      }
+    });
+
+    socket.on('tolee-join-response', ({ userId, approved }: any) => {
+      if (userId === currentUserId) {
+        if (approved) {
+          setMyLiveRequestStatus('approved');
+          joinLiveBroadcast();
+        } else {
+          setMyLiveRequestStatus('rejected');
+          alert("Your request to join the live session was rejected by the admin.");
+        }
+      }
+    });
+
+    socket.on('tolee-participant-joined', ({ userId, name }: any) => {
+      setViewerCount(prev => prev + 1);
+      setLiveChatMessages(prev => [
+        ...prev,
+        { sender: 'System 🤖', avatar: '', message: `👤 ${name} joined the live session.`, time: 'Now', isSystem: true }
+      ]);
+    });
+
+    socket.on('tolee-participant-left', ({ userId, name }: any) => {
+      setViewerCount(prev => Math.max(0, prev - 1));
+      setLiveChatMessages(prev => [
+        ...prev,
+        { sender: 'System 🤖', avatar: '', message: `👤 ${name} left the live session.`, time: 'Now', isSystem: true }
+      ]);
+    });
+
+    socket.on('tolee-live-chat', ({ sender, avatar, message, time }: any) => {
+      setLiveChatMessages(prev => [
+        ...prev,
+        { sender, avatar, message, time }
+      ]);
+    });
+
+    socket.on('tolee-live-reaction', ({ emoji }: any) => {
+      triggerFloatingEmoji(emoji);
+    });
+
+    socket.on('tolee-live-hand-raise', ({ userId, name }: any) => {
+      setLiveChatMessages(prev => [
+        ...prev,
+        { sender: 'System 🤖', avatar: '', message: `🖐️ ${name} raised hand to request speaking.`, time: 'Now', isSystem: true }
+      ]);
+    });
+
+    socket.on('tolee-live-speak-action', ({ userId, action }: any) => {
+      if (userId === currentUserId) {
+        if (action === 'approve') {
+          alert("Admin approved you to speak. Your mic is now active.");
+          setIsMicOn(true);
+        } else if (action === 'mute') {
+          alert("Admin muted you.");
+          setIsMicOn(false);
+        }
+      }
+    });
+
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+      }
+    };
+  }, [currentUserId, isLive, isAdmin]);
+
+  useEffect(() => {
+    if (activeTab === 'live') {
+      if (isAdmin) {
+        getLiveJoinRequests(tolee.id).then(res => {
+          if (res.success && res.requests) {
+            setLiveJoinRequests(res.requests);
+          }
+        });
+      } else {
+        getMemberLiveStatus(tolee.id).then(res => {
+          if (res.success && res.status) {
+            setMyLiveRequestStatus(res.status);
+            if (res.status === 'approved') {
+              setIsUserJoined(true);
+            }
+          }
+        });
+      }
+    }
+  }, [activeTab, isAdmin, tolee.id]);
+
+  // Cleanup media streams on unmount
   useEffect(() => {
     return () => {
       if (cameraStreamRef.current) {
@@ -557,7 +825,6 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
   };
 
   const isPending = membershipStatus === 'pending';
-  const isAdmin = role === 'admin';
   const isModerator = role === 'moderator' || isAdmin;
 
   return (
@@ -590,6 +857,20 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
             </div>
             
             <div className="flex gap-2 mb-2 w-full md:w-auto items-center">
+              {isLive && (
+                <Button 
+                  onClick={() => {
+                    setActiveTab('live');
+                    if (!isAdmin && !isUserJoined) {
+                      handleJoinLiveClick();
+                    }
+                  }}
+                  className="bg-red-600 hover:bg-red-700 text-white font-extrabold px-4 rounded-xl shadow-lg flex items-center gap-2 animate-pulse h-10 flex-shrink-0"
+                >
+                  <Radio className="w-4 h-4 animate-ping text-white" />
+                  🔴 LIVE NOW
+                </Button>
+              )}
               {isAdmin ? (
                 <div className="flex-1 md:flex-initial">
                   <ManageToleeModal tolee={tolee}>
@@ -1391,11 +1672,11 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                         <div>
                           <div className="flex items-center gap-2 mb-3">
                             <span className="flex h-2.5 w-2.5 relative">
-                              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isLive || isUserJoined ? 'bg-red-400' : 'bg-gray-400'}`}></span>
-                              <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isLive || isUserJoined ? 'bg-red-500' : 'bg-gray-500'}`}></span>
+                              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isLive ? 'bg-red-400' : 'bg-gray-400'}`}></span>
+                              <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isLive ? 'bg-red-500' : 'bg-gray-500'}`}></span>
                             </span>
                             <span className="text-xs font-bold uppercase tracking-wider text-teal-400">
-                              {isLive || isUserJoined ? 'Live Broadcast' : 'Offline'}
+                              {isLive ? 'Live Broadcast' : 'Offline'}
                             </span>
                           </div>
                           <h2 className="text-3xl font-extrabold tracking-tight">Group & Student Meetings Stage</h2>
@@ -1426,21 +1707,52 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                         ) : (
                           // Non-admin view
                           isLive && !isUserJoined ? (
-                            <Button 
-                              onClick={joinLiveBroadcast}
-                              className="bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white font-bold px-8 py-6 rounded-xl shadow-lg shadow-teal-500/25 flex items-center gap-2 transform active:scale-95 transition-all"
-                            >
-                              <PlayCircle className="w-5 h-5" />
-                              Join Live Training
-                            </Button>
+                            liveSessionType === 'public' ? (
+                              <Button 
+                                onClick={joinLiveBroadcast}
+                                className="bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white font-bold px-8 py-6 rounded-xl shadow-lg shadow-teal-500/25 flex items-center gap-2 transform active:scale-95 transition-all"
+                              >
+                                <PlayCircle className="w-5 h-5" />
+                                Join Live Training
+                              </Button>
+                            ) : myLiveRequestStatus === 'pending' ? (
+                              <Button 
+                                disabled
+                                className="bg-amber-600/80 text-white font-bold px-8 py-6 rounded-xl flex items-center gap-2"
+                              >
+                                <Loader2 className="w-5 h-5 animate-spin" />
+                                Requested... Waiting for Approval
+                              </Button>
+                            ) : myLiveRequestStatus === 'rejected' ? (
+                              <div className="bg-red-500/10 border border-red-500/20 text-red-500 px-6 py-4 rounded-xl font-bold">
+                                ❌ Request Rejected by Admin
+                              </div>
+                            ) : (
+                              <Button 
+                                onClick={handleJoinLiveClick}
+                                className="bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white font-bold px-8 py-6 rounded-xl shadow-lg shadow-teal-500/25 flex items-center gap-2 transform active:scale-95 transition-all"
+                              >
+                                <Lock className="w-5 h-5" />
+                                Request to Join Live
+                              </Button>
+                            )
                           ) : isUserJoined ? (
-                            <Button 
-                              onClick={leaveLiveBroadcast}
-                              variant="outline"
-                              className="border-white/20 hover:bg-white/10 text-white font-bold px-8 py-6 rounded-xl flex items-center gap-2 transform active:scale-95 transition-all"
-                            >
-                              Leave Masterclass
-                            </Button>
+                            <div className="flex gap-2">
+                              <Button 
+                                onClick={leaveLiveBroadcast}
+                                variant="outline"
+                                className="border-white/20 hover:bg-white/10 text-white font-bold px-8 py-6 rounded-xl flex items-center gap-2 transform active:scale-95 transition-all"
+                              >
+                                Leave Masterclass
+                              </Button>
+                              <Button 
+                                onClick={raiseHand}
+                                variant="outline"
+                                className="border-amber-500/20 hover:bg-amber-500/10 text-amber-500 font-bold px-8 py-6 rounded-xl flex items-center gap-2 transform active:scale-95 transition-all"
+                              >
+                                🖐️ Raise Hand
+                              </Button>
+                            </div>
                           ) : (
                             <div className="bg-white/5 border border-white/10 backdrop-blur-md px-6 py-4 rounded-xl text-center">
                               <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Next Live Session</p>
@@ -1452,16 +1764,42 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                     </div>
 
                     {/* Live Screen & Sidebar Grid */}
-                    {(isLive || isUserJoined) ? (
+                    {((isAdmin && isLive) || isUserJoined) ? (
                       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         {/* Video Player Box */}
                         <div className="lg:col-span-2 flex flex-col gap-4">
                           <div className="relative aspect-video rounded-2xl bg-black overflow-hidden border border-gray-800 shadow-2xl group">
                             
+                            {/* Keyframes Style */}
+                            <style>{`
+                              @keyframes floatUp {
+                                0% {
+                                  transform: translateY(0) scale(0.5);
+                                  opacity: 0;
+                                }
+                                10% {
+                                  opacity: 1;
+                                }
+                                100% {
+                                  transform: translateY(-250px) scale(1.2);
+                                  opacity: 0;
+                                }
+                              }
+                            `}</style>
+
+                            {/* Floating Emojis Container */}
+                            <div className="absolute inset-0 pointer-events-none overflow-hidden z-30">
+                              {floatingEmojis.map((item) => (
+                                <span key={item.id} style={item.style}>
+                                  {item.emoji}
+                                </span>
+                              ))}
+                            </div>
+
                             {/* Live Badge */}
                             <div className="absolute top-4 left-4 z-10 flex items-center gap-2 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
                               <span className="h-2 w-2 rounded-full bg-red-500 animate-ping" />
-                              <span className="text-[10px] font-bold tracking-wider uppercase text-white">LIVE</span>
+                              <span className="text-[10px] font-bold tracking-wider uppercase text-white">LIVE ({liveSessionType})</span>
                             </div>
 
                             {/* Viewer count */}
@@ -1469,6 +1807,59 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                               <Users className="w-3.5 h-3.5 text-gray-400" />
                               <span className="text-[10px] font-bold text-white">{viewerCount} Viewers</span>
                             </div>
+
+                            {/* Admin Join Request Notifications Inside Stream */}
+                            {isAdmin && liveJoinRequests.length > 0 && (
+                              <div className="absolute top-16 left-4 right-4 z-20 space-y-2 max-w-sm">
+                                {liveJoinRequests.map((req) => (
+                                  <div key={req.id} className="bg-black/95 border border-teal-500/30 rounded-xl p-3 flex items-center justify-between shadow-2xl backdrop-blur-md">
+                                    <div className="flex items-center gap-2">
+                                      <Avatar className="w-8 h-8">
+                                        <AvatarImage src={req.user?.avatar || '/default-user-avatar.svg'} />
+                                        <AvatarFallback className="text-[10px]">{req.user?.name?.[0]}</AvatarFallback>
+                                      </Avatar>
+                                      <div>
+                                        <p className="text-xs font-bold text-white">{req.user?.name}</p>
+                                        <p className="text-[10px] text-gray-400">Wants to join live</p>
+                                      </div>
+                                    </div>
+                                    <div className="flex gap-2">
+                                      <Button 
+                                        size="sm" 
+                                        onClick={async () => {
+                                          const res = await handleLiveJoinRequest(req.id, true);
+                                          if (res.success) {
+                                            setLiveJoinRequests(prev => prev.filter(r => r.id !== req.id));
+                                            if (socketRef.current?.connected) {
+                                              socketRef.current.emit('tolee-join-response', { toleeId: tolee.id, userId: req.userId, approved: true });
+                                            }
+                                          }
+                                        }}
+                                        className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] px-2 py-1 h-7 font-bold rounded-lg"
+                                      >
+                                        Approve
+                                      </Button>
+                                      <Button 
+                                        size="sm" 
+                                        variant="destructive"
+                                        onClick={async () => {
+                                          const res = await handleLiveJoinRequest(req.id, false);
+                                          if (res.success) {
+                                            setLiveJoinRequests(prev => prev.filter(r => r.id !== req.id));
+                                            if (socketRef.current?.connected) {
+                                              socketRef.current.emit('tolee-join-response', { toleeId: tolee.id, userId: req.userId, approved: false });
+                                            }
+                                          }
+                                        }}
+                                        className="text-[10px] px-2 py-1 h-7 font-bold rounded-lg"
+                                      >
+                                        Reject
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
 
                             {/* Video Stream Element */}
                             {isAdmin ? (
@@ -1489,9 +1880,9 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                                     <Radio className="w-10 h-10 text-[#0a7c85]" />
                                   </div>
                                   <div>
-                                    <h3 className="font-bold text-lg text-white">Admin Ka Live Stream Chal Raha Hai</h3>
+                                    <h3 className="font-bold text-lg text-white">Live Broadcast Is Streaming</h3>
                                     <p className="text-xs text-gray-400 max-w-sm mt-1">
-                                      Screen Share ya Webcam broadcast stream settings fully active hain. Welcome to the webinar!
+                                      Host is presenting slides and sharing live camera video stream. Welcome to the webinar!
                                     </p>
                                   </div>
                                 </div>
@@ -1581,6 +1972,20 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                             ))}
                           </div>
 
+                          {/* Live Emoji Reactions */}
+                          <div className="px-3 py-1.5 border-t border-gray-100 dark:border-zinc-900 bg-gray-50/50 dark:bg-zinc-900/10 flex gap-2 justify-center select-none">
+                            {['❤️', '👍', '🔥', '👏', '😂', '😮'].map((emoji) => (
+                              <button 
+                                key={emoji} 
+                                type="button"
+                                onClick={() => sendReaction(emoji)}
+                                className="hover:scale-125 transition-transform text-lg px-1.5 active:scale-95"
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                          </div>
+
                           {/* Send input */}
                           <form onSubmit={sendLiveChatMessage} className="p-3 border-t border-gray-100 dark:border-zinc-900 bg-gray-50 dark:bg-zinc-900/30 flex gap-2">
                             <Input 
@@ -1597,23 +2002,59 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                         </div>
                       </div>
                     ) : (
-                      /* Offline Stage Information Banner */
+                      /* Offline Stage Information Banner / Member Action Gates */
                       <Card className="border-gray-200 dark:border-gray-800 bg-white dark:bg-[#121212] overflow-hidden p-8 text-center flex flex-col items-center justify-center">
-                        <div className="w-20 h-20 bg-gray-100 dark:bg-zinc-900 rounded-full flex items-center justify-center mb-4 text-gray-400">
+                        <div className="w-20 h-20 bg-gray-100 dark:bg-zinc-900 rounded-full flex items-center justify-center mb-4 text-gray-400 animate-pulse">
                           <Radio className="w-10 h-10" />
                         </div>
-                        <h3 className="font-extrabold text-xl mb-2 text-gray-900 dark:text-white">Live Meeting Offline Hai</h3>
+                        <h3 className="font-extrabold text-xl mb-2 text-gray-900 dark:text-white">
+                          {isLive ? 'Live Masterclass Active Hai!' : 'Live Meeting Offline Hai'}
+                        </h3>
                         <p className="text-sm text-gray-500 max-w-md mx-auto mb-6">
-                          Group super admin jab bhi live training program ya meeting broadcast karenge, aapko automatic push notification alert mil jayega.
+                          {isLive 
+                            ? 'Admin has started a live session. Tap join below to enter the live room.'
+                            : 'Group super admin jab bhi live training program ya meeting broadcast karenge, aapko automatic push notification alert mil jayega.'}
                         </p>
-                        {isAdmin && (
+                        
+                        {isAdmin && !isLive && (
                           <Button 
                             onClick={startLiveBroadcast}
                             className="bg-[#0a7c85] hover:bg-[#08676f] text-white font-bold px-6 py-5 rounded-xl flex items-center gap-2"
                           >
-                            <Radio className="w-4 h-4" />
+                            <Radio className="w-4 h-4 animate-pulse" />
                             Go Live Broadcast Now
                           </Button>
+                        )}
+
+                        {!isAdmin && isLive && !isUserJoined && (
+                          <div className="flex flex-col items-center gap-3">
+                            {liveSessionType === 'public' ? (
+                              <Button 
+                                onClick={joinLiveBroadcast}
+                                className="bg-[#0a7c85] hover:bg-[#08676f] text-white font-bold px-8 py-5 rounded-xl flex items-center gap-2"
+                              >
+                                <PlayCircle className="w-5 h-5" />
+                                Join Live Training
+                              </Button>
+                            ) : myLiveRequestStatus === 'pending' ? (
+                              <div className="flex flex-col items-center gap-2">
+                                <Loader2 className="w-6 h-6 animate-spin text-amber-500" />
+                                <p className="text-sm font-bold text-amber-500">Requested... Waiting for Admin Approval</p>
+                              </div>
+                            ) : myLiveRequestStatus === 'rejected' ? (
+                              <div className="bg-red-500/10 border border-red-500/20 text-red-500 px-6 py-4 rounded-xl font-bold">
+                                ❌ Request Rejected by Admin
+                              </div>
+                            ) : (
+                              <Button 
+                                onClick={handleJoinLiveClick}
+                                className="bg-amber-600 hover:bg-amber-700 text-white font-bold px-8 py-5 rounded-xl flex items-center gap-2 shadow-lg shadow-amber-600/20"
+                              >
+                                <Lock className="w-5 h-5" />
+                                Request to Join Live
+                              </Button>
+                            )}
+                          </div>
                         )}
                       </Card>
                     )}
