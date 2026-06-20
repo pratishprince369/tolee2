@@ -98,7 +98,7 @@ export default async function MeetingPage({ params }: PageProps) {
     );
   }
 
-  const meeting = res.meeting;
+  const meeting = JSON.parse(JSON.stringify(res.meeting));
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">

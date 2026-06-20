@@ -122,6 +122,10 @@ export default function MeetingClientWrapper({
       }
 
       setPreviewError(null);
+      if (typeof navigator === 'undefined' || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setPreviewError('Media access is not supported by your browser or connection type (requires HTTPS).');
+        return;
+      }
       const constraints = {
         video: isCamOn ? { width: 640, height: 360, facingMode: 'user' } : false,
         audio: true // Keep microphone active, we can mute track digitally
