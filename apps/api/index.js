@@ -519,6 +519,7 @@ io.on('connection', (socket) => {
 
   socket.on('tolee-participant-joined', ({ toleeId, userId, name, avatar }) => {
     console.log(`[Live signaling] Participant ${name} joined live in Tolee ${toleeId}`);
+    console.log(`[DEBUG] [User Joined Live] Participant ${name} (${userId}) joined live in Tolee ${toleeId}`);
     io.to(`tolee-${toleeId}`).emit('tolee-participant-joined', { toleeId, userId, name, avatar });
   });
 

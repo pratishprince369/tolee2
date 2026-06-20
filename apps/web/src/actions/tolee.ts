@@ -158,6 +158,13 @@ export async function getToleeBySlug(slug: string) {
         }
       }
     });
+    if (tolee) {
+      if (tolee.isLive) {
+        console.log(`[DEBUG] [Live Session Found] Live session is active for Tolee: ${tolee.name} (${tolee.id})`);
+      } else {
+        console.log(`[DEBUG] [Live Session Missing] No active live session for Tolee: ${tolee.name} (${tolee.id})`);
+      }
+    }
     return { success: true, tolee };
   } catch (error) {
     console.error("Error fetching tolee by slug:", error);
@@ -715,17 +722,20 @@ export async function startLiveSession(toleeId: string, type: 'public' | 'privat
       }
     });
 
+    console.log(`[DEBUG] [Live Created] Live session started for Tolee ID: ${toleeId}, Host: ${userId}, Type: ${type}`);
+
     // Notify all other members of the group
-    const otherMembers = tolee.members.filter(m => m.userId !== userId);
+    const otherMembers = tolee.members.filter((m: any) => m.userId !== userId);
     if (otherMembers.length > 0) {
       const hostName = session.user.name || 'Admin';
-      const notifications = otherMembers.map(m => ({
+      const notifications = otherMembers.map((m: any) => ({
         userId: m.userId,
-        type: 'chat', // Use chat notification type to reuse group/chat channels
+        type: 'live', // Use live notification type to prevent filtering
         message: `🔴 Live Now\n\n${tolee.name} has started a live session. Tap to join.`,
         link: `/t/${tolee.slug}?tab=live`
       }));
       await createSystemNotificationsMany(notifications, { groupName: tolee.name });
+      console.log(`[DEBUG] [Notification Sent] Group notifications created for ${notifications.length} members of Tolee: ${tolee.name}`);
     }
 
     revalidatePath(`/t/${tolee.slug}`);

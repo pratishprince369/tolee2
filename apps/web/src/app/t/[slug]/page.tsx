@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { ToleeView } from '@/components/ToleeView';
 import { getToleeBySlug } from '@/actions/tolee';
 import { getServerSession } from 'next-auth/next';

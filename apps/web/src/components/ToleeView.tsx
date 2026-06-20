@@ -67,7 +67,11 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
       const newUrl = window.location.pathname;
       window.history.replaceState({ ...window.history.state, as: newUrl, url: newUrl }, '', newUrl);
     }
-  }, [searchParams]);
+    const tabParam = searchParams?.get('tab');
+    if (tabParam === 'live' && isMember) {
+      setActiveTab('live');
+    }
+  }, [searchParams, isMember]);
 
   // Masterclass Live Stage States
   const [isLive, setIsLive] = useState(tolee?.isLive || false);
@@ -255,6 +259,7 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
   };
 
   const joinLiveBroadcast = () => {
+    console.log(`[DEBUG] [User Joined Live] User: ${currentUserId} (${session?.user?.name || 'User'}) joined live session for Tolee ID: ${tolee.id}`);
     setIsUserJoined(true);
     setLiveChatMessages([
       { sender: 'System 🤖', avatar: '', message: '👋 You joined the Live Masterclass. Hello!', time: 'Now', isSystem: true }
@@ -453,17 +458,21 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
           }
         });
       } else {
-        getMemberLiveStatus(tolee.id).then(res => {
-          if (res.success && res.status) {
-            setMyLiveRequestStatus(res.status);
-            if (res.status === 'approved') {
-              setIsUserJoined(true);
+        if (liveSessionType === 'public') {
+          joinLiveBroadcast();
+        } else {
+          getMemberLiveStatus(tolee.id).then(res => {
+            if (res.success && res.status) {
+              setMyLiveRequestStatus(res.status);
+              if (res.status === 'approved') {
+                joinLiveBroadcast();
+              }
             }
-          }
-        });
+          });
+        }
       }
     }
-  }, [activeTab, isAdmin, tolee.id]);
+  }, [activeTab, isAdmin, tolee.id, liveSessionType]);
 
   // Cleanup media streams on unmount
   useEffect(() => {

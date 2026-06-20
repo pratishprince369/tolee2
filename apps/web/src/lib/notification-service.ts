@@ -35,6 +35,8 @@ function getChannelAndTitle(type: string, groupName?: string): { channelId: stri
       return { channelId: 'marketplace', title: '🛍️ Marketplace Listing' };
     case 'requirement':
       return { channelId: 'social', title: '📌 Local Requirement' };
+    case 'live':
+      return { channelId: 'groups', title: '🔴 Live Now' };
     default:
       return { channelId: 'default', title: 'Tolee Alert' };
   }
@@ -70,7 +72,7 @@ export async function createSystemNotification(params: CreateNotificationParams,
     // 3. Dispatch Push Notification if enabled
     if (user?.pushNotifications) {
       let isPreferenceEnabled = true;
-      if (params.type === 'chat') {
+      if (params.type === 'chat' || params.type === 'live') {
         isPreferenceEnabled = extra?.groupName ? user.groupNotifications : user.chatNotifications;
       } else if (params.type === 'marketplace') {
         isPreferenceEnabled = user.marketplaceNotifications;
@@ -80,6 +82,7 @@ export async function createSystemNotification(params: CreateNotificationParams,
 
       if (isPreferenceEnabled) {
         const { channelId, title } = getChannelAndTitle(params.type, extra?.groupName);
+        console.log(`[DEBUG] [Notification Delivered] Sending FCM Push to User: ${params.userId} -> Title: "${title}", Body: "${params.message}"`);
         await sendPushNotification(
           params.userId,
           title,
@@ -90,7 +93,11 @@ export async function createSystemNotification(params: CreateNotificationParams,
             type: params.type,
           }
         );
+      } else {
+        console.log(`[DEBUG] [Notification Delivered] Skip sending push to ${params.userId} because preference is disabled.`);
       }
+    } else {
+      console.log(`[DEBUG] [Notification Delivered] Skip sending push to ${params.userId} because user pushNotifications preference is disabled.`);
     }
 
     return { success: true, notification: notif };
@@ -136,7 +143,7 @@ export async function createSystemNotificationsMany(
 
         if (user?.pushNotifications) {
           let isPreferenceEnabled = true;
-          if (n.type === 'chat') {
+          if (n.type === 'chat' || n.type === 'live') {
             isPreferenceEnabled = extra?.groupName ? user.groupNotifications : user.chatNotifications;
           } else if (n.type === 'marketplace') {
             isPreferenceEnabled = user.marketplaceNotifications;
@@ -146,6 +153,7 @@ export async function createSystemNotificationsMany(
 
           if (isPreferenceEnabled) {
             const { channelId, title } = getChannelAndTitle(n.type, extra?.groupName);
+            console.log(`[DEBUG] [Notification Delivered] Sending FCM Push to User: ${n.userId} -> Title: "${title}", Body: "${n.message}"`);
             await sendPushNotification(
               n.userId,
               title,
@@ -156,7 +164,11 @@ export async function createSystemNotificationsMany(
                 type: n.type,
               }
             );
+          } else {
+            console.log(`[DEBUG] [Notification Delivered] Skip sending push to ${n.userId} because group/chat notifications are muted/disabled by preference.`);
           }
+        } else {
+          console.log(`[DEBUG] [Notification Delivered] Skip sending push to ${n.userId} because user pushNotifications preference is disabled.`);
         }
       } catch (err) {
         console.error(`[NotificationService] Failed to send push to ${n.userId}:`, err);
