@@ -99,6 +99,20 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const memberPeerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const memberVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteStreamRef = useRef<MediaStream | null>(null);
+  const isAdminRef = useRef(isAdmin);
+  isAdminRef.current = isAdmin;
+
+  // ICE servers config with TURN fallback for NAT traversal
+  const iceServersConfig = useRef({
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+      { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+      { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
+    ]
+  });
 
   const triggerFloatingEmoji = (emoji: string) => {
     const id = emojiIdCounter.current++;
@@ -356,6 +370,8 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
   };
 
   // Socket Connection and initial state sync effects
+  // IMPORTANT: Only depend on currentUserId so socket is NOT re-created when isLive/isAdmin changes.
+  // Re-creating the socket mid-handshake destroys all WebRTC peer connections => black screen.
   useEffect(() => {
     if (!currentUserId) return;
 
@@ -369,14 +385,6 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
     socket.on('connect', () => {
       console.log('[Live View Socket] Connected!', socket.id);
       socket.emit('join-tolee-room', { toleeId: tolee.id, userId: currentUserId });
-      if (isLive && isUserJoined) {
-        socket.emit('tolee-participant-joined', {
-          toleeId: tolee.id,
-          userId: currentUserId,
-          name: session?.user?.name || 'User',
-          avatar: session?.user?.image || ''
-        });
-      }
     });
 
     socket.on('tolee-viewer-count-update', ({ viewerCount }: { viewerCount: number }) => {
@@ -385,12 +393,16 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
     });
 
     socket.on('tolee-webrtc-offer', async ({ offer, fromUserId }: any) => {
-      if (isAdmin) return; // Only viewers handle offers
+      if (isAdminRef.current) return; // Only viewers handle offers
       console.log('[WebRTC] Viewer received offer from host:', fromUserId);
       
-      const pc = new RTCPeerConnection({
-        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-      });
+      // Close existing peer connection if any
+      if (memberPeerConnectionRef.current) {
+        memberPeerConnectionRef.current.close();
+        memberPeerConnectionRef.current = null;
+      }
+
+      const pc = new RTCPeerConnection(iceServersConfig.current);
       memberPeerConnectionRef.current = pc;
 
       pc.onicecandidate = (event) => {
@@ -404,10 +416,32 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
         }
       };
 
+      pc.oniceconnectionstatechange = () => {
+        console.log('[WebRTC] Viewer ICE connection state:', pc.iceConnectionState);
+        if (pc.iceConnectionState === 'failed') {
+          console.warn('[WebRTC] ICE connection failed - attempting restart');
+          pc.restartIce();
+        }
+      };
+
+      pc.onconnectionstatechange = () => {
+        console.log('[WebRTC] Viewer connection state:', pc.connectionState);
+      };
+
       pc.ontrack = (event) => {
-        console.log('[WebRTC] Remote track received:', event.streams[0]);
+        console.log('[WebRTC] Remote track received! kind:', event.track.kind, 'readyState:', event.track.readyState);
+        // Use event.streams[0] if available, otherwise create a new MediaStream from the track
+        const stream = event.streams?.[0] || new MediaStream([event.track]);
+        remoteStreamRef.current = stream;
+        console.log('[WebRTC] Remote stream ID:', stream.id, 'tracks:', stream.getTracks().map(t => `${t.kind}:${t.readyState}`));
+        
+        // Assign to video element immediately if available
         if (memberVideoRef.current) {
-          memberVideoRef.current.srcObject = event.streams[0];
+          memberVideoRef.current.srcObject = stream;
+          memberVideoRef.current.play().catch(e => console.log('[WebRTC] Auto-play blocked:', e));
+          console.log('[WebRTC] Stream assigned to member video element');
+        } else {
+          console.log('[WebRTC] memberVideoRef not ready yet, stream buffered in remoteStreamRef');
         }
       };
 
@@ -423,6 +457,7 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
             answer,
             fromUserId: currentUserId
           });
+          console.log('[WebRTC] Answer sent back to host');
         }
       } catch (err) {
         console.error('[WebRTC] Error handling offer:', err);
@@ -430,21 +465,23 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
     });
 
     socket.on('tolee-webrtc-answer', async ({ answer, fromUserId }: any) => {
-      if (!isAdmin) return; // Only host handles answers
+      if (!isAdminRef.current) return; // Only host handles answers
       console.log('[WebRTC] Host received answer from viewer:', fromUserId);
       const pc = peerConnectionsRef.current.get(fromUserId);
       if (pc) {
         try {
           await pc.setRemoteDescription(new RTCSessionDescription(answer));
+          console.log('[WebRTC] Remote description set for viewer:', fromUserId);
         } catch (err) {
           console.error('[WebRTC] Error setting remote answer:', err);
         }
+      } else {
+        console.warn('[WebRTC] No peer connection found for viewer:', fromUserId);
       }
     });
 
     socket.on('tolee-webrtc-ice-candidate', async ({ candidate, fromUserId }: any) => {
-      console.log('[WebRTC] Received ICE candidate from:', fromUserId);
-      const pc = isAdmin 
+      const pc = isAdminRef.current 
         ? peerConnectionsRef.current.get(fromUserId)
         : memberPeerConnectionRef.current;
       if (pc) {
@@ -472,11 +509,17 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
       setIsUserJoined(false);
       setMyLiveRequestStatus(null);
       setLiveChatMessages([]);
+      // Clean up viewer peer connection
+      if (memberPeerConnectionRef.current) {
+        memberPeerConnectionRef.current.close();
+        memberPeerConnectionRef.current = null;
+      }
+      remoteStreamRef.current = null;
       alert("The host has ended the live session.");
     });
 
     socket.on('tolee-join-request', ({ userId, name, avatar }: any) => {
-      if (isAdmin) {
+      if (isAdminRef.current) {
         setLiveJoinRequests(prev => {
           if (prev.some(r => r.userId === userId)) return prev;
           return [...prev, { id: `temp-${userId}`, userId, user: { name, username: name, avatar } }];
@@ -506,23 +549,29 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
         { sender: 'System 🤖', avatar: '', message: `👤 ${name} joined the live session.`, time: 'Now', isSystem: true }
       ]);
 
-      if (isAdmin) {
+      if (isAdminRef.current) {
         if (userId === currentUserId) return; // Ignore host
         console.log('[WebRTC] Host initiating connection for viewer:', userId);
 
-        const pc = new RTCPeerConnection({
-          iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-        });
+        // Close existing connection for this viewer if any
+        const existingPc = peerConnectionsRef.current.get(userId);
+        if (existingPc) {
+          existingPc.close();
+          peerConnectionsRef.current.delete(userId);
+        }
+
+        const pc = new RTCPeerConnection(iceServersConfig.current);
         peerConnectionsRef.current.set(userId, pc);
 
-        if (cameraStreamRef.current) {
-          cameraStreamRef.current.getTracks().forEach(track => {
-            pc.addTrack(track, cameraStreamRef.current!);
+        // Add media tracks to the connection
+        const activeStream = cameraStreamRef.current || screenStreamRef.current;
+        if (activeStream) {
+          activeStream.getTracks().forEach(track => {
+            pc.addTrack(track, activeStream);
+            console.log('[WebRTC] Added track to peer connection:', track.kind, track.readyState);
           });
-        } else if (screenStreamRef.current) {
-          screenStreamRef.current.getTracks().forEach(track => {
-            pc.addTrack(track, screenStreamRef.current!);
-          });
+        } else {
+          console.error('[WebRTC] ERROR: No active stream (camera/screen) to send to viewer!');
         }
 
         pc.onicecandidate = (event) => {
@@ -536,6 +585,14 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
           }
         };
 
+        pc.oniceconnectionstatechange = () => {
+          console.log(`[WebRTC] Host ICE state for ${userId}:`, pc.iceConnectionState);
+        };
+
+        pc.onconnectionstatechange = () => {
+          console.log(`[WebRTC] Host connection state for ${userId}:`, pc.connectionState);
+        };
+
         try {
           const offer = await pc.createOffer();
           await pc.setLocalDescription(offer);
@@ -546,6 +603,7 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
               offer,
               fromUserId: currentUserId
             });
+            console.log('[WebRTC] Offer sent to viewer:', userId);
           }
         } catch (err) {
           console.error('[WebRTC] Error creating offer for new viewer:', err);
@@ -559,7 +617,7 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
         { sender: 'System 🤖', avatar: '', message: `👤 ${name} left the live session.`, time: 'Now', isSystem: true }
       ]);
 
-      if (isAdmin) {
+      if (isAdminRef.current) {
         const pc = peerConnectionsRef.current.get(userId);
         if (pc) {
           pc.close();
@@ -601,6 +659,7 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
     return () => {
       if (socketRef.current) {
         socketRef.current.disconnect();
+        socketRef.current = null;
       }
       peerConnectionsRef.current.forEach(pc => pc.close());
       peerConnectionsRef.current.clear();
@@ -608,8 +667,10 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
         memberPeerConnectionRef.current.close();
         memberPeerConnectionRef.current = null;
       }
+      remoteStreamRef.current = null;
     };
-  }, [currentUserId, isLive, isAdmin]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUserId]);
 
   useEffect(() => {
     if (activeTab === 'live') {
@@ -2004,7 +2065,15 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                               />
                             ) : (
                               <video 
-                                ref={memberVideoRef}
+                                ref={(el) => {
+                                  (memberVideoRef as any).current = el;
+                                  // When the video element mounts, assign any buffered remote stream
+                                  if (el && remoteStreamRef.current && !el.srcObject) {
+                                    el.srcObject = remoteStreamRef.current;
+                                    el.play().catch(e => console.log('[WebRTC] Auto-play blocked on mount:', e));
+                                    console.log('[WebRTC] Buffered stream assigned to video element on mount');
+                                  }
+                                }}
                                 autoPlay 
                                 playsInline 
                                 className="w-full h-full object-cover"

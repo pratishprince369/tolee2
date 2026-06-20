@@ -556,29 +556,39 @@ io.on('connection', (socket) => {
 
   // WebRTC Live Stream Signaling Relays
   socket.on('tolee-webrtc-offer', ({ toleeId, toUserId, offer, fromUserId }) => {
+    console.log(`[WebRTC Relay] Forwarding OFFER from ${fromUserId} to ${toUserId} in Tolee ${toleeId}`);
     const sockets = activeUsers.get(toUserId);
-    if (sockets) {
+    if (sockets && sockets.size > 0) {
       sockets.forEach(sid => {
         io.to(sid).emit('tolee-webrtc-offer', { toleeId, offer, fromUserId });
       });
+      console.log(`[WebRTC Relay] OFFER delivered to ${sockets.size} socket(s) of user ${toUserId}`);
+    } else {
+      console.warn(`[WebRTC Relay] WARNING: No active sockets found for user ${toUserId} - OFFER NOT DELIVERED`);
     }
   });
 
   socket.on('tolee-webrtc-answer', ({ toleeId, toUserId, answer, fromUserId }) => {
+    console.log(`[WebRTC Relay] Forwarding ANSWER from ${fromUserId} to ${toUserId} in Tolee ${toleeId}`);
     const sockets = activeUsers.get(toUserId);
-    if (sockets) {
+    if (sockets && sockets.size > 0) {
       sockets.forEach(sid => {
         io.to(sid).emit('tolee-webrtc-answer', { toleeId, answer, fromUserId });
       });
+      console.log(`[WebRTC Relay] ANSWER delivered to ${sockets.size} socket(s) of user ${toUserId}`);
+    } else {
+      console.warn(`[WebRTC Relay] WARNING: No active sockets found for user ${toUserId} - ANSWER NOT DELIVERED`);
     }
   });
 
   socket.on('tolee-webrtc-ice-candidate', ({ toleeId, toUserId, candidate, fromUserId }) => {
     const sockets = activeUsers.get(toUserId);
-    if (sockets) {
+    if (sockets && sockets.size > 0) {
       sockets.forEach(sid => {
         io.to(sid).emit('tolee-webrtc-ice-candidate', { toleeId, candidate, fromUserId });
       });
+    } else {
+      console.warn(`[WebRTC Relay] ICE candidate from ${fromUserId} could not be delivered - user ${toUserId} not found`);
     }
   });
 
