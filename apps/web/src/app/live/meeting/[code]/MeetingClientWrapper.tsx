@@ -7,6 +7,7 @@ import { Mic, MicOff, Video, VideoOff, Users, Loader2, Lock, ArrowLeft } from 'l
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import MeetingRoom from '@/components/meeting/MeetingRoom';
+import { sendMeetingInvitationToAllMembers } from '@/actions/meeting';
 
 const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 
   (typeof window !== 'undefined' 
@@ -40,10 +41,13 @@ export default function MeetingClientWrapper({
   const router = useRouter();
   
   // States
-  const [meeting, setMeeting] = useState(initialMeeting);
+  const [meeting, setMeeting] = useState(initialMeeting || {});
   const [needsApproval, setNeedsApproval] = useState(initialNeedsApproval);
   const [approvalStatus, setApprovalStatus] = useState<'idle' | 'requested' | 'approved' | 'rejected'>('idle');
   const [hasJoined, setHasJoined] = useState(false);
+  const [isJoining, setIsJoining] = useState(false);
+  const [sendingInvites, setSendingInvites] = useState(false);
+  const [invitesSent, setInvitesSent] = useState(false);
   
   // Lobby Media states
   const [isMicOn, setIsMicOn] = useState(true);
@@ -234,6 +238,39 @@ export default function MeetingClientWrapper({
     );
   }
 
+  const handleSendInvitations = async () => {
+    if (!meeting?.id) return;
+    setSendingInvites(true);
+    try {
+      const res = await sendMeetingInvitationToAllMembers(meeting.id);
+      if (res.success) {
+        setInvitesSent(true);
+        alert(`🔔 Invitations sent to all ${res.count} members of the group!`);
+      } else {
+        alert("Failed to send invitations: " + (res.error || "Unknown error"));
+      }
+    } catch (err) {
+      console.error(err);
+      alert("An error occurred while sending invitations.");
+    } finally {
+      setSendingInvites(false);
+    }
+  };
+
+  // ----------------------------------------------------
+  // RENDER: Joining Meeting Spinner Loader
+  // ----------------------------------------------------
+  if (isJoining && !hasJoined) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-zinc-950 text-white">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="w-10 h-10 text-teal-400 animate-spin" />
+          <p className="text-sm font-semibold text-zinc-400">Joining Meeting...</p>
+        </div>
+      </div>
+    );
+  }
+
   // ----------------------------------------------------
   // RENDER: Full LiveKit Meeting Room (Joined State)
   // ----------------------------------------------------
@@ -271,9 +308,9 @@ export default function MeetingClientWrapper({
             ) : (
               <div className="flex flex-col items-center gap-3 select-none">
                 <Avatar className="w-20 h-20 border-2 border-zinc-700">
-                  <AvatarImage src={currentUser.avatar} />
+                  <AvatarImage src={currentUser?.avatar} />
                   <AvatarFallback className="bg-zinc-800 text-2xl font-bold text-teal-400">
-                    {currentUser.name[0]}
+                    {currentUser?.name ? currentUser.name[0] : 'U'}
                   </AvatarFallback>
                 </Avatar>
                 <p className="text-sm font-semibold text-zinc-400">Your camera is off</p>
@@ -320,14 +357,14 @@ export default function MeetingClientWrapper({
               Ready to connect?
             </span>
             <h1 className="text-2xl font-extrabold tracking-tight text-white line-clamp-2">
-              {meeting.title}
+              {meeting?.title || 'Interactive Meeting'}
             </h1>
             <p className="text-xs text-zinc-500 font-mono tracking-wider">
               Meeting code: {meetingCode}
             </p>
           </div>
 
-          {meeting.description && (
+          {meeting?.description && (
             <p className="text-sm text-zinc-400 leading-relaxed line-clamp-3">
               {meeting.description}
             </p>
@@ -336,10 +373,40 @@ export default function MeetingClientWrapper({
           <div className="h-[1px] bg-zinc-800 my-2" />
 
           <div className="flex flex-col gap-3">
+            {meeting?.hostId === currentUser?.id && meeting?.toleeId && (
+              <Button
+                onClick={handleSendInvitations}
+                disabled={sendingInvites || invitesSent}
+                className={`w-full py-6 font-bold rounded-xl text-sm flex items-center justify-center gap-1.5 transition-all ${
+                  invitesSent 
+                    ? 'bg-zinc-850 text-zinc-500 border border-zinc-800/50 cursor-default' 
+                    : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-600/10'
+                }`}
+              >
+                {sendingInvites ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Sending Invitations...
+                  </>
+                ) : invitesSent ? (
+                  <>
+                    🔔 Invitations Sent! ✓
+                  </>
+                ) : (
+                  <>
+                    🔔 Send Invitation to All Members
+                  </>
+                )}
+              </Button>
+            )}
+
             <Button
               onClick={() => {
+                setIsJoining(true);
                 stopPreview();
-                setHasJoined(true);
+                setTimeout(() => {
+                  setHasJoined(true);
+                }, 500);
               }}
               className="w-full py-6 bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white font-bold rounded-xl text-base shadow-lg shadow-teal-500/20 transform active:scale-98 transition-all"
             >

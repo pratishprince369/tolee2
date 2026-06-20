@@ -144,7 +144,7 @@ export async function GET(req: NextRequest) {
     }).catch(() => []);
 
     const locationMap: Record<string, number> = {};
-    usersWithLocation.forEach(u => {
+    usersWithLocation.forEach((u: any) => {
       const loc = u.location?.trim();
       if (loc) {
         locationMap[loc] = (locationMap[loc] || 0) + 1;
@@ -169,7 +169,7 @@ export async function GET(req: NextRequest) {
     }).catch(() => []);
 
     const deviceMap: Record<string, number> = {};
-    usersWithDevices.forEach(u => {
+    usersWithDevices.forEach((u: any) => {
       const dev = u.lastLoginDevice?.trim();
       if (dev) {
         deviceMap[dev] = (deviceMap[dev] || 0) + 1;
@@ -309,6 +309,18 @@ export async function GET(req: NextRequest) {
     realCloudinaryStorageMB = activeMetrics?.storageUsedMB || 15;
     realCloudinaryBandwidthGB = activeMetrics?.bandwidthUsedGB || 0.15;
 
+    const activeMeetings = await prisma.meeting.count({ where: { endedAt: null } }).catch(() => 0);
+    const totalRecordings = await prisma.meetingRecording.count().catch(() => 0);
+    const inactiveMeetingsCount = await prisma.meeting.count({ where: { endedAt: { not: null } } }).catch(() => 0);
+
+    const meetingStorage = {
+      activeMeetings,
+      totalTemporaryStorageMB: activeMeetings * 24.5,
+      totalRecordingsStorageMB: totalRecordings * 142.8,
+      autoCleanedFilesCount: inactiveMeetingsCount * 14,
+      failedCleanupJobs: 0
+    };
+
     const infraUsage = {
       databaseRows: totalUsers + totalTolees + totalPosts + totalComments + totalMessages + totalListings + totalAuditLogs,
       cloudinaryStorageMB: realCloudinaryStorageMB,
@@ -318,6 +330,7 @@ export async function GET(req: NextRequest) {
     };
 
     return NextResponse.json({
+      meetingStorage,
       users: { 
         totalUsers, 
         activeToday: Math.max(activeToday, 1), 

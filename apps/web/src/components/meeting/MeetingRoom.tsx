@@ -13,11 +13,12 @@ import { Track, Room } from 'livekit-client';
 import { 
   Mic, MicOff, Video, VideoOff, Monitor, PhoneOff, 
   MessageSquare, Users, BarChart3, HelpCircle, Hand, 
-  Sparkles, ShieldAlert, Lock, Unlock, Settings
+  Sparkles, ShieldAlert, Lock, Unlock, Settings, Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import MeetingSidebar from './MeetingSidebar';
+import { sendMeetingInvitationToAllMembers } from '@/actions/meeting';
 import { io, Socket } from 'socket.io-client';
 
 const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 
@@ -91,7 +92,7 @@ export default function MeetingRoom({
   if (!token) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-zinc-950 text-white">
-        <LoaderSpinner message="Preparing secure meeting environment..." />
+        <LoaderSpinner message="Joining Meeting..." />
       </div>
     );
   }
@@ -145,8 +146,67 @@ function MeetingRoomInner({ meeting, meetingCode, currentUser, onLeave }: {
   const [floatingEmojis, setFloatingEmojis] = useState<any[]>([]);
   const [raisedHands, setRaisedHands] = useState<string[]>([]); // Identities of users with raised hands
   const [showExitConfirm, setShowExitConfirm] = useState(false);
-  const [isLocked, setIsLocked] = useState(meeting.isLocked);
+  const [isLocked, setIsLocked] = useState(meeting?.isLocked ?? false);
   const [socket, setSocket] = useState<Socket | null>(null);
+  const [sendingInvites, setSendingInvites] = useState(false);
+  const [invitesSent, setInvitesSent] = useState(false);
+  const [isRecording, setIsRecording] = useState(meeting?.isRecording ?? false);
+
+  // Heartbeat effect (runs every 30s to prevent meeting timeout)
+  useEffect(() => {
+    if (!meeting?.id) return;
+    
+    const sendPulse = () => {
+      import('@/actions/meeting').then(({ heartbeatMeeting }) => {
+        heartbeatMeeting(meeting.id);
+      });
+    };
+
+    sendPulse(); // Initial heartbeat
+    const interval = setInterval(sendPulse, 30000);
+    return () => clearInterval(interval);
+  }, [meeting?.id]);
+
+  const handleSendInvitations = async () => {
+    if (!meeting?.id) return;
+    setSendingInvites(true);
+    try {
+      const res = await sendMeetingInvitationToAllMembers(meeting.id);
+      if (res.success) {
+        setInvitesSent(true);
+        alert(`🔔 Invitations sent to all ${res.count} members of the group!`);
+      } else {
+        alert("Failed to send invitations: " + (res.error || "Unknown error"));
+      }
+    } catch (err) {
+      console.error(err);
+      alert("An error occurred while sending invitations.");
+    } finally {
+      setSendingInvites(false);
+    }
+  };
+
+  const toggleRecording = async () => {
+    if (!meeting?.id) return;
+    try {
+      const action = isRecording ? 'stop' : 'start';
+      const res = await fetch('/api/recording', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ meetingId: meeting.id, action })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setIsRecording(!isRecording);
+        alert(`Recording ${action === 'start' ? 'started' : 'stopped'} successfully!`);
+      } else {
+        alert(`Failed to control recording: ${data.error || 'Unknown error'}`);
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error controlling recording');
+    }
+  };
 
   // Initialize Socket.IO connection
   useEffect(() => {
@@ -326,18 +386,24 @@ function MeetingRoomInner({ meeting, meetingCode, currentUser, onLeave }: {
           <div className="absolute top-4 left-6 z-10 flex items-center gap-3">
             <span className="bg-black/65 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-zinc-800 text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
-              {meeting.type.toUpperCase()}
+              {meeting?.type ? meeting.type.toUpperCase() : 'MEETING'}
             </span>
             <span className="bg-black/65 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-zinc-800 text-xs font-semibold text-zinc-400">
               {meetingCode}
             </span>
+            {isRecording && (
+              <span className="bg-red-600/90 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-red-500 text-xs font-bold text-white flex items-center gap-1.5 animate-pulse shadow-lg shadow-red-500/10">
+                <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                Recording Status: ON
+              </span>
+            )}
           </div>
 
           {/* Presentation Mode Layout */}
           {isSomeonePresenting ? (
             <div className="w-full h-full grid grid-rows-12 gap-4">
               <div className="row-span-9 rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-800 relative shadow-2xl">
-                <VideoTrack trackRef={screenShareTracks[0]} className="w-full h-full object-contain" />
+                <VideoTrack trackRef={screenShareTracks[0] as any} className="w-full h-full object-contain" />
                 <div className="absolute bottom-4 left-4 bg-black/75 px-3.5 py-2 rounded-xl border border-zinc-800 text-xs text-zinc-300">
                   🖥️ Screen share by {screenShareTracks[0].participant.name || 'User'}
                 </div>
@@ -366,9 +432,36 @@ function MeetingRoomInner({ meeting, meetingCode, currentUser, onLeave }: {
                   <p className="text-zinc-400 text-xs leading-relaxed">
                     Share your meeting link or invite your group members. Anyone with the code can join.
                   </p>
-                  <div className="bg-zinc-950 p-3 rounded-xl border border-zinc-800 font-mono text-sm tracking-wider text-teal-300">
+                  <div className="bg-zinc-950 p-3 rounded-xl border border-zinc-800 font-mono text-sm tracking-wider text-teal-300 mb-2">
                     tolee.in/live/meeting/{meetingCode}
                   </div>
+
+                  {meeting?.hostId === currentUser?.id && meeting?.toleeId && (
+                    <Button
+                      onClick={handleSendInvitations}
+                      disabled={sendingInvites || invitesSent}
+                      className={`w-full py-5 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all ${
+                        invitesSent 
+                          ? 'bg-zinc-800 text-zinc-500 border border-zinc-800/80 cursor-default' 
+                          : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-md'
+                      }`}
+                    >
+                      {sendingInvites ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          Sending Invitations...
+                        </>
+                      ) : invitesSent ? (
+                        <>
+                          🔔 Invitations Sent! ✓
+                        </>
+                      ) : (
+                        <>
+                          🔔 Send Invitation to All Members
+                        </>
+                      )}
+                    </Button>
+                  )}
                 </div>
               ) : (
                 <div className={`grid w-full h-full gap-4 ${
@@ -473,6 +566,22 @@ function MeetingRoomInner({ meeting, meetingCode, currentUser, onLeave }: {
               </button>
             ))}
           </div>
+
+          {/* Host Recording Control */}
+          {meeting?.hostId === currentUser?.id && (
+            <Button
+              size="icon"
+              onClick={toggleRecording}
+              className={`w-12 h-12 rounded-full border transition-all ml-2 ${
+                isRecording 
+                  ? 'bg-red-600 border-red-500 hover:bg-red-700 text-white animate-pulse' 
+                  : 'bg-zinc-800 border-zinc-700 hover:bg-zinc-700 text-white'
+              }`}
+              title={isRecording ? "Stop Recording" : "Start Recording"}
+            >
+              <span className="text-base">🎥</span>
+            </Button>
+          )}
 
           <Button
             size="icon"

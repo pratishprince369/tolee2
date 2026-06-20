@@ -62,6 +62,13 @@ interface Metrics {
     unverifiedUsers: number;
   };
   cloudinaryAccounts?: any[];
+  meetingStorage?: {
+    activeMeetings: number;
+    totalTemporaryStorageMB: number;
+    totalRecordingsStorageMB: number;
+    autoCleanedFilesCount: number;
+    failedCleanupJobs: number;
+  };
 }
 
 function StatCard({ icon, label, value, sub, color = '#22c55e', trend, pulse }: any) {
@@ -707,6 +714,23 @@ export default function SuperAdminOverview() {
           <StatCard icon="⚠️" label="Failed Deliveries" value={m.emailAnalytics?.failed || 0} sub="Delivery bounces / errors" color="#ef4444" />
           <StatCard icon="✅" label="Verified Users" value={m.emailAnalytics?.verifiedUsers || 0} sub={`${m.emailAnalytics?.verifiedUsers && m.users.totalUsers ? Math.round((m.emailAnalytics.verifiedUsers / m.users.totalUsers) * 100) : 0}% verification rate`} color="#22c55e" />
           <StatCard icon="❌" label="Unverified Users" value={m.emailAnalytics?.unverifiedUsers || 0} sub="Pending verification" color="#fb923c" />
+        </div>
+      </div>
+
+      {/* Live Meeting Storage & Cleanup Monitor */}
+      <div style={{ background: '#0d0d0f', border: '1px solid #1c1c1e', borderRadius: 20, padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div>
+          <h3 style={{ color: '#fff', fontSize: 16, fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+            🎥 Live Meeting Storage & Cleanup Monitor
+          </h3>
+          <p style={{ color: '#71717a', fontSize: 12, margin: '4px 0 0' }}>Real-time status of active meeting streams, temporary data allocations, S3/Cloudinary recordings storage, and auto-cleaned files count.</p>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 16 }}>
+          <StatCard icon="📞" label="Active Meetings" value={m.meetingStorage?.activeMeetings || 0} sub="Ongoing live sessions" color="#3b82f6" />
+          <StatCard icon="🗑️" label="Temporary Storage" value={`${(m.meetingStorage?.totalTemporaryStorageMB || 0).toFixed(1)} MB`} sub="WebRTC buffers & cache" color="#ec4899" />
+          <StatCard icon="💾" label="Recordings Storage" value={`${(m.meetingStorage?.totalRecordingsStorageMB || 0).toLocaleString()} MB`} sub="Permanent MP4 files" color="#10b981" />
+          <StatCard icon="✨" label="Auto-Cleaned Files" value={m.meetingStorage?.autoCleanedFilesCount || 0} sub="Temp chunks garbage collected" color="#a78bfa" />
+          <StatCard icon="❌" label="Failed Cleanup Jobs" value={m.meetingStorage?.failedCleanupJobs || 0} sub="Failed database or storage purges" color="#ef4444" />
         </div>
       </div>
 

@@ -1138,6 +1138,9 @@ model Meeting {
   endedAt            DateTime?
   isLocked           Boolean              @default(false)
   waitingRoomEnabled Boolean              @default(true)
+  temporary          Boolean              @default(true)
+  lastHeartbeatAt    DateTime?
+  isRecording        Boolean              @default(false)
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
 

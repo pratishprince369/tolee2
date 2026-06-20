@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, Send, UserCheck, UserX, BarChart3, HelpCircle, 
-  MessageSquare, Users, Pin, CheckCircle2, Lock, Plus, Trash
+  MessageSquare, Users, Pin, CheckCircle2, Lock, Plus, Trash,
+  Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,7 +17,8 @@ import {
   answerMeetingQuestion, 
   pinMeetingQuestion,
   getMeetingPolls,
-  getMeetingQuestions
+  getMeetingQuestions,
+  sendMeetingInvitationToAllMembers
 } from '@/actions/meeting';
 
 interface MeetingSidebarProps {
@@ -36,7 +38,27 @@ export default function MeetingSidebar({
   onClose,
   socket
 }: MeetingSidebarProps) {
-  const isHost = meeting.hostId === currentUser.id;
+  const isHost = meeting?.hostId === currentUser?.id;
+  const [sendingInvites, setSendingInvites] = useState(false);
+  const [invitesSent, setInvitesSent] = useState(false);
+
+  const handleSendInvitations = async () => {
+    setSendingInvites(true);
+    try {
+      const res = await sendMeetingInvitationToAllMembers(meetingId);
+      if (res.success) {
+        setInvitesSent(true);
+        alert(`🔔 Invitations sent to all ${res.count} members of the group!`);
+      } else {
+        alert("Failed to send invitations: " + (res.error || "Unknown error"));
+      }
+    } catch (err) {
+      console.error(err);
+      alert("An error occurred while sending invitations.");
+    } finally {
+      setSendingInvites(false);
+    }
+  };
 
   // Tabs states
   const [chatMessages, setChatMessages] = useState<any[]>([]);
@@ -347,12 +369,39 @@ export default function MeetingSidebar({
               </h4>
               <div className="space-y-2 bg-zinc-950/40 border border-zinc-800 p-4 rounded-2xl">
                 <p className="text-xs text-zinc-400 leading-relaxed">
-                  Host: <span className="font-semibold text-zinc-200">{meeting.host.name}</span>
+                  Host: <span className="font-semibold text-zinc-200">{meeting?.host?.name ?? 'Unknown'}</span>
                 </p>
                 <p className="text-xs text-zinc-400 leading-relaxed mt-1">
-                  Type: <span className="font-semibold text-teal-400 uppercase">{meeting.type}</span>
+                  Type: <span className="font-semibold text-teal-400 uppercase">{meeting?.type ?? 'MEETING'}</span>
                 </p>
               </div>
+
+              {isHost && meeting?.toleeId && (
+                <Button
+                  onClick={handleSendInvitations}
+                  disabled={sendingInvites || invitesSent}
+                  className={`w-full py-4 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all mt-2 ${
+                    invitesSent 
+                      ? 'bg-zinc-800 text-zinc-500 border border-zinc-850 cursor-default' 
+                      : 'bg-indigo-650 hover:bg-indigo-750 text-white shadow-md'
+                  }`}
+                >
+                  {sendingInvites ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      Sending Invitations...
+                    </>
+                  ) : invitesSent ? (
+                    <>
+                      🔔 Invitations Sent! ✓
+                    </>
+                  ) : (
+                    <>
+                      🔔 Send Invitation to All Members
+                    </>
+                  )}
+                </Button>
+              )}
             </div>
 
           </div>
