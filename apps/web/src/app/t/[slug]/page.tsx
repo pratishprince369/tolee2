@@ -63,6 +63,62 @@ export default async function ToleePage({ params }: { params: { slug: string } }
     }
   }
 
+  // Fetch real group leaderboard
+  const membersWithPoints = await prisma.toleeMember.findMany({
+    where: {
+      toleeId: dbTolee.id,
+      status: 'approved'
+    },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          username: true,
+          avatar: true
+        }
+      }
+    },
+    orderBy: {
+      points: 'desc'
+    },
+    take: 10
+  });
+
+  const realLeaderboard = membersWithPoints.map((m: any) => ({
+    id: m.userId,
+    name: m.user.name || m.user.username || 'Anonymous User',
+    avatar: m.user.avatar || '/default-user-avatar.svg',
+    points: m.points,
+    level: Math.floor(m.points / 1000) + 1
+  }));
+
+  // Fetch real group members list
+  const dbMembers = await prisma.toleeMember.findMany({
+    where: {
+      toleeId: dbTolee.id,
+      status: 'approved'
+    },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          username: true,
+          avatar: true
+        }
+      }
+    },
+    take: 50
+  });
+
+  const realMembers = dbMembers.map((m: any) => ({
+    id: m.userId,
+    name: m.user.name || m.user.username || 'Anonymous User',
+    role: m.role === 'admin' ? 'Admin' : m.role === 'moderator' ? 'Moderator' : 'Member',
+    avatar: m.user.avatar || '/default-user-avatar.svg'
+  }));
+
   const toleeData = {
     tolee: {
       id: dbTolee.id,
@@ -102,8 +158,12 @@ export default async function ToleePage({ params }: { params: { slug: string } }
         authorId: p.post.author.id,
         visibility: p.post.visibility,
         author: authorName,
+        authorName,
+        username: p.post.author.username || 'unknown',
         authorAvatar: getValidAvatarUrl(p.post.author.avatar),
+        avatar: getValidAvatarUrl(p.post.author.avatar),
         content: p.post.caption || '',
+        caption: p.post.caption,
         image: p.post.mediaTypes && p.post.mediaTypes.split(',')[0] === 'image' ? p.post.mediaUrls?.split(/,(?=https?:\/\/)/)[0] : null,
         video: p.post.mediaTypes && p.post.mediaTypes.split(',')[0] === 'video' ? p.post.mediaUrls?.split(/,(?=https?:\/\/)/)[0] : null,
         mediaUrls: p.post.mediaUrls || null,
@@ -124,11 +184,8 @@ export default async function ToleePage({ params }: { params: { slug: string } }
         createdAt: p.post.createdAt
       };
     }),
-    leaderboard: [
-      { id: 1, name: 'Michael Scott', avatar: 'https://i.pravatar.cc/150?u=51', points: 4250, level: 7 },
-      { id: 2, name: 'Dwight S.', avatar: 'https://i.pravatar.cc/150?u=52', points: 3800, level: 6 },
-      { id: 3, name: 'Jim Halpert', avatar: 'https://i.pravatar.cc/150?u=53', points: 3100, level: 6 },
-    ],
+    leaderboard: realLeaderboard,
+    members: realMembers,
     listings: dbTolee ? (await prisma.listing.findMany({
       where: {
         tolees: {

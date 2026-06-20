@@ -495,6 +495,11 @@ io.on('connection', (socket) => {
   socket.on('join-tolee-room', ({ toleeId, userId }) => {
     socket.join(`tolee-${toleeId}`);
     console.log(`[Live signaling] Socket ${socket.id} joined tolee room tolee-${toleeId} for user ${userId}`);
+    
+    // Broadcast updated viewer count to the room
+    const clients = io.sockets.adapter.rooms.get(`tolee-${toleeId}`);
+    const count = clients ? clients.size : 0;
+    io.to(`tolee-${toleeId}`).emit('tolee-viewer-count-update', { toleeId, viewerCount: count });
   });
 
   socket.on('tolee-live-started', ({ toleeId, type }) => {
@@ -526,6 +531,11 @@ io.on('connection', (socket) => {
   socket.on('tolee-participant-left', ({ toleeId, userId, name }) => {
     console.log(`[Live signaling] Participant ${name} left live in Tolee ${toleeId}`);
     io.to(`tolee-${toleeId}`).emit('tolee-participant-left', { toleeId, userId, name });
+    
+    // Broadcast updated viewer count
+    const clients = io.sockets.adapter.rooms.get(`tolee-${toleeId}`);
+    const count = clients ? clients.size : 0;
+    io.to(`tolee-${toleeId}`).emit('tolee-viewer-count-update', { toleeId, viewerCount: count });
   });
 
   socket.on('tolee-live-chat', ({ toleeId, sender, avatar, message, time }) => {
@@ -544,7 +554,48 @@ io.on('connection', (socket) => {
     io.to(`tolee-${toleeId}`).emit('tolee-live-speak-action', { userId, action });
   });
 
+  // WebRTC Live Stream Signaling Relays
+  socket.on('tolee-webrtc-offer', ({ toleeId, toUserId, offer, fromUserId }) => {
+    const sockets = activeUsers.get(toUserId);
+    if (sockets) {
+      sockets.forEach(sid => {
+        io.to(sid).emit('tolee-webrtc-offer', { toleeId, offer, fromUserId });
+      });
+    }
+  });
+
+  socket.on('tolee-webrtc-answer', ({ toleeId, toUserId, answer, fromUserId }) => {
+    const sockets = activeUsers.get(toUserId);
+    if (sockets) {
+      sockets.forEach(sid => {
+        io.to(sid).emit('tolee-webrtc-answer', { toleeId, answer, fromUserId });
+      });
+    }
+  });
+
+  socket.on('tolee-webrtc-ice-candidate', ({ toleeId, toUserId, candidate, fromUserId }) => {
+    const sockets = activeUsers.get(toUserId);
+    if (sockets) {
+      sockets.forEach(sid => {
+        io.to(sid).emit('tolee-webrtc-ice-candidate', { toleeId, candidate, fromUserId });
+      });
+    }
+  });
+
   // 8. Disconnect Cleanup
+  socket.on('disconnecting', () => {
+    socket.rooms.forEach(room => {
+      if (room.startsWith('tolee-')) {
+        const clients = io.sockets.adapter.rooms.get(room);
+        const count = clients ? Math.max(0, clients.size - 1) : 0;
+        socket.to(room).emit('tolee-viewer-count-update', { 
+          toleeId: room.replace('tolee-', ''), 
+          viewerCount: count 
+        });
+      }
+    });
+  });
+
   socket.on('disconnect', () => {
     const userId = socketToUser.get(socket.id);
 

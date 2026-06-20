@@ -96,6 +96,9 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
   const cameraStreamRef = useRef<MediaStream | null>(null);
   const screenStreamRef = useRef<MediaStream | null>(null);
   const videoElementRef = useRef<HTMLVideoElement>(null);
+  const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
+  const memberPeerConnectionRef = useRef<RTCPeerConnection | null>(null);
+  const memberVideoRef = useRef<HTMLVideoElement>(null);
 
   const triggerFloatingEmoji = (emoji: string) => {
     const id = emojiIdCounter.current++;
@@ -180,6 +183,19 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
     }
   };
 
+  const replaceVideoTrack = (newStream: MediaStream) => {
+    const videoTrack = newStream.getVideoTracks()[0];
+    peerConnectionsRef.current.forEach(pc => {
+      const senders = pc.getSenders();
+      const videoSender = senders.find(s => s.track && s.track.kind === 'video');
+      if (videoSender && videoTrack) {
+        videoSender.replaceTrack(videoTrack).catch(err => {
+          console.log('[WebRTC] Failed to replace video track:', err);
+        });
+      }
+    });
+  };
+
   const toggleScreenShare = async () => {
     if (isScreenSharing) {
       if (screenStreamRef.current) {
@@ -189,6 +205,7 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
       setIsScreenSharing(false);
       if (videoElementRef.current && cameraStreamRef.current) {
         videoElementRef.current.srcObject = cameraStreamRef.current;
+        replaceVideoTrack(cameraStreamRef.current);
       }
     } else {
       try {
@@ -197,11 +214,13 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
         setIsScreenSharing(true);
         if (videoElementRef.current) {
           videoElementRef.current.srcObject = stream;
+          replaceVideoTrack(stream);
         }
         stream.getVideoTracks()[0].onended = () => {
           setIsScreenSharing(false);
           if (videoElementRef.current && cameraStreamRef.current) {
             videoElementRef.current.srcObject = cameraStreamRef.current;
+            replaceVideoTrack(cameraStreamRef.current);
           }
         };
       } catch (err) {
@@ -219,6 +238,10 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
       screenStreamRef.current.getTracks().forEach(t => t.stop());
       screenStreamRef.current = null;
     }
+
+    // Close all viewer connections
+    peerConnectionsRef.current.forEach(pc => pc.close());
+    peerConnectionsRef.current.clear();
     
     await endLiveSession(tolee.id);
 
@@ -277,6 +300,10 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
   const leaveLiveBroadcast = () => {
     setIsUserJoined(false);
     setLiveChatMessages([]);
+    if (memberPeerConnectionRef.current) {
+      memberPeerConnectionRef.current.close();
+      memberPeerConnectionRef.current = null;
+    }
     if (socketRef.current?.connected) {
       socketRef.current.emit('tolee-participant-left', {
         toleeId: tolee.id,
@@ -352,6 +379,83 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
       }
     });
 
+    socket.on('tolee-viewer-count-update', ({ viewerCount }: { viewerCount: number }) => {
+      console.log('[DEBUG] [Viewer Count Updated] Real-time viewers:', viewerCount);
+      setViewerCount(viewerCount);
+    });
+
+    socket.on('tolee-webrtc-offer', async ({ offer, fromUserId }: any) => {
+      if (isAdmin) return; // Only viewers handle offers
+      console.log('[WebRTC] Viewer received offer from host:', fromUserId);
+      
+      const pc = new RTCPeerConnection({
+        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+      });
+      memberPeerConnectionRef.current = pc;
+
+      pc.onicecandidate = (event) => {
+        if (event.candidate && socketRef.current) {
+          socketRef.current.emit('tolee-webrtc-ice-candidate', {
+            toleeId: tolee.id,
+            toUserId: fromUserId,
+            candidate: event.candidate,
+            fromUserId: currentUserId
+          });
+        }
+      };
+
+      pc.ontrack = (event) => {
+        console.log('[WebRTC] Remote track received:', event.streams[0]);
+        if (memberVideoRef.current) {
+          memberVideoRef.current.srcObject = event.streams[0];
+        }
+      };
+
+      try {
+        await pc.setRemoteDescription(new RTCSessionDescription(offer));
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        
+        if (socketRef.current) {
+          socketRef.current.emit('tolee-webrtc-answer', {
+            toleeId: tolee.id,
+            toUserId: fromUserId,
+            answer,
+            fromUserId: currentUserId
+          });
+        }
+      } catch (err) {
+        console.error('[WebRTC] Error handling offer:', err);
+      }
+    });
+
+    socket.on('tolee-webrtc-answer', async ({ answer, fromUserId }: any) => {
+      if (!isAdmin) return; // Only host handles answers
+      console.log('[WebRTC] Host received answer from viewer:', fromUserId);
+      const pc = peerConnectionsRef.current.get(fromUserId);
+      if (pc) {
+        try {
+          await pc.setRemoteDescription(new RTCSessionDescription(answer));
+        } catch (err) {
+          console.error('[WebRTC] Error setting remote answer:', err);
+        }
+      }
+    });
+
+    socket.on('tolee-webrtc-ice-candidate', async ({ candidate, fromUserId }: any) => {
+      console.log('[WebRTC] Received ICE candidate from:', fromUserId);
+      const pc = isAdmin 
+        ? peerConnectionsRef.current.get(fromUserId)
+        : memberPeerConnectionRef.current;
+      if (pc) {
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch (err) {
+          console.error('[WebRTC] Error adding ICE candidate:', err);
+        }
+      }
+    });
+
     socket.on('tolee-live-started', ({ type }: { type: 'public' | 'private' }) => {
       setIsLive(true);
       setLiveSessionType(type);
@@ -396,20 +500,72 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
       }
     });
 
-    socket.on('tolee-participant-joined', ({ userId, name }: any) => {
-      setViewerCount(prev => prev + 1);
+    socket.on('tolee-participant-joined', async ({ userId, name }: any) => {
       setLiveChatMessages(prev => [
         ...prev,
         { sender: 'System 🤖', avatar: '', message: `👤 ${name} joined the live session.`, time: 'Now', isSystem: true }
       ]);
+
+      if (isAdmin) {
+        if (userId === currentUserId) return; // Ignore host
+        console.log('[WebRTC] Host initiating connection for viewer:', userId);
+
+        const pc = new RTCPeerConnection({
+          iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+        });
+        peerConnectionsRef.current.set(userId, pc);
+
+        if (cameraStreamRef.current) {
+          cameraStreamRef.current.getTracks().forEach(track => {
+            pc.addTrack(track, cameraStreamRef.current!);
+          });
+        } else if (screenStreamRef.current) {
+          screenStreamRef.current.getTracks().forEach(track => {
+            pc.addTrack(track, screenStreamRef.current!);
+          });
+        }
+
+        pc.onicecandidate = (event) => {
+          if (event.candidate && socketRef.current) {
+            socketRef.current.emit('tolee-webrtc-ice-candidate', {
+              toleeId: tolee.id,
+              toUserId: userId,
+              candidate: event.candidate,
+              fromUserId: currentUserId
+            });
+          }
+        };
+
+        try {
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          if (socketRef.current) {
+            socketRef.current.emit('tolee-webrtc-offer', {
+              toleeId: tolee.id,
+              toUserId: userId,
+              offer,
+              fromUserId: currentUserId
+            });
+          }
+        } catch (err) {
+          console.error('[WebRTC] Error creating offer for new viewer:', err);
+        }
+      }
     });
 
     socket.on('tolee-participant-left', ({ userId, name }: any) => {
-      setViewerCount(prev => Math.max(0, prev - 1));
       setLiveChatMessages(prev => [
         ...prev,
         { sender: 'System 🤖', avatar: '', message: `👤 ${name} left the live session.`, time: 'Now', isSystem: true }
       ]);
+
+      if (isAdmin) {
+        const pc = peerConnectionsRef.current.get(userId);
+        if (pc) {
+          pc.close();
+          peerConnectionsRef.current.delete(userId);
+        }
+      }
     });
 
     socket.on('tolee-live-chat', ({ sender, avatar, message, time }: any) => {
@@ -445,6 +601,12 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
     return () => {
       if (socketRef.current) {
         socketRef.current.disconnect();
+      }
+      peerConnectionsRef.current.forEach(pc => pc.close());
+      peerConnectionsRef.current.clear();
+      if (memberPeerConnectionRef.current) {
+        memberPeerConnectionRef.current.close();
+        memberPeerConnectionRef.current = null;
       }
     };
   }, [currentUserId, isLive, isAdmin]);
@@ -486,46 +648,7 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
     };
   }, []);
 
-  // Chat simulator
-  useEffect(() => {
-    let interval: any;
-    if (isLive || isUserJoined) {
-      const mockMessages = [
-        "Kya baath hai, sir! Kamaal ka conversion formula hai! 🔥",
-        "Sir, team projects ke documentation ko kaise speed up karein?",
-        "Best team management strategy explained simply. 🚀",
-        "Team Kalyan and Khadakpada present here! 🌟",
-        "Presentation slides aur metrics details aacha bataya.",
-        "Aapka training program hamesha simple aur practical hota hai.",
-        "Agle session ke tickets kab open honge sir?",
-        "Audio and video quality is crystal clear! 👍",
-        "Next target is to reach Level 7 by next month!",
-        "This screen share presentation looks amazing.",
-        "Super logic sir, main apni puri team ko share karunga."
-      ];
-      
-      const mockNames = [
-        "Rohan Patil", "Amit Sharma", "Pooja Rupawate", "Sandeep Kalyan", "Kunal G.", 
-        "Dwight K.", "Jim Halpert", "Nisha Patel", "Vikram Rathore", "Sunil Yadav"
-      ];
 
-      interval = setInterval(() => {
-        const randomMsg = mockMessages[Math.floor(Math.random() * mockMessages.length)];
-        const randomName = mockNames[Math.floor(Math.random() * mockNames.length)];
-        setLiveChatMessages(prev => [
-          ...prev,
-          {
-            sender: randomName,
-            avatar: `https://i.pravatar.cc/150?u=${randomName.replace(/\s+/g, '')}`,
-            message: randomMsg,
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          }
-        ]);
-        setViewerCount(prev => prev + (Math.random() > 0.4 ? 1 : -1));
-      }, 5000);
-    }
-    return () => clearInterval(interval);
-  }, [isLive, isUserJoined]);
 
   React.useEffect(() => {
     if (currentUserId) return;
@@ -1880,22 +2003,12 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                                 className={`w-full h-full object-cover transform ${isScreenSharing ? '' : 'scale-x-[-1]'}`}
                               />
                             ) : (
-                              /* Member viewing admin stream placeholder */
-                              <div className="w-full h-full relative flex items-center justify-center bg-zinc-950">
-                                <div className="absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_center,rgba(10,124,133,0.3)_0,transparent_70%)] animate-pulse" />
-                                
-                                <div className="z-10 flex flex-col items-center gap-4 text-center p-6">
-                                  <div className="w-20 h-20 rounded-full bg-teal-500/10 border border-teal-500/30 flex items-center justify-center animate-bounce">
-                                    <Radio className="w-10 h-10 text-[#0a7c85]" />
-                                  </div>
-                                  <div>
-                                    <h3 className="font-bold text-lg text-white">Live Broadcast Is Streaming</h3>
-                                    <p className="text-xs text-gray-400 max-w-sm mt-1">
-                                      Host is presenting slides and sharing live camera video stream. Welcome to the webinar!
-                                    </p>
-                                  </div>
-                                </div>
-                              </div>
+                              <video 
+                                ref={memberVideoRef}
+                                autoPlay 
+                                playsInline 
+                                className="w-full h-full object-cover"
+                              />
                             )}
 
                             {/* Control Bar (Only for Admin host) */}
@@ -2115,13 +2228,9 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                       </div>
                     </div>
                     <div className="divide-y divide-gray-100 dark:divide-gray-800">
-                      {[
-                        { id: 'admin', name: tolee.admin?.name || 'Admin', role: 'Admin', avatar: tolee.avatar || '/default-tolee-avatar.svg' },
-                        { id: '1', name: 'Michael Scott', role: 'Member', avatar: 'https://i.pravatar.cc/150?u=51' },
-                        { id: '2', name: 'Dwight Schrute', role: 'Moderator', avatar: 'https://i.pravatar.cc/150?u=52' },
-                        { id: '3', name: 'Jim Halpert', role: 'Member', avatar: 'https://i.pravatar.cc/150?u=53' },
-                        { id: '4', name: 'Pam Beesly', role: 'Member', avatar: 'https://i.pravatar.cc/150?u=54' },
-                      ].map((member) => (
+                      {(toleeData.members && toleeData.members.length > 0 ? toleeData.members : [
+                        { id: 'admin', name: tolee.admin?.name || 'Admin', role: 'Admin', avatar: tolee.avatar || '/default-tolee-avatar.svg' }
+                      ]).map((member: any) => (
                         <div key={member.id} className="p-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors">
                           <div className="flex items-center gap-3">
                             <Avatar className="w-11 h-11 border-2 border-white dark:border-gray-800">
