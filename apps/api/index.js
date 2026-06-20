@@ -592,6 +592,60 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Google Meet Upgrade Socket.IO Relays
+  socket.on('meeting-join-room', ({ meetingCode, userId }) => {
+    const roomName = `meeting-${meetingCode}`;
+    socket.join(roomName);
+    console.log(`[Signaling] Socket ${socket.id} (User: ${userId}) joined meeting room: ${roomName}`);
+  });
+
+  socket.on('meeting-chat-message', ({ meetingCode, senderId, senderName, senderAvatar, text, timestamp }) => {
+    const roomName = `meeting-${meetingCode}`;
+    io.to(roomName).emit('meeting-chat-message', {
+      senderId,
+      senderName,
+      senderAvatar,
+      text,
+      timestamp
+    });
+  });
+
+  socket.on('meeting-join-request', ({ meetingCode, userId, name, avatar }) => {
+    const roomName = `meeting-${meetingCode}`;
+    io.to(roomName).emit('meeting-join-request', { userId, name, avatar });
+    console.log(`[Signaling] Waiting room request from ${name} (${userId}) for meeting ${meetingCode}`);
+  });
+
+  socket.on('meeting-join-response', ({ meetingCode, userId, approved }) => {
+    console.log(`[Signaling] Waiting room response for ${userId}: approved=${approved}`);
+    const targetSockets = activeUsers.get(userId);
+    if (targetSockets) {
+      targetSockets.forEach(sid => {
+        io.to(sid).emit('meeting-join-response', { approved });
+      });
+    }
+  });
+
+  socket.on('meeting-poll-created', ({ meetingCode, poll }) => {
+    const roomName = `meeting-${meetingCode}`;
+    io.to(roomName).emit('meeting-poll-updated', poll);
+  });
+
+  socket.on('meeting-poll-vote', ({ meetingCode, poll }) => {
+    const roomName = `meeting-${meetingCode}`;
+    io.to(roomName).emit('meeting-poll-updated', poll);
+  });
+
+  socket.on('meeting-qa-created', ({ meetingCode, qa }) => {
+    const roomName = `meeting-${meetingCode}`;
+    io.to(roomName).emit('meeting-qa-updated', qa);
+  });
+
+  socket.on('meeting-qa-action', ({ meetingCode, qa }) => {
+    const roomName = `meeting-${meetingCode}`;
+    io.to(roomName).emit('meeting-qa-updated', qa);
+  });
+
   // 8. Disconnect Cleanup
   socket.on('disconnecting', () => {
     socket.rooms.forEach(room => {

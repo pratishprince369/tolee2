@@ -133,6 +133,10 @@ model User {
   agenticInterval      String    @default("DAILY") // "20_MINS", "1_HOUR", "DAILY"
   agenticLastPostAt    DateTime?
   liveJoinRequests     LiveJoinRequest[]
+  meetingsHosted       Meeting[]         @relation("MeetingHost")
+  meetingParticipants  MeetingParticipant[]
+  meetingQA            MeetingQA[]
+  meetingAttendance    MeetingAttendance[]
 }
 
 model EmailLog {
@@ -187,6 +191,7 @@ model Tolee {
   liveStartedAt        DateTime?
   liveViewerCount      Int                 @default(0)
   liveJoinRequests     LiveJoinRequest[]
+  meetings             Meeting[]           @relation("ToleeMeeting")
 }
 
 model ToleeMember {
@@ -1115,4 +1120,102 @@ model LiveJoinRequest {
 
   @@unique([toleeId, userId])
 }
+
+model Meeting {
+  id                 String               @id @default(cuid())
+  meetingCode        String               @unique // Unique short code e.g. "abc-defg-hij"
+  title              String
+  description        String?
+  hostId             String
+  host               User                 @relation("MeetingHost", fields: [hostId], references: [id], onDelete: Cascade)
+  toleeId            String?
+  tolee              Tolee?               @relation("ToleeMeeting", fields: [toleeId], references: [id], onDelete: Cascade)
+  type               String               @default("meeting") // "meeting" | "webinar" | "masterclass"
+  visibility         String               @default("public") // "public" | "private"
+  scheduledStart     DateTime?
+  scheduledEnd       DateTime?
+  startedAt          DateTime?
+  endedAt            DateTime?
+  isLocked           Boolean              @default(false)
+  waitingRoomEnabled Boolean              @default(true)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  participants       MeetingParticipant[]
+  polls              MeetingPoll[]
+  qaList             MeetingQA[]
+  recordings         MeetingRecording[]
+  attendance         MeetingAttendance[]
+  notes              MeetingNotes?
+}
+
+model MeetingParticipant {
+  id        String   @id @default(cuid())
+  meetingId String
+  meeting   Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      String   @default("participant") // "host" | "cohost" | "participant"
+  joinedAt  DateTime @default(now())
+  leftAt    DateTime?
+
+  @@unique([meetingId, userId])
+}
+
+model MeetingPoll {
+  id        String   @id @default(cuid())
+  meetingId String
+  meeting   Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  creatorId String
+  question  String
+  options   String   // JSON list of options
+  results   String   // JSON map of option index to list of userIds
+  status    String   @default("draft") // "draft" | "active" | "ended"
+  createdAt DateTime @default(now())
+}
+
+model MeetingQA {
+  id        String   @id @default(cuid())
+  meetingId String
+  meeting   Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question  String
+  answer    String?
+  isPinned  Boolean  @default(false)
+  status    String   @default("unanswered") // "unanswered" | "answered"
+  createdAt DateTime @default(now())
+}
+
+model MeetingRecording {
+  id           String   @id @default(cuid())
+  meetingId    String
+  meeting      Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  egressId     String   @unique
+  recordingUrl String
+  duration     Int      @default(0)
+  createdAt    DateTime @default(now())
+}
+
+model MeetingAttendance {
+  id        String   @id @default(cuid())
+  meetingId String
+  meeting   Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  duration  Int      @default(0) // active duration in seconds
+  joinedAt  DateTime @default(now())
+  leftAt    DateTime?
+}
+
+model MeetingNotes {
+  id          String   @id @default(cuid())
+  meetingId   String   @unique
+  meeting     Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  transcript  String?  @db.Text
+  summary     String?  @db.Text
+  actionItems String?  // JSON list of tasks
+  generatedAt DateTime @default(now())
+}
+
 

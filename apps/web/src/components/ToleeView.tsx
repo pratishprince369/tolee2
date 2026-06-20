@@ -22,6 +22,8 @@ import { ManageToleeModal } from '@/components/ManageToleeModal';
 import { createPost, toggleLike, addComment, getLikes, getComments, toggleSavePost, toggleRepost, getReposts, updatePostVisibility, deletePostPermanently, editPostCaption } from '@/actions/post';
 import { joinTolee, leaveToleeGroup, startLiveSession, endLiveSession, requestToJoinLive, handleLiveJoinRequest, getLiveJoinRequests, getMemberLiveStatus } from '@/actions/tolee';
 import { io } from 'socket.io-client';
+import { createMeeting, getToleeMeetings } from '@/actions/meeting';
+
 
 function getSocketUrl() {
   if (process.env.NEXT_PUBLIC_SOCKET_URL) return process.env.NEXT_PUBLIC_SOCKET_URL;
@@ -99,9 +101,45 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const memberPeerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const memberVideoRef = useRef<HTMLVideoElement>(null);
-  const remoteStreamRef = useRef<MediaStream | null>(null);
-  const isAdminRef = useRef(isAdmin);
-  isAdminRef.current = isAdmin;
+  const [meetingsList, setMeetingsList] = useState<any[]>([]);
+  const [loadingMeetings, setLoadingMeetings] = useState(false);
+
+  // Fetch active Google Meet sessions on Live tab click
+  useEffect(() => {
+    if (activeTab === 'live' && tolee?.id) {
+      const loadMeetings = async () => {
+        setLoadingMeetings(true);
+        const res = await getToleeMeetings(tolee.id);
+        if (res.success) {
+          setMeetingsList(res.meetings || []);
+        }
+        setLoadingMeetings(false);
+      };
+      loadMeetings();
+    }
+  }, [activeTab, tolee?.id]);
+
+  const handleStartInstantMeeting = async () => {
+    try {
+      const title = window.prompt("Enter Meeting Title:", `${tolee.name} Masterclass`) || `${tolee.name} Masterclass`;
+      const visibility = window.confirm("Make this a Public Meeting? (Press OK for Public, Cancel for Private/Waiting Room)") ? 'public' : 'private';
+      
+      const res = await createMeeting({
+        title,
+        type: 'meeting',
+        visibility,
+        toleeId: tolee.id
+      });
+
+      if (res.success && res.meeting) {
+        router.push(`/live/meeting/${res.meeting.meetingCode}`);
+      } else {
+        alert("Failed to start meeting: " + (res.error || "Unknown error"));
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   // ICE servers config with TURN fallback for NAT traversal
   const iceServersConfig = useRef({
@@ -1855,8 +1893,7 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                   });
                 })()}
 
-                {/* Live Masterclass Tab Content */}
-                {activeTab === 'live' && (
+                  {activeTab === 'live' && (
                   <div className="space-y-6">
                     {/* Header Banner */}
                     <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-teal-900 to-indigo-950 p-8 text-white shadow-xl border border-teal-500/20">
@@ -1865,390 +1902,94 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                         <div>
                           <div className="flex items-center gap-2 mb-3">
                             <span className="flex h-2.5 w-2.5 relative">
-                              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isLive ? 'bg-red-400' : 'bg-gray-400'}`}></span>
-                              <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isLive ? 'bg-red-500' : 'bg-gray-500'}`}></span>
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-teal-400"></span>
+                              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-teal-500"></span>
                             </span>
                             <span className="text-xs font-bold uppercase tracking-wider text-teal-400">
-                              {isLive ? 'Live Broadcast' : 'Offline'}
+                              Tolee Interactive Room
                             </span>
                           </div>
                           <h2 className="text-3xl font-extrabold tracking-tight">Group & Student Meetings Stage</h2>
                           <p className="text-gray-300 mt-2 max-w-xl text-sm leading-relaxed">
-                            Aapki teams ke liye direct live audio & video meetings (Group Meetings, Student Classes aur Board Meetings), interactive webinars aur digital screen sharing.
+                            Start instant meetings, webinars, or classes, share screen, track attendance, and record sessions.
                           </p>
                         </div>
                         
-                        {isAdmin ? (
-                          !isLive ? (
-                            <Button 
-                              onClick={startLiveBroadcast}
-                              className="bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white font-bold px-8 py-6 rounded-xl shadow-lg shadow-teal-500/25 flex items-center gap-2 transform active:scale-95 transition-all"
-                            >
-                              <Radio className="w-5 h-5 animate-pulse" />
-                              Go Live Now 🚀
-                            </Button>
-                          ) : (
-                            <Button 
-                              onClick={stopLiveBroadcast}
-                              variant="destructive"
-                              className="font-bold px-8 py-6 rounded-xl shadow-lg shadow-red-500/25 flex items-center gap-2 transform active:scale-95 transition-all"
-                            >
-                              <StopCircle className="w-5 h-5" />
-                              End Live Broadcast
-                            </Button>
-                          )
-                        ) : (
-                          // Non-admin view
-                          isLive && !isUserJoined ? (
-                            liveSessionType === 'public' ? (
-                              <Button 
-                                onClick={joinLiveBroadcast}
-                                className="bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white font-bold px-8 py-6 rounded-xl shadow-lg shadow-teal-500/25 flex items-center gap-2 transform active:scale-95 transition-all"
-                              >
-                                <PlayCircle className="w-5 h-5" />
-                                Join Live Training
-                              </Button>
-                            ) : myLiveRequestStatus === 'pending' ? (
-                              <Button 
-                                disabled
-                                className="bg-amber-600/80 text-white font-bold px-8 py-6 rounded-xl flex items-center gap-2"
-                              >
-                                <Loader2 className="w-5 h-5 animate-spin" />
-                                Requested... Waiting for Approval
-                              </Button>
-                            ) : myLiveRequestStatus === 'rejected' ? (
-                              <div className="bg-red-500/10 border border-red-500/20 text-red-500 px-6 py-4 rounded-xl font-bold">
-                                ❌ Request Rejected by Admin
-                              </div>
-                            ) : (
-                              <Button 
-                                onClick={handleJoinLiveClick}
-                                className="bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white font-bold px-8 py-6 rounded-xl shadow-lg shadow-teal-500/25 flex items-center gap-2 transform active:scale-95 transition-all"
-                              >
-                                <Lock className="w-5 h-5" />
-                                Request to Join Live
-                              </Button>
-                            )
-                          ) : isUserJoined ? (
-                            <div className="flex gap-2">
-                              <Button 
-                                onClick={leaveLiveBroadcast}
-                                variant="outline"
-                                className="border-white/20 hover:bg-white/10 text-white font-bold px-8 py-6 rounded-xl flex items-center gap-2 transform active:scale-95 transition-all"
-                              >
-                                Leave Masterclass
-                              </Button>
-                              <Button 
-                                onClick={raiseHand}
-                                variant="outline"
-                                className="border-amber-500/20 hover:bg-amber-500/10 text-amber-500 font-bold px-8 py-6 rounded-xl flex items-center gap-2 transform active:scale-95 transition-all"
-                              >
-                                🖐️ Raise Hand
-                              </Button>
-                            </div>
-                          ) : (
-                            <div className="bg-white/5 border border-white/10 backdrop-blur-md px-6 py-4 rounded-xl text-center">
-                              <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Next Live Session</p>
-                              <p className="text-sm font-bold text-teal-400 mt-1">Starting soon by Admin</p>
-                            </div>
-                          )
+                        {isAdmin && (
+                          <Button 
+                            onClick={handleStartInstantMeeting}
+                            className="bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white font-bold px-8 py-6 rounded-xl shadow-lg shadow-teal-500/25 flex items-center gap-2 transform active:scale-95 transition-all"
+                          >
+                            <Video className="w-5 h-5" />
+                            Start Instant Meeting 🚀
+                          </Button>
                         )}
                       </div>
                     </div>
 
-                    {/* Live Screen & Sidebar Grid */}
-                    {((isAdmin && isLive) || isUserJoined) ? (
-                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        {/* Video Player Box */}
-                        <div className="lg:col-span-2 flex flex-col gap-4">
-                          <div className="relative aspect-video rounded-2xl bg-black overflow-hidden border border-gray-800 shadow-2xl group">
-                            
-                            {/* Keyframes Style */}
-                            <style>{`
-                              @keyframes floatUp {
-                                0% {
-                                  transform: translateY(0) scale(0.5);
-                                  opacity: 0;
-                                }
-                                10% {
-                                  opacity: 1;
-                                }
-                                100% {
-                                  transform: translateY(-250px) scale(1.2);
-                                  opacity: 0;
-                                }
-                              }
-                            `}</style>
+                    {/* Active Meetings List Section */}
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                        <span className="flex h-2 w-2 relative">
+                          <span className="animate-ping absolute inline-flex h-full w-full bg-red-400 opacity-75 rounded-full"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                        </span>
+                        Active Live Rooms
+                      </h3>
 
-                            {/* Floating Emojis Container */}
-                            <div className="absolute inset-0 pointer-events-none overflow-hidden z-30">
-                              {floatingEmojis.map((item) => (
-                                <span key={item.id} style={item.style}>
-                                  {item.emoji}
-                                </span>
-                              ))}
-                            </div>
-
-                            {/* Live Badge */}
-                            <div className="absolute top-4 left-4 z-10 flex items-center gap-2 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
-                              <span className="h-2 w-2 rounded-full bg-red-500 animate-ping" />
-                              <span className="text-[10px] font-bold tracking-wider uppercase text-white">LIVE ({liveSessionType})</span>
-                            </div>
-
-                            {/* Viewer count */}
-                            <div className="absolute top-4 right-4 z-10 flex items-center gap-2 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
-                              <Users className="w-3.5 h-3.5 text-gray-400" />
-                              <span className="text-[10px] font-bold text-white">{viewerCount} Viewers</span>
-                            </div>
-
-                            {/* Admin Join Request Notifications Inside Stream */}
-                            {isAdmin && liveJoinRequests.length > 0 && (
-                              <div className="absolute top-16 left-4 right-4 z-20 space-y-2 max-w-sm">
-                                {liveJoinRequests.map((req) => (
-                                  <div key={req.id} className="bg-black/95 border border-teal-500/30 rounded-xl p-3 flex items-center justify-between shadow-2xl backdrop-blur-md">
-                                    <div className="flex items-center gap-2">
-                                      <Avatar className="w-8 h-8">
-                                        <AvatarImage src={req.user?.avatar || '/default-user-avatar.svg'} />
-                                        <AvatarFallback className="text-[10px]">{req.user?.name?.[0]}</AvatarFallback>
-                                      </Avatar>
-                                      <div>
-                                        <p className="text-xs font-bold text-white">{req.user?.name}</p>
-                                        <p className="text-[10px] text-gray-400">Wants to join live</p>
-                                      </div>
+                      {loadingMeetings ? (
+                        <div className="text-center py-12 bg-white dark:bg-zinc-900 border border-gray-150 dark:border-zinc-800 rounded-2xl">
+                          <Loader2 className="w-6 h-6 animate-spin text-teal-500 mx-auto mb-2" />
+                          <p className="text-xs text-gray-500">Loading active rooms...</p>
+                        </div>
+                      ) : meetingsList.length === 0 ? (
+                        <div className="text-center py-12 bg-white dark:bg-zinc-900 border border-gray-150 dark:border-zinc-800 rounded-2xl text-gray-500 text-sm">
+                          No active meetings in this group right now.
+                          {isAdmin && (
+                            <p className="text-xs text-zinc-500 mt-1">Click "Start Instant Meeting" above to host one.</p>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {meetingsList.map(meeting => (
+                            <Card key={meeting.id} className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-800 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                              <CardHeader className="p-5 pb-3">
+                                <div className="flex justify-between items-start">
+                                  <div className="space-y-1">
+                                    <div className="flex items-center gap-1.5 font-bold">
+                                      <Badge variant="outline" className="border-teal-500/35 text-teal-600 dark:text-teal-400 capitalize text-[10px]">
+                                        {meeting.type}
+                                      </Badge>
+                                      <Badge variant="outline" className="border-zinc-300 dark:border-zinc-700 text-zinc-600 dark:border-zinc-400 capitalize text-[10px]">
+                                        {meeting.visibility}
+                                      </Badge>
                                     </div>
-                                    <div className="flex gap-2">
-                                      <Button 
-                                        size="sm" 
-                                        onClick={async () => {
-                                          const res = await handleLiveJoinRequest(req.id, true);
-                                          if (res.success) {
-                                            setLiveJoinRequests(prev => prev.filter(r => r.id !== req.id));
-                                            if (socketRef.current?.connected) {
-                                              socketRef.current.emit('tolee-join-response', { toleeId: tolee.id, userId: req.userId, approved: true });
-                                            }
-                                          }
-                                        }}
-                                        className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] px-2 py-1 h-7 font-bold rounded-lg"
-                                      >
-                                        Approve
-                                      </Button>
-                                      <Button 
-                                        size="sm" 
-                                        variant="destructive"
-                                        onClick={async () => {
-                                          const res = await handleLiveJoinRequest(req.id, false);
-                                          if (res.success) {
-                                            setLiveJoinRequests(prev => prev.filter(r => r.id !== req.id));
-                                            if (socketRef.current?.connected) {
-                                              socketRef.current.emit('tolee-join-response', { toleeId: tolee.id, userId: req.userId, approved: false });
-                                            }
-                                          }
-                                        }}
-                                        className="text-[10px] px-2 py-1 h-7 font-bold rounded-lg"
-                                      >
-                                        Reject
-                                      </Button>
-                                    </div>
+                                    <h4 className="font-extrabold text-sm text-gray-900 dark:text-white mt-1 pr-6 line-clamp-1">{meeting.title}</h4>
                                   </div>
-                                ))}
-                              </div>
-                            )}
-
-                            {/* Video Stream Element */}
-                            {isAdmin ? (
-                              <video 
-                                ref={videoElementRef}
-                                autoPlay 
-                                playsInline 
-                                muted 
-                                className={`w-full h-full object-cover transform ${isScreenSharing ? '' : 'scale-x-[-1]'}`}
-                              />
-                            ) : (
-                              <video 
-                                ref={(el) => {
-                                  (memberVideoRef as any).current = el;
-                                  // When the video element mounts, assign any buffered remote stream
-                                  if (el && remoteStreamRef.current && !el.srcObject) {
-                                    el.srcObject = remoteStreamRef.current;
-                                    el.play().catch(e => console.log('[WebRTC] Auto-play blocked on mount:', e));
-                                    console.log('[WebRTC] Buffered stream assigned to video element on mount');
-                                  }
-                                }}
-                                autoPlay 
-                                playsInline 
-                                className="w-full h-full object-cover"
-                              />
-                            )}
-
-                            {/* Control Bar (Only for Admin host) */}
-                            {isAdmin && (
-                              <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-10 flex items-center gap-3 bg-black/80 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-white/10 shadow-lg opacity-90 hover:opacity-100 transition-opacity">
+                                </div>
+                              </CardHeader>
+                              <CardContent className="px-5 py-0">
+                                <div className="flex items-center gap-2 text-xs text-gray-500">
+                                  <Avatar className="w-5 h-5">
+                                    <AvatarImage src={meeting.host.avatar} />
+                                    <AvatarFallback className="text-[9px] bg-zinc-800 font-bold text-teal-400">{meeting.host.name[0]}</AvatarFallback>
+                                  </Avatar>
+                                  <span>Hosted by <span className="font-bold text-gray-800 dark:text-zinc-200">{meeting.host.name}</span></span>
+                                </div>
+                              </CardContent>
+                              <CardFooter className="p-5 pt-4 flex gap-3">
                                 <Button 
-                                  size="icon" 
-                                  variant="ghost" 
-                                  onClick={toggleMic}
-                                  className={`rounded-xl h-10 w-10 ${isMicOn ? 'text-white hover:bg-white/10' : 'text-red-500 bg-red-500/20 hover:bg-red-500/30'}`}
+                                  onClick={() => router.push(`/live/meeting/${meeting.meetingCode}`)}
+                                  className="flex-1 bg-[#0a7c85] hover:bg-[#0a7c85]/90 text-white font-bold rounded-xl"
                                 >
-                                  {isMicOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
+                                  Join Meeting
                                 </Button>
-                                
-                                <Button 
-                                  size="icon" 
-                                  variant="ghost" 
-                                  onClick={toggleCamera}
-                                  className={`rounded-xl h-10 w-10 ${isCamOn ? 'text-white hover:bg-white/10' : 'text-red-500 bg-red-500/20 hover:bg-red-500/30'}`}
-                                >
-                                  {isCamOn ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
-                                </Button>
-
-                                <div className="w-[1px] h-6 bg-white/10 mx-1" />
-
-                                <Button 
-                                  onClick={toggleScreenShare}
-                                  variant="ghost" 
-                                  className={`rounded-xl h-10 text-xs font-bold px-3 gap-2 ${isScreenSharing ? 'text-teal-400 bg-teal-400/20 hover:bg-teal-400/30' : 'text-white hover:bg-white/10'}`}
-                                >
-                                  <Monitor className="w-4 h-4" />
-                                  {isScreenSharing ? 'Sharing' : 'Share Screen'}
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                          
-                          <div className="flex justify-between items-center bg-gray-50 dark:bg-zinc-900/50 p-4 rounded-xl border border-gray-200 dark:border-gray-800">
-                            <div>
-                              <p className="text-xs text-gray-500 font-semibold">Broadcasting Node</p>
-                              <h4 className="font-bold text-sm text-gray-800 dark:text-white mt-0.5">Tolee Media Gateway Server-4</h4>
-                            </div>
-                            <div className="flex items-center gap-2 text-xs font-bold text-emerald-500">
-                              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                              Active Latency: 48ms
-                            </div>
-                          </div>
+                              </CardFooter>
+                            </Card>
+                          ))}
                         </div>
-
-                        {/* Interactive Chat Sidebar */}
-                        <div className="flex flex-col h-[480px] bg-white dark:bg-[#121212] rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm">
-                          <div className="p-4 border-b border-gray-100 dark:border-zinc-900 flex justify-between items-center bg-gray-50 dark:bg-zinc-900/30">
-                            <h3 className="font-bold text-sm tracking-wide text-gray-800 dark:text-white uppercase">Live Meeting Chat</h3>
-                            <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-1 rounded-full uppercase">Live Network</span>
-                          </div>
-
-                          {/* Chat Box Area */}
-                          <div className="flex-1 overflow-y-auto p-4 space-y-4 select-none hide-scrollbar">
-                            {liveChatMessages.map((msg, index) => (
-                              <div key={index} className="flex gap-2">
-                                {msg.isSystem ? (
-                                  <div className="w-full bg-teal-500/10 border border-teal-500/20 rounded-xl p-3 text-xs text-teal-600 dark:text-teal-400 font-medium text-center">
-                                    {msg.message}
-                                  </div>
-                                ) : (
-                                  <>
-                                    <Avatar className="w-8 h-8 rounded-full border border-gray-100 dark:border-zinc-800">
-                                      <AvatarImage src={msg.avatar} />
-                                      <AvatarFallback className="text-xs bg-primary/10 text-primary font-bold">{msg.sender?.[0]}</AvatarFallback>
-                                    </Avatar>
-                                    <div className="flex-1">
-                                      <div className="flex items-baseline gap-1.5">
-                                        <span className="text-xs font-bold text-gray-800 dark:text-gray-200">{msg.sender}</span>
-                                        <span className="text-[9px] text-gray-400">{msg.time}</span>
-                                      </div>
-                                      <p className="text-xs text-gray-600 dark:text-gray-300 mt-0.5 leading-relaxed">
-                                        {msg.message}
-                                      </p>
-                                    </div>
-                                  </>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-
-                          {/* Live Emoji Reactions */}
-                          <div className="px-3 py-1.5 border-t border-gray-100 dark:border-zinc-900 bg-gray-50/50 dark:bg-zinc-900/10 flex gap-2 justify-center select-none">
-                            {['❤️', '👍', '🔥', '👏', '😂', '😮'].map((emoji) => (
-                              <button 
-                                key={emoji} 
-                                type="button"
-                                onClick={() => sendReaction(emoji)}
-                                className="hover:scale-125 transition-transform text-lg px-1.5 active:scale-95"
-                              >
-                                {emoji}
-                              </button>
-                            ))}
-                          </div>
-
-                          {/* Send input */}
-                          <form onSubmit={sendLiveChatMessage} className="p-3 border-t border-gray-100 dark:border-zinc-900 bg-gray-50 dark:bg-zinc-900/30 flex gap-2">
-                            <Input 
-                              type="text" 
-                              value={liveChatInput}
-                              onChange={(e) => setLiveChatInput(e.target.value)}
-                              placeholder="Type something to join discussion..." 
-                              className="flex-1 text-xs bg-white dark:bg-zinc-950 border-gray-200 dark:border-zinc-800 rounded-xl h-10 px-3"
-                            />
-                            <Button type="submit" size="icon" className="rounded-xl h-10 w-10 bg-primary hover:bg-primary/95 text-white">
-                              <Send className="w-4 h-4" />
-                            </Button>
-                          </form>
-                        </div>
-                      </div>
-                    ) : (
-                      /* Offline Stage Information Banner / Member Action Gates */
-                      <Card className="border-gray-200 dark:border-gray-800 bg-white dark:bg-[#121212] overflow-hidden p-8 text-center flex flex-col items-center justify-center">
-                        <div className="w-20 h-20 bg-gray-100 dark:bg-zinc-900 rounded-full flex items-center justify-center mb-4 text-gray-400 animate-pulse">
-                          <Radio className="w-10 h-10" />
-                        </div>
-                        <h3 className="font-extrabold text-xl mb-2 text-gray-900 dark:text-white">
-                          {isLive ? 'Live Masterclass Active Hai!' : 'Live Meeting Offline Hai'}
-                        </h3>
-                        <p className="text-sm text-gray-500 max-w-md mx-auto mb-6">
-                          {isLive 
-                            ? 'Admin has started a live session. Tap join below to enter the live room.'
-                            : 'Group super admin jab bhi live training program ya meeting broadcast karenge, aapko automatic push notification alert mil jayega.'}
-                        </p>
-                        
-                        {isAdmin && !isLive && (
-                          <Button 
-                            onClick={startLiveBroadcast}
-                            className="bg-[#0a7c85] hover:bg-[#08676f] text-white font-bold px-6 py-5 rounded-xl flex items-center gap-2"
-                          >
-                            <Radio className="w-4 h-4 animate-pulse" />
-                            Go Live Broadcast Now
-                          </Button>
-                        )}
-
-                        {!isAdmin && isLive && !isUserJoined && (
-                          <div className="flex flex-col items-center gap-3">
-                            {liveSessionType === 'public' ? (
-                              <Button 
-                                onClick={joinLiveBroadcast}
-                                className="bg-[#0a7c85] hover:bg-[#08676f] text-white font-bold px-8 py-5 rounded-xl flex items-center gap-2"
-                              >
-                                <PlayCircle className="w-5 h-5" />
-                                Join Live Training
-                              </Button>
-                            ) : myLiveRequestStatus === 'pending' ? (
-                              <div className="flex flex-col items-center gap-2">
-                                <Loader2 className="w-6 h-6 animate-spin text-amber-500" />
-                                <p className="text-sm font-bold text-amber-500">Requested... Waiting for Admin Approval</p>
-                              </div>
-                            ) : myLiveRequestStatus === 'rejected' ? (
-                              <div className="bg-red-500/10 border border-red-500/20 text-red-500 px-6 py-4 rounded-xl font-bold">
-                                ❌ Request Rejected by Admin
-                              </div>
-                            ) : (
-                              <Button 
-                                onClick={handleJoinLiveClick}
-                                className="bg-amber-600 hover:bg-amber-700 text-white font-bold px-8 py-5 rounded-xl flex items-center gap-2 shadow-lg shadow-amber-600/20"
-                              >
-                                <Lock className="w-5 h-5" />
-                                Request to Join Live
-                              </Button>
-                            )}
-                          </div>
-                        )}
-                      </Card>
-                    )}
+                      )}
+                    </div>
                   </div>
                 )}
 

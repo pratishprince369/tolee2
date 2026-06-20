@@ -13,6 +13,15 @@ model User {
   name          String
   email         String   @unique
   emailVerified DateTime?
+  email_verified      Boolean   @default(false)
+  email_verified_at   DateTime?
+  verification_otp    String?
+  verification_expiry DateTime?
+  verification_attempts Int     @default(0)
+  reset_password_otp  String?
+  reset_password_otp_expiry DateTime?
+  reset_password_attempts Int   @default(0)
+  last_otp_sent_at    DateTime?
   passwordHash  String?
   transferPin   String?
   avatar        String?
@@ -112,7 +121,31 @@ model User {
   lastActiveAt  DateTime           @default(now())
   callsMade     Call[] @relation("CallCaller")
   callsReceived Call[] @relation("CallReceiver")
+
+  // Creator / Influencer Program
+  isCreator          Boolean  @default(false)
+  creatorStatus      String?  // "pending" | "approved" | "rejected"
+  creatorTier        String?  // "creator" | "influencer" | "vip_creator" | "verified_creator" | "premium_partner"
+  creatorApplication CreatorApplication?
+
+  // Agentic AI Reels configuration
+  agenticReelsEnabled  Boolean   @default(false)
+  agenticInterval      String    @default("DAILY") // "20_MINS", "1_HOUR", "DAILY"
+  agenticLastPostAt    DateTime?
   liveJoinRequests     LiveJoinRequest[]
+  meetingsHosted       Meeting[]         @relation("MeetingHost")
+  meetingParticipants  MeetingParticipant[]
+  meetingQA            MeetingQA[]
+  meetingAttendance    MeetingAttendance[]
+}
+
+model EmailLog {
+  id        String   @id @default(cuid())
+  emailType String   // "verification" | "password_reset"
+  to        String
+  status    String   // "sent" | "failed"
+  error     String?
+  createdAt DateTime @default(now())
 }
 
 model Tolee {
@@ -158,6 +191,7 @@ model Tolee {
   liveStartedAt        DateTime?
   liveViewerCount      Int                 @default(0)
   liveJoinRequests     LiveJoinRequest[]
+  meetings             Meeting[]           @relation("ToleeMeeting")
 }
 
 model ToleeMember {
@@ -978,6 +1012,45 @@ model AnalyticsEvent {
   createdAt  DateTime       @default(now())
 }
 
+model CreatorApplication {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Basic Details
+  fullName        String
+  username        String
+  email           String
+  mobile          String
+  city            String
+  country         String   @default("India")
+
+  // Social Links
+  instagramLink   String?
+  youtubeLink     String?
+  facebookLink    String?
+  telegramLink    String?
+  otherLinks      String?  // JSON array of other links
+
+  // Creator Stats
+  followersRange  String   // "1K-10K" | "10K-50K" | "50K-100K" | "100K+" | "1M+"
+  monthlyReach    String?
+  niche           String   // e.g. "Comedy,Fashion,Tech"
+  avgReelViews    String?
+  contentType     String?  // e.g. "Short Videos,Reels,Long Form"
+
+  // Status & Admin
+  status          String   @default("pending") // "pending" | "approved" | "rejected"
+  creatorTier     String?  // "creator" | "influencer" | "vip_creator" | "verified_creator" | "premium_partner"
+  adminNotes      String?
+  approvedAt      DateTime?
+  rejectedAt      DateTime?
+  walletCreditGiven Boolean @default(false)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
 model Highlight {
   id        String           @id @default(cuid())
   name      String
@@ -1000,6 +1073,41 @@ model HighlightStory {
   @@unique([highlightId, storyId])
 }
 
+// ---------------------------------------------------------
+// PUBLIC CREATOR LEAD (No login required — from ads landing page)
+// ---------------------------------------------------------
+model PublicCreatorLead {
+  id              String   @id @default(cuid())
+
+  // Basic Details
+  fullName        String
+  mobile          String
+  email           String?
+  city            String?
+  country         String   @default("India")
+
+  // Social Links
+  instagramLink   String?
+  youtubeLink     String?
+  otherLink       String?
+
+  // Creator Stats
+  followersRange  String?
+  niche           String?  // comma-separated
+
+  // Source tracking
+  utmSource       String?
+  utmCampaign     String?
+  referrerUrl     String?
+
+  // Status
+  status          String   @default("new") // "new" | "contacted" | "converted"
+  adminNotes      String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
 model LiveJoinRequest {
   id        String   @id @default(cuid())
   toleeId   String
@@ -1012,3 +1120,102 @@ model LiveJoinRequest {
 
   @@unique([toleeId, userId])
 }
+
+model Meeting {
+  id                 String               @id @default(cuid())
+  meetingCode        String               @unique // Unique short code e.g. "abc-defg-hij"
+  title              String
+  description        String?
+  hostId             String
+  host               User                 @relation("MeetingHost", fields: [hostId], references: [id], onDelete: Cascade)
+  toleeId            String?
+  tolee              Tolee?               @relation("ToleeMeeting", fields: [toleeId], references: [id], onDelete: Cascade)
+  type               String               @default("meeting") // "meeting" | "webinar" | "masterclass"
+  visibility         String               @default("public") // "public" | "private"
+  scheduledStart     DateTime?
+  scheduledEnd       DateTime?
+  startedAt          DateTime?
+  endedAt            DateTime?
+  isLocked           Boolean              @default(false)
+  waitingRoomEnabled Boolean              @default(true)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  participants       MeetingParticipant[]
+  polls              MeetingPoll[]
+  qaList             MeetingQA[]
+  recordings         MeetingRecording[]
+  attendance         MeetingAttendance[]
+  notes              MeetingNotes?
+}
+
+model MeetingParticipant {
+  id        String   @id @default(cuid())
+  meetingId String
+  meeting   Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      String   @default("participant") // "host" | "cohost" | "participant"
+  joinedAt  DateTime @default(now())
+  leftAt    DateTime?
+
+  @@unique([meetingId, userId])
+}
+
+model MeetingPoll {
+  id        String   @id @default(cuid())
+  meetingId String
+  meeting   Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  creatorId String
+  question  String
+  options   String   // JSON list of options
+  results   String   // JSON map of option index to list of userIds
+  status    String   @default("draft") // "draft" | "active" | "ended"
+  createdAt DateTime @default(now())
+}
+
+model MeetingQA {
+  id        String   @id @default(cuid())
+  meetingId String
+  meeting   Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question  String
+  answer    String?
+  isPinned  Boolean  @default(false)
+  status    String   @default("unanswered") // "unanswered" | "answered"
+  createdAt DateTime @default(now())
+}
+
+model MeetingRecording {
+  id           String   @id @default(cuid())
+  meetingId    String
+  meeting      Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  egressId     String   @unique
+  recordingUrl String
+  duration     Int      @default(0)
+  createdAt    DateTime @default(now())
+}
+
+model MeetingAttendance {
+  id        String   @id @default(cuid())
+  meetingId String
+  meeting   Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  duration  Int      @default(0) // active duration in seconds
+  joinedAt  DateTime @default(now())
+  leftAt    DateTime?
+}
+
+model MeetingNotes {
+  id          String   @id @default(cuid())
+  meetingId   String   @unique
+  meeting     Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  transcript  String?  @db.Text
+  summary     String?  @db.Text
+  actionItems String?  // JSON list of tasks
+  generatedAt DateTime @default(now())
+}
+
+
