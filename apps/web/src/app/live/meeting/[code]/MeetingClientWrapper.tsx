@@ -6,8 +6,20 @@ import { io, Socket } from 'socket.io-client';
 import { Mic, MicOff, Video, VideoOff, Users, Loader2, Lock, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import MeetingRoom from '@/components/meeting/MeetingRoom';
+import dynamic from 'next/dynamic';
 import { sendMeetingInvitationToAllMembers } from '@/actions/meeting';
+
+const MeetingRoom = dynamic(() => import('@/components/meeting/MeetingRoom'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-zinc-950 text-white">
+      <div className="flex flex-col items-center gap-3">
+        <Loader2 className="w-10 h-10 text-teal-400 animate-spin" />
+        <p className="text-sm font-semibold text-zinc-400">Loading meeting room...</p>
+      </div>
+    </div>
+  )
+});
 
 const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 
   (typeof window !== 'undefined' 

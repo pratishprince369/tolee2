@@ -22,7 +22,7 @@ import { ManageToleeModal } from '@/components/ManageToleeModal';
 import { createPost, toggleLike, addComment, getLikes, getComments, toggleSavePost, toggleRepost, getReposts, updatePostVisibility, deletePostPermanently, editPostCaption } from '@/actions/post';
 import { joinTolee, leaveToleeGroup, startLiveSession, endLiveSession, requestToJoinLive, handleLiveJoinRequest, getLiveJoinRequests, getMemberLiveStatus } from '@/actions/tolee';
 import { io } from 'socket.io-client';
-import { createMeeting, getToleeMeetings } from '@/actions/meeting';
+import { createMeeting, getToleeMeetings, updateMeetingStatus } from '@/actions/meeting';
 
 
 function getSocketUrl() {
@@ -138,6 +138,27 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
       }
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleEndMeeting = async (meetingId: string) => {
+    if (!window.confirm("Are you sure you want to end this live meeting and clean up all resources?")) {
+      return;
+    }
+    try {
+      const res = await updateMeetingStatus(meetingId, 'end');
+      if (res.success) {
+        alert("Meeting ended and resources cleaned up successfully.");
+        const loadRes = await getToleeMeetings(tolee.id);
+        if (loadRes.success) {
+          setMeetingsList(loadRes.meetings || []);
+        }
+      } else {
+        alert("Failed to end meeting: " + (res.error || "Unknown error"));
+      }
+    } catch (err) {
+      console.error(err);
+      alert("An error occurred while ending the meeting.");
     }
   };
 
@@ -1980,10 +2001,19 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                               <CardFooter className="p-5 pt-4 flex gap-3">
                                 <Button 
                                   onClick={() => router.push(`/live/meeting/${meeting.meetingCode}`)}
-                                  className="flex-1 bg-[#0a7c85] hover:bg-[#0a7c85]/90 text-white font-bold rounded-xl"
+                                  className="flex-1 bg-[#0a7c85] hover:bg-[#0a7c85]/90 text-white font-bold rounded-xl text-xs py-5"
                                 >
                                   Join Meeting
                                 </Button>
+                                {(isAdmin || meeting.hostId === currentUserId) && (
+                                  <Button
+                                    onClick={() => handleEndMeeting(meeting.id)}
+                                    variant="destructive"
+                                    className="font-bold rounded-xl bg-red-650 hover:bg-red-750 text-white text-xs py-5 px-4 flex items-center gap-1.5"
+                                  >
+                                    🛑 End Meeting
+                                  </Button>
+                                )}
                               </CardFooter>
                             </Card>
                           ))}

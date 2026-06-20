@@ -18,7 +18,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import MeetingSidebar from './MeetingSidebar';
-import { sendMeetingInvitationToAllMembers } from '@/actions/meeting';
+import { sendMeetingInvitationToAllMembers, updateMeetingStatus } from '@/actions/meeting';
 import { io, Socket } from 'socket.io-client';
 
 const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 
@@ -166,6 +166,26 @@ function MeetingRoomInner({ meeting, meetingCode, currentUser, onLeave }: {
     const interval = setInterval(sendPulse, 30000);
     return () => clearInterval(interval);
   }, [meeting?.id]);
+
+  // Tab Close / Navigator offline detection for host
+  useEffect(() => {
+    const isHost = meeting?.hostId === currentUser?.id;
+    if (!isHost || !meeting?.id) return;
+
+    const handleTabClose = () => {
+      fetch('/api/meeting/end', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ meetingId: meeting.id }),
+        keepalive: true
+      });
+    };
+
+    window.addEventListener('beforeunload', handleTabClose);
+    return () => {
+      window.removeEventListener('beforeunload', handleTabClose);
+    };
+  }, [meeting?.id, meeting?.hostId, currentUser?.id]);
 
   const handleSendInvitations = async () => {
     if (!meeting?.id) return;
@@ -639,16 +659,41 @@ function MeetingRoomInner({ meeting, meetingCode, currentUser, onLeave }: {
       {showExitConfirm && (
         <div className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center backdrop-blur-sm">
           <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl max-w-sm w-full text-center space-y-4">
-            <h3 className="text-lg font-bold">Leave Meeting?</h3>
+            <h3 className="text-lg font-bold font-sans text-white">Leave Meeting?</h3>
             <p className="text-zinc-400 text-xs">
               Are you sure you want to disconnect from this live session?
             </p>
-            <div className="flex gap-3 pt-2">
-              <Button onClick={() => setShowExitConfirm(false)} variant="outline" className="flex-1">
+            <div className="flex flex-col gap-2 pt-2">
+              {meeting?.hostId === currentUser?.id ? (
+                <>
+                  <Button 
+                    onClick={async () => {
+                      await updateMeetingStatus(meeting.id, 'end');
+                      onLeave();
+                    }} 
+                    className="w-full bg-red-600 hover:bg-red-700 font-bold py-5 rounded-xl text-sm"
+                  >
+                    🛑 End Meeting for All
+                  </Button>
+                  <Button 
+                    onClick={onLeave} 
+                    variant="outline" 
+                    className="w-full border-zinc-700 hover:bg-zinc-800 text-zinc-300 py-5 rounded-xl text-xs"
+                  >
+                    Leave Meeting (Keep Room Open)
+                  </Button>
+                </>
+              ) : (
+                <Button onClick={onLeave} className="w-full bg-red-600 hover:bg-red-700 py-5 rounded-xl font-bold text-sm">
+                  Leave Meeting
+                </Button>
+              )}
+              <Button 
+                onClick={() => setShowExitConfirm(false)} 
+                variant="ghost" 
+                className="w-full text-zinc-400 hover:text-white mt-1 font-bold text-xs"
+              >
                 Cancel
-              </Button>
-              <Button onClick={onLeave} className="flex-1 bg-red-600 hover:bg-red-700">
-                Leave
               </Button>
             </div>
           </div>
