@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
 import { sanitizeText } from '@/lib/sanitize';
+import { getSimulationSettings, getGroupMemberCount, getSimulatedEngagement } from '@/lib/simulation';
 
 export interface SearchFilters {
   type?: 'all' | 'users' | 'reels' | 'posts' | 'groups' | 'marketplace' | 'requirements' | 'locations' | 'trending';
@@ -56,6 +57,8 @@ export async function performSearch(
 ): Promise<{ success: boolean; data: SearchResultItem[]; total: number }> {
   try {
     const session = await getServerSession(authOptions);
+    const simSettings = await getSimulationSettings();
+    const isSimOn = simSettings.simulationMode;
     const userId = session?.user ? (session.user as any).id : null;
     const userLocation = session?.user ? (session.user as any).location : null;
 
@@ -76,6 +79,7 @@ export async function performSearch(
       searchType === 'all' || searchType === 'users'
         ? prisma.user.findMany({
             where: {
+              ...(!isSimOn ? { isSimulation: false } : {}),
               OR: [
                 { username: { contains: cleanQuery, mode: 'insensitive' } },
                 { name: { contains: cleanQuery, mode: 'insensitive' } },
@@ -94,6 +98,7 @@ export async function performSearch(
               status: 'published',
               visibility: 'public',
               isArchived: false,
+              ...(!isSimOn ? { isSimulation: false } : {}),
               AND: [
                 // Filter by type
                 searchType === 'reels' ? { postType: 'reel' } : {},
@@ -328,6 +333,16 @@ export async function performSearch(
         extra: `${p.ocrText || ''} ${p.audioTranscript || ''} ${p.location || ''}`
       });
 
+      const eng = p.isSimulation ? getSimulatedEngagement(
+        p.id,
+        simSettings.minLikes,
+        simSettings.maxLikes,
+        simSettings.minComments,
+        simSettings.maxComments,
+        simSettings.minViews,
+        simSettings.maxViews
+      ) : null;
+
       results.push({
         id: p.id,
         type,
@@ -343,10 +358,10 @@ export async function performSearch(
           username: p.author.username || '',
           avatar: p.author.avatar || p.author.image || '',
           isVerified: p.author.isVerified,
-          likesCount: p.likes?.length || 0,
-          commentsCount: p.comments?.length || 0,
-          savesCount: p.savedBy?.length || 0,
-          viewsCount: p.views?.length || 0
+          likesCount: eng ? eng.likes : (p.likes?.length || 0),
+          commentsCount: eng ? eng.comments : (p.comments?.length || 0),
+          savesCount: eng ? eng.shares : (p.savedBy?.length || 0),
+          viewsCount: eng ? eng.views : (p.views?.length || 0)
         }
       });
     }
@@ -360,11 +375,14 @@ export async function performSearch(
           extra: `${t.category || ''} ${t.location || ''}`
         });
 
+        const realCount = t.members?.length || 0;
+        const simulatedCount = getGroupMemberCount(t.id, t.name, realCount, isSimOn, simSettings.minGroupMembers, simSettings.maxGroupMembers);
+
         results.push({
           id: t.id,
           type: 'group',
           title: t.name,
-          subtitle: `${t.members?.length || 0} members`,
+          subtitle: `${simulatedCount.toLocaleString()} members`,
           description: t.description,
           mediaUrl: t.avatar || '/images/default-tolee.png',
           location: t.location,
@@ -372,7 +390,7 @@ export async function performSearch(
           createdAt: t.createdAt,
           score,
           meta: {
-            memberCount: t.members?.length || 0,
+            memberCount: simulatedCount,
             ownerName: t.owner?.name
           }
         });

@@ -8,6 +8,7 @@ import { headers } from 'next/headers';
 import { getOrCreatePersonalChat } from './chat';
 import { extractPublicIdFromUrl, extractResourceTypeFromUrl, destroyMultipleAssets } from '@/lib/cloudinary-cleanup';
 import { createSystemNotification, createSystemNotificationsMany } from '@/lib/notification-service';
+import { getSimulationSettings, getSimulatedEngagement } from '@/lib/simulation';
 
 export async function createPost(data: {
   content?: string;
@@ -161,10 +162,14 @@ export async function getPosts() {
     const session = await getServerSession(authOptions);
     const currentUserId = (session?.user as any)?.id;
 
+    const simSettings = await getSimulationSettings();
+    const isSimOn = simSettings.simulationMode;
+
     const posts = await prisma.post.findMany({
       where: {
         isArchived: false,
         status: 'published',
+        ...(!isSimOn ? { isSimulation: false } : {}),
         ...(currentUserId ? {
           OR: [
             // Public author
@@ -276,6 +281,7 @@ export async function getPosts() {
           }
         },
         comments: {
+          where: !isSimOn ? { isSimulation: false } : {},
           orderBy: { createdAt: 'desc' },
           take: 3,
           select: {
@@ -393,7 +399,31 @@ export async function getPosts() {
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
 
-    return { success: true, posts: combinedPosts.slice(0, 30) };
+    const finalPosts = combinedPosts.map((post: any) => {
+      if (post.isSimulation) {
+        const eng = getSimulatedEngagement(
+          post.id,
+          simSettings.minLikes,
+          simSettings.maxLikes,
+          simSettings.minComments,
+          simSettings.maxComments,
+          simSettings.minViews,
+          simSettings.maxViews
+        );
+        return {
+          ...post,
+          _count: {
+            likes: eng.likes,
+            comments: eng.comments,
+            reposts: post._count?.reposts || eng.shares,
+            views: eng.views,
+          },
+        };
+      }
+      return post;
+    });
+
+    return { success: true, posts: finalPosts.slice(0, 30) };
   } catch (error) {
     console.error("Error fetching posts:", error);
     return { success: false, posts: [] };
@@ -528,8 +558,14 @@ export async function addComment(postId: string, content: string, parentId?: str
 
 export async function getComments(postId: string) {
   try {
+    const simSettings = await getSimulationSettings();
+    const isSimOn = simSettings.simulationMode;
+
     const comments = await prisma.comment.findMany({
-      where: { postId },
+      where: {
+        postId,
+        ...(!isSimOn ? { isSimulation: false } : {})
+      },
       include: { 
         author: {
           select: {
@@ -1416,8 +1452,12 @@ export async function getReels(skip = 0, take = 20) {
     const session = await getServerSession(authOptions);
     const currentUserId = (session?.user as any)?.id;
 
+    const simSettings = await getSimulationSettings();
+    const isSimOn = simSettings.simulationMode;
+
     const posts = await prisma.post.findMany({
       where: {
+        ...(!isSimOn ? { isSimulation: false } : {}),
         isArchived: false,
         status: 'published',
         mediaTypes: 'video',
@@ -1587,6 +1627,16 @@ export async function getReels(skip = 0, take = 20) {
 
       const hasActiveStory = authorsWithActiveStories.includes(post.author.id);
       
+      const eng = post.isSimulation ? getSimulatedEngagement(
+        post.id,
+        simSettings.minLikes,
+        simSettings.maxLikes,
+        simSettings.minComments,
+        simSettings.maxComments,
+        simSettings.minViews,
+        simSettings.maxViews
+      ) : null;
+
       return {
         id: post.id,
         authorId: post.author.id,
@@ -1600,11 +1650,11 @@ export async function getReels(skip = 0, take = 20) {
         toleeId: firstTolee?.id || null,
         role: firstTolee?.ownerId === post.author.id ? 'Admin' : 'Member',
         caption: post.caption || '',
-        likes: post.likes?.length || 0,
-        comments: post.comments?.length || 0,
-        views: post._count?.views || 0,
-        shares: '0',
-        reposts: repostsCount,
+        likes: eng ? eng.likes : (post.likes?.length || 0),
+        comments: eng ? eng.comments : (post.comments?.length || 0),
+        views: eng ? eng.views : (post._count?.views || 0),
+        shares: eng ? String(eng.shares) : '0',
+        reposts: eng ? eng.shares : repostsCount,
         audio: 'Original Audio',
         isVerified: false,
         likedByMe,

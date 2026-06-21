@@ -8,16 +8,30 @@ import { extractPublicIdFromUrl, extractResourceTypeFromUrl, destroyAsset } from
 import { createSystemNotification, createSystemNotificationsMany } from '@/lib/notification-service';
 import { writeLimiter, getClientIp } from '@/lib/rate-limit';
 import { sanitizeText } from '@/lib/sanitize';
+import { getSimulationSettings, getGroupMemberCount, getSimulatedEngagement } from '@/lib/simulation';
 
 
 export async function getTolees() {
   try {
+    const simSettings = await getSimulationSettings();
+    const isSimOn = simSettings.simulationMode;
+
     const tolees = await prisma.tolee.findMany({
       include: {
         members: true,
       }
     });
-    return { success: true, tolees };
+
+    const mappedTolees = tolees.map(t => {
+      const realCount = t.members.length;
+      const count = getGroupMemberCount(t.id, t.name, realCount, isSimOn, simSettings.minGroupMembers, simSettings.maxGroupMembers);
+      return {
+        ...t,
+        membersCount: count
+      };
+    });
+
+    return { success: true, tolees: mappedTolees };
   } catch (error) {
     console.error("Error fetching tolees:", error);
     return { success: false, tolees: [] };
@@ -28,6 +42,9 @@ export async function getToleeBySlug(slug: string) {
   try {
     const session = await getServerSession(authOptions);
     const currentUserId = (session?.user as any)?.id;
+
+    const simSettings = await getSimulationSettings();
+    const isSimOn = simSettings.simulationMode;
 
     // Check if the current user is an approved member of this tolee slug
     let isMember = false;
@@ -74,14 +91,17 @@ export async function getToleeBySlug(slug: string) {
         posts: {
           take: 10,
           where: {
-            post: currentUserId ? {
-              OR: [
-                { authorId: currentUserId },
-                { visibility: 'public' },
-                ...(isMember ? [{ visibility: 'hidden_from_public' }] : [])
-              ]
-            } : {
-              visibility: 'public'
+            post: {
+              ...(!isSimOn ? { isSimulation: false } : {}),
+              ...(currentUserId ? {
+                OR: [
+                  { authorId: currentUserId },
+                  { visibility: 'public' },
+                  ...(isMember ? [{ visibility: 'hidden_from_public' }] : [])
+                ]
+              } : {
+                visibility: 'public'
+              })
             }
           },
           include: {
@@ -164,8 +184,50 @@ export async function getToleeBySlug(slug: string) {
       } else {
         console.log(`[DEBUG] [Live Session Missing] No active live session for Tolee: ${tolee.name} (${tolee.id})`);
       }
+
+      const realCount = tolee._count?.members || 0;
+      const count = getGroupMemberCount(tolee.id, tolee.name, realCount, isSimOn, simSettings.minGroupMembers, simSettings.maxGroupMembers);
+
+      const mappedPosts = tolee.posts.map((p: any) => {
+        if (p.post.isSimulation) {
+          const eng = getSimulatedEngagement(
+            p.post.id,
+            simSettings.minLikes,
+            simSettings.maxLikes,
+            simSettings.minComments,
+            simSettings.maxComments,
+            simSettings.minViews,
+            simSettings.maxViews
+          );
+          return {
+            ...p,
+            post: {
+              ...p.post,
+              _count: {
+                likes: eng.likes,
+                comments: eng.comments,
+                reposts: p.post._count?.reposts || eng.shares,
+                views: eng.views,
+              }
+            }
+          };
+        }
+        return p;
+      });
+
+      return {
+        success: true,
+        tolee: {
+          ...tolee,
+          _count: {
+            ...tolee._count,
+            members: count
+          },
+          posts: mappedPosts
+        }
+      };
     }
-    return { success: true, tolee };
+    return { success: true, tolee: null };
   } catch (error) {
     console.error("Error fetching tolee by slug:", error);
     return { success: false, tolee: null };
