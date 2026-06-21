@@ -4,11 +4,22 @@ import { headers } from 'next/headers';
 // Country-specific simulated names
 const MOCK_NAMES_BY_COUNTRY: Record<string, string[]> = {
   IN: [
-    'Aarav Sharma', 'Ananya Iyer', 'Vihaan Patel', 'Diya Nair', 'Kabir Mehta',
-    'Ishaan Roy', 'Aanya Gupta', 'Rohan Sen', 'Kavya Reddy', 'Aditya Deshmukh',
-    'Siddharth Joshi', 'Meera Rao', 'Neha Verma', 'Arjun Malhotra', 'Priya Kapoor',
-    'Rahul Bhatia', 'Riya Saxena', 'Karan Johar', 'Shreya Ghoshal', 'Vikram Seth',
-    'Tanvi Hegde', 'Amit Trivedi', 'Sneha Paul', 'Devendra Fadnavis', 'Sunita Rao'
+    'Aarav Sharma', 'Vivaan Patel', 'Aditya Singh', 'Arjun Gupta', 'Rahul Verma',
+    'Karan Mehta', 'Mohit Yadav', 'Rohan Joshi', 'Sandeep Nair', 'Amit Mishra',
+    'Rajesh Kumar', 'Deepak Choudhary', 'Vikas Jain', 'Manish Agarwal', 'Ankit Saxena',
+    'Pankaj Tiwari', 'Nitin Deshmukh', 'Prashant Kulkarni', 'Saurabh Bansal', 'Gaurav Srivastava',
+    'Rohit Chavan', 'Omkar Pawar', 'Pratik Shinde', 'Sachin Jadhav', 'Tanmay Patil',
+    'Naveen Gowda', 'Harish Rao', 'Karthik Reddy', 'Sai Naidu', 'Balaji Menon',
+    'Chirag Bhatt', 'Hardik Trivedi', 'Yash Modi', 'Dhruv Parekh', 'Krunal Vora',
+    'Jay Thakkar', 'Tushar Bhavsar', 'Het Panchal', 'Nirav Doshi', 'Ashwin Kamble',
+    'Priya Sharma', 'Ananya Gupta', 'Sneha Patel', 'Pooja Singh', 'Neha Verma',
+    'Aarti Mehta', 'Kavya Iyer', 'Nisha Nair', 'Riya Shah', 'Simran Kaur',
+    'Divya Reddy', 'Swati Mishra', 'Meera Joshi', 'Aisha Khan', 'Fatima Sheikh',
+    'Sana Ansari', 'Zoya Siddiqui', 'Harpreet Gill', 'Gurpreet Sandhu', 'Jaspreet Brar',
+    'Shruti Patil', 'Komal Deshmukh', 'Bhavna Chavan', 'Priti Kulkarni', 'Radhika Menon',
+    'Vaishnavi Pawar', 'Ishita Sharma', 'Tanvi More', 'Sakshi Jadhav', 'Nikita Rao',
+    'Sonali Gaikwad', 'Ankita Bhosale', 'Mansi Trivedi', 'Reema Shah', 'Monika Agarwal',
+    'Khushi Gupta', 'Muskan Yadav', 'Palak Jain', 'Heena Khan', 'Alisha Kapoor'
   ],
   US: [
     'Liam Smith', 'Emma Johnson', 'Noah Williams', 'Olivia Jones', 'William Brown',
@@ -769,7 +780,7 @@ export function generateDynamicGroupPosts(
     postSeed = Math.abs(postSeed);
 
     // Roll for author country: 85% regional matching countryCode, 15% other country (for diversity)
-    const authorCountryRoll = (postSeed + i) % 100;
+    const authorCountryRoll = postSeed % 100;
     let authorCountry = countryCode;
     if (authorCountryRoll >= 85) {
       const countries = ['IN', 'US', 'AE', 'GB', 'CA'].filter(c => c !== countryCode);
@@ -784,9 +795,9 @@ export function generateDynamicGroupPosts(
     const catKey = getCategoryKey(category || toleeName);
     const templates = templatesByCountry[catKey] || templatesByCountry.general;
 
-    const authorIdx = (postSeed + i) % namePool.length;
+    const authorIdx = postSeed % namePool.length;
     const authorName = namePool[authorIdx];
-    const username = generateRealisticUsername(authorName, postSeed + i);
+    const username = generateRealisticUsername(authorName, postSeed);
     const avatar = MOCK_AVATARS[postSeed % MOCK_AVATARS.length];
     const profession = MOCK_PROFESSIONS[postSeed % MOCK_PROFESSIONS.length];
     const location = cityPool[postSeed % cityPool.length];
