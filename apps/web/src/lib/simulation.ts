@@ -468,6 +468,28 @@ export async function getIsSimulationModeOn(): Promise<boolean> {
   return settings.simulationMode;
 }
 
+// Helper to generate realistic, natural usernames from a display name
+export function generateRealisticUsername(name: string, seed: number): string {
+  const parts = name.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim().split(/\s+/);
+  const firstName = parts[0] || 'user';
+  const lastName = parts[1] || '';
+
+  const formatType = seed % 5;
+  if (formatType === 0 && lastName) {
+    return `${firstName}_${lastName}`;
+  } else if (formatType === 1 && lastName) {
+    const num = seed % 100;
+    return `${firstName}.${lastName}${num ? num : ''}`;
+  } else if (formatType === 2 && lastName) {
+    const num = seed % 99;
+    return `${firstName}${lastName}${num ? num : ''}`;
+  } else if (formatType === 3) {
+    return `${firstName}_${seed % 1000}`;
+  } else {
+    return lastName ? `${firstName}_${lastName}_` : `${firstName}_${seed % 99}`;
+  }
+}
+
 // Detect country code based on user context or headers
 export async function detectCountryCode(currentUserId?: string | null): Promise<string> {
   let userLocation: string | null = null;
@@ -669,7 +691,7 @@ export function generateDynamicComments(postId: string, count: number, countryCo
     const namePool = MOCK_NAMES_BY_COUNTRY[authorCountry] || MOCK_NAMES_BY_COUNTRY.OTHER;
     const authorIndex = seed % namePool.length;
     const name = namePool[authorIndex];
-    const username = `sim_${name.toLowerCase().replace(/\s+/g, '')}_${seed % 100}`;
+    const username = generateRealisticUsername(name, seed);
     const avatar = MOCK_AVATARS[seed % MOCK_AVATARS.length];
     const createdAt = new Date(Date.now() - (i + 1) * 35 * 60 * 1000);
 
@@ -764,7 +786,7 @@ export function generateDynamicGroupPosts(
 
     const authorIdx = (postSeed + i) % namePool.length;
     const authorName = namePool[authorIdx];
-    const username = `sim_${authorName.toLowerCase().replace(/\s+/g, '')}_${postSeed % 100}`;
+    const username = generateRealisticUsername(authorName, postSeed + i);
     const avatar = MOCK_AVATARS[postSeed % MOCK_AVATARS.length];
     const profession = MOCK_PROFESSIONS[postSeed % MOCK_PROFESSIONS.length];
     const location = cityPool[postSeed % cityPool.length];
@@ -898,8 +920,8 @@ export async function syncSimulationData() {
     // Seed Indian profiles mostly for database base
     const namePool = MOCK_NAMES_BY_COUNTRY.IN;
     const cityPool = MOCK_CITIES_BY_COUNTRY.IN;
-    const name = namePool[i % namePool.length] + ' ' + (Math.floor(i / namePool.length) || '');
-    const username = `sim_${name.toLowerCase().replace(/\s+/g, '_')}_${i}`;
+    const name = namePool[i % namePool.length] + (Math.floor(i / namePool.length) ? ' ' + Math.floor(i / namePool.length) : '');
+    const username = generateRealisticUsername(name, i);
     const email = `${username}@simulatedtolee.com`;
     const avatar = MOCK_AVATARS[i % MOCK_AVATARS.length];
     const profession = MOCK_PROFESSIONS[i % MOCK_PROFESSIONS.length];
