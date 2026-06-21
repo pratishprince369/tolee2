@@ -190,6 +190,11 @@ export async function syncSimulationData() {
     return { success: true, message: 'Simulation mode is OFF. Cleaned up simulated data.' };
   }
 
+  // Cap the actual database records to a lightweight pool to prevent timeouts/crashes
+  const actualUsersCount = Math.min(settings.simulatedUsersCount, 150);
+  const actualPostsCount = Math.min(settings.simulatedPostsCount, 100);
+  const actualReelsCount = Math.min(settings.simulatedReelsCount, 100);
+
   // Fetch some active groups/Tolees to tag simulated posts to
   const activeTolees = await prisma.tolee.findMany({ select: { id: true } });
   if (activeTolees.length === 0) {
@@ -198,7 +203,7 @@ export async function syncSimulationData() {
 
   // 2. Generate simulated users
   const usersToCreate = [];
-  for (let i = 0; i < settings.simulatedUsersCount; i++) {
+  for (let i = 0; i < actualUsersCount; i++) {
     const name = MOCK_NAMES[i % MOCK_NAMES.length] + ' ' + (Math.floor(i / MOCK_NAMES.length) || '');
     const username = `sim_${name.toLowerCase().replace(/\s+/g, '_')}_${i}`;
     const email = `${username}@simulatedtolee.com`;
@@ -228,10 +233,14 @@ export async function syncSimulationData() {
     select: { id: true }
   });
 
+  if (createdUsers.length === 0) {
+    return { success: false, error: 'Failed to retrieve seeded simulated users.' };
+  }
+
   // 3. Generate simulated posts
   const postsToCreate = [];
   // regular posts
-  for (let i = 0; i < settings.simulatedPostsCount; i++) {
+  for (let i = 0; i < actualPostsCount; i++) {
     const author = createdUsers[i % createdUsers.length];
     const isImage = i % 3 !== 0; // 66% image, 33% text posts
     const mediaUrls = isImage ? MOCK_IMAGES[i % MOCK_IMAGES.length] : null;
@@ -252,7 +261,7 @@ export async function syncSimulationData() {
   }
 
   // reels posts
-  for (let i = 0; i < settings.simulatedReelsCount; i++) {
+  for (let i = 0; i < actualReelsCount; i++) {
     const author = createdUsers[(i + 5) % createdUsers.length];
     const mediaUrls = MOCK_VIDEOS[i % MOCK_VIDEOS.length];
     const mediaTypes = 'video';

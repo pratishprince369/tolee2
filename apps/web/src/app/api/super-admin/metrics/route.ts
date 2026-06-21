@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { verifySuperAdminToken, SUPER_ADMIN_COOKIE } from '@/lib/superAdminAuth';
 import { getAllCloudinaryAccounts, getActiveCloudinaryAccount } from '@/lib/cloudinary-fallback';
 import { v2 as cloudinary } from 'cloudinary';
+import { getSimulationSettings } from '@/lib/simulation';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,8 +19,11 @@ export async function GET(req: NextRequest) {
     const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
+    const simSettings = await getSimulationSettings();
+    const isSimOn = simSettings.simulationMode;
+
     // Run core counts with fallback to 0
-    const [
+    let [
       totalUsers, activeToday, activeWeek, activeMonth, newToday, newThisMonth,
       verifiedUsers, suspendedUsers,
       totalTolees, toleeToday,
@@ -60,6 +64,21 @@ export async function GET(req: NextRequest) {
       prisma.auditLog.count({ where: { action: 'app_installed_click' } }).catch(() => 0),
       prisma.auditLog.count({ where: { action: 'app_installed_click', createdAt: { gte: todayStart } } }).catch(() => 0),
     ]);
+
+    if (isSimOn) {
+      totalUsers = simSettings.simulatedUsersCount;
+      activeToday = Math.floor(simSettings.simulatedUsersCount * 0.15) + (now.getTime() % 100);
+      activeWeek = Math.floor(simSettings.simulatedUsersCount * 0.45);
+      activeMonth = Math.floor(simSettings.simulatedUsersCount * 0.85);
+      newToday = Math.floor(simSettings.simulatedUsersCount * 0.02) + (now.getTime() % 50);
+      newThisMonth = Math.floor(simSettings.simulatedUsersCount * 0.25);
+      verifiedUsers = Math.floor(simSettings.simulatedUsersCount * 0.25);
+      
+      totalPosts = simSettings.simulatedPostsCount;
+      totalReels = simSettings.simulatedReelsCount;
+      totalComments = simSettings.simulatedPostsCount * 4;
+      totalShares = Math.floor(simSettings.simulatedPostsCount * 0.2);
+    }
 
     // Top communities using correct Prisma syntax (select only)
     const topTolees = await prisma.tolee.findMany({
