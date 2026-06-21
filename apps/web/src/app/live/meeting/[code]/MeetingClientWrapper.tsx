@@ -60,6 +60,11 @@ export default function MeetingClientWrapper({
   const [isJoining, setIsJoining] = useState(false);
   const [sendingInvites, setSendingInvites] = useState(false);
   const [invitesSent, setInvitesSent] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   
   // Lobby Media states
   const [isMicOn, setIsMicOn] = useState(true);
@@ -198,6 +203,18 @@ export default function MeetingClientWrapper({
       router.push('/');
     }
   };
+
+  // Hydration guard: render loading skeleton until client is mounted
+  if (!mounted) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-zinc-950 text-white">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="w-10 h-10 text-teal-400 animate-spin" />
+          <p className="text-sm font-semibold text-zinc-400">Loading interactive session...</p>
+        </div>
+      </div>
+    );
+  }
 
   // ----------------------------------------------------
   // RENDER: Waiting Room / Needs Host Approval Screen
