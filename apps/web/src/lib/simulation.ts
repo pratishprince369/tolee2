@@ -486,7 +486,16 @@ export async function detectCountryCode(currentUserId?: string | null): Promise<
   // Parse location text to match country
   if (userLocation) {
     const loc = userLocation.toLowerCase();
-    if (loc.includes('india')) return 'IN';
+    const hasIndianCity = [
+      'mumbai', 'pune', 'delhi', 'bangalore', 'bengaluru', 'hyderabad', 'chennai', 'kolkata',
+      'ahmedabad', 'jaipur', 'lucknow', 'nagpur', 'indore', 'surat', 'kalyan', 'thane',
+      'varanasi', 'mulund', 'ghatkopar', 'bhiwandi', 'panvel', 'dadar', 'chembur', 'vikroli',
+      'vikhroli', 'kharadi', 'kurla', 'sion', 'govandi', 'noida', 'gurgaon', 'gurugram',
+      'chakan', 'matunga', 'manikonda', 'bengal', 'maharashtra', 'karnataka', 'telangana',
+      'gujarat', 'rajasthan', 'uttar pradesh', 'madhya pradesh', 'india'
+    ].some(city => loc.includes(city));
+    if (hasIndianCity) return 'IN';
+
     if (loc.includes('united states') || loc.includes('usa') || loc.includes('america')) return 'US';
     if (loc.includes('uae') || loc.includes('emirates') || loc.includes('dubai') || loc.includes('abu dhabi')) return 'AE';
     if (loc.includes('united kingdom') || loc.includes('uk') || loc.includes('london')) return 'GB';
@@ -505,11 +514,16 @@ export async function detectCountryCode(currentUserId?: string | null): Promise<
       const acceptLanguage = reqHeaders.get('accept-language');
       if (acceptLanguage) {
         const lang = acceptLanguage.toLowerCase();
-        if (lang.includes('in')) countryHeader = 'IN';
-        else if (lang.includes('us')) countryHeader = 'US';
-        else if (lang.includes('ae')) countryHeader = 'AE';
-        else if (lang.includes('gb') || lang.includes('uk')) countryHeader = 'GB';
-        else if (lang.includes('ca')) countryHeader = 'CA';
+        // Specifically look for country subtags to avoid treating generic en-US language as US country
+        if (lang.includes('en-in') || lang.includes('hi-in') || lang.includes('hi')) {
+          countryHeader = 'IN';
+        } else if (lang.includes('en-gb') || lang.includes('gb-') || lang.includes('uk-')) {
+          countryHeader = 'GB';
+        } else if (lang.includes('en-ca') || lang.includes('fr-ca')) {
+          countryHeader = 'CA';
+        } else if (lang.includes('ar-ae') || lang.includes('en-ae')) {
+          countryHeader = 'AE';
+        }
       }
     }
   } catch (e) {
