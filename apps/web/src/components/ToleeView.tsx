@@ -97,12 +97,18 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
   
   const cameraStreamRef = useRef<MediaStream | null>(null);
   const screenStreamRef = useRef<MediaStream | null>(null);
+  const remoteStreamRef = useRef<MediaStream | null>(null);
   const videoElementRef = useRef<HTMLVideoElement>(null);
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const memberPeerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const memberVideoRef = useRef<HTMLVideoElement>(null);
   const [meetingsList, setMeetingsList] = useState<any[]>([]);
   const [loadingMeetings, setLoadingMeetings] = useState(false);
+
+  const isAdminRef = useRef(isAdmin);
+  useEffect(() => {
+    isAdminRef.current = isAdmin;
+  }, [isAdmin]);
 
   // Fetch active Google Meet sessions on Live tab click
   useEffect(() => {
