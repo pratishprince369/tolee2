@@ -4,22 +4,50 @@ import { headers } from 'next/headers';
 // Country-specific simulated names
 const MOCK_NAMES_BY_COUNTRY: Record<string, string[]> = {
   IN: [
-    'Aarav Sharma', 'Vivaan Patel', 'Aditya Singh', 'Arjun Gupta', 'Rahul Verma',
-    'Karan Mehta', 'Mohit Yadav', 'Rohan Joshi', 'Sandeep Nair', 'Amit Mishra',
-    'Rajesh Kumar', 'Deepak Choudhary', 'Vikas Jain', 'Manish Agarwal', 'Ankit Saxena',
-    'Pankaj Tiwari', 'Nitin Deshmukh', 'Prashant Kulkarni', 'Saurabh Bansal', 'Gaurav Srivastava',
-    'Rohit Chavan', 'Omkar Pawar', 'Pratik Shinde', 'Sachin Jadhav', 'Tanmay Patil',
-    'Naveen Gowda', 'Harish Rao', 'Karthik Reddy', 'Sai Naidu', 'Balaji Menon',
-    'Chirag Bhatt', 'Hardik Trivedi', 'Yash Modi', 'Dhruv Parekh', 'Krunal Vora',
-    'Jay Thakkar', 'Tushar Bhavsar', 'Het Panchal', 'Nirav Doshi', 'Ashwin Kamble',
-    'Priya Sharma', 'Ananya Gupta', 'Sneha Patel', 'Pooja Singh', 'Neha Verma',
-    'Aarti Mehta', 'Kavya Iyer', 'Nisha Nair', 'Riya Shah', 'Simran Kaur',
-    'Divya Reddy', 'Swati Mishra', 'Meera Joshi', 'Aisha Khan', 'Fatima Sheikh',
-    'Sana Ansari', 'Zoya Siddiqui', 'Harpreet Gill', 'Gurpreet Sandhu', 'Jaspreet Brar',
-    'Shruti Patil', 'Komal Deshmukh', 'Bhavna Chavan', 'Priti Kulkarni', 'Radhika Menon',
-    'Vaishnavi Pawar', 'Ishita Sharma', 'Tanvi More', 'Sakshi Jadhav', 'Nikita Rao',
-    'Sonali Gaikwad', 'Ankita Bhosale', 'Mansi Trivedi', 'Reema Shah', 'Monika Agarwal',
-    'Khushi Gupta', 'Muskan Yadav', 'Palak Jain', 'Heena Khan', 'Alisha Kapoor'
+    // South India (AP, Telangana, Karnataka, Kerala, TN)
+    'Sai Reddy', 'Venkatesh Naidu', 'Karthik Rao', 'Srinivas Reddy', 'Lakshmi Reddy',
+    'Keerthana Naidu', 'Anusha Rao', 'Divya Reddy', 'Naveen Gowda', 'Harish Shetty',
+    'Vinay Hegde', 'Pradeep Rao', 'Aishwarya Gowda', 'Kavya Shetty', 'Deepa Hegde',
+    'Nisha Rao', 'Arjun Nair', 'Suresh Menon', 'Rahul Pillai', 'Anand Varma',
+    'Meera Nair', 'Anjali Menon', 'Lakshmi Pillai', 'Arya Varma', 'Karthik Iyer',
+    'Arvind Subramanian', 'Balaji Krishnan', 'Ananya Iyer', 'Nandhini Subramanian', 'Priya Krishnan',
+    'Ravi Goud', 'Mahesh Naidu', 'Keerthi Reddy', 'Sneha Goud', 'Divya Naidu',
+    // North India (UP, Bihar, Haryana, HP, Punjab, Rajasthan, Uttarakhand)
+    'Aarav Sharma', 'Abhishek Pandey', 'Vivek Tripathi', 'Priya Sharma', 'Neha Pandey',
+    'Swati Tripathi', 'Rahul Kumar', 'Amit Singh', 'Deepak Yadav', 'Manish Jha',
+    'Priya Kumari', 'Neha Singh', 'Pooja Jha', 'Rani Devi', 'Mohit Malik',
+    'Deepak Dahiya', 'Rahul Hooda', 'Komal Malik', 'Priya Dahiya', 'Neha Hooda',
+    'Rohit Thakur', 'Pankaj Chauhan', 'Anil Negi', 'Pooja Thakur', 'Neha Chauhan',
+    'Shalini Negi', 'Gurpreet Singh', 'Harpreet Gill', 'Navdeep Sandhu', 'Simran Kaur',
+    'Harleen Gill', 'Gurleen Sandhu', 'Mahendra Rathore', 'Vikram Singh', 'Gajendra Shekhawat',
+    'Kavita Rathore', 'Rekha Shekhawat', 'Pooja Choudhary', 'Mohit Rawat', 'Deepak Bisht',
+    'Pankaj Negi', 'Pooja Rawat', 'Anjali Bisht', 'Neha Negi',
+    // West India & Central (Gujarat, Maharashtra, Goa, MP, Chhattisgarh)
+    'Dhruv Patel', 'Nirav Shah', 'Hardik Mehta', 'Jay Thakkar', 'Khushi Patel',
+    'Riya Shah', 'Hetal Mehta', 'Jinal Thakkar', 'Prathamesh Patil', 'Omkar Shinde',
+    'Sagar Jadhav', 'Rohit Chavan', 'Prajakta Patil', 'Snehal Shinde', 'Rutuja Jadhav',
+    'Sonali Chavan', "Ryan D'Souza", 'Kevin Fernandes', 'Melroy Rodrigues', "Alisha D'Souza",
+    'Maria Fernandes', 'Natasha Rodrigues', 'Rajesh Mishra', 'Amit Tiwari', 'Sandeep Chouhan',
+    'Swati Mishra', 'Neha Tiwari', 'Pooja Chouhan', 'Ankit Verma', 'Rajesh Sahu',
+    'Dinesh Patel', 'Aarti Verma', 'Poonam Sahu', 'Neha Patel',
+    // East India (WB, Odisha, Jharkhand)
+    'Soumik Chatterjee', 'Anirban Banerjee', 'Sayan Mukherjee', 'Moumita Chatterjee', 'Priyanka Banerjee',
+    'Debolina Mukherjee', 'Subham Mohanty', 'Debasis Sahu', 'Satyajit Das', 'Lipika Mohanty',
+    'Sasmita Sahu', 'Priyanka Das', 'Rakesh Mahato', 'Sunil Oraon', 'Deepak Soren',
+    'Anita Mahato', 'Priyanka Oraon', 'Riya Soren',
+    // Northeast (Assam, Arunachal, Manipur, Meghalaya, Mizoram, Nagaland, Sikkim, Tripura)
+    'Rohan Gogoi', 'Rupam Das', 'Abhijit Bora', 'Pranjal Deka', 'Priyanka Gogoi',
+    'Nabanita Das', 'Riya Bora', 'Monalisa Deka', 'Tashi Tsering', 'Dorjee Wangchu',
+    'Karma Bhutia', 'Pema Dolma', 'Choden Bhutia', 'Sonam Tsering', 'Ningthoujam Rajen',
+    'Khumanthem Dev', 'Chanu Devi', 'Ningol Rani', 'Banri Khongwir', 'Ribok Lyngdoh',
+    'Merisha Khongwir', 'Elina Lyngdoh', 'Lalrinmawia', 'C. Lalhmingmawia', 'Lalhriatpuii',
+    'Vanlalruati', 'Imkong Jamir', 'Ketho Zhimomi', 'Aienla Jamir', 'Keneituo Zhimomi',
+    'Tenzing Lepcha', 'Sonam Bhutia', 'Pema Lepcha', 'Dolma Bhutia', 'Biplab Debbarma',
+    'Arindam Das', 'Rima Debbarma', 'Mousumi Das',
+    // UTs & Extras (Delhi, Chandigarh, J&K, Ladakh, Lakshadweep, Puducherry, Dadra, Andaman)
+    'Priya Gupta', 'Aamir Bhat', 'Zoya Bhat', 'Tsering Namgyal', 'Dolma Angmo',
+    'Sameer Koya', 'Amina Koya', 'Arvind Pillai', 'Meera Pillai', 'Rohan Patel',
+    'Rahul Das', 'Priya Das'
   ],
   US: [
     'Liam Smith', 'Emma Johnson', 'Noah Williams', 'Olivia Jones', 'William Brown',
