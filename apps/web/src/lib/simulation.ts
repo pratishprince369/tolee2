@@ -140,12 +140,99 @@ const MOCK_AVATARS = [
   'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80',
 ];
 
-const MOCK_VIDEOS = [
-  'https://assets.mixkit.co/videos/preview/mixkit-keyboard-typing-in-a-dark-room-41981-large.mp4',
-  'https://assets.mixkit.co/videos/preview/mixkit-holding-and-using-a-smartphone-41983-large.mp4',
-  'https://assets.mixkit.co/videos/preview/mixkit-business-team-in-a-meeting-room-40502-large.mp4',
-  'https://assets.mixkit.co/videos/preview/mixkit-man-working-on-his-laptop-in-a-cafe-40285-large.mp4',
+const FALLBACK_PIXABAY_VIDEOS = [
+  'https://cdn.pixabay.com/video/2021/08/04/83896-584732159_large.mp4',
+  'https://cdn.pixabay.com/video/2020/05/11/38600-418859942_large.mp4',
+  'https://cdn.pixabay.com/video/2021/11/04/93557-641566898_large.mp4',
+  'https://cdn.pixabay.com/video/2022/01/18/104762-663884392_large.mp4',
+  'https://cdn.pixabay.com/video/2022/03/17/111082-689369974_large.mp4',
+  'https://cdn.pixabay.com/video/2023/10/22/186071-877209700_large.mp4',
+  'https://cdn.pixabay.com/video/2023/04/28/160759-821731671_large.mp4',
+  'https://cdn.pixabay.com/video/2020/03/09/33364-396556101_large.mp4',
+  'https://cdn.pixabay.com/video/2021/09/24/89445-607871680_large.mp4',
+  'https://cdn.pixabay.com/video/2022/09/04/130128-746356763_large.mp4',
+  'https://cdn.pixabay.com/video/2023/08/11/175546-853372224_large.mp4',
+  'https://cdn.pixabay.com/video/2021/04/20/71746-540191834_large.mp4'
 ];
+
+// Global in-memory cache for Pixabay video URLs mapped by query
+const cachedPixabayVideos: Record<string, string[]> = {};
+const isFetchingPixabay: Record<string, boolean> = {};
+
+// Maps local simulation category key to search query
+export function getPixabayQueryForCategory(category: string): string {
+  const norm = category.toLowerCase().trim();
+  if (norm.includes('tech') || norm.includes('developer') || norm.includes('coding')) {
+    return 'programming computer technology office';
+  }
+  if (norm.includes('money') || norm.includes('business') || norm.includes('finance') || norm.includes('invest') || norm.includes('property')) {
+    return 'business money finance startup';
+  }
+  if (norm.includes('health') || norm.includes('doctor') || norm.includes('medical') || norm.includes('fit') || norm.includes('gym')) {
+    return 'fitness workout gym yoga';
+  }
+  return 'nature travel city landscape';
+}
+
+/**
+ * Asynchronously fetches video lists from Pixabay in the background.
+ * Updates cachedPixabayVideos for the specific category query.
+ */
+export function fetchPixabayVideosInBackground(category: string): void {
+  const apiKey = process.env.PIXABAY_API_KEY;
+  if (!apiKey || apiKey.trim() === 'your-pixabay-api-key' || apiKey.trim() === '') {
+    return;
+  }
+
+  const query = getPixabayQueryForCategory(category);
+  
+  // Return if already fetched or currently fetching
+  if (cachedPixabayVideos[query] && cachedPixabayVideos[query].length > 0) return;
+  if (isFetchingPixabay[query]) return;
+
+  isFetchingPixabay[query] = true;
+  console.log(`[Pixabay Simulation] Triggering background video fetch for category "${category}" (query: "${query}")...`);
+
+  // Run the fetch in background asynchronously without blocking the request flow
+  fetch(
+    `https://pixabay.com/api/videos/?key=${apiKey}&q=${encodeURIComponent(query)}&per_page=30&safesearch=true&video_type=all`
+  )
+    .then((res) => {
+      if (!res.ok) {
+        throw new Error(`Pixabay API responded with status ${res.status}`);
+      }
+      return res.json();
+    })
+    .then((data: any) => {
+      if (data && Array.isArray(data.hits)) {
+        const urls: string[] = [];
+        for (const hit of data.hits) {
+          const videosObj = hit.videos;
+          const directUrl =
+            videosObj?.medium?.url ||
+            videosObj?.small?.url ||
+            videosObj?.large?.url ||
+            videosObj?.tiny?.url;
+            
+          if (directUrl && typeof directUrl === 'string') {
+            urls.push(directUrl);
+          }
+        }
+        if (urls.length > 0) {
+          cachedPixabayVideos[query] = urls;
+          console.log(`[Pixabay Simulation] Successfully cached ${urls.length} video URLs for query: "${query}".`);
+        } else {
+          console.warn(`[Pixabay Simulation] Pixabay search returned 0 video hits for query: "${query}".`);
+        }
+      }
+    })
+    .catch((err) => {
+      console.error(`[Pixabay Simulation] Failed to fetch videos for query "${query}":`, err);
+    })
+    .finally(() => {
+      isFetchingPixabay[query] = false;
+    });
+}
 
 // Country-specific simulated comments pools
 const MOCK_COMMENTS_BY_COUNTRY: Record<string, string[]> = {
@@ -202,7 +289,7 @@ const CATEGORY_TEMPLATES_BY_COUNTRY: Record<string, Record<string, {
         'https://images.unsplash.com/photo-1515378791036-0648a3ef77b2?w=800&auto=format&fit=crop&q=80',
         'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800&auto=format&fit=crop&q=80'
       ],
-      videos: MOCK_VIDEOS,
+      videos: FALLBACK_PIXABAY_VIDEOS,
       polls: [
         { question: "Next project ke liye kaun sa tech select karein?", options: ["Node.js / TS", "Python / Fast API", "Go Lang", "Rust"] },
         { question: "React project me state kaise manage karte ho?", options: ["Zustand", "Redux Toolkit", "Context API", "Jotai / signals"] }
@@ -232,7 +319,7 @@ const CATEGORY_TEMPLATES_BY_COUNTRY: Record<string, Record<string, {
         'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&auto=format&fit=crop&q=80',
         'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=800&auto=format&fit=crop&q=80'
       ],
-      videos: MOCK_VIDEOS,
+      videos: FALLBACK_PIXABAY_VIDEOS,
       polls: [
         { question: "Aapke according best investment option kaun sa hai?", options: ["Mutual Funds / Stocks", "Real Estate / Land", "Gold / Bonds", "Crypto / Startups"] },
         { question: "Monthly savings target kitna hona chahiye?", options: ["10% - 20%", "20% - 40%", "40%+", "No target, spend first"] }
@@ -261,7 +348,7 @@ const CATEGORY_TEMPLATES_BY_COUNTRY: Record<string, Record<string, {
         'https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=800&auto=format&fit=crop&q=80',
         'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=800&auto=format&fit=crop&q=80'
       ],
-      videos: MOCK_VIDEOS,
+      videos: FALLBACK_PIXABAY_VIDEOS,
       polls: [
         { question: "Aapki physical activity main routine kya hai?", options: ["Weight Training", "Running / Yoga", "Swimming / Sports", "Sedentary lifestyle"] },
         { question: "Diet preference kya hai aapki?", options: ["Pure Vegetarian", "Balanced Non-Veg", "Vegan / Keto", "No diet control"] }
@@ -291,7 +378,7 @@ const CATEGORY_TEMPLATES_BY_COUNTRY: Record<string, Record<string, {
         'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=800&auto=format&fit=crop&q=80',
         'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800&auto=format&fit=crop&q=80'
       ],
-      videos: MOCK_VIDEOS,
+      videos: FALLBACK_PIXABAY_VIDEOS,
       polls: [
         { question: "Chai or Coffee during monsoon?", options: ["Chai ☕", "Filter Coffee ☕", "Cold Coffee", "Water only"] },
         { question: "Weekend plan kya hai?", options: ["Travel / Outing", "Netflix & Chill", "Pending work", "Sleep all day"] }
@@ -323,7 +410,7 @@ const CATEGORY_TEMPLATES_BY_COUNTRY: Record<string, Record<string, {
         'https://images.unsplash.com/photo-1515378791036-0648a3ef77b2?w=800&auto=format&fit=crop&q=80',
         'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800&auto=format&fit=crop&q=80'
       ],
-      videos: MOCK_VIDEOS,
+      videos: FALLBACK_PIXABAY_VIDEOS,
       polls: [
         { question: "What is your primary backend language of choice?", options: ["Node.js / TS", "Python", "Go", "Rust"] },
         { question: "How do you manage frontend state in large React apps?", options: ["Zustand", "Redux Toolkit", "Context API", "Signal / Jotai"] }
@@ -353,7 +440,7 @@ const CATEGORY_TEMPLATES_BY_COUNTRY: Record<string, Record<string, {
         'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&auto=format&fit=crop&q=80',
         'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=800&auto=format&fit=crop&q=80'
       ],
-      videos: MOCK_VIDEOS,
+      videos: FALLBACK_PIXABAY_VIDEOS,
       polls: [
         { question: "Where are you investing most of your capital right now?", options: ["Real Estate", "Mutual Funds / Stocks", "Gold / Sovereign Bonds", "Crypto / Startups"] },
         { question: "What is your main financial goal for this year?", options: ["Increase Passive Income", "Clear All Debts", "Buy Property", "Start a Business"] }
@@ -383,7 +470,7 @@ const CATEGORY_TEMPLATES_BY_COUNTRY: Record<string, Record<string, {
         'https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=800&auto=format&fit=crop&q=80',
         'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=800&auto=format&fit=crop&q=80'
       ],
-      videos: MOCK_VIDEOS,
+      videos: FALLBACK_PIXABAY_VIDEOS,
       polls: [
         { question: "What is your favorite form of physical exercise?", options: ["Weight Training", "Running / Cycling", "Yoga / Pilates", "Swimming / Sports"] },
         { question: "How many hours of sleep do you get on average?", options: ["Under 6 hours", "6 - 7 hours", "7 - 8 hours", "8+ hours"] }
@@ -413,7 +500,7 @@ const CATEGORY_TEMPLATES_BY_COUNTRY: Record<string, Record<string, {
         'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=800&auto=format&fit=crop&q=80',
         'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800&auto=format&fit=crop&q=80'
       ],
-      videos: MOCK_VIDEOS,
+      videos: FALLBACK_PIXABAY_VIDEOS,
       polls: [
         { question: "How do you plan your day?", options: ["Notion / Digital Apps", "Paper Planner / Journal", "To-Do list on sticky notes", "No planning, go with the flow"] },
         { question: "What is your favorite time of day to be productive?", options: ["Early Morning", "Afternoon", "Late Night", "Whenever inspiration strikes"] }
@@ -858,8 +945,15 @@ export function generateDynamicGroupPosts(
         mediaUrls = templates.images[postSeed % templates.images.length];
         mediaTypes = 'image';
       } else if (mediaRoll < 65) {
-        mediaUrls = templates.videos[postSeed % templates.videos.length];
         mediaTypes = 'video';
+        const query = getPixabayQueryForCategory(catKey);
+        fetchPixabayVideosInBackground(catKey);
+        const cachedList = cachedPixabayVideos[query];
+        if (cachedList && cachedList.length > 0) {
+          mediaUrls = cachedList[postSeed % cachedList.length];
+        } else {
+          mediaUrls = FALLBACK_PIXABAY_VIDEOS[postSeed % FALLBACK_PIXABAY_VIDEOS.length];
+        }
       }
     }
 
@@ -1012,9 +1106,26 @@ export async function syncSimulationData() {
     });
   }
 
+  // Trigger background pre-fetches for all categories to populate the cache
+  fetchPixabayVideosInBackground('tech');
+  fetchPixabayVideosInBackground('money');
+  fetchPixabayVideosInBackground('health');
+  fetchPixabayVideosInBackground('general');
+
+  const getSeededVideoUrl = (idx: number) => {
+    const categories = ['tech', 'money', 'health', 'general'];
+    const cat = categories[idx % categories.length];
+    const query = getPixabayQueryForCategory(cat);
+    const cachedList = cachedPixabayVideos[query];
+    if (cachedList && cachedList.length > 0) {
+      return cachedList[idx % cachedList.length];
+    }
+    return FALLBACK_PIXABAY_VIDEOS[idx % FALLBACK_PIXABAY_VIDEOS.length];
+  };
+
   for (let i = 0; i < actualReelsCount; i++) {
     const author = createdUsers[(i + 5) % createdUsers.length];
-    const mediaUrls = MOCK_VIDEOS[i % MOCK_VIDEOS.length];
+    const mediaUrls = getSeededVideoUrl(i);
     const mediaTypes = 'video';
     const caption = `🔥 simulated reel: ${CATEGORY_TEMPLATES_BY_COUNTRY.IN.general.captions[i % CATEGORY_TEMPLATES_BY_COUNTRY.IN.general.captions.length].slice(0, 30)}...`;
 
