@@ -1110,7 +1110,7 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                   Created by {tolee.admin?.name || 'Admin'}
                 </span>
                 <span className="hidden sm:inline text-gray-400">•</span>
-                <span className="flex items-center gap-1.5"><Users className="w-4 h-4" /> {tolee.membersCount} Members</span>
+                <span className="flex items-center gap-1.5"><Users className="w-4 h-4" /> {formatViewCount(tolee.membersCount || 0)} Members</span>
               </div>
             </div>
             
@@ -1308,7 +1308,7 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                         <Globe className="w-5 h-5 text-[#0a7c85]" /> {tolee.isPrivate ? 'Private' : 'Public'}
                       </div>
                       <div className="flex items-center gap-2 text-[15px] font-bold text-gray-900 dark:text-white">
-                        <Users className="w-5 h-5 text-[#0a7c85]" /> {tolee.membersCount.toLocaleString()} members
+                        <Users className="w-5 h-5 text-[#0a7c85]" /> {formatViewCount(tolee.membersCount || 0)} members
                       </div>
                       <div className="flex items-center gap-2 text-[15px] font-bold text-gray-900 dark:text-white">
                         <Bookmark className="w-5 h-5 text-[#0a7c85]" /> Free
@@ -1790,6 +1790,26 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                               <Trophy className="w-3 h-3" /> Community Win
                             </div>
                           )}
+                          {post.postType === 'poll' && (
+                            <div className="mb-2 inline-flex items-center gap-1.5 bg-purple-500/10 text-purple-600 dark:bg-purple-500/20 dark:text-purple-400 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                              📊 Community Poll
+                            </div>
+                          )}
+                          {post.postType === 'event' && (
+                            <div className="mb-2 inline-flex items-center gap-1.5 bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                              📅 Event
+                            </div>
+                          )}
+                          {post.postType === 'announcement' && (
+                            <div className="mb-2 inline-flex items-center gap-1.5 bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                              📢 Announcement
+                            </div>
+                          )}
+                          {post.postType === 'question' && (
+                            <div className="mb-2 inline-flex items-center gap-1.5 bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                              ❓ Question
+                            </div>
+                          )}
                           <p className="text-[14px] leading-snug whitespace-pre-wrap mb-2">{post.content}</p>
                           
                           {(post.mediaUrls || post.image || post.video) && (
@@ -1867,9 +1887,12 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                                 if (!currentUserId) { triggerAuthModal('Login or create an account to save posts.'); return; }
                                 handleSave(post.id); 
                               }} 
-                              className="transition-transform duration-200 active:scale-125 focus:outline-none text-gray-700 dark:text-gray-300 hover:text-yellow-500"
+                              className="flex items-center gap-1 transition-transform duration-200 active:scale-125 focus:outline-none text-gray-700 dark:text-gray-300 hover:text-yellow-500"
                             >
                               <Bookmark className={`w-6 h-6 transition-colors ${post.savedByMe ? 'fill-black dark:fill-white text-black dark:text-white' : 'fill-transparent'}`} />
+                              {(post.savesCount || 0) > 0 && (
+                                <span className="text-[13px] font-semibold">{formatViewCount(post.savesCount)}</span>
+                              )}
                             </button>
                           </div>
   
@@ -1881,13 +1904,13 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                                 onClick={(e) => { e.stopPropagation(); openLikesModal(post.id); }} 
                                 className="cursor-pointer hover:underline"
                               >
-                                {post.likes} {post.likes === 1 ? 'like' : 'likes'}
+                                {formatViewCount(post.likes)} {post.likes === 1 ? 'like' : 'likes'}
                               </span>
                               <span className="text-gray-500 font-medium">
                                 {formatViewCount(post.views || 0)} {post.views === 1 ? 'view' : 'views'}
                               </span>
                               <span className="text-gray-500 font-medium">
-                                {post.shareCount || 0} {post.shareCount === 1 ? 'share' : 'shares'}
+                                {formatViewCount(post.shareCount || 0)} {post.shareCount === 1 ? 'share' : 'shares'}
                               </span>
                             </div>
                             {post.reposts > 0 && (
@@ -1895,7 +1918,7 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                                 onClick={(e) => { e.stopPropagation(); openRepostsModal(post.id); }}
                                 className="text-[12px] text-gray-500 font-medium cursor-pointer hover:underline"
                               >
-                                {post.reposts} {post.reposts === 1 ? 'repost' : 'reposts'}
+                                {formatViewCount(post.reposts)} {post.reposts === 1 ? 'repost' : 'reposts'}
                               </span>
                             )}
                             {post.comments > 0 ? (
@@ -1903,7 +1926,7 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                                 className="text-[13px] text-gray-500 dark:text-gray-400 font-normal hover:underline cursor-pointer mt-0.5" 
                                 onClick={(e) => { e.stopPropagation(); openCommentsModal(post.id); }}
                               >
-                                View all {post.comments} comments
+                                View all {formatViewCount(post.comments)} comments
                               </div>
                             ) : (
                               <div 
@@ -2257,11 +2280,11 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                   {/* Stats Grid with vertical separators */}
                   <div className="grid grid-cols-3 gap-0 text-center mb-6 border border-gray-100 dark:border-gray-800 rounded-xl overflow-hidden">
                     <div className="py-3 px-2 border-r border-gray-100 dark:border-gray-800">
-                      <div className="text-xl font-bold text-gray-900 dark:text-white">{tolee.membersCount.toLocaleString()}</div>
+                      <div className="text-xl font-bold text-gray-900 dark:text-white">{formatViewCount(tolee.membersCount || 0)}</div>
                       <div className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mt-0.5">Members</div>
                     </div>
                     <div className="py-3 px-2 border-r border-gray-100 dark:border-gray-800">
-                      <div className="text-xl font-bold text-[#0a7c85]">{(tolee.membersCount > 5 ? Math.floor(tolee.membersCount * 0.1) : 1)}</div>
+                      <div className="text-xl font-bold text-[#0a7c85]">{formatViewCount(tolee.membersCount > 5 ? Math.floor(tolee.membersCount * 0.1) : 1)}</div>
                       <div className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mt-0.5">Online</div>
                     </div>
                     <div className="py-3 px-2">

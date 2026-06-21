@@ -8,7 +8,7 @@ import { extractPublicIdFromUrl, extractResourceTypeFromUrl, destroyAsset } from
 import { createSystemNotification, createSystemNotificationsMany } from '@/lib/notification-service';
 import { writeLimiter, getClientIp } from '@/lib/rate-limit';
 import { sanitizeText } from '@/lib/sanitize';
-import { getSimulationSettings, getGroupMemberCount, getSimulatedEngagement } from '@/lib/simulation';
+import { getSimulationSettings, getGroupMemberCount, getSimulatedEngagement, generateDynamicGroupPosts } from '@/lib/simulation';
 
 
 export async function getTolees() {
@@ -188,32 +188,32 @@ export async function getToleeBySlug(slug: string) {
       const realCount = tolee._count?.members || 0;
       const count = getGroupMemberCount(tolee.id, tolee.name, realCount, isSimOn, simSettings.minGroupMembers, simSettings.maxGroupMembers);
 
-      const mappedPosts = tolee.posts.map((p: any) => {
-        if (p.post.isSimulation) {
-          const eng = getSimulatedEngagement(
-            p.post.id,
-            simSettings.minLikes,
-            simSettings.maxLikes,
-            simSettings.minComments,
-            simSettings.maxComments,
-            simSettings.minViews,
-            simSettings.maxViews
-          );
-          return {
-            ...p,
-            post: {
-              ...p.post,
-              _count: {
-                likes: eng.likes,
-                comments: eng.comments,
-                reposts: p.post._count?.reposts || eng.shares,
-                views: eng.views,
+      let mappedPosts = tolee.posts;
+      if (isSimOn) {
+        const category = (tolee as any).category || 'General';
+        mappedPosts = generateDynamicGroupPosts(tolee.id, tolee.name, category, tolee.posts);
+        
+        mappedPosts = mappedPosts.map((p: any) => {
+          if (!p.post.isSimulation) {
+            const eng = getSimulatedEngagement(p.post.id);
+            return {
+              ...p,
+              post: {
+                ...p.post,
+                savesCount: eng.saves,
+                _count: {
+                  likes: eng.likes,
+                  comments: eng.comments,
+                  reposts: p.post._count?.reposts || eng.shares,
+                  views: eng.views,
+                  saves: eng.saves
+                }
               }
-            }
-          };
-        }
-        return p;
-      });
+            };
+          }
+          return p;
+        });
+      }
 
       return {
         success: true,

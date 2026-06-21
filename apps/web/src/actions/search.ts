@@ -333,15 +333,7 @@ export async function performSearch(
         extra: `${p.ocrText || ''} ${p.audioTranscript || ''} ${p.location || ''}`
       });
 
-      const eng = p.isSimulation ? getSimulatedEngagement(
-        p.id,
-        simSettings.minLikes,
-        simSettings.maxLikes,
-        simSettings.minComments,
-        simSettings.maxComments,
-        simSettings.minViews,
-        simSettings.maxViews
-      ) : null;
+      const eng = isSimOn ? getSimulatedEngagement(p.id) : null;
 
       results.push({
         id: p.id,
@@ -360,7 +352,7 @@ export async function performSearch(
           isVerified: p.author.isVerified,
           likesCount: eng ? eng.likes : (p.likes?.length || 0),
           commentsCount: eng ? eng.comments : (p.comments?.length || 0),
-          savesCount: eng ? eng.shares : (p.savedBy?.length || 0),
+          savesCount: eng ? eng.saves : (p.savedBy?.length || 0),
           viewsCount: eng ? eng.views : (p.views?.length || 0)
         }
       });

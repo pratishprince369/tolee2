@@ -11,6 +11,7 @@ import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { MapPin, Users, Shield, Loader2, Check, Search, Sparkles, Lock, ArrowRight, Globe, Zap, TrendingUp, UserPlus, LogIn, LayoutGrid, ShoppingBag, Briefcase, GraduationCap, Home, MoreHorizontal } from 'lucide-react';
 import { joinTolee } from '@/actions/tolee';
 import { triggerAuthModal } from '@/components/AuthModal';
+import { formatViewCount } from '@/lib/utils';
 
 const categories = [
   { name: 'All', icon: '🌐' },
@@ -234,7 +235,7 @@ export function DiscoverGrid({ initialTolees, tolees: propTolees, isAuthenticate
                     {/* Stats & Join Footer Row */}
                     <div className="flex items-center justify-between mt-auto pt-3 border-t border-gray-100 dark:border-zinc-800/80 w-full gap-2">
                       <div className="text-xs text-gray-500 dark:text-gray-400 font-bold truncate flex items-center gap-1 select-none">
-                        <span>{tolee.members.toLocaleString()} Members</span>
+                        <span>{formatViewCount(tolee.members)} Members</span>
                         <span className="text-gray-300 dark:text-zinc-750">•</span>
                         <span className="text-[#0a7c85] dark:text-[#1299a3]">{tolee.price === 'Free' ? 'Free' : tolee.price}</span>
                       </div>

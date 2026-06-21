@@ -8,7 +8,7 @@ import { headers } from 'next/headers';
 import { getOrCreatePersonalChat } from './chat';
 import { extractPublicIdFromUrl, extractResourceTypeFromUrl, destroyMultipleAssets } from '@/lib/cloudinary-cleanup';
 import { createSystemNotification, createSystemNotificationsMany } from '@/lib/notification-service';
-import { getSimulationSettings, getSimulatedEngagement } from '@/lib/simulation';
+import { getSimulationSettings, getSimulatedEngagement, generateDynamicComments } from '@/lib/simulation';
 
 export async function createPost(data: {
   content?: string;
@@ -400,23 +400,17 @@ export async function getPosts() {
     );
 
     const finalPosts = combinedPosts.map((post: any) => {
-      if (post.isSimulation) {
-        const eng = getSimulatedEngagement(
-          post.id,
-          simSettings.minLikes,
-          simSettings.maxLikes,
-          simSettings.minComments,
-          simSettings.maxComments,
-          simSettings.minViews,
-          simSettings.maxViews
-        );
+      if (isSimOn) {
+        const eng = getSimulatedEngagement(post.id);
         return {
           ...post,
+          savesCount: eng.saves,
           _count: {
             likes: eng.likes,
             comments: eng.comments,
             reposts: post._count?.reposts || eng.shares,
             views: eng.views,
+            saves: eng.saves
           },
         };
       }
@@ -561,7 +555,7 @@ export async function getComments(postId: string) {
     const simSettings = await getSimulationSettings();
     const isSimOn = simSettings.simulationMode;
 
-    const comments = await prisma.comment.findMany({
+    let comments = await prisma.comment.findMany({
       where: {
         postId,
         ...(!isSimOn ? { isSimulation: false } : {})
@@ -578,6 +572,16 @@ export async function getComments(postId: string) {
       },
       orderBy: { createdAt: 'desc' }
     });
+
+    if (isSimOn) {
+      const eng = getSimulatedEngagement(postId);
+      // Generate comments corresponding to the engagement distribution
+      const simComments = generateDynamicComments(postId, Math.min(eng.comments, 15));
+      comments = [...comments, ...simComments].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+    }
+
     return { success: true, comments };
   } catch (error) {
     console.error("Error fetching comments:", error);
@@ -1627,15 +1631,7 @@ export async function getReels(skip = 0, take = 20) {
 
       const hasActiveStory = authorsWithActiveStories.includes(post.author.id);
       
-      const eng = post.isSimulation ? getSimulatedEngagement(
-        post.id,
-        simSettings.minLikes,
-        simSettings.maxLikes,
-        simSettings.minComments,
-        simSettings.maxComments,
-        simSettings.minViews,
-        simSettings.maxViews
-      ) : null;
+      const eng = isSimOn ? getSimulatedEngagement(post.id) : null;
 
       return {
         id: post.id,

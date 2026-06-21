@@ -1795,6 +1795,26 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                           <Trophy className="w-3 h-3" /> Tolee Win
                         </div>
                       )}
+                      {post.postType === 'poll' && (
+                        <div className="mb-2.5 px-5 inline-flex items-center gap-1.5 bg-purple-500/10 text-purple-600 dark:bg-purple-500/20 dark:text-purple-400 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                          📊 Community Poll
+                        </div>
+                      )}
+                      {post.postType === 'event' && (
+                        <div className="mb-2.5 px-5 inline-flex items-center gap-1.5 bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                          📅 Event
+                        </div>
+                      )}
+                      {post.postType === 'announcement' && (
+                        <div className="mb-2.5 px-5 inline-flex items-center gap-1.5 bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                          📢 Announcement
+                        </div>
+                      )}
+                      {post.postType === 'question' && (
+                        <div className="mb-2.5 px-5 inline-flex items-center gap-1.5 bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                          ❓ Question
+                        </div>
+                      )}
                       <p className="text-[14.5px] leading-snug text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap mb-3 px-5">{post.content}</p>
                       
                       {(post.mediaUrls || post.image || post.video) && (
@@ -1821,7 +1841,7 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                             className={`flex items-center gap-1.5 transition-all duration-200 active:scale-110 focus:outline-none ${post.likedByMe ? 'text-red-500' : 'text-zinc-600 dark:text-zinc-400 hover:text-red-500'}`}
                           >
                             <Heart strokeWidth={1.5} className={`w-[22px] h-[22px] transition-colors ${post.likedByMe ? 'fill-red-500 stroke-red-500' : 'fill-transparent'}`} />
-                            <span className="text-[13px] font-semibold">{post.likes > 0 ? post.likes.toLocaleString() : '0'}</span>
+                            <span className="text-[13px] font-semibold">{post.likes > 0 ? formatViewCount(post.likes) : '0'}</span>
                           </button>
 
                           {/* 2. Comment Icon + Count */}
@@ -1830,7 +1850,7 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                             className="flex items-center gap-1.5 text-zinc-600 dark:text-zinc-400 hover:text-blue-500 transition-all duration-200 active:scale-110 focus:outline-none"
                           >
                             <MessageCircle strokeWidth={1.5} className="w-[22px] h-[22px] fill-transparent" />
-                            <span className="text-[13px] font-semibold">{post.comments > 0 ? post.comments.toLocaleString() : '0'}</span>
+                            <span className="text-[13px] font-semibold">{post.comments > 0 ? formatViewCount(post.comments) : '0'}</span>
                           </button>
 
                           {/* 3. Reshare Icon + Count */}
@@ -1843,7 +1863,7 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                             className={`flex items-center gap-1.5 transition-all duration-200 active:scale-110 focus:outline-none ${post.repostedByMe ? 'text-green-500' : 'text-zinc-600 dark:text-zinc-400 hover:text-green-500'}`}
                           >
                             <Repeat strokeWidth={1.5} className={`w-[22px] h-[22px] transition-colors ${post.repostedByMe ? 'text-green-500' : ''}`} />
-                            <span className="text-[13px] font-semibold">{post.reposts > 0 ? post.reposts.toLocaleString() : '0'}</span>
+                            <span className="text-[13px] font-semibold">{post.reposts > 0 ? formatViewCount(post.reposts) : '0'}</span>
                           </button>
 
                           {/* 4. Share Icon + Count */}
@@ -1856,7 +1876,7 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                             className="flex items-center gap-1.5 text-zinc-600 dark:text-zinc-400 hover:text-primary dark:hover:text-white transition-all duration-200 active:scale-110 focus:outline-none"
                           >
                             <Send strokeWidth={1.5} className="w-[22px] h-[22px] fill-transparent" />
-                            <span className="text-[13px] font-semibold">{(post.shareCount || 0) > 0 ? (post.shareCount || 0).toLocaleString() : '0'}</span>
+                            <span className="text-[13px] font-semibold">{(post.shareCount || 0) > 0 ? formatViewCount(post.shareCount) : '0'}</span>
                           </button>
 
                         </div>
@@ -1895,9 +1915,12 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                           {/* Bookmark */}
                           <button
                             onClick={(e) => { e.stopPropagation(); handleSave(post.id); }}
-                            className="transition-all duration-200 active:scale-125 focus:outline-none text-zinc-600 dark:text-zinc-400 hover:text-yellow-500"
+                            className="flex items-center gap-1 transition-all duration-200 active:scale-125 focus:outline-none text-zinc-600 dark:text-zinc-400 hover:text-yellow-500"
                           >
                             <Bookmark strokeWidth={1.5} className={`w-[22px] h-[22px] transition-colors ${post.savedByMe ? 'fill-primary dark:fill-white text-primary dark:text-white' : 'fill-transparent'}`} />
+                            {(post.savesCount || 0) > 0 && (
+                              <span className="text-[13px] font-semibold">{formatViewCount(post.savesCount)}</span>
+                            )}
                           </button>
                         </div>
                       </div>

@@ -181,6 +181,7 @@ export default async function ToleePage({ params }: { params: { slug: string } }
         savedByMe,
         repostedByMe,
         resharedByUser,
+        savesCount: p.post.savesCount || p.post._count?.saves || p.post.savedBy?.length || 0,
         createdAt: p.post.createdAt
       };
     }),
