@@ -1,31 +1,65 @@
 import { prisma } from '@/lib/prisma';
+import { headers } from 'next/headers';
 
-// Curated high-quality mock data assets for realistic simulation
-const MOCK_AVATARS = [
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80',
-];
+// Country-specific simulated names
+const MOCK_NAMES_BY_COUNTRY: Record<string, string[]> = {
+  IN: [
+    'Aarav Sharma', 'Ananya Iyer', 'Vihaan Patel', 'Diya Nair', 'Kabir Mehta',
+    'Ishaan Roy', 'Aanya Gupta', 'Rohan Sen', 'Kavya Reddy', 'Aditya Deshmukh',
+    'Siddharth Joshi', 'Meera Rao', 'Neha Verma', 'Arjun Malhotra', 'Priya Kapoor',
+    'Rahul Bhatia', 'Riya Saxena', 'Karan Johar', 'Shreya Ghoshal', 'Vikram Seth',
+    'Tanvi Hegde', 'Amit Trivedi', 'Sneha Paul', 'Devendra Fadnavis', 'Sunita Rao'
+  ],
+  US: [
+    'Liam Smith', 'Emma Johnson', 'Noah Williams', 'Olivia Jones', 'William Brown',
+    'Sophia Davis', 'James Miller', 'Isabella Wilson', 'Oliver Moore', 'Charlotte Taylor',
+    'Benjamin Anderson', 'Amelia Thomas', 'Lucas Jackson', 'Mia White', 'Henry Harris'
+  ],
+  AE: [
+    'Zayed Al Mansouri', 'Fatima Al Hashimi', 'Ahmed Al Maktoum', 'Maryam Al Falasi',
+    'Omar Al Suwaidi', 'Aisha Al Qassimi', 'Ali Al Shehhi', 'Reem Al Nuaimi',
+    'Khalid Al Hosani', 'Latifa Al Marzooqi', 'Mohammed Al Jaber', 'Sarah Al Mulla'
+  ],
+  GB: [
+    'Oliver Smith', 'Olivia Jones', 'George Taylor', 'Amelia Brown', 'Harry Williams',
+    'Isla Wilson', 'Jack Davies', 'Emily Evans', 'Charlie Thomas', 'Jessica Roberts',
+    'Thomas Johnson', 'Lily Macdonald'
+  ],
+  CA: [
+    'Liam Tremblay', 'Olivia Roy', 'Noah Gagnon', 'Emma Macdonald', 'Jackson Campbell',
+    'Charlotte Smith', 'Lucas Leblanc', 'Sophia Stewart', 'Benjamin Bouchard', 'Chloe Morin'
+  ],
+  OTHER: [
+    'Alex Mercer', 'Elena Rostova', 'Yuki Tanaka', 'Hans Mueller', 'Luca Rossi',
+    'Sofia Gomez', 'Carlos Silva', 'Anna Dubois', 'David Kim', 'Zoe Chen'
+  ]
+};
 
-const MOCK_NAMES = [
-  'Aarav Sharma', 'Ananya Iyer', 'Vihaan Patel', 'Diya Nair', 'Kabir Mehta',
-  'Ishaan Roy', 'Aanya Gupta', 'Rohan Sen', 'Kavya Reddy', 'Aditya Deshmukh',
-  'Siddharth Joshi', 'Meera Rao', 'Neha Verma', 'Arjun Malhotra', 'Priya Kapoor',
-  'Rahul Bhatia', 'Riya Saxena', 'Karan Johar', 'Shreya Ghoshal', 'Vikram Seth',
-  'Tanvi Hegde', 'Amit Trivedi', 'Sneha Paul', 'Devendra Fadnavis', 'Sunita Rao'
-];
+// Country-specific simulated cities
+const MOCK_CITIES_BY_COUNTRY: Record<string, string[]> = {
+  IN: [
+    'Mumbai, Maharashtra', 'Bangalore, Karnataka', 'Pune, Maharashtra',
+    'Delhi NCR', 'Hyderabad, Telangana', 'Chennai, Tamil Nadu', 'Kolkata, West Bengal',
+    'Ahmedabad, Gujarat', 'Jaipur, Rajasthan', 'Lucknow, Uttar Pradesh',
+    'Nagpur, Maharashtra', 'Indore, Madhya Pradesh', 'Surat, Gujarat'
+  ],
+  US: [
+    'New York, NY', 'San Francisco, CA', 'Los Angeles, CA', 'Chicago, IL',
+    'Seattle, WA', 'Boston, MA', 'Austin, TX', 'Miami, FL'
+  ],
+  AE: [
+    'Dubai, UAE', 'Abu Dhabi, UAE', 'Sharjah, UAE', 'Al Ain, UAE'
+  ],
+  GB: [
+    'London, UK', 'Manchester, UK', 'Birmingham, UK', 'Edinburgh, UK', 'Glasgow, UK'
+  ],
+  CA: [
+    'Toronto, ON', 'Vancouver, BC', 'Montreal, QC', 'Calgary, AB', 'Ottawa, ON'
+  ],
+  OTHER: [
+    'Sydney, Australia', 'Singapore', 'Berlin, Germany', 'Paris, France', 'Tokyo, Japan'
+  ]
+};
 
 const MOCK_PROFESSIONS = [
   'UX Designer', 'Software Engineer', 'Startup Founder', 'Digital Marketer',
@@ -49,9 +83,22 @@ const MOCK_BIOS = [
   'Living life in full resolution.',
 ];
 
-const MOCK_LOCATIONS = [
-  'Mumbai, Maharashtra', 'Bangalore, Karnataka', 'Pune, Maharashtra',
-  'Delhi NCR', 'Hyderabad, Telangana', 'Chennai, Tamil Nadu', 'Kolkata, West Bengal'
+const MOCK_AVATARS = [
+  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=150&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=150&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80',
 ];
 
 const MOCK_VIDEOS = [
@@ -61,30 +108,316 @@ const MOCK_VIDEOS = [
   'https://assets.mixkit.co/videos/preview/mixkit-man-working-on-his-laptop-in-a-cafe-40285-large.mp4',
 ];
 
-const MOCK_COMMENTS = [
-  'This is super helpful, thanks for sharing!',
-  'Absolutely spot on. Consistency makes all the difference.',
-  'Love the layout! What font did you use here?',
-  'Incredible shot. Definitely adding this location to my list.',
-  'Let’s connect! I am building a startup in a similar space.',
-  'Amazing work! Keep pushing.',
-  'Well written. Couldn’t agree more.',
-  'Wow, this is so clean! Great setup.',
-  'Very inspiring! 🔥',
-  'Thanks for the motivation this morning.',
-];
+// Country-specific simulated comments pools
+const MOCK_COMMENTS_BY_COUNTRY: Record<string, string[]> = {
+  IN: [
+    'Bhai mast hai ❤️', 'Kya baat hai 🔥', 'Bilkul sahi bola.', 'Amazing yaar.',
+    'Nice post.', 'Keep growing.', 'Bahut badhiya.', 'Super content 👏',
+    'Ye information useful thi.', 'Thanks for sharing.', 'Loved this.', 'Very useful.',
+    'Sahi baat hai, full agreement 👍', 'Outstanding information!', 'Ji bilkul sahi 💯'
+  ],
+  US: [
+    'Awesome post!', 'Love this advice.', 'Very helpful, thanks!', 'Great setup.',
+    'Spot on!', 'Definitely trying this.', 'Amazing work!', 'Thanks for sharing.',
+    'Keep it up!', 'Very insightful.', 'Perfect breakdown! 👍', 'Highly recommended.'
+  ],
+  AE: [
+    'Brilliant share! 👏', 'Stunning setup.', 'Very useful info.', 'Spot on advice.',
+    'Love this! 👍', 'Thanks for sharing.', 'Great content.', 'Keep growing.',
+    'Perfect representation of Dubai vibes! 🏙️✨', 'Incredible investment tip!'
+  ],
+  GB: [
+    'Splendid advice! 👏', 'Cheerio, very useful post.', 'Absolutely spot on!',
+    'Thanks for sharing, mate.', 'Brilliant content.', 'Top drawer info!', 'Perfect! 👍'
+  ],
+  CA: [
+    'Awesome post, eh! 🍁', 'Very useful tips, thanks!', 'Great content.',
+    'Spot on advice!', 'Thanks for sharing.', 'Brilliant setup!'
+  ],
+  OTHER: [
+    'Awesome post!', 'Very helpful, thanks!', 'Great setup.', 'Spot on!',
+    'Amazing work!', 'Thanks for sharing.', 'Keep it up!', 'Very insightful.'
+  ]
+};
 
-const HARDCODED_GROUPS: Record<string, number> = {
-  'mumbai business group': 2400000,
-  'startup india': 850000,
-  'real estate investors': 5500000,
-  'travel community': 120000,
-  'fitness club': 2100000,
-  'gurgaon real estate agents': 2125168,
-  'flats for rent in noida': 760594,
-  'property in dubai': 1634347,
-  'gold jewellery design': 324100,
-  'gorakhpur': 82300
+// Localized captions & content by country
+const CATEGORY_TEMPLATES_BY_COUNTRY: Record<string, Record<string, {
+  captions: string[];
+  images: string[];
+  videos: string[];
+  polls: { question: string; options: string[] }[];
+  questions: string[];
+  events: string[];
+  announcements: string[];
+}>> = {
+  IN: {
+    tech: {
+      captions: [
+        "Aaj finally office ka project complete ho gaya 😍 ready for deployment! #ux #webdev #hinglish",
+        "Is TypeScript really necessary for small projects? Kya lagta hai aapko? Let's discuss! #programming",
+        "A clean desk is a must for writing clean code! 💻☕ Naya setup built. #desksetup #developer",
+        "Top 5 SaaS growth hacks that helped us scale 40% last month. Apne business me implement karo! 🚀 #saas #marketing",
+        "Exploring WebAssembly and its performance implications for next-gen Indian web apps. #webassembly #tech"
+      ],
+      images: [
+        'https://images.unsplash.com/photo-1515378791036-0648a3ef77b2?w=800&auto=format&fit=crop&q=80',
+        'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800&auto=format&fit=crop&q=80'
+      ],
+      videos: MOCK_VIDEOS,
+      polls: [
+        { question: "Next project ke liye kaun sa tech select karein?", options: ["Node.js / TS", "Python / Fast API", "Go Lang", "Rust"] },
+        { question: "React project me state kaise manage karte ho?", options: ["Zustand", "Redux Toolkit", "Context API", "Jotai / signals"] }
+      ],
+      questions: [
+        "Indian tech market me developer salaries ke trends kaise chal rahe hain?",
+        "Next.js optimization ke liye best hacks kya hain?"
+      ],
+      events: [
+        "Friday Tech Talk: Architecting AI Agents with LLMs! Register now. 🚀",
+        "Online Hackathon: Build a collaborative tool in 48 hours. Saturday 10 AM!"
+      ],
+      announcements: [
+        "🚀 Tolee Tech community is now officially live! Let's build together.",
+        "📢 Resource library is open. Post your Hinglish guides and templates!"
+      ]
+    },
+    money: {
+      captions: [
+        "Real estate investments in Mumbai, Pune, and Bangalore are booming. Ye top areas watch karo. #investing #realestate",
+        "Business me consistency is key. Customer feedback ko ignore mat karna. #business #growth",
+        "Portfolio asset allocation kaise manage karein? sharing my personal model today. 📈 #finance #wealth",
+        "Indian startups scale up fast. 🚀 Bootstrapping or Venture funding, kya better hai? #startupindia",
+        "Sales call conversion rate improve karne ki 3 magic strategies. #sales #business"
+      ],
+      images: [
+        'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&auto=format&fit=crop&q=80',
+        'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=800&auto=format&fit=crop&q=80'
+      ],
+      videos: MOCK_VIDEOS,
+      polls: [
+        { question: "Aapke according best investment option kaun sa hai?", options: ["Mutual Funds / Stocks", "Real Estate / Land", "Gold / Bonds", "Crypto / Startups"] },
+        { question: "Monthly savings target kitna hona chahiye?", options: ["10% - 20%", "20% - 40%", "40%+", "No target, spend first"] }
+      ],
+      questions: [
+        "India me seed funding ke liye pitching kaise shuru karein?",
+        "Noida aur Gurgaon me commercial property buy karna profitable hai kya?"
+      ],
+      events: [
+        "Startup Pitch Day: Meet 10 active Indian angel investors this Wednesday!",
+        "Commercial Real Estate Wealth Masterclass: Saturday 4 PM."
+      ],
+      announcements: [
+        "📢 Mumbai Business Group just hit 2.4M members! Thank you all for joining.",
+        "🚀 Premium wealth templates section is now unlocked for all joined members!"
+      ]
+    },
+    health: {
+      captions: [
+        "Aaj gym me first day tha 💪 Pura body pain ho raha hai but feeling great. #fitness #motivation",
+        "5 simple morning habits to boost your energy levels. Try this starting tomorrow! #health #wellness",
+        "Chai kam karo, stay hydrated, and sleep at least 7 hours. Simple advice, rarely followed. #lifestyle #nutrition",
+        "Mental health is just as important as physical health. Take a break if you need it. 🧘‍♂️ #mindfulness"
+      ],
+      images: [
+        'https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=800&auto=format&fit=crop&q=80',
+        'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=800&auto=format&fit=crop&q=80'
+      ],
+      videos: MOCK_VIDEOS,
+      polls: [
+        { question: "Aapki physical activity main routine kya hai?", options: ["Weight Training", "Running / Yoga", "Swimming / Sports", "Sedentary lifestyle"] },
+        { question: "Diet preference kya hai aapki?", options: ["Pure Vegetarian", "Balanced Non-Veg", "Vegan / Keto", "No diet control"] }
+      ],
+      questions: [
+        "Consistent gym and workout schedule kaise maintain karein?",
+        "Burnout and stress handle karne ka local remedy kya hai?"
+      ],
+      events: [
+        "Live Q&A: longevity and health session with Dr. Aarav. Saturday 5 PM.",
+        "Yoga for Mindfulness & Stress Management: Sunday morning 7 AM."
+      ],
+      announcements: [
+        "📢 Welcome to the Doctors Community! Read verified rules pinned at top.",
+        "🚀 Launching weekly newsletter sharing curated healthcare tips next month!"
+      ]
+    },
+    general: {
+      captions: [
+        "Kya mast weather hai aaj ☁️ monsoon vibes in the air. #monsoon #peace",
+        "Weekend trip successful 🔥 Hilly areas hit different. #travel #peace",
+        "Cricket match ki excitement alag hi hoti hai! Who else is watching? 🏏🔥 #cricket #india",
+        "Festivals ka season shuru! Family and friends block. ✨🎉 #festivals #celebration",
+        "Local news: Traffic in Mumbai is getting worse. Roadworks are ongoing. 🏙️❤️ #mumbai"
+      ],
+      images: [
+        'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=800&auto=format&fit=crop&q=80',
+        'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800&auto=format&fit=crop&q=80'
+      ],
+      videos: MOCK_VIDEOS,
+      polls: [
+        { question: "Chai or Coffee during monsoon?", options: ["Chai ☕", "Filter Coffee ☕", "Cold Coffee", "Water only"] },
+        { question: "Weekend plan kya hai?", options: ["Travel / Outing", "Netflix & Chill", "Pending work", "Sleep all day"] }
+      ],
+      questions: [
+        "What is the single best advice you've ever received in your life?",
+        "How do you organize your digital life to avoid information overload?"
+      ],
+      events: [
+        "Goal Setting Workshop: Let's design our 2026 roadmap this Sunday!",
+        "Community Meetup: Coffee & networking. Next Friday at 6 PM."
+      ],
+      announcements: [
+        "📢 Community updates: new layout and badges are now live! Check them out.",
+        "🚀 Share your wins in the main feed. Let's celebrate our achievements!"
+      ]
+    }
+  },
+  GLOBAL: {
+    tech: {
+      captions: [
+        "Just built a beautiful Glassmorphism dashboard mockup. What do you think? #ux #webdev",
+        "Is TypeScript really necessary for small projects? Let's discuss in the comments below. #programming",
+        "A clean desk is a must for writing clean code! 💻☕ #desksetup #developer",
+        "Here are my top 5 SaaS growth hacks that helped us scale 40% last month. Check them out! 🚀 #saas #marketing",
+        "Exploring WebAssembly and its performance implications for next-gen web apps. #webassembly #tech"
+      ],
+      images: [
+        'https://images.unsplash.com/photo-1515378791036-0648a3ef77b2?w=800&auto=format&fit=crop&q=80',
+        'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800&auto=format&fit=crop&q=80'
+      ],
+      videos: MOCK_VIDEOS,
+      polls: [
+        { question: "What is your primary backend language of choice?", options: ["Node.js / TS", "Python", "Go", "Rust"] },
+        { question: "How do you manage frontend state in large React apps?", options: ["Zustand", "Redux Toolkit", "Context API", "Signal / Jotai"] }
+      ],
+      questions: [
+        "What is the single most important programming language a beginner should learn in 2026?",
+        "How do you handle error boundaries and crash reporting in Next.js applications?"
+      ],
+      events: [
+        "Friday Tech Talk: Architecting AI Agents with LLMs! Register now.",
+        "Hackathon 2026: Build a collaborative tool in 48 hours. Kickoff this Saturday at 10 AM!"
+      ],
+      announcements: [
+        "🚀 Tech community is now officially live! Let's build together.",
+        "📢 We've added a resource library channel. Post your guides and templates!"
+      ]
+    },
+    money: {
+      captions: [
+        "Real estate investments are booming. Here is a breakdown of the top areas to watch. #investing #realestate",
+        "Always invest in relationships and networking before you need them. #business #growth",
+        "How do you allocate your portfolio? Sharing my personal asset allocation model today. 📈 #finance #wealth",
+        "Bootstrapping a startup from 0 to profitable is hard, but it is the most rewarding journey. #startups #indiehacker",
+        "Mastering sales is the single most valuable skill in business. Here are 3 frameworks. #sales #business"
+      ],
+      images: [
+        'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&auto=format&fit=crop&q=80',
+        'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=800&auto=format&fit=crop&q=80'
+      ],
+      videos: MOCK_VIDEOS,
+      polls: [
+        { question: "Where are you investing most of your capital right now?", options: ["Real Estate", "Mutual Funds / Stocks", "Gold / Sovereign Bonds", "Crypto / Startups"] },
+        { question: "What is your main financial goal for this year?", options: ["Increase Passive Income", "Clear All Debts", "Buy Property", "Start a Business"] }
+      ],
+      questions: [
+        "What is the best way to get seed funding for a SaaS startup?",
+        "How do you evaluate rental yield versus capital appreciation when buying real estate?"
+      ],
+      events: [
+        "Startup Pitch Day: Meet 10 active angel investors this Wednesday!",
+        "Masterclass: Wealth building through commercial real estate. Saturday 4 PM."
+      ],
+      announcements: [
+        "📢 Group just hit a new milestone members count! Thank you all for joining.",
+        "🚀 Premium investment templates are now unlocked for all joined members!"
+      ]
+    },
+    health: {
+      captions: [
+        "5 simple morning habits to boost your energy levels and focus. #health #wellness",
+        "Consistency is key. 5 AM workouts hit different. Who else is up? 💪🔥 #fitness #motivation",
+        "Eat your greens, stay hydrated, and sleep at least 7 hours. Simple advice, rarely followed. #lifestyle #nutrition",
+        "Mental health is just as important as physical health. Take a break if you need it. 🧘‍♂️ #mindfulness",
+        "Had an amazing workout session today. Your body can stand almost anything, it is your mind you have to convince."
+      ],
+      images: [
+        'https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=800&auto=format&fit=crop&q=80',
+        'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=800&auto=format&fit=crop&q=80'
+      ],
+      videos: MOCK_VIDEOS,
+      polls: [
+        { question: "What is your favorite form of physical exercise?", options: ["Weight Training", "Running / Cycling", "Yoga / Pilates", "Swimming / Sports"] },
+        { question: "How many hours of sleep do you get on average?", options: ["Under 6 hours", "6 - 7 hours", "7 - 8 hours", "8+ hours"] }
+      ],
+      questions: [
+        "What is the best diet plan for sustained energy throughout the day?",
+        "How do you manage stress and burnout during busy work weeks?"
+      ],
+      events: [
+        "Live Q&A: longevity and health session. Saturday 5 PM.",
+        "Online Bootcamp: High-Intensity Interval Training (HIIT) session this Sunday morning."
+      ],
+      announcements: [
+        "📢 Welcome to the Doctors Community! Please read the verification rules pinned at the top.",
+        "🚀 We are launching a weekly newsletter sharing curated healthcare tips next month!"
+      ]
+    },
+    general: {
+      captions: [
+        "Had an incredible brainstorming session today with the team! Excited for what we are building. #tolee #community",
+        "Taking some time off to recharge by the lake. Nature is the best cure for burnout. 🌲🧘‍♂️ #peace #nature",
+        "Sharing some daily wisdom: consistency is more important than intensity. #motivation #quotes",
+        "An amazing view of the city skyline tonight. The city never sleeps! 🏙️❤️ #skyline",
+        "Had a wonderful conversation with a new friend today. Connect with people!"
+      ],
+      images: [
+        'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=800&auto=format&fit=crop&q=80',
+        'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800&auto=format&fit=crop&q=80'
+      ],
+      videos: MOCK_VIDEOS,
+      polls: [
+        { question: "How do you plan your day?", options: ["Notion / Digital Apps", "Paper Planner / Journal", "To-Do list on sticky notes", "No planning, go with the flow"] },
+        { question: "What is your favorite time of day to be productive?", options: ["Early Morning", "Afternoon", "Late Night", "Whenever inspiration strikes"] }
+      ],
+      questions: [
+        "What is the single best advice you've ever received in your life?",
+        "How do you organize your digital life to avoid information overload?"
+      ],
+      events: [
+        "Goal Setting Workshop: Let's design our 2026 roadmap this Sunday!",
+        "Community Meetup: Coffee & networking. Next Friday at 6 PM."
+      ],
+      announcements: [
+        "📢 Community updates: new layout and badges are now live! Check them out.",
+        "🚀 Share your wins in the main feed. Let's celebrate our achievements!"
+      ]
+    }
+  }
+};
+
+const HARDCODED_GROUPS_BY_COUNTRY: Record<string, Record<string, number>> = {
+  IN: {
+    'mumbai business group': 2400000,
+    'startup india': 850000,
+    'real estate investors': 5500000,
+    'travel community': 120000,
+    'fitness club': 2100000,
+    'gurgaon real estate agents': 2125168,
+    'flats for rent in noida': 760594,
+    'property in dubai': 1634347
+  },
+  US: {
+    'nyc startups': 320000,
+    'silicon valley developers': 850000,
+    'us real estate investors': 1200000,
+    'travel usa': 450000
+  },
+  AE: {
+    'dubai business club': 180000,
+    'dubai developers': 95000,
+    'property in dubai': 1634347,
+    'uae lifestyle': 220000
+  }
 };
 
 // Returns simulation settings with default fallbacks
@@ -135,6 +468,64 @@ export async function getIsSimulationModeOn(): Promise<boolean> {
   return settings.simulationMode;
 }
 
+// Detect country code based on user context or headers
+export async function detectCountryCode(currentUserId?: string | null): Promise<string> {
+  let userLocation: string | null = null;
+  if (currentUserId) {
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: currentUserId },
+        select: { location: true }
+      });
+      userLocation = user?.location || null;
+    } catch (e) {
+      console.error('Error fetching user location for simulation:', e);
+    }
+  }
+
+  // Parse location text to match country
+  if (userLocation) {
+    const loc = userLocation.toLowerCase();
+    if (loc.includes('india')) return 'IN';
+    if (loc.includes('united states') || loc.includes('usa') || loc.includes('america')) return 'US';
+    if (loc.includes('uae') || loc.includes('emirates') || loc.includes('dubai') || loc.includes('abu dhabi')) return 'AE';
+    if (loc.includes('united kingdom') || loc.includes('uk') || loc.includes('london')) return 'GB';
+    if (loc.includes('canada')) return 'CA';
+  }
+
+  let countryHeader: string | null = null;
+  try {
+    const reqHeaders = headers();
+    countryHeader = reqHeaders.get('x-vercel-ip-country') || 
+                    reqHeaders.get('cf-ipcountry') || 
+                    reqHeaders.get('x-country-code') || 
+                    null;
+                    
+    if (!countryHeader) {
+      const acceptLanguage = reqHeaders.get('accept-language');
+      if (acceptLanguage) {
+        const lang = acceptLanguage.toLowerCase();
+        if (lang.includes('in')) countryHeader = 'IN';
+        else if (lang.includes('us')) countryHeader = 'US';
+        else if (lang.includes('ae')) countryHeader = 'AE';
+        else if (lang.includes('gb') || lang.includes('uk')) countryHeader = 'GB';
+        else if (lang.includes('ca')) countryHeader = 'CA';
+      }
+    }
+  } catch (e) {
+    // Suppress warning if not inside request scope
+  }
+
+  const detected = countryHeader ? countryHeader.toUpperCase().trim() : 'IN';
+  return ['IN', 'US', 'AE', 'GB', 'CA'].includes(detected) ? detected : 'IN';
+}
+
+const HARDCODED_GROUPS_ALL = {
+  ...HARDCODED_GROUPS_BY_COUNTRY.IN,
+  ...HARDCODED_GROUPS_BY_COUNTRY.US,
+  ...HARDCODED_GROUPS_BY_COUNTRY.AE
+};
+
 // Generate deterministic member count for a group
 export function getGroupMemberCount(
   groupId: string,
@@ -146,10 +537,11 @@ export function getGroupMemberCount(
 ): number {
   if (!isSimulationOn) return realCount;
   const lowerName = name.toLowerCase().trim();
-  if (HARDCODED_GROUPS[lowerName] !== undefined) {
-    return HARDCODED_GROUPS[lowerName];
+  
+  if ((HARDCODED_GROUPS_ALL as any)[lowerName] !== undefined) {
+    return (HARDCODED_GROUPS_ALL as any)[lowerName];
   }
-  // Simple deterministic hash based on groupId to make the count consistent across reloads
+  
   let hash = 0;
   for (let i = 0; i < groupId.length; i++) {
     hash = groupId.charCodeAt(i) + ((hash << 5) - hash);
@@ -186,7 +578,6 @@ export function getSimulatedEngagement(
   }
   hash = Math.abs(hash);
 
-  // Distribution roll
   const roll = hash % 100;
   
   let likes = 0;
@@ -238,19 +629,12 @@ export function getSimulatedEngagement(
   };
 }
 
-// Generate realistic simulated comments on the fly
-export function generateDynamicComments(postId: string, count: number) {
+// Generate realistic simulated comments on the fly, adapted to country locale
+export function generateDynamicComments(postId: string, count: number, countryCode = 'IN') {
   const list = [];
-  const commentsPool = [
-    'Amazing ❤️', 'Very useful.', 'Thanks for sharing.', 'Excellent information.',
-    'Nice video 👏', 'Super 🔥', 'Keep posting.', 'Helpful.', 'Interesting.', 'Loved this.',
-    'Absolutely spot on. Consistency makes all the difference.', 'Love the layout! What font did you use here?',
-    'Incredible shot. Definitely adding this location to my list.', 'Let’s connect! I am building a startup in a similar space.',
-    'Amazing work! Keep pushing.', 'Well written. Couldn’t agree more.', 'Wow, this is so clean! Great setup.',
-    'Very inspiring! 🔥', 'Thanks for the motivation this morning.', 'Insightful share, thanks!',
-    'Great point of view.', 'Keep it up! 🙌', 'This is exactly what I needed today.', 'Brilliant!',
-    'Simple yet powerful.', 'Highly recommend reading this.', 'Love the vibe!'
-  ];
+  
+  // Use country-specific comment pool
+  const commentsPool = MOCK_COMMENTS_BY_COUNTRY[countryCode] || MOCK_COMMENTS_BY_COUNTRY.OTHER;
 
   for (let i = 0; i < count; i++) {
     let seed = 0;
@@ -260,8 +644,17 @@ export function generateDynamicComments(postId: string, count: number) {
     }
     seed = Math.abs(seed);
 
-    const authorIndex = seed % MOCK_NAMES.length;
-    const name = MOCK_NAMES[authorIndex];
+    // Roll for author country: 85% regional matching countryCode, 15% other country (for diversity)
+    const authorCountryRoll = seed % 100;
+    let authorCountry = countryCode;
+    if (authorCountryRoll >= 85) {
+      const countries = ['IN', 'US', 'AE', 'GB', 'CA'].filter(c => c !== countryCode);
+      authorCountry = countries[seed % countries.length];
+    }
+
+    const namePool = MOCK_NAMES_BY_COUNTRY[authorCountry] || MOCK_NAMES_BY_COUNTRY.OTHER;
+    const authorIndex = seed % namePool.length;
+    const name = namePool[authorIndex];
     const username = `sim_${name.toLowerCase().replace(/\s+/g, '')}_${seed % 100}`;
     const avatar = MOCK_AVATARS[seed % MOCK_AVATARS.length];
     const createdAt = new Date(Date.now() - (i + 1) * 35 * 60 * 1000);
@@ -283,182 +676,6 @@ export function generateDynamicComments(postId: string, count: number) {
   return list;
 }
 
-const CATEGORY_TEMPLATES: Record<string, {
-  captions: string[];
-  images: string[];
-  videos: string[];
-  polls: { question: string; options: string[] }[];
-  questions: string[];
-  events: string[];
-  announcements: string[];
-}> = {
-  tech: {
-    captions: [
-      "Just built a beautiful Glassmorphism dashboard mockup. What do you think? #ux #webdev",
-      "Is TypeScript really necessary for small projects? Let's discuss in the comments below. #programming",
-      "A clean desk is a must for writing clean code! 💻☕ #desksetup #developer",
-      "Here are my top 5 SaaS growth hacks that helped us scale 40% last month. Check them out! 🚀 #saas #marketing",
-      "Exploring WebAssembly and its performance implications for next-gen web apps. #webassembly #tech"
-    ],
-    images: [
-      'https://images.unsplash.com/photo-1515378791036-0648a3ef77b2?w=800&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800&auto=format&fit=crop&q=80'
-    ],
-    videos: [
-      'https://assets.mixkit.co/videos/preview/mixkit-keyboard-typing-in-a-dark-room-41981-large.mp4',
-      'https://assets.mixkit.co/videos/preview/mixkit-man-working-on-his-laptop-in-a-cafe-40285-large.mp4'
-    ],
-    polls: [
-      { question: "What is your primary backend language of choice?", options: ["Node.js / TS", "Python", "Go", "Rust"] },
-      { question: "How do you manage frontend state in large React apps?", options: ["Zustand", "Redux Toolkit", "Context API", "Signal / Jotai"] }
-    ],
-    questions: [
-      "What is the single most important programming language a beginner should learn in 2026?",
-      "How do you handle error boundaries and crash reporting in Next.js applications?"
-    ],
-    events: [
-      "Friday Tech Talk: Architecting AI Agents with LLMs! Register now.",
-      "Hackathon 2026: Build a collaborative tool in 48 hours. Kickoff this Saturday at 10 AM!"
-    ],
-    announcements: [
-      "🚀 Tolee Tech community is now officially live! Let's build together.",
-      "📢 We've added a resource library channel. Post your guides and templates!"
-    ]
-  },
-  money: {
-    captions: [
-      "Real estate investments in metro cities are booming. Here is a breakdown of the top areas to watch. #investing #realestate",
-      "Always invest in relationships and networking before you need them. #business #growth",
-      "How do you allocate your portfolio? Sharing my personal asset allocation model today. 📈 #finance #wealth",
-      "Bootstrapping a startup from 0 to profitable is hard, but it is the most rewarding journey. #startups #indiehacker",
-      "Mastering sales is the single most valuable skill in business. Here are 3 frameworks. #sales #business"
-    ],
-    images: [
-      'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=800&auto=format&fit=crop&q=80'
-    ],
-    videos: [
-      'https://assets.mixkit.co/videos/preview/mixkit-business-team-in-a-meeting-room-40502-large.mp4',
-      'https://assets.mixkit.co/videos/preview/mixkit-holding-and-using-a-smartphone-41983-large.mp4'
-    ],
-    polls: [
-      { question: "Where are you investing most of your capital right now?", options: ["Real Estate", "Mutual Funds / Stocks", "Gold / Sovereign Bonds", "Crypto / Startups"] },
-      { question: "What is your main financial goal for this year?", options: ["Increase Passive Income", "Clear All Debts", "Buy Property", "Start a Business"] }
-    ],
-    questions: [
-      "What is the best way to get seed funding for a SaaS startup in India?",
-      "How do you evaluate rental yield versus capital appreciation when buying real estate?"
-    ],
-    events: [
-      "Startup Pitch Day: Meet 10 active angel investors this Wednesday!",
-      "Masterclass: Wealth building through commercial real estate. Saturday 4 PM."
-    ],
-    announcements: [
-      "📢 Mumbai Business Group just hit 2.4M members! Thank you all for joining.",
-      "🚀 Premium investment guides section is now unlocked for all joined members!"
-    ]
-  },
-  health: {
-    captions: [
-      "5 simple morning habits to boost your energy levels and focus. #health #wellness",
-      "Consistency is key. 5 AM workouts hit different. Who else is up? 💪🔥 #fitness #motivation",
-      "Eat your greens, stay hydrated, and sleep at least 7 hours. Simple advice, rarely followed. #lifestyle #nutrition",
-      "Mental health is just as important as physical health. Take a break if you need it. 🧘‍♂️ #mindfulness",
-      "Had an amazing workout session today. Your body can stand almost anything, it is your mind you have to convince."
-    ],
-    images: [
-      'https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=800&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=800&auto=format&fit=crop&q=80'
-    ],
-    videos: [
-      'https://assets.mixkit.co/videos/preview/mixkit-holding-and-using-a-smartphone-41983-large.mp4',
-      'https://assets.mixkit.co/videos/preview/mixkit-man-working-on-his-laptop-in-a-cafe-40285-large.mp4'
-    ],
-    polls: [
-      { question: "What is your favorite form of physical exercise?", options: ["Weight Training", "Running / Cycling", "Yoga / Pilates", "Swimming / Sports"] },
-      { question: "How many hours of sleep do you get on average?", options: ["Under 6 hours", "6 - 7 hours", "7 - 8 hours", "8+ hours"] }
-    ],
-    questions: [
-      "What is the best diet plan for sustained energy throughout the day?",
-      "How do you manage stress and burnout during busy work weeks?"
-    ],
-    events: [
-      "Live Q&A: Ask Dr. Aarav anything about longevity and health! Saturday 5 PM.",
-      "Online Bootcamp: High-Intensity Interval Training (HIIT) session this Sunday morning."
-    ],
-    announcements: [
-      "📢 Welcome to the Doctors Community! Please read the verification rules pinned at the top.",
-      "🚀 We are launching a weekly newsletter sharing curated healthcare tips next month!"
-    ]
-  },
-  music: {
-    captions: [
-      "Just dropped a new acoustic cover! Let me know what you think in the comments. 🎵✨ #cover #acoustic",
-      "A clean studio setup leads to beautiful melodies. Ready to create! 🎹🎧 #musicproducer #studio",
-      "Music is the language of the soul. Sharing some tracks I've been working on. #indie #creator",
-      "Practice makes perfect. Spending 2 hours on scales today. #musicianlife",
-      "Listening to old vinyl records tonight. The warmth of analog sound is unmatched. 📻❤️ #vinyl #music"
-    ],
-    images: [
-      'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=800&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800&auto=format&fit=crop&q=80'
-    ],
-    videos: [
-      'https://assets.mixkit.co/videos/preview/mixkit-keyboard-typing-in-a-dark-room-41981-large.mp4',
-      'https://assets.mixkit.co/videos/preview/mixkit-man-working-on-his-laptop-in-a-cafe-40285-large.mp4'
-    ],
-    polls: [
-      { question: "Which DAW do you prefer for music production?", options: ["Ableton Live", "FL Studio", "Logic Pro", "Pro Tools / Reaper"] },
-      { question: "What is your favorite genre to listen to while working?", options: ["Lo-Fi / Chillhop", "Classical / Ambient", "Synthwave / Techno", "Rock / Indie"] }
-    ],
-    questions: [
-      "How do you overcome writer's block when composing a new song?",
-      "What is the best budget microphone for home studio vocal recording?"
-    ],
-    events: [
-      "Virtual Jam Session: Join in with your instrument this Thursday at 8 PM!",
-      "Workshop: Electronic Music Production for Beginners. Saturday afternoon."
-    ],
-    announcements: [
-      "🚀 Our collaborative Spotify playlist is open for submissions! Add your tracks.",
-      "📢 Weekly Creator Program spotlight is now open. Submit your work to get featured!"
-    ]
-  },
-  general: {
-    captions: [
-      "Had an incredible brainstorming session today with the team! Excited for what we are building. #tolee #community",
-      "Taking some time off to recharge by the lake. Nature is the best cure for burnout. 🌲🧘‍♂️ #peace #nature",
-      "Sharing some daily wisdom: consistency is more important than intensity. #motivation #quotes",
-      "An amazing view of the city skyline tonight. The city never sleeps! 🏙️❤️ #mumbai #skyline",
-      "Had a wonderful conversation with a new friend today. Connect with people!"
-    ],
-    images: [
-      'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=800&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800&auto=format&fit=crop&q=80'
-    ],
-    videos: [
-      'https://assets.mixkit.co/videos/preview/mixkit-holding-and-using-a-smartphone-41983-large.mp4',
-      'https://assets.mixkit.co/videos/preview/mixkit-business-team-in-a-meeting-room-40502-large.mp4'
-    ],
-    polls: [
-      { question: "How do you plan your day?", options: ["Notion / Digital Apps", "Paper Planner / Journal", "To-Do list on sticky notes", "No planning, go with the flow"] },
-      { question: "What is your favorite time of day to be productive?", options: ["Early Morning", "Afternoon", "Late Night", "Whenever inspiration strikes"] }
-    ],
-    questions: [
-      "What is the single best advice you've ever received in your life?",
-      "How do you organize your digital life to avoid information overload?"
-    ],
-    events: [
-      "Goal Setting Workshop: Let's design our 2026 roadmap this Sunday!",
-      "Community Meetup: Coffee & networking. Next Friday at 6 PM."
-    ],
-    announcements: [
-      "📢 Community updates: new layout and badges are now live! Check them out.",
-      "🚀 Share your wins in the main feed. Let's celebrate our achievements!"
-    ]
-  }
-};
-
 function getCategoryKey(category: string): string {
   const norm = category.toLowerCase().trim();
   if (norm.includes('tech') || norm.includes('developer') || norm.includes('coding') || norm.includes('titans')) return 'tech';
@@ -468,12 +685,13 @@ function getCategoryKey(category: string): string {
   return 'general';
 }
 
-// Generate dynamic group posts mixed with real posts, shuffling on 15s time block
+// Generate dynamic group posts mixed with real posts, shuffling on 15s time block, adapted to user's location
 export function generateDynamicGroupPosts(
   toleeId: string,
   toleeName: string,
   category: string,
-  realPosts: any[] = []
+  realPosts: any[] = [],
+  countryCode = 'IN'
 ): any[] {
   const lowerName = toleeName.toLowerCase().trim();
   const slug = toleeName.replace(/\s+/g, '-').toLowerCase();
@@ -496,13 +714,9 @@ export function generateDynamicGroupPosts(
     targetCount = 50 + (hash % 901); // 50 to 950
   }
 
-  const catKey = getCategoryKey(category || toleeName);
-  const templates = CATEGORY_TEMPLATES[catKey] || CATEGORY_TEMPLATES.general;
-
   // Time block rotates every 15 seconds
   const timeBlock = Math.floor(Date.now() / 15000);
 
-  // Return up to 60 dynamic posts at once to ensure fast performance
   const activeCount = Math.min(targetCount, 60);
   const startIndex = timeBlock % targetCount;
 
@@ -518,12 +732,28 @@ export function generateDynamicGroupPosts(
     }
     postSeed = Math.abs(postSeed);
 
-    const authorIdx = (postSeed + i) % MOCK_NAMES.length;
-    const authorName = MOCK_NAMES[authorIdx];
+    // Roll for author country: 85% regional matching countryCode, 15% other country (for diversity)
+    const authorCountryRoll = (postSeed + i) % 100;
+    let authorCountry = countryCode;
+    if (authorCountryRoll >= 85) {
+      const countries = ['IN', 'US', 'AE', 'GB', 'CA'].filter(c => c !== countryCode);
+      authorCountry = countries[postSeed % countries.length];
+    }
+
+    const namePool = MOCK_NAMES_BY_COUNTRY[authorCountry] || MOCK_NAMES_BY_COUNTRY.OTHER;
+    const cityPool = MOCK_CITIES_BY_COUNTRY[authorCountry] || MOCK_CITIES_BY_COUNTRY.OTHER;
+
+    // Localized captions templates
+    const templatesByCountry = CATEGORY_TEMPLATES_BY_COUNTRY[authorCountry] || CATEGORY_TEMPLATES_BY_COUNTRY.GLOBAL;
+    const catKey = getCategoryKey(category || toleeName);
+    const templates = templatesByCountry[catKey] || templatesByCountry.general;
+
+    const authorIdx = (postSeed + i) % namePool.length;
+    const authorName = namePool[authorIdx];
     const username = `sim_${authorName.toLowerCase().replace(/\s+/g, '')}_${postSeed % 100}`;
-    const avatar = MOCK_AVATARS[authorIdx % MOCK_AVATARS.length];
-    const profession = MOCK_PROFESSIONS[authorIdx % MOCK_PROFESSIONS.length];
-    const location = MOCK_LOCATIONS[postSeed % MOCK_LOCATIONS.length];
+    const avatar = MOCK_AVATARS[postSeed % MOCK_AVATARS.length];
+    const profession = MOCK_PROFESSIONS[postSeed % MOCK_PROFESSIONS.length];
+    const location = cityPool[postSeed % cityPool.length];
 
     const typeRoll = postSeed % 100;
     let postType = 'regular';
@@ -578,7 +808,7 @@ export function generateDynamicGroupPosts(
         updatedAt: createdAt,
         isSimulation: true,
         author: {
-          id: `sim-user-${authorIdx}`,
+          id: `sim-user-${authorIdx}-${authorCountry}`,
           name: authorName,
           username,
           avatar,
@@ -604,12 +834,11 @@ export function generateDynamicGroupPosts(
           saves: eng.saves
         },
         savesCount: eng.saves,
-        comments: generateDynamicComments(postId, Math.min(eng.comments, 4))
+        comments: generateDynamicComments(postId, Math.min(eng.comments, 4), authorCountry)
       }
     });
   }
 
-  // Interleave real posts and simulated posts in a natural 2 fakes, 1 real mix
   const mixed: any[] = [];
   let simIdx = 0;
   let realIdx = 0;
@@ -632,7 +861,6 @@ export function generateDynamicGroupPosts(
 export async function syncSimulationData() {
   const settings = await getSimulationSettings();
   
-  // 1. Clear existing simulated content to match exact configured counts cleanly
   await prisma.comment.deleteMany({ where: { isSimulation: true } });
   await prisma.postTolee.deleteMany({ where: { post: { isSimulation: true } } });
   await prisma.post.deleteMany({ where: { isSimulation: true } });
@@ -642,27 +870,27 @@ export async function syncSimulationData() {
     return { success: true, message: 'Simulation mode is OFF. Cleaned up simulated data.' };
   }
 
-  // Cap database seeding to lightweight pools to keep admin interface fast and prevent requests timeouts
   const actualUsersCount = Math.min(settings.simulatedUsersCount, 150);
   const actualPostsCount = Math.min(settings.simulatedPostsCount, 100);
   const actualReelsCount = Math.min(settings.simulatedReelsCount, 100);
 
-  // Fetch some active groups/Tolees to tag simulated posts to
   const activeTolees = await prisma.tolee.findMany({ select: { id: true } });
   if (activeTolees.length === 0) {
     return { success: false, error: 'No active groups (Tolees) found in the database to link simulated posts to.' };
   }
 
-  // 2. Generate simulated users
   const usersToCreate = [];
   for (let i = 0; i < actualUsersCount; i++) {
-    const name = MOCK_NAMES[i % MOCK_NAMES.length] + ' ' + (Math.floor(i / MOCK_NAMES.length) || '');
+    // Seed Indian profiles mostly for database base
+    const namePool = MOCK_NAMES_BY_COUNTRY.IN;
+    const cityPool = MOCK_CITIES_BY_COUNTRY.IN;
+    const name = namePool[i % namePool.length] + ' ' + (Math.floor(i / namePool.length) || '');
     const username = `sim_${name.toLowerCase().replace(/\s+/g, '_')}_${i}`;
     const email = `${username}@simulatedtolee.com`;
     const avatar = MOCK_AVATARS[i % MOCK_AVATARS.length];
     const profession = MOCK_PROFESSIONS[i % MOCK_PROFESSIONS.length];
     const bio = MOCK_BIOS[i % MOCK_BIOS.length] + ` | ${profession}`;
-    const location = MOCK_LOCATIONS[i % MOCK_LOCATIONS.length];
+    const location = cityPool[i % cityPool.length];
     
     usersToCreate.push({
       username,
@@ -688,14 +916,13 @@ export async function syncSimulationData() {
     return { success: false, error: 'Failed to retrieve seeded simulated users.' };
   }
 
-  // 3. Generate simulated posts
   const postsToCreate = [];
   for (let i = 0; i < actualPostsCount; i++) {
     const author = createdUsers[i % createdUsers.length];
     const isImage = i % 3 !== 0;
-    const mediaUrls = isImage ? CATEGORY_TEMPLATES.general.images[i % CATEGORY_TEMPLATES.general.images.length] : null;
+    const mediaUrls = isImage ? CATEGORY_TEMPLATES_BY_COUNTRY.IN.general.images[i % CATEGORY_TEMPLATES_BY_COUNTRY.IN.general.images.length] : null;
     const mediaTypes = isImage ? 'image' : null;
-    const caption = CATEGORY_TEMPLATES.general.captions[i % CATEGORY_TEMPLATES.general.captions.length];
+    const caption = CATEGORY_TEMPLATES_BY_COUNTRY.IN.general.captions[i % CATEGORY_TEMPLATES_BY_COUNTRY.IN.general.captions.length];
     
     postsToCreate.push({
       authorId: author.id,
@@ -714,7 +941,7 @@ export async function syncSimulationData() {
     const author = createdUsers[(i + 5) % createdUsers.length];
     const mediaUrls = MOCK_VIDEOS[i % MOCK_VIDEOS.length];
     const mediaTypes = 'video';
-    const caption = `🔥 simulated reel: ${CATEGORY_TEMPLATES.general.captions[i % CATEGORY_TEMPLATES.general.captions.length].slice(0, 30)}...`;
+    const caption = `🔥 simulated reel: ${CATEGORY_TEMPLATES_BY_COUNTRY.IN.general.captions[i % CATEGORY_TEMPLATES_BY_COUNTRY.IN.general.captions.length].slice(0, 30)}...`;
 
     postsToCreate.push({
       authorId: author.id,
@@ -756,7 +983,6 @@ export async function syncSimulationData() {
   }
   await prisma.postTolee.createMany({ data: postToleeRelations });
 
-  // 4. Seeding static comments pool
   const commentsToCreate = [];
   for (let i = 0; i < createdPosts.length; i++) {
     const post = createdPosts[i];
@@ -768,7 +994,7 @@ export async function syncSimulationData() {
       commentsToCreate.push({
         postId: post.id,
         authorId: commenter.id,
-        content: MOCK_COMMENTS[ (i + j) % MOCK_COMMENTS.length ],
+        content: MOCK_COMMENTS_BY_COUNTRY.IN[ (i + j) % MOCK_COMMENTS_BY_COUNTRY.IN.length ],
         isSimulation: true,
         createdAt: new Date(post.createdAt.getTime() + (j + 1) * 20 * 60 * 1000),
       });

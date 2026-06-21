@@ -8,7 +8,7 @@ import { extractPublicIdFromUrl, extractResourceTypeFromUrl, destroyAsset } from
 import { createSystemNotification, createSystemNotificationsMany } from '@/lib/notification-service';
 import { writeLimiter, getClientIp } from '@/lib/rate-limit';
 import { sanitizeText } from '@/lib/sanitize';
-import { getSimulationSettings, getGroupMemberCount, getSimulatedEngagement, generateDynamicGroupPosts } from '@/lib/simulation';
+import { getSimulationSettings, getGroupMemberCount, getSimulatedEngagement, generateDynamicGroupPosts, detectCountryCode } from '@/lib/simulation';
 
 
 export async function getTolees() {
@@ -190,8 +190,9 @@ export async function getToleeBySlug(slug: string) {
 
       let mappedPosts = tolee.posts;
       if (isSimOn) {
+        const countryCode = await detectCountryCode(currentUserId);
         const category = (tolee as any).category || 'General';
-        mappedPosts = generateDynamicGroupPosts(tolee.id, tolee.name, category, tolee.posts);
+        mappedPosts = generateDynamicGroupPosts(tolee.id, tolee.name, category, tolee.posts, countryCode);
         
         mappedPosts = mappedPosts.map((p: any) => {
           if (!p.post.isSimulation) {

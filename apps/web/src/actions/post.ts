@@ -8,7 +8,7 @@ import { headers } from 'next/headers';
 import { getOrCreatePersonalChat } from './chat';
 import { extractPublicIdFromUrl, extractResourceTypeFromUrl, destroyMultipleAssets } from '@/lib/cloudinary-cleanup';
 import { createSystemNotification, createSystemNotificationsMany } from '@/lib/notification-service';
-import { getSimulationSettings, getSimulatedEngagement, generateDynamicComments } from '@/lib/simulation';
+import { getSimulationSettings, getSimulatedEngagement, generateDynamicComments, detectCountryCode } from '@/lib/simulation';
 
 export async function createPost(data: {
   content?: string;
@@ -574,9 +574,12 @@ export async function getComments(postId: string) {
     });
 
     if (isSimOn) {
+      const session = await getServerSession(authOptions);
+      const currentUserId = session?.user ? (session.user as any).id : null;
+      const countryCode = await detectCountryCode(currentUserId);
       const eng = getSimulatedEngagement(postId);
       // Generate comments corresponding to the engagement distribution
-      const simComments = generateDynamicComments(postId, Math.min(eng.comments, 15));
+      const simComments = generateDynamicComments(postId, Math.min(eng.comments, 15), countryCode);
       comments = [...comments, ...simComments].sort(
         (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
