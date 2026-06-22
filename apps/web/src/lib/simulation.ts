@@ -1,5 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { headers } from 'next/headers';
+import fs from 'fs';
+import path from 'path';
 
 // Country-specific simulated names
 const MOCK_NAMES_BY_COUNTRY: Record<string, string[]> = {
@@ -122,23 +124,37 @@ const MOCK_BIOS = [
   'Living life in full resolution.',
 ];
 
-const MOCK_AVATARS = [
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+const MOCK_AVATARS_MALE = [
   'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
   'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&auto=format&fit=crop&q=80',
   'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80',
   'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80',
   'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=150&auto=format&fit=crop&q=80',
   'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=150&auto=format&fit=crop&q=80',
   'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1500048993953-d23a436266cf?w=150&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1506803682981-6e718a9dd3ee?w=150&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=150&auto=format&fit=crop&q=80'
 ];
+
+const MOCK_AVATARS_FEMALE = [
+  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1496449903678-68ddcb189a24?w=150&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1548142813-c348350df52b?w=150&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=150&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=150&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1554151228-14d9def656e4?w=150&auto=format&fit=crop&q=80'
+];
+
+const MOCK_AVATARS = [...MOCK_AVATARS_MALE, ...MOCK_AVATARS_FEMALE];
 
 const FALLBACK_PIXABAY_VIDEOS = [
   'https://cdn.pixabay.com/video/2021/08/04/83896-584732159_large.mp4',
@@ -154,6 +170,53 @@ const FALLBACK_PIXABAY_VIDEOS = [
   'https://cdn.pixabay.com/video/2023/08/11/175546-853372224_large.mp4',
   'https://cdn.pixabay.com/video/2021/04/20/71746-540191834_large.mp4'
 ];
+
+// Curated high-quality Unsplash image assets representing simulated category scenes
+const UNSPLASH_IMAGES: Record<string, string[]> = {
+  tech: [
+    'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=800&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=800&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1531403009284-440f080d1e12?w=800&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1504639725590-34d0984388bd?w=800&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1515378791036-0648a3ef77b2?w=800&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=800&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1581291518655-9523c932dedf?w=800&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=800&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1531297484001-80022131f5a1?w=800&auto=format&fit=crop&q=80'
+  ],
+  money: [
+    'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=800&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=800&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=800&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1512428559087-560fa5ceab42?w=800&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?w=800&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1560520653-9e0e4c89eb11?w=800&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=800&auto=format&fit=crop&q=80'
+  ],
+  health: [
+    'https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=800&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=800&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=800&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?w=800&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=800&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1505576399279-565b52d4ac71?w=800&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=800&auto=format&fit=crop&q=80'
+  ],
+  general: [
+    'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=800&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1493612276216-ee3925520721?w=800&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1501504905252-473c47e087f8?w=800&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?w=800&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1472396961693-142e6e269027?w=800&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1530789253388-582c481c54b0?w=800&auto=format&fit=crop&q=80'
+  ]
+};
 
 // Global in-memory cache for Pixabay video URLs mapped by query
 const cachedPixabayVideos: Record<string, string[]> = {};
@@ -186,14 +249,12 @@ export function fetchPixabayVideosInBackground(category: string): void {
 
   const query = getPixabayQueryForCategory(category);
   
-  // Return if already fetched or currently fetching
   if (cachedPixabayVideos[query] && cachedPixabayVideos[query].length > 0) return;
   if (isFetchingPixabay[query]) return;
 
   isFetchingPixabay[query] = true;
   console.log(`[Pixabay Simulation] Triggering background video fetch for category "${category}" (query: "${query}")...`);
 
-  // Run the fetch in background asynchronously without blocking the request flow
   fetch(
     `https://pixabay.com/api/videos/?key=${apiKey}&q=${encodeURIComponent(query)}&per_page=30&safesearch=true&video_type=all`
   )
@@ -266,7 +327,7 @@ const MOCK_COMMENTS_BY_COUNTRY: Record<string, string[]> = {
   ]
 };
 
-// Localized captions & content by country
+// Localized captions & content by country (Fallback templates pool)
 const CATEGORY_TEMPLATES_BY_COUNTRY: Record<string, Record<string, {
   captions: string[];
   images: string[];
@@ -285,10 +346,7 @@ const CATEGORY_TEMPLATES_BY_COUNTRY: Record<string, Record<string, {
         "Top 5 SaaS growth hacks that helped us scale 40% last month. Apne business me implement karo! 🚀 #saas #marketing",
         "Exploring WebAssembly and its performance implications for next-gen Indian web apps. #webassembly #tech"
       ],
-      images: [
-        'https://images.unsplash.com/photo-1515378791036-0648a3ef77b2?w=800&auto=format&fit=crop&q=80',
-        'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800&auto=format&fit=crop&q=80'
-      ],
+      images: UNSPLASH_IMAGES.tech,
       videos: FALLBACK_PIXABAY_VIDEOS,
       polls: [
         { question: "Next project ke liye kaun sa tech select karein?", options: ["Node.js / TS", "Python / Fast API", "Go Lang", "Rust"] },
@@ -315,10 +373,7 @@ const CATEGORY_TEMPLATES_BY_COUNTRY: Record<string, Record<string, {
         "Indian startups scale up fast. 🚀 Bootstrapping or Venture funding, kya better hai? #startupindia",
         "Sales call conversion rate improve karne ki 3 magic strategies. #sales #business"
       ],
-      images: [
-        'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&auto=format&fit=crop&q=80',
-        'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=800&auto=format&fit=crop&q=80'
-      ],
+      images: UNSPLASH_IMAGES.money,
       videos: FALLBACK_PIXABAY_VIDEOS,
       polls: [
         { question: "Aapke according best investment option kaun sa hai?", options: ["Mutual Funds / Stocks", "Real Estate / Land", "Gold / Bonds", "Crypto / Startups"] },
@@ -344,10 +399,7 @@ const CATEGORY_TEMPLATES_BY_COUNTRY: Record<string, Record<string, {
         "Chai kam karo, stay hydrated, and sleep at least 7 hours. Simple advice, rarely followed. #lifestyle #nutrition",
         "Mental health is just as important as physical health. Take a break if you need it. 🧘‍♂️ #mindfulness"
       ],
-      images: [
-        'https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=800&auto=format&fit=crop&q=80',
-        'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=800&auto=format&fit=crop&q=80'
-      ],
+      images: UNSPLASH_IMAGES.health,
       videos: FALLBACK_PIXABAY_VIDEOS,
       polls: [
         { question: "Aapki physical activity main routine kya hai?", options: ["Weight Training", "Running / Yoga", "Swimming / Sports", "Sedentary lifestyle"] },
@@ -374,10 +426,7 @@ const CATEGORY_TEMPLATES_BY_COUNTRY: Record<string, Record<string, {
         "Festivals ka season shuru! Family and friends block. ✨🎉 #festivals #celebration",
         "Local news: Traffic in Mumbai is getting worse. Roadworks are ongoing. 🏙️❤️ #mumbai"
       ],
-      images: [
-        'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=800&auto=format&fit=crop&q=80',
-        'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800&auto=format&fit=crop&q=80'
-      ],
+      images: UNSPLASH_IMAGES.general,
       videos: FALLBACK_PIXABAY_VIDEOS,
       polls: [
         { question: "Chai or Coffee during monsoon?", options: ["Chai ☕", "Filter Coffee ☕", "Cold Coffee", "Water only"] },
@@ -406,10 +455,7 @@ const CATEGORY_TEMPLATES_BY_COUNTRY: Record<string, Record<string, {
         "Here are my top 5 SaaS growth hacks that helped us scale 40% last month. Check them out! 🚀 #saas #marketing",
         "Exploring WebAssembly and its performance implications for next-gen web apps. #webassembly #tech"
       ],
-      images: [
-        'https://images.unsplash.com/photo-1515378791036-0648a3ef77b2?w=800&auto=format&fit=crop&q=80',
-        'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800&auto=format&fit=crop&q=80'
-      ],
+      images: UNSPLASH_IMAGES.tech,
       videos: FALLBACK_PIXABAY_VIDEOS,
       polls: [
         { question: "What is your primary backend language of choice?", options: ["Node.js / TS", "Python", "Go", "Rust"] },
@@ -436,10 +482,7 @@ const CATEGORY_TEMPLATES_BY_COUNTRY: Record<string, Record<string, {
         "Bootstrapping a startup from 0 to profitable is hard, but it is the most rewarding journey. #startups #indiehacker",
         "Mastering sales is the single most valuable skill in business. Here are 3 frameworks. #sales #business"
       ],
-      images: [
-        'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&auto=format&fit=crop&q=80',
-        'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=800&auto=format&fit=crop&q=80'
-      ],
+      images: UNSPLASH_IMAGES.money,
       videos: FALLBACK_PIXABAY_VIDEOS,
       polls: [
         { question: "Where are you investing most of your capital right now?", options: ["Real Estate", "Mutual Funds / Stocks", "Gold / Sovereign Bonds", "Crypto / Startups"] },
@@ -466,10 +509,7 @@ const CATEGORY_TEMPLATES_BY_COUNTRY: Record<string, Record<string, {
         "Mental health is just as important as physical health. Take a break if you need it. 🧘‍♂️ #mindfulness",
         "Had an amazing workout session today. Your body can stand almost anything, it is your mind you have to convince."
       ],
-      images: [
-        'https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=800&auto=format&fit=crop&q=80',
-        'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=800&auto=format&fit=crop&q=80'
-      ],
+      images: UNSPLASH_IMAGES.health,
       videos: FALLBACK_PIXABAY_VIDEOS,
       polls: [
         { question: "What is your favorite form of physical exercise?", options: ["Weight Training", "Running / Cycling", "Yoga / Pilates", "Swimming / Sports"] },
@@ -496,10 +536,7 @@ const CATEGORY_TEMPLATES_BY_COUNTRY: Record<string, Record<string, {
         "An amazing view of the city skyline tonight. The city never sleeps! 🏙️❤️ #skyline",
         "Had a wonderful conversation with a new friend today. Connect with people!"
       ],
-      images: [
-        'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=800&auto=format&fit=crop&q=80',
-        'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800&auto=format&fit=crop&q=80'
-      ],
+      images: UNSPLASH_IMAGES.general,
       videos: FALLBACK_PIXABAY_VIDEOS,
       polls: [
         { question: "How do you plan your day?", options: ["Notion / Digital Apps", "Paper Planner / Journal", "To-Do list on sticky notes", "No planning, go with the flow"] },
@@ -545,6 +582,345 @@ const HARDCODED_GROUPS_BY_COUNTRY: Record<string, Record<string, number>> = {
     'uae lifestyle': 220000
   }
 };
+
+// AI Cache Interface
+interface AICachedUser {
+  name: string;
+  profession: string;
+  bio: string;
+  location: string;
+  postCategory: string;
+  gender: 'male' | 'female';
+}
+
+interface AICache {
+  timestamp: number;
+  countryCode: string;
+  users: AICachedUser[];
+  captions: Record<string, string[]>;
+  reelCaptions: Record<string, string[]>;
+  comments: string[];
+}
+
+let cachedDataInMemory: AICache | null = null;
+
+// Helper to generate local fallbacks in identical cache format
+function generateLocalFallbackCache(countryCode: string): AICache {
+  const namePool = MOCK_NAMES_BY_COUNTRY[countryCode] || MOCK_NAMES_BY_COUNTRY.OTHER;
+  const cityPool = MOCK_CITIES_BY_COUNTRY[countryCode] || MOCK_CITIES_BY_COUNTRY.OTHER;
+  
+  const users: AICachedUser[] = [];
+  for (let i = 0; i < 50; i++) {
+    const name = namePool[i % namePool.length] + (Math.floor(i / namePool.length) ? ' ' + Math.floor(i / namePool.length) : '');
+    const profession = MOCK_PROFESSIONS[i % MOCK_PROFESSIONS.length];
+    const bio = MOCK_BIOS[i % MOCK_BIOS.length] + ` | ${profession}`;
+    const location = cityPool[i % cityPool.length];
+    const postCategories = ['tech', 'money', 'health', 'general'];
+    const postCategory = postCategories[i % postCategories.length];
+    const gender = i % 2 === 0 ? 'male' : 'female';
+    
+    users.push({
+      name,
+      profession,
+      bio,
+      location,
+      postCategory,
+      gender
+    });
+  }
+
+  const templatesByCountry = CATEGORY_TEMPLATES_BY_COUNTRY[countryCode] || CATEGORY_TEMPLATES_BY_COUNTRY.GLOBAL;
+  
+  const extractCaptions = (cat: string) => {
+    const list = templatesByCountry[cat]?.captions || CATEGORY_TEMPLATES_BY_COUNTRY.GLOBAL.general.captions;
+    const result = [];
+    for (let i = 0; i < 25; i++) {
+      result.push(list[i % list.length]);
+    }
+    return result;
+  };
+
+  const commentsPool = MOCK_COMMENTS_BY_COUNTRY[countryCode] || MOCK_COMMENTS_BY_COUNTRY.OTHER;
+  const comments = [];
+  for (let i = 0; i < 60; i++) {
+    comments.push(commentsPool[i % commentsPool.length]);
+  }
+
+  return {
+    timestamp: Date.now(),
+    countryCode,
+    users,
+    captions: {
+      tech: extractCaptions('tech'),
+      money: extractCaptions('money'),
+      health: extractCaptions('health'),
+      general: extractCaptions('general')
+    },
+    reelCaptions: {
+      tech: extractCaptions('tech').map(c => `🔥 simulated reel: ${c.slice(0, 30)}...`),
+      money: extractCaptions('money').map(c => `🔥 simulated reel: ${c.slice(0, 30)}...`),
+      health: extractCaptions('health').map(c => `🔥 simulated reel: ${c.slice(0, 30)}...`),
+      general: extractCaptions('general').map(c => `🔥 simulated reel: ${c.slice(0, 30)}...`)
+    },
+    comments
+  };
+}
+
+// Synchronous JSON file cache loader for dynamic rendering (fast, under 1ms)
+function getAICacheSync(countryCode = 'IN'): AICache {
+  if (cachedDataInMemory && cachedDataInMemory.countryCode === countryCode) {
+    return cachedDataInMemory;
+  }
+  try {
+    const cacheFile = path.join(process.cwd(), 'src/lib/ai-simulation-cache.json');
+    if (fs.existsSync(cacheFile)) {
+      const data = JSON.parse(fs.readFileSync(cacheFile, 'utf8')) as AICache;
+      if (data.countryCode === countryCode && data.users && data.users.length > 0) {
+        cachedDataInMemory = data;
+        return data;
+      }
+    }
+  } catch (e) {
+    console.warn('[AI Simulation Cache] Read failed, using local templates:', e);
+  }
+  return generateLocalFallbackCache(countryCode);
+}
+
+// NVIDIA NIM Batch Creators
+async function generateAIUsersBatch(count: number, countryCode: string): Promise<AICachedUser[]> {
+  const apiKey = process.env.NVIDIA_API_KEY;
+  if (!apiKey || apiKey.trim() === 'your-nvidia-api-key' || apiKey.trim() === '') {
+    throw new Error('NVIDIA_API_KEY not configured.');
+  }
+
+  const prompt = `Generate a JSON array of exactly ${count} unique simulated user profiles for a social network.
+The profiles must match the country code: "${countryCode}" (e.g. for IN, use popular Indian names and Indian cities).
+Each user must have a unique profile with the following fields:
+- name: Real full name (first and last name).
+- profession: One of these: 'Business Owner', 'Real Estate Agent', 'Doctor', 'Student', 'Software Engineer', 'Digital Marketer', 'Housewife', 'Teacher', 'Influencer', 'Fitness Trainer', 'Food Blogger', 'Photographer', 'News Creator', 'Investor'.
+- bio: A unique, engaging, short bio matching their profession.
+- location: A realistic city and state/province in that country.
+- postCategory: Choose one matching their profession: 'tech' (for software, marketing, influencer), 'money' (for business, real estate, investor, news), 'health' (for doctor, trainer, food blogger), or 'general' (for student, housewife, teacher, photographer).
+- gender: 'male' or 'female' (appropriate for the name).
+
+Return ONLY a JSON object with a single key "users" containing the array of user objects. Do not include any markdown formatting, backticks, or extra text. Just raw JSON.`;
+
+  const res = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: 'meta/llama-3.1-70b-instruct',
+      messages: [
+        { role: 'system', content: 'You are a database seeding helper. You output raw structured JSON objects matching the schema requested. No markdown formatting.' },
+        { role: 'user', content: prompt }
+      ],
+      temperature: 0.8,
+      max_tokens: 3000,
+      response_format: { type: 'json_object' }
+    })
+  });
+
+  if (!res.ok) {
+    throw new Error(`LLM Users API responded with status ${res.status}`);
+  }
+
+  const data = await res.json();
+  const text = data?.choices?.[0]?.message?.content || '';
+  const parsed = JSON.parse(text);
+  if (Array.isArray(parsed.users)) {
+    return parsed.users;
+  }
+  throw new Error('Invalid users response format');
+}
+
+async function generateAICaptionsBatch(category: string, count: number, countryCode: string, type: 'post' | 'reel'): Promise<string[]> {
+  const apiKey = process.env.NVIDIA_API_KEY;
+  if (!apiKey || apiKey.trim() === 'your-nvidia-api-key' || apiKey.trim() === '') {
+    throw new Error('NVIDIA_API_KEY not configured.');
+  }
+
+  const isIndia = countryCode === 'IN';
+  const languageRules = isIndia 
+    ? 'Write in Hinglish (Hindi + English mix) or conversational Indian English, reflecting real topics, local trends, sports, technology, festivals, or local news. E.g. "Aaj finally client ka project complete ho gaya 😍", "Weekend trip mast raha ❤️".' 
+    : 'Write in natural, conversational, locally appropriate English matching the region.';
+
+  const prompt = `Generate a JSON array of exactly ${count} unique social media captions for a "${type}" of category "${category}" in "${countryCode}".
+Rules:
+- ${languageRules}
+- Match the category: "${category}" (tech: software/marketing/apps, money: finance/business/investing, health: gym/nutrition/doctor, general: travel/lifestyle/weather).
+- Do not repeat captions. Make every single caption unique and authentic.
+- Include 1-3 emojis and 2-4 relevant hashtags.
+- Keep them under 250 characters, friendly and natural. No formal AI templates.
+
+Return ONLY a JSON object with a single key "captions" containing the array of strings.`;
+
+  const res = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: 'meta/llama-3.1-70b-instruct',
+      messages: [
+        { role: 'system', content: 'You are a helpful copywriter. You output raw structured JSON objects matching the schema requested.' },
+        { role: 'user', content: prompt }
+      ],
+      temperature: 0.8,
+      max_tokens: 2500,
+      response_format: { type: 'json_object' }
+    })
+  });
+
+  if (!res.ok) {
+    throw new Error(`LLM Captions API responded with status ${res.status}`);
+  }
+
+  const data = await res.json();
+  const text = data?.choices?.[0]?.message?.content || '';
+  const parsed = JSON.parse(text);
+  if (Array.isArray(parsed.captions)) {
+    return parsed.captions;
+  }
+  throw new Error('Invalid captions response format');
+}
+
+async function generateAICommentsBatch(count: number, countryCode: string): Promise<string[]> {
+  const apiKey = process.env.NVIDIA_API_KEY;
+  if (!apiKey || apiKey.trim() === 'your-nvidia-api-key' || apiKey.trim() === '') {
+    throw new Error('NVIDIA_API_KEY not configured.');
+  }
+
+  const isIndia = countryCode === 'IN';
+  const commentRules = isIndia 
+    ? 'Use colloquial Hinglish/Hindi/English typical comments for Indian social media. E.g. "Bilkul sahi bola.", "Nice information.", "Mast content ❤️", "Bhai ye useful tha.", "Amazing 🔥", "Keep growing.", "Bahut badhiya.", "Ye mujhe bhi try karna hai."' 
+    : 'Use friendly, natural comments typical for social media.';
+
+  const prompt = `Generate a JSON array of exactly ${count} unique, short, human-like social media comments.
+Rules:
+- ${commentRules}
+- Make them short (1-6 words).
+- Vary the style, punctuation, and emojis (e.g. use ❤️, 🔥, 👍, 👏 or none).
+- Return ONLY a JSON object with a single key "comments" containing the array of strings.`;
+
+  const res = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: 'meta/llama-3.1-70b-instruct',
+      messages: [
+        { role: 'system', content: 'You are a helpful copywriter. You output raw structured JSON. No markdown formatting.' },
+        { role: 'user', content: prompt }
+      ],
+      temperature: 0.8,
+      max_tokens: 1500,
+      response_format: { type: 'json_object' }
+    })
+  });
+
+  if (!res.ok) {
+    throw new Error(`LLM Comments API responded with status ${res.status}`);
+  }
+
+  const data = await res.json();
+  const text = data?.choices?.[0]?.message?.content || '';
+  const parsed = JSON.parse(text);
+  if (Array.isArray(parsed.comments)) {
+    return parsed.comments;
+  }
+  throw new Error('Invalid comments response format');
+}
+
+// Background content pre-warming and file caching
+export async function loadOrCreateAICache(countryCode: string, forceRefresh = false): Promise<AICache> {
+  const cacheFile = path.join(process.cwd(), 'src/lib/ai-simulation-cache.json');
+  
+  if (!forceRefresh) {
+    try {
+      if (fs.existsSync(cacheFile)) {
+        const fileContent = fs.readFileSync(cacheFile, 'utf8');
+        const data = JSON.parse(fileContent) as AICache;
+        if (data.countryCode === countryCode && data.users && data.users.length > 0) {
+          console.log('[AI Simulation] Cache file loaded successfully:', cacheFile);
+          cachedDataInMemory = data;
+          return data;
+        }
+      }
+    } catch (e) {
+      console.warn('[AI Simulation] Error reading cache file, will regenerate:', e);
+    }
+  }
+
+  console.log('[AI Simulation] Generating new AI simulation content cache for country:', countryCode);
+
+  try {
+    const apiKey = process.env.NVIDIA_API_KEY;
+    if (!apiKey || apiKey.trim() === 'your-nvidia-api-key' || apiKey.trim() === '') {
+      throw new Error('NVIDIA_API_KEY not configured. Using local fallback templates.');
+    }
+
+    console.log('[AI Simulation] Fetching batch users, captions, and comments from NVIDIA NIM...');
+    
+    const [
+      users,
+      techPost, moneyPost, healthPost, generalPost,
+      techReel, moneyReel, healthReel, generalReel,
+      comments
+    ] = await Promise.all([
+      generateAIUsersBatch(50, countryCode),
+      generateAICaptionsBatch('tech', 25, countryCode, 'post'),
+      generateAICaptionsBatch('money', 25, countryCode, 'post'),
+      generateAICaptionsBatch('health', 25, countryCode, 'post'),
+      generateAICaptionsBatch('general', 25, countryCode, 'post'),
+      generateAICaptionsBatch('tech', 25, countryCode, 'reel'),
+      generateAICaptionsBatch('money', 25, countryCode, 'reel'),
+      generateAICaptionsBatch('health', 25, countryCode, 'reel'),
+      generateAICaptionsBatch('general', 25, countryCode, 'reel'),
+      generateAICommentsBatch(60, countryCode)
+    ]);
+
+    const cacheData: AICache = {
+      timestamp: Date.now(),
+      countryCode,
+      users,
+      captions: {
+        tech: techPost,
+        money: moneyPost,
+        health: healthPost,
+        general: generalPost
+      },
+      reelCaptions: {
+        tech: techReel,
+        money: moneyReel,
+        health: healthReel,
+        general: generalReel
+      },
+      comments
+    };
+
+    try {
+      fs.mkdirSync(path.dirname(cacheFile), { recursive: true });
+      fs.writeFileSync(cacheFile, JSON.stringify(cacheData, null, 2), 'utf8');
+      console.log('[AI Simulation] Cache file written successfully:', cacheFile);
+      cachedDataInMemory = cacheData;
+    } catch (writeErr) {
+      console.error('[AI Simulation] Failed to write cache file:', writeErr);
+    }
+
+    return cacheData;
+  } catch (error: any) {
+    console.warn('[AI Simulation] LLM generation failed or key unconfigured. Falling back to local templates.', error.message || error);
+    const fallback = generateLocalFallbackCache(countryCode);
+    cachedDataInMemory = fallback;
+    return fallback;
+  }
+}
 
 // Returns simulation settings with default fallbacks
 export async function getSimulationSettings() {
@@ -631,7 +1007,6 @@ export async function detectCountryCode(currentUserId?: string | null): Promise<
     }
   }
 
-  // Parse location text to match country
   if (userLocation) {
     const loc = userLocation.toLowerCase();
     const hasIndianCity = [
@@ -662,7 +1037,6 @@ export async function detectCountryCode(currentUserId?: string | null): Promise<
       const acceptLanguage = reqHeaders.get('accept-language');
       if (acceptLanguage) {
         const lang = acceptLanguage.toLowerCase();
-        // Specifically look for country subtags to avoid treating generic en-US language as US country
         if (lang.includes('en-in') || lang.includes('hi-in') || lang.includes('hi')) {
           countryHeader = 'IN';
         } else if (lang.includes('en-gb') || lang.includes('gb-') || lang.includes('uk-')) {
@@ -753,29 +1127,29 @@ export function getSimulatedEngagement(
     likes = 40000 + (hash % 60000);
     comments = 2000 + ((hash >> 2) % 4000);
     views = 1500000 + ((hash >> 4) % 3000000);
-    shares = 2000 + ((hash >> 6) % 6000);
-    saves = 1000 + ((hash >> 8) % 3000);
+    shares = 2000 + ((hash >> 6) % 600);
+    saves = 1000 + ((hash >> 8) % 300);
   } else if (roll < 10) {
     // Trending Post
     likes = 5000 + (hash % 5000);
     comments = 300 + ((hash >> 2) % 300);
     views = 100000 + ((hash >> 4) % 150000);
-    shares = 300 + ((hash >> 6) % 600);
-    saves = 200 + ((hash >> 8) % 500);
+    shares = 300 + ((hash >> 6) % 60);
+    saves = 200 + ((hash >> 8) % 50);
   } else if (roll < 35) {
     // Popular Post
     likes = 500 + (hash % 700);
     comments = 40 + ((hash >> 2) % 50);
     views = 10000 + ((hash >> 4) % 20000);
-    shares = 30 + ((hash >> 6) % 70);
-    saves = 20 + ((hash >> 8) % 60);
+    shares = 30 + ((hash >> 6) % 7);
+    saves = 20 + ((hash >> 8) % 6);
   } else {
     // Normal Post
     likes = 15 + (hash % 35);
     comments = 2 + ((hash >> 2) % 7);
     views = 500 + ((hash >> 4) % 1000);
-    shares = 1 + ((hash >> 6) % 6);
-    saves = 1 + ((hash >> 8) % 5);
+    shares = 1 + ((hash >> 6) % 2);
+    saves = 1 + ((hash >> 8) % 2);
   }
 
   if (views <= likes) {
@@ -795,8 +1169,10 @@ export function getSimulatedEngagement(
 export function generateDynamicComments(postId: string, count: number, countryCode = 'IN') {
   const list = [];
   
-  // Use country-specific comment pool
-  const commentsPool = MOCK_COMMENTS_BY_COUNTRY[countryCode] || MOCK_COMMENTS_BY_COUNTRY.OTHER;
+  const aiCache = getAICacheSync(countryCode);
+  const commentsPool = aiCache.comments && aiCache.comments.length > 0 
+    ? aiCache.comments 
+    : MOCK_COMMENTS_BY_COUNTRY[countryCode] || MOCK_COMMENTS_BY_COUNTRY.OTHER;
 
   for (let i = 0; i < count; i++) {
     let seed = 0;
@@ -806,7 +1182,6 @@ export function generateDynamicComments(postId: string, count: number, countryCo
     }
     seed = Math.abs(seed);
 
-    // Roll for author country: 85% regional matching countryCode, 15% other country (for diversity)
     const authorCountryRoll = seed % 100;
     let authorCountry = countryCode;
     if (authorCountryRoll >= 85) {
@@ -818,7 +1193,12 @@ export function generateDynamicComments(postId: string, count: number, countryCo
     const authorIndex = seed % namePool.length;
     const name = namePool[authorIndex];
     const username = generateRealisticUsername(name, seed);
-    const avatar = MOCK_AVATARS[seed % MOCK_AVATARS.length];
+    
+    // Choose appropriate avatar pool
+    const gender = seed % 2 === 0 ? 'female' : 'male';
+    const avatarPool = gender === 'female' ? MOCK_AVATARS_FEMALE : MOCK_AVATARS_MALE;
+    const avatar = avatarPool[seed % avatarPool.length];
+    
     const createdAt = new Date(Date.now() - (i + 1) * 35 * 60 * 1000);
 
     list.push({
@@ -843,7 +1223,6 @@ function getCategoryKey(category: string): string {
   if (norm.includes('tech') || norm.includes('developer') || norm.includes('coding') || norm.includes('titans')) return 'tech';
   if (norm.includes('money') || norm.includes('business') || norm.includes('finance') || norm.includes('real estate') || norm.includes('startup') || norm.includes('invest') || norm.includes('india') || norm.includes('property') || norm.includes('dubai')) return 'money';
   if (norm.includes('health') || norm.includes('doctor') || norm.includes('medical') || norm.includes('fit') || norm.includes('wellness') || norm.includes('gym')) return 'health';
-  if (norm.includes('music') || norm.includes('song') || norm.includes('audio') || norm.includes('soul')) return 'music';
   return 'general';
 }
 
@@ -876,12 +1255,9 @@ export function generateDynamicGroupPosts(
     targetCount = 50 + (hash % 901); // 50 to 950
   }
 
-  // Time block rotates every 15 seconds
   const timeBlock = Math.floor(Date.now() / 15000);
-
   const activeCount = Math.min(targetCount, 60);
   const startIndex = timeBlock % targetCount;
-
   const simPosts: any[] = [];
 
   for (let i = 0; i < activeCount; i++) {
@@ -894,7 +1270,6 @@ export function generateDynamicGroupPosts(
     }
     postSeed = Math.abs(postSeed);
 
-    // Roll for author country: 85% regional matching countryCode, 15% other country (for diversity)
     const authorCountryRoll = postSeed % 100;
     let authorCountry = countryCode;
     if (authorCountryRoll >= 85) {
@@ -902,20 +1277,27 @@ export function generateDynamicGroupPosts(
       authorCountry = countries[postSeed % countries.length];
     }
 
-    const namePool = MOCK_NAMES_BY_COUNTRY[authorCountry] || MOCK_NAMES_BY_COUNTRY.OTHER;
     const cityPool = MOCK_CITIES_BY_COUNTRY[authorCountry] || MOCK_CITIES_BY_COUNTRY.OTHER;
 
-    // Localized captions templates
-    const templatesByCountry = CATEGORY_TEMPLATES_BY_COUNTRY[authorCountry] || CATEGORY_TEMPLATES_BY_COUNTRY.GLOBAL;
-    const catKey = getCategoryKey(category || toleeName);
-    const templates = templatesByCountry[catKey] || templatesByCountry.general;
+    // Load AI cache for author country
+    const aiCache = getAICacheSync(authorCountry);
+    const usersPool = aiCache.users && aiCache.users.length > 0 
+      ? aiCache.users 
+      : generateLocalFallbackCache(authorCountry).users;
 
-    const authorIdx = postSeed % namePool.length;
-    const authorName = namePool[authorIdx];
+    const cachedUser = usersPool[postSeed % usersPool.length];
+    const authorName = cachedUser.name;
     const username = generateRealisticUsername(authorName, postSeed);
-    const avatar = MOCK_AVATARS[postSeed % MOCK_AVATARS.length];
-    const profession = MOCK_PROFESSIONS[postSeed % MOCK_PROFESSIONS.length];
+    
+    // Choose appropriate avatar pool
+    const avatarPool = cachedUser.gender === 'female' ? MOCK_AVATARS_FEMALE : MOCK_AVATARS_MALE;
+    const avatar = avatarPool[postSeed % avatarPool.length];
+    const profession = cachedUser.profession;
     const location = cityPool[postSeed % cityPool.length];
+    const catKey = cachedUser.postCategory;
+
+    const captionsList = aiCache.captions[catKey] || aiCache.captions.general;
+    const reelsList = aiCache.reelCaptions[catKey] || aiCache.reelCaptions.general;
 
     const typeRoll = postSeed % 100;
     let postType = 'regular';
@@ -923,26 +1305,30 @@ export function generateDynamicGroupPosts(
     let mediaUrls: string | null = null;
     let mediaTypes: string | null = null;
 
-    if (typeRoll < 12) {
+    const fallbackTemplates = CATEGORY_TEMPLATES_BY_COUNTRY[authorCountry] || CATEGORY_TEMPLATES_BY_COUNTRY.GLOBAL;
+    const templates = fallbackTemplates[catKey] || fallbackTemplates.general;
+
+    if (typeRoll < 10) {
       postType = 'poll';
       const pollTpl = templates.polls[postSeed % templates.polls.length];
-      content = `📊 POLL: ${pollTpl.question}\n\nOptions:\n` + pollTpl.options.map((o, idx) => `  [ ] ${o}`).join('\n');
-    } else if (typeRoll < 22) {
+      content = `📊 POLL: ${pollTpl.question}\n\nOptions:\n` + pollTpl.options.map((o) => `  [ ] ${o}`).join('\n');
+    } else if (typeRoll < 18) {
       postType = 'event';
       content = `📅 EVENT: ${templates.events[postSeed % templates.events.length]}`;
-    } else if (typeRoll < 32) {
+    } else if (typeRoll < 26) {
       postType = 'announcement';
       content = `📢 ANNOUNCEMENT: ${templates.announcements[postSeed % templates.announcements.length]}`;
-    } else if (typeRoll < 47) {
+    } else if (typeRoll < 38) {
       postType = 'question';
       content = `❓ QUESTION: ${templates.questions[postSeed % templates.questions.length]}`;
     } else {
       postType = 'regular';
-      content = templates.captions[postSeed % templates.captions.length];
+      content = captionsList[postSeed % captionsList.length];
       
       const mediaRoll = (postSeed >> 2) % 100;
       if (mediaRoll < 45) {
-        mediaUrls = templates.images[postSeed % templates.images.length];
+        const imgList = UNSPLASH_IMAGES[catKey] || UNSPLASH_IMAGES.general;
+        mediaUrls = imgList[postSeed % imgList.length];
         mediaTypes = 'image';
       } else if (mediaRoll < 65) {
         mediaTypes = 'video';
@@ -957,9 +1343,7 @@ export function generateDynamicGroupPosts(
       }
     }
 
-    // Stagger timestamp
     const createdAt = new Date(Date.now() - (i * 25 * 60 * 1000) - (timeBlock % 10) * 15 * 1000);
-
     const eng = getSimulatedEngagement(postId);
 
     simPosts.push({
@@ -977,7 +1361,7 @@ export function generateDynamicGroupPosts(
         updatedAt: createdAt,
         isSimulation: true,
         author: {
-          id: `sim-user-${authorIdx}-${authorCountry}`,
+          id: `sim-user-${postSeed % 1000}-${authorCountry}`,
           name: authorName,
           username,
           avatar,
@@ -1030,14 +1414,57 @@ export function generateDynamicGroupPosts(
 export async function syncSimulationData() {
   const settings = await getSimulationSettings();
   
-  await prisma.comment.deleteMany({ where: { isSimulation: true } });
-  await prisma.postTolee.deleteMany({ where: { post: { isSimulation: true } } });
+  // Clean up existing simulated records safely to prevent foreign key errors
+  await prisma.comment.deleteMany({
+    where: {
+      OR: [
+        { isSimulation: true },
+        { post: { isSimulation: true } },
+        { author: { isSimulation: true } }
+      ]
+    }
+  });
+
+  await prisma.like.deleteMany({
+    where: {
+      OR: [
+        { post: { isSimulation: true } },
+        { user: { isSimulation: true } }
+      ]
+    }
+  });
+
+  await prisma.follow.deleteMany({
+    where: {
+      OR: [
+        { follower: { isSimulation: true } },
+        { following: { isSimulation: true } }
+      ]
+    }
+  });
+
+  await prisma.toleeMember.deleteMany({
+    where: {
+      user: { isSimulation: true }
+    }
+  });
+
+  await prisma.postTolee.deleteMany({
+    where: {
+      post: { isSimulation: true }
+    }
+  });
+
   await prisma.post.deleteMany({ where: { isSimulation: true } });
   await prisma.user.deleteMany({ where: { isSimulation: true } });
 
   if (!settings.simulationMode) {
     return { success: true, message: 'Simulation mode is OFF. Cleaned up simulated data.' };
   }
+
+  // Pre-warm the cache using either LLM or fallback
+  const countryCode = await detectCountryCode(null);
+  const aiCache = await loadOrCreateAICache(countryCode);
 
   const actualUsersCount = Math.min(settings.simulatedUsersCount, 150);
   const actualPostsCount = Math.min(settings.simulatedPostsCount, 100);
@@ -1048,18 +1475,18 @@ export async function syncSimulationData() {
     return { success: false, error: 'No active groups (Tolees) found in the database to link simulated posts to.' };
   }
 
+  // 1. Create simulated users
   const usersToCreate = [];
   for (let i = 0; i < actualUsersCount; i++) {
-    // Seed Indian profiles mostly for database base
-    const namePool = MOCK_NAMES_BY_COUNTRY.IN;
-    const cityPool = MOCK_CITIES_BY_COUNTRY.IN;
-    const name = namePool[i % namePool.length] + (Math.floor(i / namePool.length) ? ' ' + Math.floor(i / namePool.length) : '');
+    const cachedUser = aiCache.users[i % aiCache.users.length];
+    const suffix = Math.floor(i / aiCache.users.length) > 0 ? ` ${Math.floor(i / aiCache.users.length)}` : '';
+    const name = cachedUser.name + suffix;
     const username = generateRealisticUsername(name, i);
     const email = `${username}@simulatedtolee.com`;
-    const avatar = MOCK_AVATARS[i % MOCK_AVATARS.length];
-    const profession = MOCK_PROFESSIONS[i % MOCK_PROFESSIONS.length];
-    const bio = MOCK_BIOS[i % MOCK_BIOS.length] + ` | ${profession}`;
-    const location = cityPool[i % cityPool.length];
+    
+    // Choose appropriate avatar pool matching gender
+    const avatarPool = cachedUser.gender === 'female' ? MOCK_AVATARS_FEMALE : MOCK_AVATARS_MALE;
+    const avatar = avatarPool[i % avatarPool.length];
     
     usersToCreate.push({
       username,
@@ -1067,9 +1494,9 @@ export async function syncSimulationData() {
       email,
       avatar,
       image: avatar,
-      bio,
-      profession,
-      location,
+      bio: cachedUser.bio,
+      profession: cachedUser.profession,
+      location: cachedUser.location,
       isVerified: i % 4 === 0,
       isSimulation: true,
     });
@@ -1078,21 +1505,113 @@ export async function syncSimulationData() {
   await prisma.user.createMany({ data: usersToCreate });
   const createdUsers = await prisma.user.findMany({
     where: { isSimulation: true },
-    select: { id: true }
+    select: { id: true, profession: true, location: true, name: true, username: true }
   });
 
   if (createdUsers.length === 0) {
     return { success: false, error: 'Failed to retrieve seeded simulated users.' };
   }
 
+  // 2. Setup followers & memberships
+  const realUsers = await prisma.user.findMany({
+    where: { isSimulation: false },
+    take: 10,
+    select: { id: true }
+  });
+
+  const followsToCreate = [];
+  const toleeMemberships = [];
+
+  for (let i = 0; i < createdUsers.length; i++) {
+    const user = createdUsers[i];
+
+    // Join Tolee groups
+    const joinCount = Math.min(activeTolees.length, 2 + (i % 2));
+    const shuffledTolees = [...activeTolees].sort(() => 0.5 - (i % 10) / 10);
+    for (let j = 0; j < joinCount; j++) {
+      toleeMemberships.push({
+        userId: user.id,
+        toleeId: shuffledTolees[j].id,
+        role: 'member',
+        status: 'approved'
+      });
+    }
+
+    // Follow fellow simulated users
+    const followCount = Math.min(createdUsers.length - 1, 3 + (i % 3));
+    for (let j = 1; j <= followCount; j++) {
+      const targetUser = createdUsers[(i + j) % createdUsers.length];
+      followsToCreate.push({
+        followerId: user.id,
+        followingId: targetUser.id,
+        status: 'approved'
+      });
+    }
+
+    // Follow real creators
+    if (realUsers.length > 0) {
+      const realCount = Math.min(realUsers.length, 1 + (i % 2));
+      for (let j = 0; j < realCount; j++) {
+        followsToCreate.push({
+          followerId: user.id,
+          followingId: realUsers[j].id,
+          status: 'approved'
+        });
+      }
+    }
+  }
+
+  // De-duplicate follow relationships
+  const uniqueFollowsMap = new Map();
+  for (const f of followsToCreate) {
+    const key = `${f.followerId}-${f.followingId}`;
+    uniqueFollowsMap.set(key, f);
+  }
+
+  await prisma.follow.createMany({ data: Array.from(uniqueFollowsMap.values()) });
+  await prisma.toleeMember.createMany({ data: toleeMemberships });
+
+  // 3. Create unique posts and reels
   const postsToCreate = [];
+  const posters = createdUsers.filter((_u: any, idx: number) => idx % 2 === 0);
+  if (posters.length === 0) posters.push(createdUsers[0]);
+
+  const getCategoryFromProfession = (prof: string | null): string => {
+    if (!prof) return 'general';
+    const norm = prof.toLowerCase();
+    if (norm.includes('engineer') || norm.includes('designer') || norm.includes('marketer') || norm.includes('influencer')) return 'tech';
+    if (norm.includes('owner') || norm.includes('agent') || norm.includes('investor') || norm.includes('creator')) return 'money';
+    if (norm.includes('doctor') || norm.includes('trainer') || norm.includes('blogger')) return 'health';
+    return 'general';
+  };
+
+  const usedCaptions = new Set<string>();
+
+  // Regular Posts
   for (let i = 0; i < actualPostsCount; i++) {
-    const author = createdUsers[i % createdUsers.length];
-    const isImage = i % 3 !== 0;
-    const mediaUrls = isImage ? CATEGORY_TEMPLATES_BY_COUNTRY.IN.general.images[i % CATEGORY_TEMPLATES_BY_COUNTRY.IN.general.images.length] : null;
-    const mediaTypes = isImage ? 'image' : null;
-    const caption = CATEGORY_TEMPLATES_BY_COUNTRY.IN.general.captions[i % CATEGORY_TEMPLATES_BY_COUNTRY.IN.general.captions.length];
+    const author = posters[i % posters.length];
+    const category = getCategoryFromProfession(author.profession);
+    const captionsList = aiCache.captions[category] || aiCache.captions.general;
     
+    let caption = captionsList[i % captionsList.length];
+    if (usedCaptions.has(caption)) {
+      caption = caption + ` (Update #${Math.floor(i / captionsList.length) + 1})`;
+    }
+    usedCaptions.add(caption);
+
+    let mediaUrls: string | null = null;
+    let mediaTypes: string | null = null;
+    const mediaRoll = i % 10;
+    
+    if (mediaRoll < 5) {
+      const imgList = UNSPLASH_IMAGES[category] || UNSPLASH_IMAGES.general;
+      mediaUrls = imgList[i % imgList.length];
+      mediaTypes = 'image';
+    } else if (mediaRoll < 7) {
+      mediaUrls = FALLBACK_PIXABAY_VIDEOS[i % FALLBACK_PIXABAY_VIDEOS.length];
+      mediaTypes = 'video';
+    }
+
     postsToCreate.push({
       authorId: author.id,
       caption,
@@ -1106,34 +1625,25 @@ export async function syncSimulationData() {
     });
   }
 
-  // Trigger background pre-fetches for all categories to populate the cache
-  fetchPixabayVideosInBackground('tech');
-  fetchPixabayVideosInBackground('money');
-  fetchPixabayVideosInBackground('health');
-  fetchPixabayVideosInBackground('general');
-
-  const getSeededVideoUrl = (idx: number) => {
-    const categories = ['tech', 'money', 'health', 'general'];
-    const cat = categories[idx % categories.length];
-    const query = getPixabayQueryForCategory(cat);
-    const cachedList = cachedPixabayVideos[query];
-    if (cachedList && cachedList.length > 0) {
-      return cachedList[idx % cachedList.length];
-    }
-    return FALLBACK_PIXABAY_VIDEOS[idx % FALLBACK_PIXABAY_VIDEOS.length];
-  };
-
+  // Reels
   for (let i = 0; i < actualReelsCount; i++) {
-    const author = createdUsers[(i + 5) % createdUsers.length];
-    const mediaUrls = getSeededVideoUrl(i);
-    const mediaTypes = 'video';
-    const caption = `🔥 simulated reel: ${CATEGORY_TEMPLATES_BY_COUNTRY.IN.general.captions[i % CATEGORY_TEMPLATES_BY_COUNTRY.IN.general.captions.length].slice(0, 30)}...`;
+    const author = posters[(i + 3) % posters.length];
+    const category = getCategoryFromProfession(author.profession);
+    const reelsList = aiCache.reelCaptions[category] || aiCache.reelCaptions.general;
+
+    let caption = reelsList[i % reelsList.length];
+    if (usedCaptions.has(caption)) {
+      caption = caption + ` (Reel #${Math.floor(i / reelsList.length) + 1})`;
+    }
+    usedCaptions.add(caption);
+
+    const mediaUrls = FALLBACK_PIXABAY_VIDEOS[(i + 5) % FALLBACK_PIXABAY_VIDEOS.length];
 
     postsToCreate.push({
       authorId: author.id,
       caption,
       mediaUrls,
-      mediaTypes,
+      mediaTypes: 'video',
       postType: 'reel',
       visibility: 'public',
       isSimulation: true,
@@ -1145,9 +1655,10 @@ export async function syncSimulationData() {
   await prisma.post.createMany({ data: postsToCreate });
   const createdPosts = await prisma.post.findMany({
     where: { isSimulation: true },
-    select: { id: true, authorId: true }
+    select: { id: true, authorId: true, createdAt: true }
   });
 
+  // Link posts to Tolee groups
   const postToleeRelations = [];
   for (let i = 0; i < createdPosts.length; i++) {
     const post = createdPosts[i];
@@ -1158,7 +1669,7 @@ export async function syncSimulationData() {
       isPinned: false
     });
 
-    if (activeTolees.length > 1 && i % 2 === 0) {
+    if (activeTolees.length > 1 && i % 3 === 0) {
       const secondToleeIndex = (i + 1) % activeTolees.length;
       postToleeRelations.push({
         postId: post.id,
@@ -1169,24 +1680,69 @@ export async function syncSimulationData() {
   }
   await prisma.postTolee.createMany({ data: postToleeRelations });
 
+  // 4. Create Likes & Comments
+  const likesToCreate = [];
   const commentsToCreate = [];
+
   for (let i = 0; i < createdPosts.length; i++) {
     const post = createdPosts[i];
-    const commentCount = 2 + (i % 4);
-    for (let j = 0; j < commentCount; j++) {
-      const commenter = createdUsers[(i + j + 3) % createdUsers.length];
-      if (commenter.id === post.authorId) continue;
-      
+    const roll = (i * 11) % 100;
+    
+    let targetLikes = 0;
+    let targetComments = 0;
+
+    if (roll < 6) {
+      targetLikes = 45 + (i % 25);
+      targetComments = 12 + (i % 8);
+    } else if (roll < 22) {
+      targetLikes = 15 + (i % 15);
+      targetComments = 4 + (i % 4);
+    } else {
+      targetLikes = 1 + (i % 8);
+      targetComments = i % 2 === 0 ? 1 : 0;
+    }
+
+    targetLikes = Math.min(targetLikes, createdUsers.length - 1);
+    targetComments = Math.min(targetComments, createdUsers.length - 1);
+
+    const interactorsPool = createdUsers.filter((u: any) => u.id !== post.authorId);
+
+    // Seed Likes
+    const shuffledLikers = [...interactorsPool].sort(() => 0.5 - Math.random()).slice(0, targetLikes);
+    for (const liker of shuffledLikers) {
+      likesToCreate.push({
+        userId: liker.id,
+        postId: post.id,
+        createdAt: new Date(post.createdAt.getTime() + Math.random() * 2 * 3600 * 1000)
+      });
+    }
+
+    // Seed Comments
+    const shuffledCommenters = [...interactorsPool].sort(() => 0.5 - Math.random()).slice(0, targetComments);
+    const postCommentsPool = [...aiCache.comments].sort(() => 0.5 - Math.random());
+    
+    for (let j = 0; j < shuffledCommenters.length; j++) {
+      const commenter = shuffledCommenters[j];
+      const commentContent = postCommentsPool[j % postCommentsPool.length] || "Outstanding! 👏";
       commentsToCreate.push({
         postId: post.id,
         authorId: commenter.id,
-        content: MOCK_COMMENTS_BY_COUNTRY.IN[ (i + j) % MOCK_COMMENTS_BY_COUNTRY.IN.length ],
+        content: commentContent,
         isSimulation: true,
-        createdAt: new Date(post.createdAt.getTime() + (j + 1) * 20 * 60 * 1000),
+        createdAt: new Date(post.createdAt.getTime() + (j + 1) * 12 * 60 * 1000)
       });
     }
   }
-  await prisma.comment.createMany({ data: commentsToCreate });
 
-  return { success: true, message: `Simulation mode turned ON. Seeded database users, posts, and comments.` };
+  if (likesToCreate.length > 0) {
+    await prisma.like.createMany({ data: likesToCreate });
+  }
+  if (commentsToCreate.length > 0) {
+    await prisma.comment.createMany({ data: commentsToCreate });
+  }
+
+  return { 
+    success: true, 
+    message: `Simulation engine turned ON. Loaded AI Cache & seeded ${createdUsers.length} users, ${createdPosts.length} posts/reels, ${likesToCreate.length} likes, and ${commentsToCreate.length} comments.` 
+  };
 }
