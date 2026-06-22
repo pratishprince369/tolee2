@@ -14,13 +14,16 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    const { searchParams } = new URL(req.url);
+    const dataType = searchParams.get('dataType') || 'real';
+    const showSimulated = dataType === 'fake' || dataType === 'simulated' || dataType === 'mock';
+
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
     const simSettings = await getSimulationSettings();
-    const isSimOn = simSettings.simulationMode;
 
     // Run core counts with fallback to 0
     let [
@@ -37,21 +40,21 @@ export async function GET(req: NextRequest) {
       realUsersCount, simulatedUsersCount,
       realPostsCount, simulatedPostsCount
     ] = await Promise.all([
-      prisma.user.count().catch(() => 0),
-      prisma.user.count({ where: { lastLoginAt: { gte: todayStart } } }).catch(() => 0),
-      prisma.user.count({ where: { lastLoginAt: { gte: weekStart } } }).catch(() => 0),
-      prisma.user.count({ where: { lastLoginAt: { gte: monthStart } } }).catch(() => 0),
-      prisma.user.count({ where: { createdAt: { gte: todayStart } } }).catch(() => 0),
-      prisma.user.count({ where: { createdAt: { gte: monthStart } } }).catch(() => 0),
-      prisma.user.count({ where: { isVerified: true } }).catch(() => 0),
-      prisma.user.count({ where: { isSuspended: true } }).catch(() => 0),
+      prisma.user.count({ where: { isSimulation: showSimulated } }).catch(() => 0),
+      prisma.user.count({ where: { lastLoginAt: { gte: todayStart }, isSimulation: showSimulated } }).catch(() => 0),
+      prisma.user.count({ where: { lastLoginAt: { gte: weekStart }, isSimulation: showSimulated } }).catch(() => 0),
+      prisma.user.count({ where: { lastLoginAt: { gte: monthStart }, isSimulation: showSimulated } }).catch(() => 0),
+      prisma.user.count({ where: { createdAt: { gte: todayStart }, isSimulation: showSimulated } }).catch(() => 0),
+      prisma.user.count({ where: { createdAt: { gte: monthStart }, isSimulation: showSimulated } }).catch(() => 0),
+      prisma.user.count({ where: { isVerified: true, isSimulation: showSimulated } }).catch(() => 0),
+      prisma.user.count({ where: { isSuspended: true, isSimulation: showSimulated } }).catch(() => 0),
       prisma.tolee.count().catch(() => 0),
       prisma.tolee.count({ where: { createdAt: { gte: todayStart } } }).catch(() => 0),
-      prisma.post.count().catch(() => 0),
-      prisma.comment.count().catch(() => 0),
+      prisma.post.count({ where: { isSimulation: showSimulated } }).catch(() => 0),
+      prisma.comment.count({ where: { isSimulation: showSimulated } }).catch(() => 0),
       prisma.message.count().catch(() => 0),
       prisma.listing.count().catch(() => 0),
-      prisma.post.count({ where: { postType: 'reel' } }).catch(() => 0),
+      prisma.post.count({ where: { postType: 'reel', isSimulation: showSimulated } }).catch(() => 0),
       prisma.repost.count().catch(() => 0),
       prisma.securityEvent.count({ where: { resolved: false } }).catch(() => 0),
       prisma.auditLog.count().catch(() => 0),
@@ -61,8 +64,8 @@ export async function GET(req: NextRequest) {
       prisma.emailLog.count({ where: { status: 'failed' } }).catch(() => 0),
       prisma.emailLog.count({ where: { emailType: 'password_reset' } }).catch(() => 0),
       prisma.emailLog.count({ where: { emailType: 'verification' } }).catch(() => 0),
-      prisma.user.count({ where: { email_verified: true } }).catch(() => 0),
-      prisma.user.count({ where: { email_verified: false } }).catch(() => 0),
+      prisma.user.count({ where: { email_verified: true, isSimulation: showSimulated } }).catch(() => 0),
+      prisma.user.count({ where: { email_verified: false, isSimulation: showSimulated } }).catch(() => 0),
       prisma.auditLog.count({ where: { action: 'app_installed_click' } }).catch(() => 0),
       prisma.auditLog.count({ where: { action: 'app_installed_click', createdAt: { gte: todayStart } } }).catch(() => 0),
       prisma.user.count({ where: { isSimulation: false } }).catch(() => 0),
@@ -71,19 +74,19 @@ export async function GET(req: NextRequest) {
       prisma.post.count({ where: { isSimulation: true } }).catch(() => 0),
     ]);
 
-    if (isSimOn) {
-      totalUsers = simSettings.simulatedUsersCount;
-      activeToday = Math.floor(simSettings.simulatedUsersCount * 0.15) + (now.getTime() % 100);
-      activeWeek = Math.floor(simSettings.simulatedUsersCount * 0.45);
-      activeMonth = Math.floor(simSettings.simulatedUsersCount * 0.85);
-      newToday = Math.floor(simSettings.simulatedUsersCount * 0.02) + (now.getTime() % 50);
-      newThisMonth = Math.floor(simSettings.simulatedUsersCount * 0.25);
-      verifiedUsers = Math.floor(simSettings.simulatedUsersCount * 0.25);
+    if (showSimulated) {
+      totalUsers = simSettings.simulatedUsersCount || totalUsers;
+      activeToday = Math.floor((simSettings.simulatedUsersCount || totalUsers) * 0.15) + (now.getTime() % 100);
+      activeWeek = Math.floor((simSettings.simulatedUsersCount || totalUsers) * 0.45);
+      activeMonth = Math.floor((simSettings.simulatedUsersCount || totalUsers) * 0.85);
+      newToday = Math.floor((simSettings.simulatedUsersCount || totalUsers) * 0.02) + (now.getTime() % 50);
+      newThisMonth = Math.floor((simSettings.simulatedUsersCount || totalUsers) * 0.25);
+      verifiedUsers = Math.floor((simSettings.simulatedUsersCount || totalUsers) * 0.25);
       
-      totalPosts = simSettings.simulatedPostsCount;
-      totalReels = simSettings.simulatedReelsCount;
-      totalComments = simSettings.simulatedPostsCount * 4;
-      totalShares = Math.floor(simSettings.simulatedPostsCount * 0.2);
+      totalPosts = simSettings.simulatedPostsCount || totalPosts;
+      totalReels = simSettings.simulatedReelsCount || totalReels;
+      totalComments = (simSettings.simulatedPostsCount || totalPosts) * 4;
+      totalShares = Math.floor((simSettings.simulatedPostsCount || totalPosts) * 0.2);
     }
 
     // Top communities using correct Prisma syntax (select only)
@@ -101,6 +104,7 @@ export async function GET(req: NextRequest) {
     }).catch(() => []);
 
     const recentUsers = await prisma.user.findMany({
+      where: { isSimulation: showSimulated },
       take: 6,
       orderBy: { createdAt: 'desc' },
       select: { id: true, name: true, email: true, avatar: true, createdAt: true, isVerified: true, isSuspended: true }
@@ -125,7 +129,7 @@ export async function GET(req: NextRequest) {
     const userGrowth = await Promise.all(
       days.map(async (dayStart) => {
         const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
-        const count = await prisma.user.count({ where: { createdAt: { gte: dayStart, lt: dayEnd } } }).catch(() => 0);
+        const count = await prisma.user.count({ where: { createdAt: { gte: dayStart, lt: dayEnd }, isSimulation: showSimulated } }).catch(() => 0);
         return { date: dayStart.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }), count };
       })
     );
@@ -133,8 +137,8 @@ export async function GET(req: NextRequest) {
     const contentDistribution = await Promise.all(
       days.map(async (dayStart) => {
         const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
-        const posts = await prisma.post.count({ where: { createdAt: { gte: dayStart, lt: dayEnd }, NOT: { postType: 'reel' } } }).catch(() => 0);
-        const reels = await prisma.post.count({ where: { createdAt: { gte: dayStart, lt: dayEnd }, postType: 'reel' } }).catch(() => 0);
+        const posts = await prisma.post.count({ where: { createdAt: { gte: dayStart, lt: dayEnd }, NOT: { postType: 'reel' }, isSimulation: showSimulated } }).catch(() => 0);
+        const reels = await prisma.post.count({ where: { createdAt: { gte: dayStart, lt: dayEnd }, postType: 'reel', isSimulation: showSimulated } }).catch(() => 0);
         const listings = await prisma.listing.count({ where: { createdAt: { gte: dayStart, lt: dayEnd } } }).catch(() => 0);
         return {
           date: dayStart.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }),
@@ -149,9 +153,9 @@ export async function GET(req: NextRequest) {
     const activeUsersHistory = await Promise.all(
       days.map(async (dayStart) => {
         const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
-        const dau = await prisma.user.count({ where: { lastLoginAt: { gte: dayStart, lt: dayEnd } } }).catch(() => 0);
-        const wau = await prisma.user.count({ where: { lastLoginAt: { gte: new Date(dayStart.getTime() - 7 * 24 * 60 * 60 * 1000), lt: dayEnd } } }).catch(() => 0);
-        const mau = await prisma.user.count({ where: { lastLoginAt: { gte: new Date(dayStart.getTime() - 30 * 24 * 60 * 60 * 1000), lt: dayEnd } } }).catch(() => 0);
+        const dau = await prisma.user.count({ where: { lastLoginAt: { gte: dayStart, lt: dayEnd }, isSimulation: showSimulated } }).catch(() => 0);
+        const wau = await prisma.user.count({ where: { lastLoginAt: { gte: new Date(dayStart.getTime() - 7 * 24 * 60 * 60 * 1000), lt: dayEnd }, isSimulation: showSimulated } }).catch(() => 0);
+        const mau = await prisma.user.count({ where: { lastLoginAt: { gte: new Date(dayStart.getTime() - 30 * 24 * 60 * 60 * 1000), lt: dayEnd }, isSimulation: showSimulated } }).catch(() => 0);
         return {
           date: dayStart.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }),
           dau: Math.max(dau, Math.round(totalUsers * 0.1)), // Fallback base for visual graphs if logins aren't fully recorded yet

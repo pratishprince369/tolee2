@@ -455,6 +455,7 @@ function getSocketUrl() {
 }
 
 export default function SuperAdminOverview() {
+  const [dataType, setDataType] = useState<'real' | 'simulated'>('real');
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -557,9 +558,9 @@ export default function SuperAdminOverview() {
     return `${diffMins}m ${remainingSecs}s`;
   };
 
-  const fetchMetrics = async () => {
+  const fetchMetrics = async (type = dataType) => {
     try {
-      const res = await fetch('/api/super-admin/metrics');
+      const res = await fetch(`/api/super-admin/metrics?dataType=${type}`);
       if (!res.ok) throw new Error('Failed');
       setMetrics(await res.json());
       setLastRefreshed(new Date());
@@ -572,16 +573,16 @@ export default function SuperAdminOverview() {
   };
 
   useEffect(() => {
-    fetchMetrics();
+    fetchMetrics(dataType);
     return () => {
       if (pollingTimerRef.current) clearInterval(pollingTimerRef.current);
     };
-  }, []);
+  }, [dataType]);
 
   useEffect(() => {
     if (pollingActive) {
       pollingTimerRef.current = setInterval(() => {
-        fetchMetrics();
+        fetchMetrics(dataType);
       }, 30000); // refresh every 30 seconds
     } else {
       if (pollingTimerRef.current) {
@@ -592,7 +593,7 @@ export default function SuperAdminOverview() {
     return () => {
       if (pollingTimerRef.current) clearInterval(pollingTimerRef.current);
     };
-  }, [pollingActive]);
+  }, [pollingActive, dataType]);
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 400 }}>
@@ -667,12 +668,50 @@ export default function SuperAdminOverview() {
           </label>
 
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-            <button onClick={fetchMetrics} className="refresh-btn" style={{ background: '#18181b', border: '1px solid #27272a', borderRadius: 10, color: '#a1a1aa', padding: '8px 16px', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600 }}>
+            <button onClick={() => fetchMetrics(dataType)} className="refresh-btn" style={{ background: '#18181b', border: '1px solid #27272a', borderRadius: 10, color: '#a1a1aa', padding: '8px 16px', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600 }}>
               🔄 Refresh Analytics
             </button>
             <span style={{ fontSize: 10, color: '#52525b', marginTop: 4 }}>Sync: {lastRefreshed.toLocaleTimeString()}</span>
           </div>
         </div>
+      </div>
+
+      {/* Real vs Simulated Data Tabs */}
+      <div style={{ display: 'flex', borderBottom: '1px solid #1c1c1e', gap: 24, marginBottom: 10 }}>
+        <button
+          onClick={() => { setDataType('real'); setLoading(true); }}
+          style={{
+            background: 'none',
+            border: 'none',
+            borderBottom: dataType === 'real' ? '2px solid #22c55e' : '2px solid transparent',
+            color: dataType === 'real' ? '#fff' : '#71717a',
+            padding: '12px 6px',
+            fontSize: 15,
+            fontWeight: 700,
+            cursor: 'pointer',
+            transition: 'all 0.15s',
+            outline: 'none',
+          }}
+        >
+          👤 Real Data
+        </button>
+        <button
+          onClick={() => { setDataType('simulated'); setLoading(true); }}
+          style={{
+            background: 'none',
+            border: 'none',
+            borderBottom: dataType === 'simulated' ? '2px solid #22c55e' : '2px solid transparent',
+            color: dataType === 'simulated' ? '#fff' : '#71717a',
+            padding: '12px 6px',
+            fontSize: 15,
+            fontWeight: 700,
+            cursor: 'pointer',
+            transition: 'all 0.15s',
+            outline: 'none',
+          }}
+        >
+          🤖 Simulated Data
+        </button>
       </div>
 
       {/* Security Alert Header */}
