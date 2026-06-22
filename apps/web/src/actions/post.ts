@@ -8,7 +8,7 @@ import { headers } from 'next/headers';
 import { getOrCreatePersonalChat } from './chat';
 import { extractPublicIdFromUrl, extractResourceTypeFromUrl, destroyMultipleAssets } from '@/lib/cloudinary-cleanup';
 import { createSystemNotification, createSystemNotificationsMany } from '@/lib/notification-service';
-import { getSimulationSettings, getSimulatedEngagement, generateDynamicComments, detectCountryCode } from '@/lib/simulation';
+import { getSimulationSettings, getSimulatedEngagement, generateDynamicComments, detectCountryCode, getAICacheSync } from '@/lib/simulation';
 
 export async function createPost(data: {
   content?: string;
@@ -157,7 +157,7 @@ export async function createPost(data: {
   }
 }
 
-export async function getPosts() {
+export async function getPosts(options?: { mediaType?: string; limit?: number }) {
   try {
     const session = await getServerSession(authOptions);
     const currentUserId = (session?.user as any)?.id;
@@ -165,23 +165,68 @@ export async function getPosts() {
     const simSettings = await getSimulationSettings();
     const isSimOn = simSettings.simulationMode;
 
-    const posts = await prisma.post.findMany({
+    const limit = options?.limit || 30;
+    const mediaType = options?.mediaType;
+
+    // Trigger dynamic simulation activity in background if simulated latest post is too old
+    if (isSimOn) {
+      const checkAndTrigger = async () => {
+        try {
+          const latestSimPost = await prisma.post.findFirst({
+            where: { isSimulation: true },
+            orderBy: { createdAt: 'desc' },
+            select: { createdAt: true }
+          });
+          const timeSinceLast = latestSimPost 
+            ? Date.now() - new Date(latestSimPost.createdAt).getTime()
+            : Infinity;
+          
+          if (timeSinceLast > 15 * 60 * 1000) { // 15 minutes
+            console.log('[Simulation Activity Trigger] Latest post is old. Triggering background simulation activity...');
+            const { runBackgroundSimulationActivity } = require('@/lib/simulation');
+            runBackgroundSimulationActivity();
+          }
+        } catch (e) {
+          console.error('[Simulation Activity Trigger] Check failed:', e);
+        }
+      };
+      checkAndTrigger();
+    }
+
+    // Determine viewed post history to support Anti-Repetition
+    let viewedPostIds: string[] = [];
+    if (currentUserId) {
+      const recentViews = await prisma.view.findMany({
+        where: {
+          viewer_user_id: currentUserId,
+          contentType: 'post',
+          createdAt: {
+            gte: new Date(Date.now() - 2 * 3600 * 1000) // last 2 hours
+          }
+        },
+        select: {
+          contentId: true
+        }
+      });
+      viewedPostIds = recentViews.map(v => v.contentId);
+    }
+
+    // Fetch all published posts
+    let posts = await prisma.post.findMany({
       where: {
         isArchived: false,
         status: 'published',
         ...(!isSimOn ? { isSimulation: false } : {}),
+        ...(mediaType ? { mediaTypes: mediaType } : {}),
         ...(currentUserId ? {
           OR: [
-            // Public author
             {
               author: { isPrivate: false },
               visibility: 'public'
             },
-            // My own posts
             {
               authorId: currentUserId
             },
-            // Posts from private users I follow (approved)
             {
               author: {
                 isPrivate: true,
@@ -203,7 +248,7 @@ export async function getPosts() {
         })
       },
       orderBy: { createdAt: 'desc' },
-      take: isSimOn ? 100 : 20,
+      take: isSimOn ? 250 : 50, // Grab a larger pool when simulation is active for proper mixing
       select: {
         id: true,
         caption: true,
@@ -216,6 +261,7 @@ export async function getPosts() {
         subLocation: true,
         createdAt: true,
         worldProjectId: true,
+        isSimulation: true,
         worldProject: {
           select: {
             id: true,
@@ -242,7 +288,8 @@ export async function getPosts() {
                 id: true,
                 name: true,
                 slug: true,
-                ownerId: true
+                ownerId: true,
+                category: true
               }
             }
           }
@@ -299,8 +346,256 @@ export async function getPosts() {
       }
     });
 
+    // Dynamic Pexels Injection for simulated reels
+    if (isSimOn && mediaType === 'video') {
+      try {
+        const aiCache = getAICacheSync('IN');
+        const cachedVideos = aiCache.mediaAssets?.filter(m => m.type === 'video') || [];
+
+        if (cachedVideos.length > 0) {
+          const simUsers = await prisma.user.findMany({
+            where: { isSimulation: true },
+            take: 15
+          });
+
+          if (simUsers.length > 0) {
+            // Shuffle and take up to 15
+            const shuffledVideos = [...cachedVideos].sort(() => 0.5 - Math.random()).slice(0, 15);
+            const dynamicReels = shuffledVideos.map((video, idx) => {
+              const author = simUsers[idx % simUsers.length];
+              return {
+                id: `pexels_dyn_reel_${idx}_${Date.now()}`,
+                caption: video.caption,
+                postType: 'reel',
+                mediaUrls: video.url,
+                mediaTypes: 'video',
+                visibility: 'public',
+                shareCount: Math.floor(Math.random() * 100),
+                location: author.location,
+                subLocation: null,
+                createdAt: new Date(Date.now() - idx * 10 * 60 * 1000),
+                isSimulation: true,
+                author: {
+                  id: author.id,
+                  name: author.name,
+                  username: author.username,
+                  avatar: author.avatar,
+                  isPrivate: false
+                },
+                tolees: [],
+                likes: [],
+                savedBy: [],
+                reposts: [],
+                _count: {
+                  likes: Math.floor(Math.random() * 200 + 10),
+                  comments: Math.floor(Math.random() * 10 + 1),
+                  reposts: Math.floor(Math.random() * 5),
+                  views: Math.floor(Math.random() * 1000 + 100)
+                },
+                comments: []
+              };
+            });
+            posts.push(...dynamicReels);
+          }
+        } else {
+          // Fallback to fetch on-the-fly from Pexels API
+          const apiKey = process.env.PEXELS_API_KEY;
+          if (apiKey && apiKey.trim() !== '') {
+            const categories = ['nature', 'fitness', 'cooking', 'travel', 'technology', 'dance', 'comedy', 'lifestyle'];
+            const randomCat = categories[Math.floor(Math.random() * categories.length)];
+            const randomPage = Math.floor(Math.random() * 5) + 1; // page 1-5
+            
+            const res = await fetch(`https://api.pexels.com/videos/search?query=${encodeURIComponent(randomCat)}&per_page=15&page=${randomPage}`, {
+              headers: { 'Authorization': apiKey }
+            });
+            
+            if (res.ok) {
+              const data = await res.json();
+              if (data && Array.isArray(data.videos)) {
+                const simUsers = await prisma.user.findMany({
+                  where: { isSimulation: true },
+                  take: 15
+                });
+                
+                if (simUsers.length > 0) {
+                  const captionsList = aiCache.reelCaptions[randomCat] || aiCache.reelCaptions.general || ['Awesome video! #reels'];
+                  
+                  const dynamicReels = data.videos.map((video: any, idx: number) => {
+                    const author = simUsers[idx % simUsers.length];
+                    const file = video.video_files?.find((f: any) => f.width && f.height && f.height > f.width) || video.video_files?.[0];
+                    
+                    if (!file?.link) return null;
+                    
+                    const caption = captionsList[idx % captionsList.length] || 'Enjoying this! 🌟 #reels';
+                    
+                    return {
+                      id: `pexels_dyn_${video.id}_${Date.now()}`,
+                      caption,
+                      postType: 'reel',
+                      mediaUrls: file.link,
+                      mediaTypes: 'video',
+                      visibility: 'public',
+                      shareCount: Math.floor(Math.random() * 100),
+                      location: author.location,
+                      subLocation: null,
+                      createdAt: new Date(Date.now() - idx * 10 * 60 * 1000),
+                      isSimulation: true,
+                      author: {
+                        id: author.id,
+                        name: author.name,
+                        username: author.username,
+                        avatar: author.avatar,
+                        isPrivate: false
+                      },
+                      tolees: [],
+                      likes: [],
+                      savedBy: [],
+                      reposts: [],
+                      _count: {
+                        likes: Math.floor(Math.random() * 200 + 10),
+                        comments: Math.floor(Math.random() * 10 + 1),
+                        reposts: Math.floor(Math.random() * 5),
+                        views: Math.floor(Math.random() * 1000 + 100)
+                      },
+                      comments: []
+                    };
+                  }).filter(Boolean);
+                  
+                  posts.push(...(dynamicReels as any[]));
+                }
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[Dynamic Reels Pexels Fetch/Cache Failed]:', err);
+      }
+    }
+
+    // Dynamic Pexels Injection for simulated media (feed: both images and videos)
+    if (isSimOn && !mediaType) {
+      try {
+        const aiCache = getAICacheSync('IN');
+        const cachedMedia = aiCache.mediaAssets || [];
+
+        if (cachedMedia.length > 0) {
+          const simUsers = await prisma.user.findMany({
+            where: { isSimulation: true },
+            take: 20
+          });
+
+          if (simUsers.length > 0) {
+            // Shuffle and take up to 20 media items (mix of images and videos)
+            const shuffledMedia = [...cachedMedia].sort(() => 0.5 - Math.random()).slice(0, 20);
+            const dynamicPosts = shuffledMedia.map((media, idx) => {
+              const author = simUsers[idx % simUsers.length];
+              return {
+                id: `pexels_dyn_feed_${idx}_${Date.now()}`,
+                caption: media.caption,
+                postType: 'regular',
+                mediaUrls: media.url,
+                mediaTypes: media.type,
+                visibility: 'public',
+                shareCount: Math.floor(Math.random() * 50),
+                location: author.location,
+                subLocation: null,
+                createdAt: new Date(Date.now() - idx * 12 * 60 * 1000),
+                isSimulation: true,
+                author: {
+                  id: author.id,
+                  name: author.name,
+                  username: author.username,
+                  avatar: author.avatar,
+                  isPrivate: false
+                },
+                tolees: [],
+                likes: [],
+                savedBy: [],
+                reposts: [],
+                _count: {
+                  likes: Math.floor(Math.random() * 150 + 5),
+                  comments: Math.floor(Math.random() * 8),
+                  reposts: Math.floor(Math.random() * 3),
+                  views: Math.floor(Math.random() * 500 + 50)
+                },
+                comments: []
+              };
+            });
+            posts.push(...dynamicPosts);
+          }
+        } else {
+          // Fallback to fetch on-the-fly from Pexels API
+          const apiKey = process.env.PEXELS_API_KEY;
+          if (apiKey && apiKey.trim() !== '') {
+            const categories = ['nature', 'fitness', 'cooking', 'travel', 'technology', 'dance', 'comedy', 'lifestyle'];
+            const randomCat = categories[Math.floor(Math.random() * categories.length)];
+            const randomPage = Math.floor(Math.random() * 5) + 1; // page 1-5
+            
+            const res = await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(randomCat)}&per_page=15&page=${randomPage}`, {
+              headers: { 'Authorization': apiKey }
+            });
+            
+            if (res.ok) {
+              const data = await res.json();
+              if (data && Array.isArray(data.photos)) {
+                const simUsers = await prisma.user.findMany({
+                  where: { isSimulation: true },
+                  take: 15
+                });
+                
+                if (simUsers.length > 0) {
+                  const captionsList = aiCache.captions[randomCat] || aiCache.captions.general || ['Love this vibe! 📸'];
+                  
+                  const dynamicImages = data.photos.map((photo: any, idx: number) => {
+                    const author = simUsers[idx % simUsers.length];
+                    const caption = captionsList[idx % captionsList.length] || 'Loving this moment! 🌟';
+                    
+                    return {
+                      id: `pexels_dyn_img_${photo.id}_${Date.now()}`,
+                      caption,
+                      postType: 'regular',
+                      mediaUrls: photo.src?.large || null,
+                      mediaTypes: 'image',
+                      visibility: 'public',
+                      shareCount: Math.floor(Math.random() * 50),
+                      location: author.location,
+                      subLocation: null,
+                      createdAt: new Date(Date.now() - idx * 12 * 60 * 1000),
+                      isSimulation: true,
+                      author: {
+                        id: author.id,
+                        name: author.name,
+                        username: author.username,
+                        avatar: author.avatar,
+                        isPrivate: false
+                      },
+                      tolees: [],
+                      likes: [],
+                      savedBy: [],
+                      reposts: [],
+                      _count: {
+                        likes: Math.floor(Math.random() * 150 + 5),
+                        comments: Math.floor(Math.random() * 8),
+                        reposts: Math.floor(Math.random() * 3),
+                        views: Math.floor(Math.random() * 500 + 50)
+                      },
+                      comments: []
+                    };
+                  }).filter((p: any) => p.mediaUrls);
+                  
+                  posts.push(...(dynamicImages as any[]));
+                }
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[Dynamic Images Pexels Fetch/Cache Failed]:', err);
+      }
+    }
+
     let listings: any[] = [];
-    if (currentUserId) {
+    if (currentUserId && !mediaType) { // only fetch marketplace listings for general feed (not reels)
       const memberships = await prisma.toleeMember.findMany({
         where: {
           userId: currentUserId,
@@ -392,16 +687,130 @@ export async function getPosts() {
       currency: listing.currency,
       category: listing.category,
       condition: listing.condition,
-      locationText: listing.locationText
+      locationText: listing.locationText,
+      isSimulation: false
     }));
 
     const combinedPosts = [...posts, ...mappedListings];
-    const finalPosts = isSimOn 
-      ? combinedPosts.sort(() => Math.random() - 0.5)
-      : combinedPosts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    let finalPosts = combinedPosts;
+
+    if (isSimOn) {
+      // PERSONALIZATION DATA
+      const likedPostIds = currentUserId ? (await prisma.like.findMany({
+        where: { userId: currentUserId },
+        select: { postId: true }
+      })).map(l => l.postId) : [];
+
+      const savedPostIds = currentUserId ? (await prisma.savedPost.findMany({
+        where: { userId: currentUserId },
+        select: { postId: true }
+      })).map(s => s.postId) : [];
+
+      const followedAuthorIds = currentUserId ? (await prisma.follow.findMany({
+        where: { followerId: currentUserId, status: 'approved' },
+        select: { followingId: true }
+      })).map(f => f.followingId) : [];
+
+      const joinedToleeCategories = currentUserId ? (await prisma.toleeMember.findMany({
+        where: { userId: currentUserId, status: 'approved' },
+        select: { tolee: { select: { category: true } } }
+      })).map(m => m.tolee?.category).filter(Boolean) as string[] : [];
+
+      // ANTI-REPETITION FILTER: Filter out recently viewed posts
+      let candidates = combinedPosts.filter(p => !viewedPostIds.includes(p.id));
+      if (candidates.length < 10) {
+        // Fallback: If too few posts remain, ignore viewed filter to prevent empty feed
+        candidates = combinedPosts;
+      }
+
+      // PERSONALIZATION SCORING
+      const scoredCandidates = candidates.map(post => {
+        let score = 1.0;
+        
+        // Freshness boost: newer posts get higher priority
+        const ageInHours = (Date.now() - new Date(post.createdAt).getTime()) / (3600 * 1000);
+        score += Math.max(0, 5.0 - (ageInHours / 24)); // boost up to +5.0 for very fresh posts
+
+        // Follow boost
+        const authorId = post.author?.id || post.authorId;
+        if (authorId && followedAuthorIds.includes(authorId)) {
+          score += 3.0;
+        }
+
+        // Like/Save boosts
+        if (likedPostIds.includes(post.id) || savedPostIds.includes(post.id)) {
+          score += 1.0;
+        }
+
+        // Category matching boost based on user's interests (joined Tolees)
+        const postCategory = post.category || (post.tolees?.[0]?.tolee?.category);
+        if (postCategory && joinedToleeCategories.includes(postCategory)) {
+          score += 2.0;
+        }
+
+        // Randomize slightly so they don't see the exact same order each refresh
+        score *= (0.5 + Math.random() * 1.0);
+
+        return { post, score };
+      });
+
+      // Split into Real and Simulation pools
+      const realPool = scoredCandidates.filter(c => !c.post.isSimulation).sort((a, b) => b.score - a.score).map(c => c.post);
+      const simPool = scoredCandidates.filter(c => c.post.isSimulation).sort((a, b) => b.score - a.score).map(c => c.post);
+
+      // MIXING ALGORITHM: 40-60% real user content, backfilled by simulated content
+      const mixed: any[] = [];
+      const targetSize = Math.min(limit, candidates.length);
+      
+      // Calculate how many real posts to take. Aim for 50%
+      const targetRealCount = Math.floor(targetSize * 0.5);
+      const actualRealCount = Math.min(realPool.length, targetRealCount);
+      const actualSimCount = targetSize - actualRealCount;
+
+      const selectedReal = realPool.slice(0, actualRealCount);
+      const selectedSim = simPool.slice(0, actualSimCount);
+
+      // Interleave them to mix naturally
+      let rIdx = 0;
+      let sIdx = 0;
+      while (mixed.length < targetSize) {
+        if (sIdx < selectedSim.length && (mixed.length % 2 === 0 || rIdx >= selectedReal.length)) {
+          mixed.push(selectedSim[sIdx++]);
+        } else if (rIdx < selectedReal.length) {
+          mixed.push(selectedReal[rIdx++]);
+        } else if (sIdx < selectedSim.length) {
+          mixed.push(selectedSim[sIdx++]);
+        } else {
+          break;
+        }
+      }
+
+      // SPACING OUT posts by the same author to prevent consecutive identical posters
+      for (let i = 1; i < mixed.length; i++) {
+        const currentAuthor = mixed[i].author?.id || mixed[i].authorId;
+        const prevAuthor = mixed[i - 1].author?.id || mixed[i - 1].authorId;
+        if (currentAuthor && currentAuthor === prevAuthor) {
+          for (let j = i + 1; j < mixed.length; j++) {
+            const nextAuthor = mixed[j].author?.id || mixed[j].authorId;
+            if (nextAuthor && nextAuthor !== currentAuthor) {
+              const temp = mixed[i];
+              mixed[i] = mixed[j];
+              mixed[j] = temp;
+              break;
+            }
+          }
+        }
+      }
+
+      finalPosts = mixed;
+    } else {
+      // Simulation is OFF: sort by date descending
+      finalPosts = combinedPosts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    }
 
     const mappedPosts = finalPosts.map((post: any) => {
-      if (isSimOn) {
+      if (isSimOn && post.isSimulation) {
         const eng = getSimulatedEngagement(post.id);
         return {
           ...post,
@@ -418,7 +827,7 @@ export async function getPosts() {
       return post;
     });
 
-    return { success: true, posts: mappedPosts.slice(0, 30) };
+    return { success: true, posts: mappedPosts.slice(0, limit) };
   } catch (error) {
     console.error("Error fetching posts:", error);
     return { success: false, posts: [] };

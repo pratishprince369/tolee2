@@ -82,7 +82,10 @@ const MOCK_CITIES_BY_COUNTRY: Record<string, string[]> = {
     'Mumbai, Maharashtra', 'Bangalore, Karnataka', 'Pune, Maharashtra',
     'Delhi NCR', 'Hyderabad, Telangana', 'Chennai, Tamil Nadu', 'Kolkata, West Bengal',
     'Ahmedabad, Gujarat', 'Jaipur, Rajasthan', 'Lucknow, Uttar Pradesh',
-    'Nagpur, Maharashtra', 'Indore, Madhya Pradesh', 'Surat, Gujarat'
+    'Nagpur, Maharashtra', 'Indore, Madhya Pradesh', 'Surat, Gujarat',
+    'Amritsar, Punjab', 'Kochi, Kerala', 'Patna, Bihar', 'Bhubaneswar, Odisha',
+    'Guwahati, Assam', 'Thiruvananthapuram, Kerala', 'Ludhiana, Punjab',
+    'Kanpur, Uttar Pradesh', 'Coimbatore, Tamil Nadu', 'Visakhapatnam, Andhra Pradesh'
   ],
   US: [
     'New York, NY', 'San Francisco, CA', 'Los Angeles, CA', 'Chicago, IL',
@@ -715,6 +718,14 @@ interface AICachedUser {
   gender: 'male' | 'female';
 }
 
+interface AICachedMedia {
+  url: string;
+  type: 'image' | 'video';
+  category: string;
+  description: string;
+  caption: string;
+}
+
 interface AICache {
   timestamp: number;
   countryCode: string;
@@ -722,6 +733,7 @@ interface AICache {
   captions: Record<string, string[]>;
   reelCaptions: Record<string, string[]>;
   comments: string[];
+  mediaAssets?: AICachedMedia[];
 }
 
 let cachedDataInMemory: AICache | null = null;
@@ -768,6 +780,36 @@ function generateLocalFallbackCache(countryCode: string): AICache {
     comments.push(commentsPool[i % commentsPool.length]);
   }
 
+  const mediaAssets: AICachedMedia[] = [];
+  const categories = ['tech', 'money', 'health', 'general'];
+  for (const cat of categories) {
+    // Fallback images
+    const imgList = UNSPLASH_IMAGES[cat] || UNSPLASH_IMAGES.general;
+    const imgCaptions = extractCaptions(cat);
+    for (let i = 0; i < Math.min(imgList.length, 10); i++) {
+      mediaAssets.push({
+        url: imgList[i],
+        type: 'image',
+        category: cat,
+        description: `${cat} category photo`,
+        caption: imgCaptions[i % imgCaptions.length]
+      });
+    }
+
+    // Fallback videos
+    const vidList = FALLBACK_PIXABAY_VIDEOS;
+    const vidCaptions = extractCaptions(cat);
+    for (let i = 0; i < Math.min(vidList.length, 10); i++) {
+      mediaAssets.push({
+        url: vidList[i],
+        type: 'video',
+        category: cat,
+        description: `${cat} category video clip`,
+        caption: `🔥 simulated reel: ${vidCaptions[i % vidCaptions.length]}`
+      });
+    }
+  }
+
   return {
     timestamp: Date.now(),
     countryCode,
@@ -784,12 +826,13 @@ function generateLocalFallbackCache(countryCode: string): AICache {
       health: extractCaptions('health').map(c => `🔥 simulated reel: ${c.slice(0, 30)}...`),
       general: extractCaptions('general').map(c => `🔥 simulated reel: ${c.slice(0, 30)}...`)
     },
-    comments
+    comments,
+    mediaAssets
   };
 }
 
 // Synchronous JSON file cache loader for dynamic rendering (fast, under 1ms)
-function getAICacheSync(countryCode = 'IN'): AICache {
+export function getAICacheSync(countryCode = 'IN'): AICache {
   if (cachedDataInMemory && cachedDataInMemory.countryCode === countryCode) {
     return cachedDataInMemory;
   }
@@ -806,6 +849,202 @@ function getAICacheSync(countryCode = 'IN'): AICache {
     console.warn('[AI Simulation Cache] Read failed, using local templates:', e);
   }
   return generateLocalFallbackCache(countryCode);
+}
+
+// Generate realistic Hinglish/Indian English social media captions matching a batch of media assets using LLM
+export async function generateAssetCaptionsBatch(
+  assets: { url: string; description: string }[],
+  category: string,
+  type: 'image' | 'video',
+  countryCode: string
+): Promise<string[]> {
+  const apiKey = process.env.NVIDIA_API_KEY;
+  const isIndia = countryCode === 'IN';
+
+  const fallbackPrefixes = isIndia ? [
+    "Work mode on! 💻", "Aaj ka vibe alag hi hai ❤️", "Always busy with this...", "Kya aapane bhi ye try kiya hai? 🤔",
+    "Weekend plans ready! 🚀", "Kuch naya seekh raha hu aaj.", "Perfect view for today. 😍", "Life is short, make every moment count.",
+    "Monday motivation! 🔥", "Chasing dreams as always. ✨", "Finally, here is the update."
+  ] : [
+    "Work mode on! 💻", "Today's vibe is special ❤️", "Always busy with this...", "Have you tried this yet? 🤔",
+    "Weekend plans ready! 🚀", "Learning something new today.", "Perfect view for today. 😍", "Life is short, make it count.",
+    "Monday motivation! 🔥", "Chasing dreams as always. ✨", "Finally, here is the update."
+  ];
+
+  const fallbackCaptions = assets.map(asset => {
+    const prefix = fallbackPrefixes[Math.floor(Math.random() * fallbackPrefixes.length)];
+    return `${prefix} Looking at this amazing ${asset.description.toLowerCase()}. #${category} #tolee`;
+  });
+
+  if (!apiKey || apiKey.trim() === 'your-nvidia-api-key' || apiKey.trim() === '') {
+    return fallbackCaptions;
+  }
+
+  try {
+    const apiMessages = [
+      {
+        role: 'system',
+        content: `You are a real social media user from India. Write a natural, highly human-like caption for each of the media descriptions.
+Write in natural Hinglish (Hindi + English mix) or conversational Indian English with casual emojis.
+Describe or reference the content of the image/video realistically.
+Keep each caption under 2 sentences. Include 1-2 emojis and 2-3 relevant hashtags (including #tolee).
+Respond with a single JSON object having the exact key "captions" which is an array of strings in the exact same order as the descriptions.`
+      },
+      {
+        role: 'user',
+        content: `Generate captions for these ${assets.length} ${type === 'video' ? 'videos' : 'images'} in the category "${category}":
+${assets.map((a, idx) => `${idx + 1}. Description: "${a.description}"`).join('\n')}`
+      }
+    ];
+
+    const res = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'meta/llama-3.1-70b-instruct',
+        messages: apiMessages,
+        temperature: 0.8,
+        max_tokens: 1500,
+        response_format: { type: 'json_object' }
+      })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      const text = data?.choices?.[0]?.message?.content || '';
+      const parsed = JSON.parse(text);
+      if (Array.isArray(parsed.captions)) {
+        return parsed.captions;
+      }
+    }
+  } catch (err) {
+    console.warn(`[Batch Asset Caption Gen Failed] for category "${category}":`, err);
+  }
+
+  return fallbackCaptions;
+}
+
+// Fetch detailed image and video assets from Pexels API
+export async function fetchPexelsAssets(category: string, type: 'image' | 'video'): Promise<{ url: string, description: string }[]> {
+  const apiKey = process.env.PEXELS_API_KEY;
+  if (!apiKey || apiKey.trim() === '' || apiKey.includes('api-key')) {
+    return [];
+  }
+
+  const query = getPexelsQueryForCategory(category);
+  try {
+    if (type === 'video') {
+      const res = await fetch(`https://api.pexels.com/videos/search?query=${encodeURIComponent(query)}&per_page=20&size=medium`, {
+        headers: { 'Authorization': apiKey }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && Array.isArray(data.videos)) {
+          const results = [];
+          for (const video of data.videos) {
+            const file = video.video_files?.find((f: any) => f.width && f.height && f.height > f.width) || video.video_files?.[0];
+            if (file?.link) {
+              const urlParts = video.url.split('/video/')[1];
+              let desc = urlParts ? urlParts.split('-').slice(0, -1).join(' ') : 'vertical video';
+              if (desc.trim() === '') desc = 'video clip';
+              results.push({ url: file.link, description: desc });
+            }
+          }
+          return results;
+        }
+      }
+    } else {
+      const res = await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&per_page=20`, {
+        headers: { 'Authorization': apiKey }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && Array.isArray(data.photos)) {
+          return data.photos.map((photo: any) => ({
+            url: photo.src?.large || '',
+            description: photo.alt || 'stock image'
+          })).filter((p: any) => p.url !== '');
+        }
+      }
+    }
+  } catch (err) {
+    console.error(`[Pexels Assets Fetch Failed] for type "${type}" query "${query}":`, err);
+  }
+  return [];
+}
+
+// Generate realistic Hinglish/Indian English social media caption matching media description using LLM
+export async function generateAssetCaption(description: string, category: string, type: 'image' | 'video', countryCode: string): Promise<string> {
+  const apiKey = process.env.NVIDIA_API_KEY;
+  const isIndia = countryCode === 'IN';
+
+  const fallbackPrefixes = isIndia ? [
+    "Work mode on! 💻", "Aaj ka vibe alag hi hai ❤️", "Always busy with this...", "Kya aapane bhi ye try kiya hai? 🤔",
+    "Weekend plans ready! 🚀", "Kuch naya seekh raha hu aaj.", "Perfect view for today. 😍", "Life is short, make every moment count.",
+    "Monday motivation! 🔥", "Chasing dreams as always. ✨", "Finally, here is the update."
+  ] : [
+    "Work mode on! 💻", "Today's vibe is special ❤️", "Always busy with this...", "Have you tried this yet? 🤔",
+    "Weekend plans ready! 🚀", "Learning something new today.", "Perfect view for today. 😍", "Life is short, make it count.",
+    "Monday motivation! 🔥", "Chasing dreams as always. ✨", "Finally, here is the update."
+  ];
+
+  const prefix = fallbackPrefixes[Math.floor(Math.random() * fallbackPrefixes.length)];
+  const fallbackCaption = `${prefix} Looking at this amazing ${description.toLowerCase()}. #${category} #tolee`;
+
+  if (!apiKey || apiKey.trim() === 'your-nvidia-api-key' || apiKey.trim() === '') {
+    return fallbackCaption;
+  }
+
+  try {
+    const apiMessages = [
+      {
+        role: 'system',
+        content: `You are a real social media user from India. Write a natural, highly human-like caption for a social media ${type === 'video' ? 'video/reel' : 'photo'} update.
+Description of the media: "${description}"
+Category/Interests: "${category}"
+Rules:
+- Write in natural, expressive Hinglish (Hindi + English mix) or conversational Indian English with casual emojis.
+- Talk like a genuine individual posting about their daily life, not like a bot.
+- Keep it under 2 sentences. Include 2-3 emojis and 2-3 relevant hashtags (including #tolee).
+- Respond with a single JSON object having the exact key: "caption".`
+      },
+      {
+        role: 'user',
+        content: `Generate a caption for media showing: "${description}".`
+      }
+    ];
+
+    const res = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'meta/llama-3.1-70b-instruct',
+        messages: apiMessages,
+        temperature: 0.8,
+        max_tokens: 150,
+        response_format: { type: 'json_object' }
+      })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      const text = data?.choices?.[0]?.message?.content || '';
+      const parsed = JSON.parse(text);
+      if (parsed.caption) {
+        return parsed.caption;
+      }
+    }
+  } catch (err) {
+    console.warn(`[Asset Caption Gen Failed] for "${description}":`, err);
+  }
+
+  return fallbackCaption;
 }
 
 // NVIDIA NIM Batch Creators
@@ -987,13 +1226,41 @@ export async function loadOrCreateAICache(countryCode: string, forceRefresh = fa
       throw new Error('NVIDIA_API_KEY not configured. Using local fallback templates.');
     }
 
-    console.log('[AI Simulation] Fetching batch users, captions, and comments from NVIDIA NIM...');
-    
+    console.log('[AI Simulation] Fetching batch users, captions, comments, and media assets...');
+
+    const getAssetsWithFallback = async (cat: string, type: 'image' | 'video'): Promise<{ url: string; description: string }[]> => {
+      let assets: { url: string; description: string }[] = [];
+      try {
+        assets = await fetchPexelsAssets(cat, type);
+      } catch (err) {
+        console.warn(`[AI Cache Pre-warm] Pexels fetch failed for ${cat} ${type}:`, err);
+      }
+      if (assets.length === 0) {
+        if (type === 'image') {
+          const imgList = UNSPLASH_IMAGES[cat] || UNSPLASH_IMAGES.general;
+          assets = imgList.map((url, i) => ({
+            url,
+            description: `${cat} category photo representation ${i + 1}`
+          }));
+        } else {
+          assets = FALLBACK_PIXABAY_VIDEOS.map((url, i) => ({
+            url,
+            description: `${cat} category video clip representation ${i + 1}`
+          }));
+        }
+      }
+      return assets.slice(0, 10);
+    };
+
     const [
       users,
       techPost, moneyPost, healthPost, generalPost,
       techReel, moneyReel, healthReel, generalReel,
-      comments
+      comments,
+      techImages, techVideos,
+      moneyImages, moneyVideos,
+      healthImages, healthVideos,
+      generalImages, generalVideos
     ] = await Promise.all([
       generateAIUsersBatch(50, countryCode),
       generateAICaptionsBatch('tech', 25, countryCode, 'post'),
@@ -1004,8 +1271,51 @@ export async function loadOrCreateAICache(countryCode: string, forceRefresh = fa
       generateAICaptionsBatch('money', 25, countryCode, 'reel'),
       generateAICaptionsBatch('health', 25, countryCode, 'reel'),
       generateAICaptionsBatch('general', 25, countryCode, 'reel'),
-      generateAICommentsBatch(60, countryCode)
+      generateAICommentsBatch(60, countryCode),
+      getAssetsWithFallback('tech', 'image'), getAssetsWithFallback('tech', 'video'),
+      getAssetsWithFallback('money', 'image'), getAssetsWithFallback('money', 'video'),
+      getAssetsWithFallback('health', 'image'), getAssetsWithFallback('health', 'video'),
+      getAssetsWithFallback('general', 'image'), getAssetsWithFallback('general', 'video')
     ]);
+
+    // Generate matched captions for the media assets using LLM in parallel batches
+    const [
+      techImgCaps, techVidCaps,
+      moneyImgCaps, moneyVidCaps,
+      healthImgCaps, healthVidCaps,
+      generalImgCaps, generalVidCaps
+    ] = await Promise.all([
+      generateAssetCaptionsBatch(techImages, 'tech', 'image', countryCode),
+      generateAssetCaptionsBatch(techVideos, 'tech', 'video', countryCode),
+      generateAssetCaptionsBatch(moneyImages, 'money', 'image', countryCode),
+      generateAssetCaptionsBatch(moneyVideos, 'money', 'video', countryCode),
+      generateAssetCaptionsBatch(healthImages, 'health', 'image', countryCode),
+      generateAssetCaptionsBatch(healthVideos, 'health', 'video', countryCode),
+      generateAssetCaptionsBatch(generalImages, 'general', 'image', countryCode),
+      generateAssetCaptionsBatch(generalVideos, 'general', 'video', countryCode)
+    ]);
+
+    const mediaAssets: AICachedMedia[] = [];
+    const addAssets = (assets: { url: string; description: string }[], caps: string[], cat: string, type: 'image' | 'video') => {
+      for (let i = 0; i < assets.length; i++) {
+        mediaAssets.push({
+          url: assets[i].url,
+          type,
+          category: cat,
+          description: assets[i].description,
+          caption: caps[i] || `Enjoying this ${type === 'video' ? 'video' : 'photo'} of ${assets[i].description.toLowerCase()}. #${cat} #tolee`
+        });
+      }
+    };
+
+    addAssets(techImages, techImgCaps, 'tech', 'image');
+    addAssets(techVideos, techVidCaps, 'tech', 'video');
+    addAssets(moneyImages, moneyImgCaps, 'money', 'image');
+    addAssets(moneyVideos, moneyVidCaps, 'money', 'video');
+    addAssets(healthImages, healthImgCaps, 'health', 'image');
+    addAssets(healthVideos, healthVidCaps, 'health', 'video');
+    addAssets(generalImages, generalImgCaps, 'general', 'image');
+    addAssets(generalVideos, generalVidCaps, 'general', 'video');
 
     const cacheData: AICache = {
       timestamp: Date.now(),
@@ -1023,7 +1333,8 @@ export async function loadOrCreateAICache(countryCode: string, forceRefresh = fa
         health: healthReel,
         general: generalReel
       },
-      comments
+      comments,
+      mediaAssets
     };
 
     try {
@@ -1039,6 +1350,13 @@ export async function loadOrCreateAICache(countryCode: string, forceRefresh = fa
   } catch (error: any) {
     console.warn('[AI Simulation] LLM generation failed or key unconfigured. Falling back to local templates.', error.message || error);
     const fallback = generateLocalFallbackCache(countryCode);
+    try {
+      fs.mkdirSync(path.dirname(cacheFile), { recursive: true });
+      fs.writeFileSync(cacheFile, JSON.stringify(fallback, null, 2), 'utf8');
+      console.log('[AI Simulation] Fallback cache file written successfully:', cacheFile);
+    } catch (writeErr) {
+      console.error('[AI Simulation] Failed to write fallback cache file:', writeErr);
+    }
     cachedDataInMemory = fallback;
     return fallback;
   }
@@ -1445,38 +1763,60 @@ export function generateDynamicGroupPosts(
       content = `❓ QUESTION: ${templates.questions[postSeed % templates.questions.length]}`;
     } else {
       postType = 'regular';
-      content = captionsList[postSeed % captionsList.length];
       
       const mediaRoll = (postSeed >> 2) % 100;
+      let selectedMediaType: 'image' | 'video' | 'text' = 'text';
       if (mediaRoll < 45) {
-        // Try Pexels first
-        const pexQuery = getPexelsQueryForCategory(catKey);
-        fetchPexelsImagesInBackground(catKey);
-        const cachedList = cachedPexelsImages[pexQuery];
-        if (cachedList && cachedList.length > 0) {
-          mediaUrls = cachedList[postSeed % cachedList.length];
+        selectedMediaType = 'image';
+      } else if (mediaRoll < 80) {
+        selectedMediaType = 'video';
+      } else {
+        selectedMediaType = 'text';
+      }
+
+      if (selectedMediaType === 'text') {
+        content = captionsList[postSeed % captionsList.length];
+      } else {
+        const catMedia = aiCache.mediaAssets?.filter(
+          m => m.category === catKey && m.type === selectedMediaType
+        ) || [];
+
+        if (catMedia.length > 0) {
+          const matchedAsset = catMedia[postSeed % catMedia.length];
+          mediaUrls = matchedAsset.url;
+          mediaTypes = matchedAsset.type;
+          content = matchedAsset.caption;
         } else {
-          const imgList = UNSPLASH_IMAGES[catKey] || UNSPLASH_IMAGES.general;
-          mediaUrls = imgList[postSeed % imgList.length];
-        }
-        mediaTypes = 'image';
-      } else if (mediaRoll < 65) {
-        mediaTypes = 'video';
-        // Try Pexels videos first
-        const pexQuery = getPexelsQueryForCategory(catKey);
-        fetchPexelsVideosInBackground(catKey);
-        const cachedList = cachedPexelsVideos[pexQuery];
-        if (cachedList && cachedList.length > 0) {
-          mediaUrls = cachedList[postSeed % cachedList.length];
-        } else {
-          // fallback to Pixabay
-          const query = getPixabayQueryForCategory(catKey);
-          fetchPixabayVideosInBackground(catKey);
-          const cachedPix = cachedPixabayVideos[query];
-          if (cachedPix && cachedPix.length > 0) {
-            mediaUrls = cachedPix[postSeed % cachedPix.length];
+          // Fallback if no mediaAssets in cache
+          content = captionsList[postSeed % captionsList.length];
+          if (selectedMediaType === 'image') {
+            const pexQuery = getPexelsQueryForCategory(catKey);
+            fetchPexelsImagesInBackground(catKey);
+            const cachedList = cachedPexelsImages[pexQuery];
+            if (cachedList && cachedList.length > 0) {
+              mediaUrls = cachedList[postSeed % cachedList.length];
+            } else {
+              const imgList = UNSPLASH_IMAGES[catKey] || UNSPLASH_IMAGES.general;
+              mediaUrls = imgList[postSeed % imgList.length];
+            }
+            mediaTypes = 'image';
           } else {
-            mediaUrls = FALLBACK_PIXABAY_VIDEOS[postSeed % FALLBACK_PIXABAY_VIDEOS.length];
+            const pexQuery = getPexelsQueryForCategory(catKey);
+            fetchPexelsVideosInBackground(catKey);
+            const cachedList = cachedPexelsVideos[pexQuery];
+            if (cachedList && cachedList.length > 0) {
+              mediaUrls = cachedList[postSeed % cachedList.length];
+            } else {
+              const query = getPixabayQueryForCategory(catKey);
+              fetchPixabayVideosInBackground(catKey);
+              const cachedPix = cachedPixabayVideos[query];
+              if (cachedPix && cachedPix.length > 0) {
+                mediaUrls = cachedPix[postSeed % cachedPix.length];
+              } else {
+                mediaUrls = FALLBACK_PIXABAY_VIDEOS[postSeed % FALLBACK_PIXABAY_VIDEOS.length];
+              }
+            }
+            mediaTypes = 'video';
           }
         }
       }
@@ -1664,6 +2004,9 @@ export async function syncSimulationData() {
     const avatarPool = cachedUser.gender === 'female' ? MOCK_AVATARS_FEMALE : MOCK_AVATARS_MALE;
     const avatar = avatarPool[i % avatarPool.length];
     
+    const joinDaysAgo = Math.floor(Math.random() * 180) + 10;
+    const userCreatedAt = new Date(Date.now() - joinDaysAgo * 24 * 60 * 60 * 1000);
+
     usersToCreate.push({
       username,
       name,
@@ -1675,6 +2018,7 @@ export async function syncSimulationData() {
       location: cachedUser.location,
       isVerified: i % 4 === 0,
       isSimulation: true,
+      createdAt: userCreatedAt,
     });
   }
 
@@ -1768,24 +2112,45 @@ export async function syncSimulationData() {
     const author = posters[i % posters.length];
     const category = getCategoryFromProfession(author.profession);
     const captionsList = aiCache.captions[category] || aiCache.captions.general;
-    
-    let caption = captionsList[i % captionsList.length];
+
+    let mediaUrls: string | null = null;
+    let mediaTypes: string | null = null;
+    let caption = '';
+
+    const mediaRoll = i % 10;
+    let selectedType: 'image' | 'video' | 'text' = 'text';
+    if (mediaRoll < 5) {
+      selectedType = 'image';
+    } else if (mediaRoll < 7) {
+      selectedType = 'video';
+    }
+
+    if (selectedType === 'text') {
+      caption = captionsList[i % captionsList.length];
+    } else {
+      const catMedia = aiCache.mediaAssets?.filter(m => m.category === category && m.type === selectedType) || [];
+      if (catMedia.length > 0) {
+        const asset = catMedia[i % catMedia.length];
+        mediaUrls = asset.url;
+        mediaTypes = asset.type;
+        caption = asset.caption;
+      } else {
+        // Fallback
+        caption = captionsList[i % captionsList.length];
+        if (selectedType === 'image') {
+          mediaUrls = getSeededImageUrl(category, i);
+          mediaTypes = 'image';
+        } else {
+          mediaUrls = getSeededVideoUrl(category, i);
+          mediaTypes = 'video';
+        }
+      }
+    }
+
     if (usedCaptions.has(caption)) {
       caption = caption + ` (Update #${Math.floor(i / captionsList.length) + 1})`;
     }
     usedCaptions.add(caption);
-
-    let mediaUrls: string | null = null;
-    let mediaTypes: string | null = null;
-    const mediaRoll = i % 10;
-    
-    if (mediaRoll < 5) {
-      mediaUrls = getSeededImageUrl(category, i);
-      mediaTypes = 'image';
-    } else if (mediaRoll < 7) {
-      mediaUrls = getSeededVideoUrl(category, i);
-      mediaTypes = 'video';
-    }
 
     postsToCreate.push({
       authorId: author.id,
@@ -1804,15 +2169,25 @@ export async function syncSimulationData() {
   for (let i = 0; i < actualReelsCount; i++) {
     const author = posters[(i + 3) % posters.length];
     const category = getCategoryFromProfession(author.profession);
-    const reelsList = aiCache.reelCaptions[category] || aiCache.reelCaptions.general;
+    const catVideos = aiCache.mediaAssets?.filter(m => m.category === category && m.type === 'video') || [];
 
-    let caption = reelsList[i % reelsList.length];
+    let caption = '';
+    let mediaUrls = '';
+
+    if (catVideos.length > 0) {
+      const asset = catVideos[i % catVideos.length];
+      mediaUrls = asset.url;
+      caption = asset.caption;
+    } else {
+      const reelsList = aiCache.reelCaptions[category] || aiCache.reelCaptions.general;
+      caption = reelsList[i % reelsList.length];
+      mediaUrls = getSeededVideoUrl(category, i);
+    }
+
     if (usedCaptions.has(caption)) {
       caption = caption + ` (Reel #${Math.floor(i / reelsList.length) + 1})`;
     }
     usedCaptions.add(caption);
-
-    const mediaUrls = getSeededVideoUrl(category, i);
 
     postsToCreate.push({
       authorId: author.id,
@@ -1920,4 +2295,277 @@ export async function syncSimulationData() {
     success: true, 
     message: `Simulation engine turned ON. Loaded AI Cache & seeded ${createdUsers.length} users, ${createdPosts.length} posts/reels, ${likesToCreate.length} likes, and ${commentsToCreate.length} comments.` 
   };
+}
+
+// Background simulation activity runner for ongoing engagement throughout the day
+export async function runBackgroundSimulationActivity() {
+  try {
+    const isSimOn = await getIsSimulationModeOn();
+    if (!isSimOn) return;
+
+    // Pick a random simulated user to post
+    const simulatedUsers = await prisma.user.findMany({
+      where: { isSimulation: true }
+    });
+    if (simulatedUsers.length === 0) return;
+
+    const author = simulatedUsers[Math.floor(Math.random() * simulatedUsers.length)];
+
+    // Get time-of-day category and theme
+    const hr = new Date().getHours();
+    let timeContext = 'daily life';
+    let themes: string[] = [];
+
+    if (hr >= 6 && hr < 11) {
+      timeContext = 'morning';
+      themes = ['morning greetings', 'breakfast', 'office commute', 'college updates'];
+    } else if (hr >= 11 && hr < 16) {
+      timeContext = 'afternoon';
+      themes = ['lunch', 'afternoon food', 'technology', 'startups', 'business'];
+    } else if (hr >= 16 && hr < 21) {
+      timeContext = 'evening';
+      themes = ['gym fitness', 'shopping', 'evening travel', 'daily life', 'sports cricket'];
+    } else {
+      timeContext = 'night';
+      themes = ['dinner', 'night lifestyle', 'gaming', 'memes', 'weekend outings'];
+    }
+
+    const selectedTheme = themes[Math.floor(Math.random() * themes.length)];
+
+    // Decide if it's a regular image post or a reel (video)
+    const isReel = Math.random() > 0.5;
+
+    // Fetch from Pexels API
+    const apiKey = process.env.PEXELS_API_KEY;
+    let mediaUrl: string | null = null;
+    let mediaDescription = '';
+
+    if (apiKey && apiKey.trim() !== '') {
+      try {
+        if (isReel) {
+          // Fetch video from Pexels
+          const res = await fetch(`https://api.pexels.com/videos/search?query=${encodeURIComponent(selectedTheme)}&per_page=15`, {
+            headers: { 'Authorization': apiKey }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data && Array.isArray(data.videos) && data.videos.length > 0) {
+              const video = data.videos[Math.floor(Math.random() * data.videos.length)];
+              const file = video.video_files?.find((f: any) => f.width && f.height && f.height > f.width) || video.video_files?.[0];
+              mediaUrl = file?.link || null;
+              
+              const urlParts = video.url.split('/video/')[1];
+              mediaDescription = urlParts ? urlParts.split('-').slice(0, -1).join(' ') : 'video clip';
+            }
+          }
+        } else {
+          // Fetch image from Pexels
+          const res = await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(selectedTheme)}&per_page=15`, {
+            headers: { 'Authorization': apiKey }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data && Array.isArray(data.photos) && data.photos.length > 0) {
+              const photo = data.photos[Math.floor(Math.random() * data.photos.length)];
+              mediaUrl = photo.src?.large || null;
+              mediaDescription = photo.alt || 'stock photo';
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[Dynamic Simulation Activity] Pexels API call failed:', err);
+      }
+    }
+
+    // Fallbacks if Pexels API key is not configured or failed
+    if (!mediaUrl) {
+      if (isReel) {
+        mediaUrl = FALLBACK_PIXABAY_VIDEOS[Math.floor(Math.random() * FALLBACK_PIXABAY_VIDEOS.length)];
+        mediaDescription = 'daily life video';
+      } else {
+        const getCategoryFromProfession = (prof: string | null): string => {
+          if (!prof) return 'general';
+          const norm = prof.toLowerCase();
+          if (norm.includes('engineer') || norm.includes('designer') || norm.includes('marketer') || norm.includes('influencer')) return 'tech';
+          if (norm.includes('owner') || norm.includes('agent') || norm.includes('investor') || norm.includes('creator')) return 'money';
+          if (norm.includes('doctor') || norm.includes('trainer') || norm.includes('blogger')) return 'health';
+          return 'general';
+        };
+        const catKey = getCategoryFromProfession(author.profession);
+        const imgList = UNSPLASH_IMAGES[catKey] || UNSPLASH_IMAGES.general;
+        mediaUrl = imgList[Math.floor(Math.random() * imgList.length)];
+        mediaDescription = `${catKey} activity`;
+      }
+    }
+
+    // Generate dynamic caption
+    let caption = `Enjoying a beautiful ${timeContext}! 🌟 #${selectedTheme.replace(/\s+/g, '')} #tolee #reels`;
+    const nvidiaKey = process.env.NVIDIA_API_KEY;
+    if (nvidiaKey) {
+      try {
+        const apiMessages = [
+          {
+            role: 'system',
+            content: `You are a real Indian social media user from "${author.location || 'Mumbai'}". Write a natural, extremely human-like caption for a social media ${isReel ? 'video/reel' : 'photo'} update.
+Media content description: "${mediaDescription}"
+Theme context: "${selectedTheme}"
+Time of day context: "${timeContext}"
+Rules:
+- Write in natural, expressive Hinglish (Hindi + English mix) or conversational Indian English with casual emojis.
+- Talk like a genuine individual, referencing the actual media content description naturally.
+- Keep it under 2 sentences. Include 2-3 emojis and 2-3 relevant hashtags (including #tolee).
+- Respond with a single JSON object having the exact key: "caption".`
+          },
+          {
+            role: 'user',
+            content: `Generate a Hinglish caption for media description "${mediaDescription}" under theme "${selectedTheme}".`
+          }
+        ];
+
+        const llmRes = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${nvidiaKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: 'meta/llama-3.1-70b-instruct',
+            messages: apiMessages,
+            temperature: 0.8,
+            max_tokens: 200,
+            response_format: { type: 'json_object' }
+          })
+        });
+
+        if (llmRes.ok) {
+          const data = await llmRes.json();
+          const text = data?.choices?.[0]?.message?.content || '';
+          const parsed = JSON.parse(text);
+          if (parsed.caption) {
+            caption = parsed.caption;
+          }
+        }
+      } catch (err) {
+        console.warn('[Dynamic Simulation Activity] AI Caption failed, using fallback:', err);
+      }
+    } else {
+      // Fallback from cache
+      const aiCache = getAICacheSync('IN');
+      const getCategoryFromProfession = (prof: string | null): string => {
+        if (!prof) return 'general';
+        const norm = prof.toLowerCase();
+        if (norm.includes('engineer') || norm.includes('designer') || norm.includes('marketer') || norm.includes('influencer')) return 'tech';
+        if (norm.includes('owner') || norm.includes('agent') || norm.includes('investor') || norm.includes('creator')) return 'money';
+        if (norm.includes('doctor') || norm.includes('trainer') || norm.includes('blogger')) return 'health';
+        return 'general';
+      };
+      const catKey = getCategoryFromProfession(author.profession);
+      const list = isReel 
+        ? (aiCache.reelCaptions[catKey] || aiCache.reelCaptions.general)
+        : (aiCache.captions[catKey] || aiCache.captions.general);
+      if (list && list.length > 0) {
+        caption = list[Math.floor(Math.random() * list.length)];
+      }
+    }
+
+    // Find a Tolee group to link
+    const publicTolees = await prisma.tolee.findMany({
+      where: { isPrivate: false },
+      select: { id: true },
+      take: 5
+    });
+    const targetToleeId = publicTolees.length > 0
+      ? publicTolees[Math.floor(Math.random() * publicTolees.length)].id
+      : null;
+
+    // Create the post
+    const newPost = await prisma.post.create({
+      data: {
+        caption,
+        mediaUrls: mediaUrl,
+        mediaTypes: isReel ? 'video' : 'image',
+        postType: isReel ? 'reel' : 'regular',
+        status: 'published',
+        authorId: author.id,
+        isSimulation: true,
+        tolees: targetToleeId ? {
+          create: [
+            { toleeId: targetToleeId }
+          ]
+        } : undefined
+      }
+    });
+
+    console.log(`[Dynamic Simulation Activity] Created dynamic post ${newPost.id} by simulated user ${author.name}`);
+
+    // Simulate engagement (likes/comments)
+    const otherUsers = simulatedUsers.filter(u => u.id !== author.id);
+    if (otherUsers.length > 0) {
+      // Determine engagement scale
+      const likesCount = Math.floor(5 + Math.random() * 20);
+      const commentsCount = Math.floor(1 + Math.random() * 3);
+
+      const shufflers = [...otherUsers].sort(() => 0.5 - Math.random());
+      
+      // Likes
+      const likesData = shufflers.slice(0, likesCount).map(u => ({
+        userId: u.id,
+        postId: newPost.id
+      }));
+      await prisma.like.createMany({ data: likesData, skipDuplicates: true });
+
+      // Comments
+      const commenters = shufflers.slice(likesCount, likesCount + commentsCount);
+      const aiCache = getAICacheSync('IN');
+      const commentsPool = aiCache.comments || ['Great post!', 'Wow!', 'Nice!'];
+      
+      for (let i = 0; i < commenters.length; i++) {
+        const commenter = commenters[i];
+        let commentContent = commentsPool[Math.floor(Math.random() * commentsPool.length)];
+
+        if (nvidiaKey) {
+          try {
+            const commentRes = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${nvidiaKey}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                model: 'meta/llama-3.1-70b-instruct',
+                messages: [
+                  {
+                    role: 'system',
+                    content: `You are an Indian social media user. Write a single, short comment reacting to this post caption: "${caption}". Keep it casual, friendly, and natural. Hinglish/English mix is preferred. Use 1 emoji. Do not write a long paragraph. Respond with a JSON object having key "comment".`
+                  }
+                ],
+                temperature: 0.8,
+                max_tokens: 100,
+                response_format: { type: 'json_object' }
+              })
+            });
+            if (commentRes.ok) {
+              const data = await commentRes.json();
+              const text = data?.choices?.[0]?.message?.content || '';
+              const parsed = JSON.parse(text);
+              if (parsed.comment) {
+                commentContent = parsed.comment;
+              }
+            }
+          } catch (e) {}
+        }
+
+        await prisma.comment.create({
+          data: {
+            content: commentContent,
+            postId: newPost.id,
+            authorId: commenter.id,
+            isSimulation: true
+          }
+        });
+      }
+    }
+  } catch (err) {
+    console.error('[Dynamic Simulation Activity] Failed:', err);
+  }
 }

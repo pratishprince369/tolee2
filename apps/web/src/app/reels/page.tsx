@@ -20,7 +20,7 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
   // Fetch real posts from DB
   let dbReels: any[] = [];
   try {
-    const res = await getPosts();
+    const res = await getPosts({ mediaType: 'video', limit: 100 });
     if (res.success && res.posts) {
       const videoPosts = res.posts.filter(post => post.mediaTypes === 'video' && post.mediaUrls);
       const authorIds = videoPosts.map(p => p.author.id);
