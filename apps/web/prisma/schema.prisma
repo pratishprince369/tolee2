@@ -263,6 +263,7 @@ model Post {
   worldProject   WorldProject? @relation(fields: [worldProjectId], references: [id], onDelete: Cascade)
 
   isSimulation   Boolean       @default(false)
+  storyAnalytics PostStoryAnalytics?
 }
 
 model PostTolee {
@@ -1240,5 +1241,16 @@ model MeetingNotes {
   actionItems String?  // JSON list of tasks
   generatedAt DateTime @default(now())
 }
+
+model PostStoryAnalytics {
+  id              String   @id @default(cuid())
+  postId          String   @unique
+  post            Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  storyShares     Int      @default(0)
+  storyViews      Int      @default(0)
+  viewPostClicks  Int      @default(0)
+  engagementCount Int      @default(0)
+}
+
 
 

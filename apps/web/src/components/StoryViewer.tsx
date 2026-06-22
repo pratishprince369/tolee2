@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { HLSVideo } from '@/components/HLSVideo';
 import { markStoryAsViewed, sendStoryReply } from '@/actions/story';
 import { deleteStory } from '@/actions/highlight';
+import { checkPostStatus, incrementViewOriginalPostClick } from '@/actions/post';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -83,6 +84,31 @@ export function StoryViewer({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeletingStory, setIsDeletingStory] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  // Shared post status tracking
+  const [sharedPostStatus, setSharedPostStatus] = useState<'loading' | 'active' | 'deleted' | 'private'>('loading');
+
+  useEffect(() => {
+    if (activeStory?.overlays) {
+      try {
+        const parsed = JSON.parse(activeStory.overlays);
+        if (parsed?.sharedPost?.id) {
+          setSharedPostStatus('loading');
+          checkPostStatus(parsed.sharedPost.id).then((res) => {
+            if (res.success) {
+              setSharedPostStatus(res.status as any);
+            } else {
+              setSharedPostStatus('deleted');
+            }
+          });
+          return;
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    setSharedPostStatus('active');
+  }, [activeStory?.id]);
 
   const activeGroup = storyGroups[groupIndex];
   const activeStory = activeGroup?.stories[slideIndex];
@@ -445,6 +471,68 @@ export function StoryViewer({
 
               return (
                 <>
+                  {parsedOverlays?.sharedPost && (
+                    <div 
+                      onClick={async (e) => {
+                        e.stopPropagation(); // prevent story sliding
+                        if (sharedPostStatus === 'deleted' || sharedPostStatus === 'private') {
+                          return;
+                        }
+                        const postId = parsedOverlays.sharedPost.id;
+                        await incrementViewOriginalPostClick(postId);
+                        onClose(); // close story viewer
+                        router.push(`/feed?postId=${postId}&fromStory=true`);
+                      }}
+                      className="absolute top-[25%] left-[6%] right-[6%] z-20 bg-black/60 backdrop-blur-md rounded-2xl p-4 border border-white/10 flex flex-col gap-3 pointer-events-auto select-none shadow-xl cursor-pointer hover:bg-black/70 active:scale-[0.99] transition-all"
+                    >
+                      {sharedPostStatus === 'deleted' || sharedPostStatus === 'private' ? (
+                        <div className="flex flex-col items-center justify-center py-6 text-center text-zinc-450 gap-2">
+                          <AlertTriangle className="w-8 h-8 text-zinc-500" />
+                          <span className="text-[13px] font-bold text-white">Original Post Unavailable</span>
+                          <span className="text-[10px] text-zinc-500">This post has been deleted or set to private.</span>
+                        </div>
+                      ) : (
+                        <>
+                          {/* Header */}
+                          <div className="flex items-center gap-2">
+                            <Avatar className="w-8 h-8 border border-white/20">
+                              <AvatarImage src={parsedOverlays.sharedPost.authorAvatar || '/default-user-avatar.svg'} />
+                              <AvatarFallback>{parsedOverlays.sharedPost.author[0]}</AvatarFallback>
+                            </Avatar>
+                            <div className="flex flex-col">
+                              <span className="text-[13px] font-bold text-white leading-none">@{parsedOverlays.sharedPost.author}</span>
+                              <span className="text-[9px] text-zinc-400 font-semibold leading-none mt-1">Shared from Tolee</span>
+                            </div>
+                          </div>
+
+                          {/* Media preview inside card (if post has media) */}
+                          {parsedOverlays.sharedPost.mediaUrl && (
+                            <div className="w-full aspect-video rounded-lg overflow-hidden bg-black/40 border border-white/5 relative flex items-center justify-center">
+                              {parsedOverlays.sharedPost.mediaType === 'video' ? (
+                                <video src={parsedOverlays.sharedPost.mediaUrl} muted playsInline className="w-full h-full object-cover" />
+                              ) : (
+                                <img src={parsedOverlays.sharedPost.mediaUrl} alt="" className="w-full h-full object-cover" />
+                              )}
+                            </div>
+                          )}
+
+                          {/* Caption */}
+                          {parsedOverlays.sharedPost.caption && (
+                            <p className="text-[12px] text-white/90 line-clamp-2 leading-relaxed">
+                              {parsedOverlays.sharedPost.caption}
+                            </p>
+                          )}
+
+                          {/* Attribution footer */}
+                          <div className="border-t border-white/5 pt-2 flex items-center justify-between text-[10px] text-zinc-400 font-semibold">
+                            <span>View Original Post</span>
+                            <span>Tolee Post</span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+
                   {activeStory.mediaType === 'video' ? (
                     <HLSVideo
                       src={activeStory.mediaUrl}
@@ -523,6 +611,24 @@ export function StoryViewer({
                           )}
                         </div>
                       ))}
+                    </div>
+                  )}
+
+                  {/* View Original Post Floating button */}
+                  {parsedOverlays?.sharedPost && sharedPostStatus === 'active' && (
+                    <div className="absolute bottom-6 inset-x-0 z-30 flex justify-center pointer-events-auto">
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          const postId = parsedOverlays.sharedPost.id;
+                          await incrementViewOriginalPostClick(postId);
+                          onClose();
+                          router.push(`/feed?postId=${postId}&fromStory=true`);
+                        }}
+                        className="flex items-center gap-1.5 px-6 py-2.5 bg-white text-black font-extrabold text-[12px] uppercase tracking-wider rounded-full shadow-xl hover:bg-zinc-100 active:scale-95 transition-all"
+                      >
+                        View Original Post
+                      </button>
                     </div>
                   )}
                 </>

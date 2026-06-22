@@ -184,6 +184,28 @@ export async function markStoryAsViewed(storyId: string) {
       update: {}
     });
 
+    // Check if the story is a shared post and increment its views count
+    const story = await prisma.story.findUnique({
+      where: { id: storyId },
+      select: { overlays: true }
+    });
+
+    if (story?.overlays) {
+      try {
+        const parsed = JSON.parse(story.overlays);
+        if (parsed?.sharedPost?.id) {
+          const postId = parsed.sharedPost.id;
+          await prisma.postStoryAnalytics.upsert({
+            where: { postId },
+            create: { postId, storyViews: 1 },
+            update: { storyViews: { increment: 1 } }
+          });
+        }
+      } catch (e) {
+        console.error("Error updating story views analytics:", e);
+      }
+    }
+
     return { success: true };
   } catch (error) {
     console.error('Error marking story as viewed:', error);

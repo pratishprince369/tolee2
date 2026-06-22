@@ -680,6 +680,11 @@ export function ProfileReelsView({
           postId={selectedReelForShare.id}
           shareUrl={selectedReelForShare.toleeSlug ? `${window.location.origin}/t/${selectedReelForShare.toleeSlug}` : `${window.location.origin}/u/${selectedReelForShare.author}`}
           previewText={selectedReelForShare.caption || 'Check out this reel on Tolee!'}
+          postMediaUrl={selectedReelForShare.video}
+          postMediaType="video"
+          postAuthor={selectedReelForShare.author}
+          postAuthorAvatar={selectedReelForShare.authorAvatar}
+          postCaption={selectedReelForShare.caption}
           onShareSuccess={(count: number) => {
             setReels((curr) => curr.map((r) => r.id === selectedReelForShare.id ? { ...r, shares: count } : r));
           }}

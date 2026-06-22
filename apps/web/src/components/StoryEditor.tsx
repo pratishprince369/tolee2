@@ -25,6 +25,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useSession } from 'next-auth/react';
 import { createTestStory } from '@/actions/highlight';
+import { incrementStoryShare } from '@/actions/post';
 import { uploadFile } from '@/lib/upload';
 
 interface StoryEditorProps {
@@ -35,6 +36,14 @@ interface StoryEditorProps {
   userAvatar?: string;
   userName?: string;
   onStoryPublished?: () => void; // callback after publishing
+  sharedPost?: {
+    id: string;
+    author: string;
+    authorAvatar?: string | null;
+    caption?: string | null;
+    mediaUrl?: string | null;
+    mediaType?: string | null;
+  };
 }
 
 interface FloatingElement {
@@ -103,7 +112,8 @@ export function StoryEditor({
   mediaType,
   userAvatar,
   userName,
-  onStoryPublished
+  onStoryPublished,
+  sharedPost
 }: StoryEditorProps) {
   const { data: session } = useSession();
   
@@ -733,7 +743,15 @@ export function StoryEditor({
           rotation,
           offsetX,
           offsetY,
-          music: selectedSong ? { id: selectedSong.id, title: selectedSong.title, artist: selectedSong.artist } : null
+          music: selectedSong ? { id: selectedSong.id, title: selectedSong.title, artist: selectedSong.artist } : null,
+          sharedPost: sharedPost || null
+        });
+      }
+
+      // If it's an image story and we have sharedPost, serialize it as overlays json too
+      if (mediaType === 'image' && sharedPost) {
+        finalOverlaysJson = JSON.stringify({
+          sharedPost: sharedPost || null
         });
       }
 
@@ -748,6 +766,11 @@ export function StoryEditor({
       );
 
       if (res.success) {
+        // Call incrementStoryShare server action to log analytic event
+        if (sharedPost) {
+          await incrementStoryShare(sharedPost.id);
+        }
+
         clearStoryDraft();
         setPublishSuccess(true);
         setTimeout(() => {
@@ -875,6 +898,47 @@ export function StoryEditor({
             />
           )}
         </div>
+
+        {/* Shared Post Attribution Overlay Card (Story Editor Preview) */}
+        {sharedPost && (
+          <div className="absolute top-[25%] left-[6%] right-[6%] z-20 bg-black/60 backdrop-blur-md rounded-2xl p-4 border border-white/10 flex flex-col gap-3 pointer-events-none select-none shadow-xl">
+            {/* Header */}
+            <div className="flex items-center gap-2">
+              <Avatar className="w-8 h-8 border border-white/20">
+                <AvatarImage src={sharedPost.authorAvatar || '/default-user-avatar.svg'} />
+                <AvatarFallback>{sharedPost.author[0]}</AvatarFallback>
+              </Avatar>
+              <div className="flex flex-col">
+                <span className="text-[13px] font-bold text-white leading-none">@{sharedPost.author}</span>
+                <span className="text-[9px] text-zinc-400 font-semibold leading-none mt-1">Original Post</span>
+              </div>
+            </div>
+
+            {/* Media preview inside card (if post has media) */}
+            {sharedPost.mediaUrl && (
+              <div className="w-full aspect-video rounded-lg overflow-hidden bg-black/40 border border-white/5 relative flex items-center justify-center">
+                {sharedPost.mediaType === 'video' ? (
+                  <video src={sharedPost.mediaUrl} muted playsInline className="w-full h-full object-cover" />
+                ) : (
+                  <img src={sharedPost.mediaUrl} alt="" className="w-full h-full object-cover" />
+                )}
+              </div>
+            )}
+
+            {/* Caption */}
+            {sharedPost.caption && (
+              <p className="text-[12px] text-white/90 line-clamp-2 leading-relaxed">
+                {sharedPost.caption}
+              </p>
+            )}
+
+            {/* Attribution footer */}
+            <div className="border-t border-white/5 pt-2 flex items-center justify-between text-[10px] text-zinc-400 font-semibold">
+              <span>View Original Post</span>
+              <span>Tolee Post</span>
+            </div>
+          </div>
+        )}
 
         {/* ── TOP ACTION NAVIGATION ── */}
         <div className="absolute inset-x-0 top-0 pt-5 pb-16 px-4 bg-gradient-to-b from-black/80 via-black/30 to-transparent flex items-center justify-between z-20 pointer-events-none">

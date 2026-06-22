@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Search, X, Loader2, Check, Link as LinkIcon, Copy, Send } from 'lucide-react';
+import { Search, X, Loader2, Check, Link as LinkIcon, Copy, Send, Sparkles } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { getFriendsList } from '@/actions/user';
 import { incrementShareCount, sharePostToFriends } from '@/actions/post';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { StoryEditor } from '@/components/StoryEditor';
 
 interface ShareModalProps {
   isOpen: boolean;
@@ -16,6 +17,11 @@ interface ShareModalProps {
   shareUrl: string;
   previewText: string;
   onShareSuccess?: (newShareCount: number) => void;
+  postMediaUrl?: string | null;
+  postMediaType?: string | null;
+  postAuthor?: string | null;
+  postAuthorAvatar?: string | null;
+  postCaption?: string | null;
 }
 
 export function ShareModal({
@@ -24,7 +30,12 @@ export function ShareModal({
   postId,
   shareUrl,
   previewText,
-  onShareSuccess
+  onShareSuccess,
+  postMediaUrl,
+  postMediaType,
+  postAuthor,
+  postAuthorAvatar,
+  postCaption
 }: ShareModalProps) {
   const { data: session } = useSession();
   const currentUserId = (session?.user as any)?.id;
@@ -35,6 +46,11 @@ export function ShareModal({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
+
+  // Story sharing states
+  const [isStoryEditorOpen, setIsStoryEditorOpen] = useState(false);
+  const [storyMediaUrl, setStoryMediaUrl] = useState('');
+  const [storyMediaType, setStoryMediaType] = useState<'image' | 'video'>('image');
 
   useEffect(() => {
     if (isOpen && currentUserId) {
@@ -64,6 +80,32 @@ export function ShareModal({
     (friend.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
     (friend.username || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const handleShareToStory = () => {
+    let mediaUrl = postMediaUrl || '';
+    let mediaType: 'image' | 'video' = 'image';
+
+    if (mediaUrl.includes(',')) {
+      mediaUrl = mediaUrl.split(',')[0];
+    }
+    
+    if (postMediaType) {
+      const type = postMediaType.includes(',') ? postMediaType.split(',')[0] : postMediaType;
+      if (type.includes('video')) {
+        mediaType = 'video';
+      }
+    }
+
+    // Default gradient background if post has no media
+    if (!mediaUrl || mediaUrl.trim() === '') {
+      mediaUrl = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1080&h=1920&fit=crop';
+      mediaType = 'image';
+    }
+
+    setStoryMediaUrl(mediaUrl);
+    setStoryMediaType(mediaType);
+    setIsStoryEditorOpen(true);
+  };
 
   const handleCopyLink = async () => {
     try {
@@ -178,45 +220,64 @@ export function ShareModal({
         </div>
 
         {/* Top Section: Copy & Share Actions */}
-        <div className="p-4 border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-[#181818]/30 flex flex-col sm:flex-row gap-3">
+        <div className="p-4 border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-[#181818]/30 flex flex-col gap-3">
+          {/* Share to Story (Premium option) */}
           <button
-            onClick={handleCopyLink}
-            className="flex-1 flex items-center justify-between p-3.5 rounded-2xl bg-white dark:bg-[#181818] border border-gray-200 dark:border-gray-800 hover:border-primary/50 dark:hover:border-primary/50 transition-all duration-200 shadow-sm group active:scale-[0.98]"
+            onClick={handleShareToStory}
+            className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-gradient-to-r from-pink-600 via-purple-600 to-indigo-600 border border-purple-500/20 hover:opacity-95 text-white transition-all duration-200 shadow-md group active:scale-[0.98]"
           >
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary/10 rounded-xl group-hover:bg-primary/20 transition-colors">
-                <LinkIcon className="w-5 h-5 text-primary" />
+              <div className="p-2 bg-white/10 rounded-xl">
+                <Sparkles className="w-5 h-5 text-white animate-pulse" />
               </div>
               <div className="text-left">
-                <p className="text-sm font-bold text-gray-900 dark:text-white">Copy Link</p>
-                <p className="text-xs text-gray-400">Save to clipboard</p>
+                <p className="text-sm font-black tracking-tight">Share to Story / Status</p>
+                <p className="text-xs text-purple-100">Add text, stickers, music & publish instantly</p>
               </div>
             </div>
-            <div className="flex items-center ml-2 shrink-0">
-              {copied ? (
-                <Check className="w-4 h-4 text-green-500" />
-              ) : (
-                <Copy className="w-4 h-4 text-gray-400 group-hover:text-primary transition-colors" />
-              )}
-            </div>
+            <span className="text-xs bg-white/20 px-2 py-0.5 rounded-md font-bold uppercase tracking-wider scale-90">New</span>
           </button>
 
-          {typeof window !== 'undefined' && typeof navigator !== 'undefined' && typeof navigator.share === 'function' && (
+          <div className="flex flex-col sm:flex-row gap-3">
             <button
-              onClick={handleWebShare}
-              className="flex-1 flex items-center justify-between p-3.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 border border-indigo-500/20 hover:from-blue-700 hover:to-indigo-700 text-white transition-all duration-200 shadow-md group active:scale-[0.98]"
+              onClick={handleCopyLink}
+              className="flex-1 flex items-center justify-between p-3.5 rounded-2xl bg-white dark:bg-[#181818] border border-gray-200 dark:border-gray-800 hover:border-primary/50 dark:hover:border-primary/50 transition-all duration-200 shadow-sm group active:scale-[0.98]"
             >
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-white/10 rounded-xl transition-colors">
-                  <Send className="w-5 h-5 text-white" />
+                <div className="p-2 bg-primary/10 rounded-xl group-hover:bg-primary/20 transition-colors">
+                  <LinkIcon className="w-5 h-5 text-primary" />
                 </div>
                 <div className="text-left">
-                  <p className="text-sm font-bold">Share to Apps</p>
-                  <p className="text-xs text-blue-100">WhatsApp, SMS, etc.</p>
+                  <p className="text-sm font-bold text-gray-900 dark:text-white">Copy Link</p>
+                  <p className="text-xs text-gray-400">Clipboard</p>
                 </div>
               </div>
+              <div className="flex items-center ml-2 shrink-0">
+                {copied ? (
+                  <Check className="w-4 h-4 text-green-500" />
+                ) : (
+                  <Copy className="w-4 h-4 text-gray-400 group-hover:text-primary transition-colors" />
+                )}
+              </div>
             </button>
-          )}
+
+            {typeof window !== 'undefined' && typeof navigator !== 'undefined' && typeof navigator.share === 'function' && (
+              <button
+                onClick={handleWebShare}
+                className="flex-1 flex items-center justify-between p-3.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 border border-indigo-500/20 hover:from-blue-700 hover:to-indigo-700 text-white transition-all duration-200 shadow-md group active:scale-[0.98]"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-white/10 rounded-xl transition-colors">
+                    <Send className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-sm font-bold">Share Externally</p>
+                    <p className="text-xs text-blue-100">WhatsApp, SMS, etc.</p>
+                  </div>
+                </div>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Search Friends Section */}
@@ -360,6 +421,28 @@ export function ShareModal({
           </div>
         )}
       </div>
+
+      {isStoryEditorOpen && (
+        <StoryEditor
+          isOpen={isStoryEditorOpen}
+          onClose={() => {
+            setIsStoryEditorOpen(false);
+            onClose();
+          }}
+          mediaUrl={storyMediaUrl}
+          mediaType={storyMediaType}
+          userAvatar={session?.user?.image || undefined}
+          userName={session?.user?.name || undefined}
+          sharedPost={{
+            id: postId,
+            author: postAuthor || '',
+            authorAvatar: postAuthorAvatar || null,
+            caption: postCaption || null,
+            mediaUrl: postMediaUrl || null,
+            mediaType: postMediaType || null
+          }}
+        />
+      )}
     </div>
   );
 }

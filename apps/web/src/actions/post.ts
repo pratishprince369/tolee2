@@ -2086,4 +2086,103 @@ export async function getReels(skip = 0, take = 20) {
   }
 }
 
+export async function checkPostStatus(postId: string) {
+  try {
+    const session = await getServerSession(authOptions);
+    const post = await prisma.post.findUnique({
+      where: { id: postId },
+      select: {
+        id: true,
+        visibility: true,
+        authorId: true,
+        author: {
+          select: {
+            id: true,
+            username: true
+          }
+        }
+      }
+    });
+
+    if (!post) {
+      return { success: true, status: 'deleted' };
+    }
+
+    if (post.visibility === 'only_me') {
+      const userId = session?.user ? (session.user as any).id : null;
+      if (post.authorId !== userId) {
+        return { success: true, status: 'private' };
+      }
+    }
+
+    return { success: true, status: 'active', post };
+  } catch (error) {
+    console.error("Error checking post status:", error);
+    return { success: false, error: 'Failed to verify post status' };
+  }
+}
+
+export async function incrementStoryShare(postId: string) {
+  try {
+    const analytics = await prisma.postStoryAnalytics.upsert({
+      where: { postId },
+      create: { postId, storyShares: 1 },
+      update: { storyShares: { increment: 1 } }
+    });
+    return { success: true, analytics };
+  } catch (error) {
+    console.error("Error incrementing story share:", error);
+    return { success: false, error: 'Failed to update story share count' };
+  }
+}
+
+export async function incrementViewOriginalPostClick(postId: string) {
+  try {
+    const analytics = await prisma.postStoryAnalytics.upsert({
+      where: { postId },
+      create: { postId, viewPostClicks: 1 },
+      update: { viewPostClicks: { increment: 1 } }
+    });
+    return { success: true, analytics };
+  } catch (error) {
+    console.error("Error incrementing view post clicks:", error);
+    return { success: false, error: 'Failed to update view post clicks count' };
+  }
+}
+
+export async function incrementStoryEngagement(postId: string) {
+  try {
+    const analytics = await prisma.postStoryAnalytics.upsert({
+      where: { postId },
+      create: { postId, engagementCount: 1 },
+      update: { engagementCount: { increment: 1 } }
+    });
+    return { success: true, analytics };
+  } catch (error) {
+    console.error("Error incrementing story engagement count:", error);
+    return { success: false, error: 'Failed to update engagement count' };
+  }
+}
+
+export async function getPostStoryAnalytics(postId: string) {
+  try {
+    const analytics = await prisma.postStoryAnalytics.findUnique({
+      where: { postId }
+    });
+    return {
+      success: true,
+      analytics: analytics || {
+        storyShares: 0,
+        storyViews: 0,
+        viewPostClicks: 0,
+        engagementCount: 0
+      }
+    };
+  } catch (error) {
+    console.error("Error fetching story analytics:", error);
+    return { success: false, error: 'Failed to fetch story analytics' };
+  }
+}
+
+
 

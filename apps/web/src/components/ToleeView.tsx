@@ -2888,6 +2888,11 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
           postId={selectedPostForShare.id}
           shareUrl={`${window.location.origin}/t/${tolee.slug}`}
           previewText={selectedPostForShare.content || 'Check out this post on Tolee!'}
+          postMediaUrl={selectedPostForShare.mediaUrls}
+          postMediaType={selectedPostForShare.mediaTypes}
+          postAuthor={selectedPostForShare.author}
+          postAuthorAvatar={selectedPostForShare.authorAvatar}
+          postCaption={selectedPostForShare.content || selectedPostForShare.caption}
           onShareSuccess={(newShareCount) => {
             setLocalPosts((currentPosts: any[]) => 
               currentPosts.map((p: any) => 

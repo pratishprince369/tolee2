@@ -2220,6 +2220,11 @@ export function InstagramProfileView({
           postId={selectedPost.id}
           shareUrl={selectedPost.toleeSlug ? `${window.location.origin}/t/${selectedPost.toleeSlug}` : `${window.location.origin}/u/${selectedPost.author || user.username}`}
           previewText={selectedPost.caption || 'Check out this post on Tolee!'}
+          postMediaUrl={selectedPost.mediaUrls}
+          postMediaType={selectedPost.mediaTypes}
+          postAuthor={selectedPost.author || user.username}
+          postAuthorAvatar={selectedPost.authorAvatar || user.avatar}
+          postCaption={selectedPost.caption}
           onShareSuccess={(newShareCount) => {
             setSelectedPost((prev: any) => prev ? { ...prev, shareCount: newShareCount } : null);
             setProfilePosts((prevPosts: any[]) => prevPosts.map((p: any) => p.id === selectedPost.id ? { ...p, shareCount: newShareCount } : p));

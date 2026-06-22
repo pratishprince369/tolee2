@@ -21,7 +21,7 @@ import { ReShareModal } from '@/components/ReShareModal';
 import { ShareModal } from '@/components/ShareModal';
 import { QuickBoostModal } from '@/components/QuickBoostModal';
 import { getOrCreatePersonalChat } from '@/actions/chat';
-import { editPostCaption, deletePostPermanently, updatePostVisibility, archivePost } from '@/actions/post';
+import { editPostCaption, deletePostPermanently, updatePostVisibility, archivePost, incrementStoryEngagement, getPostStoryAnalytics } from '@/actions/post';
 import { formatViewCount } from '@/lib/utils';
 import { UserHovercard } from '@/components/UserHovercard';
 
@@ -127,6 +127,36 @@ export function ProfileFeedView({
   const [activeLikePost, setActiveLikePost] = useState<string | null>(null);
   const [activeRepostPost, setActiveRepostPost] = useState<string | null>(null);
   const [activeOptionsPost, setActiveOptionsPost] = useState<PostType | null>(null);
+  const [postAnalytics, setPostAnalytics] = useState<any | null>(null);
+  const [loadingAnalytics, setLoadingAnalytics] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (activeOptionsPost && session?.user) {
+      const isOwner = isMe || 
+                      activeOptionsPost.authorId === currentUserId || 
+                      activeOptionsPost.author === session?.user?.name || 
+                      activeOptionsPost.author === (session?.user as any)?.username;
+      if (isOwner) {
+        setLoadingAnalytics(true);
+        getPostStoryAnalytics(activeOptionsPost.id).then(res => {
+          if (res.success) {
+            setPostAnalytics(res.analytics);
+          } else {
+            setPostAnalytics(null);
+          }
+          setLoadingAnalytics(false);
+        }).catch(err => {
+          console.error("Error fetching analytics:", err);
+          setPostAnalytics(null);
+          setLoadingAnalytics(false);
+        });
+      } else {
+        setPostAnalytics(null);
+      }
+    } else {
+      setPostAnalytics(null);
+    }
+  }, [activeOptionsPost, session?.user, isMe, currentUserId]);
   const [modalComments, setModalComments] = useState<any[]>([]);
   const [modalLikes, setModalLikes] = useState<any[]>([]);
   const [modalReposts, setModalReposts] = useState<any[]>([]);
@@ -221,7 +251,11 @@ export function ProfileFeedView({
     );
 
     const res = await toggleLikeAction(postId);
-    if (!res.success) {
+    if (res.success) {
+      if (searchParams.get('fromStory') === 'true') {
+        incrementStoryEngagement(postId);
+      }
+    } else {
       // Revert if database save fails
       setFeedPosts(currPosts => 
         currPosts.map(post => {
@@ -281,7 +315,12 @@ export function ProfileFeedView({
     ]);
 
     const res = await addCommentAction(activeCommentPost, text);
-    if (!res.success) {
+    if (res.success) {
+      if (searchParams.get('fromStory') === 'true') {
+        incrementStoryEngagement(activeCommentPost);
+      }
+      setModalComments(prev => prev.map(c => c.id === tempId ? res.comment : c));
+    } else {
       // Revert comment count
       setFeedPosts(currPosts => 
         currPosts.map(post => {
@@ -299,8 +338,6 @@ export function ProfileFeedView({
       );
       setModalComments(prev => prev.filter(c => c.id !== tempId));
       alert("Failed to add comment.");
-    } else {
-      setModalComments(prev => prev.map(c => c.id === tempId ? res.comment : c));
     }
   };
 
@@ -685,6 +722,65 @@ export function ProfileFeedView({
               if (isOwner) {
                 return (
                   <>
+                    {/* Glassmorphic Post Insights Panel */}
+                    <div className="w-full px-4 py-4 bg-gradient-to-br from-[#2a2a2e]/60 to-[#1c1c1e]/90 backdrop-blur-md border-b border-gray-800/80">
+                      <div className="flex items-center justify-center gap-2 mb-3 text-indigo-400 font-bold text-[14px]">
+                        <span className="p-1.5 rounded-lg bg-indigo-500/10">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2z" />
+                          </svg>
+                        </span>
+                        Post Story Insights
+                      </div>
+                      {loadingAnalytics ? (
+                        <div className="flex items-center justify-center py-6">
+                          <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+                        </div>
+                      ) : postAnalytics ? (
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <div className="p-3 bg-white/[0.03] hover:bg-white/[0.05] border border-white/[0.05] rounded-2xl text-left transition-all">
+                            <div className="flex items-center justify-between text-gray-400 text-xs font-medium mb-1">
+                              <span>Story Shares</span>
+                              <svg className="w-3.5 h-3.5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 10.742L19.88 5.144l-1.06-2.12-11.196 5.6a1.5 1.5 0 101.06 2.118zM19.88 18.856L8.684 13.258a1.5 1.5 0 10-1.06 2.118l11.196 5.6 1.06-2.12z" />
+                              </svg>
+                            </div>
+                            <div className="text-xl font-bold tracking-tight text-white">{postAnalytics.storyShares || 0}</div>
+                          </div>
+
+                          <div className="p-3 bg-white/[0.03] hover:bg-white/[0.05] border border-white/[0.05] rounded-2xl text-left transition-all">
+                            <div className="flex items-center justify-between text-gray-400 text-xs font-medium mb-1">
+                              <span>Story Views</span>
+                              <Eye className="w-3.5 h-3.5 text-purple-400" />
+                            </div>
+                            <div className="text-xl font-bold tracking-tight text-white">{postAnalytics.storyViews || 0}</div>
+                          </div>
+
+                          <div className="p-3 bg-white/[0.03] hover:bg-white/[0.05] border border-white/[0.05] rounded-2xl text-left transition-all">
+                            <div className="flex items-center justify-between text-gray-400 text-xs font-medium mb-1">
+                              <span>Click-throughs</span>
+                              <svg className="w-3.5 h-3.5 text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
+                              </svg>
+                            </div>
+                            <div className="text-xl font-bold tracking-tight text-white">{postAnalytics.viewPostClicks || 0}</div>
+                          </div>
+
+                          <div className="p-3 bg-white/[0.03] hover:bg-white/[0.05] border border-white/[0.05] rounded-2xl text-left transition-all">
+                            <div className="flex items-center justify-between text-gray-400 text-xs font-medium mb-1">
+                              <span>Engagement</span>
+                              <svg className="w-3.5 h-3.5 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                              </svg>
+                            </div>
+                            <div className="text-xl font-bold tracking-tight text-white">{postAnalytics.engagementCount || 0}</div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-gray-500 text-sm py-4">No insights available yet for this post.</div>
+                      )}
+                    </div>
+
                     {/* Boost option (if own listing or post) */}
                     <button 
                       onClick={() => {
@@ -918,6 +1014,11 @@ export function ProfileFeedView({
           postId={selectedPostForShare.id}
           shareUrl={selectedPostForShare.toleeSlug ? `${window.location.origin}/t/${selectedPostForShare.toleeSlug}` : `${window.location.origin}/u/${user.username}`}
           previewText={selectedPostForShare.previewText || 'Check out this post on Tolee!'}
+          postMediaUrl={selectedPostForShare.mediaUrls}
+          postMediaType={selectedPostForShare.mediaTypes}
+          postAuthor={selectedPostForShare.author}
+          postAuthorAvatar={selectedPostForShare.authorAvatar}
+          postCaption={selectedPostForShare.caption}
           onShareSuccess={(newShareCount) => {
             setFeedPosts(currPosts => 
               currPosts.map(post => post.id === selectedPostForShare.id ? { ...post, shareCount: newShareCount } : post)
