@@ -33,7 +33,9 @@ export async function GET(req: NextRequest) {
       totalCampaigns, activeCampaigns,
       totalEmailsSent, failedEmailDeliveries, passwordResetEmails, verificationEmailsSent,
       verifiedUserCount, unverifiedUserCount,
-      appInstalls, appInstallsToday
+      appInstalls, appInstallsToday,
+      realUsersCount, simulatedUsersCount,
+      realPostsCount, simulatedPostsCount
     ] = await Promise.all([
       prisma.user.count().catch(() => 0),
       prisma.user.count({ where: { lastLoginAt: { gte: todayStart } } }).catch(() => 0),
@@ -63,6 +65,10 @@ export async function GET(req: NextRequest) {
       prisma.user.count({ where: { email_verified: false } }).catch(() => 0),
       prisma.auditLog.count({ where: { action: 'app_installed_click' } }).catch(() => 0),
       prisma.auditLog.count({ where: { action: 'app_installed_click', createdAt: { gte: todayStart } } }).catch(() => 0),
+      prisma.user.count({ where: { isSimulation: false } }).catch(() => 0),
+      prisma.user.count({ where: { isSimulation: true } }).catch(() => 0),
+      prisma.post.count({ where: { isSimulation: false } }).catch(() => 0),
+      prisma.post.count({ where: { isSimulation: true } }).catch(() => 0),
     ]);
 
     if (isSimOn) {
@@ -360,7 +366,9 @@ export async function GET(req: NextRequest) {
         verifiedUsers, 
         suspendedUsers,
         appInstalls,
-        appInstallsToday
+        appInstallsToday,
+        realUsersCount,
+        simulatedUsersCount
       },
       communities: { totalTolees, toleeToday, topTolees },
       content: { 
@@ -369,7 +377,9 @@ export async function GET(req: NextRequest) {
         totalMessages, 
         totalListings,
         totalReels,
-        totalShares
+        totalShares,
+        realPostsCount,
+        simulatedPostsCount
       },
       ads: { totalCampaigns, activeCampaigns },
       security: { unresolvedSecurityEvents, totalAuditLogs },

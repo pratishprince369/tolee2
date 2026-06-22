@@ -5,6 +5,9 @@ import { useEffect, useState } from 'react';
 export default function UsersPage() {
   const [users, setUsers] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
+  const [totalReal, setTotalReal] = useState(0);
+  const [totalFake, setTotalFake] = useState(0);
+  const [dataType, setDataType] = useState<'real' | 'fake'>('real');
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
   const [q, setQ] = useState('');
@@ -31,21 +34,23 @@ export default function UsersPage() {
   
   const [searchInput, setSearchInput] = useState('');
 
-  const fetchUsers = async (search = q, f = filter, p = page) => {
+  const fetchUsers = async (search = q, f = filter, p = page, type = dataType) => {
     setLoading(true);
     setSelectedUserIds([]); // Clear selection when users list updates
     try {
-      const res = await fetch(`/api/super-admin/users?q=${encodeURIComponent(search)}&filter=${f}&page=${p}`);
+      const res = await fetch(`/api/super-admin/users?q=${encodeURIComponent(search)}&filter=${f}&page=${p}&dataType=${type}`);
       const data = await res.json();
       setUsers(data.users || []);
       setTotal(data.total || 0);
+      setTotalReal(data.totalReal || 0);
+      setTotalFake(data.totalFake || 0);
       setPages(data.pages || 1);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchUsers(); }, [page, filter]);
+  useEffect(() => { fetchUsers(q, filter, page, dataType); }, [page, filter, dataType]);
 
   useEffect(() => {
     if (selectedUser) {
@@ -60,14 +65,14 @@ export default function UsersPage() {
       setMarketplaceRestricted(!!selectedUser.marketplaceRestricted);
       
       if (selectedUser.restrictionExpiresAt) {
-        const expDate = new Date(selectedUser.restrictionExpiresAt);
-        if (expDate > new Date()) {
-          setExpiryType('custom');
-          setCustomExpiry(expDate.toISOString().slice(0, 16));
-        } else {
-          setExpiryType('indefinite');
-          setCustomExpiry('');
-        }
+         const expDate = new Date(selectedUser.restrictionExpiresAt);
+         if (expDate > new Date()) {
+           setExpiryType('custom');
+           setCustomExpiry(expDate.toISOString().slice(0, 16));
+         } else {
+           setExpiryType('indefinite');
+           setCustomExpiry('');
+         }
       } else {
         setExpiryType('indefinite');
         setCustomExpiry('');
@@ -79,7 +84,7 @@ export default function UsersPage() {
     e.preventDefault();
     setPage(1);
     setQ(searchInput);
-    fetchUsers(searchInput, filter, 1);
+    fetchUsers(searchInput, filter, 1, dataType);
   };
 
   const toggleSelectUser = (id: string) => {
@@ -241,7 +246,45 @@ export default function UsersPage() {
 
       <div>
         <h1 style={{ color: '#fff', fontSize: 22, fontWeight: 800 }}>User Management</h1>
-        <p style={{ color: '#71717a', fontSize: 14 }}>{total.toLocaleString()} users registered</p>
+        <p style={{ color: '#71717a', fontSize: 14 }}>{total.toLocaleString()} users shown</p>
+      </div>
+
+      {/* Real vs Fake Tabs */}
+      <div style={{ display: 'flex', borderBottom: '1px solid #1c1c1e', gap: 24, marginBottom: 10 }}>
+        <button
+          onClick={() => { setDataType('real'); setPage(1); }}
+          style={{
+            background: 'none',
+            border: 'none',
+            borderBottom: dataType === 'real' ? '2px solid #22c55e' : '2px solid transparent',
+            color: dataType === 'real' ? '#fff' : '#71717a',
+            padding: '12px 6px',
+            fontSize: 14,
+            fontWeight: 700,
+            cursor: 'pointer',
+            transition: 'all 0.15s',
+            outline: 'none',
+          }}
+        >
+          👤 Real Users ({totalReal.toLocaleString()})
+        </button>
+        <button
+          onClick={() => { setDataType('fake'); setPage(1); }}
+          style={{
+            background: 'none',
+            border: 'none',
+            borderBottom: dataType === 'fake' ? '2px solid #22c55e' : '2px solid transparent',
+            color: dataType === 'fake' ? '#fff' : '#71717a',
+            padding: '12px 6px',
+            fontSize: 14,
+            fontWeight: 700,
+            cursor: 'pointer',
+            transition: 'all 0.15s',
+            outline: 'none',
+          }}
+        >
+          🤖 Simulated Users ({totalFake.toLocaleString()})
+        </button>
       </div>
 
       {/* Search & Filter */}
@@ -257,7 +300,7 @@ export default function UsersPage() {
         </form>
         <div style={{ display: 'flex', gap: 6 }}>
           {filters.map(f => (
-            <button key={f} onClick={() => { setFilter(f); setPage(1); fetchUsers(q, f, 1); }}
+            <button key={f} onClick={() => { setFilter(f); setPage(1); fetchUsers(q, f, 1, dataType); }}
               style={{ background: filter === f ? '#22c55e' : '#18181b', border: '1px solid', borderColor: filter === f ? '#22c55e' : '#27272a', borderRadius: 8, color: filter === f ? '#000' : '#a1a1aa', padding: '7px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 600, textTransform: 'capitalize' }}>
               {f}
             </button>
@@ -349,6 +392,15 @@ export default function UsersPage() {
                     </td>
                     <td style={{ padding: '12px 16px' }}>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, maxWidth: '180px' }}>
+                        {u.isSimulation ? (
+                          <span style={{ fontSize: 10, fontWeight: 700, color: '#a78bfa', background: '#2e1065', border: '1px solid #581c87', padding: '2px 8px', borderRadius: 6, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                            🤖 Simulated
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: 10, fontWeight: 700, color: '#10b981', background: '#064e3b', border: '1px solid #065f46', padding: '2px 8px', borderRadius: 6, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                            👤 Real
+                          </span>
+                        )}
                         {u.isBanned && (
                           <span style={{ fontSize: 10, fontWeight: 700, color: '#ef4444', background: '#450a0a', border: '1px solid #7f1d1d', padding: '2px 8px', borderRadius: 6, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
                             🛑 Banned

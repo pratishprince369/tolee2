@@ -15,6 +15,7 @@ export async function GET(req: NextRequest) {
   const q = searchParams.get('q') || '';
   const page = parseInt(searchParams.get('page') || '1');
   const filter = searchParams.get('filter') || 'all';
+  const dataType = searchParams.get('dataType') || 'real';
   const limit = 20;
   const skip = (page - 1) * limit;
 
@@ -39,8 +40,14 @@ export async function GET(req: NextRequest) {
     ];
   }
 
+  if (dataType === 'real') {
+    where.isSimulation = false;
+  } else if (dataType === 'fake') {
+    where.isSimulation = true;
+  }
+
   try {
-    const [users, total] = await Promise.all([
+    const [users, total, totalReal, totalFake] = await Promise.all([
       prisma.user.findMany({
         where, skip, take: limit,
         orderBy: { createdAt: 'desc' },
@@ -53,13 +60,23 @@ export async function GET(req: NextRequest) {
           suspensionReason: true, restrictionExpiresAt: true,
           createdAt: true, lastLoginAt: true, lastLoginIp: true,
           lastLoginDevice: true, trustScore: true,
+          isSimulation: true,
           _count: { select: { posts: true, tolees: true, followers: true } }
         }
       }),
-      prisma.user.count({ where })
+      prisma.user.count({ where }),
+      prisma.user.count({ where: { isSimulation: false } }),
+      prisma.user.count({ where: { isSimulation: true } }),
     ]);
 
-    return NextResponse.json({ users, total, page, pages: Math.ceil(total / limit) });
+    return NextResponse.json({
+      users,
+      total,
+      totalReal,
+      totalFake,
+      page,
+      pages: Math.ceil(total / limit)
+    });
   } catch (err) {
     console.error('[Users API Error]', err);
     return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });

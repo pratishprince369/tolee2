@@ -15,6 +15,8 @@ interface Metrics {
     suspendedUsers: number;
     appInstalls?: number;
     appInstallsToday?: number;
+    realUsersCount?: number;
+    simulatedUsersCount?: number;
   };
   communities: { 
     totalTolees: number; 
@@ -28,6 +30,8 @@ interface Metrics {
     totalListings: number;
     totalReels: number;
     totalShares: number;
+    realPostsCount?: number;
+    simulatedPostsCount?: number;
   };
   ads: { 
     totalCampaigns: number; 
@@ -685,12 +689,12 @@ export default function SuperAdminOverview() {
 
       {/* Stats Cards - Expanded Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16 }}>
-        <StatCard icon="👥" label="Total Registered Users" value={m.users.totalUsers} sub={`+${m.users.newToday} today · +${m.users.newThisMonth} this month`} color="#22c55e" trend={m.users.newToday} />
+        <StatCard icon="👥" label="Total Registered Users" value={m.users.totalUsers} sub={`Real: ${m.users.realUsersCount?.toLocaleString() || 0} · Simulated: ${m.users.simulatedUsersCount?.toLocaleString() || 0}`} color="#22c55e" trend={m.users.newToday} />
         <StatCard icon="🟢" label="Users Online Now" value={realtimeOnlineCount} sub={`${realtimeOnlineCount} Users Active Now`} color="#22c55e" pulse={true} />
         <StatCard icon="⚡" label="Active Users Today (DAU)" value={m.users.activeToday} sub={`WAU: ${m.users.activeWeek.toLocaleString()} · MAU: ${m.users.activeMonth.toLocaleString()}`} color="#3b82f6" />
         <StatCard icon="📱" label="App Installations" value={m.users.appInstalls || 0} sub={`+${m.users.appInstallsToday || 0} today from PWA prompt`} color="#10b981" trend={m.users.appInstallsToday || 0} />
         <StatCard icon="🏘️" label="Total Tolees (Groups)" value={m.communities.totalTolees} sub={`+${m.communities.toleeToday} groups today`} color="#f59e0b" trend={m.communities.toleeToday} />
-        <StatCard icon="📝" label="Total Posts" value={m.content.totalPosts} sub={`${m.content.totalComments.toLocaleString()} comments recorded`} color="#06b6d4" />
+        <StatCard icon="📝" label="Total Posts" value={m.content.totalPosts} sub={`Real: ${m.content.realPostsCount?.toLocaleString() || 0} · Simulated: ${m.content.simulatedPostsCount?.toLocaleString() || 0}`} color="#06b6d4" />
         <StatCard icon="🎥" label="Total Reels Uploaded" value={m.content.totalReels} sub="Short-video content pieces" color="#d946ef" />
         <StatCard icon="🛍️" label="Marketplace Listings" value={m.content.totalListings} sub="Active buy/sell advertising ads" color="#f97316" />
         <StatCard icon="💬" label="Messages Sent" value={m.content.totalMessages} sub="Instant messages routed" color="#a78bfa" />
