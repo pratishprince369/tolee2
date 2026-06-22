@@ -222,6 +222,12 @@ const UNSPLASH_IMAGES: Record<string, string[]> = {
 const cachedPixabayVideos: Record<string, string[]> = {};
 const isFetchingPixabay: Record<string, boolean> = {};
 
+// Global in-memory cache for Pexels URLs mapped by query
+const cachedPexelsVideos: Record<string, string[]> = {};
+const cachedPexelsImages: Record<string, string[]> = {};
+const isFetchingPexelsVideos: Record<string, boolean> = {};
+const isFetchingPexelsImages: Record<string, boolean> = {};
+
 // Maps local simulation category key to search query
 export function getPixabayQueryForCategory(category: string): string {
   const norm = category.toLowerCase().trim();
@@ -235,6 +241,21 @@ export function getPixabayQueryForCategory(category: string): string {
     return 'fitness workout gym yoga';
   }
   return 'nature travel city landscape';
+}
+
+// Maps local simulation category key to search query for Pexels
+export function getPexelsQueryForCategory(category: string): string {
+  const norm = category.toLowerCase().trim();
+  if (norm.includes('tech') || norm.includes('developer') || norm.includes('coding')) {
+    return 'technology programming computer office';
+  }
+  if (norm.includes('money') || norm.includes('business') || norm.includes('finance') || norm.includes('invest')) {
+    return 'business startup money office finance';
+  }
+  if (norm.includes('health') || norm.includes('doctor') || norm.includes('medical') || norm.includes('fit') || norm.includes('gym')) {
+    return 'fitness workout gym doctor wellness';
+  }
+  return 'travel nature city lifestyle';
 }
 
 /**
@@ -293,6 +314,107 @@ export function fetchPixabayVideosInBackground(category: string): void {
     .finally(() => {
       isFetchingPixabay[query] = false;
     });
+}
+
+// Fetch lists from Pexels API
+export async function fetchPexelsVideos(category: string): Promise<string[]> {
+  const apiKey = process.env.PEXELS_API_KEY;
+  if (!apiKey || apiKey.trim() === '' || apiKey.includes('api-key')) {
+    return [];
+  }
+
+  const query = getPexelsQueryForCategory(category);
+  if (cachedPexelsVideos[query] && cachedPexelsVideos[query].length > 0) {
+    return cachedPexelsVideos[query];
+  }
+
+  try {
+    const res = await fetch(`https://api.pexels.com/videos/search?query=${encodeURIComponent(query)}&per_page=40&size=medium`, {
+      headers: {
+        'Authorization': apiKey
+      }
+    });
+
+    if (!res.ok) {
+      throw new Error(`Pexels Videos responded with status ${res.status}`);
+    }
+
+    const data = await res.json();
+    if (data && Array.isArray(data.videos)) {
+      const urls: string[] = [];
+      for (const video of data.videos) {
+        const file = video.video_files?.find((f: any) => f.width && f.height && f.height > f.width) || video.video_files?.[0];
+        if (file?.link) {
+          urls.push(file.link);
+        }
+      }
+      if (urls.length > 0) {
+        cachedPexelsVideos[query] = urls;
+        return urls;
+      }
+    }
+  } catch (err) {
+    console.error(`[Pexels Videos Fetch Failed] for query "${query}":`, err);
+  }
+  return [];
+}
+
+export async function fetchPexelsImages(category: string): Promise<string[]> {
+  const apiKey = process.env.PEXELS_API_KEY;
+  if (!apiKey || apiKey.trim() === '' || apiKey.includes('api-key')) {
+    return [];
+  }
+
+  const query = getPexelsQueryForCategory(category);
+  if (cachedPexelsImages[query] && cachedPexelsImages[query].length > 0) {
+    return cachedPexelsImages[query];
+  }
+
+  try {
+    const res = await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&per_page=40`, {
+      headers: {
+        'Authorization': apiKey
+      }
+    });
+
+    if (!res.ok) {
+      throw new Error(`Pexels Images responded with status ${res.status}`);
+    }
+
+    const data = await res.json();
+    if (data && Array.isArray(data.photos)) {
+      const urls = data.photos.map((photo: any) => photo.src?.large).filter(Boolean) as string[];
+      if (urls.length > 0) {
+        cachedPexelsImages[query] = urls;
+        return urls;
+      }
+    }
+  } catch (err) {
+    console.error(`[Pexels Images Fetch Failed] for query "${query}":`, err);
+  }
+  return [];
+}
+
+export function fetchPexelsVideosInBackground(category: string): void {
+  const query = getPexelsQueryForCategory(category);
+  if (cachedPexelsVideos[query] && cachedPexelsVideos[query].length > 0) return;
+  if (isFetchingPexelsVideos[query]) return;
+
+  isFetchingPexelsVideos[query] = true;
+  fetchPexelsVideos(category).finally(() => {
+    isFetchingPexelsVideos[query] = false;
+  });
+}
+
+export function fetchPexelsImagesInBackground(category: string): void {
+  const query = getPexelsQueryForCategory(category);
+  if (cachedPexelsImages[query] && cachedPexelsImages[query].length > 0) return;
+  if (isFetchingPexelsImages[query]) return;
+
+  isFetchingPexelsImages[query] = true;
+  fetchPexelsImages(category).finally(() => {
+    isFetchingPexelsImages[query] = false;
+  });
 }
 
 // Country-specific simulated comments pools
@@ -1135,7 +1257,7 @@ export function getSimulatedEngagement(
     comments = 300 + ((hash >> 2) % 300);
     views = 100000 + ((hash >> 4) % 150000);
     shares = 300 + ((hash >> 6) % 60);
-    saves = 200 + ((hash >> 8) % 50);
+    saves = 20 + ((hash >> 8) % 50);
   } else if (roll < 35) {
     // Popular Post
     likes = 500 + (hash % 700);
@@ -1327,18 +1449,35 @@ export function generateDynamicGroupPosts(
       
       const mediaRoll = (postSeed >> 2) % 100;
       if (mediaRoll < 45) {
-        const imgList = UNSPLASH_IMAGES[catKey] || UNSPLASH_IMAGES.general;
-        mediaUrls = imgList[postSeed % imgList.length];
-        mediaTypes = 'image';
-      } else if (mediaRoll < 65) {
-        mediaTypes = 'video';
-        const query = getPixabayQueryForCategory(catKey);
-        fetchPixabayVideosInBackground(catKey);
-        const cachedList = cachedPixabayVideos[query];
+        // Try Pexels first
+        const pexQuery = getPexelsQueryForCategory(catKey);
+        fetchPexelsImagesInBackground(catKey);
+        const cachedList = cachedPexelsImages[pexQuery];
         if (cachedList && cachedList.length > 0) {
           mediaUrls = cachedList[postSeed % cachedList.length];
         } else {
-          mediaUrls = FALLBACK_PIXABAY_VIDEOS[postSeed % FALLBACK_PIXABAY_VIDEOS.length];
+          const imgList = UNSPLASH_IMAGES[catKey] || UNSPLASH_IMAGES.general;
+          mediaUrls = imgList[postSeed % imgList.length];
+        }
+        mediaTypes = 'image';
+      } else if (mediaRoll < 65) {
+        mediaTypes = 'video';
+        // Try Pexels videos first
+        const pexQuery = getPexelsQueryForCategory(catKey);
+        fetchPexelsVideosInBackground(catKey);
+        const cachedList = cachedPexelsVideos[pexQuery];
+        if (cachedList && cachedList.length > 0) {
+          mediaUrls = cachedList[postSeed % cachedList.length];
+        } else {
+          // fallback to Pixabay
+          const query = getPixabayQueryForCategory(catKey);
+          fetchPixabayVideosInBackground(catKey);
+          const cachedPix = cachedPixabayVideos[query];
+          if (cachedPix && cachedPix.length > 0) {
+            mediaUrls = cachedPix[postSeed % cachedPix.length];
+          } else {
+            mediaUrls = FALLBACK_PIXABAY_VIDEOS[postSeed % FALLBACK_PIXABAY_VIDEOS.length];
+          }
         }
       }
     }
@@ -1475,6 +1614,43 @@ export async function syncSimulationData() {
     return { success: false, error: 'No active groups (Tolees) found in the database to link simulated posts to.' };
   }
 
+  // Pre-fetch Pexels assets in parallel for seeding
+  try {
+    await Promise.all([
+      fetchPexelsImages('tech'),
+      fetchPexelsImages('money'),
+      fetchPexelsImages('health'),
+      fetchPexelsImages('general'),
+      fetchPexelsVideos('tech'),
+      fetchPexelsVideos('money'),
+      fetchPexelsVideos('health'),
+      fetchPexelsVideos('general'),
+    ]);
+    console.log('[Pexels] Seeding media assets successfully fetched and pre-warmed.');
+  } catch (err) {
+    console.warn('[Pexels] Pre-fetching failed, using fallbacks during seeding:', err);
+  }
+
+  // Helper for matching cached Pexels URLs
+  const getSeededVideoUrl = (category: string, idx: number) => {
+    const query = getPexelsQueryForCategory(category);
+    const cachedList = cachedPexelsVideos[query];
+    if (cachedList && cachedList.length > 0) {
+      return cachedList[idx % cachedList.length];
+    }
+    return FALLBACK_PIXABAY_VIDEOS[idx % FALLBACK_PIXABAY_VIDEOS.length];
+  };
+
+  const getSeededImageUrl = (category: string, idx: number) => {
+    const query = getPexelsQueryForCategory(category);
+    const cachedList = cachedPexelsImages[query];
+    if (cachedList && cachedList.length > 0) {
+      return cachedList[idx % cachedList.length];
+    }
+    const imgList = UNSPLASH_IMAGES[category] || UNSPLASH_IMAGES.general;
+    return imgList[idx % imgList.length];
+  };
+
   // 1. Create simulated users
   const usersToCreate = [];
   for (let i = 0; i < actualUsersCount; i++) {
@@ -1604,11 +1780,10 @@ export async function syncSimulationData() {
     const mediaRoll = i % 10;
     
     if (mediaRoll < 5) {
-      const imgList = UNSPLASH_IMAGES[category] || UNSPLASH_IMAGES.general;
-      mediaUrls = imgList[i % imgList.length];
+      mediaUrls = getSeededImageUrl(category, i);
       mediaTypes = 'image';
     } else if (mediaRoll < 7) {
-      mediaUrls = FALLBACK_PIXABAY_VIDEOS[i % FALLBACK_PIXABAY_VIDEOS.length];
+      mediaUrls = getSeededVideoUrl(category, i);
       mediaTypes = 'video';
     }
 
@@ -1637,7 +1812,7 @@ export async function syncSimulationData() {
     }
     usedCaptions.add(caption);
 
-    const mediaUrls = FALLBACK_PIXABAY_VIDEOS[(i + 5) % FALLBACK_PIXABAY_VIDEOS.length];
+    const mediaUrls = getSeededVideoUrl(category, i);
 
     postsToCreate.push({
       authorId: author.id,

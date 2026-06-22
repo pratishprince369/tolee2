@@ -52,6 +52,7 @@ const ENV_VARS: EnvVar[] = [
   { name: 'MODELSLAB_API_KEY', required: false, description: 'ModelsLab API key for video generation', secret: true },
   { name: 'MONITORING_ALERTS_WEBHOOK', required: false, description: 'Slack/Teams webhook URL for error alerts' },
   { name: 'PIXABAY_API_KEY', required: false, description: 'Pixabay API key for dynamic simulated video posts', secret: true },
+  { name: 'PEXELS_API_KEY', required: false, description: 'Pexels API key for dynamic simulated images & videos', secret: true },
 ];
 
 export function validateEnvironment(): void {
