@@ -203,7 +203,7 @@ export async function getPosts() {
         })
       },
       orderBy: { createdAt: 'desc' },
-      take: 20,
+      take: isSimOn ? 100 : 20,
       select: {
         id: true,
         caption: true,
@@ -395,11 +395,12 @@ export async function getPosts() {
       locationText: listing.locationText
     }));
 
-    const combinedPosts = [...posts, ...mappedListings].sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
+    const combinedPosts = [...posts, ...mappedListings];
+    const finalPosts = isSimOn 
+      ? combinedPosts.sort(() => Math.random() - 0.5)
+      : combinedPosts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-    const finalPosts = combinedPosts.map((post: any) => {
+    const mappedPosts = finalPosts.map((post: any) => {
       if (isSimOn) {
         const eng = getSimulatedEngagement(post.id);
         return {
@@ -417,7 +418,7 @@ export async function getPosts() {
       return post;
     });
 
-    return { success: true, posts: finalPosts.slice(0, 30) };
+    return { success: true, posts: mappedPosts.slice(0, 30) };
   } catch (error) {
     console.error("Error fetching posts:", error);
     return { success: false, posts: [] };
