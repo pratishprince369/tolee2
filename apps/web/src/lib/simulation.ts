@@ -1943,7 +1943,7 @@ export async function syncSimulationData() {
 
   // Pre-warm the cache using either LLM or fallback
   const countryCode = await detectCountryCode(null);
-  const aiCache = await loadOrCreateAICache(countryCode);
+  const aiCache = await loadOrCreateAICache(countryCode, true);
 
   const actualUsersCount = Math.min(settings.simulatedUsersCount, 150);
   const actualPostsCount = Math.min(settings.simulatedPostsCount, 100);
