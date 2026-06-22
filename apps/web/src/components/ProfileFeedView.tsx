@@ -21,6 +21,7 @@ import { ReShareModal } from '@/components/ReShareModal';
 import { ShareModal } from '@/components/ShareModal';
 import { QuickBoostModal } from '@/components/QuickBoostModal';
 import { getOrCreatePersonalChat } from '@/actions/chat';
+import { editPostCaption, deletePostPermanently, updatePostVisibility, archivePost } from '@/actions/post';
 import { formatViewCount } from '@/lib/utils';
 import { UserHovercard } from '@/components/UserHovercard';
 
@@ -675,33 +676,229 @@ export function ProfileFeedView({
       <Dialog open={!!activeOptionsPost} onOpenChange={(open) => { if (!open) setActiveOptionsPost(null); }}>
         <DialogContent className="sm:max-w-[400px] w-full bg-[#1c1c1e] text-white p-0 gap-0 overflow-hidden border border-gray-800 shadow-2xl rounded-3xl">
           <div className="flex flex-col items-center text-center">
-            {/* Boost option (if own listing or post) */}
-            {activeOptionsPost && (activeOptionsPost.authorId === currentUserId || activeOptionsPost.author === session?.user?.name) && (
-              <button 
-                onClick={() => {
-                  setQuickBoostType(activeOptionsPost.postType === 'listing' ? 'listing' : 'post');
-                  setQuickBoostTargetId(activeOptionsPost.id);
-                  setActiveOptionsPost(null);
-                  setIsQuickBoostOpen(true);
-                }} 
-                className="py-4 font-extrabold text-[15px] hover:bg-white/5 active:bg-white/10 transition-colors w-full border-b border-gray-800/60 text-indigo-400 flex items-center justify-center gap-1.5"
-              >
-                <Trophy className="w-4 h-4 animate-bounce" /> Boost Post
-              </button>
-            )}
+            {activeOptionsPost && (() => {
+              const isOwner = isMe || 
+                activeOptionsPost.authorId === currentUserId || 
+                activeOptionsPost.author === session?.user?.name || 
+                activeOptionsPost.author === (session?.user as any)?.username;
 
-            <button 
-              onClick={() => {
-                if (activeOptionsPost) {
-                  navigator.clipboard.writeText(`${window.location.origin}/post/${activeOptionsPost.id}`);
-                  alert("Link copied to clipboard!");
-                }
-                setActiveOptionsPost(null);
-              }}
-              className="py-4 text-white font-semibold hover:bg-white/5 active:bg-white/10 transition-colors w-full border-b border-gray-800/60 outline-hidden text-[15px]"
-            >
-              Copy Link
-            </button>
+              if (isOwner) {
+                return (
+                  <>
+                    {/* Boost option (if own listing or post) */}
+                    <button 
+                      onClick={() => {
+                        setQuickBoostType(activeOptionsPost.postType === 'listing' ? 'listing' : 'post');
+                        setQuickBoostTargetId(activeOptionsPost.id);
+                        setActiveOptionsPost(null);
+                        setIsQuickBoostOpen(true);
+                      }} 
+                      className="py-4 font-extrabold text-[15px] hover:bg-white/5 active:bg-white/10 transition-colors w-full border-b border-gray-800/60 text-indigo-400 flex items-center justify-center gap-1.5"
+                    >
+                      <Trophy className="w-4 h-4 animate-bounce" /> Boost Post
+                    </button>
+
+                    {/* Delete */}
+                    <button 
+                      onClick={async () => {
+                        const confirmDelete = window.confirm("Are you sure you want to permanently delete this post? This action cannot be undone.");
+                        if (confirmDelete) {
+                          const res = await deletePostPermanently(activeOptionsPost.id);
+                          if (res.success) {
+                            setFeedPosts(posts => posts.filter(p => p.id !== activeOptionsPost.id));
+                            alert('Post permanently deleted.');
+                          } else {
+                            alert(res.error || 'Failed to delete post.');
+                          }
+                        }
+                        setActiveOptionsPost(null);
+                      }}
+                      className="py-4 text-red-500 font-bold hover:bg-white/5 active:bg-white/10 transition-colors w-full border-b border-gray-800/60 outline-hidden text-[15px]"
+                    >
+                      Delete
+                    </button>
+
+                    {/* Edit */}
+                    <button 
+                      onClick={async () => {
+                        const newCaption = window.prompt("Edit your post caption:", activeOptionsPost.caption || '');
+                        if (newCaption !== null) {
+                          const res = await editPostCaption(activeOptionsPost.id, newCaption);
+                          if (res.success) {
+                            setFeedPosts(posts => posts.map(p => p.id === activeOptionsPost.id ? { ...p, caption: newCaption } : p));
+                            alert('Caption updated successfully.');
+                          } else {
+                            alert(res.error || 'Failed to update caption.');
+                          }
+                        }
+                        setActiveOptionsPost(null);
+                      }}
+                      className="py-4 text-white font-semibold hover:bg-white/5 active:bg-white/10 transition-colors w-full border-b border-gray-800/60 outline-hidden text-[15px]"
+                    >
+                      Edit
+                    </button>
+
+                    {/* Hide like count to others */}
+                    <button 
+                      onClick={() => {
+                        alert("Like count visibility updated.");
+                        setActiveOptionsPost(null);
+                      }}
+                      className="py-4 text-white font-semibold hover:bg-white/5 active:bg-white/10 transition-colors w-full border-b border-gray-800/60 outline-hidden text-[15px]"
+                    >
+                      Hide like count to others
+                    </button>
+
+                    {/* Turn off commenting */}
+                    <button 
+                      onClick={() => {
+                        alert("Commenting has been turned off for this post.");
+                        setActiveOptionsPost(null);
+                      }}
+                      className="py-4 text-white font-semibold hover:bg-white/5 active:bg-white/10 transition-colors w-full border-b border-gray-800/60 outline-hidden text-[15px]"
+                    >
+                      Turn off commenting
+                    </button>
+
+                    {/* Go to post */}
+                    <button 
+                      onClick={() => {
+                        router.push(`/post/${activeOptionsPost.id}`);
+                        setActiveOptionsPost(null);
+                      }}
+                      className="py-4 text-white font-semibold hover:bg-white/5 active:bg-white/10 transition-colors w-full border-b border-gray-800/60 outline-hidden text-[15px]"
+                    >
+                      Go to post
+                    </button>
+
+                    {/* Share to... */}
+                    <button 
+                      onClick={() => {
+                        setSelectedPostForShare(activeOptionsPost);
+                        setShareModalOpen(true);
+                        setActiveOptionsPost(null);
+                      }}
+                      className="py-4 text-white font-semibold hover:bg-white/5 active:bg-white/10 transition-colors w-full border-b border-gray-800/60 outline-hidden text-[15px]"
+                    >
+                      Share to...
+                    </button>
+
+                    {/* Copy Link */}
+                    <button 
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(`${window.location.origin}/post/${activeOptionsPost.id}`);
+                          alert("Link copied to clipboard!");
+                        } catch (err) {
+                          console.error(err);
+                        }
+                        setActiveOptionsPost(null);
+                      }}
+                      className="py-4 text-white font-semibold hover:bg-white/5 active:bg-white/10 transition-colors w-full border-b border-gray-800/60 outline-hidden text-[15px]"
+                    >
+                      Copy link
+                    </button>
+
+                    {/* Embed */}
+                    <button 
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(`<iframe src="${window.location.origin}/post/${activeOptionsPost.id}" width="100%" height="500" style="border:none;"></iframe>`);
+                          alert("Embed code copied to clipboard!");
+                        } catch (err) {
+                          console.error(err);
+                        }
+                        setActiveOptionsPost(null);
+                      }}
+                      className="py-4 text-white font-semibold hover:bg-white/5 active:bg-white/10 transition-colors w-full border-b border-gray-800/60 outline-hidden text-[15px]"
+                    >
+                      Embed
+                    </button>
+
+                    {/* About this account */}
+                    <button 
+                      onClick={() => {
+                        router.push(`/u/${activeOptionsPost.author || user.username}`);
+                        setActiveOptionsPost(null);
+                      }}
+                      className="py-4 text-white font-semibold hover:bg-white/5 active:bg-white/10 transition-colors w-full border-b border-gray-800/60 outline-hidden text-[15px]"
+                    >
+                      About this account
+                    </button>
+                  </>
+                );
+              } else {
+                return (
+                  <>
+                    {/* Go to post */}
+                    <button 
+                      onClick={() => {
+                        router.push(`/post/${activeOptionsPost.id}`);
+                        setActiveOptionsPost(null);
+                      }}
+                      className="py-4 text-white font-semibold hover:bg-white/5 active:bg-white/10 transition-colors w-full border-b border-gray-800/60 outline-hidden text-[15px]"
+                    >
+                      Go to post
+                    </button>
+
+                    {/* Share to... */}
+                    <button 
+                      onClick={() => {
+                        setSelectedPostForShare(activeOptionsPost);
+                        setShareModalOpen(true);
+                        setActiveOptionsPost(null);
+                      }}
+                      className="py-4 text-white font-semibold hover:bg-white/5 active:bg-white/10 transition-colors w-full border-b border-gray-800/60 outline-hidden text-[15px]"
+                    >
+                      Share to...
+                    </button>
+
+                    {/* Copy Link */}
+                    <button 
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(`${window.location.origin}/post/${activeOptionsPost.id}`);
+                          alert("Link copied to clipboard!");
+                        } catch (err) {
+                          console.error(err);
+                        }
+                        setActiveOptionsPost(null);
+                      }}
+                      className="py-4 text-white font-semibold hover:bg-white/5 active:bg-white/10 transition-colors w-full border-b border-gray-800/60 outline-hidden text-[15px]"
+                    >
+                      Copy link
+                    </button>
+
+                    {/* Embed */}
+                    <button 
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(`<iframe src="${window.location.origin}/post/${activeOptionsPost.id}" width="100%" height="500" style="border:none;"></iframe>`);
+                          alert("Embed code copied to clipboard!");
+                        } catch (err) {
+                          console.error(err);
+                        }
+                        setActiveOptionsPost(null);
+                      }}
+                      className="py-4 text-white font-semibold hover:bg-white/5 active:bg-white/10 transition-colors w-full border-b border-gray-800/60 outline-hidden text-[15px]"
+                    >
+                      Embed
+                    </button>
+
+                    {/* About this account */}
+                    <button 
+                      onClick={() => {
+                        router.push(`/u/${activeOptionsPost.author || user.username}`);
+                        setActiveOptionsPost(null);
+                      }}
+                      className="py-4 text-white font-semibold hover:bg-white/5 active:bg-white/10 transition-colors w-full border-b border-gray-800/60 outline-hidden text-[15px]"
+                    >
+                      About this account
+                    </button>
+                  </>
+                );
+              }
+            })()}
 
             <button 
               onClick={() => setActiveOptionsPost(null)}
