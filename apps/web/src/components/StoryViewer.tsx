@@ -88,6 +88,11 @@ export function StoryViewer({
   // Shared post status tracking
   const [sharedPostStatus, setSharedPostStatus] = useState<'loading' | 'active' | 'deleted' | 'private'>('loading');
 
+  const activeGroup = storyGroups[groupIndex];
+  const activeStory = activeGroup?.stories[slideIndex];
+  const totalSlides = activeGroup?.stories.length || 0;
+  const isOwner = !!currentUserId && !!activeGroup && currentUserId === activeGroup.user.id;
+
   useEffect(() => {
     if (activeStory?.overlays) {
       try {
@@ -109,11 +114,6 @@ export function StoryViewer({
     }
     setSharedPostStatus('active');
   }, [activeStory?.id]);
-
-  const activeGroup = storyGroups[groupIndex];
-  const activeStory = activeGroup?.stories[slideIndex];
-  const totalSlides = activeGroup?.stories.length || 0;
-  const isOwner = !!currentUserId && !!activeGroup && currentUserId === activeGroup.user.id;
 
   const progressIntervalRef = useRef<any>(null);
   const durationRef = useRef<number>(5000);
