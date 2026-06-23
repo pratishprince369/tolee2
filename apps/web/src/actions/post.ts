@@ -218,36 +218,43 @@ export async function getPosts(options?: { mediaType?: string; limit?: number })
       where: {
         isArchived: false,
         status: 'published',
-        ...(!isSimOn ? { isSimulation: false } : {}),
         ...(mediaType ? { mediaTypes: mediaType } : {}),
-        ...(currentUserId ? {
-          OR: [
-            {
-              author: { isPrivate: false },
-              visibility: 'public'
-            },
-            {
-              authorId: currentUserId
-            },
-            {
-              author: {
-                isPrivate: true,
-                followers: {
-                  some: {
-                    followerId: currentUserId,
-                    status: 'approved'
-                  }
-                }
+        AND: [
+          ...(!isSimOn ? [{
+            OR: [
+              { isSimulation: false },
+              ...(currentUserId ? [{ authorId: currentUserId }] : [])
+            ]
+          }] : []),
+          currentUserId ? {
+            OR: [
+              {
+                author: { isPrivate: false },
+                visibility: 'public'
               },
-              visibility: 'public'
+              {
+                authorId: currentUserId
+              },
+              {
+                author: {
+                  isPrivate: true,
+                  followers: {
+                    some: {
+                      followerId: currentUserId,
+                      status: 'approved'
+                    }
+                  }
+                },
+                visibility: 'public'
+              }
+            ]
+          } : {
+            visibility: 'public',
+            author: {
+              isPrivate: false
             }
-          ]
-        } : {
-          visibility: 'public',
-          author: {
-            isPrivate: false
           }
-        })
+        ]
       },
       orderBy: { createdAt: 'desc' },
       take: isSimOn ? 250 : 50, // Grab a larger pool when simulation is active for proper mixing

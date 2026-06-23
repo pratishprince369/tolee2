@@ -118,7 +118,7 @@ export default function CreatorStudioPage() {
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'processing' | 'done' | 'error'>('idle');
   const [muxUploadId, setMuxUploadId] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
-  const [isSimulatedUpload, setIsSimulatedUpload] = useState(true); // Default to simulation for rich flow demo
+  const [isSimulatedUpload, setIsSimulatedUpload] = useState(false); // Default to real upload for production usage
   const [isReel, setIsReel] = useState(false);
 
   // Chunk upload simulation state

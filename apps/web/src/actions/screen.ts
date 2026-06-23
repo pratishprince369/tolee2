@@ -122,29 +122,45 @@ async function seedSimulatedScreenVideos() {
  */
 export async function getScreenVideos(searchQuery?: string, category?: string, limit = 8, cursorId?: string) {
   try {
+    const session = await getServerSession(authOptions);
+    const currentUserId = session?.user ? (session.user as any).id : null;
+
     // Attempt to seed simulated content in background
     await seedSimulatedScreenVideos();
 
     const simSettings = await getSimulationSettings();
     const isSimOn = simSettings.simulationMode;
 
-    const whereClause: any = {};
+    const andConditions: any[] = [];
 
     // Simulation filter fallback
     if (!isSimOn) {
-      whereClause.isSimulation = false;
+      if (currentUserId) {
+        andConditions.push({
+          OR: [
+            { isSimulation: false },
+            { userId: currentUserId }
+          ]
+        });
+      } else {
+        andConditions.push({ isSimulation: false });
+      }
     }
 
     if (searchQuery && searchQuery.trim() !== '') {
-      whereClause.OR = [
-        { title: { contains: searchQuery, mode: 'insensitive' } },
-        { description: { contains: searchQuery, mode: 'insensitive' } },
-      ];
+      andConditions.push({
+        OR: [
+          { title: { contains: searchQuery, mode: 'insensitive' } },
+          { description: { contains: searchQuery, mode: 'insensitive' } },
+        ]
+      });
     }
 
     if (category && category.trim() !== '' && category !== 'Recommended' && category !== 'Latest' && category !== 'Trending') {
-      whereClause.category = category;
+      andConditions.push({ category });
     }
+
+    const whereClause = andConditions.length > 0 ? { AND: andConditions } : {};
 
     let orderByClause: any = { createdAt: 'desc' };
     if (category === 'Trending') {
@@ -650,7 +666,10 @@ export async function createMuxDirectUpload() {
     }
 
     const upload = await mux.video.uploads.create({
-      new_asset_settings: { playback_policy: ['public'] },
+      new_asset_settings: { 
+        playback_policy: ['public'],
+        mp4_support: 'standard'
+      },
       cors_origin: '*',
     });
 
@@ -729,6 +748,7 @@ export async function saveScreenVideo(
         description,
         muxAssetId: assetId,
         muxPlaybackId: playbackId,
+        mediaUrl: videoUrl,
         duration,
         category,
         visibility,
