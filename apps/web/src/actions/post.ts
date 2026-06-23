@@ -18,6 +18,7 @@ export async function createPost(data: {
   location?: string | null;
   subLocation?: string | null;
   status?: string;
+  isAnonymous?: boolean;
 }) {
   try {
     const session = await getServerSession(authOptions);
@@ -106,6 +107,7 @@ export async function createPost(data: {
         subLocation: data.subLocation || null,
         status: isDraft ? 'DRAFT' : 'published',
         authorId: userId,
+        isAnonymous: !!data.isAnonymous,
         tolees: data.toleeIds && data.toleeIds.length > 0 ? {
           create: data.toleeIds.map(id => ({
             toleeId: id
@@ -262,6 +264,7 @@ export async function getPosts(options?: { mediaType?: string; limit?: number })
         createdAt: true,
         worldProjectId: true,
         isSimulation: true,
+        isAnonymous: true,
         worldProject: {
           select: {
             id: true,

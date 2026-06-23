@@ -116,6 +116,7 @@ export async function getToleeBySlug(slug: string) {
                 shareCount: true,
                 createdAt: true,
                 worldProjectId: true,
+                isAnonymous: true,
                 worldProject: {
                   select: {
                     id: true,

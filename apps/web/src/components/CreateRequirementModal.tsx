@@ -8,6 +8,7 @@ import { Image as ImageIcon, CheckCircle2, ShieldCheck, Globe, X, MapPin, Search
 import { getSidebarData } from '@/actions/user';
 import { useSession } from 'next-auth/react';
 import { uploadFile } from '@/lib/upload';
+import { createPost } from '@/actions/post';
 
 export function CreateRequirementModal({ 
   children, 
@@ -29,6 +30,7 @@ export function CreateRequirementModal({
   const [isOpen, setIsOpen] = useState(false);
   const [joinedTolees, setJoinedTolees] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isAnonymous, setIsAnonymous] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch joined Tolees from API
@@ -107,16 +109,28 @@ export function CreateRequirementModal({
       }
 
       try {
-        await onPost({
+        const result = await createPost({
           content,
           postType: 'requirement',
-          toleeName: selectedTolees.length === 1 ? firstSelectedTolee?.name : `${selectedTolees.length} Tolees`,
-          toleeSlug: selectedTolees.length === 1 ? firstSelectedTolee?.slug : 'multiple',
-          selectedToleeIds: selectedTolees,
-          media: media && finalMediaUrl ? { type: media.type, url: finalMediaUrl } : null,
-          location,
-          subLocation
+          toleeIds: selectedTolees,
+          media: finalMediaUrl ? { type: 'image', url: finalMediaUrl } : null,
+          location: location || null,
+          subLocation: subLocation || null,
+          isAnonymous: isAnonymous
         });
+
+        if (!result.success) {
+          alert(result.error || "Failed to post requirement. Please try again.");
+          setIsUploading(false);
+          return;
+        }
+
+        if (onPost && result.post) {
+          await onPost(result.post, {
+            toleeName: selectedTolees.length === 1 ? firstSelectedTolee?.name : `${selectedTolees.length} Tolees`,
+            toleeSlug: selectedTolees.length === 1 ? firstSelectedTolee?.slug : 'multiple'
+          });
+        }
       } catch (err) {
         console.error("Post handler failed:", err);
       } finally {
@@ -128,6 +142,7 @@ export function CreateRequirementModal({
         setMedia(null);
         setSelectedFile(null);
         setSelectedTolees(toleeId ? [toleeId] : []);
+        setIsAnonymous(false);
         setIsOpen(false);
       }
     }
@@ -154,16 +169,33 @@ export function CreateRequirementModal({
         </DialogHeader>
 
         {/* User Info */}
-        <div className="p-4 flex items-center gap-3">
-          <Avatar className="w-10 h-10">
-            <AvatarImage src={session?.user?.image || '/default-user-avatar.svg'} />
-            <AvatarFallback>{session?.user?.name?.[0] || 'ME'}</AvatarFallback>
-          </Avatar>
-          <div>
-            <h3 className="font-bold text-gray-900 dark:text-white">{session?.user?.name || 'Anonymous User'}</h3>
-            <span className="text-xs text-gray-500 flex items-center gap-1">
-              <Globe className="w-3 h-3" /> Visible to {selectedTolees.length} selected Tolees
-            </span>
+        <div className="p-4 flex items-center justify-between border-b border-gray-50 dark:border-gray-800/40">
+          <div className="flex items-center gap-3">
+            <Avatar className="w-10 h-10">
+              <AvatarImage src={isAnonymous ? '/default-user-avatar.svg' : (session?.user?.image || '/default-user-avatar.svg')} />
+              <AvatarFallback>{isAnonymous ? 'A' : (session?.user?.name?.[0] || 'ME')}</AvatarFallback>
+            </Avatar>
+            <div>
+              <h3 className="font-bold text-gray-900 dark:text-white">
+                {isAnonymous ? 'Anonymous' : (session?.user?.name || 'Anonymous User')}
+              </h3>
+              <span className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+                <Globe className="w-3 h-3" /> Visible to {selectedTolees.length} selected Tolees
+              </span>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-2 bg-gray-50 dark:bg-zinc-900/60 px-3 py-1.5 rounded-xl border border-gray-100 dark:border-zinc-800">
+            <input
+              type="checkbox"
+              id="anonymous-toggle"
+              checked={isAnonymous}
+              onChange={(e) => setIsAnonymous(e.target.checked)}
+              className="w-4 h-4 rounded text-rose-500 border-gray-300 dark:border-zinc-700 focus:ring-rose-500 cursor-pointer"
+            />
+            <label htmlFor="anonymous-toggle" className="text-xs font-bold text-gray-600 dark:text-zinc-300 cursor-pointer select-none">
+              Post Anonymously
+            </label>
           </div>
         </div>
 

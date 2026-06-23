@@ -241,6 +241,7 @@ model Post {
   shareCount  Int      @default(0)
   location    String?
   subLocation String?
+  isAnonymous Boolean  @default(false)
   
   // AI Content Understanding (Future-ready)
   ocrText         String?

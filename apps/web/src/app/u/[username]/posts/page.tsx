@@ -93,7 +93,7 @@ export default async function UserProfileFeed({
     where: {
       authorId: user.id,
       isArchived: false,
-      ...(isMe ? {} : { visibility: 'public' })
+      ...(isMe ? {} : { visibility: 'public', isAnonymous: false })
     },
     orderBy: { createdAt: 'desc' },
     select: {
@@ -105,6 +105,7 @@ export default async function UserProfileFeed({
       visibility: true,
       authorId: true,
       createdAt: true,
+      isAnonymous: true,
       shareCount: true,
       likes: {
         select: {

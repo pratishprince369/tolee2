@@ -153,15 +153,20 @@ export default async function ToleePage({ params }: { params: { slug: string } }
         avatar: getValidAvatarUrl(mostRecentRepost.user.avatar)
       } : null;
       
+      const isAnon = !!p.post.isAnonymous;
+      const displayAuthor = isAnon ? 'Anonymous' : authorName;
+      const displayAvatar = isAnon ? '/default-user-avatar.svg' : getValidAvatarUrl(p.post.author.avatar);
+
       return {
         id: p.post.id,
-        authorId: p.post.author.id,
+        authorId: isAnon ? null : p.post.author.id,
         visibility: p.post.visibility,
-        author: authorName,
-        authorName,
-        username: p.post.author.username || 'unknown',
-        authorAvatar: getValidAvatarUrl(p.post.author.avatar),
-        avatar: getValidAvatarUrl(p.post.author.avatar),
+        author: displayAuthor,
+        authorName: displayAuthor,
+        username: isAnon ? 'anonymous' : (p.post.author.username || 'unknown'),
+        authorAvatar: displayAvatar,
+        avatar: displayAvatar,
+        isAnonymous: isAnon,
         content: p.post.caption || '',
         caption: p.post.caption,
         image: p.post.mediaTypes && p.post.mediaTypes.split(',')[0] === 'image' ? p.post.mediaUrls?.split(/,(?=https?:\/\/)/)[0] : null,

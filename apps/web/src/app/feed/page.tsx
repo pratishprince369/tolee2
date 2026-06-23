@@ -60,18 +60,19 @@ export default async function GlobalFeedPage() {
           ? (pendingFollowAuthorIds.includes(post.author.id) ? 'pending' : (isFollowing ? 'approved' : null))
           : null;
         
+        const isAnon = !!post.isAnonymous;
         return {
           id: post.id,
-          authorId: post.author?.id,
-          authorIsPrivate: post.author?.isPrivate || false,
-          isFollowing,
-          followStatus,
+          authorId: isAnon ? null : post.author?.id,
+          authorIsPrivate: isAnon ? false : (post.author?.isPrivate || false),
+          isFollowing: isAnon ? false : isFollowing,
+          followStatus: isAnon ? null : followStatus,
           visibility: post.visibility,
-          author: post.author?.username || post.author?.name || 'Anonymous',
-          authorAvatar: post.author?.avatar || '/default-user-avatar.svg',
+          author: isAnon ? 'Anonymous' : (post.author?.username || post.author?.name || 'Anonymous'),
+          authorAvatar: isAnon ? '/default-user-avatar.svg' : (post.author?.avatar || '/default-user-avatar.svg'),
           toleeName: firstTolee?.name || 'Tolee',
           toleeSlug: firstTolee?.slug || 'group',
-          role: (firstTolee?.ownerId && post.author?.id && firstTolee.ownerId === post.author.id) ? 'Admin' : 'Member',
+          role: (firstTolee?.ownerId && post.author?.id && firstTolee.ownerId === post.author.id && !isAnon) ? 'Admin' : 'Member',
           time: new Date(post.createdAt).toLocaleDateString(),
           content: post.caption || '',
           image: post.mediaTypes && post.mediaTypes.split(',')[0] === 'image' ? post.mediaUrls?.split(/,(?=https?:\/\/)/)[0] : null,

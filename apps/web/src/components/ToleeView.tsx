@@ -817,12 +817,14 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
 
   const handleNewPost = (post: any, postData: any) => {
     if (post) {
+      const isAnon = !!post.isAnonymous;
       const newLocalPost = {
         id: post.id,
-        authorId: post.authorId,
+        authorId: isAnon ? null : post.authorId,
         visibility: post.visibility,
-        author: post.author?.username || post.author?.name || 'Anonymous',
-        authorAvatar: post.author?.avatar || '/default-user-avatar.svg',
+        author: isAnon ? 'Anonymous' : (post.author?.username || post.author?.name || 'Anonymous'),
+        authorAvatar: isAnon ? '/default-user-avatar.svg' : (post.author?.avatar || '/default-user-avatar.svg'),
+        isAnonymous: isAnon,
         content: post.caption || '',
         image: post.mediaTypes && post.mediaTypes.split(',')[0] === 'image' ? post.mediaUrls?.split(/,(?=https?:\/\/)/)[0] : null,
         video: post.mediaTypes && post.mediaTypes.split(',')[0] === 'video' ? post.mediaUrls?.split(/,(?=https?:\/\/)/)[0] : null,
@@ -1681,23 +1683,36 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                       <Card key={post.id} className="border-gray-200 dark:border-gray-800 shadow-sm bg-white dark:bg-[#121212] overflow-hidden transition-all duration-300">
                         <CardHeader className="p-3 pb-1 flex flex-row items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <div 
-                              onClick={(e) => handleProfileClick(e, post.author)}
-                              className="cursor-pointer"
-                            >
+                            {post.isAnonymous ? (
                               <Avatar className="w-9 h-9 border border-gray-100 dark:border-gray-800 shadow-sm">
-                                <AvatarImage src={post.authorAvatar || '/default-user-avatar.svg'} />
-                                <AvatarFallback>{post.author?.[0] || 'U'}</AvatarFallback>
+                                <AvatarImage src="/default-user-avatar.svg" />
+                                <AvatarFallback>A</AvatarFallback>
                               </Avatar>
-                            </div>
+                            ) : (
+                              <div 
+                                onClick={(e) => handleProfileClick(e, post.author)}
+                                className="cursor-pointer"
+                              >
+                                <Avatar className="w-9 h-9 border border-gray-100 dark:border-gray-800 shadow-sm">
+                                  <AvatarImage src={post.authorAvatar || '/default-user-avatar.svg'} />
+                                  <AvatarFallback>{post.author?.[0] || 'U'}</AvatarFallback>
+                                </Avatar>
+                              </div>
+                            )}
                             <div className="flex flex-col -space-y-0.5">
                               <div className="flex items-center gap-1.5">
-                                <span 
-                                  onClick={(e) => handleProfileClick(e, post.author)}
-                                  className="font-bold text-[14px] cursor-pointer hover:underline"
-                                >
-                                  {post.author || 'Unknown User'}
-                                </span>
+                                {post.isAnonymous ? (
+                                  <span className="font-bold text-[14px]">
+                                    Anonymous
+                                  </span>
+                                ) : (
+                                  <span 
+                                    onClick={(e) => handleProfileClick(e, post.author)}
+                                    className="font-bold text-[14px] cursor-pointer hover:underline"
+                                  >
+                                    {post.author || 'Unknown User'}
+                                  </span>
+                                )}
                                 {post.role === 'Moderator' && <Badge variant="secondary" className="bg-primary/10 text-primary text-[9px] h-4 px-1">MOD</Badge>}
                                 {post.role === 'Admin' && <Badge variant="secondary" className="bg-red-500/10 text-red-500 text-[9px] h-4 px-1">ADMIN</Badge>}
                               </div>

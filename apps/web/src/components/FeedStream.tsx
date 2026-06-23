@@ -810,10 +810,13 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
   };
 
   const handleNewPost = (post: any, postData?: any) => {
+    const isAnon = !!post.isAnonymous;
     const newLocalPost = {
       id: post.id,
-      author: post.author?.username || post.author?.name || 'Anonymous',
-      authorAvatar: post.author?.avatar || '/default-user-avatar.svg',
+      author: isAnon ? 'Anonymous' : (post.author?.username || post.author?.name || 'Anonymous'),
+      authorAvatar: isAnon ? '/default-user-avatar.svg' : (post.author?.avatar || '/default-user-avatar.svg'),
+      authorId: isAnon ? null : post.author?.id,
+      isAnonymous: isAnon,
       toleeName: postData?.toleeName,
       toleeSlug: postData?.toleeSlug,
       role: 'Member',
@@ -829,6 +832,11 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
       postType: post.postType,
       location: post.location,
       subLocation: post.subLocation,
+      likedByMe: false,
+      savedByMe: false,
+      repostedByMe: false,
+      commentsList: [],
+      resharedByUser: null
     };
     setFeedPosts(prev => [newLocalPost, ...prev]);
   };
@@ -1684,21 +1692,32 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
 
                     <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <UserHovercard username={post.author}>
-                          <Link href={`/u/${post.author}`}>
-                            <Avatar className="w-10 h-10 cursor-pointer border border-zinc-100 dark:border-zinc-800 shadow-sm">
-                              <AvatarImage src={post.authorAvatar} alt={post.author} />
-                              <AvatarFallback>{post.author?.[0] || 'U'}</AvatarFallback>
-                            </Avatar>
-                          </Link>
-                        </UserHovercard>
+                        {post.isAnonymous ? (
+                          <Avatar className="w-10 h-10 border border-zinc-100 dark:border-zinc-800 shadow-sm">
+                            <AvatarImage src="/default-user-avatar.svg" alt="Anonymous" />
+                            <AvatarFallback>A</AvatarFallback>
+                          </Avatar>
+                        ) : (
+                          <UserHovercard username={post.author}>
+                            <Link href={`/u/${post.author}`}>
+                              <Avatar className="w-10 h-10 cursor-pointer border border-zinc-100 dark:border-zinc-800 shadow-sm">
+                                <AvatarImage src={post.authorAvatar} alt={post.author} />
+                                <AvatarFallback>{post.author?.[0] || 'U'}</AvatarFallback>
+                              </Avatar>
+                            </Link>
+                          </UserHovercard>
+                        )}
                         <div className="flex flex-col">
                           <div className="flex items-center gap-2">
-                            <UserHovercard username={post.author}>
-                              <Link href={`/u/${post.author}`}>
-                                <span className="font-bold text-[14.5px] text-zinc-900 dark:text-zinc-50 cursor-pointer hover:underline leading-none">{post.author}</span>
-                              </Link>
-                            </UserHovercard>
+                            {post.isAnonymous ? (
+                              <span className="font-bold text-[14.5px] text-zinc-900 dark:text-zinc-50 leading-none">Anonymous</span>
+                            ) : (
+                              <UserHovercard username={post.author}>
+                                <Link href={`/u/${post.author}`}>
+                                  <span className="font-bold text-[14.5px] text-zinc-900 dark:text-zinc-50 cursor-pointer hover:underline leading-none">{post.author}</span>
+                                </Link>
+                              </UserHovercard>
+                            )}
                             {post.role === 'Admin' && (
                               <span className="bg-rose-50 text-rose-500 border border-rose-100/50 dark:bg-rose-950/20 dark:text-rose-400 font-extrabold text-[9px] tracking-wide px-1.5 py-0.5 rounded-[4px] select-none leading-none">
                                 ADMIN
