@@ -14,7 +14,7 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { useSession } from 'next-auth/react';
 import { getScreenVideos } from '@/actions/screen';
 
-export const VIDEO_CATEGORIES = [
+const VIDEO_CATEGORIES = [
   'Recommended', 'Trending', 'Latest', 'Subscriptions',
   'Technology', 'Business', 'Education', 'Gaming', 'Comedy',
   'Entertainment', 'Music', 'Movies', 'News', 'Sports',
@@ -228,23 +228,14 @@ export default function ScreenPage() {
 
           {/* Right: Upload Button (Visible on Mobile inside top row) */}
           <div className="flex items-center gap-2 md:hidden">
-            {isAuthenticated ? (
-              <Link href="/screen/studio?tab=upload">
-                <Button
-                  className="bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl px-4 py-2.5 flex items-center gap-1.5 shadow-md text-xs"
-                >
-                  <Upload className="w-3.5 h-3.5" />
-                  Upload Video
-                </Button>
-              </Link>
-            ) : (
+            <Link href="/screen/studio?tab=upload">
               <Button
-                onClick={() => router.push(`/auth/signin?callbackUrl=/screen`)}
-                className="bg-zinc-900 hover:bg-zinc-850 text-white font-bold rounded-xl px-4 py-2 text-xs"
+                className="bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl px-4 py-2.5 flex items-center gap-1.5 shadow-md text-xs"
               >
-                Sign In
+                <Upload className="w-3.5 h-3.5" />
+                Upload Video
               </Button>
-            )}
+            </Link>
           </div>
         </div>
 
@@ -336,23 +327,14 @@ export default function ScreenPage() {
 
         {/* Right: Upload Trigger (Visible on Desktop/Tablet only) */}
         <div className="hidden md:flex items-center gap-2">
-          {isAuthenticated ? (
-            <Link href="/screen/studio?tab=upload">
-              <Button
-                className="bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-2xl px-5 py-4 flex items-center gap-2 transform active:scale-95 transition-all shadow-md shadow-teal-550/10 text-xs"
-              >
-                <Upload className="w-3.5 h-3.5" />
-                Upload Video
-              </Button>
-            </Link>
-          ) : (
+          <Link href="/screen/studio?tab=upload">
             <Button
-              onClick={() => router.push(`/auth/signin?callbackUrl=/screen`)}
-              className="bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-white font-bold rounded-2xl px-5 py-4 text-xs"
+              className="bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-2xl px-5 py-4 flex items-center gap-2 transform active:scale-95 transition-all shadow-md shadow-teal-550/10 text-xs"
             >
-              Sign in to upload
+              <Upload className="w-3.5 h-3.5" />
+              Upload Video
             </Button>
-          )}
+          </Link>
         </div>
       </div>
 
