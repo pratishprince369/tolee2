@@ -32,6 +32,9 @@ interface UploadContextType {
       selectedToleeIds: string[];
       toleeName?: string;
       toleeSlug?: string;
+      location?: string | null;
+      subLocation?: string | null;
+      isAnonymous?: boolean;
     },
     uploadType: 'feed' | 'reel',
     onSuccessCallback?: (createdPost: any, postData: any) => void
@@ -143,7 +146,10 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         content: postData.content,
         postType: postData.postType,
         toleeIds: postData.selectedToleeIds,
-        media: uploadedItems.length > 0 ? { type: combinedTypes, url: combinedUrls } : null
+        media: uploadedItems.length > 0 ? { type: combinedTypes, url: combinedUrls } : null,
+        location: postData.location || null,
+        subLocation: postData.subLocation || null,
+        isAnonymous: !!postData.isAnonymous
       });
 
       if (!result.success) {
@@ -151,7 +157,10 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Success
-      const typeLabel = uploadType === 'reel' ? 'reel' : 'post';
+      let typeLabel = uploadType === 'reel' ? 'reel' : 'post';
+      if (postData?.postType === 'requirement') {
+        typeLabel = 'requirement';
+      }
       setTask(prev => ({
         ...prev,
         state: 'success',

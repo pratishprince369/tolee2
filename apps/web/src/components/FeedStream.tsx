@@ -814,7 +814,7 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
     const newLocalPost = {
       id: post.id,
       author: isAnon ? 'Anonymous' : (post.author?.username || post.author?.name || 'Anonymous'),
-      authorAvatar: isAnon ? '/default-user-avatar.svg' : (post.author?.avatar || '/default-user-avatar.svg'),
+      authorAvatar: isAnon ? '/default-user-avatar.svg' : (post.author?.avatar || post.author?.image || '/default-user-avatar.svg'),
       authorId: isAnon ? null : post.author?.id,
       isAnonymous: isAnon,
       toleeName: postData?.toleeName,

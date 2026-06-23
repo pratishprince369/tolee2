@@ -8,7 +8,7 @@ import { Image as ImageIcon, CheckCircle2, ShieldCheck, Globe, X, MapPin, Search
 import { getSidebarData } from '@/actions/user';
 import { useSession } from 'next-auth/react';
 import { uploadFile } from '@/lib/upload';
-import { createPost } from '@/actions/post';
+import { useUpload } from './UploadContext';
 
 export function CreateRequirementModal({ 
   children, 
@@ -26,7 +26,8 @@ export function CreateRequirementModal({
   const [selectedTolees, setSelectedTolees] = useState<string[]>(toleeId ? [toleeId] : []);
   const [media, setMedia] = useState<{type: 'image', url: string} | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
+  const { startUpload, task } = useUpload();
+  const isUploading = task.state === 'uploading' || task.state === 'processing';
   const [isOpen, setIsOpen] = useState(false);
   const [joinedTolees, setJoinedTolees] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -84,67 +85,46 @@ export function CreateRequirementModal({
   };
 
   const handlePost = async () => {
-    if (onPost && isPostReady) {
-      setIsUploading(true);
-      
+    if (onPost && isPostReady && !isUploading) {
       const firstSelectedTolee = joinedTolees.find(t => t.id === selectedTolees[0]);
-      let finalMediaUrl = media?.url;
       
-      if (selectedFile) {
-        try {
-          const uploadResult = await uploadFile(selectedFile);
-          finalMediaUrl = uploadResult.secure_url;
-        } catch (e: any) {
-          alert("Error uploading media: " + (e.message || "Network error. Please try again."));
-          setIsUploading(false);
-          return;
-        }
-      }
+      const mediaList = selectedFile 
+        ? [{ type: 'image' as const, url: media?.url || '', file: selectedFile }] 
+        : [];
 
-      // CRITICAL: Double check we aren't sending a blob URL
-      if (finalMediaUrl?.startsWith('blob:')) {
-        alert("Internal Error: Temporary image URL detected. Upload failed.");
-        setIsUploading(false);
-        return;
-      }
+      const postData = {
+        content,
+        postType: 'requirement',
+        selectedToleeIds: selectedTolees,
+        toleeName: selectedTolees.length === 1 ? firstSelectedTolee?.name : `${selectedTolees.length} Tolees`,
+        toleeSlug: selectedTolees.length === 1 ? firstSelectedTolee?.slug : 'multiple',
+        location: location || null,
+        subLocation: subLocation || null,
+        isAnonymous: isAnonymous
+      };
 
-      try {
-        const result = await createPost({
-          content,
-          postType: 'requirement',
-          toleeIds: selectedTolees,
-          media: finalMediaUrl ? { type: 'image', url: finalMediaUrl } : null,
-          location: location || null,
-          subLocation: subLocation || null,
-          isAnonymous: isAnonymous
-        });
-
-        if (!result.success) {
-          alert(result.error || "Failed to post requirement. Please try again.");
-          setIsUploading(false);
-          return;
-        }
-
-        if (onPost && result.post) {
-          await onPost(result.post, {
-            toleeName: selectedTolees.length === 1 ? firstSelectedTolee?.name : `${selectedTolees.length} Tolees`,
-            toleeSlug: selectedTolees.length === 1 ? firstSelectedTolee?.slug : 'multiple'
+      startUpload(
+        mediaList,
+        postData,
+        'feed',
+        (createdPost: any, pData: any) => {
+          const firstToleeRelation = createdPost.tolees?.[0]?.tolee;
+          onPost(createdPost, {
+            toleeName: firstToleeRelation?.name || pData.toleeName,
+            toleeSlug: firstToleeRelation?.slug || pData.toleeSlug
           });
         }
-      } catch (err) {
-        console.error("Post handler failed:", err);
-      } finally {
-        setIsUploading(false);
-        // Reset form
-        setContent('');
-        setLocation('');
-        setSubLocation('');
-        setMedia(null);
-        setSelectedFile(null);
-        setSelectedTolees(toleeId ? [toleeId] : []);
-        setIsAnonymous(false);
-        setIsOpen(false);
-      }
+      );
+
+      // Reset form and close modal immediately
+      setContent('');
+      setLocation('');
+      setSubLocation('');
+      setMedia(null);
+      setSelectedFile(null);
+      setSelectedTolees(toleeId ? [toleeId] : []);
+      setIsAnonymous(false);
+      setIsOpen(false);
     }
   };
 
