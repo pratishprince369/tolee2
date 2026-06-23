@@ -15,8 +15,16 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { 
   getCreatorAnalytics, getCreatorVideos, createMuxDirectUpload, 
-  saveScreenVideo, saveSimulatedScreenVideo, VIDEO_CATEGORIES 
+  saveScreenVideo, saveSimulatedScreenVideo 
 } from '@/actions/screen';
+
+const VIDEO_CATEGORIES = [
+  'Recommended', 'Trending', 'Latest', 'Subscriptions',
+  'Technology', 'Business', 'Education', 'Gaming', 'Comedy',
+  'Entertainment', 'Music', 'Movies', 'News', 'Sports',
+  'Health', 'Fashion', 'Finance', 'Real Estate', 'AI',
+  'Programming', 'Travel', 'Food', 'Podcasts', 'Kids', 'Live'
+];
 
 // High-quality mock tech/finance images for AI thumbnails
 const MOCK_THUMBNAIL_TEMPLATES = [
@@ -68,6 +76,7 @@ export default function CreatorStudioPage() {
   const [muxUploadId, setMuxUploadId] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [isSimulatedUpload, setIsSimulatedUpload] = useState(false);
+  const [isReel, setIsReel] = useState(false);
 
   // AI Suggestion states
   const [aiScore, setAiScore] = useState(65);
@@ -132,6 +141,15 @@ export default function CreatorStudioPage() {
       // Auto trigger AI Thumbnail Generation on select file
       setGeneratedThumbnails(MOCK_THUMBNAIL_TEMPLATES);
       setSelectedThumbnailUrl(MOCK_THUMBNAIL_TEMPLATES[0]);
+
+      // Detect aspect ratio
+      const videoEl = document.createElement('video');
+      videoEl.src = URL.createObjectURL(file);
+      videoEl.onloadedmetadata = () => {
+        const isVertical = videoEl.videoHeight > videoEl.videoWidth;
+        setIsReel(isVertical);
+        URL.revokeObjectURL(videoEl.src);
+      };
     }
   };
 
@@ -208,7 +226,7 @@ export default function CreatorStudioPage() {
 
       setUploadStatus('processing');
       // Save metadata in database
-      const saveRes = await saveScreenVideo(title, description, res.uploadId, category, visibility);
+      const saveRes = await saveScreenVideo(title, description, res.uploadId, category, visibility, isReel);
       if (saveRes.success) {
         setUploadStatus('done');
       } else {
@@ -244,7 +262,8 @@ export default function CreatorStudioPage() {
           category,
           visibility,
           thumbUrl,
-          selectedVideoUrl
+          selectedVideoUrl,
+          isReel
         );
         if (res.success) {
           setUploadStatus('done');
@@ -592,6 +611,18 @@ export default function CreatorStudioPage() {
                     </div>
                   </div>
 
+                  {isReel && (
+                    <div className="bg-amber-50 dark:bg-amber-955/20 border border-amber-500/15 p-3.5 rounded-2xl flex items-start gap-2.5 text-xs text-amber-800 dark:text-amber-350">
+                      <Info className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5 animate-pulse" />
+                      <div>
+                        <p className="font-bold">Vertical Video Format Detected</p>
+                        <p className="text-[10px] text-zinc-500 dark:text-zinc-450 mt-0.5">
+                          Since this video has a vertical aspect ratio, it will be automatically published to the **Reels** section on publish completion.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Title & Description inputs */}
                   <div className="space-y-4">
                     <div className="space-y-1">
@@ -758,17 +789,28 @@ export default function CreatorStudioPage() {
                         <CheckCircle2 className="w-8 h-8" />
                       </div>
                       <div className="space-y-1">
-                        <h4 className="text-base font-black text-zinc-900 dark:text-white">Video Published Successfully!</h4>
-                        <p className="text-xs text-zinc-400">Your video is now live on Tolee Screen.</p>
+                        <h4 className="text-base font-black text-zinc-900 dark:text-white">
+                          {isReel ? 'Reel Published Successfully!' : 'Video Published Successfully!'}
+                        </h4>
+                        <p className="text-xs text-zinc-400">
+                          {isReel 
+                            ? 'Your vertical video is now live in the Reels section.' 
+                            : 'Your video is now live on Tolee Screen.'}
+                        </p>
                       </div>
                       <Button
                         onClick={() => {
+                          const wasReel = isReel;
                           resetForm();
-                          setActiveTab('content');
+                          if (wasReel) {
+                            router.push('/reels');
+                          } else {
+                            setActiveTab('content');
+                          }
                         }}
                         className="bg-teal-650 text-white font-bold text-xs py-3 px-6 rounded-xl"
                       >
-                        Back to Library
+                        {isReel ? 'Go to Reels' : 'Back to Library'}
                       </Button>
                     </>
                   )}

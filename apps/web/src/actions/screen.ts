@@ -673,7 +673,8 @@ export async function saveScreenVideo(
   description: string, 
   uploadId: string, 
   category = 'General', 
-  visibility = 'public'
+  visibility = 'public',
+  isReel = false
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -704,6 +705,23 @@ export async function saveScreenVideo(
     const asset = await mux.video.assets.retrieve(assetId);
     const playbackId = asset.playback_ids?.[0]?.id;
     const duration = asset.duration || 0;
+    const videoUrl = playbackId ? `https://stream.mux.com/${playbackId}/medium.mp4` : '';
+
+    if (isReel) {
+      // Create Reel Post directly
+      const post = await prisma.post.create({
+        data: {
+          caption: `🎥 **${title}**\n\n${description || ''}`,
+          mediaUrls: videoUrl,
+          mediaTypes: 'video',
+          postType: 'reel',
+          status: 'published',
+          visibility: 'public',
+          authorId: currentUserId
+        }
+      });
+      return { success: true, isReel: true, post };
+    }
 
     const video = await prisma.screenVideo.create({
       data: {
@@ -726,6 +744,19 @@ export async function saveScreenVideo(
           },
         },
       },
+    });
+
+    // Create Feed Post for Tolee Screen Video
+    await prisma.post.create({
+      data: {
+        caption: `🎥 **${title}**\n\n${description || ''}`,
+        mediaUrls: videoUrl,
+        mediaTypes: 'video',
+        postType: 'regular',
+        status: 'published',
+        visibility: 'public',
+        authorId: currentUserId
+      }
     });
 
     return { success: true, video };
@@ -765,7 +796,8 @@ export async function saveSimulatedScreenVideo(
   category: string,
   visibility: string,
   thumbnailUrl: string,
-  mediaUrl: string
+  mediaUrl: string,
+  isReel = false
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -773,6 +805,23 @@ export async function saveSimulatedScreenVideo(
       return { success: false, error: 'Unauthorized' };
     }
     const currentUserId = (session.user as any).id;
+
+    if (isReel) {
+      // Save directly as a Reel (Post model)
+      const post = await prisma.post.create({
+        data: {
+          caption: `🎥 **${title}**\n\n${description || ''}`,
+          mediaUrls: mediaUrl,
+          mediaTypes: 'video',
+          postType: 'reel',
+          status: 'published',
+          visibility: 'public',
+          authorId: currentUserId,
+          isSimulation: true
+        }
+      });
+      return { success: true, isReel: true, post };
+    }
 
     const video = await prisma.screenVideo.create({
       data: {
@@ -785,6 +834,20 @@ export async function saveSimulatedScreenVideo(
         duration: 360 + Math.floor(Math.random() * 240), // random duration
         isSimulation: true,
         userId: currentUserId
+      }
+    });
+
+    // Also create a Feed Post so it shows up in the main Feed
+    await prisma.post.create({
+      data: {
+        caption: `🎥 **${title}**\n\n${description || ''}`,
+        mediaUrls: mediaUrl,
+        mediaTypes: 'video',
+        postType: 'regular',
+        status: 'published',
+        visibility: 'public',
+        authorId: currentUserId,
+        isSimulation: true
       }
     });
 

@@ -12,7 +12,15 @@ import {
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { useSession } from 'next-auth/react';
-import { getScreenVideos, VIDEO_CATEGORIES } from '@/actions/screen';
+import { getScreenVideos } from '@/actions/screen';
+
+export const VIDEO_CATEGORIES = [
+  'Recommended', 'Trending', 'Latest', 'Subscriptions',
+  'Technology', 'Business', 'Education', 'Gaming', 'Comedy',
+  'Entertainment', 'Music', 'Movies', 'News', 'Sports',
+  'Health', 'Fashion', 'Finance', 'Real Estate', 'AI',
+  'Programming', 'Travel', 'Food', 'Podcasts', 'Kids', 'Live'
+];
 
 // Format helpers
 function formatDuration(seconds: number | null) {
