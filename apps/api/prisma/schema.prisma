@@ -90,7 +90,10 @@ model User {
   searchClicks  SearchClickLog[]
   worldProjects WorldProject[]
   visitorSessions VisitorSession[]
-  screenVideos  ScreenVideo[]
+  screenVideos      ScreenVideo[]
+  screenLikes       ScreenVideoLike[]
+  screenComments    ScreenVideoComment[]
+  screenPlaylists   ScreenVideoPlaylist[]
 
 
   pincode               String?
@@ -1306,14 +1309,68 @@ model ScreenVideo {
   id            String   @id @default(cuid())
   title         String
   description   String?
-  muxAssetId    String?  // Mux Asset ID
-  muxPlaybackId String?  // Mux Playback ID for streaming
-  duration      Float?   // Video duration in seconds
+  mediaUrl      String?  // Direct streaming link (for simulated videos)
+  muxAssetId    String?
+  muxPlaybackId String?
+  duration      Float?
+  thumbnailUrl  String?  // Custom thumbnail (for simulated videos)
+  category      String   @default("General")
+  visibility    String   @default("public") // "public" | "private" | "unlisted"
+  viewsCount    Int      @default(0)
+  likesCount    Int      @default(0)
+  isSimulation  Boolean  @default(false)
+  isLive        Boolean  @default(false)
+
   userId        String
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  viewsCount    Int      @default(0)
+
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+
+  likes         ScreenVideoLike[]
+  comments      ScreenVideoComment[]
+  playlists     ScreenVideoPlaylist[]
+}
+
+model ScreenVideoLike {
+  id        String      @id @default(cuid())
+  videoId   String
+  video     ScreenVideo @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isDislike Boolean     @default(false)
+  createdAt DateTime    @default(now())
+
+  @@unique([videoId, userId])
+}
+
+model ScreenVideoComment {
+  id         String               @id @default(cuid())
+  videoId    String
+  video      ScreenVideo          @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  text       String
+  isPinned   Boolean              @default(false)
+  isHearted  Boolean              @default(false)
+
+  parentId   String?
+  parent     ScreenVideoComment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies    ScreenVideoComment[] @relation("CommentReplies")
+
+  createdAt  DateTime             @default(now())
+  updatedAt  DateTime             @updatedAt
+}
+
+model ScreenVideoPlaylist {
+  id          String        @id @default(cuid())
+  name        String
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  visibility  String        @default("public") // "public" | "private" | "unlisted"
+  videos      ScreenVideo[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 }
 
 

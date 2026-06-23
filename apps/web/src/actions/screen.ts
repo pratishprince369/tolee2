@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import Mux from '@mux/mux-node';
+import { getSimulationSettings } from '@/lib/simulation';
 
 const MUX_TOKEN_ID = process.env.MUX_TOKEN_ID || '0f358a94-4bdf-403e-bb8a-02ee17b68b66';
 const MUX_TOKEN_SECRET = process.env.MUX_TOKEN_SECRET || 'GiZ6iyNUthNh1Kt1BEYph8zVv24R4CINmTl64k7l0lyRzdvehcZlHCcndb0Gcn8KdsVnv5n3XBc';
@@ -13,12 +14,126 @@ const mux = new Mux({
   tokenSecret: MUX_TOKEN_SECRET,
 });
 
+// Categories list matching YouTube homepage requirements
+export const VIDEO_CATEGORIES = [
+  'Recommended', 'Trending', 'Latest', 'Subscriptions',
+  'Technology', 'Business', 'Education', 'Gaming', 'Comedy',
+  'Entertainment', 'Music', 'Movies', 'News', 'Sports',
+  'Health', 'Fashion', 'Finance', 'Real Estate', 'AI',
+  'Programming', 'Travel', 'Food', 'Podcasts'
+];
+
 /**
- * Fetches all screen videos, optional search filter.
+ * Seed simulated videos if Simulation Mode is ON
  */
-export async function getScreenVideos(searchQuery?: string) {
+async function seedSimulatedScreenVideos() {
   try {
+    const simSettings = await getSimulationSettings();
+    if (!simSettings.simulationMode) return;
+
+    // Check count of simulated videos
+    const count = await prisma.screenVideo.count({
+      where: { isSimulation: true }
+    });
+
+    if (count >= 24) return; // Already seeded enough
+
+    // Get simulated users
+    let simUsers = await prisma.user.findMany({
+      where: { isSimulation: true }
+    });
+
+    // If no simulated users exist, create a few
+    if (simUsers.length === 0) {
+      const mockCreators = [
+        { name: 'Tech Gyan', email: 'techgyan@simulation.tolee', avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150', username: 'techgyan' },
+        { name: 'Finance Guruji', email: 'guruji@simulation.tolee', avatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150', username: 'finance_guruji' },
+        { name: 'Gaming Zone', email: 'gaming@simulation.tolee', avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150', username: 'gaming_zone' },
+        { name: 'Chef Rasoi', email: 'chef@simulation.tolee', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150', username: 'chef_rasoi' },
+        { name: 'Fitness Mantra', email: 'fitness@simulation.tolee', avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150', username: 'fitness_mantra' }
+      ];
+
+      for (const mc of mockCreators) {
+        const u = await prisma.user.create({
+          data: {
+            name: mc.name,
+            email: mc.email,
+            avatar: mc.avatar,
+            username: mc.username,
+            isSimulation: true,
+            isVerified: true
+          }
+        });
+        simUsers.push(u);
+      }
+    }
+
+    const videoUrls = [
+      'https://cdn.pixabay.com/video/2021/08/04/83896-584732159_large.mp4',
+      'https://cdn.pixabay.com/video/2020/05/11/38600-418859942_large.mp4',
+      'https://cdn.pixabay.com/video/2021/11/04/93557-641566898_large.mp4',
+      'https://cdn.pixabay.com/video/2022/01/18/104762-663884392_large.mp4',
+      'https://cdn.pixabay.com/video/2023/10/22/186071-877209700_large.mp4'
+    ];
+
+    const thumbUrls = [
+      'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=640',
+      'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=640',
+      'https://images.unsplash.com/photo-1538481199705-c710c4e965fc?w=640',
+      'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?w=640',
+      'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=640'
+    ];
+
+    const seedTemplates = [
+      { title: 'Next.js 16 Server Actions: The Complete Engineering Guide', desc: 'Step-by-step tutorial on Next.js 16 advanced patterns, databases, and secure APIs.', category: 'Programming', duration: 720 },
+      { title: 'How to Invest in Stock Markets in 2026 (Zero Risks)', desc: 'Daily finance guidance on investing, assets, mutual funds, and passive cashflows.', category: 'Finance', duration: 480 },
+      { title: 'Cyberpunk 2077 Phantom Liberty - RayTracing Ultra Gameplay Walkthrough', desc: 'No commentary gameplay of Phantom Liberty expansion at Max Settings 4K HDR.', category: 'Gaming', duration: 1200 },
+      { title: 'Authentic Butter Chicken Recipe - Restaurant Style Secrets', desc: 'Learn how to cook the best butter chicken at home with traditional spices.', category: 'Food', duration: 320 },
+      { title: '15 Mins Full Body Daily Workout (No Equipment Needed)', desc: 'Home workout routine for burning fat, cardiovascular strength, and muscle tone.', category: 'Health', duration: 900 }
+    ];
+
+    for (let i = 0; i < 20; i++) {
+      const template = seedTemplates[i % seedTemplates.length];
+      const author = simUsers[i % simUsers.length];
+
+      await prisma.screenVideo.create({
+        data: {
+          title: `${template.title} (Vol ${Math.floor(i/5) + 1})`,
+          description: template.desc,
+          mediaUrl: videoUrls[i % videoUrls.length],
+          duration: template.duration + (i * 20),
+          thumbnailUrl: thumbUrls[i % thumbUrls.length],
+          category: template.category,
+          viewsCount: 1500 + (i * 450),
+          likesCount: 120 + (i * 25),
+          isSimulation: true,
+          userId: author.id,
+          createdAt: new Date(Date.now() - (i * 4 * 3600 * 1000)) // offset timestamps
+        }
+      });
+    }
+  } catch (err) {
+    console.error('Failed to seed simulated videos:', err);
+  }
+}
+
+/**
+ * Fetch screen videos supporting Cursor Pagination for Infinite Scroll
+ */
+export async function getScreenVideos(searchQuery?: string, category?: string, limit = 8, cursorId?: string) {
+  try {
+    // Attempt to seed simulated content in background
+    await seedSimulatedScreenVideos();
+
+    const simSettings = await getSimulationSettings();
+    const isSimOn = simSettings.simulationMode;
+
     const whereClause: any = {};
+
+    // Simulation filter fallback
+    if (!isSimOn) {
+      whereClause.isSimulation = false;
+    }
 
     if (searchQuery && searchQuery.trim() !== '') {
       whereClause.OR = [
@@ -27,8 +142,20 @@ export async function getScreenVideos(searchQuery?: string) {
       ];
     }
 
+    if (category && category.trim() !== '' && category !== 'Recommended' && category !== 'Latest' && category !== 'Trending') {
+      whereClause.category = category;
+    }
+
+    let orderByClause: any = { createdAt: 'desc' };
+    if (category === 'Trending') {
+      orderByClause = { viewsCount: 'desc' };
+    }
+
     const videos = await prisma.screenVideo.findMany({
       where: whereClause,
+      take: limit + 1, // Get extra item for cursor checking
+      cursor: cursorId ? { id: cursorId } : undefined,
+      skip: cursorId ? 1 : 0,
       include: {
         user: {
           select: {
@@ -36,15 +163,21 @@ export async function getScreenVideos(searchQuery?: string) {
             name: true,
             avatar: true,
             username: true,
+            isVerified: true,
+            followers: true // For subscribers
           },
         },
       },
-      orderBy: {
-        createdAt: 'desc',
-      },
+      orderBy: orderByClause,
     });
 
-    return { success: true, videos };
+    let nextCursor: string | undefined = undefined;
+    if (videos.length > limit) {
+      const nextItem = videos.pop();
+      nextCursor = nextItem?.id;
+    }
+
+    return { success: true, videos, nextCursor };
   } catch (error) {
     console.error('Error fetching screen videos:', error);
     return { success: false, error: 'Failed to fetch videos' };
@@ -52,16 +185,18 @@ export async function getScreenVideos(searchQuery?: string) {
 }
 
 /**
- * Fetches details of a single screen video and increments view count.
+ * Fetch video details, recommended list, likes/dislikes ratio
  */
 export async function getScreenVideoDetails(id: string) {
   try {
+    const session = await getServerSession(authOptions);
+    const currentUserId = session?.user ? (session.user as any).id : null;
+
+    // Increment views and retrieve details
     const video = await prisma.screenVideo.update({
       where: { id },
       data: {
-        viewsCount: {
-          increment: 1,
-        },
+        viewsCount: { increment: 1 }
       },
       include: {
         user: {
@@ -70,19 +205,41 @@ export async function getScreenVideoDetails(id: string) {
             name: true,
             avatar: true,
             username: true,
-          },
+            isVerified: true,
+            followers: {
+              select: {
+                followerId: true
+              }
+            }
+          }
         },
-      },
+        likes: true
+      }
     });
 
-    if (!video) {
-      return { success: false, error: 'Video not found' };
+    if (!video) return { success: false, error: 'Video not found' };
+
+    // Fetch user engagement values
+    let userLikeStatus: 'like' | 'dislike' | null = null;
+    let isSubscribed = false;
+
+    if (currentUserId) {
+      const likeRecord = video.likes.find(l => l.userId === currentUserId);
+      if (likeRecord) {
+        userLikeStatus = likeRecord.isDislike ? 'dislike' : 'like';
+      }
+      isSubscribed = video.user.followers.some(f => f.followerId === currentUserId);
     }
 
-    // Fetch some recommended videos (excluding the current one)
+    // Get likes / dislikes count
+    const likesCount = video.likes.filter(l => !l.isDislike).length;
+    const dislikesCount = video.likes.filter(l => l.isDislike).length;
+
+    // recommended videos (excluding the current one)
     const recommended = await prisma.screenVideo.findMany({
       where: {
         id: { not: id },
+        isSimulation: video.isSimulation // match simulation pool for cohesion
       },
       include: {
         user: {
@@ -91,16 +248,29 @@ export async function getScreenVideoDetails(id: string) {
             name: true,
             avatar: true,
             username: true,
-          },
-        },
+            isVerified: true
+          }
+        }
       },
       take: 6,
-      orderBy: {
-        createdAt: 'desc',
-      },
+      orderBy: { createdAt: 'desc' }
     });
 
-    return { success: true, video, recommended };
+    // Subscribed channels check (simulated followers if simulation mode is active)
+    const subscriberCount = video.user.followers.length + (video.isSimulation ? 12400 : 0);
+
+    return { 
+      success: true, 
+      video: {
+        ...video,
+        likesCount,
+        dislikesCount,
+        subscriberCount,
+        userLikeStatus,
+        isSubscribed
+      }, 
+      recommended 
+    };
   } catch (error) {
     console.error('Error fetching screen video details:', error);
     return { success: false, error: 'Failed to fetch video details' };
@@ -108,7 +278,369 @@ export async function getScreenVideoDetails(id: string) {
 }
 
 /**
- * Request Mux Direct Upload URL
+ * Handle Like & Dislike Toggle
+ */
+export async function toggleLikeScreenVideo(videoId: string, isDislike = false) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !(session.user as any).id) {
+      return { success: false, error: 'Unauthorized' };
+    }
+    const userId = (session.user as any).id;
+
+    // Check existing interaction
+    const existing = await prisma.screenVideoLike.findUnique({
+      where: {
+        videoId_userId: { videoId, userId }
+      }
+    });
+
+    if (existing) {
+      // If user clicks the same button, remove interaction
+      if (existing.isDislike === isDislike) {
+        await prisma.screenVideoLike.delete({
+          where: { id: existing.id }
+        });
+      } else {
+        // Toggle from like to dislike, or vice-versa
+        await prisma.screenVideoLike.update({
+          where: { id: existing.id },
+          data: { isDislike }
+        });
+      }
+    } else {
+      // Create new interaction record
+      await prisma.screenVideoLike.create({
+        data: { videoId, userId, isDislike }
+      });
+    }
+
+    // Update denormalized likesCount on Video
+    const currentLikes = await prisma.screenVideoLike.count({
+      where: { videoId, isDislike: false }
+    });
+    
+    await prisma.screenVideo.update({
+      where: { id: videoId },
+      data: { likesCount: currentLikes }
+    });
+
+    return { success: true };
+  } catch (err) {
+    console.error('Error liking video:', err);
+    return { success: false, error: 'Failed to complete like operation' };
+  }
+}
+
+/**
+ * Create custom comment threads (support replies, pins, hearts)
+ */
+export async function getScreenVideoComments(videoId: string) {
+  try {
+    const comments = await prisma.screenVideoComment.findMany({
+      where: { videoId, parentId: null }, // Top level comments
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            avatar: true,
+            username: true,
+            isVerified: true
+          }
+        },
+        replies: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                avatar: true,
+                username: true,
+                isVerified: true
+              }
+            }
+          },
+          orderBy: { createdAt: 'asc' }
+        }
+      },
+      orderBy: [
+        { isPinned: 'desc' }, // pinned comments at the top
+        { createdAt: 'desc' }
+      ]
+    });
+
+    return { success: true, comments };
+  } catch (err) {
+    console.error(err);
+    return { success: false, error: 'Failed to retrieve comments' };
+  }
+}
+
+export async function addScreenVideoComment(videoId: string, text: string, parentId?: string) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !(session.user as any).id) {
+      return { success: false, error: 'Unauthorized' };
+    }
+    const userId = (session.user as any).id;
+
+    const comment = await prisma.screenVideoComment.create({
+      data: {
+        videoId,
+        userId,
+        text,
+        parentId
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            avatar: true,
+            username: true,
+            isVerified: true
+          }
+        }
+      }
+    });
+
+    return { success: true, comment };
+  } catch (err) {
+    console.error(err);
+    return { success: false, error: 'Failed to publish comment' };
+  }
+}
+
+export async function togglePinComment(commentId: string) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) return { success: false, error: 'Unauthorized' };
+    const userId = (session.user as any).id;
+
+    const comment = await prisma.screenVideoComment.findUnique({
+      where: { id: commentId },
+      include: { video: true }
+    });
+
+    if (!comment || comment.video.userId !== userId) {
+      return { success: false, error: 'Only the video creator can pin comments.' };
+    }
+
+    // Toggle pin status
+    const updated = await prisma.screenVideoComment.update({
+      where: { id: commentId },
+      data: { isPinned: !comment.isPinned }
+    });
+
+    return { success: true, isPinned: updated.isPinned };
+  } catch (err) {
+    console.error(err);
+    return { success: false, error: 'Failed to pin comment' };
+  }
+}
+
+export async function toggleHeartComment(commentId: string) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) return { success: false, error: 'Unauthorized' };
+    const userId = (session.user as any).id;
+
+    const comment = await prisma.screenVideoComment.findUnique({
+      where: { id: commentId },
+      include: { video: true }
+    });
+
+    if (!comment || comment.video.userId !== userId) {
+      return { success: false, error: 'Only the video creator can heart comments.' };
+    }
+
+    // Toggle heart status
+    const updated = await prisma.screenVideoComment.update({
+      where: { id: commentId },
+      data: { isHearted: !comment.isHearted }
+    });
+
+    return { success: true, isHearted: updated.isHearted };
+  } catch (err) {
+    console.error(err);
+    return { success: false, error: 'Failed to heart comment' };
+  }
+}
+
+/**
+ * Playlist management systems (public, private, unlisted)
+ */
+export async function getPlaylists() {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) return { success: false, error: 'Unauthorized' };
+    const userId = (session.user as any).id;
+
+    const playlists = await prisma.screenVideoPlaylist.findMany({
+      where: { userId },
+      include: {
+        videos: {
+          select: { id: true, thumbnailUrl: true, muxPlaybackId: true }
+        }
+      },
+      orderBy: { updatedAt: 'desc' }
+    });
+
+    return { success: true, playlists };
+  } catch (err) {
+    console.error(err);
+    return { success: false, error: 'Failed to load playlists' };
+  }
+}
+
+export async function createPlaylist(name: string, visibility = 'public') {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) return { success: false, error: 'Unauthorized' };
+    const userId = (session.user as any).id;
+
+    const playlist = await prisma.screenVideoPlaylist.create({
+      data: { name, userId, visibility }
+    });
+
+    return { success: true, playlist };
+  } catch (err) {
+    console.error(err);
+    return { success: false, error: 'Failed to create playlist' };
+  }
+}
+
+export async function addVideoToPlaylist(playlistId: string, videoId: string) {
+  try {
+    await prisma.screenVideoPlaylist.update({
+      where: { id: playlistId },
+      data: {
+        videos: {
+          connect: { id: videoId }
+        }
+      }
+    });
+    return { success: true };
+  } catch (err) {
+    console.error(err);
+    return { success: false, error: 'Failed to add video to playlist' };
+  }
+}
+
+export async function removeVideoFromPlaylist(playlistId: string, videoId: string) {
+  try {
+    await prisma.screenVideoPlaylist.update({
+      where: { id: playlistId },
+      data: {
+        videos: {
+          disconnect: { id: videoId }
+        }
+      }
+    });
+    return { success: true };
+  } catch (err) {
+    console.error(err);
+    return { success: false, error: 'Failed to remove video from playlist' };
+  }
+}
+
+/**
+ * Channel Subscription toggle (Subscribers mapping to Followers)
+ */
+export async function toggleSubscribeChannel(creatorId: string) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !(session.user as any).id) {
+      return { success: false, error: 'Unauthorized' };
+    }
+    const currentUserId = (session.user as any).id;
+
+    if (currentUserId === creatorId) {
+      return { success: false, error: 'You cannot subscribe to your own channel!' };
+    }
+
+    const existingFollow = await prisma.follow.findUnique({
+      where: {
+        followerId_followingId: {
+          followerId: currentUserId,
+          followingId: creatorId
+        }
+      }
+    });
+
+    if (existingFollow) {
+      await prisma.follow.delete({
+        where: { id: existingFollow.id }
+      });
+      return { success: true, subscribed: false };
+    } else {
+      await prisma.follow.create({
+        data: {
+          followerId: currentUserId,
+          followingId: creatorId
+        }
+      });
+      return { success: true, subscribed: true };
+    }
+  } catch (err) {
+    console.error(err);
+    return { success: false, error: 'Subscription operation failed' };
+  }
+}
+
+/**
+ * Creator Studio Analytics & Metrics Dashboard
+ */
+export async function getCreatorAnalytics() {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) return { success: false, error: 'Unauthorized' };
+    const userId = (session.user as any).id;
+
+    // Fetch user channels stats
+    const videosCount = await prisma.screenVideo.count({ where: { userId } });
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        followers: true,
+        screenVideos: {
+          select: { viewsCount: true, likesCount: true }
+        }
+      }
+    });
+
+    const subscriberCount = user?.followers.length || 0;
+    const totalViews = user?.screenVideos.reduce((acc, v) => acc + v.viewsCount, 0) || 0;
+    const totalLikes = user?.screenVideos.reduce((acc, v) => acc + v.likesCount, 0) || 0;
+
+    // Compute estimated financial metrics
+    const rpm = 2.45; // Revenue Per Mille (1000 views)
+    const cpm = 4.12; // Cost Per Mille
+    const estimatedRevenue = (totalViews / 1000) * rpm;
+    const watchTime = (totalViews * 4.2) / 60; // Average watch time in hours
+
+    return {
+      success: true,
+      metrics: {
+        videosCount,
+        subscriberCount,
+        totalViews,
+        totalLikes,
+        estimatedRevenue: Number(estimatedRevenue.toFixed(2)),
+        watchTime: Number(watchTime.toFixed(1)),
+        rpm,
+        cpm
+      }
+    };
+  } catch (err) {
+    console.error(err);
+    return { success: false, error: 'Failed to compute creator metrics' };
+  }
+}
+
+/**
+ * Generate Mux Direct Upload Url
  */
 export async function createMuxDirectUpload() {
   try {
@@ -134,9 +666,15 @@ export async function createMuxDirectUpload() {
 }
 
 /**
- * Poll Mux for asset creation status and register video in DB
+ * Register video metadata in DB
  */
-export async function saveScreenVideo(title: string, description: string, uploadId: string) {
+export async function saveScreenVideo(
+  title: string, 
+  description: string, 
+  uploadId: string, 
+  category = 'General', 
+  visibility = 'public'
+) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user || !(session.user as any).id) {
@@ -148,8 +686,7 @@ export async function saveScreenVideo(title: string, description: string, upload
     let upload = await mux.video.uploads.retrieve(uploadId);
     let retries = 0;
     
-    while (upload.status !== 'asset_created' && retries < 12) {
-      // Wait 2 seconds before next retry
+    while (upload.status !== 'asset_created' && retries < 15) {
       await new Promise(resolve => setTimeout(resolve, 2000));
       upload = await mux.video.uploads.retrieve(uploadId);
       retries++;
@@ -175,6 +712,8 @@ export async function saveScreenVideo(title: string, description: string, upload
         muxAssetId: assetId,
         muxPlaybackId: playbackId,
         duration,
+        category,
+        visibility,
         userId: currentUserId,
       },
       include: {
@@ -193,5 +732,65 @@ export async function saveScreenVideo(title: string, description: string, upload
   } catch (error) {
     console.error('Error saving screen video:', error);
     return { success: false, error: 'Failed to save video details' };
+  }
+}
+
+/**
+ * Fetch creator videos for Studio Content Tab
+ */
+export async function getCreatorVideos() {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) return { success: false, error: 'Unauthorized' };
+    const userId = (session.user as any).id;
+
+    const videos = await prisma.screenVideo.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    return { success: true, videos };
+  } catch (err) {
+    console.error(err);
+    return { success: false, error: 'Failed to retrieve creator videos' };
+  }
+}
+
+/**
+ * Create a simulated video record directly in database (Simulation Mode upload)
+ */
+export async function saveSimulatedScreenVideo(
+  title: string,
+  description: string,
+  category: string,
+  visibility: string,
+  thumbnailUrl: string,
+  mediaUrl: string
+) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !(session.user as any).id) {
+      return { success: false, error: 'Unauthorized' };
+    }
+    const currentUserId = (session.user as any).id;
+
+    const video = await prisma.screenVideo.create({
+      data: {
+        title,
+        description,
+        category,
+        visibility,
+        thumbnailUrl,
+        mediaUrl,
+        duration: 360 + Math.floor(Math.random() * 240), // random duration
+        isSimulation: true,
+        userId: currentUserId
+      }
+    });
+
+    return { success: true, video };
+  } catch (err) {
+    console.error('Error saving simulated video:', err);
+    return { success: false, error: 'Failed to publish simulated video' };
   }
 }

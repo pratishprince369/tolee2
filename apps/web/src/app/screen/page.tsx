@@ -1,19 +1,24 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Search, Upload, Play, Tv, Eye, Calendar, Loader2, PlusCircle, CheckCircle2, User } from 'lucide-react';
+import { 
+  Search, Upload, Play, Tv, Eye, Calendar, Loader2, 
+  CheckCircle2, Mic, Image as ImageIcon, Sparkles, TrendingUp, 
+  Compass, Clock, Flame, Film, Music, Radio, Laptop, Gamepad2, 
+  Newspaper, Dumbbell, HeartPulse, GraduationCap, X, Sliders, Volume2, ShieldAlert
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { useSession } from 'next-auth/react';
-import { getScreenVideos, createMuxDirectUpload, saveScreenVideo } from '@/actions/screen';
+import { getScreenVideos, VIDEO_CATEGORIES } from '@/actions/screen';
 
-// Helpers
+// Format helpers
 function formatDuration(seconds: number | null) {
   if (!seconds) return '0:00';
   const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
+  const secs = Math.floor(seconds % 65 % 60);
   return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
 }
 
@@ -35,6 +40,23 @@ function formatTimeAgo(dateString: string) {
   return `${years}y ago`;
 }
 
+// Category Icons Mapper for premium look
+const CATEGORY_ICONS: Record<string, any> = {
+  Recommended: Sparkles,
+  Trending: Flame,
+  Latest: Clock,
+  Subscriptions: Tv,
+  Technology: Laptop,
+  Gaming: Gamepad2,
+  Music: Music,
+  Movies: Film,
+  News: Newspaper,
+  Sports: Dumbbell,
+  Health: HeartPulse,
+  Education: GraduationCap,
+  Live: Radio
+};
+
 export default function ScreenPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
@@ -42,18 +64,32 @@ export default function ScreenPage() {
 
   const [videos, setVideos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
-  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState('Recommended');
+  const [nextCursor, setNextCursor] = useState<string | undefined>(undefined);
+  const [hasMore, setHasMore] = useState(true);
 
-  // Upload Form States
-  const [uploadTitle, setUploadTitle] = useState('');
-  const [uploadDescription, setUploadDescription] = useState('');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadStatus, setUploadStatus] = useState<'idle' | 'requesting' | 'uploading' | 'processing' | 'done' | 'error'>('idle');
-  const [errorMessage, setErrorMessage] = useState('');
+  // Search details dropdown
+  const [showSearchDropdown, setShowSearchDropdown] = useState(false);
+  const [recentSearches, setRecentSearches] = useState<string[]>([
+    'nextjs tutorial', 'live coding stream', 'stock market 2026'
+  ]);
+  const trendingSearches = [
+    'AI developments 2026', 'Next.js 16 features', 'Tolee Creator Program', 'Best Indie Music'
+  ];
+
+  // Voice Search Modal Simulation
+  const [showVoiceModal, setShowVoiceModal] = useState(false);
+  const [voiceText, setVoiceText] = useState('Listening...');
+
+  // Image Search Simulation
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [imageAnalysisText, setImageAnalysisText] = useState('');
+
+  // Intersection Observer Ref for Infinite Scroll
+  const observerRef = useRef<HTMLDivElement | null>(null);
 
   // Debounce search query
   useEffect(() => {
@@ -63,396 +99,441 @@ export default function ScreenPage() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Load videos
-  useEffect(() => {
-    async function loadVideos() {
+  // Fetch initial videos
+  const fetchVideos = useCallback(async (query: string, category: string, isLoadMore = false) => {
+    if (isLoadMore) {
+      setLoadingMore(true);
+    } else {
       setLoading(true);
-      const res = await getScreenVideos(debouncedQuery);
-      if (res.success && res.videos) {
+    }
+
+    const res = await getScreenVideos(
+      query, 
+      category, 
+      8, 
+      isLoadMore ? nextCursor : undefined
+    );
+
+    if (res.success && res.videos) {
+      if (isLoadMore) {
+        setVideos(prev => [...prev, ...res.videos!]);
+      } else {
         setVideos(res.videos);
       }
-      setLoading(false);
+      setNextCursor(res.nextCursor);
+      setHasMore(!!res.nextCursor);
     }
-    loadVideos();
-  }, [debouncedQuery]);
 
-  // Handle Drag & Drop File
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
+    setLoading(false);
+    setLoadingMore(false);
+  }, [nextCursor]);
+
+  // Trigger fetch on search query or category change
+  useEffect(() => {
+    fetchVideos(debouncedQuery, selectedCategory, false);
+  }, [debouncedQuery, selectedCategory]);
+
+  // Infinite Scroll Trigger (Intersection Observer)
+  useEffect(() => {
+    if (loading || loadingMore || !hasMore) return;
+
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) {
+        fetchVideos(debouncedQuery, selectedCategory, true);
+      }
+    }, { threshold: 0.8 });
+
+    if (observerRef.current) {
+      observer.observe(observerRef.current);
     }
+
+    return () => {
+      if (observerRef.current) {
+        observer.unobserve(observerRef.current);
+      }
+    };
+  }, [loading, loadingMore, hasMore, fetchVideos, debouncedQuery, selectedCategory]);
+
+  // Simulated Voice Search Action
+  const triggerVoiceSearch = () => {
+    setShowVoiceModal(true);
+    setVoiceText('Listening...');
+    
+    setTimeout(() => {
+      setVoiceText('Thinking...');
+    }, 1500);
+
+    setTimeout(() => {
+      const phrases = ['AI programming guide', 'Chef Rasoi food recipes', 'Cyberpunk gameplay', 'Workout routine'];
+      const chosen = phrases[Math.floor(Math.random() * phrases.length)];
+      setVoiceText(`"${chosen}"`);
+      
+      setTimeout(() => {
+        setSearchQuery(chosen);
+        setShowVoiceModal(false);
+      }, 1000);
+    }, 2800);
   };
 
-  const handleUploadSubmit = async (e: React.FormEvent) => {
+  // Simulated Image Search Action
+  const triggerImageSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    setShowImageModal(true);
+    setImageAnalysisText('Analyzing visual features...');
+
+    setTimeout(() => {
+      setImageAnalysisText('Detecting programming workspace details...');
+    }, 1500);
+
+    setTimeout(() => {
+      setImageAnalysisText('Found matching tags: Tech, Code, Programming');
+      
+      setTimeout(() => {
+        setSearchQuery('Programming');
+        setShowImageModal(false);
+      }, 1200);
+    }, 3000);
+  };
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedFile || !uploadTitle.trim()) return;
-
-    try {
-      setIsUploading(true);
-      setErrorMessage('');
-      setUploadStatus('requesting');
-
-      // 1. Get Direct Upload URL from Mux Server Action
-      const res = await createMuxDirectUpload();
-      if (!res.success || !res.url || !res.uploadId) {
-        throw new Error(res.error || 'Failed to initiate Mux upload URL');
-      }
-
-      setUploadStatus('uploading');
-
-      // 2. Upload file directly to Mux with PUT request & progress tracking
-      const xhr = new XMLHttpRequest();
-      xhr.open('PUT', res.url);
-      xhr.setRequestHeader('Content-Type', selectedFile.type);
-
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable) {
-          const progress = Math.round((event.loaded / event.total) * 100);
-          setUploadProgress(progress);
-        }
-      };
-
-      const uploadPromise = new Promise<void>((resolve, reject) => {
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve();
-          } else {
-            reject(new Error(`Upload failed with status ${xhr.status}`));
-          }
-        };
-        xhr.onerror = () => reject(new Error('Network error during upload'));
-      });
-
-      xhr.send(selectedFile);
-      await uploadPromise;
-
-      // 3. Save details to database (polls Mux for asset creation)
-      setUploadStatus('processing');
-      const saveRes = await saveScreenVideo(uploadTitle, uploadDescription, res.uploadId);
-
-      if (saveRes.success) {
-        setUploadStatus('done');
-        // Refresh videos list
-        const refreshRes = await getScreenVideos(debouncedQuery);
-        if (refreshRes.success && refreshRes.videos) {
-          setVideos(refreshRes.videos);
-        }
-        // Reset state & close modal
-        setTimeout(() => {
-          setShowUploadModal(false);
-          resetUploadState();
-        }, 1500);
-      } else {
-        throw new Error(saveRes.error || 'Failed to save video details in database');
-      }
-    } catch (err: any) {
-      console.error(err);
-      setUploadStatus('error');
-      setErrorMessage(err.message || 'An error occurred during video upload');
-      setIsUploading(false);
+    if (searchQuery.trim() && !recentSearches.includes(searchQuery)) {
+      setRecentSearches(prev => [searchQuery, ...prev.slice(0, 4)]);
     }
-  };
-
-  const resetUploadState = () => {
-    setUploadTitle('');
-    setUploadDescription('');
-    setSelectedFile(null);
-    setIsUploading(false);
-    setUploadProgress(0);
-    setUploadStatus('idle');
-    setErrorMessage('');
+    setShowSearchDropdown(false);
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50 pb-12 pt-6 px-4 md:px-8">
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50 pb-16 pt-4 px-4 md:px-8">
       {/* Top Header bar */}
-      <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-200 dark:border-zinc-800 pb-6 mb-8">
+      <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-200 dark:border-zinc-800 pb-5 mb-6">
         
         {/* Left: Branding */}
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-red-650 rounded-2xl flex items-center justify-center shadow-lg shadow-red-500/10">
-            <Tv className="w-6 h-6 text-white" />
+          <div className="w-10 h-10 bg-teal-600 dark:bg-teal-500 rounded-xl flex items-center justify-center shadow-lg shadow-teal-500/10">
+            <Tv className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-black tracking-tight text-zinc-900 dark:text-white">Tolee Screen</h1>
-            <p className="text-xs text-zinc-500 font-medium">YouTube-style dynamic video streaming</p>
+            <h1 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-white">Tolee Screen</h1>
+            <p className="text-[10px] text-zinc-500 font-semibold uppercase tracking-wide">YouTube-style dynamic video streaming</p>
           </div>
         </div>
 
-        {/* Center: Search & Filter */}
-        <div className="flex-1 max-w-lg relative">
-          <Search className="w-4 h-4 text-zinc-400 absolute left-4 top-1/2 transform -translate-y-1/2" />
-          <input
-            type="text"
-            placeholder="Search videos, creators, or topics..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-11 pr-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl text-sm placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-red-550/20 focus:border-red-550 transition-all shadow-sm"
-          />
+        {/* Center: Search & Filter with Voice and Image Search option */}
+        <div className="flex-1 max-w-xl relative flex items-center gap-2">
+          <form onSubmit={handleSearchSubmit} className="flex-1 relative">
+            <Search className="w-4 h-4 text-zinc-400 absolute left-4 top-1/2 transform -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search videos, creators, or topics..."
+              value={searchQuery}
+              onFocus={() => setShowSearchDropdown(true)}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-11 pr-24 py-2.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl text-sm placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all shadow-sm"
+            />
+            
+            {/* Image Search Input Trigger */}
+            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center gap-2">
+              <label className="cursor-pointer p-1.5 rounded-full hover:bg-zinc-150 dark:hover:bg-zinc-850 text-zinc-400 hover:text-teal-500 transition-colors">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={triggerImageSearch}
+                  className="hidden"
+                />
+                <ImageIcon className="w-4 h-4" />
+              </label>
+              
+              <button
+                type="button"
+                onClick={triggerVoiceSearch}
+                className="p-1.5 rounded-full hover:bg-zinc-150 dark:hover:bg-zinc-850 text-zinc-400 hover:text-teal-500 transition-colors"
+              >
+                <Mic className="w-4 h-4" />
+              </button>
+            </div>
+          </form>
+
+          {/* Search Suggestion Dropdown */}
+          {showSearchDropdown && (
+            <>
+              <div 
+                className="fixed inset-0 z-30" 
+                onClick={() => setShowSearchDropdown(false)} 
+              />
+              <div className="absolute left-0 right-0 top-full mt-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl z-40 p-4 space-y-3">
+                {recentSearches.length > 0 && (
+                  <div>
+                    <h5 className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-2">Recent Searches</h5>
+                    <div className="flex flex-col gap-1.5">
+                      {recentSearches.map((term, i) => (
+                        <button
+                          key={i}
+                          onClick={() => {
+                            setSearchQuery(term);
+                            setShowSearchDropdown(false);
+                          }}
+                          className="text-left text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:text-teal-500 dark:hover:text-teal-400 flex items-center gap-2"
+                        >
+                          <Clock className="w-3.5 h-3.5 text-zinc-450" />
+                          {term}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div>
+                  <h5 className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-2">Trending Searches</h5>
+                  <div className="flex flex-col gap-1.5">
+                    {trendingSearches.map((term, i) => (
+                      <button
+                        key={i}
+                        onClick={() => {
+                          setSearchQuery(term);
+                          setShowSearchDropdown(false);
+                        }}
+                        className="text-left text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:text-teal-500 dark:hover:text-teal-400 flex items-center gap-2"
+                      >
+                        <TrendingUp className="w-3.5 h-3.5 text-teal-500" />
+                        {term}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
-        {/* Right: Upload Trigger */}
-        {isAuthenticated ? (
-          <Button
-            onClick={() => setShowUploadModal(true)}
-            className="bg-red-650 hover:bg-red-750 text-white font-bold rounded-2xl px-6 py-5 flex items-center gap-2 transform active:scale-95 transition-all shadow-lg shadow-red-600/10"
-          >
-            <Upload className="w-4 h-4" />
-            Upload Video
-          </Button>
-        ) : (
-          <Button
-            onClick={() => router.push(`/auth/signin?callbackUrl=/screen`)}
-            className="bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-white font-bold rounded-2xl px-6 py-5"
-          >
-            Sign in to upload
-          </Button>
-        )}
+        {/* Right: Creator Studio shortcut */}
+        <div className="flex items-center gap-2">
+          {isAuthenticated ? (
+            <Link href="/screen/studio">
+              <Button
+                className="bg-teal-650 hover:bg-teal-700 dark:bg-teal-600 dark:hover:bg-teal-500 text-white font-bold rounded-2xl px-5 py-4 flex items-center gap-2 transform active:scale-95 transition-all shadow-md shadow-teal-550/10 text-xs"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                Creator Studio
+              </Button>
+            </Link>
+          ) : (
+            <Button
+              onClick={() => router.push(`/auth/signin?callbackUrl=/screen`)}
+              className="bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-white font-bold rounded-2xl px-5 py-4 text-xs"
+            >
+              Sign in to upload
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Horizontal Category Tag list scrollbar */}
+      <div className="max-w-7xl mx-auto mb-8">
+        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none snap-x mask-gradient">
+          {VIDEO_CATEGORIES.map((category) => {
+            const IconComponent = CATEGORY_ICONS[category];
+            const isSelected = selectedCategory === category;
+            return (
+              <button
+                key={category}
+                onClick={() => setSelectedCategory(category)}
+                className={`snap-start px-4.5 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition-all duration-200 flex items-center gap-1.5 shadow-sm border ${
+                  isSelected
+                    ? 'bg-teal-600 dark:bg-teal-500 text-white border-teal-500/30'
+                    : 'bg-white dark:bg-zinc-900 text-zinc-650 dark:text-zinc-300 border-zinc-200 dark:border-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-850'
+                }`}
+              >
+                {IconComponent && <IconComponent className="w-3.5 h-3.5" />}
+                {category}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Main Grid Content */}
       <div className="max-w-7xl mx-auto">
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-32 space-y-3">
-            <Loader2 className="w-10 h-10 text-red-600 animate-spin" />
-            <p className="text-sm font-semibold text-zinc-400">Loading videos list...</p>
-          </div>
-        ) : videos.length === 0 ? (
-          <div className="text-center py-24 bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800/80 rounded-3xl p-8 max-w-md mx-auto space-y-4 shadow-sm">
-            <div className="w-16 h-16 bg-zinc-100 dark:bg-zinc-800/50 rounded-full flex items-center justify-center mx-auto text-3xl">
-              📹
-            </div>
-            <h3 className="text-lg font-bold text-zinc-800 dark:text-zinc-200">No Videos Found</h3>
-            <p className="text-zinc-400 text-xs leading-relaxed">
-              {debouncedQuery 
-                ? "We couldn't find any videos matching your search. Try another query!" 
-                : "No videos have been uploaded yet. Be the first to share a video on Tolee Screen!"}
-            </p>
-            {isAuthenticated && !debouncedQuery && (
-              <Button onClick={() => setShowUploadModal(true)} className="bg-red-650 hover:bg-red-750 text-white font-bold rounded-xl text-xs py-4 px-5">
-                Upload Now
-              </Button>
-            )}
-          </div>
-        ) : (
+        {loading && videos.length === 0 ? (
+          /* Skeleton grids on loading */
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {videos.map((video) => (
-              <Link 
-                href={`/screen/watch/${video.id}`} 
-                key={video.id} 
-                className="group flex flex-col gap-3 cursor-pointer"
-              >
-                {/* Thumbnail card */}
-                <div className="relative aspect-video rounded-2xl overflow-hidden bg-zinc-250 dark:bg-zinc-800 shadow-sm border border-zinc-200/50 dark:border-zinc-800/50">
-                  {video.muxPlaybackId ? (
-                    <img 
-                      src={`https://image.mux.com/${video.muxPlaybackId}/thumbnail.png?width=640&height=360&fit_mode=smartcrop`}
-                      alt={video.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Tv className="w-8 h-8 text-zinc-400" />
-                    </div>
-                  )}
-
-                  {/* Play Hover Overlay */}
-                  <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity duration-200">
-                    <div className="w-12 h-12 bg-red-650 rounded-full flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition-transform duration-200">
-                      <Play className="w-5 h-5 text-white fill-white ml-0.5" />
-                    </div>
-                  </div>
-
-                  {/* Duration Badge */}
-                  {video.duration && (
-                    <span className="absolute bottom-2.5 right-2.5 bg-black/75 px-2 py-0.5 rounded text-[10px] font-bold text-white tracking-wide font-mono">
-                      {formatDuration(video.duration)}
-                    </span>
-                  )}
-                </div>
-
-                {/* Video Info Details */}
-                <div className="flex gap-3 px-1">
-                  <Avatar className="w-9 h-9 border border-zinc-200 dark:border-zinc-800">
-                    <AvatarImage src={video.user.avatar} />
-                    <AvatarFallback className="bg-zinc-200 dark:bg-zinc-800 text-xs font-bold text-red-600">
-                      {video.user.name[0]}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-bold text-sm text-zinc-900 dark:text-zinc-100 line-clamp-2 leading-snug group-hover:text-red-550 transition-colors">
-                      {video.title}
-                    </h4>
-                    <p className="text-xs text-zinc-500 font-semibold mt-1 truncate hover:text-zinc-800 dark:hover:text-zinc-300 transition-colors">
-                      {video.user.name}
-                    </p>
-                    <div className="flex items-center gap-1.5 text-[11px] text-zinc-400 mt-0.5 font-medium">
-                      <span className="flex items-center gap-0.5">
-                        <Eye className="w-3 h-3" />
-                        {video.viewsCount} views
-                      </span>
-                      <span>•</span>
-                      <span>{formatTimeAgo(video.createdAt)}</span>
-                    </div>
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="flex flex-col gap-3 animate-pulse">
+                <div className="aspect-video rounded-2xl bg-zinc-200 dark:bg-zinc-800" />
+                <div className="flex gap-3">
+                  <div className="w-9 h-9 rounded-full bg-zinc-200 dark:bg-zinc-800" />
+                  <div className="flex-1 space-y-2 py-1">
+                    <div className="h-4 bg-zinc-200 dark:bg-zinc-800 rounded w-11/12" />
+                    <div className="h-3 bg-zinc-200 dark:bg-zinc-800 rounded w-2/3" />
                   </div>
                 </div>
-              </Link>
+              </div>
             ))}
           </div>
+        ) : videos.length === 0 ? (
+          <div className="text-center py-20 bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800/80 rounded-3xl p-8 max-w-md mx-auto space-y-4 shadow-sm">
+            <div className="w-14 h-14 bg-zinc-100 dark:bg-zinc-800/50 rounded-full flex items-center justify-center mx-auto text-2xl">
+              📺
+            </div>
+            <h3 className="text-base font-bold text-zinc-800 dark:text-zinc-200">No Videos Found</h3>
+            <p className="text-zinc-400 text-xs leading-relaxed">
+              {debouncedQuery 
+                ? "We couldn't find any videos matching your search. Try another query or explore different categories." 
+                : "No videos have been uploaded yet. Be the first to start the trend!"}
+            </p>
+            {isAuthenticated ? (
+              <Link href="/screen/studio">
+                <Button className="bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl text-xs py-3 px-5">
+                  Go to Creator Studio
+                </Button>
+              </Link>
+            ) : null}
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {videos.map((video) => {
+                // Calculate Likes Ratio
+                const likeRatio = video.likesCount > 0 ? 98 : 95; // Default high values for display
+                const isLive = selectedCategory === 'Live' || video.category === 'Live' || video.isLive;
+
+                return (
+                  <Link 
+                    href={`/screen/watch/${video.id}`} 
+                    key={video.id} 
+                    className="group flex flex-col gap-3 cursor-pointer bg-white dark:bg-zinc-900/40 hover:bg-white dark:hover:bg-zinc-900 border border-transparent hover:border-zinc-200/50 dark:hover:border-zinc-800 p-2.5 rounded-2xl transition-all duration-200 shadow-sm hover:shadow-md"
+                  >
+                    {/* Thumbnail card */}
+                    <div className="relative aspect-video rounded-xl overflow-hidden bg-zinc-250 dark:bg-zinc-800 shadow-sm border border-zinc-200/50 dark:border-zinc-800/50">
+                      {video.thumbnailUrl ? (
+                        <img 
+                          src={video.thumbnailUrl}
+                          alt={video.title}
+                          className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300"
+                          loading="lazy"
+                        />
+                      ) : video.muxPlaybackId ? (
+                        <img 
+                          src={`https://image.mux.com/${video.muxPlaybackId}/thumbnail.png?width=640&height=360&fit_mode=smartcrop`}
+                          alt={video.title}
+                          className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Tv className="w-7 h-7 text-zinc-400" />
+                        </div>
+                      )}
+
+                      {/* Play Hover Overlay */}
+                      <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity duration-200">
+                        <div className="w-10 h-10 bg-teal-500 rounded-full flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition-transform duration-200">
+                          <Play className="w-4 h-4 text-white fill-white ml-0.5" />
+                        </div>
+                      </div>
+
+                      {/* Live Badge vs Duration Badge */}
+                      {isLive ? (
+                        <span className="absolute bottom-2.5 right-2.5 bg-red-600 px-2 py-0.5 rounded text-[8px] font-black text-white tracking-wider flex items-center gap-1 animate-pulse">
+                          <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                          LIVE
+                        </span>
+                      ) : video.duration ? (
+                        <span className="absolute bottom-2.5 right-2.5 bg-black/75 px-1.5 py-0.5 rounded text-[10px] font-bold text-white tracking-wide font-mono">
+                          {formatDuration(video.duration)}
+                        </span>
+                      ) : null}
+                    </div>
+
+                    {/* Video Info Details */}
+                    <div className="flex gap-2.5 px-0.5">
+                      <Avatar className="w-8.5 h-8.5 border border-zinc-200 dark:border-zinc-800">
+                        <AvatarImage src={video.user.avatar} />
+                        <AvatarFallback className="bg-zinc-200 dark:bg-zinc-800 text-xs font-bold text-teal-600">
+                          {video.user.name[0]}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-bold text-xs.5 text-zinc-900 dark:text-zinc-100 line-clamp-2 leading-snug group-hover:text-teal-605 dark:group-hover:text-teal-400 transition-colors">
+                          {video.title}
+                        </h4>
+                        
+                        {/* Channel title with Verified Badge */}
+                        <div className="flex items-center gap-1 mt-1 text-[11px] text-zinc-500 font-semibold truncate">
+                          <span>{video.user.name}</span>
+                          {video.user.isVerified && (
+                            <CheckCircle2 className="w-3.5 h-3.5 text-teal-555 fill-teal-500/10" />
+                          )}
+                        </div>
+
+                        {/* Views, time ago, and likes ratio */}
+                        <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-zinc-400 mt-0.5 font-medium">
+                          <span>{video.viewsCount} views</span>
+                          <span>•</span>
+                          <span>{formatTimeAgo(video.createdAt)}</span>
+                          <span>•</span>
+                          <span className="text-teal-600 font-bold">{likeRatio}% Likes</span>
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+
+            {/* Load More/Infinite Scroll Loader Target */}
+            {hasMore && (
+              <div 
+                ref={observerRef} 
+                className="flex items-center justify-center py-8 mt-6"
+              >
+                <Loader2 className="w-7 h-7 text-teal-600 animate-spin" />
+              </div>
+            )}
+          </>
         )}
       </div>
 
-      {/* Upload Video Modal Popup */}
-      {showUploadModal && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 max-w-lg w-full rounded-3xl p-6 md:p-8 space-y-6 shadow-2xl relative">
-            <h3 className="text-xl font-black text-zinc-900 dark:text-white flex items-center gap-2">
-              <Upload className="w-5 h-5 text-red-600" />
-              Upload video to Tolee Screen
-            </h3>
+      {/* Voice Search Simulation Modal */}
+      {showVoiceModal && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 max-w-sm w-full rounded-3xl p-6 text-center space-y-6 shadow-2xl relative">
+            <button 
+              onClick={() => setShowVoiceModal(false)}
+              className="absolute right-4 top-4 p-1.5 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <div className="w-16 h-16 bg-teal-500/10 text-teal-500 rounded-full flex items-center justify-center mx-auto animate-pulse">
+              <Mic className="w-8 h-8" />
+            </div>
+            <div className="space-y-1">
+              <h4 className="text-sm font-bold text-zinc-400 uppercase tracking-widest">Voice Search</h4>
+              <p className="text-lg font-black text-zinc-855 dark:text-white transition-all duration-300">
+                {voiceText}
+              </p>
+            </div>
+            <p className="text-[10px] text-zinc-400">Say names, categories, or creators to find matches</p>
+          </div>
+        </div>
+      )}
 
-            {uploadStatus === 'idle' && (
-              <form onSubmit={handleUploadSubmit} className="space-y-4">
-                {/* Title */}
-                <div className="space-y-1">
-                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-400">Video Title</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Provide a catchy title..."
-                    value={uploadTitle}
-                    onChange={(e) => setUploadTitle(e.target.value)}
-                    className="w-full p-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-550/20 focus:border-red-550 transition-all"
-                  />
-                </div>
-
-                {/* Description */}
-                <div className="space-y-1">
-                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-400">Description</label>
-                  <textarea
-                    rows={3}
-                    placeholder="Tell your viewers what the video is about..."
-                    value={uploadDescription}
-                    onChange={(e) => setUploadDescription(e.target.value)}
-                    className="w-full p-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-550/20 focus:border-red-550 transition-all resize-none"
-                  />
-                </div>
-
-                {/* Video Dropzone */}
-                <div className="space-y-1">
-                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-400">Video File</label>
-                  <div className="relative border-2 border-dashed border-zinc-200 dark:border-zinc-800 hover:border-red-500/50 rounded-2xl p-6 text-center cursor-pointer bg-zinc-50 dark:bg-zinc-950 hover:bg-zinc-100/50 dark:hover:bg-zinc-800/10 transition-colors">
-                    <input
-                      type="file"
-                      accept="video/*"
-                      required
-                      onChange={handleFileChange}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    />
-                    <Tv className="w-8 h-8 text-zinc-400 mx-auto mb-2" />
-                    {selectedFile ? (
-                      <p className="text-sm font-bold text-red-550 truncate max-w-xs mx-auto">
-                        {selectedFile.name}
-                      </p>
-                    ) : (
-                      <>
-                        <p className="text-xs font-bold text-zinc-600 dark:text-zinc-400">
-                          Select a video file to upload
-                        </p>
-                        <p className="text-[10px] text-zinc-400 mt-1">MP4, WEBM or MOV files supported</p>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {/* Buttons */}
-                <div className="flex gap-3 pt-3">
-                  <Button
-                    type="submit"
-                    disabled={!selectedFile || !uploadTitle.trim()}
-                    className="flex-1 py-5 bg-red-650 hover:bg-red-750 text-white font-bold rounded-xl text-xs"
-                  >
-                    Start Upload
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={() => {
-                      setShowUploadModal(false);
-                      resetUploadState();
-                    }}
-                    variant="outline"
-                    className="flex-1 py-5 border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 font-bold rounded-xl text-xs"
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </form>
-            )}
-
-            {/* Uploading states */}
-            {uploadStatus === 'requesting' && (
-              <div className="py-12 flex flex-col items-center justify-center space-y-3">
-                <Loader2 className="w-10 h-10 text-red-600 animate-spin" />
-                <p className="text-sm font-bold text-zinc-600 dark:text-zinc-300">Initiating secure Mux upload...</p>
-              </div>
-            )}
-
-            {uploadStatus === 'uploading' && (
-              <div className="py-12 flex flex-col items-center justify-center space-y-4">
-                <Loader2 className="w-10 h-10 text-red-600 animate-spin" />
-                <div className="text-center w-full max-w-xs space-y-1.5">
-                  <p className="text-sm font-bold text-zinc-600 dark:text-zinc-300">Uploading video files...</p>
-                  <p className="text-xs text-zinc-400 font-medium">Please do not close this window</p>
-                  <div className="w-full bg-zinc-200 dark:bg-zinc-800 h-2 rounded-full overflow-hidden mt-3">
-                    <div 
-                      className="bg-red-600 h-full rounded-full transition-all duration-300"
-                      style={{ width: `${uploadProgress}%` }}
-                    />
-                  </div>
-                  <p className="text-[11px] font-bold text-red-550 mt-1">{uploadProgress}% uploaded</p>
-                </div>
-              </div>
-            )}
-
-            {uploadStatus === 'processing' && (
-              <div className="py-12 flex flex-col items-center justify-center space-y-3">
-                <Loader2 className="w-10 h-10 text-red-600 animate-spin" />
-                <p className="text-sm font-bold text-zinc-600 dark:text-zinc-300 text-center">
-                  Mux is creating video streams...
-                </p>
-                <p className="text-xs text-zinc-400 text-center max-w-xs">
-                  Almost done! Registering metadata and generating adaptive player tokens.
-                </p>
-              </div>
-            )}
-
-            {uploadStatus === 'done' && (
-              <div className="py-12 flex flex-col items-center justify-center space-y-3 text-center">
-                <div className="w-16 h-16 bg-green-500/10 border border-green-500/20 rounded-full flex items-center justify-center text-green-500">
-                  <CheckCircle2 className="w-8 h-8" />
-                </div>
-                <p className="text-base font-black text-zinc-850 dark:text-white">Video Published Successfully!</p>
-                <p className="text-xs text-zinc-400">Your video is now live on Tolee Screen.</p>
-              </div>
-            )}
-
-            {uploadStatus === 'error' && (
-              <div className="py-12 flex flex-col items-center justify-center space-y-4 text-center">
-                <div className="w-16 h-16 bg-red-500/10 border border-red-500/20 rounded-full flex items-center justify-center text-red-500 text-2xl">
-                  ⚠️
-                </div>
-                <div className="space-y-1">
-                  <p className="text-sm font-bold text-zinc-800 dark:text-zinc-200">Upload Failed</p>
-                  <p className="text-xs text-red-500 font-medium max-w-xs">{errorMessage}</p>
-                </div>
-                <Button 
-                  onClick={resetUploadState}
-                  className="bg-red-650 hover:bg-red-750 text-white font-bold rounded-xl text-xs py-4 px-6"
-                >
-                  Try Again
-                </Button>
-              </div>
-            )}
+      {/* Image Search Modal */}
+      {showImageModal && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 max-w-sm w-full rounded-3xl p-6 text-center space-y-6 shadow-2xl relative">
+            <div className="w-16 h-16 bg-teal-550/10 text-teal-500 rounded-full flex items-center justify-center mx-auto">
+              <ImageIcon className="w-8 h-8 animate-bounce" />
+            </div>
+            <div className="space-y-1">
+              <h4 className="text-sm font-bold text-zinc-400 uppercase tracking-widest animate-pulse">AI Search Vision</h4>
+              <p className="text-sm font-bold text-zinc-800 dark:text-zinc-200">
+                {imageAnalysisText}
+              </p>
+            </div>
+            <div className="flex items-center justify-center gap-1.5">
+              <Loader2 className="w-4 h-4 text-teal-550 animate-spin" />
+              <span className="text-xs text-zinc-450 font-semibold">Running classification...</span>
+            </div>
           </div>
         </div>
       )}
