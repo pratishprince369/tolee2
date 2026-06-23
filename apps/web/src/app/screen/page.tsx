@@ -216,19 +216,40 @@ export default function ScreenPage() {
       {/* Top Header bar */}
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-200 dark:border-zinc-800 pb-5 mb-6">
         
-        {/* Left: Branding */}
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-teal-600 dark:bg-teal-500 rounded-xl flex items-center justify-center shadow-lg shadow-teal-500/10">
-            <Tv className="w-5 h-5 text-white" />
-          </div>
-          <div>
+        {/* Top Row for Mobile (Branding + Upload Button) */}
+        <div className="flex items-center justify-between w-full md:w-auto gap-4">
+          {/* Left: Branding */}
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-teal-600 rounded-xl flex items-center justify-center shadow-lg shadow-teal-500/20">
+              <Tv className="w-5 h-5 text-white" />
+            </div>
             <h1 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-white">Tolee Screen</h1>
-            <p className="text-[10px] text-zinc-500 font-semibold uppercase tracking-wide">YouTube-style dynamic video streaming</p>
+          </div>
+
+          {/* Right: Upload Button (Visible on Mobile inside top row) */}
+          <div className="flex items-center gap-2 md:hidden">
+            {isAuthenticated ? (
+              <Link href="/screen/studio?tab=upload">
+                <Button
+                  className="bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl px-4 py-2.5 flex items-center gap-1.5 shadow-md text-xs"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  Upload Video
+                </Button>
+              </Link>
+            ) : (
+              <Button
+                onClick={() => router.push(`/auth/signin?callbackUrl=/screen`)}
+                className="bg-zinc-900 hover:bg-zinc-850 text-white font-bold rounded-xl px-4 py-2 text-xs"
+              >
+                Sign In
+              </Button>
+            )}
           </div>
         </div>
 
         {/* Center: Search & Filter with Voice and Image Search option */}
-        <div className="flex-1 max-w-xl relative flex items-center gap-2">
+        <div className="flex-1 max-w-xl w-full relative flex items-center gap-2">
           <form onSubmit={handleSearchSubmit} className="flex-1 relative">
             <Search className="w-4 h-4 text-zinc-400 absolute left-4 top-1/2 transform -translate-y-1/2" />
             <input
@@ -242,7 +263,7 @@ export default function ScreenPage() {
             
             {/* Image Search Input Trigger */}
             <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center gap-2">
-              <label className="cursor-pointer p-1.5 rounded-full hover:bg-zinc-150 dark:hover:bg-zinc-850 text-zinc-400 hover:text-teal-500 transition-colors">
+              <label className="cursor-pointer p-1.5 rounded-full hover:bg-zinc-155 dark:hover:bg-zinc-850 text-zinc-400 hover:text-teal-500 transition-colors">
                 <input
                   type="file"
                   accept="image/*"
@@ -255,7 +276,7 @@ export default function ScreenPage() {
               <button
                 type="button"
                 onClick={triggerVoiceSearch}
-                className="p-1.5 rounded-full hover:bg-zinc-150 dark:hover:bg-zinc-850 text-zinc-400 hover:text-teal-500 transition-colors"
+                className="p-1.5 rounded-full hover:bg-zinc-155 dark:hover:bg-zinc-850 text-zinc-400 hover:text-teal-500 transition-colors"
               >
                 <Mic className="w-4 h-4" />
               </button>
@@ -313,15 +334,15 @@ export default function ScreenPage() {
           )}
         </div>
 
-        {/* Right: Creator Studio shortcut */}
-        <div className="flex items-center gap-2">
+        {/* Right: Upload Trigger (Visible on Desktop/Tablet only) */}
+        <div className="hidden md:flex items-center gap-2">
           {isAuthenticated ? (
-            <Link href="/screen/studio">
+            <Link href="/screen/studio?tab=upload">
               <Button
-                className="bg-teal-650 hover:bg-teal-700 dark:bg-teal-600 dark:hover:bg-teal-500 text-white font-bold rounded-2xl px-5 py-4 flex items-center gap-2 transform active:scale-95 transition-all shadow-md shadow-teal-550/10 text-xs"
+                className="bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-2xl px-5 py-4 flex items-center gap-2 transform active:scale-95 transition-all shadow-md shadow-teal-550/10 text-xs"
               >
                 <Upload className="w-3.5 h-3.5" />
-                Creator Studio
+                Upload Video
               </Button>
             </Link>
           ) : (

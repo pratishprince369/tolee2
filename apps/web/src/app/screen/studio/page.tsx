@@ -117,6 +117,16 @@ export default function CreatorStudioPage() {
   };
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get('tab');
+      if (tabParam === 'upload' || tabParam === 'content' || tabParam === 'dashboard') {
+        setActiveTab(tabParam as any);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
     if (status === 'unauthenticated') {
       router.push(`/auth/signin?callbackUrl=/screen/studio`);
     } else if (status === 'authenticated') {
