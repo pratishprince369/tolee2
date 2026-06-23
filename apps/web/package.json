@@ -23,6 +23,8 @@
     "@gradio/client": "^2.2.0",
     "@livekit/components-react": "^2.9.21",
     "@livekit/components-styles": "^1.2.0",
+    "@mux/mux-node": "^14.1.1",
+    "@mux/mux-player-react": "^3.13.0",
     "@prisma/client": "^5.14.0",
     "@react-oauth/google": "^0.13.5",
     "bcryptjs": "^3.0.3",

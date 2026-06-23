@@ -90,6 +90,7 @@ model User {
   searchClicks  SearchClickLog[]
   worldProjects WorldProject[]
   visitorSessions VisitorSession[]
+  screenVideos  ScreenVideo[]
 
 
   pincode               String?
@@ -1299,6 +1300,20 @@ model EventAttendee {
   event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@unique([userId, eventId])
+}
+
+model ScreenVideo {
+  id            String   @id @default(cuid())
+  title         String
+  description   String?
+  muxAssetId    String?  // Mux Asset ID
+  muxPlaybackId String?  // Mux Playback ID for streaming
+  duration      Float?   // Video duration in seconds
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  viewsCount    Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 

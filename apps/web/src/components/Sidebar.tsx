@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Compass, Film, MessageCircle, Bell, PlusCircle, Settings, ShieldCheck, Store, Bot, Globe, Megaphone, Zap, MessageSquare, Map } from 'lucide-react';
+import { Home, Compass, Film, MessageCircle, Bell, PlusCircle, Settings, ShieldCheck, Store, Bot, Globe, Megaphone, Zap, MessageSquare, Map, Tv } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { useSession } from 'next-auth/react';
@@ -48,6 +48,7 @@ export function Sidebar() {
     { name: 'Feed', href: '/feed', icon: Home },
     { name: 'Discover', href: '/discover', icon: Compass },
     { name: 'Reels', href: '/reels', icon: Film },
+    { name: 'Tolee Screen', href: '/screen', icon: Tv },
     { name: 'Chats', href: '/chat', icon: MessageCircle, badge: data.unreadMessages > 0 ? String(data.unreadMessages) : null },
     { name: 'AI Manager', href: '/ai-manager', icon: Bot },
     { name: 'Notifications', href: '/notifications', icon: Bell, badge: data.unreadNotifications > 0 ? String(data.unreadNotifications) : null },
@@ -58,6 +59,7 @@ export function Sidebar() {
     { name: 'Creator Program', href: '/creator-program', icon: Zap, isCreator: true },
   ] : [
     { name: 'Discover', href: '/discover', icon: Compass },
+    { name: 'Tolee Screen', href: '/screen', icon: Tv },
     { name: 'Live Map', href: '/map', icon: Map },
     { name: 'Creator Program', href: '/creator-program', icon: Zap, isCreator: true },
   ];
