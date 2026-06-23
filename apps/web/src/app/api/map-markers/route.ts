@@ -42,7 +42,51 @@ export async function GET() {
       }
     });
 
-    // 3. Add local mock items to ensure map looks active (Kalyan West / Khadakpada focus)
+    // 3. Fetch location-based Tolee groups
+    const toleeGroups = await prisma.tolee.findMany({
+      where: {
+        latitude: { not: null },
+        longitude: { not: null }
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        description: true,
+        avatar: true,
+        latitude: true,
+        longitude: true,
+        location: true,
+        address: true
+      }
+    });
+
+    // 4. Fetch active or recently ended events
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const dbEvents = await prisma.event.findMany({
+      where: {
+        status: { in: ['active', 'ended'] },
+        OR: [
+          { status: 'active' },
+          { status: 'ended', endDate: { gte: startOfToday } }
+        ]
+      },
+      include: {
+        creator: {
+          select: {
+            id: true,
+            username: true,
+            name: true,
+            avatar: true
+          }
+        },
+        attendees: true
+      }
+    });
+
+    // 5. Add local mock items to ensure map looks active (Kalyan West / Khadakpada focus)
     const mockMarkers = [
       {
         id: 'mock-meetup-1',
@@ -98,6 +142,43 @@ export async function GET() {
         longitude: l.longitude,
         locationText: l.locationText,
         link: `/marketplace`
+      })),
+      ...toleeGroups.map(tg => ({
+        id: tg.id,
+        type: 'group',
+        name: tg.name,
+        description: tg.description || 'Welcome to this community!',
+        image: tg.avatar || null,
+        latitude: tg.latitude as number,
+        longitude: tg.longitude as number,
+        locationText: tg.address || tg.location || 'Local Group',
+        link: `/t/${tg.slug}`
+      })),
+      ...dbEvents.map(e => ({
+        id: e.id,
+        type: 'event',
+        name: e.name,
+        description: e.description || 'No description available.',
+        image: e.bannerImage || null,
+        latitude: e.latitude,
+        longitude: e.longitude,
+        locationText: e.address || 'Local Event',
+        link: `/map?eventId=${e.id}`,
+        // Extra event metadata
+        category: e.category,
+        startDate: e.startDate.toISOString(),
+        startTime: e.startTime,
+        endDate: e.endDate.toISOString(),
+        endTime: e.endTime,
+        visibility: e.visibility,
+        maxAttendees: e.maxAttendees,
+        contactDetails: e.contactDetails,
+        status: e.status,
+        creatorId: e.creatorId,
+        creatorName: e.creator.username || e.creator.name,
+        creatorAvatar: e.creator.avatar,
+        attendeeCount: e.attendees.filter(a => a.status === 'approved').length,
+        attendees: e.attendees.map(a => ({ userId: a.userId, status: a.status }))
       })),
       ...mockMarkers
     ];

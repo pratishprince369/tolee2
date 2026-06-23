@@ -312,7 +312,10 @@ export async function createTolee(data: {
   coverImage?: string,
   coverImagePublicId?: string,
   avatar?: string,
-  avatarPublicId?: string
+  avatarPublicId?: string,
+  latitude?: number,
+  longitude?: number,
+  address?: string
 }) {
   try {
     const session = await getServerSession(authOptions);
@@ -345,6 +348,7 @@ export async function createTolee(data: {
     const safeMembershipQuestions = data.membershipQuestions ? sanitizeText(data.membershipQuestions, 2000) : undefined;
     const safeRules = data.rules ? sanitizeText(data.rules, 3000) : undefined;
     const safeWelcomeMessage = data.welcomeMessage ? sanitizeText(data.welcomeMessage, 1000) : undefined;
+    const safeAddress = data.address ? sanitizeText(data.address, 200) : undefined;
 
     // Generate a simple slug
     const slug = safeName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '-' + Date.now().toString().slice(-4);
@@ -365,6 +369,9 @@ export async function createTolee(data: {
         isPrivate: data.isPrivate,
         category: safeCategory,
         location: safeLocation,
+        latitude: data.latitude || null,
+        longitude: data.longitude || null,
+        address: safeAddress || null,
         membershipQuestions: safeMembershipQuestions,
         rules: safeRules,
         welcomeMessage: safeWelcomeMessage,
@@ -386,6 +393,7 @@ export async function createTolee(data: {
 
     revalidatePath('/discover');
     revalidatePath('/feed');
+    revalidatePath('/map');
     
     return { success: true, tolee };
   } catch (error) {

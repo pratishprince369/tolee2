@@ -6,8 +6,10 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   Crown, Star, TrendingUp, Users, Wallet, Share2, Copy, CheckCircle2,
-  Rocket, Award, Zap, ArrowRight, Loader2, Shield, Gift, RefreshCw
+  Rocket, Award, Zap, ArrowRight, Loader2, Shield, Gift, RefreshCw,
+  Calendar, Clock, Trash2, Archive, Play
 } from 'lucide-react';
+import { getEventsForDashboardAction, deleteEventAction, duplicateEventAction, keepEventInHistoryAction } from '@/actions/event';
 
 const TIER_CONFIG: Record<string, { emoji: string; color: string; bg: string; label: string }> = {
   creator: { emoji: '🌱', color: '#22c55e', bg: '#052e16', label: 'Creator' },
@@ -31,6 +33,9 @@ export default function CreatorDashboardPage() {
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [referralCount, setReferralCount] = useState(0);
   const [copied, setCopied] = useState(false);
+  const [dashboardEvents, setDashboardEvents] = useState<any>({ upcoming: [], live: [], ended: [], draft: [] });
+  const [loadingEvents, setLoadingEvents] = useState(true);
+  const [activeEventTab, setActiveEventTab] = useState<'upcoming' | 'live' | 'ended' | 'draft'>('upcoming');
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/auth/signin?callbackUrl=/creator-dashboard');
@@ -44,10 +49,12 @@ export default function CreatorDashboardPage() {
 
   const fetchData = async () => {
     setLoading(true);
+    setLoadingEvents(true);
     try {
-      const [appRes, walletRes] = await Promise.all([
+      const [appRes, walletRes, eventRes] = await Promise.all([
         fetch('/api/creator/apply'),
-        fetch('/api/ads-manager/wallet').catch(() => null)
+        fetch('/api/ads-manager/wallet').catch(() => null),
+        getEventsForDashboardAction()
       ]);
       const appData = await appRes.json();
       if (appData.application) setApplication(appData.application);
@@ -57,10 +64,15 @@ export default function CreatorDashboardPage() {
         setWalletBalance(wData.balance ?? null);
         setReferralCount(wData.referralCount ?? 0);
       }
+
+      if (eventRes.success && eventRes.events) {
+        setDashboardEvents(eventRes.events);
+      }
     } catch {
       // silent
     } finally {
       setLoading(false);
+      setLoadingEvents(false);
     }
   };
 
@@ -274,6 +286,158 @@ export default function CreatorDashboardPage() {
             </div>
           </div>
         )}
+
+        {/* Location-Based Events Manager Card */}
+        <div className="card p-6 mt-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-white/5">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-indigo-400" />
+              <div>
+                <h3 className="font-black text-white text-lg">Location Events Manager</h3>
+                <p className="text-xs text-gray-500 mt-0.5">Manage your events published on the Live Map.</p>
+              </div>
+            </div>
+            <Link href="/map" className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-black text-white bg-indigo-600 hover:bg-indigo-700 transition-colors shadow-lg active:scale-95">
+              <Plus className="w-3.5 h-3.5" /> Publish New Event
+            </Link>
+          </div>
+
+          {/* Event Tabs */}
+          <div className="flex gap-2 mb-6">
+            {(['upcoming', 'live', 'ended', 'draft'] as const).map((tab) => {
+              const count = dashboardEvents[tab]?.length || 0;
+              return (
+                <button
+                  key={tab}
+                  onClick={() => setActiveEventTab(tab)}
+                  className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 border ${
+                    activeEventTab === tab
+                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-md'
+                      : 'bg-white/5 text-gray-400 border-white/5 hover:bg-white/10 hover:text-white'
+                  }`}
+                >
+                  {tab} <span className="text-[10px] bg-black/30 px-2 py-0.5 rounded-full font-bold">{count}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Events List */}
+          {loadingEvents ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {(!dashboardEvents[activeEventTab] || dashboardEvents[activeEventTab].length === 0) ? (
+                <div className="text-center py-12 bg-white/[0.01] border border-dashed border-white/5 rounded-2xl">
+                  <p className="text-sm text-gray-500 font-semibold">No {activeEventTab} events found.</p>
+                  <p className="text-xs text-gray-600 mt-1">Go to Tolee Live Map to schedule one!</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {dashboardEvents[activeEventTab].map((event: any) => {
+                    const statusInfo = getEventStatusText(event.startDate, event.endDate);
+                    return (
+                      <div key={event.id} className="p-4 bg-white/[0.02] border border-white/5 hover:border-white/10 rounded-2xl flex flex-col justify-between transition-all">
+                        <div>
+                          <div className="flex items-start justify-between gap-3 mb-3">
+                            <div className="min-w-0">
+                              <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${statusInfo.badgeClass}`}>
+                                {event.status === 'ended' ? 'Status: Event Ended' : statusInfo.text}
+                              </span>
+                              <h4 className="font-extrabold text-sm text-white truncate mt-2">{event.name}</h4>
+                            </div>
+                            {event.bannerImage && (
+                              <img src={event.bannerImage} className="w-12 h-12 rounded-xl object-cover border border-white/5 shrink-0" />
+                            )}
+                          </div>
+
+                          <p className="text-xs text-gray-400 line-clamp-2 leading-relaxed mb-4">{event.description || 'No description provided.'}</p>
+
+                          <div className="space-y-2 mb-4 text-[11px] text-gray-500 font-medium">
+                            <div className="flex items-center gap-1.5">
+                              <Calendar className="w-3.5 h-3.5 text-indigo-400" />
+                              <span>📅 {new Date(event.startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <Clock className="w-3.5 h-3.5 text-indigo-400" />
+                              <span>⏰ {event.startTime} - {event.endTime}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <span>📍</span>
+                              <span className="truncate">{event.address}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <span>👥</span>
+                              <span>{event.attendees?.filter((a: any) => a.status === 'approved').length || 0} attending</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Action buttons */}
+                        <div className="border-t border-white/5 pt-3 mt-2 flex gap-2">
+                          {event.status === 'ended' || new Date(event.endDate) < new Date() ? (
+                            <>
+                              <button
+                                onClick={async () => {
+                                  if (confirm('Are you sure you want to duplicate this event?')) {
+                                    const res = await duplicateEventAction(event.id);
+                                    if (res.success) {
+                                      alert('Event duplicated successfully!');
+                                      fetchData();
+                                    } else {
+                                      alert(res.error || 'Failed to duplicate event');
+                                    }
+                                  }
+                                }}
+                                className="flex-1 py-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1"
+                              >
+                                <Copy className="w-3.5 h-3.5" /> Duplicate
+                              </button>
+                              <button
+                                onClick={async () => {
+                                  const res = await keepEventInHistoryAction(event.id);
+                                  if (res.success) {
+                                    alert('Moved to history.');
+                                    fetchData();
+                                  } else {
+                                    alert(res.error || 'Failed to update event');
+                                  }
+                                }}
+                                className="flex-1 py-2 bg-white/5 hover:bg-white/10 text-gray-300 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1"
+                              >
+                                <Archive className="w-3.5 h-3.5" /> Keep History
+                              </button>
+                            </>
+                          ) : null}
+
+                          <button
+                            onClick={async () => {
+                              if (confirm('Are you sure you want to permanently delete this event? This action cannot be undone.')) {
+                                const res = await deleteEventAction(event.id);
+                                if (res.success) {
+                                  alert('Event deleted successfully!');
+                                  fetchData();
+                                } else {
+                                  alert(res.error || 'Failed to delete event');
+                                }
+                              }
+                            }}
+                            className="py-2 px-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 rounded-xl text-xs font-bold transition-all flex items-center justify-center"
+                            title="Delete Event"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Go to Ads Manager */}
         <div className="mt-5 flex justify-center">

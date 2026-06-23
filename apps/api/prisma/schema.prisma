@@ -140,6 +140,9 @@ model User {
 
   isSimulation         Boolean           @default(false)
   profession           String?
+
+  createdEvents        Event[]           @relation("UserEvents")
+  eventAttendees       EventAttendee[]
 }
 
 model EmailLog {
@@ -164,6 +167,9 @@ model Tolee {
   rules           String?
   category        String?
   location        String?
+  latitude        Float?
+  longitude       Float?
+  address         String?
   membershipQuestions String?
   welcomeMessage  String?
   
@@ -1250,6 +1256,48 @@ model PostStoryAnalytics {
   storyViews      Int      @default(0)
   viewPostClicks  Int      @default(0)
   engagementCount Int      @default(0)
+}
+
+model Event {
+  id                 String   @id @default(cuid())
+  name               String
+  description        String?
+  bannerImage        String?
+  category           String   // e.g., "Music Event", "Business Seminar", "Cricket Tournament", "Startup Meetup", "General"
+  startDate          DateTime
+  startTime          String   // e.g. "14:30"
+  endDate            DateTime
+  endTime            String   // e.g. "17:30"
+  latitude           Float
+  longitude          Float
+  address            String
+  visibility         String   @default("public") // "public" | "private" | "invite_only"
+  maxAttendees       Int?
+  contactDetails     String?
+  status             String   @default("active") // "active" | "ended" | "history"
+  createdAt          DateTime @default(now())
+
+  notifiedEnded      Boolean  @default(false)
+  notifiedStarted    Boolean  @default(false)
+  notified1hBefore   Boolean  @default(false)
+  notified24hBefore  Boolean  @default(false)
+
+  creatorId          String
+  creator            User     @relation("UserEvents", fields: [creatorId], references: [id], onDelete: Cascade)
+  attendees          EventAttendee[]
+}
+
+model EventAttendee {
+  id        String   @id @default(cuid())
+  status    String   @default("approved") // "pending" | "approved" | "rejected"
+  joinedAt  DateTime @default(now())
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  eventId   String
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventId])
 }
 
 
