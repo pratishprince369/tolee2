@@ -752,7 +752,7 @@ export default function CreatorStudioPage() {
                       disabled={(!selectedFile && !isSimulatedUpload) || !title.trim()}
                       className="flex-1 py-5 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-2xl text-xs shadow-lg shadow-teal-600/10"
                     >
-                      {isSimulatedUpload ? 'Publish Simulated Video' : 'Publish to Mux Live'}
+                      {isReel ? 'Publish Reel' : 'Publish Video'}
                     </Button>
                     <Button
                       type="button"
