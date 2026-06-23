@@ -443,7 +443,7 @@ export default function MeetingClientWrapper({
               }}
               className="w-full py-6 bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white font-bold rounded-xl text-base shadow-lg shadow-teal-500/20 transform active:scale-98 transition-all"
             >
-              Join Meeting
+              {meeting?.hostId === currentUser?.id ? 'Start Meeting' : 'Join Meeting'}
             </Button>
             
             <Button

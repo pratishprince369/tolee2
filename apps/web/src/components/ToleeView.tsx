@@ -2047,7 +2047,7 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                                   onClick={() => router.push(`/live/meeting/${meeting.meetingCode}`)}
                                   className="flex-1 bg-[#0a7c85] hover:bg-[#0a7c85]/90 text-white font-bold rounded-xl text-xs py-5"
                                 >
-                                  Join Meeting
+                                  {meeting.hostId === currentUserId ? 'Rejoin Meeting' : 'Join Meeting'}
                                 </Button>
                                 {(isAdmin || meeting.hostId === currentUserId) && (
                                   <Button

@@ -7,7 +7,9 @@ import {
   useTracks, 
   useLocalParticipant,
   useRoomContext,
-  VideoTrack
+  VideoTrack,
+  useParticipants,
+  useConnectionState
 } from '@livekit/components-react';
 import { Track, Room } from 'livekit-client';
 import { 
@@ -129,6 +131,8 @@ function MeetingRoomInner({ meeting, meetingCode, currentUser, onLeave }: {
 }) {
   const room = useRoomContext();
   const { localParticipant, isMicrophoneEnabled, isCameraEnabled, isScreenShareEnabled } = useLocalParticipant();
+  const participants = useParticipants();
+  const connectionState = useConnectionState();
 
   // WebRTC Tracks (Camera + ScreenShare)
   const tracks = useTracks(
@@ -362,6 +366,35 @@ function MeetingRoomInner({ meeting, meetingCode, currentUser, onLeave }: {
   const cameraTracks = tracks.filter(t => t.source === Track.Source.Camera);
   const isSomeonePresenting = screenShareTracks.length > 0;
 
+  if (connectionState === 'connecting' || connectionState === 'reconnecting') {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-zinc-950 text-white">
+        <LoaderSpinner message={connectionState === 'connecting' ? "Connecting to media server..." : "Reconnecting to media server..."} />
+      </div>
+    );
+  }
+
+  if (connectionState === 'disconnected') {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-zinc-950 text-white p-6">
+        <div className="max-w-md w-full p-8 bg-zinc-900 border border-zinc-800 rounded-2xl text-center shadow-2xl space-y-6">
+          <div className="mx-auto w-12 h-12 bg-red-500/10 rounded-full flex items-center justify-center border border-red-500/20">
+            <ShieldAlert className="w-6 h-6 text-red-500" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-xl font-bold text-white">Connection Failed</h2>
+            <p className="text-zinc-400 text-sm leading-relaxed">
+              Could not establish connection to the meeting server. Please verify your internet connection or that the LiveKit configuration is correct on the server.
+            </p>
+          </div>
+          <Button onClick={onLeave} className="w-full bg-[#0a7c85] hover:bg-[#0a7c85]/90 py-5 rounded-xl font-bold text-sm transition-all">
+            Exit Meeting
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full relative select-none">
       
@@ -444,7 +477,7 @@ function MeetingRoomInner({ meeting, meetingCode, currentUser, onLeave }: {
           ) : (
             /* Traditional Video Tiles Grid */
             <div className="w-full h-full flex items-center justify-center">
-              {tracks.length <= 1 ? (
+              {participants.length <= 1 ? (
                 // Only local participant is present
                 <div className="max-w-md text-center p-8 bg-zinc-900/40 border border-zinc-900 rounded-2xl space-y-4">
                   <Sparkles className="w-10 h-10 text-teal-400 mx-auto" />
