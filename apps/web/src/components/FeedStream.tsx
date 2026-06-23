@@ -810,35 +810,41 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
   };
 
   const handleNewPost = (post: any, postData?: any) => {
-    const isAnon = !!post.isAnonymous;
-    const newLocalPost = {
-      id: post.id,
-      author: isAnon ? 'Anonymous' : (post.author?.username || post.author?.name || 'Anonymous'),
-      authorAvatar: isAnon ? '/default-user-avatar.svg' : (post.author?.avatar || post.author?.image || '/default-user-avatar.svg'),
-      authorId: isAnon ? null : post.author?.id,
-      isAnonymous: isAnon,
-      toleeName: postData?.toleeName,
-      toleeSlug: postData?.toleeSlug,
-      role: 'Member',
-      time: 'Just now',
-      content: post.caption,
-      image: post.mediaTypes && post.mediaTypes.split(',')[0] === 'image' ? post.mediaUrls?.split(/,(?=https?:\/\/)/)[0] : null,
-      video: post.mediaTypes && post.mediaTypes.split(',')[0] === 'video' ? post.mediaUrls?.split(/,(?=https?:\/\/)/)[0] : null,
-      mediaUrls: post.mediaUrls,
-      mediaTypes: post.mediaTypes,
-      likes: 0,
-      comments: 0,
-      isWin: post.postType === 'win',
-      postType: post.postType,
-      location: post.location,
-      subLocation: post.subLocation,
-      likedByMe: false,
-      savedByMe: false,
-      repostedByMe: false,
-      commentsList: [],
-      resharedByUser: null
-    };
-    setFeedPosts(prev => [newLocalPost, ...prev]);
+    try {
+      console.log("handleNewPost called with:", post, postData);
+      const isAnon = !!post.isAnonymous;
+      const newLocalPost = {
+        id: post.id,
+        author: isAnon ? 'Anonymous' : (post.author?.username || post.author?.name || 'Anonymous'),
+        authorAvatar: isAnon ? '/default-user-avatar.svg' : (post.author?.avatar || post.author?.image || '/default-user-avatar.svg'),
+        authorId: isAnon ? null : post.author?.id,
+        isAnonymous: isAnon,
+        toleeName: postData?.toleeName || 'Tolee',
+        toleeSlug: postData?.toleeSlug || 'group',
+        role: 'Member',
+        time: 'Just now',
+        content: post.caption || '',
+        image: (post.mediaTypes && post.mediaUrls) ? (post.mediaTypes.split(',')[0] === 'image' ? post.mediaUrls.split(/,(?=https?:\/\/)/)[0] : null) : null,
+        video: (post.mediaTypes && post.mediaUrls) ? (post.mediaTypes.split(',')[0] === 'video' ? post.mediaUrls.split(/,(?=https?:\/\/)/)[0] : null) : null,
+        mediaUrls: post.mediaUrls || null,
+        mediaTypes: post.mediaTypes || null,
+        likes: 0,
+        comments: 0,
+        isWin: post.postType === 'win',
+        postType: post.postType || 'regular',
+        location: post.location || null,
+        subLocation: post.subLocation || null,
+        likedByMe: false,
+        savedByMe: false,
+        repostedByMe: false,
+        commentsList: [],
+        resharedByUser: null
+      };
+      console.log("Constructed newLocalPost:", newLocalPost);
+      setFeedPosts(prev => [newLocalPost, ...prev]);
+    } catch (err) {
+      console.error("Error inside handleNewPost:", err);
+    }
   };
 
   return (

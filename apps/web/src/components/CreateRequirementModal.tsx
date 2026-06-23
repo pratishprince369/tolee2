@@ -16,7 +16,7 @@ export function CreateRequirementModal({
   toleeId 
 }: { 
   children: React.ReactNode, 
-  onPost?: (post: any) => void, 
+  onPost?: (post: any, postData?: any) => void, 
   toleeId?: string 
 }) {
   const { data: session } = useSession();
@@ -108,11 +108,18 @@ export function CreateRequirementModal({
         postData,
         'feed',
         (createdPost: any, pData: any) => {
-          const firstToleeRelation = createdPost.tolees?.[0]?.tolee;
-          onPost(createdPost, {
-            toleeName: firstToleeRelation?.name || pData.toleeName,
-            toleeSlug: firstToleeRelation?.slug || pData.toleeSlug
-          });
+          try {
+            console.log("Requirement post uploaded successfully:", createdPost, pData);
+            const firstToleeRelation = createdPost.tolees?.[0]?.tolee;
+            if (onPost) {
+              onPost(createdPost, {
+                toleeName: firstToleeRelation?.name || pData.toleeName,
+                toleeSlug: firstToleeRelation?.slug || pData.toleeSlug
+              });
+            }
+          } catch (callbackErr) {
+            console.error("Error in onPost callback inside CreateRequirementModal:", callbackErr);
+          }
         }
       );
 
