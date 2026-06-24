@@ -668,7 +668,7 @@ export async function createMuxDirectUpload() {
     const upload = await mux.video.uploads.create({
       new_asset_settings: { 
         playback_policy: ['public'],
-        mp4_support: 'standard'
+        mp4_support: 'capped-1080p'
       },
       cors_origin: '*',
     });
