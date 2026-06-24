@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { 
   getCreatorAnalytics, getCreatorVideos, createMuxDirectUpload, 
-  saveScreenVideo, saveSimulatedScreenVideo, updateScreenVideo, deleteScreenVideo,
+  saveScreenVideo, updateScreenVideo, deleteScreenVideo,
   getPlaylists, createPlaylist, addVideoToPlaylist,
   getCreatorComments, togglePinComment, toggleHeartComment,
   checkMuxUploadStatus
@@ -128,10 +128,9 @@ export default function CreatorStudioPage() {
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'processing' | 'done' | 'error'>('idle');
   const [muxUploadId, setMuxUploadId] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
-  const [isSimulatedUpload, setIsSimulatedUpload] = useState(false); // Default to real upload for production usage
   const [isReel, setIsReel] = useState(false);
 
-  // Chunk upload simulation state
+  // Upload progress state
   const [uploadSpeed, setUploadSpeed] = useState('0 KB/s');
   const [uploadTimeRemaining, setUploadTimeRemaining] = useState('');
   const [uploadPaused, setUploadPaused] = useState(false);
@@ -180,13 +179,7 @@ export default function CreatorStudioPage() {
     ]
   });
   const [searchGroupQuery, setSearchGroupQuery] = useState('');
-  const [recommendedGroups, setRecommendedGroups] = useState([
-    { id: 'g1', name: 'Next.js Developers', members: 1250, selected: false },
-    { id: 'g2', name: 'Web Development Mastery', members: 850, selected: false },
-    { id: 'g3', name: 'AI & Machine Learning Hub', members: 2100, selected: false },
-    { id: 'g4', name: 'UI/UX Design Guild', members: 450, selected: false },
-    { id: 'g5', name: 'Tolee Creators Group', members: 3400, selected: false }
-  ]);
+  const [recommendedGroups, setRecommendedGroups] = useState<any[]>([]);
 
   // Notifications toggles
   const [notifications, setNotifications] = useState({
@@ -722,51 +715,7 @@ export default function CreatorStudioPage() {
   const handleStartPublish = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavedVideoStatus('published');
-
-    if (isSimulatedUpload) {
-      startSimulatedUpload();
-      
-      const videoUrls = [
-        'https://cdn.pixabay.com/video/2021/08/04/83896-584732159_large.mp4',
-        'https://cdn.pixabay.com/video/2022/01/18/104762-663884392_large.mp4',
-        'https://cdn.pixabay.com/video/2021/11/04/93557-641566898_large.mp4',
-        'https://cdn.pixabay.com/video/2023/10/22/186071-877209700_large.mp4'
-      ];
-      const selectedVideoUrl = videoUrls[Math.floor(Math.random() * videoUrls.length)];
-      const thumbUrl = selectedThumbnailUrl || MOCK_THUMBNAIL_TEMPLATES[0];
-
-      setTimeout(async () => {
-        const res = await saveSimulatedScreenVideo(
-          title,
-          description,
-          category,
-          visibility,
-          thumbUrl,
-          selectedVideoUrl,
-          isReel,
-          'published'
-        );
-        if (res.success) {
-          let createdId = '';
-          if ('video' in res && res.video?.id) createdId = res.video.id;
-          else if ('post' in res && res.post?.id) createdId = res.post.id;
-          
-          if (createdId) setSavedVideoId(createdId);
-          
-          if (selectedPlaylists.length > 0 && createdId) {
-            for (const pId of selectedPlaylists) {
-              await addVideoToPlaylist(pId, createdId);
-            }
-          }
-          setUploadStatus('done');
-        } else {
-          setUploadStatus('error');
-          setErrorMessage(res.error || 'Failed to save simulated video data.');
-        }
-      }, 5000);
-    } else {
-      await triggerRealMuxUpload('published');
-    }
+    await triggerRealMuxUpload('published');
   };
   // Inline Playlist creation
   const handleCreatePlaylistSubmit = async (e: React.FormEvent) => {
@@ -1701,17 +1650,6 @@ export default function CreatorStudioPage() {
                         <Upload className="w-5 h-5 text-teal-500" />
                         Step 1: Upload Source Video
                       </h3>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold text-zinc-400">Mode:</span>
-                        <select 
-                          value={isSimulatedUpload ? 'simulated' : 'real'} 
-                          onChange={(e) => setIsSimulatedUpload(e.target.value === 'simulated')}
-                          className="bg-zinc-100 dark:bg-zinc-800 text-[10px] font-bold rounded-lg border-none px-2 py-1 focus:outline-none"
-                        >
-                          <option value="simulated">Simulation (Free)</option>
-                          <option value="real">Real Mux Upload</option>
-                        </select>
-                      </div>
                     </div>
 
                     {uploadStatus === 'idle' ? (
@@ -1807,31 +1745,9 @@ export default function CreatorStudioPage() {
 
                         {/* Controls */}
                         <div className="flex gap-2 justify-end pt-2">
-                          {isSimulatedUpload && uploadStatus === 'uploading' && (
-                            <>
-                              {uploadPaused ? (
-                                <Button 
-                                  type="button" 
-                                  onClick={resumeSimulatedUpload}
-                                  className="text-xs font-bold bg-teal-600 text-white px-4 py-2 rounded-xl"
-                                >
-                                  Resume
-                                </Button>
-                              ) : (
-                                <Button 
-                                  type="button" 
-                                  onClick={pauseSimulatedUpload}
-                                  variant="outline"
-                                  className="text-xs font-bold border-zinc-200 dark:border-zinc-800 text-zinc-650 px-4 py-2 rounded-xl"
-                                >
-                                  Pause
-                                </Button>
-                              )}
-                            </>
-                          )}
                           <Button 
                             type="button" 
-                            onClick={isSimulatedUpload ? cancelSimulatedUpload : cancelRealUpload}
+                            onClick={cancelRealUpload}
                             variant="destructive"
                             className="text-xs font-bold px-4 py-2 rounded-xl"
                           >
@@ -2589,15 +2505,6 @@ export default function CreatorStudioPage() {
                       </div>
                     </div>
 
-                    <div className="p-4 bg-teal-50/40 dark:bg-teal-950/10 border border-teal-500/10 rounded-2xl space-y-3">
-                      <p className="text-[10px] font-black uppercase tracking-wider text-teal-605">AI Video recommendations review</p>
-                      <div className="space-y-2 text-[10px] font-medium text-zinc-600 dark:text-zinc-400">
-                        <p className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-green-500" /> Title score is healthy, contains target keyword "Next.js"</p>
-                        <p className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-green-500" /> High description density with index chapters (Passed)</p>
-                        <p className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-green-500" /> Resolution meets full high-definition requirements (Passed)</p>
-                      </div>
-                    </div>
-
                     {/* Tolee Groups Integration */}
                     <div className="border-t border-zinc-150 dark:border-zinc-850 pt-5 space-y-4">
                       <div>
@@ -2605,52 +2512,62 @@ export default function CreatorStudioPage() {
                         <p className="text-[10px] text-zinc-400 font-semibold mt-0.5">Publish your video content directly to relevant group feeds to increase discovery.</p>
                       </div>
 
-                      {/* Search Groups bar */}
-                      <div className="relative">
-                        <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
-                        <input
-                          type="text"
-                          placeholder="Search Tolee groups..."
-                          value={searchGroupQuery}
-                          onChange={(e) => setSearchGroupQuery(e.target.value)}
-                          className="w-full pl-9 pr-4 py-2.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs focus:outline-none"
-                        />
-                      </div>
+                      {recommendedGroups.length > 0 ? (
+                        <>
+                          {/* Search Groups bar */}
+                          <div className="relative">
+                            <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
+                            <input
+                              type="text"
+                              placeholder="Search Tolee groups..."
+                              value={searchGroupQuery}
+                              onChange={(e) => setSearchGroupQuery(e.target.value)}
+                              className="w-full pl-9 pr-4 py-2.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs focus:outline-none"
+                            />
+                          </div>
 
-                      {/* Groups List */}
-                      <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                        {recommendedGroups
-                          .filter((g: any) => g.name.toLowerCase().includes(searchGroupQuery.toLowerCase()))
-                          .map((group: any) => (
-                            <label 
-                              key={group.id}
-                              className={`flex items-center justify-between p-3.5 rounded-xl border cursor-pointer transition-colors ${
-                                group.selected 
-                                  ? 'border-teal-500 bg-teal-500/5' 
-                                  : 'border-zinc-200 dark:border-zinc-850 hover:bg-zinc-50 dark:hover:bg-zinc-950'
-                              }`}
-                            >
-                              <div className="flex items-center gap-3">
-                                <div className="w-7 h-7 rounded-lg bg-zinc-200 dark:bg-zinc-850 flex items-center justify-center font-bold text-xs text-teal-655 uppercase">
-                                  {group.name[0]}
-                                </div>
-                                <div>
-                                  <p className="text-xs font-bold text-zinc-800 dark:text-zinc-200">{group.name}</p>
-                                  <p className="text-[9px] text-zinc-400 font-semibold">{group.members.toLocaleString()} members</p>
-                                </div>
-                              </div>
-                              <input
-                                type="checkbox"
-                                checked={group.selected}
-                                onChange={() => {
-                                  setRecommendedGroups((prev: any) => prev.map((g: any) => g.id === group.id ? { ...g, selected: !g.selected } : g));
-                                }}
-                                className="rounded border-zinc-300 dark:border-zinc-800 text-teal-500 focus:ring-teal-500 w-4 h-4"
-                              />
-                            </label>
-                          ))
-                        }
-                      </div>
+                          {/* Groups List */}
+                          <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                            {recommendedGroups
+                              .filter((g: any) => g.name.toLowerCase().includes(searchGroupQuery.toLowerCase()))
+                              .map((group: any) => (
+                                <label 
+                                  key={group.id}
+                                  className={`flex items-center justify-between p-3.5 rounded-xl border cursor-pointer transition-colors ${
+                                    group.selected 
+                                      ? 'border-teal-500 bg-teal-500/5' 
+                                      : 'border-zinc-200 dark:border-zinc-850 hover:bg-zinc-50 dark:hover:bg-zinc-950'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-7 h-7 rounded-lg bg-zinc-200 dark:bg-zinc-850 flex items-center justify-center font-bold text-xs text-teal-655 uppercase">
+                                      {group.name[0]}
+                                    </div>
+                                    <div>
+                                      <p className="text-xs font-bold text-zinc-800 dark:text-zinc-200">{group.name}</p>
+                                      <p className="text-[9px] text-zinc-400 font-semibold">{group.members?.toLocaleString() || 0} members</p>
+                                    </div>
+                                  </div>
+                                  <input
+                                    type="checkbox"
+                                    checked={group.selected}
+                                    onChange={() => {
+                                      setRecommendedGroups((prev: any) => prev.map((g: any) => g.id === group.id ? { ...g, selected: !g.selected } : g));
+                                    }}
+                                    className="rounded border-zinc-300 dark:border-zinc-800 text-teal-500 focus:ring-teal-500 w-4 h-4"
+                                  />
+                                </label>
+                              ))
+                            }
+                          </div>
+                        </>
+                      ) : (
+                        <div className="p-6 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 rounded-2xl text-center">
+                          <Users className="w-8 h-8 text-zinc-300 dark:text-zinc-700 mx-auto mb-2" />
+                          <p className="text-xs font-bold text-zinc-500">No groups available yet</p>
+                          <p className="text-[10px] text-zinc-400 mt-0.5">Groups feature is coming soon. Your video will still be published to the main feed.</p>
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex justify-between gap-4 pt-2">
@@ -3324,7 +3241,7 @@ export default function CreatorStudioPage() {
                           <div className="bg-teal-550 h-full rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
                         </div>
 
-                        {uploadStatus === 'uploading' && !isSimulatedUpload && (
+                        {uploadStatus === 'uploading' && (
                           <div className="grid grid-cols-2 gap-4 text-[10px] font-bold text-zinc-500">
                             <div>
                               <p className="text-[9px] text-zinc-400 font-medium">SPEED</p>
@@ -3379,49 +3296,7 @@ export default function CreatorStudioPage() {
                         disabled={uploadStatus === 'uploading' || uploadStatus === 'processing'}
                         onClick={async () => {
                           setSavedVideoStatus('draft');
-                          if (isSimulatedUpload) {
-                            startSimulatedUpload();
-                            const videoUrls = [
-                              'https://cdn.pixabay.com/video/2021/08/04/83896-584732159_large.mp4',
-                              'https://cdn.pixabay.com/video/2022/01/18/104762-663884392_large.mp4',
-                              'https://cdn.pixabay.com/video/2021/11/04/93557-641566898_large.mp4',
-                              'https://cdn.pixabay.com/video/2023/10/22/186071-877209700_large.mp4'
-                            ];
-                            const selectedVideoUrl = videoUrls[Math.floor(Math.random() * videoUrls.length)];
-                            const thumbUrl = selectedThumbnailUrl || MOCK_THUMBNAIL_TEMPLATES[0];
-
-                            setTimeout(async () => {
-                              const res = await saveSimulatedScreenVideo(
-                                title,
-                                description,
-                                category,
-                                visibility,
-                                thumbUrl,
-                                selectedVideoUrl,
-                                isReel,
-                                'draft'
-                              );
-                              if (res.success) {
-                                let createdId = '';
-                                if ('video' in res && res.video?.id) createdId = res.video.id;
-                                else if ('post' in res && res.post?.id) createdId = res.post.id;
-                                
-                                if (createdId) setSavedVideoId(createdId);
-                                
-                                if (selectedPlaylists.length > 0 && createdId) {
-                                  for (const pId of selectedPlaylists) {
-                                    await addVideoToPlaylist(pId, createdId);
-                                  }
-                                }
-                                setUploadStatus('done');
-                              } else {
-                                setUploadStatus('error');
-                                setErrorMessage(res.error || 'Failed to save simulated video data.');
-                              }
-                            }, 5000);
-                          } else {
-                            await triggerRealMuxUpload('draft');
-                          }
+                          await triggerRealMuxUpload('draft');
                         }}
                         variant="secondary"
                         className="flex-1 py-5 bg-zinc-650 hover:bg-zinc-700 text-white font-bold rounded-2xl text-xs shadow-lg shadow-zinc-650/15"
