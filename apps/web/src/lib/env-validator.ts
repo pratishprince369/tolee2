@@ -45,6 +45,9 @@ const ENV_VARS: EnvVar[] = [
   { name: 'NEXT_PUBLIC_FIREBASE_API_KEY', required: false, description: 'Firebase client API key (public, by design)' },
   { name: 'NEXT_PUBLIC_FIREBASE_PROJECT_ID', required: false, description: 'Firebase project ID (public, by design)' },
 
+  // Mux Configuration (Client-side)
+  { name: 'NEXT_PUBLIC_MUX_ENV_KEY', required: false, description: 'Mux Data Environment Key for analytics tracking' },
+
   // Optional — warn if missing
   { name: 'SMTP_HOST', required: false, description: 'SMTP server host for transactional emails' },
   { name: 'SMTP_USER', required: false, description: 'SMTP username' },

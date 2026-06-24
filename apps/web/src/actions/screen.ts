@@ -187,10 +187,10 @@ export async function getScreenVideos(searchQuery?: string, category?: string, l
       orderBy: orderByClause,
     });
 
-    let nextCursor: string | undefined = undefined;
+    let nextCursor: string | null = null;
     if (videos.length > limit) {
       const nextItem = videos.pop();
-      nextCursor = nextItem?.id;
+      nextCursor = nextItem?.id || null;
     }
 
     return { success: true, videos: JSON.parse(JSON.stringify(videos)), nextCursor };
@@ -675,8 +675,8 @@ export async function createMuxDirectUpload() {
 
     return {
       success: true,
-      uploadId: upload.id,
-      url: upload.url,
+      uploadId: upload.id || null,
+      url: upload.url || null,
     };
   } catch (error) {
     console.error('Error creating Mux direct upload:', error);
@@ -696,7 +696,7 @@ export async function checkMuxUploadStatus(uploadId: string) {
     return {
       success: true,
       status: upload.status,
-      assetId: upload.asset_id
+      assetId: upload.asset_id || null
     };
   } catch (error: any) {
     console.error('Error checking Mux upload status:', error);
