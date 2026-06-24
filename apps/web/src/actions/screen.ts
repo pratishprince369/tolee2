@@ -193,7 +193,7 @@ export async function getScreenVideos(searchQuery?: string, category?: string, l
       nextCursor = nextItem?.id;
     }
 
-    return { success: true, videos, nextCursor };
+    return { success: true, videos: JSON.parse(JSON.stringify(videos)), nextCursor };
   } catch (error) {
     console.error('Error fetching screen videos:', error);
     return { success: false, error: 'Failed to fetch videos' };
@@ -275,7 +275,7 @@ export async function getScreenVideoDetails(id: string) {
     // Subscribed channels check (simulated followers if simulation mode is active)
     const subscriberCount = video.user.followers.length + (video.isSimulation ? 12400 : 0);
 
-    return { 
+    return JSON.parse(JSON.stringify({ 
       success: true, 
       video: {
         ...video,
@@ -286,7 +286,7 @@ export async function getScreenVideoDetails(id: string) {
         isSubscribed
       }, 
       recommended 
-    };
+    }));
   } catch (error) {
     console.error('Error fetching screen video details:', error);
     return { success: false, error: 'Failed to fetch video details' };
@@ -386,7 +386,7 @@ export async function getScreenVideoComments(videoId: string) {
       ]
     });
 
-    return { success: true, comments };
+    return { success: true, comments: JSON.parse(JSON.stringify(comments)) };
   } catch (err) {
     console.error(err);
     return { success: false, error: 'Failed to retrieve comments' };
@@ -421,7 +421,7 @@ export async function addScreenVideoComment(videoId: string, text: string, paren
       }
     });
 
-    return { success: true, comment };
+    return { success: true, comment: JSON.parse(JSON.stringify(comment)) };
   } catch (err) {
     console.error(err);
     return { success: false, error: 'Failed to publish comment' };
@@ -503,7 +503,7 @@ export async function getPlaylists() {
       orderBy: { updatedAt: 'desc' }
     });
 
-    return { success: true, playlists };
+    return { success: true, playlists: JSON.parse(JSON.stringify(playlists)) };
   } catch (err) {
     console.error(err);
     return { success: false, error: 'Failed to load playlists' };
@@ -520,7 +520,7 @@ export async function createPlaylist(name: string, visibility = 'public') {
       data: { name, userId, visibility }
     });
 
-    return { success: true, playlist };
+    return { success: true, playlist: JSON.parse(JSON.stringify(playlist)) };
   } catch (err) {
     console.error(err);
     return { success: false, error: 'Failed to create playlist' };
@@ -741,7 +741,7 @@ export async function saveScreenVideo(
           authorId: currentUserId
         }
       });
-      return { success: true, isReel: true, post };
+      return { success: true, isReel: true, post: JSON.parse(JSON.stringify(post)) };
     }
 
     const video = await prisma.screenVideo.create({
@@ -781,7 +781,7 @@ export async function saveScreenVideo(
       }
     });
 
-    return { success: true, video };
+    return { success: true, video: JSON.parse(JSON.stringify(video)) };
   } catch (error) {
     console.error('Error saving screen video:', error);
     return { success: false, error: 'Failed to save video details' };
@@ -803,7 +803,7 @@ export async function getCreatorVideos() {
       orderBy: { createdAt: 'desc' }
     });
 
-    return { success: true, videos };
+    return { success: true, videos: JSON.parse(JSON.stringify(videos)) };
   } catch (err) {
     console.error(err);
     return { success: false, error: 'Failed to retrieve creator videos' };
@@ -843,7 +843,7 @@ export async function saveSimulatedScreenVideo(
           isSimulation: true
         }
       });
-      return { success: true, isReel: true, post };
+      return { success: true, isReel: true, post: JSON.parse(JSON.stringify(post)) };
     }
 
     const video = await prisma.screenVideo.create({
@@ -874,7 +874,7 @@ export async function saveSimulatedScreenVideo(
       }
     });
 
-    return { success: true, video };
+    return { success: true, video: JSON.parse(JSON.stringify(video)) };
   } catch (err) {
     console.error('Error saving simulated video:', err);
     return { success: false, error: 'Failed to publish simulated video' };
@@ -918,7 +918,7 @@ export async function getCreatorComments() {
       }
     });
 
-    return { success: true, comments };
+    return { success: true, comments: JSON.parse(JSON.stringify(comments)) };
   } catch (err) {
     console.error('Error fetching creator comments:', err);
     return { success: false, error: 'Failed to fetch comments' };
