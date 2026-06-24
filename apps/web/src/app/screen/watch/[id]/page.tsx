@@ -151,7 +151,7 @@ export default function WatchVideoPage({ params }: PageProps) {
   // Load Playlists
   const loadUserPlaylists = async () => {
     if (!currentUserId) return;
-    const res = await getPlaylists();
+    const res = await getPlaylists(currentUserId);
     if (res.success && res.playlists) {
       setPlaylists(res.playlists);
     }

@@ -499,11 +499,14 @@ export async function toggleHeartComment(commentId: string) {
 /**
  * Playlist management systems (public, private, unlisted)
  */
-export async function getPlaylists() {
+export async function getPlaylists(userIdParam?: string) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) return { success: false, error: 'Unauthorized' };
-    const userId = (session.user as any).id;
+    let userId = userIdParam;
+    if (!userId) {
+      const session = await getServerSession(authOptions);
+      if (!session?.user) return { success: false, error: 'Unauthorized' };
+      userId = (session.user as any).id;
+    }
 
     const playlists = await prisma.screenVideoPlaylist.findMany({
       where: { userId },
@@ -620,11 +623,14 @@ export async function toggleSubscribeChannel(creatorId: string) {
 /**
  * Creator Studio Analytics & Metrics Dashboard
  */
-export async function getCreatorAnalytics() {
+export async function getCreatorAnalytics(userIdParam?: string) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) return { success: false, error: 'Unauthorized' };
-    const userId = (session.user as any).id;
+    let userId = userIdParam;
+    if (!userId) {
+      const session = await getServerSession(authOptions);
+      if (!session?.user) return { success: false, error: 'Unauthorized' };
+      userId = (session.user as any).id;
+    }
 
     // Fetch user channels stats
     const videosCount = await prisma.screenVideo.count({ where: { userId } });
@@ -804,11 +810,14 @@ export async function saveScreenVideo(
 /**
  * Fetch creator videos for Studio Content Tab
  */
-export async function getCreatorVideos() {
+export async function getCreatorVideos(userIdParam?: string) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) return { success: false, error: 'Unauthorized' };
-    const userId = (session.user as any).id;
+    let userId = userIdParam;
+    if (!userId) {
+      const session = await getServerSession(authOptions);
+      if (!session?.user) return { success: false, error: 'Unauthorized' };
+      userId = (session.user as any).id;
+    }
 
     const videos = await prisma.screenVideo.findMany({
       where: { userId },
@@ -900,11 +909,14 @@ export async function saveSimulatedScreenVideo(
 /**
  * Fetch all comments on the creator's videos
  */
-export async function getCreatorComments() {
+export async function getCreatorComments(userIdParam?: string) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) return { success: false, error: 'Unauthorized' };
-    const userId = (session.user as any).id;
+    let userId = userIdParam;
+    if (!userId) {
+      const session = await getServerSession(authOptions);
+      if (!session?.user) return { success: false, error: 'Unauthorized' };
+      userId = (session.user as any).id;
+    }
 
     const comments = await prisma.screenVideoComment.findMany({
       where: {

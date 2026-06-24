@@ -248,28 +248,28 @@ export default function CreatorStudioPage() {
     if (!currentUserId) return;
     
     // Fetch dashboard metrics
-    const analRes = await getCreatorAnalytics();
+    const analRes = await getCreatorAnalytics(currentUserId);
     if (analRes.success && analRes.metrics) {
       setMetrics(analRes.metrics);
     }
 
     // Fetch video listings
     setLoadingVideos(true);
-    const vidRes = await getCreatorVideos();
+    const vidRes = await getCreatorVideos(currentUserId);
     if (vidRes.success && vidRes.videos) {
       setCreatorVideos(vidRes.videos);
     }
     setLoadingVideos(false);
 
     // Fetch user playlists
-    const playRes = await getPlaylists();
+    const playRes = await getPlaylists(currentUserId);
     if (playRes.success && playRes.playlists) {
       setPlaylists(playRes.playlists);
     }
 
     // Fetch creator comments
     setLoadingComments(true);
-    const commRes = await getCreatorComments();
+    const commRes = await getCreatorComments(currentUserId);
     if (commRes.success && commRes.comments) {
       setCreatorComments(commRes.comments);
     }
@@ -294,7 +294,7 @@ export default function CreatorStudioPage() {
     } else if (status === 'authenticated') {
       loadStudioData();
     }
-  }, [status]);
+  }, [status, currentUserId]);
 
   // Search local storage for drafts on mount
   useEffect(() => {
