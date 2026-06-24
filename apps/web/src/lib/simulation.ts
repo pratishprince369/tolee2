@@ -805,7 +805,7 @@ function generateLocalFallbackCache(countryCode: string): AICache {
         type: 'video',
         category: cat,
         description: `${cat} category video clip`,
-        caption: `🔥 simulated reel: ${vidCaptions[i % vidCaptions.length]}`
+        caption: vidCaptions[i % vidCaptions.length]
       });
     }
   }
@@ -821,10 +821,10 @@ function generateLocalFallbackCache(countryCode: string): AICache {
       general: extractCaptions('general')
     },
     reelCaptions: {
-      tech: extractCaptions('tech').map(c => `🔥 simulated reel: ${c.slice(0, 30)}...`),
-      money: extractCaptions('money').map(c => `🔥 simulated reel: ${c.slice(0, 30)}...`),
-      health: extractCaptions('health').map(c => `🔥 simulated reel: ${c.slice(0, 30)}...`),
-      general: extractCaptions('general').map(c => `🔥 simulated reel: ${c.slice(0, 30)}...`)
+      tech: extractCaptions('tech'),
+      money: extractCaptions('money'),
+      health: extractCaptions('health'),
+      general: extractCaptions('general')
     },
     comments,
     mediaAssets
