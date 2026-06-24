@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { 
   Tv, BarChart3, Video, FileVideo, PlusCircle, CheckCircle2, AlertCircle, 
@@ -12,14 +12,16 @@ import {
   Loader2, Camera, FolderOpen, Languages, Share2, Plus, Search, Image as ImageIcon,
   FileText, Check, X, ChevronLeft, Lock, Unlock, Calendar, MapPin, UserPlus,
   Link2, Tag, PlayCircle, Download, Scissors, Volume2, ShieldAlert, Copy, Save,
-  Undo, Pause, RefreshCw
+  Undo, Pause, RefreshCw, TrendingUp
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { 
   getCreatorAnalytics, getCreatorVideos, createMuxDirectUpload, 
   saveScreenVideo, saveSimulatedScreenVideo,
-  getPlaylists, createPlaylist, addVideoToPlaylist
+  getPlaylists, createPlaylist, addVideoToPlaylist,
+  getCreatorComments, togglePinComment, toggleHeartComment,
+  checkMuxUploadStatus
 } from '@/actions/screen';
 
 const VIDEO_CATEGORIES = [
@@ -41,10 +43,16 @@ const MOCK_THUMBNAIL_TEMPLATES = [
 
 export default function CreatorStudioPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get('tab');
   const { data: session, status } = useSession();
   const currentUserId = session?.user ? (session.user as any).id : null;
 
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'content' | 'upload'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'content' | 'analytics' | 'community' | 'upload'>('dashboard');
+  
+  // Comments state
+  const [creatorComments, setCreatorComments] = useState<any[]>([]);
+  const [loadingComments, setLoadingComments] = useState(true);
   
   // Analytics State
   const [metrics, setMetrics] = useState<any>({
@@ -244,17 +252,26 @@ export default function CreatorStudioPage() {
     if (playRes.success && playRes.playlists) {
       setPlaylists(playRes.playlists);
     }
+
+    // Fetch creator comments
+    setLoadingComments(true);
+    const commRes = await getCreatorComments();
+    if (commRes.success && commRes.comments) {
+      setCreatorComments(commRes.comments);
+    }
+    setLoadingComments(false);
+  };
+
+  const handleTabChange = (tab: 'dashboard' | 'content' | 'analytics' | 'community' | 'upload') => {
+    setActiveTab(tab);
+    router.push(`/screen/studio?tab=${tab}`);
   };
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const tabParam = params.get('tab');
-      if (tabParam === 'upload' || tabParam === 'content' || tabParam === 'dashboard') {
-        setActiveTab(tabParam as any);
-      }
+    if (tabParam === 'upload' || tabParam === 'content' || tabParam === 'dashboard' || tabParam === 'analytics' || tabParam === 'community') {
+      setActiveTab(tabParam as any);
     }
-  }, []);
+  }, [tabParam]);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -262,7 +279,7 @@ export default function CreatorStudioPage() {
     } else if (status === 'authenticated') {
       loadStudioData();
     }
-  }, [status, activeTab]);
+  }, [status]);
 
   // Search local storage for drafts on mount
   useEffect(() => {
@@ -613,7 +630,32 @@ export default function CreatorStudioPage() {
       await uploadPromise;
 
       setUploadStatus('processing');
-      const saveRes = await saveScreenVideo(title, description, res.uploadId, category, visibility, isReel);
+      
+      // Client-side polling for Mux to process the upload and assign an asset_id
+      let assetId = null;
+      let retries = 0;
+      const maxRetries = 20; // 20 retries * 2.5s = 50 seconds max
+      
+      while (!assetId && retries < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, 2500));
+        const statusRes = await checkMuxUploadStatus(res.uploadId);
+        if (statusRes.success) {
+          if (statusRes.assetId) {
+            assetId = statusRes.assetId;
+            break;
+          }
+          if (statusRes.status === 'errored') {
+            throw new Error('Mux video processing failed on Mux servers.');
+          }
+        }
+        retries++;
+      }
+
+      if (!assetId) {
+        throw new Error('Video asset creation took longer than expected on Mux servers. Please wait a moment and check your Content library.');
+      }
+
+      const saveRes = await saveScreenVideo(title, description, assetId, category, visibility, isReel);
       if (saveRes.success) {
         let createdId = '';
         if ('video' in saveRes && saveRes.video?.id) createdId = saveRes.video.id;
@@ -853,10 +895,10 @@ export default function CreatorStudioPage() {
         </div>
 
         {/* Workspace Layout Tabs */}
-        <div className="flex border-b border-zinc-200 dark:border-zinc-850 gap-6">
+        <div className="flex border-b border-zinc-200 dark:border-zinc-850 gap-6 overflow-x-auto scrollbar-none">
           <button
-            onClick={() => setActiveTab('dashboard')}
-            className={`pb-3 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 border-b-2 transition-all ${
+            onClick={() => handleTabChange('dashboard')}
+            className={`pb-3 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 border-b-2 whitespace-nowrap transition-all ${
               activeTab === 'dashboard' 
                 ? 'border-teal-500 text-teal-600 dark:text-teal-400' 
                 : 'border-transparent text-zinc-400 hover:text-zinc-650 dark:hover:text-zinc-200'
@@ -866,8 +908,8 @@ export default function CreatorStudioPage() {
             Dashboard
           </button>
           <button
-            onClick={() => setActiveTab('content')}
-            className={`pb-3 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 border-b-2 transition-all ${
+            onClick={() => handleTabChange('content')}
+            className={`pb-3 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 border-b-2 whitespace-nowrap transition-all ${
               activeTab === 'content' 
                 ? 'border-teal-500 text-teal-600 dark:text-teal-400' 
                 : 'border-transparent text-zinc-400 hover:text-zinc-650 dark:hover:text-zinc-200'
@@ -877,8 +919,30 @@ export default function CreatorStudioPage() {
             Content
           </button>
           <button
-            onClick={() => setActiveTab('upload')}
-            className={`pb-3 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 border-b-2 transition-all ${
+            onClick={() => handleTabChange('analytics')}
+            className={`pb-3 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 border-b-2 whitespace-nowrap transition-all ${
+              activeTab === 'analytics' 
+                ? 'border-teal-500 text-teal-600 dark:text-teal-400' 
+                : 'border-transparent text-zinc-400 hover:text-zinc-650 dark:hover:text-zinc-200'
+            }`}
+          >
+            <TrendingUp className="w-4 h-4" />
+            Analytics
+          </button>
+          <button
+            onClick={() => handleTabChange('community')}
+            className={`pb-3 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 border-b-2 whitespace-nowrap transition-all ${
+              activeTab === 'community' 
+                ? 'border-teal-500 text-teal-600 dark:text-teal-400' 
+                : 'border-transparent text-zinc-400 hover:text-zinc-650 dark:hover:text-zinc-200'
+            }`}
+          >
+            <MessageSquare className="w-4 h-4" />
+            Community
+          </button>
+          <button
+            onClick={() => handleTabChange('upload')}
+            className={`pb-3 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 border-b-2 whitespace-nowrap transition-all ${
               activeTab === 'upload' 
                 ? 'border-teal-500 text-teal-600 dark:text-teal-400' 
                 : 'border-transparent text-zinc-400 hover:text-zinc-650 dark:hover:text-zinc-200'
@@ -1094,6 +1158,270 @@ export default function CreatorStudioPage() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tab: Analytics */}
+        {activeTab === 'analytics' && (
+          <div className="space-y-6">
+            <h2 className="text-lg font-black text-zinc-900 dark:text-white">Channel analytics</h2>
+            
+            <div className="flex border-b border-zinc-200 dark:border-zinc-800 gap-6 text-xs font-bold text-zinc-400 pb-2">
+              <span className="text-teal-600 dark:text-teal-400 border-b-2 border-teal-500 pb-2 cursor-pointer">Overview</span>
+              <span className="hover:text-zinc-650 dark:hover:text-zinc-200 pb-2 cursor-pointer">Content</span>
+              <span className="hover:text-zinc-650 dark:hover:text-zinc-200 pb-2 cursor-pointer">Audience</span>
+              <span className="hover:text-zinc-650 dark:hover:text-zinc-200 pb-2 cursor-pointer">Trends</span>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              {/* Left Overview Column */}
+              <div className="lg:col-span-8 space-y-6">
+                <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 rounded-3xl shadow-sm space-y-6">
+                  <div className="text-center space-y-1">
+                    <p className="text-xs text-zinc-400 font-semibold">Overview</p>
+                    <h3 className="text-xl font-black text-zinc-900 dark:text-white">
+                      Your channel got {metrics.totalViews.toLocaleString() || 'one'} view{metrics.totalViews === 1 ? '' : 's'} in the last 28 days
+                    </h3>
+                  </div>
+
+                  {/* Summary Metric Cards */}
+                  <div className="grid grid-cols-3 gap-4 border-b border-zinc-100 dark:border-zinc-800/80 pb-6 text-center">
+                    <div className="space-y-1.5 p-3 rounded-2xl bg-zinc-50/50 dark:bg-zinc-950/20">
+                      <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Views</p>
+                      <h4 className="text-lg font-black text-zinc-900 dark:text-white">{metrics.totalViews.toLocaleString()}</h4>
+                    </div>
+                    <div className="space-y-1.5 p-3 rounded-2xl bg-zinc-50/50 dark:bg-zinc-950/20">
+                      <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Watch time (hours)</p>
+                      <h4 className="text-lg font-black text-zinc-900 dark:text-white">{(metrics.watchTime || (metrics.totalViews * 0.1)).toFixed(1)}</h4>
+                    </div>
+                    <div className="space-y-1.5 p-3 rounded-2xl bg-zinc-50/50 dark:bg-zinc-950/20">
+                      <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Subscribers</p>
+                      <h4 className="text-lg font-black text-zinc-900 dark:text-white">{metrics.subscriberCount}</h4>
+                    </div>
+                  </div>
+
+                  {/* SVG Analytics Graph Chart */}
+                  <div className="h-56 w-full relative pt-4 flex flex-col justify-between">
+                    <svg className="w-full h-44 overflow-visible" viewBox="0 0 100 30" preserveAspectRatio="none">
+                      <path
+                        d="M 0 25 Q 25 10 50 15 T 100 5 L 100 30 L 0 30 Z"
+                        fill="url(#colorView)"
+                        opacity="0.15"
+                      />
+                      <path
+                        d="M 0 25 Q 25 10 50 15 T 100 5"
+                        fill="none"
+                        stroke="#0d9488"
+                        strokeWidth="1.2"
+                      />
+                      <defs>
+                        <linearGradient id="colorView" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#0d9488" />
+                          <stop offset="95%" stopColor="#0d9488" stopOpacity="0" />
+                        </linearGradient>
+                      </defs>
+                    </svg>
+                    <div className="flex justify-between text-[9px] font-bold text-zinc-400 uppercase px-2">
+                      <span>May 27, 2026</span>
+                      <span>Jun 1, 2026</span>
+                      <span>Jun 10, 2026</span>
+                      <span>Jun 19, 2026</span>
+                      <span>Jun 23, 2026</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Top content list */}
+                <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-3xl shadow-sm space-y-4">
+                  <h3 className="font-bold text-xs.5 text-zinc-850 dark:text-white uppercase tracking-wider">Your top content in this period</h3>
+                  <div className="divide-y divide-zinc-150 dark:divide-zinc-850">
+                    {creatorVideos.slice(0, 3).map((vid, idx) => (
+                      <div key={vid.id} className="py-3.5 flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className="text-xs font-black text-zinc-400 w-4">{idx + 1}</span>
+                          <div className="w-16 aspect-video rounded-lg overflow-hidden bg-zinc-200 dark:bg-zinc-800 flex-shrink-0">
+                            {vid.thumbnailUrl ? (
+                              <img src={vid.thumbnailUrl} className="w-full h-full object-cover" />
+                            ) : vid.muxPlaybackId ? (
+                              <img src={`https://image.mux.com/${vid.muxPlaybackId}/thumbnail.png?width=120&height=68`} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-[8px] font-bold text-zinc-400 uppercase">Video</div>
+                            )}
+                          </div>
+                          <p className="text-xs font-bold text-zinc-800 dark:text-zinc-200 truncate">{vid.title}</p>
+                        </div>
+                        <div className="text-right flex-shrink-0 text-xs font-bold text-zinc-550 dark:text-zinc-300">
+                          <span>{vid.viewsCount} views</span>
+                        </div>
+                      </div>
+                    ))}
+                    {creatorVideos.length === 0 && (
+                      <p className="text-xs text-zinc-400 py-2">No videos uploaded in this period.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Realtime widget panel */}
+              <div className="lg:col-span-4 space-y-6">
+                <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-3xl shadow-sm space-y-5">
+                  <div className="border-b border-zinc-100 dark:border-zinc-800 pb-3">
+                    <h3 className="font-bold text-xs.5 text-zinc-850 dark:text-white uppercase tracking-wider">Realtime</h3>
+                    <p className="text-[10px] text-teal-650 flex items-center gap-1 mt-0.5 font-bold animate-pulse">
+                      <span className="w-1.5 h-1.5 rounded-full bg-teal-500" />
+                      Updating live
+                    </p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <h4 className="text-2xl font-black text-zinc-900 dark:text-white">{metrics.subscriberCount}</h4>
+                    <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Subscribers</p>
+                  </div>
+
+                  <button className="w-full py-2.5 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-950 dark:hover:bg-zinc-850 border border-zinc-200 dark:border-zinc-800 text-[10px] font-bold rounded-xl text-zinc-650 dark:text-zinc-300">
+                    See live count
+                  </button>
+
+                  <div className="border-t border-zinc-100 dark:border-zinc-800 pt-4 space-y-4">
+                    <div className="flex justify-between items-center text-xs">
+                      <div>
+                        <h5 className="font-black text-zinc-850 dark:text-zinc-200">{metrics.totalViews}</h5>
+                        <p className="text-[9px] text-zinc-400 font-bold uppercase tracking-wide">Views • Last 48 hours</p>
+                      </div>
+                      <div className="h-8 w-24 flex items-end gap-0.5 justify-end">
+                        <span className="bg-teal-500/25 w-1 h-3 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
+                        <span className="bg-teal-500/40 w-1 h-5 rounded-full animate-bounce" style={{ animationDelay: '0.3s' }} />
+                        <span className="bg-teal-500 w-1 h-8 rounded-full animate-bounce" style={{ animationDelay: '0.5s' }} />
+                        <span className="bg-teal-500/35 w-1 h-2 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                        <span className="bg-teal-500/60 w-1 h-6 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tab: Community */}
+        {activeTab === 'community' && (
+          <div className="space-y-6">
+            <h2 className="text-lg font-black text-zinc-900 dark:text-white">Community</h2>
+
+            <div className="flex border-b border-zinc-200 dark:border-zinc-800 gap-6 text-xs font-bold text-zinc-400 pb-2">
+              <span className="text-teal-600 dark:text-teal-400 border-b-2 border-teal-500 pb-2 cursor-pointer">Comments</span>
+              <span className="hover:text-zinc-650 dark:hover:text-zinc-200 pb-2 cursor-pointer">Viewer posts</span>
+              <span className="hover:text-zinc-650 dark:hover:text-zinc-200 pb-2 cursor-pointer">Mentions</span>
+            </div>
+
+            {/* Filter controls bar */}
+            <div className="flex flex-wrap items-center justify-between gap-4 bg-white dark:bg-zinc-900 p-4 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm">
+              <div className="flex items-center gap-2 flex-1 max-w-sm">
+                <Search className="w-4 h-4 text-zinc-400" />
+                <input
+                  type="text"
+                  placeholder="Filter comments..."
+                  className="bg-transparent border-none text-xs w-full focus:outline-none placeholder-zinc-400 font-medium"
+                />
+              </div>
+              <div className="flex gap-2">
+                <span className="px-2.5 py-1 bg-zinc-100 dark:bg-zinc-800 text-[10px] font-bold text-zinc-600 dark:text-zinc-350 rounded-lg flex items-center gap-1">
+                  Published <X className="w-3 h-3 cursor-pointer hover:text-red-500" />
+                </span>
+                <span className="px-2.5 py-1 bg-zinc-100 dark:bg-zinc-800 text-[10px] font-bold text-zinc-600 dark:text-zinc-350 rounded-lg flex items-center gap-1">
+                  Most relevant <X className="w-3 h-3 cursor-pointer hover:text-red-500" />
+                </span>
+                <span className="px-2.5 py-1 bg-zinc-100 dark:bg-zinc-800 text-[10px] font-bold text-zinc-600 dark:text-zinc-350 rounded-lg flex items-center gap-1">
+                  Response status: Unresponded <X className="w-3 h-3 cursor-pointer hover:text-red-500" />
+                </span>
+              </div>
+            </div>
+
+            {loadingComments ? (
+              <div className="p-16 text-center flex flex-col items-center justify-center gap-2">
+                <Loader2 className="w-8 h-8 text-teal-600 animate-spin" />
+                <p className="text-xs text-zinc-450 font-bold">Retrieving viewer comments...</p>
+              </div>
+            ) : creatorComments.length === 0 ? (
+              /* Youtube-like Cute Purple Character Empty State */
+              <div className="p-16 text-center space-y-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl">
+                <div className="relative w-36 h-36 mx-auto flex items-center justify-center">
+                  <svg className="w-full h-full text-teal-555 animate-pulse" viewBox="0 0 100 100" fill="none">
+                    <circle cx="50" cy="50" r="30" fill="currentColor" fillOpacity="0.1" />
+                    <rect x="42" y="35" width="16" height="30" rx="8" fill="currentColor" />
+                    <circle cx="35" cy="45" r="4" fill="currentColor" />
+                    <circle cx="65" cy="45" r="4" fill="currentColor" />
+                    <path d="M 40 55 Q 50 62 60 55" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                    <circle cx="35" cy="30" r="2.5" fill="currentColor" />
+                    <circle cx="65" cy="30" r="2.5" fill="currentColor" />
+                    <path d="M 35 30 L 45 40" stroke="currentColor" strokeWidth="1.5" />
+                    <path d="M 65 30 L 55 40" stroke="currentColor" strokeWidth="1.5" />
+                  </svg>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-black text-zinc-550 dark:text-zinc-300">No comments found</p>
+                  <p className="text-[10px] text-zinc-450">Try searching for something else or removing filters.</p>
+                </div>
+              </div>
+            ) : (
+              /* Real Comments List */
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl overflow-hidden shadow-sm divide-y divide-zinc-150 dark:divide-zinc-850">
+                {creatorComments.map((comment) => (
+                  <div key={comment.id} className="p-5 flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-4 flex-1">
+                      <Avatar className="w-9 h-9 border border-zinc-200 dark:border-zinc-800 flex-shrink-0">
+                        <AvatarImage src={comment.user.avatar || undefined} />
+                        <AvatarFallback className="bg-zinc-200 dark:bg-zinc-800 text-xs font-bold text-teal-650">U</AvatarFallback>
+                      </Avatar>
+
+                      <div className="space-y-2 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-black text-zinc-800 dark:text-white">@{comment.user.username || comment.user.name}</span>
+                          <span className="text-[9px] text-zinc-400 font-semibold">{new Date(comment.createdAt).toLocaleDateString()}</span>
+                        </div>
+                        <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-350 leading-relaxed">{comment.text}</p>
+                        
+                        <div className="flex items-center gap-4 pt-1 text-[10px] font-bold text-zinc-500">
+                          <button 
+                            onClick={async () => {
+                              await toggleHeartComment(comment.id);
+                              loadStudioData();
+                            }}
+                            className={`flex items-center gap-1 hover:text-red-500 ${comment.isHearted ? 'text-red-550' : ''}`}
+                          >
+                            <Heart className={`w-3.5 h-3.5 ${comment.isHearted ? 'fill-red-550' : ''}`} />
+                            {comment.isHearted ? 'Hearted' : 'Heart'}
+                          </button>
+
+                          <button 
+                            onClick={async () => {
+                              await togglePinComment(comment.id);
+                              loadStudioData();
+                            }}
+                            className={`flex items-center gap-1 hover:text-teal-600 ${comment.isPinned ? 'text-teal-650' : ''}`}
+                          >
+                            <Lock className="w-3.5 h-3.5" />
+                            {comment.isPinned ? 'Pinned' : 'Pin'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right side context: Video thumbnail and title comment was left on */}
+                    <div className="w-32 flex-shrink-0 flex gap-2 items-center text-right border-l border-zinc-150 dark:border-zinc-800 pl-3">
+                      <div className="w-12 aspect-video rounded overflow-hidden bg-zinc-100 dark:bg-zinc-800 flex-shrink-0">
+                        {comment.video.thumbnailUrl ? (
+                          <img src={comment.video.thumbnailUrl} className="w-full h-full object-cover" />
+                        ) : comment.video.muxPlaybackId ? (
+                          <img src={`https://image.mux.com/${comment.video.muxPlaybackId}/thumbnail.png?width=80&height=45`} className="w-full h-full object-cover" />
+                        ) : null}
+                      </div>
+                      <p className="text-[10px] font-semibold text-zinc-400 line-clamp-2 text-left leading-tight">{comment.video.title}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -2759,6 +3087,58 @@ export default function CreatorStudioPage() {
                         </div>
                       </div>
                     )}
+
+                    {/* Active Upload/Processing Progress in Step 5 */}
+                    {(uploadStatus === 'uploading' || uploadStatus === 'processing') && (
+                      <div className="p-4 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl space-y-4 mb-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Loader2 className="w-4 h-4 text-teal-505 animate-spin" />
+                            <div>
+                              <p className="text-xs font-bold text-zinc-800 dark:text-white">
+                                {uploadStatus === 'uploading' 
+                                  ? 'Uploading video file...' 
+                                  : 'Processing streams...'}
+                              </p>
+                              <p className="text-[9px] text-zinc-400 mt-0.5">
+                                Size: {selectedFile ? (selectedFile.size / (1024 * 1024)).toFixed(1) : '0'} MB | Format: {selectedFile ? selectedFile.name.split('.').pop()?.toUpperCase() : 'MP4'}
+                              </p>
+                            </div>
+                          </div>
+                          <span className="text-xs font-black text-teal-650 dark:text-teal-400">{uploadProgress}%</span>
+                        </div>
+
+                        {/* Progress Bar */}
+                        <div className="w-full bg-zinc-200 dark:bg-zinc-800 h-2 rounded-full overflow-hidden">
+                          <div className="bg-teal-550 h-full rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
+                        </div>
+
+                        {uploadStatus === 'uploading' && !isSimulatedUpload && (
+                          <div className="grid grid-cols-2 gap-4 text-[10px] font-bold text-zinc-500">
+                            <div>
+                              <p className="text-[9px] text-zinc-400 font-medium">SPEED</p>
+                              <p className="text-zinc-800 dark:text-zinc-200">{uploadSpeed}</p>
+                            </div>
+                            <div>
+                              <p className="text-[9px] text-zinc-400 font-medium">EST. TIME REMAINING</p>
+                              <p className="text-zinc-800 dark:text-zinc-200">{uploadTimeRemaining || 'Calculating...'}</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Error Banner in Step 5 */}
+                    {uploadStatus === 'error' && errorMessage && (
+                      <div className="mb-4 p-4 bg-red-500/10 border border-red-500/25 text-red-650 dark:text-red-400 rounded-2xl text-xs space-y-1.5">
+                        <p className="font-bold flex items-center gap-1.5">
+                          <ShieldAlert className="w-4 h-4" />
+                          Publishing Error
+                        </p>
+                        <p className="opacity-95 leading-relaxed">{errorMessage}</p>
+                      </div>
+                    )}
+
                     <form onSubmit={handleStartPublish} className="pt-2 flex gap-3">
                       <Button
                         type="submit"

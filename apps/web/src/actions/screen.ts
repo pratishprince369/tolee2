@@ -685,12 +685,32 @@ export async function createMuxDirectUpload() {
 }
 
 /**
+ * Check Mux Upload Status
+ */
+export async function checkMuxUploadStatus(uploadId: string) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) return { success: false, error: 'Unauthorized' };
+
+    const upload = await mux.video.uploads.retrieve(uploadId);
+    return {
+      success: true,
+      status: upload.status,
+      assetId: upload.asset_id
+    };
+  } catch (error: any) {
+    console.error('Error checking Mux upload status:', error);
+    return { success: false, error: error.message || 'Failed to check upload status' };
+  }
+}
+
+/**
  * Register video metadata in DB
  */
 export async function saveScreenVideo(
   title: string, 
   description: string, 
-  uploadId: string, 
+  assetId: string, 
   category = 'General', 
   visibility = 'public',
   isReel = false
@@ -702,24 +722,6 @@ export async function saveScreenVideo(
     }
     const currentUserId = (session.user as any).id;
 
-    // Retrieve upload status with retries (polling loop)
-    let upload = await mux.video.uploads.retrieve(uploadId);
-    let retries = 0;
-    
-    while (upload.status !== 'asset_created' && retries < 15) {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      upload = await mux.video.uploads.retrieve(uploadId);
-      retries++;
-    }
-
-    if (upload.status !== 'asset_created' || !upload.asset_id) {
-      return { 
-        success: false, 
-        error: 'Video processing is taking longer than expected. Please wait a moment and refresh.' 
-      };
-    }
-
-    const assetId = upload.asset_id;
     // Retrieve asset details
     const asset = await mux.video.assets.retrieve(assetId);
     const playbackId = asset.playback_ids?.[0]?.id;
@@ -785,6 +787,7 @@ export async function saveScreenVideo(
     return { success: false, error: 'Failed to save video details' };
   }
 }
+
 
 /**
  * Fetch creator videos for Studio Content Tab
@@ -875,5 +878,49 @@ export async function saveSimulatedScreenVideo(
   } catch (err) {
     console.error('Error saving simulated video:', err);
     return { success: false, error: 'Failed to publish simulated video' };
+  }
+}
+
+/**
+ * Fetch all comments on the creator's videos
+ */
+export async function getCreatorComments() {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) return { success: false, error: 'Unauthorized' };
+    const userId = (session.user as any).id;
+
+    const comments = await prisma.screenVideoComment.findMany({
+      where: {
+        video: {
+          userId: userId
+        }
+      },
+      include: {
+        user: {
+          select: {
+            name: true,
+            username: true,
+            avatar: true
+          }
+        },
+        video: {
+          select: {
+            id: true,
+            title: true,
+            thumbnailUrl: true,
+            muxPlaybackId: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    return { success: true, comments };
+  } catch (err) {
+    console.error('Error fetching creator comments:', err);
+    return { success: false, error: 'Failed to fetch comments' };
   }
 }

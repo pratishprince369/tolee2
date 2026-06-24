@@ -228,11 +228,19 @@ export default function ScreenPage() {
 
           {/* Right: Upload Button (Visible on Mobile inside top row) */}
           <div className="flex items-center gap-2 md:hidden">
+            <Link href="/screen/studio?tab=content">
+              <Button
+                className="bg-white dark:bg-zinc-900 text-teal-600 dark:text-teal-400 border border-zinc-200 dark:border-zinc-850 font-bold rounded-xl px-3 py-2.5 flex items-center gap-1 shadow-sm text-[10px]"
+              >
+                <Tv className="w-3 h-3" />
+                My Content
+              </Button>
+            </Link>
             <Link href="/screen/studio?tab=upload">
               <Button
-                className="bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl px-4 py-2.5 flex items-center gap-1.5 shadow-md text-xs"
+                className="bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl px-3 py-2.5 flex items-center gap-1 shadow-md text-[10px]"
               >
-                <Upload className="w-3.5 h-3.5" />
+                <Upload className="w-3 h-3" />
                 Upload Video
               </Button>
             </Link>
@@ -327,6 +335,14 @@ export default function ScreenPage() {
 
         {/* Right: Upload Trigger (Visible on Desktop/Tablet only) */}
         <div className="hidden md:flex items-center gap-2">
+          <Link href="/screen/studio?tab=content">
+            <Button
+              className="bg-white hover:bg-zinc-50 text-teal-650 dark:bg-zinc-900 dark:hover:bg-zinc-850 dark:text-teal-400 font-bold rounded-2xl px-5 py-4 flex items-center gap-2 transform active:scale-95 transition-all shadow-sm border border-zinc-200 dark:border-zinc-800 text-xs"
+            >
+              <Tv className="w-3.5 h-3.5" />
+              My Content
+            </Button>
+          </Link>
           <Link href="/screen/studio?tab=upload">
             <Button
               className="bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-2xl px-5 py-4 flex items-center gap-2 transform active:scale-95 transition-all shadow-md shadow-teal-550/10 text-xs"
