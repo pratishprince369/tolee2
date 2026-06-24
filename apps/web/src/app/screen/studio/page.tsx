@@ -596,7 +596,9 @@ export default function CreatorStudioPage() {
       setUploadProgress(0);
       setErrorMessage('');
 
-      const res = await createMuxDirectUpload();
+      const createReq = await fetch('/api/screen/mux-upload/create', { method: 'POST' });
+      const res = await createReq.json();
+      
       if (!res.success || !res.url || !res.uploadId) {
         throw new Error(res.error || 'Failed to request upload signature.');
       }
@@ -640,7 +642,9 @@ export default function CreatorStudioPage() {
       
       while (!assetId && retries < maxRetries) {
         await new Promise(resolve => setTimeout(resolve, 2500));
-        const statusRes = await checkMuxUploadStatus(res.uploadId);
+        const statusReq = await fetch(`/api/screen/mux-upload/status?uploadId=${res.uploadId}`);
+        const statusRes = await statusReq.json();
+        
         if (statusRes.success) {
           if (statusRes.assetId) {
             assetId = statusRes.assetId;
@@ -657,7 +661,13 @@ export default function CreatorStudioPage() {
         throw new Error('Video asset creation took longer than expected on Mux servers. Please wait a moment and check your Content library.');
       }
 
-      const saveRes = await saveScreenVideo(title, description, assetId, category, visibility, isReel);
+      const saveReq = await fetch('/api/screen/mux-upload/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, description, assetId, category, visibility, isReel })
+      });
+      const saveRes = await saveReq.json();
+
       if (saveRes.success) {
         let createdId = '';
         if ('video' in saveRes && saveRes.video?.id) createdId = saveRes.video.id;
