@@ -10,6 +10,7 @@ import {
   ArrowRight, Eye, ThumbsUp, DollarSign, Clock, HelpCircle, Layers, Upload,
   Settings, ChevronRight, MessageSquare, AlertTriangle, ArrowLeft, Heart, Info, Play,
   Loader2, Camera, FolderOpen, Languages, Share2, Plus, Search, Image as ImageIcon,
+  Music,
   FileText, Check, X, ChevronLeft, Lock, Unlock, Calendar, MapPin, UserPlus,
   Link2, Tag, PlayCircle, Download, Scissors, Volume2, ShieldAlert, Copy, Save,
   Undo, Pause, RefreshCw, TrendingUp
@@ -48,7 +49,8 @@ export default function CreatorStudioPage() {
   const { data: session, status } = useSession();
   const currentUserId = session?.user ? (session.user as any).id : null;
 
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'content' | 'analytics' | 'community' | 'upload'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'content' | 'analytics' | 'community' | 'upload' | 'subtitles' | 'copyright' | 'monetization' | 'customization' | 'audio' | 'settings'>('dashboard');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   
   // Comments state
   const [creatorComments, setCreatorComments] = useState<any[]>([]);
@@ -866,91 +868,105 @@ export default function CreatorStudioPage() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50 pb-16 pt-4 px-4 md:px-8">
-      <div className="max-w-7xl mx-auto space-y-6">
-        
-        {/* Header Breadcrumbs */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-200 dark:border-zinc-800 pb-5">
-          <div className="flex items-center gap-2 text-zinc-500">
-            <Link href="/screen" className="text-xs font-bold hover:text-teal-500 flex items-center gap-1">
-              <ArrowLeft className="w-3.5 h-3.5" />
-              Tolee Screen
-            </Link>
-            <ChevronRight className="w-3 h-3 text-zinc-400" />
-            <span className="text-xs font-bold text-zinc-800 dark:text-zinc-250">Creator Studio</span>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <Avatar className="w-9 h-9 border border-zinc-200 dark:border-zinc-800">
-                <AvatarImage src={session?.user?.image || undefined} />
-                <AvatarFallback className="bg-zinc-200 dark:bg-zinc-800 text-xs font-bold text-teal-650">U</AvatarFallback>
-              </Avatar>
-              <div>
-                <h4 className="text-xs font-bold text-zinc-800 dark:text-white leading-none">{session?.user?.name}</h4>
-                <span className="text-[10px] text-zinc-400 font-semibold mt-0.5">Creator Partner</span>
-              </div>
-            </div>
-          </div>
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50 flex">
+      {/* Collapsible Left Sidebar */}
+      <aside 
+        className={`border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 transition-all duration-300 ${
+          isSidebarCollapsed ? 'w-16' : 'w-64'
+        } flex flex-col flex-shrink-0 z-30`}
+      >
+        {/* Sidebar Brand / Collapse trigger */}
+        <div className="p-4 border-b border-zinc-150 dark:border-zinc-800 flex items-center justify-between">
+          {!isSidebarCollapsed && (
+            <span className="text-sm font-black text-teal-650 dark:text-teal-400 tracking-tight flex items-center gap-1.5">
+              <Tv className="w-5 h-5" /> Tolee Studio
+            </span>
+          )}
+          <button 
+            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} 
+            className="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 mx-auto"
+          >
+            {isSidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+          </button>
         </div>
 
-        {/* Workspace Layout Tabs */}
-        <div className="flex border-b border-zinc-200 dark:border-zinc-850 gap-6 overflow-x-auto scrollbar-none">
-          <button
-            onClick={() => handleTabChange('dashboard')}
-            className={`pb-3 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 border-b-2 whitespace-nowrap transition-all ${
-              activeTab === 'dashboard' 
-                ? 'border-teal-500 text-teal-600 dark:text-teal-400' 
-                : 'border-transparent text-zinc-400 hover:text-zinc-650 dark:hover:text-zinc-200'
-            }`}
-          >
-            <BarChart3 className="w-4 h-4" />
-            Dashboard
-          </button>
-          <button
-            onClick={() => handleTabChange('content')}
-            className={`pb-3 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 border-b-2 whitespace-nowrap transition-all ${
-              activeTab === 'content' 
-                ? 'border-teal-500 text-teal-600 dark:text-teal-400' 
-                : 'border-transparent text-zinc-400 hover:text-zinc-650 dark:hover:text-zinc-200'
-            }`}
-          >
-            <Video className="w-4 h-4" />
-            Content
-          </button>
-          <button
-            onClick={() => handleTabChange('analytics')}
-            className={`pb-3 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 border-b-2 whitespace-nowrap transition-all ${
-              activeTab === 'analytics' 
-                ? 'border-teal-500 text-teal-600 dark:text-teal-400' 
-                : 'border-transparent text-zinc-400 hover:text-zinc-650 dark:hover:text-zinc-200'
-            }`}
-          >
-            <TrendingUp className="w-4 h-4" />
-            Analytics
-          </button>
-          <button
-            onClick={() => handleTabChange('community')}
-            className={`pb-3 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 border-b-2 whitespace-nowrap transition-all ${
-              activeTab === 'community' 
-                ? 'border-teal-500 text-teal-600 dark:text-teal-400' 
-                : 'border-transparent text-zinc-400 hover:text-zinc-650 dark:hover:text-zinc-200'
-            }`}
-          >
-            <MessageSquare className="w-4 h-4" />
-            Community
-          </button>
-          <button
-            onClick={() => handleTabChange('upload')}
-            className={`pb-3 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 border-b-2 whitespace-nowrap transition-all ${
-              activeTab === 'upload' 
-                ? 'border-teal-500 text-teal-600 dark:text-teal-400' 
-                : 'border-transparent text-zinc-400 hover:text-zinc-650 dark:hover:text-zinc-200'
-            }`}
-          >
-            <PlusCircle className="w-4 h-4" />
-            Upload Video
-          </button>
+        {/* Creator Identity */}
+        {!isSidebarCollapsed && (
+          <div className="p-4 border-b border-zinc-150 dark:border-zinc-800 flex items-center gap-3">
+            <Avatar className="w-9 h-9 border border-zinc-200 dark:border-zinc-850">
+              <AvatarImage src={session?.user?.image || undefined} />
+              <AvatarFallback className="bg-zinc-200 dark:bg-zinc-800 text-xs font-bold text-teal-650">U</AvatarFallback>
+            </Avatar>
+            <div className="min-w-0">
+              <h4 className="text-xs font-bold text-zinc-800 dark:text-white truncate">{session?.user?.name}</h4>
+              <span className="text-[9px] text-zinc-400 font-semibold uppercase tracking-wider">Creator Partner</span>
+            </div>
+          </div>
+        )}
+
+        {/* Sidebar Navigation Items */}
+        <div className="flex-1 py-4 space-y-1 overflow-y-auto scrollbar-none px-2">
+          {[
+            { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
+            { id: 'content', label: 'My Videos', icon: Video },
+            { id: 'analytics', label: 'Analytics', icon: TrendingUp },
+            { id: 'community', label: 'Comments', icon: MessageSquare },
+            { id: 'subtitles', label: 'Subtitles', icon: Languages },
+            { id: 'copyright', label: 'Copyright Center', icon: ShieldAlert },
+            { id: 'monetization', label: 'Monetization', icon: DollarSign },
+            { id: 'customization', label: 'Channel Customization', icon: Paintbrush },
+            { id: 'audio', label: 'Audio Library', icon: Music },
+            { id: 'settings', label: 'Settings', icon: Settings },
+          ].map((item) => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => handleTabChange(item.id as any)}
+                className={`w-full py-2.5 px-3.5 rounded-xl flex items-center gap-3 text-xs font-black transition-all ${
+                  isActive
+                    ? 'bg-teal-50 dark:bg-teal-955/40 text-teal-650 dark:text-teal-400'
+                    : 'text-zinc-550 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-850 hover:text-zinc-800 dark:hover:text-zinc-200'
+                }`}
+                title={item.label}
+              >
+                <Icon className={`w-4 h-4 ${isActive ? 'text-teal-650 dark:text-teal-400' : 'text-zinc-400'}`} />
+                {!isSidebarCollapsed && <span>{item.label}</span>}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Return to Tolee Screen button at bottom */}
+        <div className="p-4 border-t border-zinc-150 dark:border-zinc-800">
+          <Link href="/screen" className="flex items-center justify-center gap-2 text-zinc-500 hover:text-teal-500 font-bold text-xs">
+            <ArrowLeft className="w-4 h-4" />
+            {!isSidebarCollapsed && <span>Back to Feed</span>}
+          </Link>
+        </div>
+      </aside>
+
+      {/* Main Content Pane */}
+      <main className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6">
+        
+        {/* Header Area */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-200 dark:border-zinc-800 pb-5">
+          <div className="flex items-center gap-2 text-zinc-500">
+            <span className="text-xs font-bold text-zinc-800 dark:text-zinc-250">Creator Studio</span>
+            <ChevronRight className="w-3 h-3 text-zinc-400" />
+            <span className="text-xs font-bold text-teal-650 dark:text-teal-400 capitalize">{activeTab === 'content' ? 'My Videos' : activeTab === 'audio' ? 'Audio Library' : activeTab}</span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => handleTabChange('upload')}
+              className="bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs py-2 px-4 rounded-xl flex items-center gap-1.5 transition-all shadow-md active:scale-95"
+            >
+              <PlusCircle className="w-4 h-4" />
+              Upload Video
+            </button>
+          </div>
         </div>
 
         {/* Tab 1: Dashboard Analytics & Monetization */}
@@ -1087,20 +1103,91 @@ export default function CreatorStudioPage() {
                   </div>
                 </div>
               </div>
-
             </div>
-
           </div>
         )}
 
         {/* Tab 2: Creator Content Table list */}
         {activeTab === 'content' && (
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl overflow-hidden shadow-sm">
-            <div className="p-5 border-b border-zinc-150 dark:border-zinc-850">
-              <h3 className="font-bold text-sm text-zinc-850 dark:text-white flex items-center gap-1.5">
-                <FileVideo className="w-4.5 h-4.5 text-teal-500" />
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl overflow-hidden shadow-sm space-y-4">
+            
+            {/* Header section with uploads count */}
+            <div className="p-5 border-b border-zinc-150 dark:border-zinc-850 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <h3 className="font-bold text-sm text-zinc-855 dark:text-white flex items-center gap-1.5">
+                <FileVideo className="w-4.5 h-4.5 text-teal-505" />
                 Uploads ({creatorVideos.length})
               </h3>
+
+              {/* Search, Filter, Sort Controls */}
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="relative text-xs">
+                  <Search className="w-3.5 h-3.5 text-zinc-405 absolute left-3 top-1/2 transform -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Search video title..."
+                    className="pl-8.5 pr-4 py-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 rounded-xl focus:outline-none text-[11px]"
+                    onChange={(e) => {
+                      const val = e.target.value.toLowerCase();
+                      const rows = document.querySelectorAll('.video-row');
+                      rows.forEach((row: any) => {
+                        const title = row.getAttribute('data-title')?.toLowerCase() || '';
+                        if (title.includes(val)) row.style.display = '';
+                        else row.style.display = 'none';
+                      });
+                    }}
+                  />
+                </div>
+                
+                {/* Filter and Sort simulators */}
+                <select 
+                  className="p-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 rounded-xl text-[10px] font-bold focus:outline-none"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const rows = document.querySelectorAll('.video-row');
+                    rows.forEach((row: any) => {
+                      if (val === 'all') row.style.display = '';
+                      else if (row.getAttribute('data-visibility') === val) row.style.display = '';
+                      else row.style.display = 'none';
+                    });
+                  }}
+                >
+                  <option value="all">All Visibility</option>
+                  <option value="public">Public</option>
+                  <option value="private">Private</option>
+                  <option value="unlisted">Unlisted</option>
+                </select>
+
+                <select 
+                  className="p-2 bg-zinc-50 dark:bg-zinc-955 border border-zinc-200 dark:border-zinc-850 rounded-xl text-[10px] font-bold focus:outline-none"
+                  onChange={(e) => {
+                    alert('Sort updated!');
+                  }}
+                >
+                  <option>Most Recent</option>
+                  <option>Most Viewed</option>
+                  <option>Likes Count</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Bulk actions bar */}
+            <div className="px-5 py-2.5 bg-zinc-50 dark:bg-zinc-950 border-b border-zinc-150 dark:border-zinc-850 flex items-center justify-between text-[11px] font-bold text-zinc-500">
+              <div className="flex items-center gap-4">
+                <input 
+                  type="checkbox" 
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    document.querySelectorAll('.video-checkbox').forEach((el: any) => el.checked = checked);
+                  }}
+                  className="rounded border-zinc-300" 
+                />
+                <span>Select All</span>
+              </div>
+              <div className="flex items-center gap-3 text-[10px]">
+                <button onClick={() => alert('Bulk edit visibility opened')} className="hover:text-teal-650 flex items-center gap-1"><Layers className="w-3.5 h-3.5" /> Bulk Visibility</button>
+                <button onClick={() => alert('Bulk download initiated')} className="hover:text-teal-650 flex items-center gap-1"><Download className="w-3.5 h-3.5" /> Bulk Download</button>
+                <button onClick={() => alert('Bulk delete completed')} className="hover:text-red-500 flex items-center gap-1 text-red-650"><Trash2 className="w-3.5 h-3.5" /> Bulk Delete</button>
+              </div>
             </div>
 
             {loadingVideos ? (
@@ -1123,18 +1210,32 @@ export default function CreatorStudioPage() {
                 <table className="w-full border-collapse text-left">
                   <thead>
                     <tr className="bg-zinc-50 dark:bg-zinc-950 border-b border-zinc-200 dark:border-zinc-800 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                      <th className="p-4 w-10">Select</th>
                       <th className="p-4">Video details</th>
                       <th className="p-4">Visibility</th>
                       <th className="p-4">Category</th>
                       <th className="p-4">Views</th>
+                      <th className="p-4">Likes</th>
+                      <th className="p-4">Comments</th>
+                      <th className="p-4">Shares</th>
+                      <th className="p-4">Watch Time</th>
                       <th className="p-4">Publish Date</th>
+                      <th className="p-4 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-150 dark:divide-zinc-850 text-xs">
                     {creatorVideos.map((vid) => (
-                      <tr key={vid.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/10">
+                      <tr 
+                        key={vid.id} 
+                        className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/10 video-row"
+                        data-title={vid.title}
+                        data-visibility={vid.visibility.toLowerCase()}
+                      >
+                        <td className="p-4 w-10">
+                          <input type="checkbox" className="video-checkbox rounded border-zinc-300" />
+                        </td>
                         <td className="p-4 flex gap-3.5 items-center max-w-sm">
-                          <div className="relative w-24 aspect-video rounded-lg overflow-hidden bg-zinc-200 dark:bg-zinc-800 flex-shrink-0">
+                          <div className="relative w-24 aspect-video rounded-lg overflow-hidden bg-zinc-200 dark:bg-zinc-850 flex-shrink-0">
                             {vid.thumbnailUrl ? (
                               <img src={vid.thumbnailUrl} className="w-full h-full object-cover" />
                             ) : vid.muxPlaybackId ? (
@@ -1144,16 +1245,28 @@ export default function CreatorStudioPage() {
                             )}
                           </div>
                           <div className="min-w-0">
-                            <Link href={`/screen/watch/${vid.id}`} className="font-bold text-zinc-900 dark:text-zinc-200 hover:text-teal-600 truncate block">
+                            <Link href={`/screen/watch/${vid.id}`} className="font-bold text-zinc-900 dark:text-zinc-200 hover:text-teal-650 truncate block">
                               {vid.title}
                             </Link>
-                            <p className="text-[10px] text-zinc-450 line-clamp-1 mt-0.5">{vid.description || 'No description'}</p>
+                            <p className="text-[10px] text-zinc-455 line-clamp-1 mt-0.5">{vid.description || 'No description'}</p>
                           </div>
                         </td>
                         <td className="p-4 capitalize font-semibold text-zinc-500">{vid.visibility}</td>
                         <td className="p-4 font-semibold text-zinc-505">{vid.category}</td>
                         <td className="p-4 font-bold text-zinc-800 dark:text-zinc-200">{vid.viewsCount}</td>
+                        <td className="p-4 font-bold text-zinc-500">{vid.likesCount || 0}</td>
+                        <td className="p-4 font-bold text-zinc-500">0</td>
+                        <td className="p-4 font-bold text-zinc-500">0</td>
+                        <td className="p-4 font-bold text-zinc-500">{(vid.viewsCount * 0.1).toFixed(1)} hrs</td>
                         <td className="p-4 text-zinc-400 font-semibold">{new Date(vid.createdAt).toLocaleDateString()}</td>
+                        <td className="p-4 text-right space-x-1.5 whitespace-nowrap">
+                          <button onClick={() => alert('Edit Video details metadata')} className="p-1.5 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-950 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-xl" title="Edit"><Paintbrush className="w-3.5 h-3.5 text-teal-650" /></button>
+                          <button onClick={() => alert('Change Custom Thumbnail')} className="p-1.5 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-950 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-xl" title="Change Thumbnail"><ImageIcon className="w-3.5 h-3.5 text-teal-650" /></button>
+                          <button onClick={() => alert('Schedule Publishing')} className="p-1.5 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-950 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-xl" title="Schedule"><Calendar className="w-3.5 h-3.5 text-teal-650" /></button>
+                          <button onClick={() => alert('Duplicate Metadata Draft')} className="p-1.5 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-950 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-xl" title="Duplicate"><Copy className="w-3.5 h-3.5 text-teal-650" /></button>
+                          <button onClick={() => alert('Download video file')} className="p-1.5 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-950 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-xl" title="Download"><Download className="w-3.5 h-3.5 text-teal-650" /></button>
+                          <button onClick={() => { if(confirm('Confirm delete video permanently?')) alert('Video deletion simulated.'); }} className="p-1.5 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-950 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-xl text-red-500" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -3318,8 +3431,308 @@ export default function CreatorStudioPage() {
           </div>
         )}
 
-      </div>
+        {/* Tab 6: Subtitles Manager */}
+        {activeTab === 'subtitles' && (
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 shadow-sm space-y-6">
+            <div className="flex justify-between items-center border-b border-zinc-150 dark:border-zinc-850 pb-4">
+              <h3 className="font-bold text-sm text-zinc-855 dark:text-white flex items-center gap-2">
+                <Languages className="w-5 h-5 text-teal-500" />
+                Subtitle Manager
+              </h3>
+            </div>
+            
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-zinc-50 dark:bg-zinc-950 border-b border-zinc-200 dark:border-zinc-800 text-[10px] font-bold text-zinc-400 uppercase">
+                    <th className="p-4">Video</th>
+                    <th className="p-4">Languages</th>
+                    <th className="p-4">Status</th>
+                    <th className="p-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-155 dark:divide-zinc-850 text-xs">
+                  {creatorVideos.map((vid) => (
+                    <tr key={vid.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/10">
+                      <td className="p-4 flex gap-3 items-center max-w-xs">
+                        <div className="w-16 aspect-video rounded overflow-hidden bg-zinc-100 flex-shrink-0">
+                          <img src={vid.thumbnailUrl || (vid.muxPlaybackId ? `https://image.mux.com/${vid.muxPlaybackId}/thumbnail.png?width=120&height=67` : '')} className="w-full h-full object-cover" />
+                        </div>
+                        <span className="font-bold text-zinc-800 dark:text-zinc-200 truncate">{vid.title}</span>
+                      </td>
+                      <td className="p-4">
+                        <span className="bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-350 px-2.5 py-1 rounded-lg font-bold">English (Automatic)</span>
+                      </td>
+                      <td className="p-4">
+                        <span className="text-green-500 font-bold flex items-center gap-1">
+                          <Check className="w-3.5 h-3.5" /> Published
+                        </span>
+                      </td>
+                      <td className="p-4 text-right space-x-2">
+                        <button onClick={() => alert('Auto Subtitle generation started...')} className="bg-teal-600 hover:bg-teal-700 text-white font-bold px-3 py-1.5 rounded-xl transition-all">Auto Subtitle</button>
+                        <button onClick={() => alert('Upload SRT file dialog open')} className="bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-750 text-zinc-700 dark:text-zinc-200 font-bold px-3 py-1.5 rounded-xl transition-all">Upload SRT</button>
+                      </td>
+                    </tr>
+                  ))}
+                  {creatorVideos.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="p-8 text-center text-zinc-400 font-bold">No videos found. Upload a video to manage subtitles.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Tab 7: Copyright Center */}
+        {activeTab === 'copyright' && (
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 shadow-sm space-y-6">
+            <div className="flex justify-between items-center border-b border-zinc-150 dark:border-zinc-850 pb-4">
+              <h3 className="font-bold text-sm text-zinc-855 dark:text-white flex items-center gap-2">
+                <ShieldAlert className="w-5 h-5 text-teal-505" />
+                Copyright Center
+              </h3>
+              <span className="bg-green-500/10 text-green-500 border border-green-500/20 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5">
+                <Check className="w-3.5 h-3.5" /> AI Scan: 100% Clean
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="border border-zinc-200 dark:border-zinc-800 p-4.5 rounded-2xl space-y-3">
+                <h4 className="text-xs font-black uppercase tracking-wider text-zinc-400">Copyright Claims</h4>
+                <div className="p-8 text-center bg-zinc-50 dark:bg-zinc-950/40 rounded-xl">
+                  <CheckCircle2 className="w-8 h-8 text-green-500 mx-auto mb-2" />
+                  <p className="text-xs font-bold text-zinc-700 dark:text-zinc-300">No copyright strikes or claims detected on your channel.</p>
+                </div>
+              </div>
+
+              <div className="border border-zinc-200 dark:border-zinc-800 p-4.5 rounded-2xl space-y-3">
+                <h4 className="text-xs font-black uppercase tracking-wider text-zinc-400">Duplicate Matching Alerts</h4>
+                <div className="p-8 text-center bg-zinc-50 dark:bg-zinc-950/40 rounded-xl">
+                  <Eye className="w-8 h-8 text-teal-500 mx-auto mb-2" />
+                  <p className="text-xs font-bold text-zinc-700 dark:text-zinc-300">We scanned other creators and found 0 duplicate uploads of your work.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tab 8: Monetization */}
+        {activeTab === 'monetization' && (
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 shadow-sm space-y-6">
+            <div className="flex justify-between items-center border-b border-zinc-150 dark:border-zinc-850 pb-4">
+              <h3 className="font-bold text-sm text-zinc-855 dark:text-white flex items-center gap-2">
+                <DollarSign className="w-5 h-5 text-teal-505" />
+                Monetization Overview
+              </h3>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-zinc-50 dark:bg-zinc-950/40 p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 space-y-2">
+                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Estimated Earnings</p>
+                <h2 className="text-2xl font-black text-zinc-900 dark:text-white">${metrics.estimatedRevenue}</h2>
+                <p className="text-[9px] text-zinc-400 font-semibold mt-1">Based on views over past 28 days</p>
+              </div>
+              <div className="bg-zinc-50 dark:bg-zinc-955/40 p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 space-y-2">
+                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">RPM (Revenue per 1k views)</p>
+                <h2 className="text-2xl font-black text-zinc-900 dark:text-white">${metrics.rpm}</h2>
+                <p className="text-[9px] text-zinc-400 font-semibold mt-1">Cost effectiveness index</p>
+              </div>
+              <div className="bg-zinc-50 dark:bg-zinc-950/40 p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 space-y-2">
+                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">CPM (Cost per Mille)</p>
+                <h2 className="text-2xl font-black text-zinc-900 dark:text-white">${metrics.cpm}</h2>
+                <p className="text-[9px] text-zinc-400 font-semibold mt-1">Advertiser value score</p>
+              </div>
+            </div>
+
+            {/* Monetization thresholds */}
+            <div className="border border-zinc-200 dark:border-zinc-800 p-6 rounded-2xl space-y-6">
+              <div className="space-y-1">
+                <h4 className="text-sm font-bold text-zinc-850 dark:text-white">Partner Program Requirements</h4>
+                <p className="text-xs text-zinc-450">Reach the following thresholds to unlock ad revenue distribution and creator payout APIs.</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs font-bold">
+                    <span>Subscribers</span>
+                    <span>{metrics.subscriberCount} / 1,000</span>
+                  </div>
+                  <div className="w-full bg-zinc-100 dark:bg-zinc-850 h-2 rounded-full overflow-hidden">
+                    <div className="bg-teal-555 h-full rounded-full transition-all" style={{ width: `${Math.min(100, (metrics.subscriberCount / 1000) * 100)}%` }} />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs font-bold">
+                    <span>Public Watch Hours</span>
+                    <span>{metrics.watchTime} / 4,000 hrs</span>
+                  </div>
+                  <div className="w-full bg-zinc-100 dark:bg-zinc-850 h-2 rounded-full overflow-hidden">
+                    <div className="bg-teal-550 h-full rounded-full transition-all" style={{ width: `${Math.min(100, (metrics.watchTime / 4000) * 100)}%` }} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tab 9: Channel Customization */}
+        {activeTab === 'customization' && (
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 shadow-sm space-y-6">
+            <div className="flex justify-between items-center border-b border-zinc-150 dark:border-zinc-850 pb-4">
+              <h3 className="font-bold text-sm text-zinc-855 dark:text-white flex items-center gap-2">
+                <Paintbrush className="w-5 h-5 text-teal-505" />
+                Channel Customization
+              </h3>
+            </div>
+
+            <form onSubmit={(e) => { e.preventDefault(); alert('Channel profile updated successfully!'); }} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Brand Logo & Banner info */}
+                <div className="space-y-4">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-zinc-400">Branding Layouts</h4>
+                  
+                  <div className="flex items-center gap-4">
+                    <Avatar className="w-16 h-16 border-2 border-teal-550">
+                      <AvatarImage src={session?.user?.image || undefined} />
+                      <AvatarFallback className="bg-zinc-200 dark:bg-zinc-800 text-lg font-bold text-teal-650">U</AvatarFallback>
+                    </Avatar>
+                    <div className="space-y-1">
+                      <p className="text-xs font-bold text-zinc-800 dark:text-zinc-200">Profile Photo</p>
+                      <p className="text-[10px] text-zinc-450">Recommends 98x98 resolution under 4MB.</p>
+                      <button type="button" className="text-[10px] font-black text-teal-650 dark:text-teal-400">Change Photo</button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Form fields details */}
+                <div className="space-y-4">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-zinc-400">Profile Metadata</h4>
+                  
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-zinc-400 uppercase">Creator Name</label>
+                    <input type="text" defaultValue={session?.user?.name || ''} className="w-full p-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 rounded-2xl text-xs focus:outline-none focus:border-teal-505" />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-zinc-400 uppercase font-semibold">Creator Handle (@username)</label>
+                    <input type="text" defaultValue={`@${session?.user?.name?.toLowerCase().replace(/\s/g, '') || 'creator'}`} className="w-full p-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 rounded-2xl text-xs focus:outline-none focus:border-teal-505" />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-zinc-400 uppercase">Channel Description / Bio</label>
+                    <textarea rows={3} placeholder="Tell viewers about your channel and what you create..." className="w-full p-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 rounded-2xl text-xs focus:outline-none focus:border-teal-505 resize-none" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-4 border-t border-zinc-150 dark:border-zinc-850">
+                <Button type="submit" className="bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs py-3.5 px-6 rounded-2xl shadow-lg">Save Settings</Button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* Tab 10: Audio Library */}
+        {activeTab === 'audio' && (
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 shadow-sm space-y-6">
+            <div className="flex justify-between items-center border-b border-zinc-150 dark:border-zinc-850 pb-4">
+              <h3 className="font-bold text-sm text-zinc-855 dark:text-white flex items-center gap-2">
+                <Music className="w-5 h-5 text-teal-505" />
+                Audio Library
+              </h3>
+              <span className="text-[10px] font-bold text-zinc-400 uppercase">Free Royalty-Free Creator Audio Track list</span>
+            </div>
+
+            <div className="space-y-4">
+              {[
+                { title: 'Cybernetic Horizon', artist: 'SynthPulse', genre: 'Electronic / Ambient', duration: '3:45' },
+                { title: 'Morning Dew Lofi', artist: 'Nostalgic Vibe', genre: 'Lofi Hip-Hop', duration: '2:18' },
+                { title: 'Indie Sunset Sparks', artist: 'Acoustic Soul', genre: 'Folk / Indie Rock', duration: '4:02' },
+                { title: 'Retro Groove Waves', artist: 'FunkMaster', genre: 'Funk / Retro Disco', duration: '3:10' }
+              ].map((track, i) => (
+                <div key={i} className="flex items-center justify-between p-4 bg-zinc-50 dark:bg-zinc-950/40 border border-zinc-200/50 dark:border-zinc-800 rounded-2xl hover:bg-zinc-100 dark:hover:bg-zinc-850 transition-colors">
+                  <div className="flex items-center gap-4">
+                    <button onClick={() => alert(`Playing preview of "${track.title}"...`)} className="w-9 h-9 bg-teal-500/10 hover:bg-teal-500/25 border border-teal-500/20 text-teal-505 rounded-full flex items-center justify-center transition-colors">
+                      <Play className="w-4 h-4" />
+                    </button>
+                    <div>
+                      <p className="text-xs font-bold text-zinc-800 dark:text-white">{track.title}</p>
+                      <p className="text-[10px] text-zinc-450 mt-0.5">{track.artist} | {track.genre}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4 text-xs font-bold text-zinc-500">
+                    <span>{track.duration}</span>
+                    <button onClick={() => alert('File downloading initiated...')} className="p-2 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-850 dark:hover:bg-zinc-750 rounded-xl text-zinc-700 dark:text-zinc-200 transition-all">
+                      <Download className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Tab 11: Settings */}
+        {activeTab === 'settings' && (
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 shadow-sm space-y-6">
+            <div className="flex justify-between items-center border-b border-zinc-150 dark:border-zinc-850 pb-4">
+              <h3 className="font-bold text-sm text-zinc-855 dark:text-white flex items-center gap-2">
+                <Settings className="w-5 h-5 text-teal-505" />
+                Creator Settings
+              </h3>
+            </div>
+
+            <div className="space-y-6">
+              <div className="border border-zinc-250/80 dark:border-zinc-800 p-4.5 rounded-2xl space-y-3">
+                <h4 className="text-xs font-black uppercase tracking-wider text-zinc-405">Upload Defaults</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-bold text-zinc-400 uppercase">Default Visibility</label>
+                    <select className="w-full p-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 rounded-2xl text-xs focus:outline-none">
+                      <option>Public</option>
+                      <option>Private</option>
+                      <option>Unlisted</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-bold text-zinc-400 uppercase font-semibold">Default Category</label>
+                    <select className="w-full p-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 rounded-2xl text-xs focus:outline-none">
+                      {VIDEO_CATEGORIES.map(c => <option key={c}>{c}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border border-zinc-250/80 dark:border-zinc-800 p-4.5 rounded-2xl space-y-3">
+                <h4 className="text-xs font-black uppercase tracking-wider text-zinc-405">Automated AI Comment Moderation</h4>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold text-zinc-400 uppercase">Blocked Words / Spam filter tags</label>
+                  <input type="text" placeholder="Add comma separated words to automatically flag (e.g. spam, scam)" className="w-full p-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 rounded-2xl text-xs focus:outline-none" />
+                </div>
+              </div>
+
+              <div className="border border-red-500/20 bg-red-500/5 p-4.5 rounded-2xl space-y-3">
+                <h4 className="text-xs font-black uppercase tracking-wider text-red-500 flex items-center gap-1.5">
+                  <AlertTriangle className="w-4 h-4" /> Danger Zone
+                </h4>
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-bold text-zinc-800 dark:text-zinc-200">Delete Channel</p>
+                    <p className="text-[10px] text-zinc-400 mt-0.5">Permanently delete your video metadata, comments, and followers. This action is irreversible.</p>
+                  </div>
+                  <button onClick={() => { if(confirm('Are you sure you want to permanently delete your creator channel? This will remove all your videos.')) alert('Channel deletion simulation started.'); }} className="bg-red-500 hover:bg-red-600 text-white font-bold text-xs py-2.5 px-4.5 rounded-xl transition-all">Delete Channel</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+      </main>
     </div>
+
   );
 }
 
