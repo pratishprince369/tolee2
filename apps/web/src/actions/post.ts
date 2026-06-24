@@ -2194,5 +2194,33 @@ export async function getPostStoryAnalytics(postId: string) {
   }
 }
 
+export async function getFreshPexelsVideoUrl(category = 'nature'): Promise<string | null> {
+  const apiKey = process.env.PEXELS_API_KEY;
+  if (!apiKey || apiKey.trim() === '') return null;
+  try {
+    const randomPage = Math.floor(Math.random() * 10) + 1;
+    const res = await fetch(`https://api.pexels.com/videos/search?query=${encodeURIComponent(category)}&per_page=10&page=${randomPage}`, {
+      headers: { 'Authorization': apiKey }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && Array.isArray(data.videos) && data.videos.length > 0) {
+        // Pick a random video that is vertical
+        const shuffled = [...data.videos].sort(() => 0.5 - Math.random());
+        for (const video of shuffled) {
+          const file = video.video_files?.find((f: any) => f.width && f.height && f.height > f.width) || video.video_files?.[0];
+          if (file?.link) {
+            return file.link;
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[getFreshPexelsVideoUrl error]:', err);
+  }
+  return null;
+}
+
+
 
 

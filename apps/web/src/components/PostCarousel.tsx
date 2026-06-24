@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Volume2, VolumeX, Play } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Volume2, VolumeX, Play, Loader2, AlertCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
   HLSVideo,
@@ -32,9 +32,11 @@ function CarouselVideo({ src, isActive, postId }: CarouselVideoProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [isReady, setIsReady] = useState(false);
+  const [isError, setIsError] = useState(false);
 
   useEffect(() => {
     setIsReady(false);
+    setIsError(false);
   }, [src]);
 
   // Viewport detection: Visible >= 65% -> Auto Play, Hidden < 40% -> Auto Pause
@@ -108,7 +110,7 @@ function CarouselVideo({ src, isActive, postId }: CarouselVideoProps) {
     const video = videoRef.current;
     if (!video) return;
 
-    if (isActive && isVisible) {
+    if (isActive && isVisible && !isError) {
       if (isReady || video.readyState >= 1) {
         setGlobalActiveVideo(video);
         video.muted = getSoundPreference();
@@ -132,7 +134,7 @@ function CarouselVideo({ src, isActive, postId }: CarouselVideoProps) {
         setGlobalActiveVideo(null);
       }
     }
-  }, [isActive, isVisible, isReady, src]);
+  }, [isActive, isVisible, isReady, isError, src]);
 
   // Clean up on unmount
   useEffect(() => {
@@ -175,9 +177,27 @@ function CarouselVideo({ src, isActive, postId }: CarouselVideoProps) {
         preload="metadata"
         poster={getPosterUrl(src) || undefined}
         onCanPlay={() => setIsReady(true)}
+        onError={() => setIsError(true)}
+        onLoadStart={() => {
+          setIsReady(false);
+          setIsError(false);
+        }}
       />
       
-      {!isPlaying && (
+      {isActive && isVisible && !isReady && !isError && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/45 z-10">
+          <Loader2 className="w-8 h-8 text-teal-500 animate-spin" />
+        </div>
+      )}
+
+      {isError && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-950 text-center p-4 z-10 space-y-3">
+          <AlertCircle className="w-10 h-10 text-zinc-500" />
+          <p className="text-xs font-bold text-zinc-400">Video Unavailable</p>
+        </div>
+      )}
+
+      {!isPlaying && isReady && !isError && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/10">
           <div className="p-3 bg-black/55 rounded-full text-white backdrop-blur-sm shadow-md animate-in fade-in duration-200">
             <Play className="w-6 h-6 fill-current text-white ml-0.5" />

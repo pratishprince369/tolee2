@@ -62,11 +62,11 @@ async function seedSimulatedScreenVideos() {
     }
 
     const videoUrls = [
-      'https://cdn.pixabay.com/video/2021/08/04/83896-584732159_large.mp4',
-      'https://cdn.pixabay.com/video/2020/05/11/38600-418859942_large.mp4',
-      'https://cdn.pixabay.com/video/2021/11/04/93557-641566898_large.mp4',
-      'https://cdn.pixabay.com/video/2022/01/18/104762-663884392_large.mp4',
-      'https://cdn.pixabay.com/video/2023/10/22/186071-877209700_large.mp4'
+      'https://videos.pexels.com/video-files/7823396/7823396-hd_1080_1920_30fps.mp4',
+      'https://videos.pexels.com/video-files/7983988/7983988-sd_360_640_25fps.mp4',
+      'https://videos.pexels.com/video-files/8141297/8141297-sd_540_960_25fps.mp4',
+      'https://videos.pexels.com/video-files/7593564/7593564-hd_1920_1080_25fps.mp4',
+      'https://videos.pexels.com/video-files/10395606/10395606-hd_1080_1920_24fps.mp4'
     ];
 
     const thumbUrls = [

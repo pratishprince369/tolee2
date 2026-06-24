@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button';
 import {
   Heart, MessageCircle, Send, MoreVertical, Music,
   Volume2, VolumeX, ShieldCheck, Plus, Bookmark, Repeat,
-  ChevronUp, ChevronDown, Eye, Rocket, MapPin, Smile, X
+  ChevronUp, ChevronDown, Eye, Rocket, MapPin, Smile, X,
+  Loader2, AlertCircle
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
@@ -19,7 +20,8 @@ import { CreatePostModal } from '@/components/CreatePostModal';
 import {
   createPost, toggleLike, addComment, getComments,
   toggleSavePost, toggleRepost, getReposts, recordView,
-  updatePostVisibility, deletePostPermanently, editPostCaption, getReels
+  updatePostVisibility, deletePostPermanently, editPostCaption, getReels,
+  getFreshPexelsVideoUrl
 } from '@/actions/post';
 import { toggleFollow } from '@/actions/user';
 import { HLSVideo, getSoundPreference, setSoundPreference } from '@/components/HLSVideo';
@@ -362,6 +364,49 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
     }
   }, []);
 
+  const [retriedUrls, setRetriedUrls] = useState<Record<string, number>>({});
+
+  const handlePlaybackFailed = useCallback(async (index: number, errDetail: string) => {
+    const item = itemsToRender[index];
+    if (!item) return;
+
+    const currentActiveIndex = isDesktop ? desktopActiveIndex : mobileActiveIndex;
+    if (index !== currentActiveIndex) return; // Only act if it is the currently visible reel
+
+    console.error(`[ReelsStream] Playback error on index ${index}: ${errDetail}`);
+
+    // If it's a simulated reel and we haven't reached max retries, try to fetch a fresh URL from Pexels API
+    if (item.type === 'reel' && item.data.isSimulation) {
+      const reelId = item.data.id;
+      const retryCount = retriedUrls[reelId] || 0;
+
+      if (retryCount < 2) {
+        setRetriedUrls(prev => ({ ...prev, [reelId]: retryCount + 1 }));
+        console.log(`[ReelsStream] Attempting to recover simulated reel ${reelId} (retry ${retryCount + 1}/2)...`);
+        
+        // Extract category or use general
+        const category = item.data.category || 'nature';
+        const freshUrl = await getFreshPexelsVideoUrl(category);
+
+        if (freshUrl) {
+          console.log(`[ReelsStream] Successfully retrieved fresh Pexels URL: ${freshUrl}`);
+          setReels(prev => prev.map(r => r.id === reelId ? { ...r, video: freshUrl } : r));
+          return; // Stop here, since state update will trigger reload
+        }
+      }
+    }
+
+    // If fetch failed or it is not a simulated video, skip to the next available reel after 2 seconds
+    console.log(`[ReelsStream] Playback failed. Scheduling auto-skip to next reel in 2 seconds...`);
+    setTimeout(() => {
+      const nextIndex = index + 1;
+      if (nextIndex < itemsToRender.length) {
+        const scrollRef = isDesktop ? desktopScrollRef : mobileScrollRef;
+        scrollToReel(scrollRef, nextIndex);
+      }
+    }, 2000);
+  }, [isDesktop, desktopActiveIndex, mobileActiveIndex, itemsToRender, retriedUrls, scrollToReel]);
+
   const handleNewPost = (post: any, postData?: any) => {
     const isVideo = post && post.mediaTypes && (post.mediaTypes === 'video' || post.mediaTypes.split(',')[0] === 'video');
     if (isVideo) {
@@ -613,6 +658,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
                     onAdClick={handleAdClick}
                     contentId={precedingReelId}
                     toleeId={precedingToleeId}
+                    onPlaybackFailed={handlePlaybackFailed}
                   />
                 );
               }
@@ -631,6 +677,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
                   onMuteToggle={() => handleSetIsMuted((m) => !m)}
                   followStatus={followStates[reel.authorId]}
                   onFollow={() => handleFollowAuthor(reel.authorId, reel.author)}
+                  onPlaybackFailed={handlePlaybackFailed}
                   {...makeActions(reel, originalIndex)}
                 />
               );
@@ -722,6 +769,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
                       onAdClick={handleAdClick}
                       contentId={precedingReelId}
                       toleeId={precedingToleeId}
+                      onPlaybackFailed={handlePlaybackFailed}
                     />
                   );
                 }
@@ -740,6 +788,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
                     onMuteToggle={() => handleSetIsMuted((m) => !m)}
                     followStatus={followStates[reel.authorId]}
                     onFollow={() => handleFollowAuthor(reel.authorId, reel.author)}
+                    onPlaybackFailed={handlePlaybackFailed}
                     {...makeActions(reel, originalIndex)}
                   />
                 );
@@ -909,6 +958,7 @@ const ReelSlide = memo(function ReelSlide({
   onMuteToggle, onLike, onComment, onReshare,
   onRepostsModal, onShare, onSave, onOptions, onBoost,
   followStatus, onFollow,
+  onPlaybackFailed,
 }: {
   reel: any; index: number; isActive: boolean; isMuted: boolean;
   session: any; desktop: boolean;
@@ -917,7 +967,26 @@ const ReelSlide = memo(function ReelSlide({
   onSave: () => void; onOptions: () => void; onBoost: () => void;
   followStatus?: 'approved' | 'pending' | null;
   onFollow?: () => void;
+  onPlaybackFailed?: (index: number, errDetail: string) => void;
 }) {
+  const [isReady, setIsReady] = useState(false);
+  const [isError, setIsError] = useState(false);
+
+  useEffect(() => {
+    if (isActive) {
+      setIsReady(false);
+      setIsError(false);
+    }
+  }, [isActive]);
+
+  const handleVideoError = (e: any) => {
+    setIsError(true);
+    console.error(`[Reel Play Error] Index: ${index}, ID: ${reel.id}, URL: ${reel.video}, Error:`, e);
+    if (onPlaybackFailed && isActive) {
+      onPlaybackFailed(index, `Video playback failed for URL: ${reel.video}`);
+    }
+  };
+
   const isOwner = session?.user && (
     (session.user as any).id === reel.authorId || 
     (session.user as any).username === reel.author || 
@@ -933,14 +1002,49 @@ const ReelSlide = memo(function ReelSlide({
       {/* ── Video ── */}
       <HLSVideo
         src={reel.video}
-        className="w-full h-full object-cover"
+        className={`w-full h-full object-cover transition-opacity duration-300 ${isReady ? 'opacity-100' : 'opacity-0'}`}
         poster={getPosterUrl(reel.video)}
         isActive={isActive}
         shouldLoad={true}
         loop
         muted={isMuted}
         playsInline
+        onCanPlay={() => setIsReady(true)}
+        onError={handleVideoError}
+        onLoadStart={() => {
+          setIsReady(false);
+          setIsError(false);
+        }}
       />
+
+      {/* ── Thumbnail Overlay (shown before first frame is ready) ── */}
+      {!isReady && !isError && getPosterUrl(reel.video) && (
+        <img
+          src={getPosterUrl(reel.video)}
+          alt="Thumbnail"
+          className="absolute inset-0 w-full h-full object-cover z-0 filter blur-[2px] scale-105"
+        />
+      )}
+
+      {/* ── Buffering/Loading Spinner ── */}
+      {isActive && !isReady && !isError && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/40 z-10">
+          <Loader2 className="w-10 h-10 text-teal-500 animate-spin drop-shadow" />
+        </div>
+      )}
+
+      {/* ── Error Placeholder ── */}
+      {isError && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-950 text-center p-6 z-10 space-y-4">
+          <div className="p-3 bg-red-500/10 rounded-full border border-red-500/30">
+            <AlertCircle className="w-10 h-10 text-red-500" />
+          </div>
+          <div className="space-y-1">
+            <h4 className="font-bold text-sm text-zinc-200">Video Unavailable</h4>
+            <p className="text-xs text-zinc-500 max-w-[200px]">This simulated asset could not be loaded.</p>
+          </div>
+        </div>
+      )}
 
       {/* Gradient overlay */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
@@ -1047,6 +1151,7 @@ const AdReelSlide = memo(function AdReelSlide({
   onAdClick,
   contentId,
   toleeId,
+  onPlaybackFailed,
 }: {
   ad: any;
   index: number;
@@ -1055,7 +1160,26 @@ const AdReelSlide = memo(function AdReelSlide({
   onAdClick: (e: React.MouseEvent, ad: any) => void;
   contentId?: string;
   toleeId?: string;
+  onPlaybackFailed?: (index: number, errDetail: string) => void;
 }) {
+  const [isReady, setIsReady] = useState(false);
+  const [isError, setIsError] = useState(false);
+
+  useEffect(() => {
+    if (isActive) {
+      setIsReady(false);
+      setIsError(false);
+    }
+  }, [isActive]);
+
+  const handleVideoError = (e: any) => {
+    setIsError(true);
+    console.error(`[Ad Reel Play Error] Index: ${index}, Ad ID: ${ad.id}, URL: ${displayMedia}, Error:`, e);
+    if (onPlaybackFailed && isActive) {
+      onPlaybackFailed(index, `Ad video playback failed for URL: ${displayMedia}`);
+    }
+  };
+
   const advertiserName = ad.adSet?.campaign?.user?.name || 'Tolee Sponsor';
   const advertiserAvatar = getValidAvatarUrl(ad.adSet?.campaign?.user?.avatar || ad.adSet?.campaign?.user?.image);
   const mediaList = ad.mediaUrls ? ad.mediaUrls.split(/,(?=https?:\/\/)/).map((u: string) => u.trim()).filter(Boolean) : [];
@@ -1076,16 +1200,53 @@ const AdReelSlide = memo(function AdReelSlide({
         <AdTracker adId={ad.id} type="click" contentId={contentId} toleeId={toleeId} placementType="normal_feed" className="w-full h-full cursor-pointer absolute inset-0 z-0">
           <div onClick={(e) => onAdClick(e, ad)} className="w-full h-full block">
             {isVideo ? (
-              <HLSVideo
-                src={displayMedia}
-                className="w-full h-full object-cover"
-                poster={getPosterUrl(displayMedia)}
-                isActive={isActive}
-                shouldLoad={true}
-                loop
-                muted
-                playsInline
-              />
+              <>
+                <HLSVideo
+                  src={displayMedia}
+                  className={`w-full h-full object-cover transition-opacity duration-300 ${isReady ? 'opacity-100' : 'opacity-0'}`}
+                  poster={getPosterUrl(displayMedia)}
+                  isActive={isActive}
+                  shouldLoad={true}
+                  loop
+                  muted
+                  playsInline
+                  onCanPlay={() => setIsReady(true)}
+                  onError={handleVideoError}
+                  onLoadStart={() => {
+                    setIsReady(false);
+                    setIsError(false);
+                  }}
+                />
+
+                {/* Thumbnail Overlay (shown before first frame is ready) */}
+                {!isReady && !isError && getPosterUrl(displayMedia) && (
+                  <img
+                    src={getPosterUrl(displayMedia)}
+                    alt="Ad Thumbnail"
+                    className="absolute inset-0 w-full h-full object-cover z-0 filter blur-[2px] scale-105"
+                  />
+                )}
+
+                {/* Loading indicator */}
+                {isActive && !isReady && !isError && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/40 z-10">
+                    <Loader2 className="w-10 h-10 text-teal-500 animate-spin drop-shadow" />
+                  </div>
+                )}
+
+                {/* Error placeholder */}
+                {isError && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-950 text-center p-6 z-10 space-y-4">
+                    <div className="p-3 bg-red-500/10 rounded-full border border-red-500/30">
+                      <AlertCircle className="w-10 h-10 text-red-500" />
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="font-bold text-sm text-zinc-200">Video Unavailable</h4>
+                      <p className="text-xs text-zinc-500 max-w-[200px]">This sponsored ad video could not be loaded.</p>
+                    </div>
+                  </div>
+                )}
+              </>
             ) : (
               <img
                 src={displayMedia}

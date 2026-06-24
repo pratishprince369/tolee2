@@ -213,7 +213,7 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
     dbReels = [
       {
         id: 1,
-        video: 'https://cdn.pixabay.com/video/2021/08/04/83896-584732159_large.mp4',
+        video: 'https://videos.pexels.com/video-files/7823396/7823396-hd_1080_1920_30fps.mp4',
         toleeName: 'AI Automation Society',
         toleeSlug: 'ai-automation-society',
         author: 'Alex Johnson',
@@ -227,7 +227,7 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
       },
       {
         id: 2,
-        video: 'https://cdn.pixabay.com/video/2020/05/11/38600-418859942_large.mp4',
+        video: 'https://videos.pexels.com/video-files/10395606/10395606-hd_1080_1920_24fps.mp4',
         toleeName: 'That Pickleball Tolee',
         toleeSlug: 'pickleball',
         author: 'Sarah Chen',

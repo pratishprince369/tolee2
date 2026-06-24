@@ -49,9 +49,6 @@ export function getMediaThumbnail(url: string | null | undefined): string {
   return url;
 }
 
-/**
- * Generates a poster thumbnail image URL for video elements.
- */
 export function getPosterUrl(url: string | null | undefined): string {
   if (!url) return '';
   if (url.includes('/video/upload/')) {
@@ -60,6 +57,14 @@ export function getPosterUrl(url: string | null | undefined): string {
       thumbUrl = url.replace('/sp_hd/m3u8/', '/');
     }
     return thumbUrl.replace(/\.(mp4|m3u8|webm|ogv|flv|mov|avi|wmv|mkv)(?:\?.*)?$/i, '.jpg');
+  }
+  
+  if (url.includes('pexels.com')) {
+    const match = url.match(/\/video-files\/(\d+)\//i) || url.match(/\/videos\/(\d+)\//i) || url.match(/\/(\d+)-/i);
+    if (match && match[1]) {
+      const id = match[1];
+      return `https://images.pexels.com/videos/${id}/pexels-photo-${id}.jpeg?auto=compress&cs=tinysrgb&h=1000`;
+    }
   }
   return '';
 }

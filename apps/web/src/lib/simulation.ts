@@ -160,18 +160,18 @@ const MOCK_AVATARS_FEMALE = [
 const MOCK_AVATARS = [...MOCK_AVATARS_MALE, ...MOCK_AVATARS_FEMALE];
 
 const FALLBACK_PIXABAY_VIDEOS = [
-  'https://cdn.pixabay.com/video/2021/08/04/83896-584732159_large.mp4',
-  'https://cdn.pixabay.com/video/2020/05/11/38600-418859942_large.mp4',
-  'https://cdn.pixabay.com/video/2021/11/04/93557-641566898_large.mp4',
-  'https://cdn.pixabay.com/video/2022/01/18/104762-663884392_large.mp4',
-  'https://cdn.pixabay.com/video/2022/03/17/111082-689369974_large.mp4',
-  'https://cdn.pixabay.com/video/2023/10/22/186071-877209700_large.mp4',
-  'https://cdn.pixabay.com/video/2023/04/28/160759-821731671_large.mp4',
-  'https://cdn.pixabay.com/video/2020/03/09/33364-396556101_large.mp4',
-  'https://cdn.pixabay.com/video/2021/09/24/89445-607871680_large.mp4',
-  'https://cdn.pixabay.com/video/2022/09/04/130128-746356763_large.mp4',
-  'https://cdn.pixabay.com/video/2023/08/11/175546-853372224_large.mp4',
-  'https://cdn.pixabay.com/video/2021/04/20/71746-540191834_large.mp4'
+  'https://videos.pexels.com/video-files/7823396/7823396-hd_1080_1920_30fps.mp4',
+  'https://videos.pexels.com/video-files/7983988/7983988-sd_360_640_25fps.mp4',
+  'https://videos.pexels.com/video-files/8141297/8141297-sd_540_960_25fps.mp4',
+  'https://videos.pexels.com/video-files/7593564/7593564-hd_1920_1080_25fps.mp4',
+  'https://videos.pexels.com/video-files/7983982/7983982-hd_1280_720_25fps.mp4',
+  'https://videos.pexels.com/video-files/7691548/7691548-hd_1280_720_25fps.mp4',
+  'https://videos.pexels.com/video-files/7693469/7693469-hd_1280_720_25fps.mp4',
+  'https://videos.pexels.com/video-files/6913276/6913276-sd_960_540_25fps.mp4',
+  'https://videos.pexels.com/video-files/11041433/11041433-sd_640_360_30fps.mp4',
+  'https://videos.pexels.com/video-files/7047257/7047257-hd_1280_720_25fps.mp4',
+  'https://videos.pexels.com/video-files/10395606/10395606-hd_1080_1920_24fps.mp4',
+  'https://videos.pexels.com/video-files/11700405/11700405-hd_1920_1080_30fps.mp4'
 ];
 
 // Curated high-quality Unsplash image assets representing simulated category scenes
@@ -2170,6 +2170,7 @@ export async function syncSimulationData() {
     const author = posters[(i + 3) % posters.length];
     const category = getCategoryFromProfession(author.profession);
     const catVideos = aiCache.mediaAssets?.filter(m => m.category === category && m.type === 'video') || [];
+    const reelsList = aiCache.reelCaptions[category] || aiCache.reelCaptions.general || [];
 
     let caption = '';
     let mediaUrls = '';
@@ -2179,7 +2180,6 @@ export async function syncSimulationData() {
       mediaUrls = asset.url;
       caption = asset.caption;
     } else {
-      const reelsList = aiCache.reelCaptions[category] || aiCache.reelCaptions.general;
       caption = reelsList[i % reelsList.length];
       mediaUrls = getSeededVideoUrl(category, i);
     }
@@ -2499,7 +2499,7 @@ Rules:
     console.log(`[Dynamic Simulation Activity] Created dynamic post ${newPost.id} by simulated user ${author.name}`);
 
     // Simulate engagement (likes/comments)
-    const otherUsers = simulatedUsers.filter(u => u.id !== author.id);
+    const otherUsers = simulatedUsers.filter((u: any) => u.id !== author.id);
     if (otherUsers.length > 0) {
       // Determine engagement scale
       const likesCount = Math.floor(5 + Math.random() * 20);
