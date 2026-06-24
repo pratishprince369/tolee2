@@ -116,6 +116,26 @@ export default async function UserProfile({ params }: { params: { username: stri
   const isMe = currentUserId === user.id;
   const isAccountPrivate = user.isPrivate && !isMe && !isFollowing;
 
+  // Retrieve Subscription status & subscriber count
+  const [subscriberCount, subscription] = await Promise.all([
+    prisma.subscription.count({
+      where: { creatorId: user.id }
+    }),
+    currentUserId
+      ? prisma.subscription.findUnique({
+          where: {
+            subscriberId_creatorId: {
+              subscriberId: currentUserId,
+              creatorId: user.id
+            }
+          }
+        })
+      : Promise.resolve(null)
+  ]);
+
+  const isSubscribed = !!subscription;
+  const bellPreference = subscription?.bellPreference || null;
+
   // Retrieve user posts
   const userPosts = isAccountPrivate ? [] : await prisma.post.findMany({
     where: {
@@ -324,6 +344,9 @@ export default async function UserProfile({ params }: { params: { username: stri
       addCommentAction={addComment}
       getCommentsAction={getComments}
       getLikesAction={getLikes}
+      initialSubscriberCount={subscriberCount}
+      initialSubscribed={isSubscribed}
+      initialBellPreference={bellPreference}
     />
   );
 }

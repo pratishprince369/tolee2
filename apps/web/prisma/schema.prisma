@@ -95,6 +95,11 @@ model User {
   screenComments    ScreenVideoComment[]
   screenPlaylists   ScreenVideoPlaylist[]
 
+  // Subscription System (Creator ↔ Subscriber)
+  subscribers       Subscription[]       @relation("CreatorSubscriptions")
+  subscribedTo      Subscription[]       @relation("SubscriberSubscriptions")
+  videoReports      ScreenVideoReport[]
+
 
   pincode               String?
   receivePromotions     Boolean           @default(true)
@@ -1323,6 +1328,14 @@ model ScreenVideo {
   isSimulation  Boolean  @default(false)
   isLive        Boolean  @default(false)
 
+  // Moderation Fields
+  reportedCount    Int      @default(0)
+  moderationStatus String   @default("clean") // "clean" | "flagged" | "removed" | "age_restricted"
+  spamLabel        String?  // "spam" | "adult" | "violent" | "scam" | "misleading"
+  nsfwScore        Float    @default(0)
+  spamScore        Float    @default(0)
+  violenceScore    Float    @default(0)
+
   userId        String
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -1332,6 +1345,7 @@ model ScreenVideo {
   likes         ScreenVideoLike[]
   comments      ScreenVideoComment[]
   playlists     ScreenVideoPlaylist[]
+  reports       ScreenVideoReport[]
 }
 
 model ScreenVideoLike {
@@ -1375,5 +1389,34 @@ model ScreenVideoPlaylist {
   updatedAt   DateTime      @updatedAt
 }
 
+// ---------------------------------------------------------
+// SUBSCRIPTION SYSTEM (Creator ↔ Subscriber)
+// ---------------------------------------------------------
+model Subscription {
+  id             String   @id @default(cuid())
+  subscriberId   String
+  subscriber     User     @relation("SubscriberSubscriptions", fields: [subscriberId], references: [id], onDelete: Cascade)
+  creatorId      String
+  creator        User     @relation("CreatorSubscriptions", fields: [creatorId], references: [id], onDelete: Cascade)
+  bellPreference String   @default("ALL") // "ALL" | "PERSONALIZED" | "NONE"
+  createdAt      DateTime @default(now())
 
+  @@unique([subscriberId, creatorId])
+}
 
+// ---------------------------------------------------------
+// VIDEO REPORT / MODERATION
+// ---------------------------------------------------------
+model ScreenVideoReport {
+  id          String      @id @default(cuid())
+  videoId     String
+  video       ScreenVideo @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  reporterId  String
+  reporter    User        @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  reason      String      // "spam" | "nudity" | "violence" | "hate_speech" | "copyright" | "misinformation" | "other"
+  description String?
+  status      String      @default("pending") // "pending" | "reviewed" | "dismissed"
+  createdAt   DateTime    @default(now())
+
+  @@unique([videoId, reporterId])
+}

@@ -48,6 +48,7 @@ import { getHighlights, getStoriesArchive, createHighlight, editHighlight, delet
 import { fetchUserActiveStories } from '@/actions/story';
 import { StoryViewer } from '@/components/StoryViewer';
 import { StoryEditor } from '@/components/StoryEditor';
+import { SubscribeButton } from '@/components/SubscribeButton';
 import { PostCarousel } from '@/components/PostCarousel';
 import { uploadFile } from '@/lib/upload';
 
@@ -226,7 +227,10 @@ export function InstagramProfileView({
   toggleLikeAction,
   addCommentAction,
   getCommentsAction,
-  getLikesAction
+  getLikesAction,
+  initialSubscriberCount = 0,
+  initialSubscribed = false,
+  initialBellPreference = null
 }: {
   user: UserType;
   posts: PostType[];
@@ -242,6 +246,9 @@ export function InstagramProfileView({
   addCommentAction: (postId: string, text: string) => Promise<any>;
   getCommentsAction: (postId: string) => Promise<any>;
   getLikesAction: (postId: string) => Promise<any>;
+  initialSubscriberCount?: number;
+  initialSubscribed?: boolean;
+  initialBellPreference?: string | null;
 }) {
   const router = useRouter();
   const { data: session, update } = useSession();
@@ -287,6 +294,7 @@ export function InstagramProfileView({
 
   const [followersCount, setFollowersCount] = useState(user._count.followers);
   const [followingCount, setFollowingCount] = useState(user._count.following);
+  const [subscriberCount, setSubscriberCount] = useState(initialSubscriberCount);
   
   // Local reactive states for profile feeds to support instant updates (visibility & deletion)
   const [profilePosts, setProfilePosts] = useState<PostType[]>(posts);
@@ -1108,7 +1116,7 @@ export function InstagramProfileView({
           {/* ===== STATS ROW ===== */}
           <div className="px-4 mb-4">
             <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-sm border border-zinc-150 dark:border-zinc-800/80 overflow-hidden">
-              <div className="grid grid-cols-4 divide-x divide-zinc-100 dark:divide-zinc-800/80">
+              <div className="grid grid-cols-5 divide-x divide-zinc-100 dark:divide-zinc-800/80">
                 <div className="flex flex-col items-center justify-center py-3.5 px-2">
                   <span className="font-bold text-[17px] text-zinc-900 dark:text-zinc-100 leading-none">{posts.length}</span>
                   <span className="text-[10.5px] text-zinc-500 dark:text-zinc-400 font-medium mt-1 text-center">posts</span>
@@ -1134,6 +1142,10 @@ export function InstagramProfileView({
                   <span className="font-bold text-[17px] text-zinc-900 dark:text-zinc-100 leading-none">{friendsCount}</span>
                   <span className="text-[10.5px] text-zinc-500 dark:text-zinc-400 font-medium mt-1 text-center">friends</span>
                 </button>
+                <div className="flex flex-col items-center justify-center py-3.5 px-2">
+                  <span className="font-bold text-[17px] text-zinc-900 dark:text-zinc-100 leading-none">{subscriberCount}</span>
+                  <span className="text-[10.5px] text-zinc-500 dark:text-zinc-400 font-medium mt-1 text-center leading-tight">subscribers</span>
+                </div>
               </div>
             </div>
           </div>
@@ -1177,9 +1189,17 @@ export function InstagramProfileView({
                   Message
                 </button>
                 {/* Subscribe */}
-                <button className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-semibold text-[13px] py-2.5 rounded-full transition-all active:scale-95 shadow-sm">
-                  Subscribe
-                </button>
+                <SubscribeButton
+                  creatorId={user.id}
+                  initialSubscribed={initialSubscribed}
+                  initialBellPreference={initialBellPreference}
+                  initialCount={subscriberCount}
+                  showCount={false}
+                  onSubscribeChange={(subscribed) => {
+                    setSubscriberCount(prev => subscribed ? prev + 1 : Math.max(0, prev - 1));
+                  }}
+                  className="w-full"
+                />
               </div>
             )}
           </div>

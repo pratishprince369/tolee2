@@ -226,12 +226,7 @@ export async function getScreenVideoDetails(id: string) {
             name: true,
             avatar: true,
             username: true,
-            isVerified: true,
-            followers: {
-              select: {
-                followerId: true
-              }
-            }
+            isVerified: true
           }
         },
         likes: true
@@ -243,13 +238,24 @@ export async function getScreenVideoDetails(id: string) {
     // Fetch user engagement values
     let userLikeStatus: 'like' | 'dislike' | null = null;
     let isSubscribed = false;
+    let bellPreference: string | null = null;
 
     if (currentUserId) {
       const likeRecord = video.likes.find(l => l.userId === currentUserId);
       if (likeRecord) {
         userLikeStatus = likeRecord.isDislike ? 'dislike' : 'like';
       }
-      isSubscribed = video.user.followers.some(f => f.followerId === currentUserId);
+      
+      const sub = await prisma.subscription.findUnique({
+        where: {
+          subscriberId_creatorId: {
+            subscriberId: currentUserId,
+            creatorId: video.userId
+          }
+        }
+      });
+      isSubscribed = !!sub;
+      bellPreference = sub?.bellPreference || null;
     }
 
     // Get likes / dislikes count
@@ -277,8 +283,10 @@ export async function getScreenVideoDetails(id: string) {
       orderBy: { createdAt: 'desc' }
     });
 
-    // Subscribed channels check (simulated followers if simulation mode is active)
-    const subscriberCount = video.user.followers.length + (video.isSimulation ? 12400 : 0);
+    // Subscribed channels check
+    const subscriberCount = await prisma.subscription.count({
+      where: { creatorId: video.userId }
+    }) + (video.isSimulation ? 12400 : 0);
 
     return JSON.parse(JSON.stringify({ 
       success: true, 
@@ -288,7 +296,8 @@ export async function getScreenVideoDetails(id: string) {
         dislikesCount,
         subscriberCount,
         userLikeStatus,
-        isSubscribed
+        isSubscribed,
+        bellPreference
       }, 
       recommended 
     }));
@@ -584,27 +593,39 @@ export async function toggleSubscribeChannel(creatorId: string) {
       return { success: false, error: 'You cannot subscribe to your own channel!' };
     }
 
-    const existingFollow = await prisma.follow.findUnique({
+    const existingSub = await prisma.subscription.findUnique({
       where: {
-        followerId_followingId: {
-          followerId: currentUserId,
-          followingId: creatorId
+        subscriberId_creatorId: {
+          subscriberId: currentUserId,
+          creatorId
         }
       }
     });
 
-    if (existingFollow) {
-      await prisma.follow.delete({
-        where: { id: existingFollow.id }
+    if (existingSub) {
+      await prisma.subscription.delete({
+        where: { id: existingSub.id }
       });
       return { success: true, subscribed: false };
     } else {
-      await prisma.follow.create({
+      await prisma.subscription.create({
         data: {
-          followerId: currentUserId,
-          followingId: creatorId
+          subscriberId: currentUserId,
+          creatorId,
+          bellPreference: 'ALL'
         }
       });
+
+      // Notify the creator
+      await prisma.notification.create({
+        data: {
+          userId: creatorId,
+          type: 'new_subscriber',
+          message: `🎉 You have a new subscriber!`,
+          link: `/u/${currentUserId}`
+        }
+      });
+
       return { success: true, subscribed: true };
     }
   } catch (err) {
@@ -791,6 +812,14 @@ export async function saveScreenVideo(
         authorId: currentUserId
       }
     });
+
+    // Trigger notification to subscribers
+    try {
+      const { sendNewVideoNotification } = await import('@/actions/creator');
+      await sendNewVideoNotification(currentUserId, video.id, title);
+    } catch (err) {
+      console.error('Failed to send new video notifications:', err);
+    }
 
     return { success: true, video: JSON.parse(JSON.stringify(video)) };
   } catch (error) {
