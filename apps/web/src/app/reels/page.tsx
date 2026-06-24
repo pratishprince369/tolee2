@@ -22,7 +22,7 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
   try {
     const res = await getPosts({ mediaType: 'video', limit: 100 });
     if (res.success && res.posts) {
-      const videoPosts = res.posts.filter(post => post.mediaTypes === 'video' && post.mediaUrls);
+      const videoPosts = res.posts.filter(post => post.postType === 'reel' && post.mediaUrls);
       const authorIds = videoPosts.map(p => p.author.id);
 
       // Query follow statuses of these authors for the current user
@@ -135,7 +135,7 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
             }
           });
 
-          if (post && post.mediaUrls && post.mediaTypes && post.mediaTypes.split(',')[0] === 'video') {
+          if (post && post.mediaUrls && post.postType === 'reel') {
             const firstTolee = post.tolees?.[0]?.tolee;
             const likedByMe = currentUserId ? post.likes.some((like: any) => like.userId === currentUserId) : false;
             const savedByMe = currentUserId ? post.savedBy.some((save: any) => save.userId === currentUserId) : false;

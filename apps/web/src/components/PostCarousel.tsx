@@ -37,7 +37,7 @@ function CarouselVideo({ src, isActive, postId }: CarouselVideoProps) {
     setIsReady(false);
   }, [src]);
 
-  // Viewport detection: Visible >= 30% -> Auto Play, Hidden < 15% -> Auto Pause
+  // Viewport detection: Visible >= 65% -> Auto Play, Hidden < 40% -> Auto Pause
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -45,15 +45,15 @@ function CarouselVideo({ src, isActive, postId }: CarouselVideoProps) {
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
-          if (entry.intersectionRatio >= 0.3) {
+          if (entry.intersectionRatio >= 0.65) {
             setIsVisible(true);
-          } else if (entry.intersectionRatio < 0.15) {
+          } else if (entry.intersectionRatio < 0.4) {
             setIsVisible(false);
           }
         }
       },
       {
-        threshold: [0.15, 0.3]
+        threshold: [0.4, 0.65]
       }
     );
 

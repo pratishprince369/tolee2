@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
           const updateData: any = {};
           if (playbackId) {
             updateData.muxPlaybackId = playbackId;
-            updateData.mediaUrl = `https://stream.mux.com/${playbackId}/medium.mp4`;
+            updateData.mediaUrl = `https://stream.mux.com/${playbackId}.m3u8`;
           }
           if (duration) updateData.duration = duration;
 
@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
 
           // Also update the associated Feed Post or Reel with the ready playback URL
           if (playbackId) {
-            const videoUrl = `https://stream.mux.com/${playbackId}/medium.mp4`;
+            const videoUrl = `https://stream.mux.com/${playbackId}.m3u8`;
             const updatedPosts = await prisma.post.updateMany({
               where: { ocrText: `mux-asset:${assetId}` },
               data: { mediaUrls: videoUrl }

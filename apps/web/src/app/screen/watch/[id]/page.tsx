@@ -108,7 +108,7 @@ export default function WatchVideoPage({ params }: PageProps) {
   const [isAIFiltering, setIsAIFiltering] = useState(false);
 
   // Stream source config: checks direct MP4 first, then builds fallbacks
-  const videoSource = video ? (video.mediaUrl || (video.muxPlaybackId ? `https://stream.mux.com/${video.muxPlaybackId}/medium.mp4` : '')) : '';
+  const videoSource = video ? (video.mediaUrl || (video.muxPlaybackId ? `https://stream.mux.com/${video.muxPlaybackId}.m3u8` : '')) : '';
 
   // Load details
   useEffect(() => {

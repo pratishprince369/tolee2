@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     const asset = await mux.video.assets.retrieve(assetId);
     const playbackId = asset.playback_ids?.[0]?.id;
     const duration = asset.duration || 0;
-    const videoUrl = playbackId ? `https://stream.mux.com/${playbackId}/medium.mp4` : '';
+    const videoUrl = playbackId ? `https://stream.mux.com/${playbackId}.m3u8` : '';
 
     if (isReel) {
       const post = await prisma.post.create({
