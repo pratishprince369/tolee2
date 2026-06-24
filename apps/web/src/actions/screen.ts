@@ -14,14 +14,7 @@ const mux = new Mux({
   tokenSecret: MUX_TOKEN_SECRET,
 });
 
-// Categories list matching YouTube homepage requirements
-export const VIDEO_CATEGORIES = [
-  'Recommended', 'Trending', 'Latest', 'Subscriptions',
-  'Technology', 'Business', 'Education', 'Gaming', 'Comedy',
-  'Entertainment', 'Music', 'Movies', 'News', 'Sports',
-  'Health', 'Fashion', 'Finance', 'Real Estate', 'AI',
-  'Programming', 'Travel', 'Food', 'Podcasts'
-];
+
 
 /**
  * Seed simulated videos if Simulation Mode is ON

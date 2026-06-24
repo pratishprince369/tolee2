@@ -44,7 +44,8 @@ export async function POST(request: Request) {
           postType: 'reel',
           status: 'published',
           visibility: 'public',
-          authorId: currentUserId
+          authorId: currentUserId,
+          ocrText: `mux-asset:${assetId}`
         }
       });
       return NextResponse.json({ success: true, isReel: true, post });
@@ -86,7 +87,8 @@ export async function POST(request: Request) {
           postType: 'regular',
           status: 'published',
           visibility: 'public',
-          authorId: currentUserId
+          authorId: currentUserId,
+          ocrText: `mux-asset:${assetId}`
         }
       });
     }

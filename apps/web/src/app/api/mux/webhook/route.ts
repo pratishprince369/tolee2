@@ -62,7 +62,10 @@ export async function POST(req: NextRequest) {
 
         if (assetId) {
           const updateData: any = {};
-          if (playbackId) updateData.muxPlaybackId = playbackId;
+          if (playbackId) {
+            updateData.muxPlaybackId = playbackId;
+            updateData.mediaUrl = `https://stream.mux.com/${playbackId}/medium.mp4`;
+          }
           if (duration) updateData.duration = duration;
 
           // Try to find by assetId first, then by uploadId
@@ -79,6 +82,16 @@ export async function POST(req: NextRequest) {
                 ...updateData,
               },
             });
+          }
+
+          // Also update the associated Feed Post or Reel with the ready playback URL
+          if (playbackId) {
+            const videoUrl = `https://stream.mux.com/${playbackId}/medium.mp4`;
+            const updatedPosts = await prisma.post.updateMany({
+              where: { ocrText: `mux-asset:${assetId}` },
+              data: { mediaUrls: videoUrl }
+            });
+            console.log(`[Mux Webhook] Updated ${updatedPosts.count} associated Feed Post/Reel mediaUrls to: ${videoUrl}`);
           }
 
           console.log(`[Mux Webhook] Asset ready: ${assetId}, playbackId: ${playbackId}, duration: ${duration}s`);
