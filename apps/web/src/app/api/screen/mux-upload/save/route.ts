@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     const currentUserId = (session.user as any).id;
 
     const body = await request.json();
-    const { title, description, assetId, category = 'General', visibility = 'public', isReel = false } = body;
+    const { title, description, assetId, category = 'General', visibility = 'public', status = 'published', isReel = false } = body;
 
     if (!assetId) {
       return NextResponse.json({ success: false, error: 'Missing assetId' }, { status: 400 });
@@ -60,6 +60,7 @@ export async function POST(request: Request) {
         duration,
         category,
         visibility,
+        status,
         userId: currentUserId,
       },
       include: {
@@ -74,18 +75,20 @@ export async function POST(request: Request) {
       },
     });
 
-    // Create Feed Post for Tolee Screen Video
-    await prisma.post.create({
-      data: {
-        caption: `🎥 **${title}**\n\n${description || ''}`,
-        mediaUrls: videoUrl,
-        mediaTypes: 'video',
-        postType: 'regular',
-        status: 'published',
-        visibility: 'public',
-        authorId: currentUserId
-      }
-    });
+    if (status !== 'draft') {
+      // Create Feed Post for Tolee Screen Video
+      await prisma.post.create({
+        data: {
+          caption: `🎥 **${title}**\n\n${description || ''}`,
+          mediaUrls: videoUrl,
+          mediaTypes: 'video',
+          postType: 'regular',
+          status: 'published',
+          visibility: 'public',
+          authorId: currentUserId
+        }
+      });
+    }
 
     return NextResponse.json({ success: true, video });
   } catch (error: any) {

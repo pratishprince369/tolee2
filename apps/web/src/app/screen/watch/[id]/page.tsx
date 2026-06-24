@@ -107,6 +107,9 @@ export default function WatchVideoPage({ params }: PageProps) {
   const [aiReplies, setAiReplies] = useState<string[]>([]);
   const [isAIFiltering, setIsAIFiltering] = useState(false);
 
+  // Stream source config: checks direct MP4 first, then builds fallbacks
+  const videoSource = video ? (video.mediaUrl || (video.muxPlaybackId ? `https://stream.mux.com/${video.muxPlaybackId}/medium.mp4` : '')) : '';
+
   // Load details
   useEffect(() => {
     async function loadVideoDetails() {
@@ -211,6 +214,50 @@ export default function WatchVideoPage({ params }: PageProps) {
       setAiReplies([]);
     }
   }, [video, currentUserId]);
+
+  // HLS Stream Integration (hls.js)
+  useEffect(() => {
+    const videoElement = videoRef.current;
+    if (!videoElement) return;
+
+    let hlsInstance: any = null;
+    let isDestroyed = false;
+    const playbackId = video?.muxPlaybackId;
+
+    if (playbackId) {
+      const hlsUrl = `https://stream.mux.com/${playbackId}.m3u8`;
+      
+      import('hls.js').then((HlsModule) => {
+        if (isDestroyed) return;
+        const Hls = HlsModule.default;
+
+        if (Hls.isSupported()) {
+          hlsInstance = new Hls();
+          hlsInstance.loadSource(hlsUrl);
+          hlsInstance.attachMedia(videoElement);
+          hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
+            if (isPlaying) {
+              videoElement.play().catch(e => console.log("Play failed:", e));
+            }
+          });
+        } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
+          // Native HLS support (Safari / iOS)
+          videoElement.src = hlsUrl;
+        }
+      }).catch(err => console.error("Error loading hls.js dynamically:", err));
+    } else if (videoSource) {
+      // Direct MP4 fallback (e.g. simulated videos)
+      videoElement.src = videoSource;
+    }
+
+    return () => {
+      isDestroyed = true;
+      if (hlsInstance) {
+        hlsInstance.destroy();
+      }
+      videoElement.src = '';
+    };
+  }, [video?.muxPlaybackId, videoSource]);
 
   // Play / Pause
   const togglePlay = () => {
@@ -462,9 +509,6 @@ export default function WatchVideoPage({ params }: PageProps) {
 
   if (!video) return null;
 
-  // Stream source config: checks direct MP4 first, then builds fallbacks
-  const videoSource = video.mediaUrl || (video.muxPlaybackId ? `https://stream.mux.com/${video.muxPlaybackId}/medium.mp4` : '');
-
   // Sorted Comments List
   const sortedComments = [...comments].sort((a, b) => {
     if (commentSort === 'newest') {
@@ -512,7 +556,6 @@ export default function WatchVideoPage({ params }: PageProps) {
               {videoSource ? (
                 <video
                   ref={videoRef}
-                  src={videoSource}
                   autoPlay
                   onClick={togglePlay}
                   onTimeUpdate={handleTimeUpdate}

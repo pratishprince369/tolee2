@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { 
   getCreatorAnalytics, getCreatorVideos, createMuxDirectUpload, 
-  saveScreenVideo, saveSimulatedScreenVideo,
+  saveScreenVideo, saveSimulatedScreenVideo, updateScreenVideo,
   getPlaylists, createPlaylist, addVideoToPlaylist,
   getCreatorComments, togglePinComment, toggleHeartComment,
   checkMuxUploadStatus
@@ -218,6 +218,25 @@ export default function CreatorStudioPage() {
   // Preview tab state
   const [activePreviewTab, setActivePreviewTab] = useState<'feed' | 'reels' | 'screen' | 'profile' | 'group'>('screen');
   const [savedVideoId, setSavedVideoId] = useState('');
+  const [savedVideoStatus, setSavedVideoStatus] = useState<'published' | 'draft'>('published');
+
+  // Video edit state variables
+  const [editingVideo, setEditingVideo] = useState<any | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editCategory, setEditCategory] = useState('');
+  const [editVisibility, setEditVisibility] = useState('');
+  const [editThumbnailUrl, setEditThumbnailUrl] = useState('');
+  const [editStatus, setEditStatus] = useState('');
+  const [editTags, setEditTags] = useState('');
+  const [editLanguage, setEditLanguage] = useState('');
+  const [editLocation, setEditLocation] = useState('');
+  const [editExternalLink, setEditExternalLink] = useState('');
+  const [editMonetization, setEditMonetization] = useState(false);
+  const [editCommentPolicy, setEditCommentPolicy] = useState<'allow' | 'hold' | 'disable'>('allow');
+
+  // Sub-tab filter inside Content library
+  const [contentFilterTab, setContentFilterTab] = useState<'all' | 'published' | 'draft'>('all');
 
   // Mocks templates
   const MOCK_THUMBNAIL_TEMPLATES = [
@@ -264,9 +283,10 @@ export default function CreatorStudioPage() {
     setLoadingComments(false);
   };
 
-  const handleTabChange = (tab: 'dashboard' | 'content' | 'analytics' | 'community' | 'upload') => {
+  const handleTabChange = (tab: any) => {
     setActiveTab(tab);
     router.push(`/screen/studio?tab=${tab}`);
+    loadStudioData();
   };
 
   useEffect(() => {
@@ -588,13 +608,14 @@ export default function CreatorStudioPage() {
   };
 
   // Real Direct Mux Upload flow
-  const triggerRealMuxUpload = async () => {
+  const triggerRealMuxUpload = async (publishStatus: 'published' | 'draft' = 'published') => {
     if (!selectedFile) return;
 
     try {
       setUploadStatus('uploading');
       setUploadProgress(0);
       setErrorMessage('');
+      setSavedVideoStatus(publishStatus);
 
       const createReq = await fetch('/api/screen/mux-upload/create', { method: 'POST' });
       const res = await createReq.json();
@@ -664,7 +685,7 @@ export default function CreatorStudioPage() {
       const saveReq = await fetch('/api/screen/mux-upload/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, description, assetId, category, visibility, isReel })
+        body: JSON.stringify({ title, description, assetId, category, visibility, isReel, status: publishStatus })
       });
       const saveRes = await saveReq.json();
 
@@ -698,9 +719,9 @@ export default function CreatorStudioPage() {
     setUploadStatus('idle');
     setUploadProgress(0);
   };
-
   const handleStartPublish = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSavedVideoStatus('published');
 
     if (isSimulatedUpload) {
       startSimulatedUpload();
@@ -722,7 +743,8 @@ export default function CreatorStudioPage() {
           visibility,
           thumbUrl,
           selectedVideoUrl,
-          isReel
+          isReel,
+          'published'
         );
         if (res.success) {
           let createdId = '';
@@ -743,10 +765,9 @@ export default function CreatorStudioPage() {
         }
       }, 5000);
     } else {
-      await triggerRealMuxUpload();
+      await triggerRealMuxUpload('published');
     }
   };
-
   // Inline Playlist creation
   const handleCreatePlaylistSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -857,6 +878,36 @@ export default function CreatorStudioPage() {
     setHasAppliedAISuggestions(true);
   };
 
+  // Open the video metadata editor modal
+  const openEditModal = (vid: any) => {
+    setEditingVideo(vid);
+    setEditTitle(vid.title || '');
+    setEditDescription(vid.description || '');
+    setEditCategory(vid.category || 'General');
+    setEditVisibility(vid.visibility || 'public');
+    setEditThumbnailUrl(vid.thumbnailUrl || '');
+    setEditStatus(vid.status || 'published');
+  };
+
+  // Save edited video metadata
+  const handleSaveEdit = async () => {
+    if (!editingVideo) return;
+    const res = await updateScreenVideo(editingVideo.id, {
+      title: editTitle,
+      description: editDescription,
+      category: editCategory,
+      visibility: editVisibility,
+      thumbnailUrl: editThumbnailUrl || undefined,
+      status: editStatus,
+    });
+    if (res.success) {
+      setEditingVideo(null);
+      loadStudioData();
+    } else {
+      alert(res.error || 'Failed to update video');
+    }
+  };
+
   const resetForm = () => {
     setTitle('');
     setDescription('');
@@ -875,6 +926,7 @@ export default function CreatorStudioPage() {
     setIsMadeForKids(null);
     setSavedVideoId('');
     localStorage.removeItem('tolee_upload_draft');
+    loadStudioData();
   };
 
   return (
@@ -1180,6 +1232,23 @@ export default function CreatorStudioPage() {
               </div>
             </div>
 
+            {/* Sub-tab filter bar: All / Published / Drafts */}
+            <div className="px-5 py-2 border-b border-zinc-150 dark:border-zinc-850 flex items-center gap-1">
+              {(['all', 'published', 'draft'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setContentFilterTab(tab)}
+                  className={`px-4 py-1.5 rounded-xl text-[10px] font-bold transition-all ${
+                    contentFilterTab === tab
+                      ? 'bg-teal-50 dark:bg-teal-955/40 text-teal-650 dark:text-teal-400'
+                      : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-850'
+                  }`}
+                >
+                  {tab === 'all' ? `All (${creatorVideos.length})` : tab === 'published' ? `Published (${creatorVideos.filter((v: any) => v.status === 'published' || !v.status).length})` : `Drafts (${creatorVideos.filter((v: any) => v.status === 'draft').length})`}
+                </button>
+              ))}
+            </div>
+
             {/* Bulk actions bar */}
             <div className="px-5 py-2.5 bg-zinc-50 dark:bg-zinc-950 border-b border-zinc-150 dark:border-zinc-850 flex items-center justify-between text-[11px] font-bold text-zinc-500">
               <div className="flex items-center gap-4">
@@ -1234,7 +1303,7 @@ export default function CreatorStudioPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-150 dark:divide-zinc-850 text-xs">
-                    {creatorVideos.map((vid) => (
+                    {creatorVideos.filter((vid: any) => contentFilterTab === 'all' ? true : contentFilterTab === 'published' ? (vid.status === 'published' || !vid.status) : vid.status === 'draft').map((vid) => (
                       <tr 
                         key={vid.id} 
                         className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/10 video-row"
@@ -1270,7 +1339,7 @@ export default function CreatorStudioPage() {
                         <td className="p-4 font-bold text-zinc-500">{(vid.viewsCount * 0.1).toFixed(1)} hrs</td>
                         <td className="p-4 text-zinc-400 font-semibold">{new Date(vid.createdAt).toLocaleDateString()}</td>
                         <td className="p-4 text-right space-x-1.5 whitespace-nowrap">
-                          <button onClick={() => alert('Edit Video details metadata')} className="p-1.5 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-950 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-xl" title="Edit"><Paintbrush className="w-3.5 h-3.5 text-teal-650" /></button>
+                          <button onClick={() => openEditModal(vid)} className="p-1.5 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-950 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-xl" title="Edit"><Paintbrush className="w-3.5 h-3.5 text-teal-650" /></button>
                           <button onClick={() => alert('Change Custom Thumbnail')} className="p-1.5 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-950 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-xl" title="Change Thumbnail"><ImageIcon className="w-3.5 h-3.5 text-teal-650" /></button>
                           <button onClick={() => alert('Schedule Publishing')} className="p-1.5 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-950 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-xl" title="Schedule"><Calendar className="w-3.5 h-3.5 text-teal-650" /></button>
                           <button onClick={() => alert('Duplicate Metadata Draft')} className="p-1.5 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-950 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-xl" title="Duplicate"><Copy className="w-3.5 h-3.5 text-teal-650" /></button>
@@ -3304,6 +3373,67 @@ export default function CreatorStudioPage() {
                           <span>Publish Video Now</span>
                         )}
                       </Button>
+
+                      <Button
+                        type="button"
+                        disabled={uploadStatus === 'uploading' || uploadStatus === 'processing'}
+                        onClick={async () => {
+                          setSavedVideoStatus('draft');
+                          if (isSimulatedUpload) {
+                            startSimulatedUpload();
+                            const videoUrls = [
+                              'https://cdn.pixabay.com/video/2021/08/04/83896-584732159_large.mp4',
+                              'https://cdn.pixabay.com/video/2022/01/18/104762-663884392_large.mp4',
+                              'https://cdn.pixabay.com/video/2021/11/04/93557-641566898_large.mp4',
+                              'https://cdn.pixabay.com/video/2023/10/22/186071-877209700_large.mp4'
+                            ];
+                            const selectedVideoUrl = videoUrls[Math.floor(Math.random() * videoUrls.length)];
+                            const thumbUrl = selectedThumbnailUrl || MOCK_THUMBNAIL_TEMPLATES[0];
+
+                            setTimeout(async () => {
+                              const res = await saveSimulatedScreenVideo(
+                                title,
+                                description,
+                                category,
+                                visibility,
+                                thumbUrl,
+                                selectedVideoUrl,
+                                isReel,
+                                'draft'
+                              );
+                              if (res.success) {
+                                let createdId = '';
+                                if ('video' in res && res.video?.id) createdId = res.video.id;
+                                else if ('post' in res && res.post?.id) createdId = res.post.id;
+                                
+                                if (createdId) setSavedVideoId(createdId);
+                                
+                                if (selectedPlaylists.length > 0 && createdId) {
+                                  for (const pId of selectedPlaylists) {
+                                    await addVideoToPlaylist(pId, createdId);
+                                  }
+                                }
+                                setUploadStatus('done');
+                              } else {
+                                setUploadStatus('error');
+                                setErrorMessage(res.error || 'Failed to save simulated video data.');
+                              }
+                            }, 5000);
+                          } else {
+                            await triggerRealMuxUpload('draft');
+                          }
+                        }}
+                        variant="secondary"
+                        className="flex-1 py-5 bg-zinc-650 hover:bg-zinc-700 text-white font-bold rounded-2xl text-xs shadow-lg shadow-zinc-650/15"
+                      >
+                        {uploadStatus === 'uploading' || uploadStatus === 'processing' ? (
+                          <span className="flex items-center gap-1.5 justify-center">
+                            <Loader2 className="w-4 h-4 animate-spin" /> Saving Draft...
+                          </span>
+                        ) : (
+                          <span>Save as Draft</span>
+                        )}
+                      </Button>
                       
                       <Button
                         type="button"
@@ -3390,21 +3520,25 @@ export default function CreatorStudioPage() {
               </div>
             </div>
 
-            {/* Success publishing status dialog */}
+            {/* Success publishing/draft status dialog */}
             {uploadStatus === 'done' && (
               <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
                 <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 max-w-md w-full text-center space-y-6 shadow-2xl">
-                  <div className="w-16 h-16 bg-green-500/10 border border-green-500/20 text-green-500 rounded-full flex items-center justify-center mx-auto">
+                  <div className={`w-16 h-16 ${savedVideoStatus === 'draft' ? 'bg-amber-500/10 border-amber-500/20 text-amber-500' : 'bg-green-500/10 border-green-500/20 text-green-500'} border rounded-full flex items-center justify-center mx-auto`}>
                     <CheckCircle2 className="w-9 h-9" />
                   </div>
                   
                   <div className="space-y-1">
-                    <h3 className="text-lg font-black text-zinc-900 dark:text-white">✅ Your video has been published successfully!</h3>
-                    <p className="text-xs text-zinc-400">The video registry tables are updated and ad insertion layers are registered.</p>
+                    <h3 className="text-lg font-black text-zinc-900 dark:text-white">
+                      {savedVideoStatus === 'draft' ? '📝 Your video has been saved as a draft!' : '✅ Your video has been published successfully!'}
+                    </h3>
+                    <p className="text-xs text-zinc-400">
+                      {savedVideoStatus === 'draft' ? 'The draft is saved. You can publish it anytime from the Content library.' : 'The video registry tables are updated and ad insertion layers are registered.'}
+                    </p>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3.5">
-                    {savedVideoId ? (
+                    {savedVideoId && savedVideoStatus !== 'draft' ? (
                       <Link 
                         href={`/screen/watch/${savedVideoId}`} 
                         className="p-3 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-950 dark:hover:bg-zinc-850 border border-zinc-200 dark:border-zinc-800 rounded-2xl flex flex-col items-center justify-center font-bold text-xs"
@@ -3413,7 +3547,7 @@ export default function CreatorStudioPage() {
                         View Video
                       </Link>
                     ) : (
-                      <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-2xl flex flex-col items-center justify-center font-bold text-xs opacity-50">
+                      <div className="p-3 bg-zinc-50 border border-zinc-200 dark:border-zinc-800 rounded-2xl flex flex-col items-center justify-center font-bold text-xs opacity-50">
                         <PlayCircle className="w-5 h-5 text-zinc-400 mb-1" />
                         View Video
                       </div>
@@ -3421,9 +3555,11 @@ export default function CreatorStudioPage() {
 
                     <button 
                       onClick={() => {
-                        const watchUrl = `${window.location.origin}/screen/watch/${savedVideoId}`;
-                        navigator.clipboard.writeText(watchUrl);
-                        alert('Video link copied to clipboard!');
+                        if (savedVideoId) {
+                          const watchUrl = `${window.location.origin}/screen/watch/${savedVideoId}`;
+                          navigator.clipboard.writeText(watchUrl);
+                          alert('Video link copied to clipboard!');
+                        }
                       }}
                       className="p-3 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-950 dark:hover:bg-zinc-850 border border-zinc-200 dark:border-zinc-800 rounded-2xl flex flex-col items-center justify-center font-bold text-xs cursor-pointer"
                     >
@@ -3433,8 +3569,13 @@ export default function CreatorStudioPage() {
 
                     <button 
                       onClick={() => {
+                        if (savedVideoId) {
+                          const vid = creatorVideos.find((v: any) => v.id === savedVideoId);
+                          if (vid) {
+                            openEditModal(vid);
+                          }
+                        }
                         resetForm();
-                        setActiveTab('content');
                       }}
                       className="p-3 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-950 dark:hover:bg-zinc-850 border border-zinc-200 dark:border-zinc-800 rounded-2xl flex flex-col items-center justify-center font-bold text-xs cursor-pointer"
                     >
@@ -3445,7 +3586,7 @@ export default function CreatorStudioPage() {
                     <button 
                       onClick={() => {
                         resetForm();
-                        setActiveTab('dashboard');
+                        handleTabChange('dashboard');
                       }}
                       className="p-3 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-950 dark:hover:bg-zinc-850 border border-zinc-200 dark:border-zinc-800 rounded-2xl flex flex-col items-center justify-center font-bold text-xs cursor-pointer"
                     >
@@ -3457,7 +3598,7 @@ export default function CreatorStudioPage() {
                   <Button 
                     onClick={() => {
                       resetForm();
-                      setActiveTab('content');
+                      handleTabChange('content');
                     }}
                     className="w-full py-4.5 bg-zinc-900 hover:bg-zinc-850 dark:bg-zinc-800 text-white font-bold text-xs rounded-2xl shadow"
                   >
@@ -3466,6 +3607,114 @@ export default function CreatorStudioPage() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Video Metadata Editor Modal */}
+        {editingVideo && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 max-w-lg w-full space-y-5 shadow-2xl max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-center border-b border-zinc-150 dark:border-zinc-850 pb-4">
+                <h3 className="font-bold text-sm text-zinc-855 dark:text-white flex items-center gap-2">
+                  <Paintbrush className="w-5 h-5 text-teal-500" />
+                  Edit Video Details
+                </h3>
+                <button onClick={() => setEditingVideo(null)} className="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-bold text-zinc-400 uppercase">Title</label>
+                  <input
+                    type="text"
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    className="w-full p-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-teal-500/30"
+                    placeholder="Video title"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-bold text-zinc-400 uppercase">Description</label>
+                  <textarea
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    rows={4}
+                    className="w-full p-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-teal-500/30 resize-none"
+                    placeholder="Video description..."
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-bold text-zinc-400 uppercase">Category</label>
+                    <select
+                      value={editCategory}
+                      onChange={(e) => setEditCategory(e.target.value)}
+                      className="w-full p-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 rounded-2xl text-xs focus:outline-none"
+                    >
+                      {VIDEO_CATEGORIES.filter(c => c !== 'Recommended' && c !== 'Trending' && c !== 'Latest' && c !== 'Subscriptions').map(c => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-bold text-zinc-400 uppercase">Visibility</label>
+                    <select
+                      value={editVisibility}
+                      onChange={(e) => setEditVisibility(e.target.value)}
+                      className="w-full p-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 rounded-2xl text-xs focus:outline-none"
+                    >
+                      <option value="public">Public</option>
+                      <option value="private">Private</option>
+                      <option value="unlisted">Unlisted</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-bold text-zinc-400 uppercase">Status</label>
+                  <select
+                    value={editStatus}
+                    onChange={(e) => setEditStatus(e.target.value)}
+                    className="w-full p-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 rounded-2xl text-xs focus:outline-none"
+                  >
+                    <option value="published">Published</option>
+                    <option value="draft">Draft</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-bold text-zinc-400 uppercase">Custom Thumbnail URL</label>
+                  <input
+                    type="text"
+                    value={editThumbnailUrl}
+                    onChange={(e) => setEditThumbnailUrl(e.target.value)}
+                    className="w-full p-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-teal-500/30"
+                    placeholder="https://example.com/thumbnail.jpg"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <Button
+                  onClick={() => setEditingVideo(null)}
+                  variant="outline"
+                  className="flex-1 rounded-2xl text-xs font-bold border-zinc-200 dark:border-zinc-850"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleSaveEdit}
+                  className="flex-1 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-2xl text-xs shadow-lg"
+                >
+                  <Save className="w-4 h-4 mr-1" /> Save Changes
+                </Button>
+              </div>
+            </div>
           </div>
         )}
 

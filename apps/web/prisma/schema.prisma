@@ -1316,6 +1316,7 @@ model ScreenVideo {
   thumbnailUrl  String?  // Custom thumbnail (for simulated videos)
   category      String   @default("General")
   visibility    String   @default("public") // "public" | "private" | "unlisted"
+  status        String   @default("published") // "published" | "draft"
   viewsCount    Int      @default(0)
   likesCount    Int      @default(0)
   isSimulation  Boolean  @default(false)

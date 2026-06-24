@@ -147,6 +147,18 @@ export async function getScreenVideos(searchQuery?: string, category?: string, l
       }
     }
 
+    // Draft filter fallback
+    if (currentUserId) {
+      andConditions.push({
+        OR: [
+          { status: 'published' },
+          { userId: currentUserId }
+        ]
+      });
+    } else {
+      andConditions.push({ status: 'published' });
+    }
+
     if (searchQuery && searchQuery.trim() !== '') {
       andConditions.push({
         OR: [
@@ -820,7 +832,8 @@ export async function saveSimulatedScreenVideo(
   visibility: string,
   thumbnailUrl: string,
   mediaUrl: string,
-  isReel = false
+  isReel = false,
+  status = 'published'
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -856,23 +869,26 @@ export async function saveSimulatedScreenVideo(
         mediaUrl,
         duration: 360 + Math.floor(Math.random() * 240), // random duration
         isSimulation: true,
+        status,
         userId: currentUserId
       }
     });
 
-    // Also create a Feed Post so it shows up in the main Feed
-    await prisma.post.create({
-      data: {
-        caption: `🎥 **${title}**\n\n${description || ''}`,
-        mediaUrls: mediaUrl,
-        mediaTypes: 'video',
-        postType: 'regular',
-        status: 'published',
-        visibility: 'public',
-        authorId: currentUserId,
-        isSimulation: true
-      }
-    });
+    if (status !== 'draft') {
+      // Also create a Feed Post so it shows up in the main Feed
+      await prisma.post.create({
+        data: {
+          caption: `🎥 **${title}**\n\n${description || ''}`,
+          mediaUrls: mediaUrl,
+          mediaTypes: 'video',
+          postType: 'regular',
+          status: 'published',
+          visibility: 'public',
+          authorId: currentUserId,
+          isSimulation: true
+        }
+      });
+    }
 
     return { success: true, video: JSON.parse(JSON.stringify(video)) };
   } catch (err) {
@@ -924,3 +940,50 @@ export async function getCreatorComments() {
     return { success: false, error: 'Failed to fetch comments' };
   }
 }
+
+/**
+ * Update video metadata (title, description, category, visibility, thumbnailUrl, status)
+ */
+export async function updateScreenVideo(
+  id: string,
+  data: {
+    title: string;
+    description?: string;
+    category?: string;
+    visibility?: string;
+    thumbnailUrl?: string;
+    status?: string;
+  }
+) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) return { success: false, error: 'Unauthorized' };
+    const userId = (session.user as any).id;
+
+    // Check ownership
+    const existing = await prisma.screenVideo.findUnique({
+      where: { id }
+    });
+    if (!existing || existing.userId !== userId) {
+      return { success: false, error: 'Unauthorized or video not found' };
+    }
+
+    const updated = await prisma.screenVideo.update({
+      where: { id },
+      data: {
+        title: data.title,
+        description: data.description ?? null,
+        category: data.category ?? 'General',
+        visibility: data.visibility ?? 'public',
+        thumbnailUrl: data.thumbnailUrl ?? null,
+        status: data.status ?? 'published'
+      }
+    });
+
+    return { success: true, video: JSON.parse(JSON.stringify(updated)) };
+  } catch (err: any) {
+    console.error('Error updating video:', err);
+    return { success: false, error: err.message || 'Failed to update video details' };
+  }
+}
+
