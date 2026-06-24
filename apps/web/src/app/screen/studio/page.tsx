@@ -2438,6 +2438,25 @@ export default function CreatorStudioPage() {
                         </div>
                       )}
                     </div>
+
+                    {/* Navigation Buttons for Step 2 */}
+                    <div className="flex justify-between gap-4 pt-4 border-t border-zinc-150 dark:border-zinc-800">
+                      <Button 
+                        type="button"
+                        onClick={() => setCurrentStep(1)} 
+                        variant="outline" 
+                        className="rounded-xl text-xs px-5 border-zinc-200 dark:border-zinc-800 font-bold"
+                      >
+                        <ChevronLeft className="w-4 h-4 mr-1" /> Back
+                      </Button>
+                      <Button 
+                        type="button"
+                        onClick={() => setCurrentStep(3)} 
+                        className="bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs px-6 rounded-xl flex items-center gap-1 shadow"
+                      >
+                        Continue to AI Optimization <ArrowRight className="w-4 h-4 ml-1" />
+                      </Button>
+                    </div>
                   </div>
                 )}
 
@@ -3253,6 +3272,15 @@ export default function CreatorStudioPage() {
                     )}
 
                     <form onSubmit={handleStartPublish} className="pt-2 flex gap-3">
+                      <Button
+                        type="button"
+                        onClick={() => setCurrentStep(4)}
+                        variant="outline"
+                        className="rounded-2xl text-xs px-5 border-zinc-200 dark:border-zinc-850 font-bold"
+                      >
+                        <ChevronLeft className="w-4 h-4 mr-1" /> Back
+                      </Button>
+
                       <Button
                         type="submit"
                         disabled={uploadStatus === 'uploading' || uploadStatus === 'processing'}
