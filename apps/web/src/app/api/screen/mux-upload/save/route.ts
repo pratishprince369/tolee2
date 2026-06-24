@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     const currentUserId = (session.user as any).id;
 
     const body = await request.json();
-    const { title, description, assetId, category = 'General', visibility = 'public', status = 'published', isReel = false } = body;
+    const { title, description, assetId, uploadId, category = 'General', visibility = 'public', status = 'published', isReel = false } = body;
 
     if (!assetId) {
       return NextResponse.json({ success: false, error: 'Missing assetId' }, { status: 400 });
@@ -56,6 +56,7 @@ export async function POST(request: Request) {
         description,
         muxAssetId: assetId,
         muxPlaybackId: playbackId,
+        muxUploadId: uploadId || null,
         mediaUrl: videoUrl,
         duration,
         category,

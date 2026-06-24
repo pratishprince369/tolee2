@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { 
   getCreatorAnalytics, getCreatorVideos, createMuxDirectUpload, 
-  saveScreenVideo, saveSimulatedScreenVideo, updateScreenVideo,
+  saveScreenVideo, saveSimulatedScreenVideo, updateScreenVideo, deleteScreenVideo,
   getPlaylists, createPlaylist, addVideoToPlaylist,
   getCreatorComments, togglePinComment, toggleHeartComment,
   checkMuxUploadStatus
@@ -685,7 +685,7 @@ export default function CreatorStudioPage() {
       const saveReq = await fetch('/api/screen/mux-upload/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, description, assetId, category, visibility, isReel, status: publishStatus })
+        body: JSON.stringify({ title, description, assetId, uploadId: res.uploadId, category, visibility, isReel, status: publishStatus })
       });
       const saveRes = await saveReq.json();
 
@@ -1344,7 +1344,7 @@ export default function CreatorStudioPage() {
                           <button onClick={() => alert('Schedule Publishing')} className="p-1.5 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-950 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-xl" title="Schedule"><Calendar className="w-3.5 h-3.5 text-teal-650" /></button>
                           <button onClick={() => alert('Duplicate Metadata Draft')} className="p-1.5 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-950 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-xl" title="Duplicate"><Copy className="w-3.5 h-3.5 text-teal-650" /></button>
                           <button onClick={() => alert('Download video file')} className="p-1.5 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-950 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-xl" title="Download"><Download className="w-3.5 h-3.5 text-teal-650" /></button>
-                          <button onClick={() => { if(confirm('Confirm delete video permanently?')) alert('Video deletion simulated.'); }} className="p-1.5 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-950 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-xl text-red-500" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
+                          <button onClick={async () => { if(confirm('Confirm delete video permanently? This will also remove it from Mux.')) { const res = await deleteScreenVideo(vid.id); if(res.success) { loadStudioData(); } else { alert(res.error || 'Failed to delete video'); } } }} className="p-1.5 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-950 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-xl text-red-500" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
                         </td>
                       </tr>
                     ))}

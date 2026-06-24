@@ -987,3 +987,54 @@ export async function updateScreenVideo(
   }
 }
 
+/**
+ * Delete a video from the database AND from Mux
+ */
+export async function deleteScreenVideo(videoId: string) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) return { success: false, error: 'Unauthorized' };
+    const userId = (session.user as any).id;
+
+    // Find the video and verify ownership
+    const video = await prisma.screenVideo.findUnique({
+      where: { id: videoId },
+    });
+
+    if (!video) return { success: false, error: 'Video not found' };
+    if (video.userId !== userId) return { success: false, error: 'Unauthorized' };
+
+    // Delete the Mux asset if it exists
+    if (video.muxAssetId) {
+      try {
+        await mux.video.assets.delete(video.muxAssetId);
+        console.log(`[Mux] Deleted asset: ${video.muxAssetId}`);
+      } catch (muxErr: any) {
+        // Don't fail the whole operation if Mux delete fails (asset may already be gone)
+        console.warn(`[Mux] Failed to delete asset ${video.muxAssetId}:`, muxErr.message);
+      }
+    }
+
+    // Delete related feed posts that reference this video
+    try {
+      await prisma.post.deleteMany({
+        where: {
+          userId,
+          content: { contains: videoId },
+        },
+      });
+    } catch (postErr) {
+      console.warn('[Delete] Failed to clean up related posts:', postErr);
+    }
+
+    // Delete the video from the database (cascading deletes will handle likes, comments, playlists)
+    await prisma.screenVideo.delete({
+      where: { id: videoId },
+    });
+
+    return { success: true };
+  } catch (err: any) {
+    console.error('Error deleting video:', err);
+    return { success: false, error: err.message || 'Failed to delete video' };
+  }
+}
