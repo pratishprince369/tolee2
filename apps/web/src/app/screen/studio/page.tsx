@@ -71,6 +71,7 @@ export default function CreatorStudioPage() {
   // Videos List State
   const [creatorVideos, setCreatorVideos] = useState<any[]>([]);
   const [loadingVideos, setLoadingVideos] = useState(false);
+  const [videoLoadError, setVideoLoadError] = useState<string | null>(null);
 
   // Wizard state
   const [currentStep, setCurrentStep] = useState(1);
@@ -255,9 +256,12 @@ export default function CreatorStudioPage() {
 
     // Fetch video listings
     setLoadingVideos(true);
+    setVideoLoadError(null);
     const vidRes = await getCreatorVideos(currentUserId);
     if (vidRes.success && vidRes.videos) {
       setCreatorVideos(vidRes.videos);
+    } else {
+      setVideoLoadError(vidRes.error || 'Failed to load videos');
     }
     setLoadingVideos(false);
 
@@ -978,6 +982,14 @@ export default function CreatorStudioPage() {
               Upload Video
             </button>
           </div>
+        </div>
+
+        {/* Dynamic Studio Debug Banner */}
+        <div className="p-3 bg-teal-500/10 border border-teal-500/20 text-teal-700 dark:text-teal-400 rounded-2xl text-[10px] font-bold flex flex-wrap items-center gap-x-6 gap-y-2">
+          <span className="flex items-center gap-1">🔒 Auth: <span className="text-zinc-650 dark:text-zinc-300">{status}</span></span>
+          <span className="flex items-center gap-1">👤 User ID: <span className="text-zinc-650 dark:text-zinc-300">{currentUserId || 'Null / Loading'}</span></span>
+          <span className="flex items-center gap-1">📹 DB Videos: <span className="text-zinc-650 dark:text-zinc-300">{creatorVideos.length}</span></span>
+          {videoLoadError && <span className="text-red-500 flex items-center gap-1 font-extrabold">❌ Error: {videoLoadError}</span>}
         </div>
 
         {/* Tab 1: Dashboard Analytics & Monetization */}
