@@ -172,11 +172,13 @@ export const HLSVideo = forwardRef<HTMLVideoElement, HLSVideoProps>(
       const hls = new Hls({
         enableWorker: true,
         capLevelToPlayerSize: true,
-        maxBufferLength: 10,
-        maxMaxBufferLength: 15,
-        backBufferLength: 10,
+        maxBufferLength: 4,       // Buffer only 4s initially for fast start
+        maxMaxBufferLength: 10,   // Allow up to 10s once playing
+        backBufferLength: 5,
         lowLatencyMode: true,
-        startLevel: 0, // lowest bitrate level initially for instant startup
+        startLevel: 0,            // Lowest bitrate for instant startup
+        startFragPrefetch: true,  // Start downloading first fragment immediately
+        testBandwidth: false,     // Skip bandwidth test, start playing now
       });
       hlsRef.current = hls;
       hls.loadSource(src);

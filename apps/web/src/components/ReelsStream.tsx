@@ -330,12 +330,9 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
 
   const activeIndex = isDesktop ? desktopActiveIndex : mobileActiveIndex;
   
-  // Calculate buffer window dynamically
-  const bufferAhead = direction === 'down' ? network.bufferAhead : 0;
-  const bufferBehind = direction === 'up' ? 2 : 1;
-
+  // Always preload 2 ahead + 1 behind for instant playback
   const shouldLoadSlide = (idx: number) => {
-    return idx >= activeIndex - bufferBehind && idx <= activeIndex + bufferAhead;
+    return idx >= activeIndex - 1 && idx <= activeIndex + 2;
   };
 
   /* ── Modal state ── */
