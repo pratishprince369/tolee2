@@ -1073,30 +1073,13 @@ const ReelSlide = memo(function ReelSlide({
         />
       )}
 
-      {/* ── Reel Loading Skeleton Overlay ── */}
+      {/* ── Reel Loading Spinner ── */}
       <div 
-        className={`absolute inset-0 z-10 bg-black/45 flex flex-col justify-end p-4 pointer-events-none transition-opacity duration-500 ${
+        className={`absolute inset-0 z-10 flex items-center justify-center pointer-events-none transition-opacity duration-300 ${
           isActive && !isReady && !isError ? 'opacity-100' : 'opacity-0'
         }`}
       >
-        {/* Skeleton Controls (right side) */}
-        <div className="absolute right-4 bottom-32 flex flex-col gap-5 items-center">
-          <div className="w-10 h-10 rounded-full bg-white/20" />
-          <div className="w-10 h-10 rounded-full bg-white/20" />
-          <div className="w-10 h-10 rounded-full bg-white/20" />
-          <div className="w-10 h-10 rounded-full bg-white/20" />
-        </div>
-
-        {/* Skeleton Bottom Info */}
-        <div className="space-y-3 max-w-[80%] pb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-white/20" />
-            <div className="w-24 h-4 bg-white/20 rounded" />
-            <div className="w-16 h-6 bg-white/20 rounded-lg" />
-          </div>
-          <div className="w-full h-3 bg-white/20 rounded" />
-          <div className="w-2/3 h-3 bg-white/20 rounded" />
-        </div>
+        <Loader2 className="w-10 h-10 text-white animate-spin" />
       </div>
 
       {/* ── Error Placeholder ── */}
@@ -1306,28 +1289,13 @@ const AdReelSlide = memo(function AdReelSlide({
                   />
                 )}
 
-                {/* ── Ad Reel Loading Skeleton Overlay ── */}
+                {/* ── Ad Reel Loading Spinner ── */}
                 <div 
-                  className={`absolute inset-0 z-10 bg-black/45 flex flex-col justify-end p-4 pointer-events-none transition-opacity duration-500 ${
+                  className={`absolute inset-0 z-10 flex items-center justify-center pointer-events-none transition-opacity duration-300 ${
                     isActive && !isReady && !isError ? 'opacity-100' : 'opacity-0'
                   }`}
                 >
-                  {/* Skeleton Controls (right side) */}
-                  <div className="absolute right-4 bottom-32 flex flex-col gap-5 items-center">
-                    <div className="w-10 h-10 rounded-full bg-white/20" />
-                    <div className="w-10 h-10 rounded-full bg-white/20" />
-                    <div className="w-10 h-10 rounded-full bg-white/20" />
-                  </div>
-
-                  {/* Skeleton Bottom Info */}
-                  <div className="space-y-3 max-w-[80%] pb-6">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-white/20" />
-                      <div className="w-24 h-4 bg-white/20 rounded" />
-                    </div>
-                    <div className="w-full h-3 bg-white/20 rounded" />
-                    <div className="w-2/3 h-3 bg-white/20 rounded" />
-                  </div>
+                  <Loader2 className="w-10 h-10 text-white animate-spin" />
                 </div>
 
                 {/* Error placeholder */}
