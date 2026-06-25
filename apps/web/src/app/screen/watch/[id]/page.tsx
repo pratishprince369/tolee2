@@ -19,6 +19,7 @@ import {
   getPlaylists, createPlaylist, addVideoToPlaylist, removeVideoFromPlaylist,
   toggleSubscribeChannel 
 } from '@/actions/screen';
+import { videoMetadataCache } from '@/lib/videoCache';
 
 // Format helpers
 function formatDuration(seconds: number | null) {
@@ -124,12 +125,26 @@ export default function WatchVideoPage({ params }: PageProps) {
 
   // Load details
   useEffect(() => {
+    // Try to load from local cache first for instant playback start
+    const cached = videoMetadataCache.get(params.id);
+    if (cached) {
+      setVideo(cached);
+      setLikesCount(cached.likesCount || cached.likes || 0);
+      setDislikesCount(cached.dislikesCount || 0);
+      setLoading(false);
+    }
+
     async function loadVideoDetails() {
-      setLoading(true);
+      if (!cached) {
+        setLoading(true);
+      }
       const res = await getScreenVideoDetails(params.id);
       if (res.success && res.video) {
         setVideo(res.video);
         setRecommended(res.recommended || []);
+        
+        // Populate/update the metadata cache
+        videoMetadataCache.set(params.id, res.video);
         
         // Setup initial social counts
         setLikeStatus(res.video.userLikeStatus);
@@ -138,8 +153,10 @@ export default function WatchVideoPage({ params }: PageProps) {
         setIsSubscribed(res.video.isSubscribed);
         setSubscriberCount(res.video.subscriberCount);
       } else {
-        alert(res.error || 'Video not found');
-        router.push('/screen');
+        if (!cached) {
+          alert(res.error || 'Video not found');
+          router.push('/screen');
+        }
       }
       setLoading(false);
     }

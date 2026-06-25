@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { useSession } from 'next-auth/react';
 import { getScreenVideos } from '@/actions/screen';
+import { videoMetadataCache } from '@/lib/videoCache';
 
 const VIDEO_CATEGORIES = [
   'Recommended', 'Trending', 'Latest', 'Subscriptions',
@@ -123,6 +124,9 @@ export default function ScreenPage() {
     );
 
     if (res.success && res.videos) {
+      res.videos.forEach((video: any) => {
+        videoMetadataCache.set(video.id, video);
+      });
       if (isLoadMore) {
         setVideos(prev => [...prev, ...res.videos!]);
       } else {

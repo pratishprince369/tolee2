@@ -104,6 +104,10 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
           location: post.location || null,
           subLocation: post.subLocation || null,
           createdAt: post.createdAt,
+          duration: 15,
+          aspectRatio: '9:16',
+          videoType: 'hls',
+          audioInfo: 'Original Audio',
         };
       });
     }
@@ -195,6 +199,10 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
               location: post.location || null,
               subLocation: post.subLocation || null,
               createdAt: post.createdAt,
+              duration: 15,
+              aspectRatio: '9:16',
+              videoType: 'hls',
+              audioInfo: 'Original Audio',
             };
             dbReels.unshift(singleReel);
           }

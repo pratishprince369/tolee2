@@ -26,6 +26,7 @@ import {
 import { toggleFollow } from '@/actions/user';
 import { HLSVideo, getSoundPreference, setSoundPreference } from '@/components/HLSVideo';
 import { useNetworkConfig } from '@/hooks/useNetworkConfig';
+import { videoMetadataCache } from '@/lib/videoCache';
 import { formatViewCount } from '@/lib/utils';
 import { ReShareModal } from '@/components/ReShareModal';
 import { ShareModal } from '@/components/ShareModal';
@@ -156,6 +157,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
   useEffect(() => {
     const seen = new Set(originalReelsRef.current.map(r => r.id));
     initialReels.forEach(r => {
+      videoMetadataCache.set(r.id, r);
       if (!seen.has(r.id)) {
         originalReelsRef.current.push(r);
         seen.add(r.id);
@@ -187,6 +189,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
         // Add to original pool of reels
         const seenIds = new Set(originalReelsRef.current.map((r: any) => r.id));
         newReels.forEach((r: any) => {
+          videoMetadataCache.set(r.id, r);
           if (!seenIds.has(r.id)) {
             originalReelsRef.current.push(r);
           }

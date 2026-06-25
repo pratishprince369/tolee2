@@ -11,6 +11,7 @@ import {
   setSoundPreference
 } from '@/components/HLSVideo';
 import { getPosterUrl } from '@/lib/media';
+import { videoMetadataCache } from '@/lib/videoCache';
 
 interface PostCarouselProps {
   mediaUrls: string;
@@ -222,6 +223,19 @@ export function PostCarousel({ mediaUrls, mediaTypes, postId }: PostCarouselProp
   const [activeIndex, setActiveIndex] = useState(0);
   const touchStartX = useRef<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Cache the thumbnail and video metadata when component mounts/renders
+  useEffect(() => {
+    if (postId && mediaUrls) {
+      videoMetadataCache.set(postId, {
+        id: postId,
+        video: mediaUrls.split(/,(?=https?:\/\/)/)[0],
+        thumbnailUrl: getPosterUrl(mediaUrls.split(/,(?=https?:\/\/)/)[0]),
+        mediaUrls,
+        mediaTypes,
+      });
+    }
+  }, [postId, mediaUrls, mediaTypes]);
 
   const urls = mediaUrls ? mediaUrls.split(/,(?=https?:\/\/)/).map(url => url.trim()).filter(Boolean) : [];
   const rawTypes = mediaTypes ? mediaTypes.split(',').map(t => t.trim().toLowerCase()) : [];
