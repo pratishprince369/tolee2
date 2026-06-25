@@ -419,16 +419,9 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
       }
     }
 
-    // If fetch failed or it is not a simulated video, skip to the next available reel after 2 seconds
-    console.log(`[ReelsStream] Playback failed. Scheduling auto-skip to next reel in 2 seconds...`);
-    setTimeout(() => {
-      const nextIndex = index + 1;
-      if (nextIndex < itemsToRender.length) {
-        const scrollRef = isDesktop ? desktopScrollRef : mobileScrollRef;
-        scrollToReel(scrollRef, nextIndex);
-      }
-    }, 2000);
-  }, [isDesktop, desktopActiveIndex, mobileActiveIndex, itemsToRender, retriedUrls, scrollToReel]);
+    // Do NOT auto-scroll to the next reel anymore. Let the user scroll manually.
+    console.log(`[ReelsStream] Playback failed. Waiting for user interaction.`);
+  }, [isDesktop, desktopActiveIndex, mobileActiveIndex, itemsToRender, retriedUrls]);
 
   const handleNewPost = (post: any, postData?: any) => {
     const isVideo = post && post.mediaTypes && (post.mediaTypes === 'video' || post.mediaTypes.split(',')[0] === 'video');
@@ -1005,19 +998,8 @@ const ReelSlide = memo(function ReelSlide({
     if (isActive) {
       setIsReady(false);
       setIsError(false);
-
-      const timeoutId = setTimeout(() => {
-        if (!isReady) {
-          console.warn(`[Reel Playback Timeout] Slide index ${index} took too long to load. Skipping...`);
-          if (onPlaybackFailed) {
-            onPlaybackFailed(index, `Video load timed out after 5000ms`);
-          }
-        }
-      }, 5000);
-
-      return () => clearTimeout(timeoutId);
     }
-  }, [isActive, isReady, index, onPlaybackFailed]);
+  }, [isActive]);
 
   const handleVideoError = (e: any) => {
     setIsError(true);
@@ -1217,19 +1199,8 @@ const AdReelSlide = memo(function AdReelSlide({
     if (isActive) {
       setIsReady(false);
       setIsError(false);
-
-      const timeoutId = setTimeout(() => {
-        if (!isReady) {
-          console.warn(`[Ad Reel Playback Timeout] Slide index ${index} took too long to load. Skipping...`);
-          if (onPlaybackFailed) {
-            onPlaybackFailed(index, `Ad video load timed out after 5000ms`);
-          }
-        }
-      }, 5000);
-
-      return () => clearTimeout(timeoutId);
     }
-  }, [isActive, isReady, index, onPlaybackFailed]);
+  }, [isActive]);
 
   const handleVideoError = (e: any) => {
     setIsError(true);
