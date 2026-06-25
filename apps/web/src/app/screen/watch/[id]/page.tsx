@@ -107,6 +107,7 @@ export default function WatchVideoPage({ params }: PageProps) {
   // AI Suggestions
   const [aiReplies, setAiReplies] = useState<string[]>([]);
   const [isAIFiltering, setIsAIFiltering] = useState(false);
+  const [isReady, setIsReady] = useState(false);
 
   // Stream source config: checks direct MP4 first, then builds fallbacks
   const videoSource = video ? (video.mediaUrl || (video.muxPlaybackId ? `https://stream.mux.com/${video.muxPlaybackId}.m3u8` : '')) : '';
@@ -602,32 +603,38 @@ export default function WatchVideoPage({ params }: PageProps) {
               className="relative aspect-video rounded-3xl overflow-hidden bg-black shadow-2xl border border-zinc-200 dark:border-zinc-900/60 group"
               style={{ filter: `brightness(${brightness}%)` }}
             >
-              {videoSource ? (
+              {videoSource && (
                 <video
                   ref={videoRef}
                   autoPlay
                   onClick={togglePlay}
                   onTimeUpdate={handleTimeUpdate}
                   onLoadedMetadata={handleLoadedMetadata}
-                  className="w-full h-full object-contain"
+                  onCanPlay={() => setIsReady(true)}
+                  onLoadStart={() => setIsReady(false)}
+                  className={`w-full h-full object-contain transition-opacity duration-500 ${isReady ? 'opacity-100' : 'opacity-0'}`}
                 />
-              ) : (
-                <div className="w-full h-full relative flex items-center justify-center bg-zinc-950 animate-pulse">
-                  {video.thumbnailUrl && (
-                    <img 
-                      src={video.thumbnailUrl} 
-                      alt={video.title} 
-                      className="absolute inset-0 w-full h-full object-cover opacity-45 filter blur-[2px]" 
-                    />
-                  )}
-                  <div className="relative z-10 flex flex-col items-center gap-2 text-white">
-                    <div className="w-12 h-12 rounded-full bg-white/20 animate-pulse flex items-center justify-center">
-                      <Play className="w-5 h-5 text-white/70 fill-white/20" />
-                    </div>
-                    <p className="text-[11px] font-bold text-white/60 tracking-wider">PREPARING STREAM...</p>
-                  </div>
-                </div>
               )}
+              
+              <div 
+                className={`absolute inset-0 flex flex-col items-center justify-center bg-zinc-950 pointer-events-none transition-opacity duration-500 ${
+                  !isReady ? 'opacity-100 z-10' : 'opacity-0 -z-10'
+                }`}
+              >
+                {video?.thumbnailUrl && (
+                  <img 
+                    src={video.thumbnailUrl} 
+                    alt={video.title} 
+                    className="absolute inset-0 w-full h-full object-cover opacity-45 filter blur-[2px] scale-105" 
+                  />
+                )}
+                <div className="relative z-10 flex flex-col items-center gap-2 text-white">
+                  <div className="w-12 h-12 rounded-full bg-white/20 animate-pulse flex items-center justify-center">
+                    <Play className="w-5 h-5 text-white/70 fill-white/20" />
+                  </div>
+                  <p className="text-[11px] font-bold text-white/60 tracking-wider">PREPARING STREAM...</p>
+                </div>
+              </div>
 
               {/* Fading Double Tap Overlay */}
               {doubleTapOverlay.show && (

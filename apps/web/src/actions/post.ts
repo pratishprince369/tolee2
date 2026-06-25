@@ -2272,6 +2272,10 @@ export async function getReels(skip = 0, take = 20) {
         location: post.location || null,
         subLocation: post.subLocation || null,
         createdAt: post.createdAt,
+        duration: 15,
+        aspectRatio: '9:16',
+        videoType: 'hls',
+        audioInfo: 'Original Audio',
       };
     });
 

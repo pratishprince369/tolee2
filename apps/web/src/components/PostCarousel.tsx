@@ -34,6 +34,7 @@ function CarouselVideo({ src, isActive, shouldLoad, postId }: CarouselVideoProps
   const [isVisible, setIsVisible] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [isError, setIsError] = useState(false);
+  const [isBuffering, setIsBuffering] = useState(false);
 
   useEffect(() => {
     setIsReady(false);
@@ -111,24 +112,16 @@ function CarouselVideo({ src, isActive, shouldLoad, postId }: CarouselVideoProps
     const video = videoRef.current;
     if (!video) return;
 
-    if (isActive && isVisible && !isError) {
-      if (isReady || video.readyState >= 1) {
-        setGlobalActiveVideo(video);
-        video.muted = getSoundPreference();
-        video.play().catch((e) => {
-          if (e.name !== 'AbortError') {
-            console.log('[CarouselVideo] play blocked:', e.message);
-            if (!video.muted) {
-              video.muted = true;
-              setIsMuted(true);
-              setSoundPreference(true);
-              video.play().catch((err) => {
-                console.error('[CarouselVideo] play failed even after muting:', err.message);
-              });
-            }
-          }
-        });
-      }
+    if (isActive && isVisible) {
+      // Small delay to prevent layout thrashing on fast scrolls
+      const t = setTimeout(() => {
+        if (isActive && isVisible && !isError) {
+          setGlobalActiveVideo(video);
+          video.muted = getSoundPreference();
+          video.play().catch(() => {});
+        }
+      }, 50);
+      return () => clearTimeout(t);
     } else {
       video.pause();
       if (getGlobalActiveVideo() === video) {
@@ -187,15 +180,18 @@ function CarouselVideo({ src, isActive, shouldLoad, postId }: CarouselVideoProps
           setIsReady(false);
           setIsError(false);
         }}
+        onBufferingChange={setIsBuffering}
       />
       
-      {isActive && isVisible && !isReady && !isError && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/45 z-10 animate-pulse pointer-events-none">
-          <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
-            <Play className="w-5 h-5 text-white/50 fill-white/10" />
-          </div>
+      <div 
+        className={`absolute inset-0 flex items-center justify-center bg-black/45 z-10 pointer-events-none transition-opacity duration-500 ${
+          isActive && isVisible && !isReady && !isError ? 'opacity-100' : 'opacity-0'
+        }`}
+      >
+        <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center animate-pulse">
+          <Play className="w-5 h-5 text-white/50 fill-white/10" />
         </div>
-      )}
+      </div>
 
       {isError && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-950 text-center p-4 z-10 space-y-3">

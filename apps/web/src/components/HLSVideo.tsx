@@ -51,6 +51,7 @@ interface HLSVideoProps extends React.VideoHTMLAttributes<HTMLVideoElement> {
   contentType?: 'post' | 'reel';
   trafficSource?: string;
   isVisible?: boolean;
+  onBufferingChange?: (isBuffering: boolean) => void;
 }
 
 export const HLSVideo = forwardRef<HTMLVideoElement, HLSVideoProps>(
@@ -64,6 +65,7 @@ export const HLSVideo = forwardRef<HTMLVideoElement, HLSVideoProps>(
       contentType,
       trafficSource,
       isVisible = true,
+      onBufferingChange,
       ...props
     },
     ref
@@ -80,6 +82,30 @@ export const HLSVideo = forwardRef<HTMLVideoElement, HLSVideoProps>(
       isActive: !!isActive,
       isVisible: !!isVisible,
     });
+
+    useEffect(() => {
+      const video = videoRef.current;
+      if (!video) return;
+
+      const handleWaiting = () => {
+        if (onBufferingChange) onBufferingChange(true);
+      };
+      const handlePlaying = () => {
+        if (onBufferingChange) onBufferingChange(false);
+      };
+
+      video.addEventListener('waiting', handleWaiting);
+      video.addEventListener('playing', handlePlaying);
+      video.addEventListener('seeking', handleWaiting);
+      video.addEventListener('seeked', handlePlaying);
+
+      return () => {
+        video.removeEventListener('waiting', handleWaiting);
+        video.removeEventListener('playing', handlePlaying);
+        video.removeEventListener('seeking', handleWaiting);
+        video.removeEventListener('seeked', handlePlaying);
+      };
+    }, [onBufferingChange]);
   const hlsRef = useRef<Hls | null>(null);
   // Track whether video is currently "loaded" (src attached & ready)
   const loadedRef = useRef(false);
@@ -150,6 +176,7 @@ export const HLSVideo = forwardRef<HTMLVideoElement, HLSVideoProps>(
         maxMaxBufferLength: 15,
         backBufferLength: 10,
         lowLatencyMode: true,
+        startLevel: 0, // lowest bitrate level initially for instant startup
       });
       hlsRef.current = hls;
       hls.loadSource(src);

@@ -198,7 +198,15 @@ export async function getScreenVideos(searchQuery?: string, category?: string, l
       nextCursor = nextItem?.id || null;
     }
 
-    return { success: true, videos: JSON.parse(JSON.stringify(videos)), nextCursor };
+    const enrichedVideos = videos.map((video: any) => ({
+      ...video,
+      aspectRatio: '16:9',
+      videoType: video.muxPlaybackId ? 'hls' : 'mp4',
+      audioInfo: 'Original Audio',
+      duration: video.duration || 15,
+    }));
+
+    return { success: true, videos: JSON.parse(JSON.stringify(enrichedVideos)), nextCursor };
   } catch (error) {
     console.error('Error fetching screen videos:', error);
     return { success: false, error: 'Failed to fetch videos' };

@@ -25,6 +25,7 @@ import {
 } from '@/actions/post';
 import { toggleFollow } from '@/actions/user';
 import { HLSVideo, getSoundPreference, setSoundPreference } from '@/components/HLSVideo';
+import { useNetworkConfig } from '@/hooks/useNetworkConfig';
 import { formatViewCount } from '@/lib/utils';
 import { ReShareModal } from '@/components/ReShareModal';
 import { ShareModal } from '@/components/ShareModal';
@@ -310,6 +311,30 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
   const mobileActiveIndex = useActiveReelIndex(mobileScrollRef, itemsToRender.length);
   const desktopActiveIndex = useActiveReelIndex(desktopScrollRef, itemsToRender.length);
 
+  const network = useNetworkConfig();
+  const lastIndexRef = useRef(0);
+  const [direction, setDirection] = useState<'down' | 'up'>('down');
+
+  useEffect(() => {
+    const activeIndex = isDesktop ? desktopActiveIndex : mobileActiveIndex;
+    if (activeIndex > lastIndexRef.current) {
+      setDirection('down');
+    } else if (activeIndex < lastIndexRef.current) {
+      setDirection('up');
+    }
+    lastIndexRef.current = activeIndex;
+  }, [mobileActiveIndex, desktopActiveIndex, isDesktop]);
+
+  const activeIndex = isDesktop ? desktopActiveIndex : mobileActiveIndex;
+  
+  // Calculate buffer window dynamically
+  const bufferAhead = direction === 'down' ? network.bufferAhead : 0;
+  const bufferBehind = direction === 'up' ? 2 : 1;
+
+  const shouldLoadSlide = (idx: number) => {
+    return idx >= activeIndex - bufferBehind && idx <= activeIndex + bufferAhead;
+  };
+
   /* ── Modal state ── */
   const [activeCommentReel, setActiveCommentReel] = useState<string | null>(null);
   const [activeRepostReel, setActiveRepostReel] = useState<string | null>(null);
@@ -344,8 +369,6 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
 
   useEffect(() => { trackView(mobileActiveIndex); }, [mobileActiveIndex, trackView]);
   useEffect(() => { trackView(desktopActiveIndex); }, [desktopActiveIndex, trackView]);
-
-  const activeIndex = isDesktop ? desktopActiveIndex : mobileActiveIndex;
 
   useEffect(() => {
     // When the user approaches the end of the loaded reels (e.g. index is reels.length - 6, i.e. 5 remaining reels)
@@ -659,7 +682,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
                     contentId={precedingReelId}
                     toleeId={precedingToleeId}
                     onPlaybackFailed={handlePlaybackFailed}
-                    shouldLoad={!isDesktop && index >= mobileActiveIndex - 1 && index <= mobileActiveIndex + 3}
+                    shouldLoad={shouldLoadSlide(index)}
                   />
                 );
               }
@@ -679,7 +702,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
                   followStatus={followStates[reel.authorId]}
                   onFollow={() => handleFollowAuthor(reel.authorId, reel.author, reel.id)}
                   onPlaybackFailed={handlePlaybackFailed}
-                  shouldLoad={!isDesktop && index >= mobileActiveIndex - 1 && index <= mobileActiveIndex + 3}
+                  shouldLoad={shouldLoadSlide(index)}
                   {...makeActions(reel, originalIndex)}
                 />
               );
@@ -772,7 +795,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
                       contentId={precedingReelId}
                       toleeId={precedingToleeId}
                       onPlaybackFailed={handlePlaybackFailed}
-                      shouldLoad={isDesktop && index >= desktopActiveIndex - 1 && index <= desktopActiveIndex + 3}
+                      shouldLoad={shouldLoadSlide(index)}
                     />
                   );
                 }
@@ -792,7 +815,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
                     followStatus={followStates[reel.authorId]}
                     onFollow={() => handleFollowAuthor(reel.authorId, reel.author, reel.id)}
                     onPlaybackFailed={handlePlaybackFailed}
-                    shouldLoad={isDesktop && index >= desktopActiveIndex - 1 && index <= desktopActiveIndex + 3}
+                    shouldLoad={shouldLoadSlide(index)}
                     {...makeActions(reel, originalIndex)}
                   />
                 );
@@ -1048,28 +1071,30 @@ const ReelSlide = memo(function ReelSlide({
       )}
 
       {/* ── Reel Loading Skeleton Overlay ── */}
-      {isActive && !isReady && !isError && (
-        <div className="absolute inset-0 z-10 bg-black/40 flex flex-col justify-end p-4 pointer-events-none animate-pulse">
-          {/* Skeleton Controls (right side) */}
-          <div className="absolute right-4 bottom-32 flex flex-col gap-5 items-center">
-            <div className="w-10 h-10 rounded-full bg-white/20" />
-            <div className="w-10 h-10 rounded-full bg-white/20" />
-            <div className="w-10 h-10 rounded-full bg-white/20" />
-            <div className="w-10 h-10 rounded-full bg-white/20" />
-          </div>
-
-          {/* Skeleton Bottom Info */}
-          <div className="space-y-3 max-w-[80%] pb-6">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-white/20" />
-              <div className="w-24 h-4 bg-white/20 rounded" />
-              <div className="w-16 h-6 bg-white/20 rounded-lg" />
-            </div>
-            <div className="w-full h-3 bg-white/20 rounded" />
-            <div className="w-2/3 h-3 bg-white/20 rounded" />
-          </div>
+      <div 
+        className={`absolute inset-0 z-10 bg-black/45 flex flex-col justify-end p-4 pointer-events-none transition-opacity duration-500 ${
+          isActive && !isReady && !isError ? 'opacity-100' : 'opacity-0'
+        }`}
+      >
+        {/* Skeleton Controls (right side) */}
+        <div className="absolute right-4 bottom-32 flex flex-col gap-5 items-center">
+          <div className="w-10 h-10 rounded-full bg-white/20" />
+          <div className="w-10 h-10 rounded-full bg-white/20" />
+          <div className="w-10 h-10 rounded-full bg-white/20" />
+          <div className="w-10 h-10 rounded-full bg-white/20" />
         </div>
-      )}
+
+        {/* Skeleton Bottom Info */}
+        <div className="space-y-3 max-w-[80%] pb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-white/20" />
+            <div className="w-24 h-4 bg-white/20 rounded" />
+            <div className="w-16 h-6 bg-white/20 rounded-lg" />
+          </div>
+          <div className="w-full h-3 bg-white/20 rounded" />
+          <div className="w-2/3 h-3 bg-white/20 rounded" />
+        </div>
+      </div>
 
       {/* ── Error Placeholder ── */}
       {isError && (
@@ -1279,26 +1304,28 @@ const AdReelSlide = memo(function AdReelSlide({
                 )}
 
                 {/* ── Ad Reel Loading Skeleton Overlay ── */}
-                {isActive && !isReady && !isError && (
-                  <div className="absolute inset-0 z-10 bg-black/40 flex flex-col justify-end p-4 pointer-events-none animate-pulse">
-                    {/* Skeleton Controls (right side) */}
-                    <div className="absolute right-4 bottom-32 flex flex-col gap-5 items-center">
-                      <div className="w-10 h-10 rounded-full bg-white/20" />
-                      <div className="w-10 h-10 rounded-full bg-white/20" />
-                      <div className="w-10 h-10 rounded-full bg-white/20" />
-                    </div>
-
-                    {/* Skeleton Bottom Info */}
-                    <div className="space-y-3 max-w-[80%] pb-6">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-white/20" />
-                        <div className="w-24 h-4 bg-white/20 rounded" />
-                      </div>
-                      <div className="w-full h-3 bg-white/20 rounded" />
-                      <div className="w-2/3 h-3 bg-white/20 rounded" />
-                    </div>
+                <div 
+                  className={`absolute inset-0 z-10 bg-black/45 flex flex-col justify-end p-4 pointer-events-none transition-opacity duration-500 ${
+                    isActive && !isReady && !isError ? 'opacity-100' : 'opacity-0'
+                  }`}
+                >
+                  {/* Skeleton Controls (right side) */}
+                  <div className="absolute right-4 bottom-32 flex flex-col gap-5 items-center">
+                    <div className="w-10 h-10 rounded-full bg-white/20" />
+                    <div className="w-10 h-10 rounded-full bg-white/20" />
+                    <div className="w-10 h-10 rounded-full bg-white/20" />
                   </div>
-                )}
+
+                  {/* Skeleton Bottom Info */}
+                  <div className="space-y-3 max-w-[80%] pb-6">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full bg-white/20" />
+                      <div className="w-24 h-4 bg-white/20 rounded" />
+                    </div>
+                    <div className="w-full h-3 bg-white/20 rounded" />
+                    <div className="w-2/3 h-3 bg-white/20 rounded" />
+                  </div>
+                </div>
 
                 {/* Error placeholder */}
                 {isError && (
