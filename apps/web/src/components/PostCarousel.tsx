@@ -171,6 +171,10 @@ function CarouselVideo({ src, isActive, shouldLoad, postId }: CarouselVideoProps
         src={src}
         isActive={isActive && isVisible}
         shouldLoad={isVisible && shouldLoad}
+        contentId={postId}
+        contentType="post"
+        trafficSource="feed"
+        isVisible={isVisible}
         className="w-full h-full object-contain"
         loop
         muted={isMuted}

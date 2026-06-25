@@ -581,7 +581,7 @@ export async function removeVideoFromPlaylist(playlistId: string, videoId: strin
 /**
  * Channel Subscription toggle (Subscribers mapping to Followers)
  */
-export async function toggleSubscribeChannel(creatorId: string) {
+export async function toggleSubscribeChannel(creatorId: string, sourcePostId?: string) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user || !(session.user as any).id) {
@@ -612,7 +612,8 @@ export async function toggleSubscribeChannel(creatorId: string) {
         data: {
           subscriberId: currentUserId,
           creatorId,
-          bellPreference: 'ALL'
+          bellPreference: 'ALL',
+          sourcePostId: sourcePostId || null
         }
       });
 

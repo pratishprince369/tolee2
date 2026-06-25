@@ -736,6 +736,10 @@ const ReelSlide = memo(function ReelSlide({
         poster={getPosterUrl(reel.video)}
         isActive={isActive}
         shouldLoad={true}
+        contentId={reel.id}
+        contentType="reel"
+        trafficSource="profile"
+        isVisible={isActive}
         loop
         muted={isMuted}
         playsInline

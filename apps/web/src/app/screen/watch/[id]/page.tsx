@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { usePlaybackTracker } from '@/hooks/usePlaybackTracker';
 import { 
   getScreenVideoDetails, toggleLikeScreenVideo, getScreenVideoComments, 
   addScreenVideoComment, togglePinComment, toggleHeartComment, 
@@ -109,6 +110,16 @@ export default function WatchVideoPage({ params }: PageProps) {
 
   // Stream source config: checks direct MP4 first, then builds fallbacks
   const videoSource = video ? (video.mediaUrl || (video.muxPlaybackId ? `https://stream.mux.com/${video.muxPlaybackId}.m3u8` : '')) : '';
+
+  // Video Playback Analytics Tracking
+  usePlaybackTracker({
+    videoElement: videoRef.current,
+    contentId: video?.id || '',
+    contentType: 'post',
+    trafficSource: 'screen',
+    isActive: !loading && !!video,
+    isVisible: true,
+  });
 
   // Load details
   useEffect(() => {
@@ -408,7 +419,7 @@ export default function WatchVideoPage({ params }: PageProps) {
       return;
     }
 
-    const res = await toggleSubscribeChannel(video.userId);
+    const res = await toggleSubscribeChannel(video.userId, video.id);
     if (res.success) {
       setIsSubscribed(res.subscribed || false);
       setSubscriberCount(prev => res.subscribed ? prev + 1 : prev - 1);

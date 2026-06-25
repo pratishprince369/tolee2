@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import Hls from 'hls.js';
+import { usePlaybackTracker } from '@/hooks/usePlaybackTracker';
 
 /* ─────────────────────────────────────────────────────────────────────
    MODULE-LEVEL SINGLETON: The one HTMLVideoElement that is currently
@@ -46,6 +47,10 @@ interface HLSVideoProps extends React.VideoHTMLAttributes<HTMLVideoElement> {
   isActive?: boolean;
   shouldLoad?: boolean;
   ignoreGlobalActive?: boolean;
+  contentId?: string;
+  contentType?: 'post' | 'reel';
+  trafficSource?: string;
+  isVisible?: boolean;
 }
 
 export const HLSVideo = forwardRef<HTMLVideoElement, HLSVideoProps>(
@@ -55,12 +60,26 @@ export const HLSVideo = forwardRef<HTMLVideoElement, HLSVideoProps>(
       isActive = true,
       shouldLoad = true,
       ignoreGlobalActive = false,
+      contentId,
+      contentType,
+      trafficSource,
+      isVisible = true,
       ...props
     },
     ref
   ) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     useImperativeHandle(ref, () => videoRef.current as HTMLVideoElement);
+
+    // Track active video playback session
+    usePlaybackTracker({
+      videoElement: videoRef.current,
+      contentId: contentId || '',
+      contentType: contentType || 'post',
+      trafficSource,
+      isActive: !!isActive,
+      isVisible: !!isVisible,
+    });
   const hlsRef = useRef<Hls | null>(null);
   // Track whether video is currently "loaded" (src attached & ready)
   const loadedRef = useRef(false);

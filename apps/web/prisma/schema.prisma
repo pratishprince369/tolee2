@@ -80,6 +80,7 @@ model User {
   highlights    Highlight[]
   reposts       Repost[]
   views         View[]
+  playbackSessions VideoPlaybackSession[]
   
   // New features
   listings      Listing[]     @relation("Seller")
@@ -275,6 +276,9 @@ model Post {
   savedBy     SavedPost[]
   reposts     Repost[]
   views       View[]
+  playbackSessions VideoPlaybackSession[]
+  gainedFollows Follow[] @relation("PostFollows")
+  gainedSubscriptions Subscription[] @relation("PostSubscriptions")
   worldProjectId String?
   worldProject   WorldProject? @relation(fields: [worldProjectId], references: [id], onDelete: Cascade)
 
@@ -431,8 +435,11 @@ model Follow {
   createdAt   DateTime @default(now())
   follower    User @relation("Follower", fields: [followerId], references: [id])
   following   User @relation("Following", fields: [followingId], references: [id])
+  sourcePostId String?
+  sourcePost   Post?   @relation("PostFollows", fields: [sourcePostId], references: [id], onDelete: SetNull)
 
   @@id([followerId, followingId])
+  @@index([sourcePostId])
 }
 
 model Like {
@@ -614,13 +621,19 @@ model View {
   
   createdAt           DateTime @default(now())
 
-  user                User?    @relation(fields: [viewer_user_id], references: [id], onDelete: SetNull)
-  post                Post     @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  postId              String?
+  screenVideoId       String?
+
+  user                User?        @relation(fields: [viewer_user_id], references: [id], onDelete: SetNull)
+  post                Post?        @relation(fields: [postId], references: [id], onDelete: Cascade)
+  screenVideo         ScreenVideo? @relation(fields: [screenVideoId], references: [id], onDelete: Cascade)
 
   // Strictly enforce unique view per content per unique viewer
   @@unique([contentId, viewer_hash])
   
   @@index([contentId])
+  @@index([postId])
+  @@index([screenVideoId])
   @@index([viewer_user_id])
   @@index([device_fingerprint])
 }
@@ -1346,6 +1359,8 @@ model ScreenVideo {
   comments      ScreenVideoComment[]
   playlists     ScreenVideoPlaylist[]
   reports       ScreenVideoReport[]
+  playbackSessions VideoPlaybackSession[]
+  views         View[]
 }
 
 model ScreenVideoLike {
@@ -1400,8 +1415,11 @@ model Subscription {
   creator        User     @relation("CreatorSubscriptions", fields: [creatorId], references: [id], onDelete: Cascade)
   bellPreference String   @default("ALL") // "ALL" | "PERSONALIZED" | "NONE"
   createdAt      DateTime @default(now())
+  sourcePostId   String?
+  sourcePost     Post?    @relation("PostSubscriptions", fields: [sourcePostId], references: [id], onDelete: SetNull)
 
   @@unique([subscriberId, creatorId])
+  @@index([sourcePostId])
 }
 
 // ---------------------------------------------------------
@@ -1419,4 +1437,66 @@ model ScreenVideoReport {
   createdAt   DateTime    @default(now())
 
   @@unique([videoId, reporterId])
+}
+
+// ---------------------------------------------------------
+// VIDEO PLAYBACK SESSION & CREATOR ANALYTICS
+// ---------------------------------------------------------
+model VideoPlaybackSession {
+  id                 String   @id @default(cuid())
+  contentId          String   // References Post.id or Reel.id
+  contentType        String   // "post" or "reel"
+  
+  // Viewer identification
+  viewer_user_id     String?
+  device_fingerprint String?
+  ip_address         String?
+  user_agent         String?
+  
+  // Session Metrics
+  watchTime          Float    // Cumulative time watched in seconds
+  videoDuration      Float    // Total duration of the video in seconds
+  completionRate     Float    // (watchTime / videoDuration) * 100
+  playbackStart      DateTime
+  playbackEnd        DateTime @default(now())
+  
+  // Device & Geo Metadata
+  deviceType         String?  // "mobile" | "tablet" | "desktop"
+  browser            String?
+  os                 String?
+  country            String?  @default("India")
+  city               String?  @default("Mumbai")
+  language           String?  @default("en")
+  referrer           String?  @default("direct")
+  trafficSource      String?  @default("feed") // "feed" | "screen" | "reels" | "shared_link" | "search" | "profile" | "map" | "marketplace" | "external"
+  
+  // Spam Detection flags
+  isVerified         Boolean  @default(false)
+  isSpam             Boolean  @default(false)
+  spamReason         String?
+  
+  // Retention Checkpoints
+  reached10s         Boolean  @default(false)
+  reached25          Boolean  @default(false)
+  reached50          Boolean  @default(false)
+  reached75          Boolean  @default(false)
+  reached100         Boolean  @default(false)
+  
+  createdAt          DateTime @default(now())
+
+  postId             String?
+  screenVideoId      String?
+
+  // Relations
+  user               User?        @relation(fields: [viewer_user_id], references: [id], onDelete: SetNull)
+  post               Post?        @relation(fields: [postId], references: [id], onDelete: Cascade)
+  screenVideo        ScreenVideo? @relation(fields: [screenVideoId], references: [id], onDelete: Cascade)
+
+  @@index([contentId])
+  @@index([viewer_user_id])
+  @@index([createdAt])
+  @@index([isSpam])
+  @@index([isVerified])
+  @@index([postId])
+  @@index([screenVideoId])
 }

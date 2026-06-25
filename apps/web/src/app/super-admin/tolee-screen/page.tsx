@@ -305,6 +305,42 @@ export default function ToleeScreenAdminPage() {
 
               {/* Detailed Analytics Grid */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 20 }}>
+                {/* Verification Queue & Anti-Spam */}
+                <div style={{ background: '#0d0d0f', border: '1px solid #1c1c1e', borderRadius: 16, padding: 24 }}>
+                  <h3 style={{ fontSize: 16, fontWeight: 700, color: '#fff', marginBottom: 20 }}>Verification & Anti-Spam Queue</h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #1c1c1e', paddingBottom: 10 }}>
+                      <span style={{ color: '#a1a1aa' }}>Verified Platform Views</span>
+                      <span style={{ color: '#22c55e', fontWeight: 600 }}>{analyticsData.totalPlatformViews?.toLocaleString() || 0}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #1c1c1e', paddingBottom: 10 }}>
+                      <span style={{ color: '#a1a1aa' }}>Filtered Spam Views</span>
+                      <span style={{ color: '#ef4444', fontWeight: 600 }}>{analyticsData.totalSpamViews?.toLocaleString() || 0}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #1c1c1e', paddingBottom: 10 }}>
+                      <span style={{ color: '#a1a1aa' }}>Pending Verification</span>
+                      <span style={{ color: '#f59e0b', fontWeight: 600 }}>{analyticsData.totalPendingViews?.toLocaleString() || 0}</span>
+                    </div>
+                    
+                    {/* Spam Reasons breakdown */}
+                    <div style={{ marginTop: 10 }}>
+                      <span style={{ color: '#fff', fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 8 }}>Spam Filtration Breakdown</span>
+                      {(!analyticsData.spamReasons || analyticsData.spamReasons.length === 0) ? (
+                        <span style={{ color: '#71717a', fontSize: 11 }}>No spam views detected. System clean!</span>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          {analyticsData.spamReasons.map((r: any) => (
+                            <div key={r.reason} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+                              <span style={{ color: '#71717a' }}>{r.reason}</span>
+                              <span style={{ color: '#ef4444', fontWeight: 600 }}>{r.count} sessions</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
                 {/* Engagement Breakdown */}
                 <div style={{ background: '#0d0d0f', border: '1px solid #1c1c1e', borderRadius: 16, padding: 24 }}>
                   <h3 style={{ fontSize: 16, fontWeight: 700, color: '#fff', marginBottom: 20 }}>Engagement Metrics</h3>

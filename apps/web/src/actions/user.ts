@@ -16,7 +16,7 @@ function safeRevalidatePath(path: string, type?: 'layout' | 'page') {
   }
 }
 
-export async function toggleFollow(targetUserId: string) {
+export async function toggleFollow(targetUserId: string, sourcePostId?: string) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user || !(session.user as any).id) {
@@ -82,7 +82,8 @@ export async function toggleFollow(targetUserId: string) {
           data: {
             followerId: currentUserId,
             followingId: targetUserId,
-            status: 'pending'
+            status: 'pending',
+            sourcePostId: sourcePostId || null
           }
         });
 
@@ -114,7 +115,8 @@ export async function toggleFollow(targetUserId: string) {
               data: {
                 followerId: currentUserId,
                 followingId: targetUserId,
-                status: 'approved'
+                status: 'approved',
+                sourcePostId: sourcePostId || null
               }
             }),
             prisma.friendship.createMany({
@@ -130,7 +132,8 @@ export async function toggleFollow(targetUserId: string) {
             data: {
               followerId: currentUserId,
               followingId: targetUserId,
-              status: 'approved'
+              status: 'approved',
+              sourcePostId: sourcePostId || null
             }
           });
         }

@@ -13,6 +13,7 @@ interface SubscribeButtonProps {
   showCount?: boolean;
   className?: string;
   onSubscribeChange?: (subscribed: boolean) => void;
+  sourcePostId?: string;
 }
 
 export function SubscribeButton({
@@ -23,7 +24,8 @@ export function SubscribeButton({
   compact = false,
   showCount = false,
   className = '',
-  onSubscribeChange
+  onSubscribeChange,
+  sourcePostId
 }: SubscribeButtonProps) {
   const [subscribed, setSubscribed] = useState(initialSubscribed);
   const [bellPref, setBellPref] = useState<string | null>(initialBellPreference);
@@ -59,7 +61,7 @@ export function SubscribeButton({
     if (loading) return;
     setLoading(true);
     try {
-      const res = await toggleSubscription(creatorId);
+      const res = await toggleSubscription(creatorId, sourcePostId);
       if (res.success) {
         setSubscribed(res.subscribed!);
         setCount(prev => res.subscribed ? prev + 1 : Math.max(0, prev - 1));

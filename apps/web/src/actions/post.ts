@@ -1278,7 +1278,7 @@ export async function getReposts(postId: string) {
   }
 }
 
-export async function recordView(contentId: string, contentType: 'post' | 'reel', deviceFingerprint?: string) {
+export async function recordView(contentId: string, contentType: 'post' | 'reel' | 'screen', deviceFingerprint?: string) {
   try {
     const session = await getServerSession(authOptions);
     const userId = session?.user ? (session.user as any).id : null;
@@ -1291,10 +1291,13 @@ export async function recordView(contentId: string, contentType: 'post' | 'reel'
     const ip_address = reqHeaders.get('x-forwarded-for') || reqHeaders.get('x-real-ip') || '';
     const user_agent = reqHeaders.get('user-agent') || '';
 
-    // Create a robust unique hash for DB uniqueness check
+    // Create a robust unique hash for DB uniqueness check with rolling 24-hour date suffix
+    const todayStr = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
     const viewer_hash = userId 
-      ? `user_${userId}` 
-      : `anon_${deviceFingerprint}_${ip_address.split(',')[0]}`;
+      ? `user_${userId}_${todayStr}` 
+      : `anon_${deviceFingerprint}_${ip_address.split(',')[0]}_${todayStr}`;
+
+    const isScreen = contentType === 'screen';
 
     await prisma.view.create({
       data: {
@@ -1304,19 +1307,202 @@ export async function recordView(contentId: string, contentType: 'post' | 'reel'
         device_fingerprint: deviceFingerprint,
         ip_address,
         user_agent,
-        viewer_hash
+        viewer_hash,
+        postId: isScreen ? null : contentId,
+        screenVideoId: isScreen ? contentId : null
       }
     });
+
+    // If it is a screen video, we also increment the viewsCount field in the ScreenVideo table
+    if (isScreen) {
+      await prisma.screenVideo.update({
+        where: { id: contentId },
+        data: { viewsCount: { increment: 1 } }
+      }).catch(err => console.error("Error incrementing ScreenVideo viewsCount:", err));
+    }
 
     return { success: true };
   } catch (error: any) {
     if (error?.code === 'P2002') {
-      // Unique constraint failed = User/Device has already viewed this! 
+      // Unique constraint failed = User/Device has already viewed this within 24 hours! 
       // This is expected and ensures accurate counts, so we silently succeed.
       return { success: true, duplicate: true };
     }
     console.error("Error recording view:", error);
     return { success: false, error: 'Failed to record view' };
+  }
+}
+
+export async function submitPlaybackSession(data: {
+  contentId: string;
+  contentType: 'post' | 'reel' | 'screen';
+  watchTime: number;
+  videoDuration: number;
+  playbackStart: string; // ISO string
+  playbackEnd: string;   // ISO string
+  deviceFingerprint?: string;
+  trafficSource?: string;
+  referrer?: string;
+  language?: string;
+  isAutomation?: boolean;
+}) {
+  try {
+    const session = await getServerSession(authOptions);
+    const userId = session?.user ? (session.user as any).id : null;
+    
+    const reqHeaders = headers();
+    const ip_address = reqHeaders.get('x-forwarded-for') || reqHeaders.get('x-real-ip') || '';
+    const user_agent = reqHeaders.get('user-agent') || '';
+
+    // Approximate geolocation from headers
+    const country = reqHeaders.get('x-vercel-ip-country') || 'India';
+    const city = reqHeaders.get('x-vercel-ip-city') || 'Mumbai';
+
+    // Parse User Agent to identify OS, Browser, Device Type
+    let deviceType = 'desktop';
+    let os = 'Unknown';
+    let browser = 'Other';
+
+    const ua = user_agent.toLowerCase();
+    
+    // Simple device detection
+    if (ua.includes('ipad') || ua.includes('tablet')) {
+      deviceType = 'tablet';
+    } else if (ua.includes('mobile') || ua.includes('android') || ua.includes('iphone') || ua.includes('ipod')) {
+      deviceType = 'mobile';
+    }
+
+    // OS detection
+    if (ua.includes('windows')) os = 'Windows';
+    else if (ua.includes('macintosh') || ua.includes('mac os')) os = 'macOS';
+    else if (ua.includes('iphone') || ua.includes('ipad') || ua.includes('ipod')) os = 'iOS';
+    else if (ua.includes('android')) os = 'Android';
+    else if (ua.includes('linux')) os = 'Linux';
+
+    // Browser detection
+    if (ua.includes('firefox')) browser = 'Firefox';
+    else if (ua.includes('chrome') || ua.includes('crios')) browser = 'Chrome';
+    else if (ua.includes('safari') && !ua.includes('chrome')) browser = 'Safari';
+    else if (ua.includes('edge') || ua.includes('edg')) browser = 'Edge';
+
+    // Spam Detection Pipeline
+    let isSpam = false;
+    let spamReason: string | null = null;
+
+    // Rule 1: Headless / Automation tools
+    if (
+      data.isAutomation ||
+      ua.includes('headlesschrome') ||
+      ua.includes('puppeteer') ||
+      ua.includes('selenium') ||
+      ua.includes('playwright') ||
+      ua.includes('phantomjs') ||
+      ua.includes('bot') ||
+      ua.includes('crawl') ||
+      ua.includes('spider') ||
+      ua.includes('wget') ||
+      ua.includes('curl')
+    ) {
+      isSpam = true;
+      spamReason = 'AUTOMATED_AGENT';
+    }
+
+    // Rule 2: Impossible Playback / Tampering (Elapsed duration vs watchTime)
+    const startMs = new Date(data.playbackStart).getTime();
+    const endMs = new Date(data.playbackEnd).getTime();
+    const elapsedSeconds = (endMs - startMs) / 1000;
+
+    if (!isSpam && data.watchTime > elapsedSeconds * 1.5 + 2) {
+      isSpam = true;
+      spamReason = 'SPEED_TAMPERING';
+    }
+
+    // Rule 3: Extreme Spikes Rate Limiting (recent sessions per video/device/IP)
+    if (!isSpam) {
+      const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+      const recentSessionsCount = await prisma.videoPlaybackSession.count({
+        where: {
+          contentId: data.contentId,
+          createdAt: { gte: tenMinutesAgo },
+          OR: [
+            data.deviceFingerprint ? { device_fingerprint: data.deviceFingerprint } : undefined,
+            ip_address ? { ip_address: ip_address.split(',')[0] } : undefined,
+          ].filter(Boolean) as any[]
+        }
+      });
+
+      if (recentSessionsCount >= 10) {
+        isSpam = true;
+        spamReason = 'RATE_LIMIT_EXCEEDED';
+      }
+    }
+
+    // Checkpoints reached
+    const ratio = data.videoDuration > 0 ? (data.watchTime / data.videoDuration) : 0;
+    const reached10s = data.watchTime >= 10;
+    const reached25 = ratio >= 0.25;
+    const reached50 = ratio >= 0.50;
+    const reached75 = ratio >= 0.75;
+    const reached100 = ratio >= 0.98; // Allow slight buffer for completion
+
+    // Determine view threshold eligibility
+    // Videos < 30s: 5s continuous watch. Videos >= 30s: 10s continuous watch.
+    const viewThreshold = data.videoDuration < 30 ? 5 : 10;
+    const meetsThreshold = data.watchTime >= viewThreshold;
+    const isVerified = !isSpam && meetsThreshold;
+
+    const isScreen = data.contentType === 'screen';
+
+    // Create session record
+    const playbackSession = await prisma.videoPlaybackSession.create({
+      data: {
+        contentId: data.contentId,
+        contentType: data.contentType,
+        viewer_user_id: userId,
+        device_fingerprint: data.deviceFingerprint,
+        ip_address: ip_address.split(',')[0],
+        user_agent,
+        watchTime: data.watchTime,
+        videoDuration: data.videoDuration,
+        completionRate: ratio * 100,
+        playbackStart: new Date(data.playbackStart),
+        playbackEnd: new Date(data.playbackEnd),
+        deviceType,
+        browser,
+        os,
+        country,
+        city,
+        language: data.language || 'en',
+        referrer: data.referrer || 'direct',
+        trafficSource: data.trafficSource || 'feed',
+        isVerified,
+        isSpam,
+        spamReason,
+        reached10s,
+        reached25,
+        reached50,
+        reached75,
+        reached100,
+        postId: isScreen ? null : data.contentId,
+        screenVideoId: isScreen ? data.contentId : null
+      }
+    });
+
+    // If verified, record verified public view
+    if (isVerified) {
+      await recordView(data.contentId, data.contentType, data.deviceFingerprint);
+    }
+
+    return { 
+      success: true, 
+      verified: isVerified, 
+      spam: isSpam, 
+      playbackSessionId: playbackSession.id 
+    };
+
+  } catch (error) {
+    console.error("Error submitting playback session:", error);
+    return { success: false, error: 'Failed to record playback session' };
   }
 }
 

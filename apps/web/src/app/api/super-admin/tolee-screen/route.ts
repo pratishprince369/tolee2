@@ -22,7 +22,8 @@ export async function GET(req: NextRequest) {
         totalVideos, publishedVideos, draftVideos, liveVideos,
         totalCreators, verifiedCreators, simulatedVideos,
         totalSubscriptions, totalReports, flaggedVideos, removedVideos,
-        totalViews, totalLikes, totalComments
+        totalViews, totalLikes, totalComments,
+        totalPlatformViews, totalSpamViews, totalPendingViews, spamReasons
       ] = await Promise.all([
         prisma.screenVideo.count().catch(() => 0),
         prisma.screenVideo.count({ where: { status: 'published' } }).catch(() => 0),
@@ -37,7 +38,15 @@ export async function GET(req: NextRequest) {
         prisma.screenVideo.count({ where: { moderationStatus: 'removed' } }).catch(() => 0),
         prisma.screenVideo.aggregate({ _sum: { viewsCount: true } }).then((r: any) => r._sum.viewsCount || 0).catch(() => 0),
         prisma.screenVideo.aggregate({ _sum: { likesCount: true } }).then((r: any) => r._sum.likesCount || 0).catch(() => 0),
-        prisma.screenVideoComment.count().catch(() => 0)
+        prisma.screenVideoComment.count().catch(() => 0),
+        prisma.videoPlaybackSession.count({ where: { isVerified: true } }).catch(() => 0),
+        prisma.videoPlaybackSession.count({ where: { isSpam: true } }).catch(() => 0),
+        prisma.videoPlaybackSession.count({ where: { isVerified: false, isSpam: false } }).catch(() => 0),
+        prisma.videoPlaybackSession.groupBy({
+          by: ['spamReason'],
+          _count: { id: true },
+          where: { isSpam: true }
+        }).catch(() => [])
       ]);
 
       // Top 5 categories
@@ -65,7 +74,14 @@ export async function GET(req: NextRequest) {
             count: c._count.id
           })),
           estimatedWatchHours: Math.round((totalViews as number) * 4.2 / 3600),
-          avgRetention: 62.4 // placeholder - real calculation would need watch event tracking
+          avgRetention: 62.4, // placeholder
+          totalPlatformViews,
+          totalSpamViews,
+          totalPendingViews,
+          spamReasons: (spamReasons as any[]).map((r: any) => ({
+            reason: r.spamReason || 'UNKNOWN',
+            count: r._count.id
+          }))
         }
       });
     }

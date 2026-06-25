@@ -7,7 +7,7 @@ import { authOptions } from '@/lib/auth';
 /**
  * Toggle subscription to a creator
  */
-export async function toggleSubscription(creatorId: string) {
+export async function toggleSubscription(creatorId: string, sourcePostId?: string) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user || !(session.user as any).id) {
@@ -38,7 +38,8 @@ export async function toggleSubscription(creatorId: string) {
         data: {
           subscriberId: currentUserId,
           creatorId,
-          bellPreference: 'ALL'
+          bellPreference: 'ALL',
+          sourcePostId: sourcePostId || null
         }
       });
 
@@ -267,5 +268,203 @@ export async function reportScreenVideo(videoId: string, reason: string, descrip
   } catch (err) {
     console.error('reportScreenVideo error:', err);
     return { success: false, error: 'Failed to report video' };
+  }
+}
+
+/**
+ * Fetch detailed video analytics for the creator dashboard
+ */
+export async function getCreatorVideoAnalytics() {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !(session.user as any).id) {
+      return { success: false, error: 'Unauthorized' };
+    }
+    const currentUserId = (session.user as any).id;
+
+    // 1. Fetch all screen videos owned by the creator
+    const screenVideos = await prisma.screenVideo.findMany({
+      where: { userId: currentUserId },
+      select: { id: true, title: true, createdAt: true, viewsCount: true, duration: true }
+    });
+
+    // 2. Fetch all video posts (reels/feed videos) owned by the creator
+    const posts = await prisma.post.findMany({
+      where: {
+        authorId: currentUserId,
+        mediaTypes: { contains: 'video' }
+      },
+      select: { id: true, caption: true, createdAt: true }
+    });
+
+    const videoIds = screenVideos.map(v => v.id);
+    const postIds = posts.map(p => p.id);
+    const allContentIds = [...videoIds, ...postIds];
+
+    if (allContentIds.length === 0) {
+      return {
+        success: true,
+        stats: {
+          totalViews: 0,
+          totalWatchTime: 0,
+          subscribersGained: 0,
+          followersGained: 0,
+          avgWatchTime: 0,
+          engagementRate: 0,
+          returningViewers: 0
+        },
+        trafficSources: {},
+        retention: { reached10s: 0, reached25: 0, reached50: 0, reached75: 0, reached100: 0 },
+        realtime: { last60m: 0, last48h: 0, activeViewers: 0 },
+        topVideos: [],
+        devices: {},
+        geography: {}
+      };
+    }
+
+    // 3. Fetch all verified playback sessions for these content items
+    const sessions = await prisma.videoPlaybackSession.findMany({
+      where: {
+        contentId: { in: allContentIds },
+        isVerified: true
+      }
+    });
+
+    // 4. Aggregate core stats
+    const totalViews = sessions.length;
+    const totalWatchTime = sessions.reduce((sum, s) => sum + s.watchTime, 0) / 3600; // in hours
+    const avgWatchTime = totalViews > 0 ? (sessions.reduce((sum, s) => sum + s.watchTime, 0) / totalViews) : 0; // in seconds
+
+    // 5. Subscribers / Followers gained from these videos
+    const subscribersGained = await prisma.subscription.count({
+      where: { sourcePostId: { in: allContentIds } }
+    });
+
+    const followersGained = await prisma.follow.count({
+      where: { sourcePostId: { in: allContentIds } }
+    });
+
+    // 6. Real-time stats (last 60 min, last 48h)
+    const now = new Date();
+    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+    const fortyEightHoursAgo = new Date(now.getTime() - 48 * 60 * 60 * 1000);
+
+    const last60m = sessions.filter(s => new Date(s.createdAt) >= oneHourAgo).length;
+    const last48h = sessions.filter(s => new Date(s.createdAt) >= fortyEightHoursAgo).length;
+
+    // 7. Returning Viewers (viewers who watched at least twice)
+    const viewerCounts: Record<string, number> = {};
+    sessions.forEach(s => {
+      const id = s.viewer_user_id || s.device_fingerprint || s.ip_address || '';
+      if (id) {
+        viewerCounts[id] = (viewerCounts[id] || 0) + 1;
+      }
+    });
+    const returningViewers = Object.values(viewerCounts).filter(c => c > 1).length;
+
+    // 8. Traffic Sources breakdown
+    const trafficSources: Record<string, number> = {};
+    sessions.forEach(s => {
+      const src = s.trafficSource || 'feed';
+      trafficSources[src] = (trafficSources[src] || 0) + 1;
+    });
+
+    // 9. Devices & Geographies breakdown
+    const devices: Record<string, number> = {};
+    const geography: Record<string, number> = {};
+    sessions.forEach(s => {
+      const d = s.deviceType || 'desktop';
+      devices[d] = (devices[d] || 0) + 1;
+
+      const geo = s.city ? `${s.city}, ${s.country}` : (s.country || 'India');
+      geography[geo] = (geography[geo] || 0) + 1;
+    });
+
+    // 10. Audience Retention percentages
+    const reached10s = sessions.filter(s => s.reached10s).length;
+    const reached25 = sessions.filter(s => s.reached25).length;
+    const reached50 = sessions.filter(s => s.reached50).length;
+    const reached75 = sessions.filter(s => s.reached75).length;
+    const reached100 = sessions.filter(s => s.reached100).length;
+
+    const retention = {
+      reached10s: totalViews > 0 ? (reached10s / totalViews) * 100 : 0,
+      reached25: totalViews > 0 ? (reached25 / totalViews) * 100 : 0,
+      reached50: totalViews > 0 ? (reached50 / totalViews) * 100 : 0,
+      reached75: totalViews > 0 ? (reached75 / totalViews) * 100 : 0,
+      reached100: totalViews > 0 ? (reached100 / totalViews) * 100 : 0,
+    };
+
+    // 11. Top Performing Videos
+    const videoViewsMap: Record<string, { title: string; views: number; watchTime: number }> = {};
+    sessions.forEach(s => {
+      const id = s.contentId;
+      if (!videoViewsMap[id]) {
+        const matchingScreen = screenVideos.find(v => v.id === id);
+        const matchingPost = posts.find(p => p.id === id);
+        const title = matchingScreen ? matchingScreen.title : (matchingPost ? (matchingPost.caption?.substring(0, 30) || 'Post Video') : 'Video');
+        videoViewsMap[id] = { title, views: 0, watchTime: 0 };
+      }
+      videoViewsMap[id].views += 1;
+      videoViewsMap[id].watchTime += s.watchTime;
+    });
+
+    const topVideos = Object.entries(videoViewsMap)
+      .map(([id, info]) => ({ id, ...info, watchTime: info.watchTime / 3600 }))
+      .sort((a, b) => b.views - a.views)
+      .slice(0, 5);
+
+    // 12. Engagement rate aggregation (likes + comments + saves / views)
+    let totalLikes = 0;
+    let totalComments = 0;
+    let totalSaves = 0;
+
+    // Fetch counts from db for accuracy
+    const screenVideoStats = await prisma.screenVideo.aggregate({
+      where: { userId: currentUserId },
+      _sum: { likesCount: true, viewsCount: true }
+    });
+
+    const postLikes = await prisma.like.count({ where: { postId: { in: postIds } } });
+    const postComments = await prisma.comment.count({ where: { postId: { in: postIds } } });
+    const postSaves = await prisma.savedPost.count({ where: { postId: { in: postIds } } });
+
+    totalLikes = (screenVideoStats._sum.likesCount || 0) + postLikes;
+    totalComments = postComments; // Screen comments are separate in ScreenVideoComment
+    const screenVideoCommentsCount = await prisma.screenVideoComment.count({
+      where: { videoId: { in: videoIds } }
+    });
+    totalComments += screenVideoCommentsCount;
+    totalSaves = postSaves;
+
+    const totalEngagement = totalLikes + totalComments + totalSaves;
+    const engagementRate = totalViews > 0 ? (totalEngagement / totalViews) * 100 : 0;
+
+    return {
+      success: true,
+      stats: {
+        totalViews,
+        totalWatchTime,
+        subscribersGained,
+        followersGained,
+        avgWatchTime,
+        engagementRate,
+        returningViewers
+      },
+      trafficSources,
+      retention,
+      realtime: {
+        last60m,
+        last48h,
+        activeViewers: last60m
+      },
+      topVideos,
+      devices,
+      geography
+    };
+
+  } catch (err: any) {
+    console.error('getCreatorVideoAnalytics error:', err);
+    return { success: false, error: err.message || 'Failed to fetch analytics data' };
   }
 }

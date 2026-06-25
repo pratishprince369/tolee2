@@ -222,7 +222,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
     }
   }, []);
 
-  const handleFollowAuthor = async (authorId: string, authorName: string) => {
+  const handleFollowAuthor = async (authorId: string, authorName: string, reelId?: string) => {
     const currentStatus = followStates[authorId] || null;
     
     const targetReel = reels.find(r => r.authorId === authorId);
@@ -233,7 +233,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
     // Optimistic state update
     setFollowStates(prev => ({ ...prev, [authorId]: nextStatus }));
 
-    const result = await toggleFollow(authorId);
+    const result = await toggleFollow(authorId, reelId);
     if (!result.success) {
       // Revert state
       setFollowStates(prev => ({ ...prev, [authorId]: currentStatus }));
@@ -677,7 +677,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
                   desktop={false}
                   onMuteToggle={() => handleSetIsMuted((m) => !m)}
                   followStatus={followStates[reel.authorId]}
-                  onFollow={() => handleFollowAuthor(reel.authorId, reel.author)}
+                  onFollow={() => handleFollowAuthor(reel.authorId, reel.author, reel.id)}
                   onPlaybackFailed={handlePlaybackFailed}
                   shouldLoad={!isDesktop && index >= mobileActiveIndex - 1 && index <= mobileActiveIndex + 3}
                   {...makeActions(reel, originalIndex)}
@@ -790,7 +790,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
                     desktop={true}
                     onMuteToggle={() => handleSetIsMuted((m) => !m)}
                     followStatus={followStates[reel.authorId]}
-                    onFollow={() => handleFollowAuthor(reel.authorId, reel.author)}
+                    onFollow={() => handleFollowAuthor(reel.authorId, reel.author, reel.id)}
                     onPlaybackFailed={handlePlaybackFailed}
                     shouldLoad={isDesktop && index >= desktopActiveIndex - 1 && index <= desktopActiveIndex + 3}
                     {...makeActions(reel, originalIndex)}
@@ -825,7 +825,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
                 onFollow={() => {
                   const authorId = reels.find(r => r.id === activeCommentReel)?.authorId;
                   const authorName = reels.find(r => r.id === activeCommentReel)?.author;
-                  if (authorId) handleFollowAuthor(authorId, authorName);
+                  if (authorId) handleFollowAuthor(authorId, authorName, activeCommentReel);
                 }}
               />
             )}
@@ -848,7 +848,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
         onFollow={() => {
           const authorId = reels.find(r => r.id === activeCommentReel)?.authorId;
           const authorName = reels.find(r => r.id === activeCommentReel)?.author;
-          if (authorId) handleFollowAuthor(authorId, authorName);
+          if (authorId) handleFollowAuthor(authorId, authorName, activeCommentReel || undefined);
         }}
       />
 
@@ -1023,6 +1023,10 @@ const ReelSlide = memo(function ReelSlide({
         poster={getPosterUrl(reel.video)}
         isActive={isActive}
         shouldLoad={shouldLoad}
+        contentId={reel.id}
+        contentType="reel"
+        trafficSource="reels"
+        isVisible={isActive}
         loop
         muted={isMuted}
         playsInline

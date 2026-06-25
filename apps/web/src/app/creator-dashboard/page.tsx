@@ -7,9 +7,10 @@ import Link from 'next/link';
 import {
   Crown, Star, TrendingUp, Users, Wallet, Share2, Copy, CheckCircle2,
   Rocket, Award, Zap, ArrowRight, Loader2, Shield, Gift, RefreshCw,
-  Calendar, Clock, Trash2, Archive, Play
+  Calendar, Clock, Trash2, Archive, Play, BarChart2, Eye, MapPin, Plus
 } from 'lucide-react';
 import { getEventsForDashboardAction, deleteEventAction, duplicateEventAction, keepEventInHistoryAction } from '@/actions/event';
+import { getCreatorVideoAnalytics } from '@/actions/creator';
 
 const TIER_CONFIG: Record<string, { emoji: string; color: string; bg: string; label: string }> = {
   creator: { emoji: '🌱', color: '#22c55e', bg: '#052e16', label: 'Creator' },
@@ -25,6 +26,36 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }
   rejected: { label: '❌ Not Approved', color: '#ef4444', bg: 'rgba(239,68,68,0.1)' },
 };
 
+function getEventStatusText(startDateStr: string, endDateStr: string) {
+  const now = new Date();
+  const start = new Date(startDateStr);
+  const end = new Date(endDateStr);
+
+  if (now > end) {
+    return { text: 'Event Ended', badgeClass: 'bg-zinc-200 text-zinc-800 border border-zinc-300' };
+  }
+
+  if (now >= start && now <= end) {
+    return { text: '🔴 LIVE EVENT', badgeClass: 'bg-red-100 text-red-600 font-bold border border-red-200' };
+  }
+
+  const diffMs = start.getTime() - now.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
+  let countdownText = 'Starts in: ';
+  if (diffDays > 0) {
+    countdownText += `${diffDays}d ${diffHours}h`;
+  } else if (diffHours > 0) {
+    countdownText += `${diffHours}h ${diffMins}m`;
+  } else {
+    countdownText += `${diffMins}m`;
+  }
+
+  return { text: countdownText, badgeClass: 'bg-indigo-100 text-indigo-800 font-bold border border-indigo-200' };
+}
+
 export default function CreatorDashboardPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -36,6 +67,8 @@ export default function CreatorDashboardPage() {
   const [dashboardEvents, setDashboardEvents] = useState<any>({ upcoming: [], live: [], ended: [], draft: [] });
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [activeEventTab, setActiveEventTab] = useState<'upcoming' | 'live' | 'ended' | 'draft'>('upcoming');
+  const [analytics, setAnalytics] = useState<any>(null);
+  const [loadingAnalytics, setLoadingAnalytics] = useState(true);
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/auth/signin?callbackUrl=/creator-dashboard');
@@ -50,11 +83,13 @@ export default function CreatorDashboardPage() {
   const fetchData = async () => {
     setLoading(true);
     setLoadingEvents(true);
+    setLoadingAnalytics(true);
     try {
-      const [appRes, walletRes, eventRes] = await Promise.all([
+      const [appRes, walletRes, eventRes, analyticsRes] = await Promise.all([
         fetch('/api/creator/apply'),
         fetch('/api/ads-manager/wallet').catch(() => null),
-        getEventsForDashboardAction()
+        getEventsForDashboardAction(),
+        getCreatorVideoAnalytics().catch(() => ({ success: false }))
       ]);
       const appData = await appRes.json();
       if (appData.application) setApplication(appData.application);
@@ -68,11 +103,16 @@ export default function CreatorDashboardPage() {
       if (eventRes.success && eventRes.events) {
         setDashboardEvents(eventRes.events);
       }
+
+      if (analyticsRes && analyticsRes.success) {
+        setAnalytics(analyticsRes);
+      }
     } catch {
       // silent
     } finally {
       setLoading(false);
       setLoadingEvents(false);
+      setLoadingAnalytics(false);
     }
   };
 
@@ -463,6 +503,278 @@ export default function CreatorDashboardPage() {
             </div>
           )}
         </div>
+
+        {/* 🎥 YouTube Studio Video Analytics Section */}
+        {isApproved && (
+          <div className="card p-6 mt-6 bg-[#090916]/40 border border-purple-500/10">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-white/5">
+              <div className="flex items-center gap-2">
+                <BarChart2 className="w-5 h-5 text-purple-400" />
+                <div>
+                  <h3 className="font-black text-white text-lg">YouTube-Style Video Analytics</h3>
+                  <p className="text-xs text-gray-500 mt-0.5">Real-time verified views, watch time, and audience retention metrics.</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 px-3 py-1 bg-purple-500/10 rounded-full border border-purple-500/20">
+                <span className="w-2 h-2 bg-emerald-400 rounded-full animate-ping" />
+                <span className="text-[10px] font-black text-purple-300 uppercase tracking-wider">Live Tracking Active</span>
+              </div>
+            </div>
+
+            {loadingAnalytics ? (
+              <div className="flex flex-col gap-6 animate-pulse">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="h-20 bg-zinc-850/40 rounded-xl" />
+                  ))}
+                </div>
+                <div className="h-48 bg-zinc-850/40 rounded-2xl" />
+              </div>
+            ) : !analytics ? (
+              <div className="text-center py-12">
+                <p className="text-sm text-gray-500 font-semibold">Failed to load video analytics. Please try refreshing.</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* 1. Core Analytics Stats Grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
+                  {[
+                    { label: 'Total Views', value: analytics.stats.totalViews.toLocaleString(), icon: '👁️', color: '#a855f7' },
+                    { label: 'Watch Time', value: `${analytics.stats.totalWatchTime.toFixed(1)}h`, icon: '⏳', color: '#3b82f6' },
+                    { label: 'Subscribers', value: `+${analytics.stats.subscribersGained}`, icon: '👥', color: '#22c55e' },
+                    { label: 'Followers', value: `+${analytics.stats.followersGained}`, icon: '⚡', color: '#f59e0b' },
+                    { label: 'Avg Watch Time', value: `${analytics.stats.avgWatchTime.toFixed(0)}s`, icon: '📈', color: '#ec4899' },
+                    { label: 'Engagement Rate', value: `${analytics.stats.engagementRate.toFixed(1)}%`, icon: '🔥', color: '#06b6d4' },
+                  ].map((stat, i) => (
+                    <div key={i} className="p-4 rounded-xl border border-white/5 bg-white/[0.01] hover:border-purple-500/10 transition-all">
+                      <div className="text-lg mb-1">{stat.icon}</div>
+                      <div className="text-[10px] text-gray-500 uppercase tracking-wider">{stat.label}</div>
+                      <div className="text-base font-black mt-1" style={{ color: stat.color }}>{stat.value}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* 2. Real-Time Viewers & Retention Graph */}
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
+                  
+                  {/* Left Column: Real-Time Stats & Audience Retention */}
+                  <div className="md:col-span-8 space-y-5">
+                    
+                    {/* Real-Time Stats */}
+                    <div className="p-5 rounded-2xl border border-white/5 bg-white/[0.01]">
+                      <h4 className="font-extrabold text-sm text-gray-300 mb-4 flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 bg-red-500 rounded-full" /> Real-Time Analytics
+                      </h4>
+                      <div className="grid grid-cols-3 gap-4 text-center">
+                        <div className="p-3 bg-white/[0.02] rounded-xl">
+                          <div className="text-2xl font-black text-white">{analytics.realtime.activeViewers}</div>
+                          <div className="text-[10px] text-gray-500 mt-1 uppercase">Active Viewers</div>
+                        </div>
+                        <div className="p-3 bg-white/[0.02] rounded-xl">
+                          <div className="text-2xl font-black text-white">{analytics.realtime.last60m}</div>
+                          <div className="text-[10px] text-gray-500 mt-1 uppercase">Last 60 Minutes</div>
+                        </div>
+                        <div className="p-3 bg-white/[0.02] rounded-xl">
+                          <div className="text-2xl font-black text-white">{analytics.realtime.last48h}</div>
+                          <div className="text-[10px] text-gray-500 mt-1 uppercase">Last 48 Hours</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* SVG Audience Retention Line Chart */}
+                    <div className="p-5 rounded-2xl border border-white/5 bg-white/[0.01]">
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="font-extrabold text-sm text-gray-300">Audience Retention Graph</h4>
+                        <span className="text-[10px] text-purple-400 font-bold uppercase">Average Completion Rate</span>
+                      </div>
+                      
+                      <div className="relative h-32 w-full mt-6 bg-[#000000]/40 rounded-xl p-4 border border-white/[0.02] flex items-end">
+                        {/* SVG Line */}
+                        <svg className="absolute inset-0 w-full h-full p-6 overflow-visible" viewBox="0 0 100 100" preserveAspectRatio="none">
+                          {/* Grid Lines */}
+                          <line x1="0" y1="25" x2="100" y2="25" stroke="rgba(255,255,255,0.05)" strokeDasharray="3" />
+                          <line x1="0" y1="50" x2="100" y2="50" stroke="rgba(255,255,255,0.05)" strokeDasharray="3" />
+                          <line x1="0" y1="75" x2="100" y2="75" stroke="rgba(255,255,255,0.05)" strokeDasharray="3" />
+                          
+                          {/* Area Fill */}
+                          <path
+                            d={`M 0,100 
+                                L 0,${100 - 100} 
+                                L 20,${100 - analytics.retention.reached10s} 
+                                L 40,${100 - analytics.retention.reached25} 
+                                L 60,${100 - analytics.retention.reached50} 
+                                L 80,${100 - analytics.retention.reached75} 
+                                L 100,${100 - analytics.retention.reached100} 
+                                L 100,100 Z`}
+                            fill="url(#gradient-fill)"
+                            opacity="0.15"
+                          />
+                          
+                          {/* Stroke Path */}
+                          <path
+                            d={`M 0,${100 - 100} 
+                                L 20,${100 - analytics.retention.reached10s} 
+                                L 40,${100 - analytics.retention.reached25} 
+                                L 60,${100 - analytics.retention.reached50} 
+                                L 80,${100 - analytics.retention.reached75} 
+                                L 100,${100 - analytics.retention.reached100}`}
+                            fill="none"
+                            stroke="#8b5cf6"
+                            strokeWidth="2.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                          
+                          {/* Data points */}
+                          {[
+                            { x: 0, y: 100 },
+                            { x: 20, y: analytics.retention.reached10s },
+                            { x: 40, y: analytics.retention.reached25 },
+                            { x: 60, y: analytics.retention.reached50 },
+                            { x: 80, y: analytics.retention.reached75 },
+                            { x: 100, y: analytics.retention.reached100 }
+                          ].map((pt, i) => (
+                            <circle key={i} cx={pt.x} cy={100 - pt.y} r="3" fill="#a855f7" stroke="#ffffff" strokeWidth="1" />
+                          ))}
+
+                          {/* Gradients */}
+                          <defs>
+                            <linearGradient id="gradient-fill" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="#a855f7" />
+                              <stop offset="100%" stopColor="#a855f7" stopOpacity="0" />
+                            </linearGradient>
+                          </defs>
+                        </svg>
+
+                        {/* Custom labels */}
+                        <div className="absolute inset-x-0 bottom-1 flex justify-between px-5 text-[9px] text-gray-500 font-bold uppercase">
+                          <span>Start</span>
+                          <span>10s</span>
+                          <span>25%</span>
+                          <span>50%</span>
+                          <span>75%</span>
+                          <span>100%</span>
+                        </div>
+                      </div>
+
+                      {/* Display values */}
+                      <div className="grid grid-cols-6 gap-1 text-center mt-3 text-xs font-bold text-gray-300">
+                        <div>100%</div>
+                        <div>{analytics.retention.reached10s.toFixed(0)}%</div>
+                        <div>{analytics.retention.reached25.toFixed(0)}%</div>
+                        <div>{analytics.retention.reached50.toFixed(0)}%</div>
+                        <div>{analytics.retention.reached75.toFixed(0)}%</div>
+                        <div>{analytics.retention.reached100.toFixed(0)}%</div>
+                      </div>
+                    </div>
+
+                    {/* Top Performing Videos */}
+                    <div className="p-5 rounded-2xl border border-white/5 bg-white/[0.01]">
+                      <h4 className="font-extrabold text-sm text-gray-300 mb-4">Top Performing Videos</h4>
+                      {analytics.topVideos.length === 0 ? (
+                        <p className="text-xs text-gray-500 font-medium">No views recorded yet.</p>
+                      ) : (
+                        <div className="space-y-3">
+                          {analytics.topVideos.map((video: any, idx: number) => (
+                            <div key={video.id} className="flex items-center justify-between text-xs py-2 border-b border-white/5">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="font-black text-purple-400">#{idx + 1}</span>
+                                <span className="text-gray-200 truncate font-semibold">{video.title}</span>
+                              </div>
+                              <div className="flex items-center gap-4 shrink-0 text-gray-450">
+                                <span>👁️ {video.views} views</span>
+                                <span>⏳ {video.watchTime.toFixed(1)}h watch time</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                  </div>
+
+                  {/* Right Column: Traffic Sources & Geo/Devices */}
+                  <div className="md:col-span-4 space-y-5">
+                    
+                    {/* Traffic Sources */}
+                    <div className="p-5 rounded-2xl border border-white/5 bg-white/[0.01]">
+                      <h4 className="font-extrabold text-sm text-gray-300 mb-4">Top Traffic Sources</h4>
+                      {Object.keys(analytics.trafficSources).length === 0 ? (
+                        <p className="text-xs text-gray-500 font-medium">No traffic data recorded.</p>
+                      ) : (
+                        <div className="space-y-3">
+                          {Object.entries(analytics.trafficSources).map(([src, count]: any) => {
+                            const pct = analytics.stats.totalViews > 0 ? (count / analytics.stats.totalViews) * 100 : 0;
+                            return (
+                              <div key={src} className="space-y-1">
+                                <div className="flex justify-between text-[11px] font-bold text-gray-400 uppercase">
+                                  <span>{src}</span>
+                                  <span>{pct.toFixed(0)}%</span>
+                                </div>
+                                <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                                  <div className="h-full bg-purple-500 rounded-full" style={{ width: `${pct}%` }} />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Devices */}
+                    <div className="p-5 rounded-2xl border border-white/5 bg-white/[0.01]">
+                      <h4 className="font-extrabold text-sm text-gray-300 mb-4">Devices</h4>
+                      {Object.keys(analytics.devices).length === 0 ? (
+                        <p className="text-xs text-gray-500 font-medium">No device data.</p>
+                      ) : (
+                        <div className="space-y-3">
+                          {Object.entries(analytics.devices).map(([dev, count]: any) => {
+                            const pct = analytics.stats.totalViews > 0 ? (count / analytics.stats.totalViews) * 100 : 0;
+                            return (
+                              <div key={dev} className="space-y-1">
+                                <div className="flex justify-between text-[11px] font-bold text-gray-400 uppercase">
+                                  <span>{dev}</span>
+                                  <span>{pct.toFixed(0)}%</span>
+                                </div>
+                                <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                                  <div className="h-full bg-blue-500 rounded-full" style={{ width: `${pct}%` }} />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Audience Geography */}
+                    <div className="p-5 rounded-2xl border border-white/5 bg-white/[0.01]">
+                      <h4 className="font-extrabold text-sm text-gray-300 mb-4">Audience Geography</h4>
+                      {Object.keys(analytics.geography).length === 0 ? (
+                        <p className="text-xs text-gray-500 font-medium">No location data.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {Object.entries(analytics.geography)
+                            .sort((a: any, b: any) => b[1] - a[1])
+                            .slice(0, 5)
+                            .map(([geo, count]: any) => (
+                              <div key={geo} className="flex justify-between text-xs py-1 border-b border-white/[0.02]">
+                                <span className="text-gray-300 truncate font-semibold flex items-center gap-1">
+                                  <MapPin className="w-3 h-3 text-purple-400" /> {geo}
+                                </span>
+                                <span className="text-gray-500">{count} views</span>
+                              </div>
+                            ))}
+                        </div>
+                      )}
+                    </div>
+
+                  </div>
+
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Go to Ads Manager */}
         <div className="mt-5 flex justify-center">
