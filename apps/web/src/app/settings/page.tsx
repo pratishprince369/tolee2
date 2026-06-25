@@ -282,9 +282,39 @@ export default function SettingsPage() {
 
   if (status === 'loading' || isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[70vh] gap-4">
-        <Loader2 className="w-10 h-10 animate-spin text-primary" />
-        <p className="text-sm font-semibold text-zinc-500 animate-pulse">Loading settings...</p>
+      <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
+        <div className="max-w-4xl mx-auto px-3 sm:px-6 lg:px-8 py-5 sm:py-8 animate-pulse">
+          {/* Header Skeleton */}
+          <div className="mb-5 sm:mb-8 space-y-3">
+            <div className="h-8 bg-zinc-250 dark:bg-zinc-800 rounded w-1/3" />
+            <div className="h-4 bg-zinc-250 dark:bg-zinc-800 rounded w-2/3" />
+          </div>
+
+          <div className="flex flex-col md:flex-row gap-5 items-start">
+            {/* Sidebar Skeleton */}
+            <div className="w-full md:w-56 flex-shrink-0 flex md:flex-col gap-2.5 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 scrollbar-none">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="h-10 w-24 md:w-full bg-zinc-250 dark:bg-zinc-800 rounded-full md:rounded-xl shrink-0" />
+              ))}
+            </div>
+
+            {/* Main Content Card Skeleton */}
+            <div className="flex-1 w-full p-6 border border-zinc-200 dark:border-zinc-800 rounded-2xl bg-white dark:bg-zinc-900/40 space-y-6">
+              <div className="space-y-2">
+                <div className="h-6 bg-zinc-250 dark:bg-zinc-800 rounded w-1/4" />
+                <div className="h-4 bg-zinc-250 dark:bg-zinc-800 rounded w-1/2" />
+              </div>
+              <div className="space-y-4 pt-4 border-t border-zinc-150 dark:border-zinc-850">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="space-y-2">
+                    <div className="h-4 bg-zinc-250 dark:bg-zinc-800 rounded w-1/6" />
+                    <div className="h-10 bg-zinc-250 dark:bg-zinc-800 rounded w-full" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

@@ -1231,9 +1231,41 @@ export default function CreatorStudioPage() {
             </div>
 
             {loadingVideos ? (
-              <div className="p-12 text-center flex flex-col items-center justify-center gap-2">
-                <Loader2 className="w-8 h-8 text-teal-555 animate-spin" />
-                <p className="text-xs text-zinc-450 font-bold">Querying library...</p>
+              <div className="overflow-x-auto animate-pulse">
+                <table className="w-full border-collapse text-left">
+                  <thead>
+                    <tr className="bg-zinc-50 dark:bg-zinc-950 border-b border-zinc-200 dark:border-zinc-800 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                      <th className="p-4 w-10">Select</th>
+                      <th className="p-4">Video details</th>
+                      <th className="p-4">Visibility</th>
+                      <th className="p-4">Category</th>
+                      <th className="p-4">Views</th>
+                      <th className="p-4">Likes</th>
+                      <th className="p-4">Publish Date</th>
+                      <th className="p-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-150 dark:divide-zinc-850">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                      <tr key={i} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/10">
+                        <td className="p-4"><div className="w-4 h-4 bg-zinc-200 dark:bg-zinc-800 rounded" /></td>
+                        <td className="p-4 flex gap-3.5 items-center">
+                          <div className="w-24 aspect-video rounded-lg bg-zinc-200 dark:bg-zinc-800 shrink-0" />
+                          <div className="space-y-2 flex-1">
+                            <div className="h-4 bg-zinc-200 dark:bg-zinc-800 rounded w-2/3" />
+                            <div className="h-3 bg-zinc-200 dark:bg-zinc-800 rounded w-1/3" />
+                          </div>
+                        </td>
+                        <td className="p-4"><div className="h-4 bg-zinc-200 dark:bg-zinc-800 rounded w-16" /></td>
+                        <td className="p-4"><div className="h-4 bg-zinc-200 dark:bg-zinc-800 rounded w-16" /></td>
+                        <td className="p-4"><div className="h-3 bg-zinc-200 dark:bg-zinc-800 rounded w-8" /></td>
+                        <td className="p-4"><div className="h-3 bg-zinc-200 dark:bg-zinc-800 rounded w-8" /></td>
+                        <td className="p-4"><div className="h-3 bg-zinc-200 dark:bg-zinc-800 rounded w-20" /></td>
+                        <td className="p-4 text-right"><div className="h-8 bg-zinc-200 dark:bg-zinc-800 rounded-lg w-16 ml-auto" /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             ) : creatorVideos.length === 0 ? (
               <div className="p-16 text-center space-y-3">
@@ -1493,9 +1525,20 @@ export default function CreatorStudioPage() {
             </div>
 
             {loadingComments ? (
-              <div className="p-16 text-center flex flex-col items-center justify-center gap-2">
-                <Loader2 className="w-8 h-8 text-teal-600 animate-spin" />
-                <p className="text-xs text-zinc-450 font-bold">Retrieving viewer comments...</p>
+              <div className="space-y-4 animate-pulse">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="flex gap-4 p-4 border border-zinc-200 dark:border-zinc-800 rounded-2xl">
+                    <div className="w-10 h-10 rounded-full bg-zinc-200 dark:bg-zinc-800 shrink-0" />
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <div className="h-3.5 bg-zinc-200 dark:bg-zinc-800 rounded w-28" />
+                        <div className="h-3 bg-zinc-200 dark:bg-zinc-800 rounded w-16" />
+                      </div>
+                      <div className="h-3.5 bg-zinc-200 dark:bg-zinc-800 rounded w-3/4" />
+                      <div className="h-3.5 bg-zinc-200 dark:bg-zinc-800 rounded w-1/2" />
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : creatorComments.length === 0 ? (
               /* Youtube-like Cute Purple Character Empty State */

@@ -2465,8 +2465,11 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                     Post Story Insights
                   </div>
                   {loadingAnalytics ? (
-                    <div className="flex items-center justify-center py-6">
-                      <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+                    <div className="grid grid-cols-2 gap-2.5 py-2 animate-pulse">
+                      <div className="p-3 bg-white/[0.03] border border-white/[0.05] rounded-2xl h-16" />
+                      <div className="p-3 bg-white/[0.03] border border-white/[0.05] rounded-2xl h-16" />
+                      <div className="p-3 bg-white/[0.03] border border-white/[0.05] rounded-2xl h-16" />
+                      <div className="p-3 bg-white/[0.03] border border-white/[0.05] rounded-2xl h-16" />
                     </div>
                   ) : postAnalytics ? (
                     <div className="grid grid-cols-2 gap-2.5">

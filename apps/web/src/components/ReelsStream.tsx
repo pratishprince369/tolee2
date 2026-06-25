@@ -659,6 +659,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
                     contentId={precedingReelId}
                     toleeId={precedingToleeId}
                     onPlaybackFailed={handlePlaybackFailed}
+                    shouldLoad={!isDesktop && index >= mobileActiveIndex - 1 && index <= mobileActiveIndex + 3}
                   />
                 );
               }
@@ -678,6 +679,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
                   followStatus={followStates[reel.authorId]}
                   onFollow={() => handleFollowAuthor(reel.authorId, reel.author)}
                   onPlaybackFailed={handlePlaybackFailed}
+                  shouldLoad={!isDesktop && index >= mobileActiveIndex - 1 && index <= mobileActiveIndex + 3}
                   {...makeActions(reel, originalIndex)}
                 />
               );
@@ -770,6 +772,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
                       contentId={precedingReelId}
                       toleeId={precedingToleeId}
                       onPlaybackFailed={handlePlaybackFailed}
+                      shouldLoad={isDesktop && index >= desktopActiveIndex - 1 && index <= desktopActiveIndex + 3}
                     />
                   );
                 }
@@ -789,6 +792,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
                     followStatus={followStates[reel.authorId]}
                     onFollow={() => handleFollowAuthor(reel.authorId, reel.author)}
                     onPlaybackFailed={handlePlaybackFailed}
+                    shouldLoad={isDesktop && index >= desktopActiveIndex - 1 && index <= desktopActiveIndex + 3}
                     {...makeActions(reel, originalIndex)}
                   />
                 );
@@ -959,6 +963,7 @@ const ReelSlide = memo(function ReelSlide({
   onRepostsModal, onShare, onSave, onOptions, onBoost,
   followStatus, onFollow,
   onPlaybackFailed,
+  shouldLoad,
 }: {
   reel: any; index: number; isActive: boolean; isMuted: boolean;
   session: any; desktop: boolean;
@@ -968,6 +973,7 @@ const ReelSlide = memo(function ReelSlide({
   followStatus?: 'approved' | 'pending' | null;
   onFollow?: () => void;
   onPlaybackFailed?: (index: number, errDetail: string) => void;
+  shouldLoad: boolean;
 }) {
   const [isReady, setIsReady] = useState(false);
   const [isError, setIsError] = useState(false);
@@ -976,8 +982,19 @@ const ReelSlide = memo(function ReelSlide({
     if (isActive) {
       setIsReady(false);
       setIsError(false);
+
+      const timeoutId = setTimeout(() => {
+        if (!isReady) {
+          console.warn(`[Reel Playback Timeout] Slide index ${index} took too long to load. Skipping...`);
+          if (onPlaybackFailed) {
+            onPlaybackFailed(index, `Video load timed out after 5000ms`);
+          }
+        }
+      }, 5000);
+
+      return () => clearTimeout(timeoutId);
     }
-  }, [isActive]);
+  }, [isActive, isReady, index, onPlaybackFailed]);
 
   const handleVideoError = (e: any) => {
     setIsError(true);
@@ -1005,7 +1022,7 @@ const ReelSlide = memo(function ReelSlide({
         className={`w-full h-full object-cover transition-opacity duration-300 ${isReady ? 'opacity-100' : 'opacity-0'}`}
         poster={getPosterUrl(reel.video)}
         isActive={isActive}
-        shouldLoad={true}
+        shouldLoad={shouldLoad}
         loop
         muted={isMuted}
         playsInline
@@ -1026,10 +1043,27 @@ const ReelSlide = memo(function ReelSlide({
         />
       )}
 
-      {/* ── Buffering/Loading Spinner ── */}
+      {/* ── Reel Loading Skeleton Overlay ── */}
       {isActive && !isReady && !isError && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/40 z-10">
-          <Loader2 className="w-10 h-10 text-teal-500 animate-spin drop-shadow" />
+        <div className="absolute inset-0 z-10 bg-black/40 flex flex-col justify-end p-4 pointer-events-none animate-pulse">
+          {/* Skeleton Controls (right side) */}
+          <div className="absolute right-4 bottom-32 flex flex-col gap-5 items-center">
+            <div className="w-10 h-10 rounded-full bg-white/20" />
+            <div className="w-10 h-10 rounded-full bg-white/20" />
+            <div className="w-10 h-10 rounded-full bg-white/20" />
+            <div className="w-10 h-10 rounded-full bg-white/20" />
+          </div>
+
+          {/* Skeleton Bottom Info */}
+          <div className="space-y-3 max-w-[80%] pb-6">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full bg-white/20" />
+              <div className="w-24 h-4 bg-white/20 rounded" />
+              <div className="w-16 h-6 bg-white/20 rounded-lg" />
+            </div>
+            <div className="w-full h-3 bg-white/20 rounded" />
+            <div className="w-2/3 h-3 bg-white/20 rounded" />
+          </div>
         </div>
       )}
 
@@ -1152,6 +1186,7 @@ const AdReelSlide = memo(function AdReelSlide({
   contentId,
   toleeId,
   onPlaybackFailed,
+  shouldLoad,
 }: {
   ad: any;
   index: number;
@@ -1161,6 +1196,7 @@ const AdReelSlide = memo(function AdReelSlide({
   contentId?: string;
   toleeId?: string;
   onPlaybackFailed?: (index: number, errDetail: string) => void;
+  shouldLoad: boolean;
 }) {
   const [isReady, setIsReady] = useState(false);
   const [isError, setIsError] = useState(false);
@@ -1169,8 +1205,19 @@ const AdReelSlide = memo(function AdReelSlide({
     if (isActive) {
       setIsReady(false);
       setIsError(false);
+
+      const timeoutId = setTimeout(() => {
+        if (!isReady) {
+          console.warn(`[Ad Reel Playback Timeout] Slide index ${index} took too long to load. Skipping...`);
+          if (onPlaybackFailed) {
+            onPlaybackFailed(index, `Ad video load timed out after 5000ms`);
+          }
+        }
+      }, 5000);
+
+      return () => clearTimeout(timeoutId);
     }
-  }, [isActive]);
+  }, [isActive, isReady, index, onPlaybackFailed]);
 
   const handleVideoError = (e: any) => {
     setIsError(true);
@@ -1206,7 +1253,7 @@ const AdReelSlide = memo(function AdReelSlide({
                   className={`w-full h-full object-cover transition-opacity duration-300 ${isReady ? 'opacity-100' : 'opacity-0'}`}
                   poster={getPosterUrl(displayMedia)}
                   isActive={isActive}
-                  shouldLoad={true}
+                  shouldLoad={shouldLoad}
                   loop
                   muted
                   playsInline
@@ -1227,10 +1274,25 @@ const AdReelSlide = memo(function AdReelSlide({
                   />
                 )}
 
-                {/* Loading indicator */}
+                {/* ── Ad Reel Loading Skeleton Overlay ── */}
                 {isActive && !isReady && !isError && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/40 z-10">
-                    <Loader2 className="w-10 h-10 text-teal-500 animate-spin drop-shadow" />
+                  <div className="absolute inset-0 z-10 bg-black/40 flex flex-col justify-end p-4 pointer-events-none animate-pulse">
+                    {/* Skeleton Controls (right side) */}
+                    <div className="absolute right-4 bottom-32 flex flex-col gap-5 items-center">
+                      <div className="w-10 h-10 rounded-full bg-white/20" />
+                      <div className="w-10 h-10 rounded-full bg-white/20" />
+                      <div className="w-10 h-10 rounded-full bg-white/20" />
+                    </div>
+
+                    {/* Skeleton Bottom Info */}
+                    <div className="space-y-3 max-w-[80%] pb-6">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-white/20" />
+                        <div className="w-24 h-4 bg-white/20 rounded" />
+                      </div>
+                      <div className="w-full h-3 bg-white/20 rounded" />
+                      <div className="w-2/3 h-3 bg-white/20 rounded" />
+                    </div>
                   </div>
                 )}
 

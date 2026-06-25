@@ -21,10 +21,11 @@ interface PostCarouselProps {
 interface CarouselVideoProps {
   src: string;
   isActive: boolean;
+  shouldLoad: boolean;
   postId: string;
 }
 
-function CarouselVideo({ src, isActive, postId }: CarouselVideoProps) {
+function CarouselVideo({ src, isActive, shouldLoad, postId }: CarouselVideoProps) {
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -169,7 +170,7 @@ function CarouselVideo({ src, isActive, postId }: CarouselVideoProps) {
         ref={videoRef}
         src={src}
         isActive={isActive && isVisible}
-        shouldLoad={isVisible}
+        shouldLoad={isVisible && shouldLoad}
         className="w-full h-full object-contain"
         loop
         muted={isMuted}
@@ -185,8 +186,10 @@ function CarouselVideo({ src, isActive, postId }: CarouselVideoProps) {
       />
       
       {isActive && isVisible && !isReady && !isError && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/45 z-10">
-          <Loader2 className="w-8 h-8 text-teal-500 animate-spin" />
+        <div className="absolute inset-0 flex items-center justify-center bg-black/45 z-10 animate-pulse pointer-events-none">
+          <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+            <Play className="w-5 h-5 text-white/50 fill-white/10" />
+          </div>
         </div>
       )}
 
@@ -283,7 +286,12 @@ export function PostCarousel({ mediaUrls, mediaTypes, postId }: PostCarouselProp
         {items.map((item, idx) => (
           <div key={idx} className="h-full relative overflow-hidden flex items-center justify-center" style={{ width: `${100 / items.length}%` }}>
             {item.type === 'video' ? (
-              <CarouselVideo src={item.url} isActive={idx === activeIndex} postId={postId} />
+              <CarouselVideo 
+                src={item.url} 
+                isActive={idx === activeIndex} 
+                shouldLoad={idx === activeIndex || idx === activeIndex + 1}
+                postId={postId} 
+              />
             ) : (
               <img 
                 src={item.url} 

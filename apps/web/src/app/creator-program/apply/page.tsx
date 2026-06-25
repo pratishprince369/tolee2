@@ -173,8 +173,21 @@ export default function CreatorApplyPage() {
 
   if (status === 'loading' || checkingExisting) {
     return (
-      <div className="min-h-screen bg-[#020209] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
+      <div className="min-h-screen bg-[#020209] py-12 px-4 animate-pulse">
+        <div className="max-w-2xl mx-auto space-y-6">
+          <div className="space-y-3 text-center">
+            <div className="h-8 bg-zinc-800/60 rounded w-1/2 mx-auto" />
+            <div className="h-4 bg-zinc-800/60 rounded w-2/3 mx-auto" />
+          </div>
+          <div className="space-y-4 p-6 bg-zinc-900/30 rounded-2xl border border-zinc-800/60">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="space-y-2">
+                <div className="h-4 bg-zinc-800/60 rounded w-24" />
+                <div className="h-10 bg-zinc-800/60 rounded w-full" />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }

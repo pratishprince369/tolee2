@@ -500,9 +500,47 @@ export default function WatchVideoPage({ params }: PageProps) {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-zinc-950 text-white space-y-3">
-        <Loader2 className="w-9 h-9 text-teal-500 animate-spin" />
-        <p className="text-xs font-bold text-zinc-400">Loading screen player...</p>
+      <div className="min-h-screen bg-zinc-55 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50 pb-16 pt-4 px-4 md:px-8">
+        <div className="max-w-7xl mx-auto">
+          {/* Header Skeleton */}
+          <div className="mb-4 flex items-center justify-between animate-pulse">
+            <div className="w-28 h-4 bg-zinc-200 dark:bg-zinc-850 rounded" />
+            <div className="w-20 h-4 bg-zinc-200 dark:bg-zinc-850 rounded" />
+          </div>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Left: Player + details */}
+            <div className="lg:col-span-8 space-y-5">
+              <div className="aspect-video w-full rounded-3xl bg-zinc-200 dark:bg-zinc-850 animate-pulse" />
+              <div className="space-y-3 pt-2">
+                <div className="h-6 bg-zinc-200 dark:bg-zinc-850 rounded w-3/4 animate-pulse" />
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full bg-zinc-200 dark:bg-zinc-850 animate-pulse" />
+                  <div className="space-y-1.5 flex-1">
+                    <div className="h-3.5 bg-zinc-200 dark:bg-zinc-850 rounded w-1/4 animate-pulse" />
+                    <div className="h-2.5 bg-zinc-200 dark:bg-zinc-850 rounded w-1/6 animate-pulse" />
+                  </div>
+                  <div className="w-20 h-8 bg-zinc-200 dark:bg-zinc-850 rounded-xl animate-pulse" />
+                </div>
+                <div className="h-20 bg-zinc-200 dark:bg-zinc-850 rounded-2xl animate-pulse" />
+              </div>
+            </div>
+            
+            {/* Right: Recommendations */}
+            <div className="lg:col-span-4 space-y-4">
+              <div className="h-5 bg-zinc-200 dark:bg-zinc-850 rounded w-1/3 animate-pulse mb-2" />
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex gap-3 animate-pulse">
+                  <div className="w-32 aspect-video bg-zinc-200 dark:bg-zinc-850 rounded-xl shrink-0" />
+                  <div className="flex-1 space-y-2 py-1">
+                    <div className="h-3 bg-zinc-200 dark:bg-zinc-850 rounded w-full" />
+                    <div className="h-2.5 bg-zinc-200 dark:bg-zinc-850 rounded w-2/3" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -563,9 +601,20 @@ export default function WatchVideoPage({ params }: PageProps) {
                   className="w-full h-full object-contain"
                 />
               ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center gap-2">
-                  <Loader2 className="w-8 h-8 text-teal-500 animate-spin" />
-                  <p className="text-xs font-bold text-zinc-500">Preparing stream channels...</p>
+                <div className="w-full h-full relative flex items-center justify-center bg-zinc-950 animate-pulse">
+                  {video.thumbnailUrl && (
+                    <img 
+                      src={video.thumbnailUrl} 
+                      alt={video.title} 
+                      className="absolute inset-0 w-full h-full object-cover opacity-45 filter blur-[2px]" 
+                    />
+                  )}
+                  <div className="relative z-10 flex flex-col items-center gap-2 text-white">
+                    <div className="w-12 h-12 rounded-full bg-white/20 animate-pulse flex items-center justify-center">
+                      <Play className="w-5 h-5 text-white/70 fill-white/20" />
+                    </div>
+                    <p className="text-[11px] font-bold text-white/60 tracking-wider">PREPARING STREAM...</p>
+                  </div>
                 </div>
               )}
 

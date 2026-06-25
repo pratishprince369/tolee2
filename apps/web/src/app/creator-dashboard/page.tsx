@@ -85,8 +85,33 @@ export default function CreatorDashboardPage() {
 
   if (status === 'loading' || loading) {
     return (
-      <div className="min-h-screen bg-[#020209] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
+      <div className="min-h-screen bg-[#020209] py-8 px-4 animate-pulse">
+        <div className="max-w-4xl mx-auto space-y-6">
+          {/* Header Skeleton */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="space-y-2.5">
+              <div className="h-8 bg-zinc-800/60 rounded w-48" />
+              <div className="h-4 bg-zinc-800/60 rounded w-36" />
+            </div>
+            <div className="flex gap-2">
+              <div className="h-8 bg-zinc-800/60 rounded-xl w-24" />
+              <div className="h-8 bg-zinc-800/60 rounded-xl w-28" />
+            </div>
+          </div>
+
+          {/* Status Banner Skeleton */}
+          <div className="h-20 bg-zinc-800/60 rounded-2xl w-full" />
+
+          {/* Stats Grid Skeleton */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="h-28 bg-zinc-800/60 rounded-2xl w-full" />
+            ))}
+          </div>
+
+          {/* Content Card Skeleton */}
+          <div className="h-48 bg-zinc-800/60 rounded-2xl w-full" />
+        </div>
       </div>
     );
   }

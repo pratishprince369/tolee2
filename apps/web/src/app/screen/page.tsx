@@ -128,7 +128,7 @@ export default function ScreenPage() {
       } else {
         setVideos(res.videos);
       }
-      setNextCursor(res.nextCursor);
+      setNextCursor(res.nextCursor || undefined);
       setHasMore(!!res.nextCursor);
     }
 
@@ -511,9 +511,20 @@ export default function ScreenPage() {
             {hasMore && (
               <div 
                 ref={observerRef} 
-                className="flex items-center justify-center py-8 mt-6"
+                className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mt-6 w-full"
               >
-                <Loader2 className="w-7 h-7 text-teal-600 animate-spin" />
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="flex flex-col gap-3 p-2.5 bg-white dark:bg-zinc-900/40 border border-transparent rounded-2xl animate-pulse">
+                    <div className="aspect-video w-full rounded-xl bg-zinc-200 dark:bg-zinc-800" />
+                    <div className="flex gap-2.5 px-0.5">
+                      <div className="w-8.5 h-8.5 rounded-full bg-zinc-200 dark:bg-zinc-800 shrink-0" />
+                      <div className="flex-1 space-y-2">
+                        <div className="h-4 bg-zinc-200 dark:bg-zinc-800 rounded w-5/6" />
+                        <div className="h-3 bg-zinc-200 dark:bg-zinc-800 rounded w-1/2" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </>

@@ -12,10 +12,26 @@ import { sendMeetingInvitationToAllMembers } from '@/actions/meeting';
 const MeetingRoom = dynamic(() => import('@/components/meeting/MeetingRoom'), {
   ssr: false,
   loading: () => (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-zinc-950 text-white">
-      <div className="flex flex-col items-center gap-3">
-        <Loader2 className="w-10 h-10 text-teal-400 animate-spin" />
-        <p className="text-sm font-semibold text-zinc-400">Loading meeting room...</p>
+    <div className="flex flex-col min-h-screen bg-zinc-950 text-white animate-pulse">
+      {/* Header bar skeleton */}
+      <div className="h-16 border-b border-zinc-900 flex items-center justify-between px-6">
+        <div className="h-5 bg-zinc-800 rounded w-32" />
+        <div className="h-5 bg-zinc-800 rounded w-20" />
+      </div>
+
+      {/* Main video grids area */}
+      <div className="flex-grow flex items-center justify-center p-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-5xl aspect-video md:aspect-[21/9]">
+          <div className="bg-zinc-900 rounded-3xl border border-zinc-800" />
+          <div className="bg-zinc-900 rounded-3xl border border-zinc-800" />
+        </div>
+      </div>
+
+      {/* Control bar skeleton */}
+      <div className="h-20 bg-zinc-900/60 border-t border-zinc-850 flex items-center justify-center gap-4">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="w-12 h-12 rounded-full bg-zinc-800" />
+        ))}
       </div>
     </div>
   )
@@ -204,13 +220,28 @@ export default function MeetingClientWrapper({
     }
   };
 
-  // Hydration guard: render loading skeleton until client is mounted
   if (!mounted) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-zinc-950 text-white">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-10 h-10 text-teal-400 animate-spin" />
-          <p className="text-sm font-semibold text-zinc-400">Loading interactive session...</p>
+      <div className="flex flex-col min-h-screen bg-zinc-950 text-white animate-pulse">
+        {/* Header bar skeleton */}
+        <div className="h-16 border-b border-zinc-900 flex items-center justify-between px-6">
+          <div className="h-5 bg-zinc-800 rounded w-32" />
+          <div className="h-5 bg-zinc-800 rounded w-20" />
+        </div>
+
+        {/* Main video grids area */}
+        <div className="flex-grow flex items-center justify-center p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-5xl aspect-video md:aspect-[21/9]">
+            <div className="bg-zinc-900 rounded-3xl border border-zinc-800" />
+            <div className="bg-zinc-900 rounded-3xl border border-zinc-800" />
+          </div>
+        </div>
+
+        {/* Control bar skeleton */}
+        <div className="h-20 bg-zinc-900/60 border-t border-zinc-850 flex items-center justify-center gap-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="w-12 h-12 rounded-full bg-zinc-800" />
+          ))}
         </div>
       </div>
     );
@@ -295,10 +326,26 @@ export default function MeetingClientWrapper({
   // ----------------------------------------------------
   if (isJoining && !hasJoined) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-zinc-950 text-white">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-10 h-10 text-teal-400 animate-spin" />
-          <p className="text-sm font-semibold text-zinc-400">Joining Meeting...</p>
+      <div className="flex flex-col min-h-screen bg-zinc-950 text-white animate-pulse">
+        {/* Header bar skeleton */}
+        <div className="h-16 border-b border-zinc-900 flex items-center justify-between px-6">
+          <div className="h-5 bg-zinc-800 rounded w-32" />
+          <div className="h-5 bg-zinc-800 rounded w-20" />
+        </div>
+
+        {/* Main video grids area */}
+        <div className="flex-grow flex items-center justify-center p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-5xl aspect-video md:aspect-[21/9]">
+            <div className="bg-zinc-900 rounded-3xl border border-zinc-800" />
+            <div className="bg-zinc-900 rounded-3xl border border-zinc-800" />
+          </div>
+        </div>
+
+        {/* Control bar skeleton */}
+        <div className="h-20 bg-zinc-900/60 border-t border-zinc-850 flex items-center justify-center gap-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="w-12 h-12 rounded-full bg-zinc-800" />
+          ))}
         </div>
       </div>
     );

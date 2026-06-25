@@ -901,9 +901,17 @@ export default function InteractiveMapPage() {
         </div>
 
         {loading ? (
-          <div className="flex-1 flex flex-col items-center justify-center gap-2 text-zinc-500 text-xs">
-            <RefreshCw className="w-6 h-6 animate-spin text-emerald-600" />
-            Locating nearby spots...
+          <div className="flex-grow flex flex-col gap-2.5 pr-1 animate-pulse">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="p-3 rounded-xl border border-zinc-100 dark:border-zinc-800/80 bg-zinc-50/50 flex items-start gap-3">
+                <div className="w-9 h-9 rounded-lg bg-zinc-200 dark:bg-zinc-800 shrink-0" />
+                <div className="flex-1 space-y-2 py-0.5">
+                  <div className="h-3 bg-zinc-200 dark:bg-zinc-800 rounded w-2/3" />
+                  <div className="h-2.5 bg-zinc-200 dark:bg-zinc-800 rounded w-1/2" />
+                  <div className="h-2 bg-zinc-200 dark:bg-zinc-800 rounded w-5/6" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto pr-1 flex flex-col gap-2.5 scrollbar-thin">

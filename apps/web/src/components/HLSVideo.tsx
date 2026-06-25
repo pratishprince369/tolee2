@@ -125,10 +125,12 @@ export const HLSVideo = forwardRef<HTMLVideoElement, HLSVideoProps>(
     if (src.endsWith('.m3u8') && Hls.isSupported()) {
       // HLS.js path
       const hls = new Hls({
+        enableWorker: true,
         capLevelToPlayerSize: true,
-        maxBufferLength: 20,
-        maxMaxBufferLength: 30,
-        lowLatencyMode: false,
+        maxBufferLength: 10,
+        maxMaxBufferLength: 15,
+        backBufferLength: 10,
+        lowLatencyMode: true,
       });
       hlsRef.current = hls;
       hls.loadSource(src);
