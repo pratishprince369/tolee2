@@ -7,8 +7,8 @@ android {
         applicationId "in.tolee.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 53
-        versionName "1.5.3"
+        versionCode 61
+        versionName "1.6.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         
         // Optimize APK size by splitting into different architectures
