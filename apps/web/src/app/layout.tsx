@@ -20,6 +20,7 @@ import { AuthModal } from "@/components/AuthModal";
 import { PushNotificationManager } from "@/components/PushNotificationManager";
 import { ApkPromoManager } from "@/components/ApkPromoManager";
 import { PwaManager } from "@/components/PwaManager";
+import { MediaPickerModal } from "@/components/MediaPickerModal";
 import AnalyticsTracker from "@/components/AnalyticsTracker";
 import { Suspense } from "react";
 import { prisma } from "@/lib/prisma";
@@ -62,6 +63,7 @@ export default async function RootLayout({
           <PushNotificationManager />
           <ApkPromoManager />
           <PwaManager />
+          <MediaPickerModal />
           <Suspense fallback={null}>
             <AnalyticsTracker />
           </Suspense>

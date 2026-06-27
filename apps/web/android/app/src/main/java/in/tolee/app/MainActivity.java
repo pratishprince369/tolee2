@@ -42,10 +42,15 @@ import com.google.android.gms.common.api.ApiException;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.messaging.FirebaseMessaging;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
+import android.database.Cursor;
+import android.webkit.JavascriptInterface;
 
 public class MainActivity extends BridgeActivity {
 
@@ -76,6 +81,17 @@ public class MainActivity extends BridgeActivity {
             mCacheClearHandler.postDelayed(this, 10 * 60 * 1000); // Repeat every 10 minutes
         }
     };
+
+    private static class FolderInfo {
+        String name;
+        String coverUri;
+        int count;
+        FolderInfo(String name, String coverUri) {
+            this.name = name;
+            this.coverUri = coverUri;
+            this.count = 0;
+        }
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -289,21 +305,51 @@ public class MainActivity extends BridgeActivity {
                 }
                 mFilePathCallback = filePathCallback;
 
-                // Build an image-picker intent (gallery + files)
-                Intent galleryIntent = new Intent(Intent.ACTION_GET_CONTENT);
-                galleryIntent.addCategory(Intent.CATEGORY_OPENABLE);
-                galleryIntent.setType("image/*");
-
-                // Allow choosing from camera as well via a chooser
-                Intent chooserIntent = Intent.createChooser(galleryIntent, "Select Image");
-
-                try {
-                    startActivityForResult(chooserIntent, RC_FILE_CHOOSER);
-                } catch (android.content.ActivityNotFoundException e) {
-                    mFilePathCallback = null;
-                    Log.e(TAG, "No activity found to handle file chooser", e);
-                    return false;
+                // Detect if the file chooser requests only image or video
+                String[] acceptTypes = fileChooserParams.getAcceptTypes();
+                boolean isVideoOnly = false;
+                boolean isImageOnly = false;
+                boolean isOther = false;
+                
+                if (acceptTypes == null || acceptTypes.length == 0 || (acceptTypes.length == 1 && acceptTypes[0].isEmpty())) {
+                    isOther = true;
+                } else {
+                    for (String type : acceptTypes) {
+                        if (type != null) {
+                            String trimmed = type.trim().toLowerCase();
+                            if (trimmed.contains("video")) {
+                                isVideoOnly = true;
+                            } else if (trimmed.contains("image")) {
+                                isImageOnly = true;
+                            } else {
+                                isOther = true;
+                            }
+                        }
+                    }
                 }
+                
+                // If it is a generic file chooser (like */* for chat attachments), use native system chooser directly
+                if (isOther && !isImageOnly && !isVideoOnly) {
+                    Intent galleryIntent = new Intent(Intent.ACTION_GET_CONTENT);
+                    galleryIntent.addCategory(Intent.CATEGORY_OPENABLE);
+                    galleryIntent.setType("*/*");
+                    Intent chooserIntent = Intent.createChooser(galleryIntent, "Select File");
+                    try {
+                        startActivityForResult(chooserIntent, RC_FILE_CHOOSER);
+                    } catch (Exception e) {
+                        mFilePathCallback = null;
+                        return false;
+                    }
+                    return true;
+                }
+
+                final String pickMode = isVideoOnly ? "videos" : (isImageOnly ? "photos" : "all");
+                final boolean multiple = fileChooserParams.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE;
+
+                runOnUiThread(() -> {
+                    String js = "if(window.showInstagramMediaPicker){window.showInstagramMediaPicker('" + pickMode + "', " + multiple + ");} else { if(window.AndroidBridge && window.AndroidBridge.fallbackToFileChooser){ window.AndroidBridge.fallbackToFileChooser(); } }";
+                    webView.evaluateJavascript(js, null);
+                });
                 return true;
             }
         });
@@ -556,6 +602,243 @@ public class MainActivity extends BridgeActivity {
                     intent.setData(Uri.parse("package:" + getPackageName()));
                 }
                 startActivity(intent);
+            });
+        }
+
+        @android.webkit.JavascriptInterface
+        public boolean hasMediaPermissions() {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                boolean hasImages = ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED;
+                boolean hasVideos = ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.READ_MEDIA_VIDEO) == PackageManager.PERMISSION_GRANTED;
+                return hasImages && hasVideos;
+            } else {
+                return ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
+            }
+        }
+
+        @android.webkit.JavascriptInterface
+        public void requestMediaPermissions() {
+            runOnUiThread(() -> {
+                List<String> permissions = new ArrayList<>();
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    permissions.add(Manifest.permission.READ_MEDIA_IMAGES);
+                    permissions.add(Manifest.permission.READ_MEDIA_VIDEO);
+                } else {
+                    permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE);
+                }
+                ActivityCompat.requestPermissions(MainActivity.this, permissions.toArray(new String[0]), PERMISSION_REQUEST_CODE);
+            });
+        }
+
+        @android.webkit.JavascriptInterface
+        public String getMediaFolders(String type) {
+            JSONArray folders = new JSONArray();
+            try {
+                Uri uri = MediaStore.Files.getContentUri("external");
+                String[] projection = {
+                    MediaStore.Files.FileColumns.BUCKET_DISPLAY_NAME,
+                    MediaStore.Files.FileColumns._ID,
+                    MediaStore.Files.FileColumns.MEDIA_TYPE,
+                    MediaStore.Files.FileColumns.DATA
+                };
+
+                String selection = "";
+                if ("photos".equals(type)) {
+                    selection = MediaStore.Files.FileColumns.MEDIA_TYPE + "=" + MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE;
+                } else if ("videos".equals(type)) {
+                    selection = MediaStore.Files.FileColumns.MEDIA_TYPE + "=" + MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO;
+                } else {
+                    selection = MediaStore.Files.FileColumns.MEDIA_TYPE + "=" + MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE
+                        + " OR " + MediaStore.Files.FileColumns.MEDIA_TYPE + "=" + MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO;
+                }
+
+                Cursor cursor = getContentResolver().query(
+                    uri,
+                    projection,
+                    selection,
+                    null,
+                    MediaStore.Files.FileColumns.DATE_ADDED + " DESC"
+                );
+
+                if (cursor != null) {
+                    Map<String, FolderInfo> folderMap = new HashMap<>();
+                    
+                    int totalCount = 0;
+                    String recentsCoverUri = null;
+
+                    int bucketIdx = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.BUCKET_DISPLAY_NAME);
+                    int idIdx = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns._ID);
+                    int typeIdx = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.MEDIA_TYPE);
+
+                    while (cursor.moveToNext()) {
+                        String bucketName = cursor.getString(bucketIdx);
+                        long id = cursor.getLong(idIdx);
+                        int mediaType = cursor.getInt(typeIdx);
+
+                        if (bucketName == null) bucketName = "Unknown";
+
+                        Uri contentUri;
+                        if (mediaType == MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO) {
+                            contentUri = Uri.withAppendedPath(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, String.valueOf(id));
+                        } else {
+                            contentUri = Uri.withAppendedPath(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, String.valueOf(id));
+                        }
+
+                        if (recentsCoverUri == null) {
+                            recentsCoverUri = contentUri.toString();
+                        }
+                        totalCount++;
+
+                        FolderInfo info = folderMap.get(bucketName);
+                        if (info == null) {
+                            info = new FolderInfo(bucketName, contentUri.toString());
+                            folderMap.put(bucketName, info);
+                        }
+                        info.count++;
+                    }
+                    cursor.close();
+
+                    // Add "Recents" folder first
+                    if (totalCount > 0) {
+                        JSONObject recents = new JSONObject();
+                        recents.put("name", "Recents");
+                        recents.put("count", totalCount);
+                        recents.put("coverUri", recentsCoverUri);
+                        folders.put(recents);
+                    }
+
+                    // Add other folders
+                    for (FolderInfo info : folderMap.values()) {
+                        JSONObject f = new JSONObject();
+                        f.put("name", info.name);
+                        f.put("count", info.count);
+                        f.put("coverUri", info.coverUri);
+                        folders.put(f);
+                    }
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error getting media folders", e);
+            }
+            return folders.toString();
+        }
+
+        @android.webkit.JavascriptInterface
+        public String getFilesInFolder(String folderName, String type) {
+            JSONArray files = new JSONArray();
+            try {
+                Uri uri = MediaStore.Files.getContentUri("external");
+                String[] projection = {
+                    MediaStore.Files.FileColumns._ID,
+                    MediaStore.Files.FileColumns.MEDIA_TYPE,
+                    MediaStore.Video.VideoColumns.DURATION,
+                    MediaStore.Files.FileColumns.DATE_ADDED
+                };
+
+                String selection = "";
+                List<String> selectionArgs = new ArrayList<>();
+
+                if ("Recents".equalsIgnoreCase(folderName)) {
+                    if ("photos".equals(type)) {
+                        selection = MediaStore.Files.FileColumns.MEDIA_TYPE + "=" + MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE;
+                    } else if ("videos".equals(type)) {
+                        selection = MediaStore.Files.FileColumns.MEDIA_TYPE + "=" + MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO;
+                    } else {
+                        selection = MediaStore.Files.FileColumns.MEDIA_TYPE + "=" + MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE
+                            + " OR " + MediaStore.Files.FileColumns.MEDIA_TYPE + "=" + MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO;
+                    }
+                } else {
+                    if ("photos".equals(type)) {
+                        selection = "(" + MediaStore.Files.FileColumns.MEDIA_TYPE + "=" + MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE + ")";
+                    } else if ("videos".equals(type)) {
+                        selection = "(" + MediaStore.Files.FileColumns.MEDIA_TYPE + "=" + MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO + ")";
+                    } else {
+                        selection = "(" + MediaStore.Files.FileColumns.MEDIA_TYPE + "=" + MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE
+                            + " OR " + MediaStore.Files.FileColumns.MEDIA_TYPE + "=" + MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO + ")";
+                    }
+                    selection += " AND " + MediaStore.Files.FileColumns.BUCKET_DISPLAY_NAME + "=?";
+                    selectionArgs.add(folderName);
+                }
+
+                Cursor cursor = getContentResolver().query(
+                    uri,
+                    projection,
+                    selection,
+                    selectionArgs.isEmpty() ? null : selectionArgs.toArray(new String[0]),
+                    MediaStore.Files.FileColumns.DATE_ADDED + " DESC"
+                );
+
+                if (cursor != null) {
+                    int idIdx = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns._ID);
+                    int typeIdx = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.MEDIA_TYPE);
+                    int durationIdx = cursor.getColumnIndexOrThrow(MediaStore.Video.VideoColumns.DURATION);
+
+                    while (cursor.moveToNext()) {
+                        long id = cursor.getLong(idIdx);
+                        int mediaType = cursor.getInt(typeIdx);
+                        long duration = cursor.getLong(durationIdx);
+
+                        Uri contentUri;
+                        String typeStr;
+                        if (mediaType == MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO) {
+                            contentUri = Uri.withAppendedPath(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, String.valueOf(id));
+                            typeStr = "video";
+                        } else {
+                            contentUri = Uri.withAppendedPath(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, String.valueOf(id));
+                            typeStr = "image";
+                        }
+
+                        JSONObject fileObj = new JSONObject();
+                        fileObj.put("uri", contentUri.toString());
+                        fileObj.put("type", typeStr);
+                        fileObj.put("duration", duration); // duration in ms
+                        files.put(fileObj);
+                    }
+                    cursor.close();
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error getting files in folder " + folderName, e);
+            }
+            return files.toString();
+        }
+
+        @android.webkit.JavascriptInterface
+        public void onMediaSelected(String jsonUris) {
+            if (mFilePathCallback != null) {
+                try {
+                    org.json.JSONArray array = new org.json.JSONArray(jsonUris);
+                    Uri[] uriArray = new Uri[array.length()];
+                    for (int i = 0; i < array.length(); i++) {
+                        uriArray[i] = Uri.parse(array.getString(i));
+                    }
+                    mFilePathCallback.onReceiveValue(uriArray);
+                } catch (Exception e) {
+                    Log.e(TAG, "Error parsing selected media URIs", e);
+                    mFilePathCallback.onReceiveValue(null);
+                }
+                mFilePathCallback = null;
+            }
+        }
+
+        @android.webkit.JavascriptInterface
+        public void onFileChooserCancelled() {
+            if (mFilePathCallback != null) {
+                mFilePathCallback.onReceiveValue(null);
+                mFilePathCallback = null;
+            }
+        }
+
+        @android.webkit.JavascriptInterface
+        public void fallbackToFileChooser() {
+            runOnUiThread(() -> {
+                Intent galleryIntent = new Intent(Intent.ACTION_GET_CONTENT);
+                galleryIntent.addCategory(Intent.CATEGORY_OPENABLE);
+                galleryIntent.setType("*/*");
+                Intent chooserIntent = Intent.createChooser(galleryIntent, "Select File");
+                try {
+                    startActivityForResult(chooserIntent, RC_FILE_CHOOSER);
+                } catch (Exception e) {
+                    mFilePathCallback = null;
+                }
             });
         }
     }
