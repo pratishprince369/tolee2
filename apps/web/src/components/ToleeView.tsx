@@ -1911,9 +1911,10 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                             </button>
                           </div>
   
-                          {/* Instagram Stats Stack Underneath */}
                           <div className="flex flex-col gap-0.5 w-full text-[13px] font-semibold text-gray-800 dark:text-gray-200 px-0.5 relative">
-                            <ViewTracker contentId={post.id} contentType="post" />
+                            {(!post.mediaTypes?.includes('video') && !post.video) && (
+                              <ViewTracker contentId={post.id} contentType="post" />
+                            )}
                             <div className="flex items-center gap-3">
                               <span 
                                 onClick={(e) => { e.stopPropagation(); openLikesModal(post.id); }} 

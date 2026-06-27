@@ -245,23 +245,7 @@ export function ProfileReelsView({
     }
   };
 
-  /* ── View tracking ── */
-  const trackedReels = useRef<Set<string>>(new Set());
-  const trackView = useCallback((index: number) => {
-    const reel = visibleReels[index];
-    if (reel && !trackedReels.current.has(reel.id)) {
-      trackedReels.current.add(reel.id);
-      let fp = localStorage.getItem('device_fingerprint');
-      if (!fp) {
-        fp = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
-        localStorage.setItem('device_fingerprint', fp);
-      }
-      recordView(reel.id, 'reel', fp).catch(() => {});
-    }
-  }, [visibleReels]);
 
-  useEffect(() => { trackView(mobileActiveIndex); }, [mobileActiveIndex, trackView]);
-  useEffect(() => { trackView(desktopActiveIndex); }, [desktopActiveIndex, trackView]);
 
   /* ── Desktop scroll control ── */
   const scrollToReel = useCallback((containerRef: React.RefObject<HTMLDivElement | null>, idx: number) => {

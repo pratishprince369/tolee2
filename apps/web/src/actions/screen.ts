@@ -221,12 +221,9 @@ export async function getScreenVideoDetails(id: string) {
     const session = await getServerSession(authOptions);
     const currentUserId = session?.user ? (session.user as any).id : null;
 
-    // Increment views and retrieve details
-    const video = await prisma.screenVideo.update({
+    // Retrieve details (views are incremented via playback-session verified triggers, not on fetch)
+    const video = await prisma.screenVideo.findUnique({
       where: { id },
-      data: {
-        viewsCount: { increment: 1 }
-      },
       include: {
         user: {
           select: {

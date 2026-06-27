@@ -349,26 +349,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [selectedReelForShare, setSelectedReelForShare] = useState<any | null>(null);
 
-  /* ── View tracking ── */
-  const trackedReels = useRef<Set<string>>(new Set());
-  const trackView = useCallback((index: number) => {
-    const item = itemsToRender[index];
-    if (item && item.type === 'reel') {
-      const reel = item.data;
-      if (!trackedReels.current.has(reel.id)) {
-        trackedReels.current.add(reel.id);
-        let fp = localStorage.getItem('device_fingerprint');
-        if (!fp) {
-          fp = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
-          localStorage.setItem('device_fingerprint', fp);
-        }
-        recordView(reel.id, 'reel', fp).catch(() => {});
-      }
-    }
-  }, [itemsToRender]);
 
-  useEffect(() => { trackView(mobileActiveIndex); }, [mobileActiveIndex, trackView]);
-  useEffect(() => { trackView(desktopActiveIndex); }, [desktopActiveIndex, trackView]);
 
   useEffect(() => {
     // When the user approaches the end of the loaded reels (e.g. index is reels.length - 6, i.e. 5 remaining reels)

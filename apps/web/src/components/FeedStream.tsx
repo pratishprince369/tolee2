@@ -1889,9 +1889,10 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                         </div>
                       )}
                     </CardContent>
-
                     <CardFooter className="px-5 pb-5 pt-0 flex flex-col gap-3">
-                      <ViewTracker contentId={post.id} contentType="post" />
+                      {(!post.mediaTypes?.includes('video') && !post.video) && (
+                        <ViewTracker contentId={post.id} contentType="post" />
+                      )}
 
                       {/* Single Action Row: Icon + Count side-by-side, exactly like screenshot */}
                       <div className="flex items-center justify-between w-full pt-3 border-t border-zinc-100 dark:border-zinc-900/60">
