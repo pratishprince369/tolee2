@@ -14,6 +14,7 @@ export default function SuperAdminFranchisePanel() {
   const [withdrawals, setWithdrawals] = useState<any[]>([]);
   const [slabs, setSlabs] = useState<any[]>([]);
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [referrals, setReferrals] = useState<any[]>([]);
 
   // Slab form states
   const [editingSlabId, setEditingSlabId] = useState<string | null>(null);
@@ -47,6 +48,7 @@ export default function SuperAdminFranchisePanel() {
       setWithdrawals(data.withdrawals || []);
       setSlabs(data.slabs || []);
       setAuditLogs(data.auditLogs || []);
+      setReferrals(data.referrals || []);
     } catch (err: any) {
       setError(err.message || 'Failed to fetch franchise data.');
     } finally {
@@ -464,6 +466,58 @@ export default function SuperAdminFranchisePanel() {
           </form>
         </div>
       )}
+
+      {/* Referred Users list */}
+      <div className="bg-[#0c0c0e] border border-zinc-900 rounded-3xl p-6 space-y-4">
+        <h3 className="text-xs uppercase font-black tracking-wider text-zinc-500 border-b border-zinc-900 pb-3">Referred User Registrations ({referrals.length})</h3>
+        
+        {referrals.length === 0 ? (
+          <div className="text-center py-6 text-zinc-500 text-xs">No referrals conversions recorded yet.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-zinc-900 text-zinc-500 font-black uppercase text-[9px] tracking-wider">
+                  <th className="py-2.5">Referred User</th>
+                  <th className="py-2.5">Referring Franchise</th>
+                  <th className="py-2.5">Registration Date</th>
+                  <th className="py-2.5 text-right">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-900 font-medium">
+                {referrals.map((r) => {
+                  const u = r.referee;
+                  if (!u) return null;
+                  const isActive = u.email_verified || u.phoneVerified || u.isMobileVerified || (u.lastActiveAt && (Date.now() - new Date(u.lastActiveAt).getTime()) < 30 * 24 * 60 * 60 * 1000);
+                  
+                  return (
+                    <tr key={r.id} className="text-zinc-300">
+                      <td className="py-3">
+                        <span className="font-bold text-white block">{u.name}</span>
+                        <span className="text-[10px] text-zinc-500">@{u.username} | {u.email}</span>
+                      </td>
+                      <td className="py-3">
+                        <span className="font-bold text-white block">{r.franchise?.code}</span>
+                        <span className="text-[10px] text-zinc-500">{r.franchise?.fullName} ({r.franchise?.preferredLocation})</span>
+                      </td>
+                      <td className="py-3 font-mono text-zinc-400">{new Date(r.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</td>
+                      <td className="py-3 text-right">
+                        <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${
+                          isActive 
+                            ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' 
+                            : 'bg-zinc-800 text-zinc-500'
+                        }`}>
+                          {isActive ? 'Active' : 'Pending'}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {/* Audit Logs section */}
       <div className="bg-[#0c0c0e] border border-zinc-900 rounded-3xl p-6 space-y-4">

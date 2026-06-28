@@ -47,12 +47,39 @@ export async function GET(req: Request) {
       take: 50
     });
 
+    // Fetch all referrals
+    const referrals = await prisma.referral.findMany({
+      where: { franchiseId: { not: null } },
+      include: {
+        referee: {
+          select: {
+            name: true,
+            email: true,
+            username: true,
+            email_verified: true,
+            phoneVerified: true,
+            isMobileVerified: true,
+            lastActiveAt: true
+          }
+        },
+        franchise: {
+          select: {
+            code: true,
+            fullName: true,
+            preferredLocation: true
+          }
+        }
+      },
+      orderBy: { createdAt: "desc" }
+    });
+
     return NextResponse.json({
       success: true,
       franchises,
       withdrawals,
       slabs,
-      auditLogs
+      auditLogs,
+      referrals
     });
   } catch (error: any) {
     console.error("[Super Admin Franchise GET Error]:", error);

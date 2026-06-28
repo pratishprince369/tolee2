@@ -31,6 +31,23 @@ function SignupForm() {
 
   useEffect(() => {
     try {
+      const ref = searchParams.get('ref');
+      if (ref && ref.startsWith('FRN')) {
+        localStorage.setItem('tolee_referral_code', ref);
+        document.cookie = `tolee_referral_code=${ref}; max-age=${30 * 24 * 60 * 60}; path=/; SameSite=Lax;`;
+      } else {
+        const storedRef = localStorage.getItem('tolee_referral_code');
+        if (storedRef && storedRef.startsWith('FRN')) {
+          document.cookie = `tolee_referral_code=${storedRef}; max-age=${30 * 24 * 60 * 60}; path=/; SameSite=Lax;`;
+        }
+      }
+    } catch (e) {
+      console.warn("localStorage or document.cookie not accessible", e);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    try {
       const cleanup = setupNativeGoogleCallbacks();
       return cleanup;
     } catch (e) {

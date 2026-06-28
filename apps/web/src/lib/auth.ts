@@ -4,7 +4,7 @@ import GoogleProvider from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "./prisma";
 import bcrypt from "bcryptjs";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 
 
 // Ensure prisma is defined before passing to adapter
@@ -195,6 +195,52 @@ export const authOptions: NextAuthOptions = {
       }
       if (dbUser?.isBanned) {
         return "/auth/signin?error=banned";
+      }
+
+      // --- FRANCHISE REFERRAL TRACKING (SIGNUP/LOGIN) ---
+      try {
+        const cookieStore = cookies();
+        const referralCode = cookieStore.get("tolee_referral_code")?.value;
+        if (referralCode && referralCode.startsWith("FRN")) {
+          const existingReferral = await prisma.referral.findUnique({
+            where: { refereeId: user.id }
+          });
+          if (!existingReferral) {
+            const franchise = await prisma.franchise.findUnique({
+              where: { code: referralCode }
+            });
+            if (franchise && franchise.status === "active") {
+              const headersList = headers();
+              const userAgent = headersList.get("user-agent") || "";
+
+              let device = "Desktop";
+              if (/Mobi|Android|iPhone|iPad/i.test(userAgent)) device = "Mobile";
+              else if (/Tablet|iPad/i.test(userAgent)) device = "Tablet";
+
+              // Log referral conversion
+              await prisma.referral.create({
+                data: {
+                  referrerId: franchise.userId,
+                  refereeId: user.id,
+                  franchiseId: franchise.id,
+                  device,
+                  source: "referral_link",
+                  rewardAmount: 0,
+                  status: "completed"
+                }
+              });
+
+              // Clean up tracking cookie
+              try {
+                cookieStore.delete("tolee_referral_code");
+              } catch (cookieErr) {
+                // Ignore cookie delete errors in some environments
+              }
+            }
+          }
+        }
+      } catch (refErr) {
+        console.error("[NextAuth Franchise Referral Tracking Error]:", refErr);
       }
 
       // Record login activity for non-credential standard provider logins (e.g. Google OAuth)
