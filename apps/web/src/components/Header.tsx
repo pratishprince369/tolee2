@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Search, Bell, MessageCircle, LogOut, User, Settings, Compass, Store, Globe, Heart, Bot, Zap, MessageSquare } from 'lucide-react';
+import { Search, Bell, MessageCircle, LogOut, User, Settings, Compass, Store, Globe, Heart, Bot, Zap, MessageSquare, Briefcase, Award } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -36,6 +36,7 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
   const { data: session, status } = useSession();
   const [counts, setCounts] = React.useState({ notifications: 0, messages: 0 });
   const [isRestricted, setIsRestricted] = React.useState(false);
+  const [franchiseStatus, setFranchiseStatus] = React.useState<string | null>(null);
   const [branding, setBranding] = React.useState<BrandingData>(initialBranding || {
     siteName: 'tolee',
     headerLogoUrl: null,
@@ -51,6 +52,7 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
             notifications: res.unreadNotifications || 0, 
             messages: res.unreadMessages || 0 
           });
+          setFranchiseStatus((res as any).franchiseStatus || null);
           const mod = (res as any).moderation;
           if (mod) {
             const hasRest = mod.postingRestricted || 
@@ -392,10 +394,22 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
                     <Globe className="mr-2 h-4 w-4" />
                     <span>My Tolees</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => router.push('/franchise')} className="cursor-pointer flex w-full items-center">
-                    <Store className="mr-2 h-4 w-4" />
-                    <span>Get Franchise</span>
-                  </DropdownMenuItem>
+                  {franchiseStatus === 'active' || franchiseStatus === 'suspended' ? (
+                    <DropdownMenuItem onClick={() => router.push('/franchise/dashboard')} className="cursor-pointer flex w-full items-center">
+                      <Briefcase className="mr-2 h-4 w-4 text-zinc-700 dark:text-zinc-300" />
+                      <span>My Franchise</span>
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem onClick={() => router.push('/franchise')} className="cursor-pointer flex w-full items-center justify-between">
+                      <div className="flex items-center">
+                        <Store className="mr-2 h-4 w-4" />
+                        <span>Get Franchise</span>
+                      </div>
+                      {franchiseStatus === 'pending' && (
+                        <span className="text-[8px] font-black uppercase text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded">Pending</span>
+                      )}
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => signOut({ callbackUrl: '/' })} className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/50">
                     <LogOut className="mr-2 h-4 w-4" />

@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Home, Compass, Film, MessageCircle, Menu, User, Settings, Globe, Store, LogOut, MessageSquare, Map } from 'lucide-react';
+import { Home, Compass, Film, MessageCircle, Menu, User, Settings, Globe, Store, LogOut, MessageSquare, Map, Briefcase, Award } from 'lucide-react';
 import { useSession, signOut } from 'next-auth/react';
 import { getSidebarData } from '@/actions/user';
 import {
@@ -19,6 +19,7 @@ export function BottomNav() {
   const router = useRouter();
   const { data: session, status } = useSession();
   const [unreadChats, setUnreadChats] = React.useState(0);
+  const [franchiseStatus, setFranchiseStatus] = React.useState<string | null>(null);
   const isAuthenticated = status === 'authenticated';
 
   React.useEffect(() => {
@@ -26,12 +27,14 @@ export function BottomNav() {
       getSidebarData().then(res => {
         if (res.success) {
           setUnreadChats(res.unreadMessages || 0);
+          setFranchiseStatus((res as any).franchiseStatus || null);
         }
       });
       const interval = setInterval(() => {
         getSidebarData().then(res => {
           if (res.success) {
             setUnreadChats(res.unreadMessages || 0);
+            setFranchiseStatus((res as any).franchiseStatus || null);
           }
         });
       }, 5000);
@@ -104,6 +107,22 @@ export function BottomNav() {
                   <Globe className="mr-2 h-4 w-4" />
                   <span>My Tolees</span>
                 </DropdownMenuItem>
+                {franchiseStatus === 'active' || franchiseStatus === 'suspended' ? (
+                  <DropdownMenuItem onClick={() => router.push('/franchise/dashboard')} className="cursor-pointer flex w-full items-center">
+                    <Briefcase className="mr-2 h-4 w-4 text-zinc-700 dark:text-zinc-300" />
+                    <span>My Franchise</span>
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem onClick={() => router.push('/franchise')} className="cursor-pointer flex w-full items-center justify-between">
+                    <div className="flex items-center">
+                      <Store className="mr-2 h-4 w-4" />
+                      <span>Get Franchise</span>
+                    </div>
+                    {franchiseStatus === 'pending' && (
+                      <span className="text-[8px] font-black uppercase text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded">Pending</span>
+                    )}
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onClick={() => router.push('/marketplace')} className="cursor-pointer flex w-full items-center">
                   <Store className="mr-2 h-4 w-4" />
                   <span>Marketplace</span>

@@ -456,6 +456,11 @@ export async function getSidebarData() {
       }
     });
 
+    const franchise = await prisma.franchise.findUnique({
+      where: { userId },
+      select: { status: true }
+    });
+
     const isExpired = user?.restrictionExpiresAt && new Date() > new Date(user.restrictionExpiresAt);
 
     return {
@@ -464,6 +469,7 @@ export async function getSidebarData() {
       joinedTolees: joinedTolees.map(m => m.tolee),
       unreadNotifications,
       unreadMessages,
+      franchiseStatus: franchise?.status || null,
       moderation: {
         isSuspended: !!user?.isSuspended,
         isBanned: !!user?.isBanned,
