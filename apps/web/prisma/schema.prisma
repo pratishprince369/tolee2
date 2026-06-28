@@ -124,6 +124,7 @@ model User {
   emailNotifications    Boolean           @default(true)
 
   wallet        Wallet?
+  franchise     Franchise?
   referralsMade Referral[] @relation("Referrer")
   referralRecv  Referral?  @relation("Referee")
   campaigns     Campaign[]
@@ -910,6 +911,16 @@ model Referral {
   rewardAmount  Float    @default(500.0)
   status        String   @default("completed")
   createdAt     DateTime @default(now())
+
+  // Franchise Referral System fields
+  franchiseId   String?
+  franchise     Franchise? @relation("FranchiseReferrals", fields: [franchiseId], references: [id], onDelete: SetNull)
+  device        String?
+  location      String?
+  state         String?
+  city          String?
+  area          String?
+  source        String?
 }
 
 // 3. Campaign & Ads Structure (Campaign -> AdSet -> Ad)
@@ -1499,4 +1510,89 @@ model VideoPlaybackSession {
   @@index([isVerified])
   @@index([postId])
   @@index([screenVideoId])
+}
+
+// ---------------------------------------------------------
+// TOLEE FRANCHISE SYSTEM
+// ---------------------------------------------------------
+model Franchise {
+  id                String                 @id @default(cuid())
+  code              String                 @unique // e.g. "FRN1001"
+  userId            String                 @unique
+  user              User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullName          String
+  businessName      String?
+  mobile            String
+  email             String
+  aadhaarPan        String?
+  address           String
+  state             String
+  city              String
+  area              String
+  pincode           String
+  preferredLocation String
+  paymentDetails    String?
+  status            String                 @default("pending") // "pending" | "active" | "suspended" | "rejected"
+  walletBalance     Float                  @default(0.0)
+  commissionEarned  Float                  @default(0.0)
+  commissionPending Float                  @default(0.0)
+  commissionPaid    Float                  @default(0.0)
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  
+  clicks            FranchiseClick[]
+  referrals         Referral[]             @relation("FranchiseReferrals")
+  withdrawals       FranchiseWithdrawal[]
+  transactions      FranchiseTransaction[]
+}
+
+model FranchiseClick {
+  id          String    @id @default(cuid())
+  franchiseId String
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
+  source      String?   // e.g. "whatsapp", "instagram", "facebook", "telegram", "email", "web"
+  device      String?   // Mobile, Desktop, Tablet, etc.
+  ipAddress   String?
+  createdAt   DateTime  @default(now())
+}
+
+model FranchiseWithdrawal {
+  id              String    @id @default(cuid())
+  franchiseId     String
+  franchise       Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
+  amount          Float
+  status          String    @default("pending") // "pending" | "approved" | "rejected"
+  bankDetails     String?   // Bank name, Account number, IFSC, UPI ID, etc.
+  rejectionReason String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model FranchiseTransaction {
+  id           String    @id @default(cuid())
+  franchiseId  String
+  franchise    Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
+  amount       Float     // Positive for earnings, negative for withdrawals
+  type         String    // "commission" | "withdrawal" | "admin_override"
+  description  String?
+  adCampaignId String?
+  createdAt    DateTime  @default(now())
+}
+
+model FranchiseSlab {
+  id         String   @id @default(cuid())
+  minUsers   Int
+  maxUsers   Int
+  commission Float    // e.g. 2.0, 2.5, 3.5, 5.0
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model FranchiseAuditLog {
+  id          String   @id @default(cuid())
+  franchiseId String?
+  action      String   // e.g. "APPLIED", "STATUS_CHANGE", "SLAB_UPDATE", "COMMISSION_CREDITED", "WITHDRAWAL_REQUEST"
+  details     String
+  ipAddress   String?
+  createdAt   DateTime @default(now())
 }

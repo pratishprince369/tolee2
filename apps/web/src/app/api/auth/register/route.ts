@@ -7,7 +7,7 @@ import { checkBotStatus } from "@/lib/botDetection";
 
 export async function POST(req: Request) {
   try {
-    const { name, email, password, website } = await req.json();
+    const { name, email, password, website, ref } = await req.json();
     
     // Honeypot check
     if (website) {
@@ -83,9 +83,49 @@ export async function POST(req: Request) {
       }
     });
 
+    // --- FRANCHISE REFERRAL TRACKING ---
+    const cookieStore = cookies();
+    const referralCode = ref || cookieStore.get("tolee_referral_code")?.value;
+    if (referralCode) {
+      try {
+        if (referralCode.startsWith("FRN")) {
+          const franchise = await prisma.franchise.findUnique({
+            where: { code: referralCode }
+          });
+          if (franchise && franchise.status === "active") {
+            const userAgent = req.headers.get("user-agent") || "";
+            let device = "Desktop";
+            if (/Mobi|Android|iPhone|iPad/i.test(userAgent)) device = "Mobile";
+            else if (/Tablet|iPad/i.test(userAgent)) device = "Tablet";
+
+            // Create Referral record linking referee to franchise owner
+            await prisma.referral.create({
+              data: {
+                referrerId: franchise.userId,
+                refereeId: user.id,
+                franchiseId: franchise.id,
+                device,
+                source: "referral_link",
+                rewardAmount: 0,
+                status: "completed"
+              }
+            });
+
+            // Clean up tracking cookie
+            try {
+              cookieStore.delete("tolee_referral_code");
+            } catch (cookieErr) {
+              // Ignore cookie delete errors in some environments
+            }
+          }
+        }
+      } catch (refErr) {
+        console.error("[Referral Logging Error]:", refErr);
+      }
+    }
+
     // --- CONVERSION TRACKING ---
     try {
-      const cookieStore = cookies();
       const sessionId = cookieStore.get('tolee_session_id')?.value;
       if (sessionId) {
         // Link user to VisitorSession

@@ -688,6 +688,74 @@ export async function trackAdInteraction(
           }
         });
 
+        // --- FRANCHISE COMMISSION REVENUE SHARING ---
+        try {
+          const referral = await tx.referral.findFirst({
+            where: { refereeId: campaign.userId, franchiseId: { not: null } },
+            include: { franchise: true }
+          });
+          if (referral && referral.franchise && referral.franchise.status === "active") {
+            // Count active referred users for this franchise
+            const activeUsersCount = await tx.referral.count({
+              where: {
+                franchiseId: referral.franchise.id,
+                referee: {
+                  OR: [
+                    { email_verified: true },
+                    { phoneVerified: true },
+                    { isMobileVerified: true },
+                    { lastActiveAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } }
+                  ]
+                }
+              }
+            });
+
+            // Retrieve slab rules
+            const slabs = await tx.franchiseSlab.findMany({
+              orderBy: { minUsers: 'asc' }
+            });
+
+            let commissionPercent = 2.0; // fallback default
+            if (slabs.length > 0) {
+              for (const slab of slabs) {
+                if (activeUsersCount >= slab.minUsers && activeUsersCount <= slab.maxUsers) {
+                  commissionPercent = slab.commission;
+                  break;
+                }
+              }
+            } else {
+              // Standard fallback slabs
+              if (activeUsersCount < 20000) commissionPercent = 2.0;
+              else if (activeUsersCount < 50000) commissionPercent = 2.5;
+              else if (activeUsersCount < 100000) commissionPercent = 3.5;
+              else commissionPercent = 5.0;
+            }
+
+            const comm = cost * (commissionPercent / 100);
+            if (comm > 0) {
+              await tx.franchise.update({
+                where: { id: referral.franchise.id },
+                data: {
+                  walletBalance: { increment: comm },
+                  commissionEarned: { increment: comm }
+                }
+              });
+
+              await tx.franchiseTransaction.create({
+                data: {
+                  franchiseId: referral.franchise.id,
+                  amount: comm,
+                  type: "commission",
+                  description: `Earned ${commissionPercent}% commission on ad spend of ₹${cost.toFixed(3)} by referred user (${referral.refereeId})`,
+                  adCampaignId: campaign.id
+                }
+              });
+            }
+          }
+        } catch (commErr) {
+          console.error("[Franchise Commission Engine Error]:", commErr);
+        }
+
         // Credit Creator Wallet
         if (creatorId && creatorShare > 0) {
           const creatorWallet = await getOrCreateWalletTx(tx, creatorId);
