@@ -826,24 +826,23 @@ function AIManagerContent() {
       }, 2000);
     }
   };
-
   return (
-    <div className="flex h-[calc(100vh-4rem)] md:h-screen w-full bg-slate-50 dark:bg-[#070709] overflow-hidden text-gray-900 dark:text-gray-100 font-sans">
+    <div className="flex h-[calc(100vh-4rem)] md:h-screen w-full bg-white dark:bg-[#09090b] overflow-hidden text-gray-900 dark:text-gray-100 font-sans">
       
       {/* 1. Left Navigation Sidebar on Desktop */}
-      <div className="hidden lg:flex flex-col w-64 bg-white dark:bg-[#0b0b0d] border-r border-gray-200 dark:border-zinc-900/80 shrink-0">
+      <div className="hidden lg:flex flex-col w-64 bg-zinc-50/40 dark:bg-[#0b0b0d] border-r border-zinc-200/50 dark:border-zinc-900/60 shrink-0">
         {/* Workspace Brand */}
-        <div className="h-16 flex items-center gap-3 px-5 border-b border-gray-100 dark:border-zinc-900/60 shrink-0 bg-white/50 dark:bg-black/50 backdrop-blur-md">
-          <Avatar className="w-8 h-8 border border-indigo-500/20">
+        <div className="h-16 flex items-center gap-3 px-5 border-b border-zinc-200/50 dark:border-zinc-900/60 shrink-0 bg-zinc-50/50 dark:bg-black/20 backdrop-blur-md">
+          <Avatar className="w-8 h-8 border border-zinc-200/60 dark:border-zinc-800">
             <AvatarImage src="https://api.dicebear.com/7.x/bottts/svg?seed=ToleeManager" />
             <AvatarFallback>AI</AvatarFallback>
           </Avatar>
           <div className="flex flex-col">
-            <span className="text-[13px] font-black text-gray-900 dark:text-white flex items-center gap-1">
+            <span className="text-[13px] font-black text-gray-800 dark:text-white flex items-center gap-1">
               AI Manager
-              <Bot className="w-3.5 h-3.5 text-indigo-500" />
+              <Bot className="w-3.5 h-3.5 text-zinc-400" />
             </span>
-            <span className="text-[8px] font-extrabold text-gray-400 tracking-wider uppercase">Tolee Growth Workspace</span>
+            <span className="text-[8px] font-extrabold text-zinc-400 dark:text-zinc-500 tracking-wider uppercase">Tolee Growth Workspace</span>
           </div>
         </div>
 
@@ -860,33 +859,33 @@ function AIManagerContent() {
         </div>
 
         {/* User context footer */}
-        <div className="p-4 border-t border-gray-100 dark:border-zinc-900/60 flex items-center gap-3">
-          <Avatar className="w-8 h-8 border border-zinc-800">
+        <div className="p-4 border-t border-zinc-200/50 dark:border-zinc-900/60 flex items-center gap-3">
+          <Avatar className="w-8 h-8 border border-zinc-200/60 dark:border-zinc-800">
             <AvatarImage src={session?.user?.image || '/default-user-avatar.svg'} />
             <AvatarFallback>{session?.user?.name?.[0]}</AvatarFallback>
           </Avatar>
           <div className="flex flex-col truncate">
-            <span className="text-xs font-bold text-gray-900 dark:text-white truncate">{session?.user?.name || 'Creator'}</span>
-            <span className="text-[10px] text-gray-400 dark:text-zinc-500 font-semibold truncate">@{ (session?.user as any)?.username || 'user' }</span>
+            <span className="text-xs font-bold text-gray-800 dark:text-zinc-200 truncate">{session?.user?.name || 'Creator'}</span>
+            <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-semibold truncate">@{ (session?.user as any)?.username || 'user' }</span>
           </div>
         </div>
       </div>
 
       {/* 2. Main Content Workspace */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-grow flex flex-col overflow-hidden">
         
         {/* Mobile View Navigation (only on screens < lg) */}
-        <div className="lg:hidden flex flex-col bg-white dark:bg-[#0b0b0d] border-b border-gray-200 dark:border-zinc-900/60 shrink-0">
+        <div className="lg:hidden flex flex-col bg-white dark:bg-[#0c0c0e] border-b border-zinc-200/50 dark:border-zinc-900/60 shrink-0">
           {/* Top Header Row */}
-          <div className="h-12 flex items-center px-4 justify-between border-b border-gray-100 dark:border-zinc-900/40">
+          <div className="h-12 flex items-center px-4 justify-between border-b border-zinc-100 dark:border-zinc-900/40">
             <div className="flex items-center gap-2">
-              <Avatar className="w-7 h-7 border border-indigo-500/20">
+              <Avatar className="w-7 h-7 border border-zinc-200/60 dark:border-zinc-800">
                 <AvatarImage src="https://api.dicebear.com/7.x/bottts/svg?seed=ToleeManager" />
                 <AvatarFallback>AI</AvatarFallback>
               </Avatar>
-              <span className="text-xs font-black text-gray-900 dark:text-white flex items-center gap-1">
+              <span className="text-xs font-black text-gray-800 dark:text-white flex items-center gap-1">
                 AI Manager
-                <Bot className="w-3.5 h-3.5 text-indigo-500" />
+                <Bot className="w-3.5 h-3.5 text-zinc-400" />
               </span>
             </div>
             
@@ -895,13 +894,13 @@ function AIManagerContent() {
                 <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span> Live Mic
               </span>
             ) : (
-              <span className="text-[9px] font-extrabold text-gray-400 dark:text-zinc-500 uppercase tracking-wider">Tolee Growth</span>
+              <span className="text-[9px] font-extrabold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">Tolee Growth</span>
             )}
           </div>
           
           {/* Horizontally Scrollable Tabs Row */}
           <div 
-            className="flex items-center gap-2 overflow-x-auto px-4 py-2.5 bg-slate-50/50 dark:bg-black/20 scrollbar-none [&::-webkit-scrollbar]:hidden"
+            className="flex items-center gap-2 overflow-x-auto px-4 py-2.5 bg-zinc-50/30 dark:bg-black/10 scrollbar-none [&::-webkit-scrollbar]:hidden"
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
           >
             <MobileTabButton active={activeTab === 'dashboard'} icon={<BarChart3 className="w-3.5 h-3.5" />} label="Growth Dashboard" onClick={() => setActiveTab('dashboard')} />
@@ -923,13 +922,13 @@ function AIManagerContent() {
             <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6 animate-in fade-in duration-300">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                  <h1 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-2">
+                  <h1 className="text-2xl font-black text-zinc-850 dark:text-white tracking-tight flex items-center gap-2">
                     AI Growth Dashboard
-                    <Sparkles className="w-5 h-5 text-indigo-400 animate-pulse" />
+                    <Sparkles className="w-5 h-5 text-zinc-400" />
                   </h1>
-                  <p className="text-xs text-gray-500 dark:text-zinc-400 mt-0.5">Real-time engagement analysis and personal coaching tips</p>
+                  <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">Real-time engagement analysis and personal coaching tips</p>
                 </div>
-                <Button onClick={loadDashboard} disabled={isLoadingDashboard} size="sm" variant="outline" className="text-xs font-bold border-zinc-800 gap-1.5 h-8">
+                <Button onClick={loadDashboard} disabled={isLoadingDashboard} size="sm" variant="outline" className="text-xs font-bold border-zinc-200 dark:border-zinc-800 gap-1.5 h-8">
                   <RefreshCw className={`w-3.5 h-3.5 ${isLoadingDashboard ? 'animate-spin' : ''}`} />
                   Sync Metrics
                 </Button>
@@ -945,43 +944,37 @@ function AIManagerContent() {
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Visual SVG Follower Growth Chart */}
-                <div className="md:col-span-2 bg-white dark:bg-[#0b0b0d] border border-gray-200 dark:border-zinc-900/60 rounded-2xl p-5 shadow-sm">
-                  <h3 className="text-sm font-bold text-gray-900 dark:text-white border-b border-gray-100 dark:border-zinc-900/50 pb-3 mb-4">Followers Growth Trend</h3>
+                <div className="md:col-span-2 bg-white dark:bg-[#0c0c0e] border border-zinc-200/60 dark:border-zinc-900/60 rounded-2xl p-5">
+                  <h3 className="text-sm font-bold text-zinc-800 dark:text-white border-b border-zinc-100 dark:border-zinc-900/50 pb-3 mb-4">Followers Growth Trend</h3>
                   <div className="h-48 flex items-end justify-between gap-1 w-full relative pt-4">
                     {/* SVG Chart */}
                     <svg className="absolute inset-0 w-full h-full p-2 overflow-visible" preserveAspectRatio="none">
                       <path 
                         d="M 10 120 Q 80 100 150 90 T 290 50 T 430 30" 
                         fill="none" 
-                        stroke="url(#indigoGrad)" 
-                        strokeWidth="3.5"
+                        stroke="#71717a" 
+                        strokeWidth="2.5"
                         strokeLinecap="round"
                       />
-                      <defs>
-                        <linearGradient id="indigoGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                          <stop offset="0%" stopColor="#4f46e5" />
-                          <stop offset="100%" stopColor="#10b981" />
-                        </linearGradient>
-                      </defs>
                     </svg>
                     {/* Visual Bars overlay */}
                     {[1020, 1032, 1054, 1089, 1102, 1140, 1175].map((val, idx) => (
                       <div key={idx} className="flex flex-col items-center flex-1 h-full justify-end z-10">
-                        <span className="text-[9px] font-mono text-gray-500 mb-1">{val}</span>
+                        <span className="text-[9px] font-mono text-zinc-400 dark:text-zinc-550 mb-1">{val}</span>
                         <div 
-                          className="w-full max-w-[20px] rounded-t bg-gradient-to-t from-indigo-500/10 to-indigo-500/40 border-t border-indigo-500/60"
+                          className="w-full max-w-[20px] rounded-t bg-zinc-100 dark:bg-zinc-800/80 border-t border-zinc-250 dark:border-zinc-700"
                           style={{ height: `${(val - 900) / 3}%` }}
                         />
-                        <span className="text-[9px] font-semibold text-gray-400 mt-2">Day {idx+1}</span>
+                        <span className="text-[9px] font-semibold text-zinc-400 dark:text-zinc-550 mt-2">Day {idx+1}</span>
                       </div>
                     ))}
                   </div>
                 </div>
 
                 {/* Growth Coach card */}
-                <div className="bg-gradient-to-b from-indigo-950/20 to-zinc-950/40 border border-indigo-500/10 dark:border-zinc-800 rounded-2xl p-5 flex flex-col shadow-xl">
-                  <h3 className="text-sm font-bold text-indigo-400 flex items-center gap-1.5 border-b border-indigo-950 pb-3 mb-4">
-                    <Bot className="w-5 h-5 text-indigo-500 animate-pulse" />
+                <div className="bg-zinc-50/50 dark:bg-zinc-900/20 border border-zinc-200/60 dark:border-zinc-800 rounded-2xl p-5 flex flex-col shadow-sm">
+                  <h3 className="text-sm font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5 border-b border-zinc-200/50 dark:border-zinc-850 pb-3 mb-4">
+                    <Bot className="w-5 h-5 text-zinc-400" />
                     Growth Coach Tips
                   </h3>
                   <div className="space-y-4 flex-1">
@@ -992,8 +985,8 @@ function AIManagerContent() {
                       'Share a client testimonial to build trust on the platform.'
                     ]).map((sug: string, idx: number) => (
                       <div key={idx} className="flex gap-2.5 items-start">
-                        <span className="w-5 h-5 rounded-full bg-indigo-500/10 text-indigo-400 text-xs flex items-center justify-center shrink-0 mt-0.5 font-bold">{idx+1}</span>
-                        <p className="text-xs text-gray-800 dark:text-zinc-300 leading-relaxed font-medium">{sug}</p>
+                        <span className="w-5 h-5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 text-xs flex items-center justify-center shrink-0 mt-0.5 font-bold">{idx+1}</span>
+                        <p className="text-xs text-zinc-700 dark:text-zinc-300 leading-relaxed font-medium">{sug}</p>
                       </div>
                     ))}
                   </div>
@@ -1003,18 +996,18 @@ function AIManagerContent() {
               {/* Trending Topics & Content idea triggers */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Trending Topics List */}
-                <div className="bg-white dark:bg-[#0b0b0d] border border-gray-200 dark:border-zinc-900/60 rounded-2xl p-5 shadow-sm">
-                  <h3 className="text-sm font-bold text-gray-900 dark:text-white border-b border-gray-100 dark:border-zinc-900/50 pb-3 mb-4">Trending Niche Topics Today</h3>
+                <div className="bg-white dark:bg-[#0c0c0e] border border-zinc-200/60 dark:border-zinc-900/60 rounded-2xl p-5">
+                  <h3 className="text-sm font-bold text-zinc-800 dark:text-white border-b border-zinc-100 dark:border-zinc-900/50 pb-3 mb-4">Trending Niche Topics Today</h3>
                   <div className="space-y-3">
                     {(dashboardData?.trendingTopics || [
                       'Property investment trends in Kalyan-Dombivli.',
                       'Advantage+ Creative hacks for local brands.',
                       'Top 3 home decor trends for 2026.'
                     ]).map((topic: string, idx: number) => (
-                      <div key={idx} className="flex items-center justify-between p-3 bg-zinc-50 dark:bg-zinc-900/40 border border-gray-100 dark:border-zinc-900/50 rounded-xl hover:border-indigo-500/30 transition-colors">
+                      <div key={idx} className="flex items-center justify-between p-3 bg-zinc-50/40 dark:bg-zinc-900/10 border border-zinc-200/40 dark:border-zinc-850 rounded-xl hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors">
                         <div className="flex items-center gap-3">
                           <span className="text-xl">🔥</span>
-                          <span className="text-xs font-bold text-gray-900 dark:text-zinc-200">{topic}</span>
+                          <span className="text-xs font-bold text-zinc-700 dark:text-zinc-200">{topic}</span>
                         </div>
                         <Button 
                           onClick={() => {
@@ -1028,7 +1021,7 @@ function AIManagerContent() {
                           }}
                           size="sm" 
                           variant="ghost" 
-                          className="text-xs text-indigo-500 font-extrabold h-8 rounded-lg"
+                          className="text-xs text-zinc-500 hover:text-zinc-800 font-extrabold h-8 rounded-lg"
                         >
                           Draft Post
                         </Button>
@@ -1038,11 +1031,11 @@ function AIManagerContent() {
                 </div>
 
                 {/* Voice assistant card */}
-                <div className="bg-white dark:bg-[#0b0b0d] border border-gray-200 dark:border-zinc-900/60 rounded-2xl p-5 shadow-sm flex flex-col items-center justify-center text-center gap-4">
+                <div className="bg-white dark:bg-[#0c0c0e] border border-zinc-200/60 dark:border-zinc-900/60 rounded-2xl p-5 flex flex-col items-center justify-center text-center gap-4">
                   <div className="relative">
                     <button 
                       onClick={handleToggleVoice}
-                      className={`w-16 h-16 rounded-full ${isVoiceActive ? 'bg-red-500 animate-pulse text-white' : 'bg-indigo-500/10 text-indigo-500 hover:bg-indigo-500/20'} flex items-center justify-center border border-indigo-500/20 transition-all shadow-md active:scale-95`}
+                      className={`w-16 h-16 rounded-full ${isVoiceActive ? 'bg-red-500 animate-pulse text-white' : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-600 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-350'} flex items-center justify-center border border-zinc-200/60 dark:border-zinc-700 transition-all shadow-sm active:scale-95`}
                     >
                       <Mic className="w-7 h-7" />
                     </button>
@@ -1051,11 +1044,11 @@ function AIManagerContent() {
                     )}
                   </div>
                   <div className="space-y-1">
-                    <h4 className="text-sm font-black text-gray-900 dark:text-white">AI Voice Assistant (Beta)</h4>
-                    <p className="text-xs text-gray-500 dark:text-zinc-400 max-w-xs">Tap mic to simulate speaking your post topic and let AI draft it instantly.</p>
+                    <h4 className="text-sm font-black text-zinc-850 dark:text-white">AI Voice Assistant (Beta)</h4>
+                    <p className="text-xs text-zinc-400 dark:text-zinc-500 max-w-xs">Tap mic to simulate speaking your post topic and let AI draft it instantly.</p>
                   </div>
                   {voiceTranscript && (
-                    <div className="p-3 bg-zinc-900/60 border border-zinc-800 rounded-xl max-w-sm text-xs font-semibold font-mono text-indigo-400">
+                    <div className="p-3 bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/60 dark:border-zinc-800 rounded-xl max-w-sm text-xs font-semibold font-mono text-zinc-600 dark:text-zinc-300">
                       "{voiceTranscript}"
                     </div>
                   )}
@@ -1066,14 +1059,14 @@ function AIManagerContent() {
 
           {/* TAB 2: COPYWRITER & CREATIVE (chatbot chat wizard) */}
           {activeTab === 'copywriter' && (
-            <div className="flex flex-col h-full bg-slate-50 dark:bg-[#09090b] relative">
+            <div className="flex flex-col h-full bg-white dark:bg-[#09090b] relative">
               {/* Header inside pane */}
-              <div className="h-14 border-b border-gray-100 dark:border-zinc-900 bg-white/40 dark:bg-black/40 backdrop-blur-md flex items-center justify-between px-6 sticky top-0 z-20 shrink-0">
+              <div className="h-14 border-b border-zinc-200/50 dark:border-zinc-900 bg-zinc-50/50 dark:bg-[#0c0c0e] flex items-center justify-between px-6 sticky top-0 z-20 shrink-0">
                 <div className="flex items-center gap-2">
-                  <Bot className="w-4.5 h-4.5 text-indigo-500" />
-                  <span className="text-sm font-extrabold text-gray-900 dark:text-white">Copywriter Chat Assistant</span>
+                  <Bot className="w-4 h-4 text-zinc-500 animate-pulse" />
+                  <span className="text-sm font-extrabold text-zinc-800 dark:text-zinc-200">Copywriter Chat Assistant</span>
                 </div>
-                <Button onClick={clearChatHistory} variant="ghost" size="sm" className="text-xs text-gray-500 hover:text-red-500 font-bold rounded-lg h-8">
+                <Button onClick={clearChatHistory} variant="ghost" size="sm" className="text-xs text-zinc-500 hover:text-red-500 font-bold rounded-lg h-8">
                   Reset Flow
                 </Button>
               </div>
@@ -1086,7 +1079,7 @@ function AIManagerContent() {
                     {aiMessages.map((msg) => (
                       <div key={msg.id} className={`flex w-full gap-2 sm:gap-3 ${msg.isMe ? 'justify-end' : 'justify-start'}`}>
                         {!msg.isMe && (
-                          <Avatar className="w-8 h-8 flex-shrink-0 mt-0.5 shadow-sm border border-zinc-900 hidden sm:block">
+                          <Avatar className="w-8 h-8 flex-shrink-0 mt-0.5 border border-zinc-200/60 dark:border-zinc-800 hidden sm:block">
                             <AvatarImage src={msg.senderAvatar} />
                             <AvatarFallback>AI</AvatarFallback>
                           </Avatar>
@@ -1094,47 +1087,56 @@ function AIManagerContent() {
                         
                         <div className={`flex flex-col max-w-[85%] ${msg.isMe ? 'items-end' : 'items-start'}`}>
                           {msg.media && (
-                            <div className="mb-1 rounded-2xl overflow-hidden max-w-sm border-2 border-zinc-800 shadow-md">
+                            <div className="mb-1 rounded-2xl overflow-hidden max-w-sm border border-zinc-200 dark:border-zinc-850 shadow-sm">
                               <img src={msg.media.url} alt="Attached" className="w-full object-cover max-h-60" />
                             </div>
                           )}
 
                           {msg.text && (
-                            <div className={`relative px-4 py-3 text-[14px] leading-relaxed shadow-sm ${
+                            <div className={`relative px-4 py-3 text-[14.5px] leading-relaxed border ${
                               msg.isMe 
-                                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl rounded-tr-sm font-medium' 
-                                : 'bg-white dark:bg-zinc-900 text-gray-800 dark:text-gray-200 border border-gray-100 dark:border-zinc-800/80 rounded-2xl rounded-tl-sm'
+                                ? 'bg-zinc-100 dark:bg-zinc-800/80 text-zinc-800 dark:text-zinc-200 border-zinc-250/60 dark:border-zinc-700/60 rounded-2xl rounded-tr-sm font-semibold' 
+                                : 'bg-zinc-50/40 dark:bg-zinc-900/10 text-zinc-800 dark:text-zinc-200 border-zinc-200/40 dark:border-zinc-850 rounded-2xl rounded-tl-sm'
                             }`}>
                               <div className="whitespace-pre-wrap break-words">{msg.text}</div>
                             </div>
                           )}
-                          <span className="text-[9px] text-gray-400 mt-1 px-1">{msg.time}</span>
+                          <span className="text-[9px] text-zinc-400 mt-1 px-1">{msg.time}</span>
                         </div>
                       </div>
                     ))}
 
                     {/* Wizards buttons inside chat stream */}
                     {flowState === 'idle' && (
-                      <div className="flex flex-col sm:flex-row gap-3 mt-4 w-full max-w-md mx-auto p-4 bg-zinc-950/40 border border-zinc-900 rounded-2xl shadow-xl">
-                        <Button
-                          onClick={() => startPostFlow()}
-                          className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold h-11 rounded-xl shadow-lg border border-indigo-400/20 gap-1.5 transition-all"
-                        >
-                          <PlusCircle className="w-4 h-4" />
-                          Create Organic Post
-                        </Button>
-                        <Button
-                          onClick={() => startAdFlow()}
-                          className="flex-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold h-11 rounded-xl shadow-lg border border-teal-400/20 gap-1.5 transition-all"
-                        >
-                          <Target className="w-4 h-4" />
-                          Place Sponsored Ad
-                        </Button>
+                      <div className="w-full max-w-lg mx-auto py-8 text-center space-y-6 animate-in fade-in duration-300">
+                        <div className="space-y-2">
+                          <Bot className="w-10 h-10 text-zinc-450 dark:text-zinc-500 mx-auto stroke-[1.5]" />
+                          <h2 className="text-lg font-extrabold text-zinc-850 dark:text-zinc-200">How can I help you today?</h2>
+                          <p className="text-xs text-zinc-400 dark:text-zinc-550 max-w-xs mx-auto">Select a quick helper task below to start collaborating with Tolee AI</p>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <button
+                            onClick={() => startPostFlow()}
+                            className="flex flex-col items-start p-3 bg-zinc-50/50 hover:bg-zinc-100/50 dark:bg-zinc-900/10 dark:hover:bg-zinc-900/30 border border-zinc-200/60 dark:border-zinc-800 rounded-xl text-left transition-all active:scale-[0.98]"
+                          >
+                            <PlusCircle className="w-4.5 h-4.5 text-zinc-500 mb-1.5" />
+                            <span className="text-xs font-extrabold text-zinc-800 dark:text-zinc-200">Create Organic Post</span>
+                            <span className="text-[10px] text-zinc-400 dark:text-zinc-550 mt-0.5">Draft caption & design AI banner</span>
+                          </button>
+                          <button
+                            onClick={() => startAdFlow()}
+                            className="flex flex-col items-start p-3 bg-zinc-50/50 hover:bg-zinc-100/50 dark:bg-zinc-900/10 dark:hover:bg-zinc-900/30 border border-zinc-200/60 dark:border-zinc-800 rounded-xl text-left transition-all active:scale-[0.98]"
+                          >
+                            <Target className="w-4.5 h-4.5 text-zinc-500 mb-1.5" />
+                            <span className="text-xs font-extrabold text-zinc-800 dark:text-zinc-200">Place Sponsored Ad</span>
+                            <span className="text-[10px] text-zinc-400 dark:text-zinc-550 mt-0.5">Promote services with custom budget</span>
+                          </button>
+                        </div>
                       </div>
                     )}
 
                     {flowState === 'post_media_choice' && (
-                      <div className="flex gap-3 mt-3 w-full max-w-sm mx-auto p-4 bg-zinc-950/40 border border-zinc-900 rounded-2xl">
+                      <div className="flex gap-3 mt-3 w-full max-w-sm mx-auto p-4 bg-zinc-50/50 dark:bg-zinc-900/10 border border-zinc-200/60 dark:border-zinc-800 rounded-2xl">
                         <Button
                           onClick={() => {
                             setFlowState('post_media_upload');
@@ -1142,7 +1144,7 @@ function AIManagerContent() {
                             const b = addBotMessage(`Select or drag your visual image or video to upload:`);
                             setAiMessages(prev => [...prev, u, b]);
                           }}
-                          className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-gray-150 font-bold h-10 rounded-xl gap-1.5 border border-zinc-700 text-xs transition-all"
+                          className="flex-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-200 font-bold h-10 rounded-xl gap-1.5 border border-zinc-200/60 dark:border-zinc-750 text-xs transition-all"
                         >
                           <Upload className="w-3.5 h-3.5" />
                           Upload Photo/Video
@@ -1154,7 +1156,7 @@ function AIManagerContent() {
                             const b = addBotMessage(`Stunning AI Image Generator active! Click "Generate visual graphic" below to design:`);
                             setAiMessages(prev => [...prev, u, b]);
                           }}
-                          className="flex-1 bg-primary hover:bg-primary/95 text-white font-bold h-10 rounded-xl gap-1.5 text-xs shadow-md transition-all"
+                          className="flex-1 bg-zinc-800 hover:bg-zinc-900 text-white font-bold h-10 rounded-xl gap-1.5 text-xs shadow-sm transition-all"
                         >
                           <Sparkles className="w-3.5 h-3.5" />
                           Generate with AI
@@ -1163,7 +1165,7 @@ function AIManagerContent() {
                     )}
 
                     {flowState === 'ad_media_choice' && (
-                      <div className="flex gap-3 mt-3 w-full max-w-sm mx-auto p-4 bg-zinc-950/40 border border-zinc-900 rounded-2xl">
+                      <div className="flex gap-3 mt-3 w-full max-w-sm mx-auto p-4 bg-zinc-50/50 dark:bg-zinc-900/10 border border-zinc-200/60 dark:border-zinc-800 rounded-2xl">
                         <Button
                           onClick={() => {
                             setFlowState('ad_media_upload');
@@ -1171,7 +1173,7 @@ function AIManagerContent() {
                             const b = addBotMessage(`Select your ad campaign creative photo/video to upload:`);
                             setAiMessages(prev => [...prev, u, b]);
                           }}
-                          className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-gray-150 font-bold h-10 rounded-xl gap-1.5 border border-zinc-700 text-xs transition-all"
+                          className="flex-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-200 font-bold h-10 rounded-xl gap-1.5 border border-zinc-200/60 dark:border-zinc-750 text-xs transition-all"
                         >
                           <Upload className="w-3.5 h-3.5" />
                           Upload Creative
@@ -1183,7 +1185,7 @@ function AIManagerContent() {
                             const b = addBotMessage(`AI Image Generator active! Select options and generate the visual:`);
                             setAiMessages(prev => [...prev, u, b]);
                           }}
-                          className="flex-1 bg-primary hover:bg-primary/95 text-white font-bold h-10 rounded-xl gap-1.5 text-xs shadow-md transition-all"
+                          className="flex-1 bg-zinc-800 hover:bg-zinc-900 text-white font-bold h-10 rounded-xl gap-1.5 text-xs shadow-sm transition-all"
                         >
                           <Sparkles className="w-3.5 h-3.5" />
                           Generate with AI
@@ -1192,10 +1194,10 @@ function AIManagerContent() {
                     )}
 
                     {generatedImageUrl && (flowState === 'post_media_generate' || flowState === 'ad_media_generate') && (
-                      <div className="flex gap-3 mt-3 w-full max-w-sm mx-auto p-4 bg-zinc-950/40 border border-zinc-900 rounded-2xl">
+                      <div className="flex gap-3 mt-3 w-full max-w-sm mx-auto p-4 bg-zinc-50/50 dark:bg-zinc-900/10 border border-zinc-200/60 dark:border-zinc-800 rounded-2xl">
                         <Button
                           onClick={() => handleKeepGeneratedImage(generatedImageUrl)}
-                          className="flex-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold h-10 text-xs rounded-xl gap-1.5 transition-all"
+                          className="flex-1 bg-zinc-800 hover:bg-zinc-900 text-white font-bold h-10 text-xs rounded-xl gap-1.5 transition-all"
                         >
                           <Check className="w-3.5 h-3.5" />
                           Keep this Image
@@ -1206,7 +1208,7 @@ function AIManagerContent() {
                             const b = addBotMessage(`Sure, let's try again! You can modify prompt options below:`);
                             setAiMessages(prev => [...prev, b]);
                           }}
-                          className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-gray-200 font-bold h-10 text-xs rounded-xl gap-1.5 border border-zinc-700 transition-all"
+                          className="flex-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-200 font-bold h-10 text-xs rounded-xl gap-1.5 border border-zinc-200/60 dark:border-zinc-700 transition-all"
                         >
                           <RefreshCw className="w-3.5 h-3.5" />
                           Try Another One
@@ -1934,8 +1936,8 @@ function SidebarTabButton({ active, icon, label, onClick, badge, badgeColor = "b
       onClick={onClick}
       className={`w-full flex items-center justify-between px-3.5 py-2.5 text-xs font-extrabold rounded-xl transition-all ${
         active 
-          ? 'bg-gradient-to-r from-blue-500/10 to-indigo-500/10 dark:from-blue-950/20 dark:to-indigo-950/20 border border-indigo-500/15 dark:border-indigo-900/30 text-indigo-600 dark:text-indigo-400' 
-          : 'text-gray-500 hover:text-gray-800 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-900/40 border border-transparent'
+          ? 'bg-zinc-200/50 dark:bg-zinc-800/80 border border-zinc-300/40 dark:border-zinc-700/50 text-zinc-800 dark:text-zinc-100 shadow-sm' 
+          : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-zinc-100/50 dark:hover:bg-zinc-900/40 border border-transparent'
       }`}
     >
       <div className="flex items-center gap-2.5">
@@ -1966,8 +1968,8 @@ function MobileTabButton({ active, icon, label, onClick, badge, badgeColor = "bg
       onClick={onClick}
       className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-extrabold rounded-lg border whitespace-nowrap shrink-0 transition-all ${
         active 
-          ? 'bg-gradient-to-r from-blue-500/10 to-indigo-500/10 dark:from-blue-950/20 dark:to-indigo-950/20 border border-indigo-500/20 dark:border-indigo-900/40 text-indigo-600 dark:text-indigo-400 shadow-sm' 
-          : 'bg-white dark:bg-[#0c0c0e]/80 text-gray-500 border-gray-250 dark:border-zinc-800 dark:text-zinc-400 hover:text-gray-800 dark:hover:text-zinc-200'
+          ? 'bg-zinc-200/50 dark:bg-zinc-800/80 border border-zinc-350/50 dark:border-zinc-700/60 text-zinc-850 dark:text-zinc-100 shadow-sm' 
+          : 'bg-white dark:bg-[#0c0c0e]/80 text-zinc-500 border-zinc-200/80 dark:border-zinc-800 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
       }`}
     >
       {icon}
@@ -1991,12 +1993,12 @@ interface MetricCardProps {
 
 function MetricCard({ label, score, change, up, hideChange }: MetricCardProps) {
   return (
-    <div className="bg-white dark:bg-[#0c0c0e] border border-gray-200 dark:border-zinc-900/60 rounded-2xl p-4 flex flex-col shadow-sm gap-2">
-      <span className="text-[10px] font-extrabold text-gray-400 dark:text-zinc-500 uppercase tracking-wider">{label}</span>
+    <div className="bg-zinc-50/40 dark:bg-zinc-900/10 border border-zinc-200/60 dark:border-zinc-800 rounded-xl p-4 flex flex-col gap-2">
+      <span className="text-[10px] font-extrabold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">{label}</span>
       <div className="flex items-end justify-between">
-        <span className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white leading-none">{score}</span>
+        <span className="text-xl sm:text-2xl font-black text-zinc-800 dark:text-white leading-none">{score}</span>
         {!hideChange && (
-          <span className={`text-[10px] font-bold ${up ? 'text-emerald-500' : 'text-red-500'} flex items-center gap-0.5`}>
+          <span className={`text-[10px] font-bold ${up ? 'text-zinc-500' : 'text-zinc-400'} flex items-center gap-0.5`}>
             {up ? '▲' : '▼'} {change}
           </span>
         )}
