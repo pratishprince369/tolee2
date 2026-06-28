@@ -392,6 +392,10 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
                     <Globe className="mr-2 h-4 w-4" />
                     <span>My Tolees</span>
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => router.push('/franchise')} className="cursor-pointer flex w-full items-center">
+                    <Store className="mr-2 h-4 w-4" />
+                    <span>Get Franchise</span>
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => signOut({ callbackUrl: '/' })} className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/50">
                     <LogOut className="mr-2 h-4 w-4" />
