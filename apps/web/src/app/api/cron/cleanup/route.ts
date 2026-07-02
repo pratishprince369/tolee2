@@ -17,6 +17,11 @@ export async function GET(req: NextRequest) {
     const activeEvents = await prisma.event.findMany({
       where: {
         status: 'active'
+      },
+      include: {
+        attendees: {
+          where: { status: 'approved' }
+        }
       }
     });
 
@@ -45,19 +50,37 @@ export async function GET(req: NextRequest) {
         // 2. Check start
         if (isPastStart && !event.notifiedStarted) {
           updates.notifiedStarted = true;
-          notificationsToCreate.push(`Live Now: Your event "${event.name}" has started!`);
+          notificationsToCreate.push(`Live Now: The event "${event.name}" has started!`);
         }
 
-        // 3. Check 1 hour reminder (timeToStartMs <= 1h, which is 60 * 60 * 1000 ms, and > 0)
+        // 3. Check 2 hours reminder
+        if (timeToStartMs <= 2 * 60 * 60 * 1000 && timeToStartMs > 0 && !event.notified2hBefore) {
+          updates.notified2hBefore = true;
+          notificationsToCreate.push(`Reminder: The event "${event.name}" starts in 2 hours.`);
+        }
+
+        // 4. Check 1 hour reminder
         if (timeToStartMs <= 60 * 60 * 1000 && timeToStartMs > 0 && !event.notified1hBefore) {
           updates.notified1hBefore = true;
-          notificationsToCreate.push(`Reminder: Your event "${event.name}" starts in 1 hour.`);
+          notificationsToCreate.push(`Reminder: The event "${event.name}" starts in 1 hour.`);
         }
 
-        // 4. Check 24 hour reminder (timeToStartMs <= 24h, which is 24 * 60 * 60 * 1000 ms, and > 0)
+        // 5. Check 24 hour reminder
         if (timeToStartMs <= 24 * 60 * 60 * 1000 && timeToStartMs > 0 && !event.notified24hBefore) {
           updates.notified24hBefore = true;
-          notificationsToCreate.push(`Reminder: Your event "${event.name}" starts in 24 hours.`);
+          notificationsToCreate.push(`Reminder: The event "${event.name}" starts in 24 hours.`);
+        }
+
+        // 6. Check 7 days reminder
+        if (timeToStartMs <= 7 * 24 * 60 * 60 * 1000 && timeToStartMs > 0 && !event.notified7dBefore) {
+          updates.notified7dBefore = true;
+          notificationsToCreate.push(`Reminder: The event "${event.name}" starts in 7 days.`);
+        }
+
+        // 7. Check 30 days reminder
+        if (timeToStartMs <= 30 * 24 * 60 * 60 * 1000 && timeToStartMs > 0 && !event.notified30dBefore) {
+          updates.notified30dBefore = true;
+          notificationsToCreate.push(`Reminder: The event "${event.name}" starts in 30 days.`);
         }
       }
 
@@ -70,15 +93,21 @@ export async function GET(req: NextRequest) {
         updatedEventsCount++;
       }
 
-      // Send notifications if any
+      // Send notifications to creator and all approved attendees
+      const targetUserIds = [event.creatorId, ...event.attendees.map((a: any) => a.userId)];
+      const uniqueUserIds = Array.from(new Set(targetUserIds));
+
       for (const msg of notificationsToCreate) {
-        await createSystemNotification({
-          userId: event.creatorId,
-          type: 'default',
-          message: msg,
-          link: '/creator-dashboard'
-        });
-        notificationsSentCount++;
+        for (const recipientId of uniqueUserIds) {
+          const isCreator = recipientId === event.creatorId;
+          await createSystemNotification({
+            userId: recipientId,
+            type: 'default',
+            message: msg,
+            link: isCreator ? '/creator-dashboard' : `/map?eventId=${event.id}`
+          });
+          notificationsSentCount++;
+        }
       }
     }
     console.log(`[Cron Cleanup] Finished event processing. Updated ${updatedEventsCount} events, sent ${notificationsSentCount} notifications.`);

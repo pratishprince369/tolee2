@@ -316,7 +316,13 @@ export async function createTolee(data: {
   avatarPublicId?: string,
   latitude?: number,
   longitude?: number,
-  address?: string
+  address?: string,
+  country?: string,
+  state?: string,
+  district?: string,
+  city?: string,
+  area?: string,
+  tags?: string
 }) {
   try {
     const session = await getServerSession(authOptions);
@@ -373,6 +379,12 @@ export async function createTolee(data: {
         latitude: data.latitude || null,
         longitude: data.longitude || null,
         address: safeAddress || null,
+        country: data.country || null,
+        state: data.state || null,
+        district: data.district || null,
+        city: data.city || null,
+        area: data.area || null,
+        tags: data.tags || null,
         membershipQuestions: safeMembershipQuestions,
         rules: safeRules,
         welcomeMessage: safeWelcomeMessage,

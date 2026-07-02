@@ -24,6 +24,25 @@ export default function CreateToleePage() {
   const [rules, setRules] = useState('');
   const [questions, setQuestions] = useState('');
   const [postApproval, setPostApproval] = useState(true);
+
+  // New location fields (Mandatory)
+  const [country, setCountry] = useState('');
+  const [stateName, setStateName] = useState('');
+  const [district, setDistrict] = useState('');
+  const [city, setCity] = useState('');
+  const [area, setArea] = useState('');
+  const [lat, setLat] = useState<number | null>(null);
+  const [lng, setLng] = useState<number | null>(null);
+  const [address, setAddress] = useState('');
+  const [tags, setTags] = useState('');
+
+  // Map & Geocoding Picker state
+  const [isMapModalOpen, setIsMapModalOpen] = useState(false);
+  const [mapSearchQuery, setMapSearchQuery] = useState('');
+  const [mapSearchResults, setMapSearchResults] = useState<any[]>([]);
+  const [geocoding, setGeocoding] = useState(false);
+  const mapRef = useRef<any>(null);
+  const mapMarkerRef = useRef<any>(null);
   
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
@@ -41,7 +60,178 @@ export default function CreateToleePage() {
 
   const categories = ['Buy and Sell', 'Business', 'Education', 'Jobs', 'Real Estate', 'Community', 'Gaming', 'Tech'];
 
-  const isFormValid = name.trim().length > 0 && privacy !== null;
+  const isFormValid = name.trim().length > 0 && 
+                      privacy !== null && 
+                      country.trim().length > 0 && 
+                      city.trim().length > 0 && 
+                      lat !== null;
+
+  // Dynamically initialize Leaflet map inside modal
+  React.useEffect(() => {
+    if (!isMapModalOpen) {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+        mapMarkerRef.current = null;
+      }
+      return;
+    }
+
+    if (!document.getElementById('leaflet-css')) {
+      const link = document.createElement('link');
+      link.id = 'leaflet-css';
+      link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(link);
+    }
+
+    const loadScript = () => {
+      const L = (window as any).L;
+      if (!L) {
+        const script = document.createElement('script');
+        script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+        script.async = true;
+        script.onload = () => initPickerMap();
+        document.body.appendChild(script);
+      } else {
+        initPickerMap();
+      }
+    };
+
+    const initPickerMap = () => {
+      const L = (window as any).L;
+      if (!L || mapRef.current) return;
+
+      const initialLat = lat || 19.2610; // Default Kalyan West
+      const initialLng = lng || 73.1280;
+
+      const mapInstance = L.map('picker-map', { zoomControl: false }).setView([initialLat, initialLng], 14);
+      mapRef.current = mapInstance;
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(mapInstance);
+
+      L.control.zoom({ position: 'bottomright' }).addTo(mapInstance);
+
+      const customIcon = L.divIcon({
+        className: 'picker-temp-pin',
+        html: `
+          <div style="position:relative; width:40px; height:40px; display:flex; align-items:center; justify-content:center;">
+            <span style="font-size:32px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));">📍</span>
+          </div>
+        `,
+        iconSize: [40, 40],
+        iconAnchor: [20, 40]
+      });
+
+      const marker = L.marker([initialLat, initialLng], {
+        draggable: true,
+        icon: customIcon
+      }).addTo(mapInstance);
+      mapMarkerRef.current = marker;
+
+      if (!lat) {
+        triggerReverseGeocoding(initialLat, initialLng);
+      }
+
+      marker.on('dragend', () => {
+        const pos = marker.getLatLng();
+        triggerReverseGeocoding(pos.lat, pos.lng);
+      });
+
+      mapInstance.on('click', (e: any) => {
+        marker.setLatLng(e.latlng);
+        triggerReverseGeocoding(e.latlng.lat, e.latlng.lng);
+      });
+    };
+
+    loadScript();
+  }, [isMapModalOpen]);
+
+  const triggerReverseGeocoding = async (latitude: number, longitude: number) => {
+    setGeocoding(true);
+    setLat(latitude);
+    setLng(longitude);
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18`);
+      if (res.ok) {
+        const data = await res.json();
+        const addressObj = data.address || {};
+        
+        setCountry(addressObj.country || 'India');
+        setStateName(addressObj.state || 'Maharashtra');
+        setDistrict(addressObj.state_district || addressObj.county || addressObj.district || '');
+        setCity(addressObj.city || addressObj.town || addressObj.village || addressObj.municipality || 'Mumbai');
+        setArea(addressObj.suburb || addressObj.neighbourhood || addressObj.locality || addressObj.quarter || '');
+        setAddress(data.display_name || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setGeocoding(false);
+    }
+  };
+
+  const handlePickerSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!mapSearchQuery.trim()) return;
+    setGeocoding(true);
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(mapSearchQuery)}&limit=5`);
+      const data = await res.json();
+      setMapSearchResults(data || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setGeocoding(false);
+    }
+  };
+
+  const handleSelectPickerResult = (res: any) => {
+    const latitude = parseFloat(res.lat);
+    const longitude = parseFloat(res.lon);
+    
+    setLat(latitude);
+    setLng(longitude);
+    
+    const addressObj = res.address || {};
+    setCountry(addressObj.country || 'India');
+    setStateName(addressObj.state || 'Maharashtra');
+    setDistrict(addressObj.state_district || addressObj.county || addressObj.district || '');
+    setCity(addressObj.city || addressObj.town || addressObj.village || addressObj.municipality || 'Mumbai');
+    setArea(addressObj.suburb || addressObj.neighbourhood || addressObj.locality || addressObj.quarter || '');
+    setAddress(res.display_name || '');
+    
+    setMapSearchResults([]);
+    setMapSearchQuery('');
+
+    if (mapRef.current) {
+      mapRef.current.setView([latitude, longitude], 15);
+      if (mapMarkerRef.current) {
+        mapMarkerRef.current.setLatLng([latitude, longitude]);
+      }
+    }
+  };
+
+  const handleUseGPSPicker = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition((pos) => {
+        const latitude = pos.coords.latitude;
+        const longitude = pos.coords.longitude;
+        setLat(latitude);
+        setLng(longitude);
+        triggerReverseGeocoding(latitude, longitude);
+
+        if (mapRef.current) {
+          mapRef.current.setView([latitude, longitude], 15);
+          if (mapMarkerRef.current) {
+            mapMarkerRef.current.setLatLng([latitude, longitude]);
+          }
+        }
+      });
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'cover' | 'avatar') => {
     const file = e.target.files?.[0];
@@ -90,12 +280,21 @@ export default function CreateToleePage() {
       isPrivate: privacy === 'private',
       description,
       category,
-      location,
+      location: address || `${city}, ${stateName}`,
       rules,
       membershipQuestions: questions,
       pendingPostApproval: postApproval,
       coverImage: finalCover || undefined,
-      avatar: finalAvatar || undefined
+      avatar: finalAvatar || undefined,
+      latitude: lat || undefined,
+      longitude: lng || undefined,
+      address: address || undefined,
+      country: country || undefined,
+      state: stateName || undefined,
+      district: district || undefined,
+      city: city || undefined,
+      area: area || undefined,
+      tags: tags || undefined
     });
 
     if (result.success && result.tolee) {
@@ -199,13 +398,56 @@ export default function CreateToleePage() {
               )}
             </div>
 
-            {/* Location (Optional) */}
+            {/* Location (Mandatory Selection) */}
+            <div className="space-y-3">
+              {!lat ? (
+                <div 
+                  onClick={() => setIsMapModalOpen(true)}
+                  className="p-4 border-2 border-dashed border-red-300 hover:border-red-400 bg-red-50/50 dark:bg-red-950/10 rounded-xl cursor-pointer transition flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-xl">📍</span>
+                    <div className="text-left">
+                      <p className="text-xs font-bold text-red-600 dark:text-red-400 uppercase tracking-wide">Mandatory Group Location</p>
+                      <p className="text-xs text-zinc-500 mt-0.5">Please click here to select group locality.</p>
+                    </div>
+                  </div>
+                  <span className="text-xs text-red-500 font-bold bg-red-100 dark:bg-red-950 px-2 py-0.5 rounded">Required</span>
+                </div>
+              ) : (
+                <div 
+                  className="p-4 border border-emerald-200 dark:border-emerald-800 bg-emerald-50/10 dark:bg-emerald-950/10 rounded-xl flex flex-col gap-2"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">📍</span>
+                      <div className="text-left">
+                        <h4 className="text-xs font-bold text-zinc-900 dark:text-white leading-none">Group Location Set</h4>
+                        <p className="text-[10px] text-zinc-400 uppercase tracking-wide mt-1.5 font-bold">{area || 'Local Area'}, {city}</p>
+                      </div>
+                    </div>
+                    <button 
+                      type="button"
+                      onClick={() => setIsMapModalOpen(true)}
+                      className="text-xs font-bold text-primary hover:underline bg-white border border-gray-200 dark:bg-zinc-900 dark:border-zinc-800 px-2.5 py-1 rounded"
+                    >
+                      Change
+                    </button>
+                  </div>
+                  <div className="text-[11px] text-zinc-500 truncate leading-relaxed text-left">
+                    {address}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Tags (Optional) */}
             <div>
               <Input
-                placeholder="Location (Optional) e.g. Kalyan, Mumbai"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                className="h-14 rounded-lg bg-transparent border-gray-300 dark:border-gray-700 focus-visible:ring-primary focus-visible:border-primary text-base px-4"
+                placeholder="Tags (Optional) e.g. cricket, coding, food"
+                value={tags}
+                onChange={(e) => setTags(e.target.value)}
+                className="h-12 rounded-lg bg-transparent border-gray-300 dark:border-gray-700 focus-visible:ring-primary focus-visible:border-primary text-sm px-4"
               />
             </div>
 
@@ -464,6 +706,106 @@ export default function CreateToleePage() {
           </div>
         </div>
       </div>
+
+      {/* MAP LOCATION PICKER MODAL */}
+      {isMapModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs">
+          <div className="w-full max-w-lg bg-white dark:bg-[#18181b] border border-gray-200 dark:border-zinc-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] text-left">
+            <div className="p-4 border-b border-gray-200 dark:border-zinc-800 flex justify-between items-center bg-gray-50 dark:bg-zinc-900/50">
+              <h3 className="text-sm font-black text-gray-900 dark:text-white flex items-center gap-1.5">
+                📍 Pin Group Locality
+              </h3>
+              <button 
+                type="button"
+                onClick={() => setIsMapModalOpen(false)} 
+                className="text-zinc-500 hover:text-zinc-900 dark:hover:text-white font-bold text-xs bg-gray-105 dark:bg-zinc-900 px-2.5 py-1 rounded"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="p-4 overflow-y-auto space-y-4 flex-1 flex flex-col min-h-0">
+              {/* Autocomplete location search bar */}
+              <form onSubmit={handlePickerSearch} className="relative flex gap-1.5">
+                <input 
+                  type="text"
+                  placeholder="Search locality, city, landmark..."
+                  value={mapSearchQuery}
+                  onChange={(e) => setMapSearchQuery(e.target.value)}
+                  className="flex-1 text-xs px-3 py-2.5 border border-gray-200 dark:border-zinc-800 rounded-xl bg-gray-50 dark:bg-zinc-900 focus:outline-hidden text-zinc-900 dark:text-white"
+                />
+                <button type="submit" className="px-3.5 py-2.5 bg-primary text-white rounded-xl text-xs font-bold shrink-0">
+                  Search
+                </button>
+
+                {mapSearchResults.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-[#18181b] border border-gray-200 dark:border-zinc-800 rounded-xl shadow-xl z-50 max-h-48 overflow-y-auto">
+                    {mapSearchResults.map((res, idx) => (
+                      <div 
+                        key={idx}
+                        onClick={() => handleSelectPickerResult(res)}
+                        className="p-2.5 text-[11px] text-zinc-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-900 cursor-pointer border-b border-gray-105 dark:border-zinc-800/50 last:border-0 truncate"
+                      >
+                        {res.display_name}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </form>
+
+              {/* The Map Div Container */}
+              <div 
+                id="picker-map" 
+                className="w-full h-64 rounded-xl border border-gray-200 dark:border-zinc-800 bg-gray-50 shrink-0 z-10"
+              />
+
+              <div className="grid grid-cols-2 gap-2 text-left">
+                <div>
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase">Country</label>
+                  <input type="text" value={country} onChange={(e) => setCountry(e.target.value)} className="w-full text-xs px-3 py-2 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl focus:outline-hidden text-zinc-900 dark:text-white mt-1" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase">State</label>
+                  <input type="text" value={stateName} onChange={(e) => setStateName(e.target.value)} className="w-full text-xs px-3 py-2 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl focus:outline-hidden text-zinc-900 dark:text-white mt-1" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 text-left">
+                <div>
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase">District</label>
+                  <input type="text" value={district} onChange={(e) => setDistrict(e.target.value)} className="w-full text-xs px-3 py-2 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl focus:outline-hidden text-zinc-900 dark:text-white mt-1" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase">City</label>
+                  <input type="text" value={city} onChange={(e) => setCity(e.target.value)} className="w-full text-xs px-3 py-2 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl focus:outline-hidden text-zinc-900 dark:text-white mt-1" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase">Area / Locality</label>
+                  <input type="text" value={area} onChange={(e) => setArea(e.target.value)} className="w-full text-xs px-3 py-2 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl focus:outline-hidden text-zinc-900 dark:text-white mt-1" />
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <button 
+                  type="button"
+                  onClick={handleUseGPSPicker}
+                  className="flex-1 py-2.5 bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5"
+                >
+                  🌐 Use Current GPS
+                </button>
+                <button 
+                  type="button"
+                  disabled={!lat || geocoding}
+                  onClick={() => setIsMapModalOpen(false)}
+                  className="flex-1 py-2.5 bg-primary hover:opacity-90 text-white text-xs font-black rounded-xl flex items-center justify-center gap-1"
+                >
+                  {geocoding ? 'Loading address...' : 'Confirm Location ✓'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

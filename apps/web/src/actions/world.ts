@@ -31,6 +31,19 @@ export async function createWorldProject(data: {
   seoKeywords?: string;
   status?: string; // "published" | "draft" | "hidden"
   selectedToleeIds: string[];
+  country?: string;
+  state?: string;
+  district?: string;
+  city?: string;
+  area?: string;
+  contactNumber?: string;
+  whatsapp?: string;
+  website?: string;
+  openingHours?: string;
+  photos?: string;
+  videos?: string;
+  offers?: string;
+  socialLinks?: string;
 }) {
   try {
     const session = await getServerSession(authOptions);
@@ -74,6 +87,19 @@ export async function createWorldProject(data: {
         locationText: data.locationText || null,
         latitude: data.latitude || null,
         longitude: data.longitude || null,
+        country: data.country || null,
+        state: data.state || null,
+        district: data.district || null,
+        city: data.city || null,
+        area: data.area || null,
+        contactNumber: data.contactNumber || null,
+        whatsapp: data.whatsapp || null,
+        website: data.website || null,
+        openingHours: data.openingHours || null,
+        photos: data.photos || null,
+        videos: data.videos || null,
+        offers: data.offers || null,
+        socialLinks: data.socialLinks || null,
         seoTitle: data.seoTitle || null,
         seoDesc: data.seoDesc || null,
         seoKeywords: data.seoKeywords || null,

@@ -192,6 +192,13 @@ model Tolee {
   price           Float    @default(0) // 0 means free
   paymentType     String   @default("free") // "free", "monthly", "yearly", "one-time"
   
+  country         String?
+  state           String?
+  district        String?
+  city            String?
+  area            String?
+  tags            String?
+
   createdAt       DateTime @default(now())
 
   ownerId         String
@@ -767,6 +774,22 @@ model WorldProject {
   locationText String?
   latitude     Float?
   longitude    Float?
+  
+  country      String?
+  state        String?
+  district     String?
+  city         String?
+  area         String?
+
+  contactNumber String?
+  whatsapp     String?
+  website      String?
+  openingHours String?
+  photos       String? // Comma-separated list of image URLs
+  videos       String? // Comma-separated list of video URLs
+  offers       String? // Custom discount or campaign text
+  socialLinks  String? // Stringified JSON object for other social media links
+
   seoTitle     String?
   seoDesc      String?
   seoKeywords  String?
@@ -1305,6 +1328,23 @@ model Event {
   latitude           Float
   longitude          Float
   address            String
+
+  country            String?
+  state              String?
+  district           String?
+  city               String?
+  area               String?
+
+  ticketPrice        Float    @default(0)
+  maxCapacity        Int?
+  dressCode          String?
+  rules              String?
+  whatsappNumber     String?
+  website            String?
+  galleryImages      String? // Comma-separated list of image URLs
+  tags               String?
+  autoWelcomeMessage String?
+
   visibility         String   @default("public") // "public" | "private" | "invite_only"
   maxAttendees       Int?
   contactDetails     String?
@@ -1313,8 +1353,11 @@ model Event {
 
   notifiedEnded      Boolean  @default(false)
   notifiedStarted    Boolean  @default(false)
+  notified2hBefore   Boolean  @default(false)
   notified1hBefore   Boolean  @default(false)
   notified24hBefore  Boolean  @default(false)
+  notified7dBefore   Boolean  @default(false)
+  notified30dBefore  Boolean  @default(false)
 
   creatorId          String
   creator            User     @relation("UserEvents", fields: [creatorId], references: [id], onDelete: Cascade)

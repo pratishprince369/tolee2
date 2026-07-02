@@ -7,11 +7,13 @@ import { useSession } from 'next-auth/react';
 import { 
   Map, MapPin, Compass, ArrowLeft, RefreshCw, ShoppingBag, Globe, Video, Users, 
   Plus, Calendar, Clock, Phone, Shield, Activity, Check, ExternalLink, Lock, 
-  AlertTriangle, Search, Info 
+  AlertTriangle, Search, Info, MessageSquare, Share2, Heart, Bookmark, ChevronRight,
+  Star, UserPlus, Send, DollarSign, Tv 
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { createTolee } from '@/actions/tolee';
 import { createEventAction, joinEventAction, leaveEventAction } from '@/actions/event';
+import { createWorldProject } from '@/actions/world';
 
 interface MapMarker {
   id: string;
@@ -37,6 +39,28 @@ interface MapMarker {
   creatorAvatar?: string | null;
   attendeeCount?: number;
   attendees?: { userId: string; status: string }[];
+  country?: string | null;
+  state?: string | null;
+  district?: string | null;
+  city?: string | null;
+  area?: string | null;
+  tags?: string | null;
+  address?: string | null;
+  ticketPrice?: number | null;
+  maxCapacity?: number | null;
+  dressCode?: string | null;
+  rules?: string | null;
+  whatsappNumber?: string | null;
+  website?: string | null;
+  galleryImages?: string | null;
+  autoWelcomeMessage?: string | null;
+  contactNumber?: string | null;
+  whatsapp?: string | null;
+  openingHours?: string | null;
+  photos?: string | null;
+  videos?: string | null;
+  offers?: string | null;
+  socialLinks?: string | null;
 }
 
 export default function InteractiveMapPage() {
@@ -47,17 +71,27 @@ export default function InteractiveMapPage() {
   const [markers, setMarkers] = useState<MapMarker[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeMarker, setActiveMarker] = useState<MapMarker | null>(null);
-  const [filterType, setFilterType] = useState<'all' | 'group' | 'event' | 'marketplace' | 'hotspots'>('all');
+  
+  // Advanced Multi-select Filters
+  const [selectedFilters, setSelectedFilters] = useState<string[]>(['all']);
+  const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false);
   
   const mapInstanceRef = useRef<any>(null);
   const tempMarkerRef = useRef<any>(null);
   const leafletLoadedRef = useRef(false);
 
   // Placement Mode States
-  const [placementMode, setPlacementMode] = useState<'group' | 'event' | null>(null);
+  const [placementMode, setPlacementMode] = useState<'group' | 'event' | 'shop' | null>(null);
   const [tempLat, setTempLat] = useState<number | null>(null);
   const [tempLng, setTempLng] = useState<number | null>(null);
   const [tempAddress, setTempAddress] = useState<string>('');
+
+  // Localized location temporary variables (parsed from geocoding)
+  const [tempCountry, setTempCountry] = useState('India');
+  const [tempState, setTempState] = useState('Maharashtra');
+  const [tempDistrict, setTempDistrict] = useState('');
+  const [tempCity, setTempCity] = useState('');
+  const [tempArea, setTempArea] = useState('');
   
   // Search Autocomplete States
   const [searchQuery, setSearchQuery] = useState('');
@@ -67,6 +101,7 @@ export default function InteractiveMapPage() {
   // Creation Modals
   const [isGroupDialogOpen, setIsGroupDialogOpen] = useState(false);
   const [isEventDialogOpen, setIsEventDialogOpen] = useState(false);
+  const [isShopDialogOpen, setIsShopDialogOpen] = useState(false);
 
   // Form Fields - Group
   const [groupName, setGroupName] = useState('');
@@ -78,7 +113,7 @@ export default function InteractiveMapPage() {
   const [groupMaxMembers, setGroupMaxMembers] = useState('');
   const [creatingGroup, setCreatingGroup] = useState(false);
 
-  // Form Fields - Event
+  // Form Fields - Event (Detailed Upgrade)
   const [eventName, setEventName] = useState('');
   const [eventDesc, setEventDesc] = useState('');
   const [eventBanner, setEventBanner] = useState('');
@@ -91,6 +126,39 @@ export default function InteractiveMapPage() {
   const [eventContact, setEventContact] = useState('');
   const [eventVisibility, setEventVisibility] = useState('public');
   const [creatingEvent, setCreatingEvent] = useState(false);
+  
+  const [eventTicketPrice, setEventTicketPrice] = useState('');
+  const [eventDressCode, setEventDressCode] = useState('');
+  const [eventRules, setEventRules] = useState('');
+  const [eventWhatsappNumber, setEventWhatsappNumber] = useState('');
+  const [eventWebsite, setEventWebsite] = useState('');
+  const [eventGalleryImages, setEventGalleryImages] = useState('');
+  const [eventTags, setEventTags] = useState('');
+  const [eventAutoWelcomeMessage, setEventAutoWelcomeMessage] = useState('');
+
+  // Form Fields - Shop
+  const [shopName, setShopName] = useState('');
+  const [shopType, setShopType] = useState('STORE'); // STORE | RESTAURANT
+  const [shopDesc, setShopDesc] = useState('');
+  const [shopHours, setShopHours] = useState('10:00 AM - 09:00 PM');
+  const [shopContact, setShopContact] = useState('');
+  const [shopWhatsapp, setShopWhatsapp] = useState('');
+  const [shopWebsite, setShopWebsite] = useState('');
+  const [shopCover, setShopCover] = useState('');
+  const [shopOffers, setShopOffers] = useState('');
+  const [shopSocialLinks, setShopSocialLinks] = useState('');
+  const [shopToleeIds, setShopToleeIds] = useState<string[]>([]);
+  const [creatingShop, setCreatingShop] = useState(false);
+
+  // Interactive Reviews Feed State (local mock persistent review logs)
+  const [localReviews, setLocalReviews] = useState<Record<string, any[]>>({
+    'mock-meetup-1': [
+      { rating: 5, text: "Always a great networking space for builders!", username: "prince_dev", date: "2 days ago" },
+      { rating: 4, text: "Fun discussion. Highly recommend joining next week.", username: "swastik_c", date: "1 week ago" }
+    ]
+  });
+  const [newReviewRating, setNewReviewRating] = useState(5);
+  const [newReviewText, setNewReviewText] = useState('');
 
   const getEventStatusText = (startDateStr: string, endDateStr: string) => {
     const now = new Date();
@@ -321,18 +389,40 @@ export default function InteractiveMapPage() {
   }, []);
 
   const getFilteredMarkers = () => {
-    if (filterType === 'all') return markers;
-    if (filterType === 'group') return markers.filter(m => m.type === 'group');
-    if (filterType === 'event') return markers.filter(m => m.type === 'event');
-    if (filterType === 'marketplace') return markers.filter(m => m.type === 'marketplace');
-    if (filterType === 'hotspots') return markers.filter(m => ['meetup', 'live_chat', 'trending_reel', 'website', 'store', 'restaurant', 'blog'].includes(m.type));
-    return markers;
+    let filtered = markers;
+    
+    // Keyword search filter (Landmark, Pincode, City, Area, Category, Name, Tags)
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter(m => 
+        m.name.toLowerCase().includes(q) ||
+        (m.description && m.description.toLowerCase().includes(q)) ||
+        (m.locationText && m.locationText.toLowerCase().includes(q)) ||
+        (m.category && m.category.toLowerCase().includes(q)) ||
+        (m.tags && m.tags.toLowerCase().includes(q)) ||
+        (m.city && m.city.toLowerCase().includes(q)) ||
+        (m.area && m.area.toLowerCase().includes(q)) ||
+        (m.country && m.country.toLowerCase().includes(q)) ||
+        (m.state && m.state.toLowerCase().includes(q)) ||
+        (m.district && m.district.toLowerCase().includes(q))
+      );
+    }
+
+    if (selectedFilters.includes('all')) return filtered;
+
+    return filtered.filter(m => {
+      const type = m.type.toLowerCase();
+      if (selectedFilters.includes('groups') && (type === 'group' || type === 'meetup')) return true;
+      if (selectedFilters.includes('events') && type === 'event') return true;
+      if (selectedFilters.includes('shops') && ['store', 'restaurant', 'website', 'blog'].includes(type)) return true;
+      if (selectedFilters.includes('marketplace') && type === 'marketplace') return true;
+      return false;
+    });
   };
 
   useEffect(() => {
     const L = (window as any).L;
     if (L && mapInstanceRef.current) {
-      // Clear existing layer markers (except temp marker)
       mapInstanceRef.current.eachLayer((layer: any) => {
         if (layer instanceof L.Marker && layer !== tempMarkerRef.current) {
           layer.remove();
@@ -340,7 +430,7 @@ export default function InteractiveMapPage() {
       });
       renderMarkers(L, mapInstanceRef.current, getFilteredMarkers());
     }
-  }, [filterType, markers]);
+  }, [selectedFilters, searchQuery, markers]);
 
   const initMap = async () => {
     const freshMarkers = await fetchMarkers();
@@ -400,92 +490,140 @@ export default function InteractiveMapPage() {
   };
 
   const renderMarkers = (L: any, map: any, markerList: MapMarker[]) => {
-    markerList.forEach((marker) => {
-      let markerColor = '#ec4899'; // Pink
-      let iconHtml = '📍';
+    const zoom = map.getZoom();
+    const threshold = 0.04 / Math.pow(2, zoom - 13);
 
-      if (marker.type === 'marketplace') {
-        markerColor = '#f97316'; // Orange
-        iconHtml = '🛍️';
-      } else if (['store', 'restaurant', 'website'].includes(marker.type)) {
-        markerColor = '#06b6d4'; // Teal
-        iconHtml = '🌐';
-      } else if (marker.type === 'group') {
-        markerColor = '#10b981'; // Green (Tolee Groups)
-        iconHtml = '👥';
-      } else if (marker.type === 'meetup') {
-        markerColor = '#10b981'; // Green
-        iconHtml = '👥';
-      } else if (marker.type === 'live_chat') {
-        markerColor = '#ef4444'; // Red
-        iconHtml = '📞';
-      } else if (marker.type === 'trending_reel') {
-        markerColor = '#d946ef'; // Purple
-        iconHtml = '🎥';
-      } else if (marker.type === 'event') {
-        // Event dynamic markers based on category
-        markerColor = '#4f46e5'; // Indigo
-        if (marker.category === 'Music Event') {
-          iconHtml = '🎵';
-        } else if (marker.category === 'Business Seminar') {
-          iconHtml = '💼';
-        } else if (marker.category === 'Cricket Tournament') {
-          iconHtml = '🏏';
-        } else if (marker.category === 'Startup Meetup') {
-          iconHtml = '🚀';
-        } else {
-          iconHtml = '🎉';
+    const clusters: { center: [number, number]; markers: MapMarker[] }[] = [];
+
+    markerList.forEach(marker => {
+      let addedToCluster = false;
+      for (const cluster of clusters) {
+        const dist = Math.sqrt(
+          Math.pow(cluster.center[0] - marker.latitude, 2) +
+          Math.pow(cluster.center[1] - marker.longitude, 2)
+        );
+        if (dist < threshold) {
+          const count = cluster.markers.length;
+          cluster.center[0] = (cluster.center[0] * count + marker.latitude) / (count + 1);
+          cluster.center[1] = (cluster.center[1] * count + marker.longitude) / (count + 1);
+          cluster.markers.push(marker);
+          addedToCluster = true;
+          break;
         }
       }
+      if (!addedToCluster) {
+        clusters.push({
+          center: [marker.latitude, marker.longitude],
+          markers: [marker]
+        });
+      }
+    });
 
-      const customIcon = L.divIcon({
-        className: 'custom-map-marker',
-        html: `
-          <div style="
-            position: relative;
-            width: 42px;
-            height: 42px;
-            background-color: #ffffff;
-            border: 2px solid ${markerColor};
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.15), 0 0 8px ${markerColor}44;
-            cursor: pointer;
-            transition: transform 0.2s ease;
-          " class="marker-bubble">
-            <span style="font-size: 18px;">${iconHtml}</span>
-            ${marker.type === 'live_chat' ? `
-              <div style="
-                position: absolute;
-                top: -3px;
-                right: -3px;
-                width: 12px;
-                height: 12px;
-                background-color: #ef4444;
-                border-radius: 50%;
-                border: 2px solid #ffffff;
-                animation: pulse-ring 1.5s infinite;
-              "></div>
-            ` : ''}
-          </div>
-        `,
-        iconSize: [42, 42],
-        iconAnchor: [21, 42],
-        popupAnchor: [0, -42]
-      });
+    clusters.forEach((cluster) => {
+      if (cluster.markers.length === 1) {
+        const marker = cluster.markers[0];
+        let markerColor = '#ec4899'; // Pink
+        let iconHtml = '📍';
 
-      const mapMarker = L.marker([marker.latitude, marker.longitude], { icon: customIcon }).addTo(map);
+        if (marker.type === 'marketplace') {
+          markerColor = '#f97316'; // Orange
+          iconHtml = '🛍️';
+        } else if (['store', 'restaurant', 'website'].includes(marker.type)) {
+          markerColor = '#06b6d4'; // Teal
+          iconHtml = '🏪';
+        } else if (marker.type === 'group') {
+          markerColor = '#10b981'; // Green (Tolee Groups)
+          iconHtml = '👥';
+        } else if (marker.type === 'meetup') {
+          markerColor = '#10b981'; // Green
+          iconHtml = '👥';
+        } else if (marker.type === 'live_chat') {
+          markerColor = '#ef4444'; // Red
+          iconHtml = '📞';
+        } else if (marker.type === 'trending_reel') {
+          markerColor = '#d946ef'; // Purple
+          iconHtml = '🎥';
+        } else if (marker.type === 'event') {
+          markerColor = '#4f46e5'; // Indigo
+          if (marker.category === 'Music Event') iconHtml = '🎵';
+          else if (marker.category === 'Business Seminar') iconHtml = '💼';
+          else if (marker.category === 'Cricket Tournament') iconHtml = '🏏';
+          else if (marker.category === 'Startup Meetup') iconHtml = '🚀';
+          else iconHtml = '🎉';
+        }
 
-      mapMarker.bindPopup(getPopupContent(marker), {
-        maxWidth: 280,
-        className: 'premium-leaflet-popup'
-      });
+        const customIcon = L.divIcon({
+          className: 'custom-map-marker',
+          html: `
+            <div style="
+              position: relative;
+              width: 42px;
+              height: 42px;
+              background-color: #ffffff;
+              border: 2px solid ${markerColor};
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              box-shadow: 0 4px 15px rgba(0,0,0,0.15), 0 0 8px ${markerColor}44;
+              cursor: pointer;
+              transition: transform 0.2s ease;
+            " class="marker-bubble">
+              <span style="font-size: 18px;">${iconHtml}</span>
+            </div>
+          `,
+          iconSize: [42, 42],
+          iconAnchor: [21, 42],
+          popupAnchor: [0, -42]
+        });
 
-      mapMarker.on('click', () => {
-        map.panTo([marker.latitude, marker.longitude]);
-      });
+        const mapMarker = L.marker([marker.latitude, marker.longitude], { icon: customIcon }).addTo(map);
+
+        mapMarker.bindPopup(getPopupContent(marker), {
+          maxWidth: 280,
+          className: 'premium-leaflet-popup'
+        });
+
+        mapMarker.on('click', () => {
+          map.panTo([marker.latitude, marker.longitude]);
+          setActiveMarker(marker);
+        });
+      } else {
+        // Render Cluster marker
+        const customIcon = L.divIcon({
+          className: 'custom-map-cluster-marker',
+          html: `
+            <div style="
+              position: relative;
+              width: 46px;
+              height: 46px;
+              background: linear-gradient(135deg, #0d9488, #0f766e);
+              border: 3px solid #ffffff;
+              color: #ffffff;
+              border-radius: 50%;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              font-size: 11px;
+              font-weight: 900;
+              box-shadow: 0 10px 15px -3px rgba(15, 118, 110, 0.4), 0 4px 6px -2px rgba(15, 118, 110, 0.2);
+              cursor: pointer;
+              transition: transform 0.2s ease;
+            ">
+              <span style="font-size: 10px; opacity: 0.8; line-height: 1;">📍</span>
+              <span style="line-height: 1.1;">${cluster.markers.length}</span>
+            </div>
+          `,
+          iconSize: [46, 46],
+          iconAnchor: [23, 23]
+        });
+
+        const mapMarker = L.marker(cluster.center, { icon: customIcon }).addTo(map);
+        mapMarker.on('click', () => {
+          map.setView(cluster.center, zoom + 2, { animate: true });
+        });
+      }
     });
   };
 
@@ -510,7 +648,7 @@ export default function InteractiveMapPage() {
   };
 
   // PLACEMENT MODE LOGIC
-  const enterPlacementMode = (type: 'group' | 'event') => {
+  const enterPlacementMode = (type: 'group' | 'event' | 'shop') => {
     const L = (window as any).L;
     if (!L || !mapInstanceRef.current) return;
 
@@ -568,6 +706,13 @@ export default function InteractiveMapPage() {
       const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18`);
       if (res.ok) {
         const data = await res.json();
+        const addressObj = data.address || {};
+        
+        setTempCountry(addressObj.country || 'India');
+        setTempState(addressObj.state || 'Maharashtra');
+        setTempDistrict(addressObj.state_district || addressObj.county || addressObj.district || '');
+        setTempCity(addressObj.city || addressObj.town || addressObj.village || addressObj.municipality || 'Mumbai');
+        setTempArea(addressObj.suburb || addressObj.neighbourhood || addressObj.locality || addressObj.quarter || '');
         setTempAddress(data.display_name || `${lat.toFixed(4)}, ${lng.toFixed(4)}`);
       } else {
         setTempAddress(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
@@ -658,6 +803,8 @@ export default function InteractiveMapPage() {
       setIsGroupDialogOpen(true);
     } else if (placementMode === 'event') {
       setIsEventDialogOpen(true);
+    } else if (placementMode === 'shop') {
+      setIsShopDialogOpen(true);
     }
   };
 
@@ -678,7 +825,12 @@ export default function InteractiveMapPage() {
         latitude: tempLat!,
         longitude: tempLng!,
         avatar: groupIcon || undefined,
-        coverImage: groupCover || undefined
+        coverImage: groupCover || undefined,
+        country: tempCountry,
+        state: tempState,
+        district: tempDistrict,
+        city: tempCity,
+        area: tempArea
       });
 
       if (res.success) {
@@ -720,7 +872,21 @@ export default function InteractiveMapPage() {
         address: tempAddress,
         visibility: eventVisibility,
         maxAttendees: eventMaxAttendees ? parseInt(eventMaxAttendees) : undefined,
-        contactDetails: eventContact || undefined
+        contactDetails: eventContact || undefined,
+        country: tempCountry,
+        state: tempState,
+        district: tempDistrict,
+        city: tempCity,
+        area: tempArea,
+        ticketPrice: eventTicketPrice ? parseFloat(eventTicketPrice) : 0,
+        maxCapacity: eventMaxAttendees ? parseInt(eventMaxAttendees) : undefined,
+        dressCode: eventDressCode || undefined,
+        rules: eventRules || undefined,
+        whatsappNumber: eventWhatsappNumber || undefined,
+        website: eventWebsite || undefined,
+        galleryImages: eventGalleryImages || undefined,
+        tags: eventTags || undefined,
+        autoWelcomeMessage: eventAutoWelcomeMessage || undefined
       });
 
       if (res.success) {
@@ -739,10 +905,389 @@ export default function InteractiveMapPage() {
     }
   };
 
+  // PUBLISH LOGIC - SHOP
+  const handlePublishShop = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!shopName.trim()) return alert('Shop Name is required.');
+
+    setCreatingShop(true);
+    try {
+      const res = await createWorldProject({
+        type: shopType,
+        name: shopName,
+        description: shopDesc,
+        bannerImage: shopCover || undefined,
+        content: {}, // empty content representation
+        locationText: tempAddress.substring(0, 100),
+        latitude: tempLat!,
+        longitude: tempLng!,
+        country: tempCountry,
+        state: tempState,
+        district: tempDistrict,
+        city: tempCity,
+        area: tempArea,
+        contactNumber: shopContact || undefined,
+        whatsapp: shopWhatsapp || undefined,
+        website: shopWebsite || undefined,
+        openingHours: shopHours || undefined,
+        photos: shopCover || undefined,
+        offers: shopOffers || undefined,
+        socialLinks: shopSocialLinks || undefined,
+        selectedToleeIds: shopToleeIds
+      });
+
+      if (res.success) {
+        alert('Shop published successfully!');
+        setIsShopDialogOpen(false);
+        exitPlacementMode();
+        fetchMarkers(); // refresh
+      } else {
+        alert(res.error || 'Failed to publish shop');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('An error occurred.');
+    } finally {
+      setCreatingShop(false);
+    }
+  };
+
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-[#f4f4f5] text-zinc-900 font-sans select-none">
       {/* Map Container */}
       <div id="tolee-map" className="w-full h-full z-0"></div>
+
+      {/* DETAIL PANEL SLIDE-OVER */}
+      {activeMarker && (
+        <div className="absolute right-4 top-20 bottom-4 w-90 bg-white/95 dark:bg-zinc-950/95 border border-zinc-205 dark:border-zinc-800/80 backdrop-blur-xl rounded-2xl shadow-2xl z-40 overflow-hidden flex flex-col pointer-events-auto transition-all animate-in slide-in-from-right duration-200">
+          
+          {/* Header Banner */}
+          <div className="relative h-32 bg-zinc-100 dark:bg-zinc-900 overflow-hidden shrink-0">
+            <img 
+              src={activeMarker.image || "/default-tolee-cover.svg"} 
+              alt="Banner" 
+              className="w-full h-full object-cover" 
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+            <button 
+              onClick={() => setActiveMarker(null)}
+              className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center transition-colors"
+            >
+              ✕
+            </button>
+            <div className="absolute bottom-3 left-4 right-4 flex items-end justify-between">
+              <div className="min-w-0">
+                <span className="text-[9px] font-black uppercase tracking-wider text-emerald-300 bg-emerald-950/80 border border-emerald-800 px-2 py-0.5 rounded-full">
+                  {activeMarker.type}
+                </span>
+                <h2 className="text-sm font-black text-white truncate mt-1 leading-none">
+                  {activeMarker.name}
+                </h2>
+              </div>
+            </div>
+          </div>
+
+          {/* Details Scrollable Body */}
+          <div className="flex-grow overflow-y-auto p-4 space-y-4 custom-scrollbar text-left">
+            <div className="flex items-start gap-2 text-xs text-zinc-500">
+              <MapPin className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold text-zinc-700 dark:text-zinc-300">{activeMarker.locationText}</p>
+                {activeMarker.address && (
+                  <p className="text-[10px] text-zinc-400 mt-0.5 leading-relaxed">{activeMarker.address}</p>
+                )}
+              </div>
+            </div>
+
+            {activeMarker.description && (
+              <div className="p-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-805 rounded-xl">
+                <span className="text-[9px] font-black uppercase text-zinc-400 block mb-1">About</span>
+                <p className="text-[11px] text-zinc-650 dark:text-zinc-350 leading-relaxed whitespace-pre-wrap">
+                  {activeMarker.description}
+                </p>
+              </div>
+            )}
+
+            {/* EVENT SPECIFIC METADATA */}
+            {activeMarker.type === 'event' && (
+              <div className="space-y-3 pt-1 border-t border-zinc-100 dark:border-zinc-800/85">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="p-2.5 bg-indigo-50/30 dark:bg-indigo-950/10 border border-indigo-100/50 dark:border-indigo-900/20 rounded-xl">
+                    <span className="text-[9px] font-bold text-indigo-500 block uppercase">Ticket Price</span>
+                    <span className="text-xs font-black text-indigo-700 dark:text-indigo-400 mt-1 block">
+                      {activeMarker.ticketPrice && activeMarker.ticketPrice > 0 ? `₹${activeMarker.ticketPrice}` : 'Free Entry'}
+                    </span>
+                  </div>
+                  <div className="p-2.5 bg-indigo-50/30 dark:bg-indigo-950/10 border border-indigo-100/50 dark:border-indigo-900/20 rounded-xl">
+                    <span className="text-[9px] font-bold text-indigo-500 block uppercase">Capacity</span>
+                    <span className="text-xs font-black text-indigo-700 dark:text-indigo-400 mt-1 block">
+                      {activeMarker.maxCapacity ? `${activeMarker.attendeeCount || 1} / ${activeMarker.maxCapacity} Seats` : 'Unlimited'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-2 text-xs">
+                  <div className="flex items-center justify-between py-1.5 border-b border-zinc-100 dark:border-zinc-800/60">
+                    <span className="text-zinc-500 font-medium">🕒 Timings</span>
+                    <span className="font-bold text-zinc-800 dark:text-zinc-200">
+                      {activeMarker.startTime} - {activeMarker.endTime || 'End'}
+                    </span>
+                  </div>
+                  {activeMarker.dressCode && (
+                    <div className="flex items-center justify-between py-1.5 border-b border-zinc-100 dark:border-zinc-800/60">
+                      <span className="text-zinc-500 font-medium">👕 Dress Code</span>
+                      <span className="font-bold text-zinc-800 dark:text-zinc-200">{activeMarker.dressCode}</span>
+                    </div>
+                  )}
+                  {activeMarker.website && (
+                    <div className="flex items-center justify-between py-1.5 border-b border-zinc-100 dark:border-zinc-800/60">
+                      <span className="text-zinc-500 font-medium">🌐 Event Page</span>
+                      <a href={activeMarker.website} target="_blank" rel="noreferrer" className="font-bold text-primary hover:underline flex items-center gap-0.5">
+                        Visit website <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                  )}
+                </div>
+
+                {activeMarker.rules && (
+                  <div className="p-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 rounded-xl">
+                    <span className="text-[9px] font-black uppercase text-zinc-400 block mb-1">Event Rules</span>
+                    <p className="text-[10px] text-zinc-600 dark:text-zinc-400 leading-relaxed whitespace-pre-wrap">{activeMarker.rules}</p>
+                  </div>
+                )}
+                
+                {/* Auto Welcome Status indicator */}
+                {activeMarker.autoWelcomeMessage && (
+                  <div className="p-2.5 bg-emerald-50/20 dark:bg-emerald-950/10 border border-emerald-100/50 dark:border-emerald-900/25 rounded-xl flex items-center gap-2">
+                    <span className="text-base">💬</span>
+                    <div className="text-left">
+                      <p className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400">Auto Welcome Message</p>
+                      <p className="text-[9px] text-zinc-400 mt-0.5">Active for all attendees.</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Event Join / Leave Action Row */}
+                <div className="pt-2 flex gap-2">
+                  {session?.user && (
+                    <button 
+                      onClick={async () => {
+                        const isAttending = activeMarker.attendees?.some((a: any) => a.userId === (session.user as any).id);
+                        if (isAttending) {
+                          const leaveRes = await leaveEventAction(activeMarker.id);
+                          if (leaveRes.success) {
+                            alert('Left the event.');
+                            const fresh = await fetchMarkers();
+                            const updated = fresh.find((m: any) => m.id === activeMarker.id);
+                            if (updated) setActiveMarker(updated);
+                          }
+                        } else {
+                          const joinRes = await joinEventAction(activeMarker.id);
+                          if (joinRes.success) {
+                            alert('Joined event successfully!');
+                            const fresh = await fetchMarkers();
+                            const updated = fresh.find((m: any) => m.id === activeMarker.id);
+                            if (updated) setActiveMarker(updated);
+                          }
+                        }
+                      }}
+                      className="flex-1 py-2.5 bg-primary text-white text-xs font-black rounded-xl hover:opacity-95 transition-opacity"
+                    >
+                      {activeMarker.attendees?.some((a: any) => a.userId === (session.user as any).id) ? 'Leave Event' : 'Join Event 🎉'}
+                    </button>
+                  )}
+                  {activeMarker.whatsappNumber && (
+                    <a 
+                      href={`https://wa.me/${activeMarker.whatsappNumber.replace(/[^0-9]/g, '')}`}
+                      target="_blank" 
+                      rel="noreferrer"
+                      className="px-3.5 py-2.5 border border-zinc-200 dark:border-zinc-800 rounded-xl flex items-center justify-center hover:bg-zinc-50 dark:hover:bg-zinc-900"
+                    >
+                      💬
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* SHOP / STORE SPECIFIC METADATA */}
+            {['store', 'restaurant', 'website', 'blog'].includes(activeMarker.type) && (
+              <div className="space-y-3 pt-1 border-t border-zinc-105 dark:border-zinc-800/85">
+                
+                {/* Hours & Offers */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="p-2.5 bg-teal-50/20 dark:bg-teal-950/10 border border-teal-100/50 dark:border-teal-900/20 rounded-xl">
+                    <span className="text-[9px] font-bold text-teal-600 block uppercase">Opening Hours</span>
+                    <span className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 mt-1 block">
+                      {activeMarker.openingHours || '10:00 AM - 09:00 PM'}
+                    </span>
+                  </div>
+                  <div className="p-2.5 bg-amber-50/30 dark:bg-amber-950/10 border border-amber-100/50 dark:border-amber-900/20 rounded-xl">
+                    <span className="text-[9px] font-bold text-amber-600 block uppercase">Special Offer</span>
+                    <span className="text-[11px] font-black text-amber-700 dark:text-amber-400 mt-1 block">
+                      {activeMarker.offers || 'Flat 10% Off!'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-2 text-xs">
+                  {activeMarker.contactNumber && (
+                    <div className="flex items-center justify-between py-1.5 border-b border-zinc-100 dark:border-zinc-800/60">
+                      <span className="text-zinc-500 font-medium">📞 Phone</span>
+                      <a href={`tel:${activeMarker.contactNumber}`} className="font-bold text-zinc-800 dark:text-zinc-200 hover:underline">{activeMarker.contactNumber}</a>
+                    </div>
+                  )}
+                  {activeMarker.website && (
+                    <div className="flex items-center justify-between py-1.5 border-b border-zinc-100 dark:border-zinc-800/60">
+                      <span className="text-zinc-500 font-medium">🌐 Website</span>
+                      <a href={activeMarker.website} target="_blank" rel="noreferrer" className="font-bold text-primary hover:underline flex items-center gap-0.5">
+                        Visit <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                  )}
+                </div>
+
+                {/* Products Catalog section */}
+                <div className="space-y-2">
+                  <h4 className="text-[10px] font-black uppercase text-zinc-400 tracking-wider">
+                    🛍️ Catalog & Items
+                  </h4>
+                  <div className="grid grid-cols-2 gap-2">
+                    {/* Mock product lists */}
+                    <div className="p-2 border border-zinc-100 dark:border-zinc-900 bg-zinc-50/50 dark:bg-zinc-900/20 rounded-xl">
+                      <div className="w-full h-16 bg-zinc-200 dark:bg-zinc-800 rounded-lg overflow-hidden">
+                        <div className="w-full h-full flex items-center justify-center text-xs opacity-55">📦 Product A</div>
+                      </div>
+                      <div className="flex justify-between items-center mt-1.5">
+                        <span className="text-[10px] font-bold">Item 1</span>
+                        <span className="text-[10px] text-emerald-600 font-black">₹199</span>
+                      </div>
+                    </div>
+                    <div className="p-2 border border-zinc-100 dark:border-zinc-900 bg-zinc-50/50 dark:bg-zinc-900/20 rounded-xl">
+                      <div className="w-full h-16 bg-zinc-200 dark:bg-zinc-800 rounded-lg overflow-hidden">
+                        <div className="w-full h-full flex items-center justify-center text-xs opacity-55">📦 Product B</div>
+                      </div>
+                      <div className="flex justify-between items-center mt-1.5">
+                        <span className="text-[10px] font-bold">Item 2</span>
+                        <span className="text-[10px] text-emerald-600 font-black">₹399</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Rating & Review Section */}
+                <div className="space-y-3 pt-2 border-t border-zinc-100 dark:border-zinc-800/80">
+                  <div className="flex justify-between items-center">
+                    <h4 className="text-[10px] font-black uppercase text-zinc-400 tracking-wider">
+                      ⭐ Ratings & Reviews
+                    </h4>
+                    <span className="text-xs font-bold text-amber-500">⭐ 4.8 (124 reviews)</span>
+                  </div>
+
+                  {/* Reviews list */}
+                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                    {(localReviews[activeMarker.id] || [
+                      { rating: 5, text: "Excellent products and swift delivery!", username: "tolee_fan", date: "Today" },
+                      { rating: 4, text: "Very good customer care support.", username: "mumbai_eats", date: "3 days ago" }
+                    ]).map((rev: any, idx: number) => (
+                      <div key={idx} className="p-2 bg-zinc-50/60 dark:bg-zinc-900/40 rounded-lg border border-zinc-100 dark:border-zinc-800/50 text-left">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[10px] font-bold text-zinc-700 dark:text-zinc-300">@{rev.username}</span>
+                          <span className="text-[9px] text-zinc-400">{rev.date}</span>
+                        </div>
+                        <div className="text-[9px] text-amber-500 mt-0.5">{"★".repeat(rev.rating)}</div>
+                        <p className="text-[10px] text-zinc-650 dark:text-zinc-350 mt-1 leading-relaxed">{rev.text}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Add Review Form */}
+                  <form 
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (!newReviewText.trim()) return;
+                      const newRev = {
+                        rating: newReviewRating,
+                        text: newReviewText.trim(),
+                        username: session?.user?.name || "anonymous",
+                        date: "Just now"
+                      };
+                      const current = localReviews[activeMarker.id] || [];
+                      setLocalReviews({
+                        ...localReviews,
+                        [activeMarker.id]: [newRev, ...current]
+                      });
+                      setNewReviewText('');
+                    }}
+                    className="space-y-1.5"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] font-bold text-zinc-400">Your Rating:</span>
+                      {[1, 2, 3, 4, 5].map(num => (
+                        <button 
+                          key={num}
+                          type="button" 
+                          onClick={() => setNewReviewRating(num)}
+                          className={`text-xs ${num <= newReviewRating ? 'text-amber-500' : 'text-zinc-300'}`}
+                        >
+                          ★
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex gap-1">
+                      <input 
+                        type="text" 
+                        placeholder="Write a quick review..." 
+                        value={newReviewText}
+                        onChange={(e) => setNewReviewText(e.target.value)}
+                        className="flex-1 text-[11px] px-2 py-1.5 border border-zinc-200 dark:border-zinc-800 rounded-lg bg-transparent text-zinc-900 dark:text-white"
+                      />
+                      <button type="submit" className="px-3 bg-teal-600 text-white rounded-lg text-[10px] font-bold">
+                        Post
+                      </button>
+                    </div>
+                  </form>
+                </div>
+
+                {/* Contact and Directions Actions */}
+                <div className="pt-2 flex gap-1.5">
+                  {activeMarker.whatsapp && (
+                    <a 
+                      href={`https://wa.me/${activeMarker.whatsapp.replace(/[^0-9]/g, '')}`}
+                      target="_blank" 
+                      rel="noreferrer"
+                      className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-xl flex items-center justify-center gap-1 shadow-sm"
+                    >
+                      💬 WhatsApp Shop
+                    </a>
+                  )}
+                  <a 
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${activeMarker.latitude},${activeMarker.longitude}`}
+                    target="_blank" 
+                    rel="noreferrer"
+                    className="flex-1 py-2 border border-zinc-200 dark:border-zinc-850 hover:bg-zinc-50 dark:hover:bg-zinc-900 text-zinc-800 dark:text-zinc-200 text-[11px] font-bold rounded-xl flex items-center justify-center gap-1 shadow-xs"
+                  >
+                    🗺️ Directions
+                  </a>
+                </div>
+              </div>
+            )}
+
+            {/* Default Quick Actions */}
+            <div className="flex justify-between items-center pt-3 border-t border-zinc-100 dark:border-zinc-800/60 text-zinc-400">
+              <button className="flex items-center gap-1 hover:text-red-500 text-[10px] font-bold">
+                <Heart className="w-3.5 h-3.5" /> Like
+              </button>
+              <button className="flex items-center gap-1 hover:text-emerald-500 text-[10px] font-bold">
+                <Share2 className="w-3.5 h-3.5" /> Share
+              </button>
+              <button className="flex items-center gap-1 hover:text-cyan-500 text-[10px] font-bold">
+                <Bookmark className="w-3.5 h-3.5" /> Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Floating Header (Light Glassmorphic) */}
       <div className="absolute top-4 left-4 right-4 z-40 pointer-events-none flex items-center justify-between">
@@ -769,6 +1314,44 @@ export default function InteractiveMapPage() {
           >
             <RefreshCw className="w-5 h-5" />
           </button>
+          
+          {session?.user && (
+            <div className="relative">
+              <button 
+                onClick={() => setIsCreateMenuOpen(!isCreateMenuOpen)}
+                className="w-10 h-10 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 text-white flex items-center justify-center hover:opacity-95 transition-all shadow-md active:scale-95 border border-white/20"
+              >
+                <Plus className={`w-5 h-5 transition-transform duration-200 ${isCreateMenuOpen ? 'rotate-45' : ''}`} />
+              </button>
+              
+              {isCreateMenuOpen && (
+                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl z-50 py-2.5 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150 text-left">
+                  <div className="px-3 pb-2 mb-1.5 border-b border-zinc-105 dark:border-zinc-800/80">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-zinc-400">Map Creations</p>
+                  </div>
+                  <button 
+                    onClick={() => { enterPlacementMode('group'); setIsCreateMenuOpen(false); }}
+                    className="w-full px-4 py-2 text-left text-xs font-bold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900 flex items-center gap-2"
+                  >
+                    <span>👥</span> Create Group (Tolee)
+                  </button>
+                  <button 
+                    onClick={() => { enterPlacementMode('event'); setIsCreateMenuOpen(false); }}
+                    className="w-full px-4 py-2 text-left text-xs font-bold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900 flex items-center gap-2"
+                  >
+                    <span>📅</span> Create Local Event
+                  </button>
+                  <button 
+                    onClick={() => { enterPlacementMode('shop'); setIsCreateMenuOpen(false); }}
+                    className="w-full px-4 py-2 text-left text-xs font-bold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900 flex items-center gap-2"
+                  >
+                    <span>🏪</span> Create Shop / Store
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           {session?.user && (
             <Avatar className="w-10 h-10 border border-zinc-200/80 shadow-md">
               <AvatarImage src={(session.user as any).avatar || session.user.image} />
@@ -784,7 +1367,7 @@ export default function InteractiveMapPage() {
           <div className="flex items-start justify-between">
             <div>
               <h3 className="text-xs font-black text-emerald-700 uppercase tracking-wider flex items-center gap-1">
-                📍 Placement Mode ({placementMode === 'group' ? 'Group' : 'Event'})
+                📍 Placement Mode ({placementMode === 'group' ? 'Group' : placementMode === 'event' ? 'Event' : 'Shop'})
               </h3>
               <p className="text-[11px] text-zinc-500 mt-0.5">Tap map or drag pin to position.</p>
             </div>
@@ -847,24 +1430,6 @@ export default function InteractiveMapPage() {
         </div>
       )}
 
-      {/* FLOATING ACTION BUTTONS (FABs) - Right Side Map */}
-      {!placementMode && session?.user && (
-        <div className="absolute right-4 top-1/2 -translate-y-1/2 z-40 flex flex-col gap-3 pointer-events-auto">
-          <button
-            onClick={() => enterPlacementMode('group')}
-            className="px-4 py-3 bg-gradient-to-r from-emerald-600 to-teal-500 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center gap-1.5 text-xs font-black border border-white/20"
-          >
-            <span>📍</span> Create Group
-          </button>
-          <button
-            onClick={() => enterPlacementMode('event')}
-            className="px-4 py-3 bg-gradient-to-r from-indigo-600 to-violet-500 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center gap-1.5 text-xs font-black border border-white/20"
-          >
-            <span>🎉</span> Create Event
-          </button>
-        </div>
-      )}
-
       {/* Sidebar - Hotspots & Discovery List (Light Glassmorphic) */}
       <div className="absolute left-4 top-20 bottom-4 w-80 bg-white/85 border border-zinc-200/60 backdrop-blur-xl rounded-2xl p-4 flex flex-col gap-4 z-10 shadow-xl pointer-events-auto overflow-hidden hidden md:flex">
         
@@ -872,23 +1437,42 @@ export default function InteractiveMapPage() {
         <div className="flex flex-wrap gap-1 border-b border-zinc-200/60 pb-3">
           {[
             { id: 'all', label: 'All' },
-            { id: 'group', label: 'Groups' },
-            { id: 'event', label: 'Events' },
-            { id: 'marketplace', label: 'Shop' },
-            { id: 'hotspots', label: 'Local' }
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setFilterType(tab.id as any)}
-              className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all border ${
-                filterType === tab.id
-                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
-                  : 'bg-zinc-50 text-zinc-500 border-zinc-200 hover:bg-zinc-100 hover:text-zinc-800'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+            { id: 'groups', label: '👥 Groups' },
+            { id: 'events', label: '📅 Events' },
+            { id: 'shops', label: '🏪 Shops' },
+            { id: 'marketplace', label: '🛍️ Market' }
+          ].map((tab) => {
+            const isSelected = selectedFilters.includes(tab.id);
+            return (
+              <button
+                key={tab.id}
+                onClick={() => {
+                  if (tab.id === 'all') {
+                    setSelectedFilters(['all']);
+                  } else {
+                    let updated = selectedFilters.filter(f => f !== 'all');
+                    if (updated.includes(tab.id)) {
+                      updated = updated.filter(f => f !== tab.id);
+                    } else {
+                      updated.push(tab.id);
+                    }
+                    if (updated.length === 0) {
+                      setSelectedFilters(['all']);
+                    } else {
+                      setSelectedFilters(updated);
+                    }
+                  }
+                }}
+                className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all border ${
+                  isSelected
+                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                    : 'bg-zinc-50 text-zinc-500 border-zinc-200 hover:bg-zinc-100 hover:text-zinc-800'
+                }`}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
 
         <div className="flex items-center justify-between border-b border-zinc-200/60 pb-1">
@@ -1227,12 +1811,243 @@ export default function InteractiveMapPage() {
                 />
               </div>
 
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-black text-zinc-400 uppercase tracking-wider block mb-1">Ticket Price (₹)</label>
+                  <input 
+                    type="number" 
+                    placeholder="0 for Free"
+                    value={eventTicketPrice}
+                    onChange={(e) => setEventTicketPrice(e.target.value)}
+                    className="w-full text-xs px-3.5 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl focus:outline-hidden focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-black text-zinc-400 uppercase tracking-wider block mb-1">Dress Code (optional)</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. Casual"
+                    value={eventDressCode}
+                    onChange={(e) => setEventDressCode(e.target.value)}
+                    className="w-full text-xs px-3.5 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl focus:outline-hidden focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-black text-zinc-400 uppercase tracking-wider block mb-1">WhatsApp Contact (optional)</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. 919876543210"
+                    value={eventWhatsappNumber}
+                    onChange={(e) => setEventWhatsappNumber(e.target.value)}
+                    className="w-full text-xs px-3.5 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl focus:outline-hidden focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-black text-zinc-400 uppercase tracking-wider block mb-1">Website URL (optional)</label>
+                  <input 
+                    type="text" 
+                    placeholder="https://..."
+                    value={eventWebsite}
+                    onChange={(e) => setEventWebsite(e.target.value)}
+                    className="w-full text-xs px-3.5 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl focus:outline-hidden focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-black text-zinc-400 uppercase tracking-wider block mb-1">Tags (optional, comma separated)</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. music, coding, food"
+                  value={eventTags}
+                  onChange={(e) => setEventTags(e.target.value)}
+                  className="w-full text-xs px-3.5 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl focus:outline-hidden focus:border-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-black text-zinc-400 uppercase tracking-wider block mb-1">Event Rules (one per line)</label>
+                <textarea 
+                  rows={2}
+                  placeholder="e.g. Bring water. No outside food."
+                  value={eventRules}
+                  onChange={(e) => setEventRules(e.target.value)}
+                  className="w-full text-xs px-3.5 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl focus:outline-hidden focus:border-indigo-500 resize-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-black text-emerald-400 uppercase tracking-wider block mb-1">Automated Welcome Message (Inbox)</label>
+                <textarea 
+                  rows={2}
+                  placeholder="Auto-sent to user's chat inbox upon joining this event..."
+                  value={eventAutoWelcomeMessage}
+                  onChange={(e) => setEventAutoWelcomeMessage(e.target.value)}
+                  className="w-full text-xs px-3.5 py-2.5 bg-zinc-900 border border-emerald-900 rounded-xl focus:outline-hidden focus:border-emerald-500 resize-none"
+                />
+              </div>
+
               <button 
                 type="submit" 
                 disabled={creatingEvent}
                 className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black rounded-xl transition-all flex items-center justify-center gap-1.5"
               >
                 {creatingEvent ? 'Creating Event...' : 'Publish Event Live ✓'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* CREATE SHOP FORM DIALOG MODAL */}
+      {isShopDialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="w-full max-w-md bg-[#18181b] border border-zinc-800 text-white rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] text-left">
+            <div className="p-5 border-b border-zinc-800 flex justify-between items-center">
+              <h3 className="text-base font-black text-white flex items-center gap-1.5">
+                🏪 Publish Shop / Store
+              </h3>
+              <button onClick={() => setIsShopDialogOpen(false)} className="text-zinc-400 hover:text-white font-bold text-xs bg-zinc-900 px-2.5 py-1 rounded">
+                Close
+              </button>
+            </div>
+
+            <form onSubmit={handlePublishShop} className="p-5 overflow-y-auto space-y-4">
+              <div>
+                <label className="text-[11px] font-black text-zinc-400 uppercase tracking-wider block mb-1">Location Address</label>
+                <input 
+                  type="text" 
+                  disabled 
+                  value={tempAddress} 
+                  className="w-full text-xs px-3.5 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl text-zinc-400 focus:outline-hidden"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-black text-zinc-400 uppercase tracking-wider block mb-1">Shop Type</label>
+                  <select 
+                    value={shopType}
+                    onChange={(e) => setShopType(e.target.value)}
+                    className="w-full text-xs px-3.5 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl focus:outline-hidden focus:border-cyan-500 text-white"
+                  >
+                    <option value="STORE" className="bg-zinc-950 text-white">Retail Store</option>
+                    <option value="RESTAURANT" className="bg-zinc-950 text-white">Restaurant / Cafe</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[11px] font-black text-zinc-400 uppercase tracking-wider block mb-1">Shop Name</label>
+                  <input 
+                    type="text" 
+                    required
+                    placeholder="e.g. Kalyan Organic Grocers"
+                    value={shopName}
+                    onChange={(e) => setShopName(e.target.value)}
+                    className="w-full text-xs px-3.5 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl focus:outline-hidden focus:border-cyan-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-black text-zinc-400 uppercase tracking-wider block mb-1">About & Description</label>
+                <textarea 
+                  rows={2}
+                  placeholder="Describe your shop products, specialization, services..."
+                  value={shopDesc}
+                  onChange={(e) => setShopDesc(e.target.value)}
+                  className="w-full text-xs px-3.5 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl focus:outline-hidden focus:border-cyan-500 resize-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-black text-zinc-400 uppercase tracking-wider block mb-1">Opening Hours</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. 10:00 AM - 09:00 PM"
+                    value={shopHours}
+                    onChange={(e) => setShopHours(e.target.value)}
+                    className="w-full text-xs px-3.5 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl focus:outline-hidden focus:border-cyan-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-black text-zinc-400 uppercase tracking-wider block mb-1">Special Offers</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. Flat 10% off"
+                    value={shopOffers}
+                    onChange={(e) => setShopOffers(e.target.value)}
+                    className="w-full text-xs px-3.5 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl focus:outline-hidden focus:border-cyan-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-black text-zinc-400 uppercase tracking-wider block mb-1">Contact Number</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. +91 98765 43210"
+                    value={shopContact}
+                    onChange={(e) => setShopContact(e.target.value)}
+                    className="w-full text-xs px-3.5 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl focus:outline-hidden focus:border-cyan-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-black text-zinc-400 uppercase tracking-wider block mb-1">WhatsApp Number</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. 919876543210"
+                    value={shopWhatsapp}
+                    onChange={(e) => setShopWhatsapp(e.target.value)}
+                    className="w-full text-xs px-3.5 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl focus:outline-hidden focus:border-cyan-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-black text-zinc-400 uppercase tracking-wider block mb-1">Website URL</label>
+                  <input 
+                    type="text" 
+                    placeholder="https://..."
+                    value={shopWebsite}
+                    onChange={(e) => setShopWebsite(e.target.value)}
+                    className="w-full text-xs px-3.5 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl focus:outline-hidden focus:border-cyan-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-black text-zinc-400 uppercase tracking-wider block mb-1">Shop Banner / Photos</label>
+                  <input 
+                    type="text" 
+                    placeholder="https://..."
+                    value={shopCover}
+                    onChange={(e) => setShopCover(e.target.value)}
+                    className="w-full text-xs px-3.5 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl focus:outline-hidden focus:border-cyan-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-black text-zinc-400 uppercase tracking-wider block mb-1">Social Links (comma separated)</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. instagram.com/shop"
+                  value={shopSocialLinks}
+                  onChange={(e) => setShopSocialLinks(e.target.value)}
+                  className="w-full text-xs px-3.5 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl focus:outline-hidden focus:border-cyan-500"
+                />
+              </div>
+
+              <button 
+                type="submit" 
+                disabled={creatingShop}
+                className="w-full py-3 bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-black rounded-xl transition-all flex items-center justify-center gap-1.5"
+              >
+                {creatingShop ? 'Publishing Shop...' : 'Publish Shop Live ✓'}
               </button>
             </form>
           </div>

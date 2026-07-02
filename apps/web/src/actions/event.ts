@@ -21,6 +21,20 @@ export async function createEventAction(data: {
   visibility?: string;
   maxAttendees?: number;
   contactDetails?: string;
+  country?: string;
+  state?: string;
+  district?: string;
+  city?: string;
+  area?: string;
+  ticketPrice?: number;
+  maxCapacity?: number;
+  dressCode?: string;
+  rules?: string;
+  whatsappNumber?: string;
+  website?: string;
+  galleryImages?: string;
+  tags?: string;
+  autoWelcomeMessage?: string;
 }) {
   try {
     const session = await getServerSession(authOptions);
@@ -65,8 +79,22 @@ export async function createEventAction(data: {
         latitude: data.latitude,
         longitude: data.longitude,
         address: safeAddress,
+        country: data.country || null,
+        state: data.state || null,
+        district: data.district || null,
+        city: data.city || null,
+        area: data.area || null,
+        ticketPrice: data.ticketPrice || 0,
+        maxCapacity: data.maxCapacity || data.maxAttendees || null,
+        dressCode: data.dressCode || null,
+        rules: data.rules || null,
+        whatsappNumber: data.whatsappNumber || null,
+        website: data.website || null,
+        galleryImages: data.galleryImages || null,
+        tags: data.tags || null,
+        autoWelcomeMessage: data.autoWelcomeMessage || null,
         visibility: data.visibility || 'public',
-        maxAttendees: data.maxAttendees || null,
+        maxAttendees: data.maxAttendees || data.maxCapacity || null,
         contactDetails: data.contactDetails || null,
         creatorId: userId,
         attendees: {
