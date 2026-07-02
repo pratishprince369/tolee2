@@ -46,10 +46,10 @@ export function Sidebar() {
 
   const mainNav = isAuthenticated ? [
     { name: 'Feed', href: '/feed', icon: Home },
-    { name: 'Tolee Screen', href: '/screen', icon: Tv },
     { name: 'Discover', href: '/discover', icon: Compass },
     { name: 'Reels', href: '/reels', icon: Film },
     { name: 'Chats', href: '/chat', icon: MessageCircle, badge: data.unreadMessages > 0 ? String(data.unreadMessages) : null },
+    { name: 'Tolee Screen', href: '/screen', icon: Tv },
     { name: 'AI Manager', href: '/ai-manager', icon: Bot },
     { name: 'Notifications', href: '/notifications', icon: Bell, badge: data.unreadNotifications > 0 ? String(data.unreadNotifications) : null },
     { name: 'Marketplace', href: '/marketplace', icon: Store },
