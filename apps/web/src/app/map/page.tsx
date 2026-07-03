@@ -138,7 +138,7 @@ export default function InteractiveMapPage() {
 
   // Form Fields - Shop
   const [shopName, setShopName] = useState('');
-  const [shopType, setShopType] = useState('STORE'); // STORE | RESTAURANT
+  const [shopType, setShopType] = useState('Store');
   const [shopDesc, setShopDesc] = useState('');
   const [shopHours, setShopHours] = useState('10:00 AM - 09:00 PM');
   const [shopContact, setShopContact] = useState('');
@@ -425,7 +425,7 @@ export default function InteractiveMapPage() {
       const type = m.type.toLowerCase();
       if (selectedFilters.includes('groups') && (type === 'group' || type === 'meetup')) return true;
       if (selectedFilters.includes('events') && type === 'event') return true;
-      if (selectedFilters.includes('shops') && ['store', 'restaurant', 'website', 'blog'].includes(type)) return true;
+      if (selectedFilters.includes('shops') && !['group', 'meetup', 'event', 'marketplace', 'live_chat', 'trending_reel'].includes(type)) return true;
       if (selectedFilters.includes('marketplace') && type === 'marketplace') return true;
       return false;
     });
@@ -539,7 +539,7 @@ export default function InteractiveMapPage() {
         if (marker.type === 'marketplace') {
           markerColor = '#f97316'; // Orange
           iconHtml = '🛍️';
-        } else if (['store', 'restaurant', 'website'].includes(marker.type)) {
+        } else if (!['marketplace', 'group', 'meetup', 'live_chat', 'trending_reel', 'event'].includes(marker.type)) {
           markerColor = '#06b6d4'; // Teal
           iconHtml = '🏪';
         } else if (marker.type === 'group') {
@@ -1122,7 +1122,7 @@ export default function InteractiveMapPage() {
             )}
 
             {/* SHOP / STORE SPECIFIC METADATA */}
-            {['store', 'restaurant', 'website', 'blog'].includes(activeMarker.type) && (
+            {!['event', 'group', 'marketplace', 'live_chat', 'trending_reel', 'meetup'].includes(activeMarker.type) && (
               <div className="space-y-3 pt-1 border-t border-zinc-105 dark:border-zinc-800/85">
                 
                 {/* Hours & Offers */}
@@ -1552,7 +1552,7 @@ export default function InteractiveMapPage() {
               </div>
             ) : (
               getFilteredMarkers().map((marker) => {
-                let markerIcon = <Globe className="w-4 h-4 text-cyan-600" />;
+                let markerIcon = <ShoppingBag className="w-4 h-4 text-cyan-600" />;
                 if (marker.type === 'marketplace') markerIcon = <ShoppingBag className="w-4 h-4 text-orange-500" />;
                 else if (marker.type === 'group' || marker.type === 'meetup') markerIcon = <Users className="w-4 h-4 text-emerald-600" />;
                 else if (marker.type === 'live_chat') markerIcon = <Video className="w-4 h-4 text-red-500" />;
@@ -1975,15 +1975,15 @@ export default function InteractiveMapPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[11px] font-black text-zinc-400 uppercase tracking-wider block mb-1">Shop Type</label>
-                  <select 
+                  <label className="text-[11px] font-black text-zinc-400 uppercase tracking-wider block mb-1">Shop Category</label>
+                  <input 
+                    type="text" 
+                    required
+                    placeholder="e.g. Makeup Artist, Bakery"
                     value={shopType}
                     onChange={(e) => setShopType(e.target.value)}
                     className="w-full text-xs px-3.5 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl focus:outline-hidden focus:border-cyan-500 text-white"
-                  >
-                    <option value="STORE" className="bg-zinc-950 text-white">Retail Store</option>
-                    <option value="RESTAURANT" className="bg-zinc-950 text-white">Restaurant / Cafe</option>
-                  </select>
+                  />
                 </div>
                 <div>
                   <label className="text-[11px] font-black text-zinc-400 uppercase tracking-wider block mb-1">Shop Name</label>
