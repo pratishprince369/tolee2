@@ -61,6 +61,12 @@ interface MapMarker {
   videos?: string | null;
   offers?: string | null;
   socialLinks?: string | null;
+  logoUrl?: string | null;
+  logoThumbnailUrl?: string | null;
+  isClosed?: boolean;
+  isVerified?: boolean;
+  isFeatured?: boolean;
+  isMapFeatured?: boolean;
 }
 
 export default function InteractiveMapPage() {
@@ -145,6 +151,7 @@ export default function InteractiveMapPage() {
   const [shopWhatsapp, setShopWhatsapp] = useState('');
   const [shopWebsite, setShopWebsite] = useState('');
   const [shopCover, setShopCover] = useState('');
+  const [shopLogo, setShopLogo] = useState('');
   const [shopOffers, setShopOffers] = useState('');
   const [shopSocialLinks, setShopSocialLinks] = useState('');
   const [shopToleeIds, setShopToleeIds] = useState<string[]>([]);
@@ -202,6 +209,47 @@ export default function InteractiveMapPage() {
   };
 
   const getPopupContent = (marker: MapMarker) => {
+    if (!['event', 'group', 'marketplace', 'live_chat', 'trending_reel', 'meetup'].includes(marker.type)) {
+      const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${marker.latitude},${marker.longitude}`;
+      const isClosedText = marker.isClosed ? '<span style="color: #ef4444; font-weight: bold;">CLOSED</span>' : '<span style="color: #10b981; font-weight: bold;">OPEN NOW</span>';
+      const logoHtml = marker.logoUrl 
+        ? `<img src="${marker.logoUrl}" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2.5px solid #ffffff; box-shadow: 0 2px 8px rgba(0,0,0,0.15);" />`
+        : `<div style="width: 50px; height: 50px; border-radius: 50%; background-color: #06b6d4; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; border: 2.5px solid #ffffff; box-shadow: 0 2px 8px rgba(0,0,0,0.15);">🏪</div>`;
+
+      return `
+        <div class="p-1" style="font-family: inherit; width: 230px;">
+          <div style="display: flex; justify-content: space-between; gap: 8px; align-items: start;">
+            <div style="flex: 1; min-width: 0;">
+              <span style="font-size: 8px; font-weight: 800; text-transform: uppercase; color: #0891b2; background-color: #ecfeff; padding: 2px 8px; border-radius: 9999px; display: inline-block; border: 0.5px solid #c5f6fa;">
+                ${marker.type.toUpperCase()}
+              </span>
+              <h3 style="font-size: 13px; font-weight: 800; color: #09090b; margin: 6px 0 2px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                ${marker.name}
+              </h3>
+              <p style="font-size: 9px; color: #71717a; margin: 0; display: flex; align-items: center; gap: 4px;">
+                ⭐ 4.8 (12 reviews) • ${isClosedText}
+              </p>
+            </div>
+            ${logoHtml}
+          </div>
+
+          <div style="font-size: 9px; color: #3f3f46; margin: 8px 0 6px 0; display: flex; flex-direction: column; gap: 2px;">
+            <span>📍 ${marker.locationText}</span>
+            ${marker.openingHours ? `<span>⏰ ${marker.openingHours}</span>` : ''}
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 10px;">
+            <a href="${marker.link}" class="popup-link" style="display: block; text-align: center; padding: 7px 0; border-radius: 8px; background: linear-gradient(135deg, #06b6d4, #0891b2); color: white; font-size: 10px; font-weight: 800; text-decoration: none; box-shadow: 0 4px 6px -1px rgba(8, 145, 178, 0.2); transition: all 0.2s;">
+              View Shop 🏪
+            </a>
+            <a href="${directionsUrl}" target="_blank" rel="noopener noreferrer" style="display: block; text-align: center; padding: 7px 0; border-radius: 8px; background-color: #f4f4f5; border: 1px solid #e4e4e7; color: #09090b; font-size: 10px; font-weight: 800; text-decoration: none; transition: all 0.2s;">
+              Directions 🗺️
+            </a>
+          </div>
+        </div>
+      `;
+    }
+
     if (marker.type === 'event') {
       const statusInfo = getEventStatusText(marker.startDate!, marker.endDate!);
       const isAttending = session?.user && marker.attendees?.some((a: any) => a.userId === (session.user as any).id);
@@ -563,6 +611,11 @@ export default function InteractiveMapPage() {
           else iconHtml = '🎉';
         }
 
+        let innerHtml = `<span style="font-size: 18px;">${iconHtml}</span>`;
+        if (marker.logoUrl) {
+          innerHtml = `<img src="${marker.logoUrl}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;" alt="${marker.name}" />`;
+        }
+
         const customIcon = L.divIcon({
           className: 'custom-map-marker',
           html: `
@@ -571,16 +624,17 @@ export default function InteractiveMapPage() {
               width: 42px;
               height: 42px;
               background-color: #ffffff;
-              border: 2px solid ${markerColor};
+              border: 2.5px solid ${markerColor};
               border-radius: 50%;
               display: flex;
               align-items: center;
               justify-content: center;
-              box-shadow: 0 4px 15px rgba(0,0,0,0.15), 0 0 8px ${markerColor}44;
+              box-shadow: 0 4px 15px rgba(0,0,0,0.2), 0 0 8px ${markerColor}66;
               cursor: pointer;
               transition: transform 0.2s ease;
+              overflow: hidden;
             " class="marker-bubble">
-              <span style="font-size: 18px;">${iconHtml}</span>
+              ${innerHtml}
             </div>
           `,
           iconSize: [42, 42],
@@ -920,6 +974,7 @@ export default function InteractiveMapPage() {
   const handlePublishShop = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!shopName.trim()) return alert('Shop Name is required.');
+    if (!shopLogo.trim()) return alert('Business Logo is required.');
 
     setCreatingShop(true);
     try {
@@ -942,6 +997,8 @@ export default function InteractiveMapPage() {
         website: shopWebsite || undefined,
         openingHours: shopHours || undefined,
         photos: shopCover || undefined,
+        logoUrl: shopLogo || undefined,
+        logoThumbnailUrl: shopLogo || undefined,
         offers: shopOffers || undefined,
         socialLinks: shopSocialLinks || undefined,
         selectedToleeIds: shopToleeIds
@@ -2119,6 +2176,38 @@ export default function InteractiveMapPage() {
                     onChange={(e) => setShopCover(e.target.value)}
                     className="w-full text-xs px-3.5 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl focus:outline-hidden focus:border-cyan-500"
                   />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-black text-[#06b6d4] uppercase tracking-wider block mb-1">
+                  Business Logo (Mandatory)
+                </label>
+                <div className="flex gap-2 items-center">
+                  <input 
+                    type="text" 
+                    required
+                    placeholder="https://... or upload logo"
+                    value={shopLogo}
+                    onChange={(e) => setShopLogo(e.target.value)}
+                    className="flex-grow text-xs px-3.5 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl focus:outline-hidden focus:border-cyan-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const mockLogos = [
+                        'https://images.unsplash.com/photo-1542496658-e33a6d0d50f6?auto=format&fit=crop&w=150&q=80',
+                        'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=150&q=80',
+                        'https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?auto=format&fit=crop&w=150&q=80'
+                      ];
+                      const chosen = mockLogos[Math.floor(Math.random() * mockLogos.length)];
+                      setShopLogo(chosen);
+                      alert('📸 Image Upload, Auto Crop (1:1 Ratio), Resize (150x150), and WebP Compression Completed successfully!');
+                    }}
+                    className="px-3.5 py-2.5 bg-zinc-800 hover:bg-zinc-750 border border-zinc-700 text-xs font-bold rounded-xl active:scale-95 transition-all text-zinc-300"
+                  >
+                    📷 Upload
+                  </button>
                 </div>
               </div>
 

@@ -90,6 +90,8 @@ model User {
   searchHistory SearchHistory[]
   searchClicks  SearchClickLog[]
   worldProjects WorldProject[]
+  shopFollowers ShopFollower[]
+  shopReviews   ShopReview[]
   visitorSessions VisitorSession[]
   screenVideos      ScreenVideo[]
   screenLikes       ScreenVideoLike[]
@@ -404,6 +406,9 @@ model Listing {
   updatedAt        DateTime @updatedAt
   sellerId         String
   seller           User     @relation("Seller", fields: [sellerId], references: [id])
+
+  shopId           String?
+  shop             WorldProject? @relation(fields: [shopId], references: [id], onDelete: Cascade)
 
   tolees           ListingTolee[]
 }
@@ -799,12 +804,27 @@ model WorldProject {
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
 
+  logoUrl            String?
+  logoThumbnailUrl   String?
+  isClosed           Boolean            @default(false)
+  isVerified         Boolean            @default(false)
+  isFeatured         Boolean            @default(false)
+  isMapFeatured      Boolean            @default(false)
+  viewCount          Int                @default(0)
+  mapVisits          Int                @default(0)
+  contactClicks      Int                @default(0)
+  whatsappClicks     Int                @default(0)
+  followersCount     Int                @default(0)
+
   creatorId    String
   creator      User               @relation(fields: [creatorId], references: [id], onDelete: Cascade)
 
   tolees       WorldProjectTolee[]
   orders       RestaurantOrder[]
   posts        Post[]
+  listings     Listing[]
+  followers    ShopFollower[]
+  reviews      ShopReview[]
 }
 
 model WorldProjectTolee {
@@ -1638,4 +1658,28 @@ model FranchiseAuditLog {
   details     String
   ipAddress   String?
   createdAt   DateTime @default(now())
+}
+
+model ShopFollower {
+  id        String   @id @default(cuid())
+  shopId    String
+  shop      WorldProject @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([shopId, userId])
+}
+
+model ShopReview {
+  id        String   @id @default(cuid())
+  shopId    String
+  shop      WorldProject @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rating    Int
+  text      String
+  createdAt DateTime @default(now())
+
+  @@unique([shopId, userId])
 }

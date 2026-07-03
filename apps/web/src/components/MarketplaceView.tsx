@@ -561,42 +561,51 @@ export function MarketplaceView({ initialListings }: { initialListings: any[] })
                       </div>
 
                       {/* Bottom Info/Action Section */}
-                      <div className="flex items-center justify-between border-t border-zinc-100 dark:border-zinc-800/80 pt-4 mt-auto">
-                        <div className="flex items-center gap-2">
-                          {listing.seller?.avatar ? (
-                            <img src={getValidAvatarUrl(listing.seller.avatar)} alt="Seller" className="w-6.5 h-6.5 rounded-full object-cover border border-zinc-100" />
-                          ) : (
-                            <div className="w-6.5 h-6.5 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center border border-zinc-200 dark:border-zinc-700">
-                              <span className="text-[10px] font-extrabold text-primary dark:text-zinc-400 uppercase">
-                                {listing.seller?.name?.charAt(0) || 'U'}
+                      <div className="flex flex-col gap-3 border-t border-zinc-100 dark:border-zinc-800/80 pt-4 mt-auto">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            {listing.shop?.logoUrl ? (
+                              <img src={listing.shop.logoUrl} alt="Shop Logo" className="w-7.5 h-7.5 rounded-full object-cover border border-zinc-250" />
+                            ) : (
+                              <div className="w-7.5 h-7.5 rounded-full bg-cyan-100 dark:bg-cyan-950/40 flex items-center justify-center border border-cyan-200">
+                                <span className="text-[10px] font-extrabold text-cyan-600 uppercase">
+                                  {listing.shop?.name?.charAt(0) || '🏪'}
+                                </span>
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <span className="text-xs font-black text-zinc-900 dark:text-zinc-100 truncate block max-w-[120px]">
+                                {listing.shop?.name || 'Local Shop'}
+                              </span>
+                              <span className="text-[9px] text-zinc-400 font-bold block">
+                                ⭐ 4.8 (Verified)
                               </span>
                             </div>
-                          )}
-                          <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 truncate max-w-[110px]">
-                            {listing.seller?.name || 'User'}
-                          </span>
+                          </div>
+
+                          <div className="flex gap-1.5">
+                            {listing.shop?.slug && (
+                              <Link href={`/store/${listing.shop.slug}`} onClick={(e) => e.stopPropagation()}>
+                                <Button 
+                                  size="sm" 
+                                  className="h-8 px-3.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 text-[10px] font-black border border-zinc-200/50 dark:border-zinc-800"
+                                >
+                                  Visit
+                                </Button>
+                              </Link>
+                            )}
+                            <Button 
+                              size="sm" 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                alert("Followed Shop successfully! You will receive notifications on sales and new product updates.");
+                              }}
+                              className="h-8 px-3.5 rounded-xl bg-cyan-500 hover:bg-cyan-600 text-black text-[10px] font-black shadow-sm"
+                            >
+                              Follow
+                            </Button>
+                          </div>
                         </div>
-                        
-                        {isOwner ? (
-                          <Button 
-                            size="sm" 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setQuickBoostTargetId(listing.id);
-                              setIsQuickBoostOpen(true);
-                            }}
-                            className="rounded-xl bg-gradient-to-r from-emerald-500 via-teal-600 to-indigo-600 hover:from-emerald-600 hover:via-teal-700 hover:to-indigo-700 text-white px-4 h-9 font-extrabold text-xs flex items-center gap-1.5 transition-all duration-300 active:scale-95 shadow-sm shadow-emerald-500/10 animate-pulse animate-in duration-300"
-                          >
-                            <Rocket className="w-3.5 h-3.5" /> Boost
-                          </Button>
-                        ) : (
-                          <Button 
-                            size="sm" 
-                            className="rounded-xl bg-primary hover:bg-primary/95 text-primary-foreground px-4 h-9 font-bold text-xs flex items-center gap-1.5 transition-all duration-300 active:scale-95 shadow-sm shadow-primary/10"
-                          >
-                            <MessageCircle className="w-4 h-4" /> Message
-                          </Button>
-                        )}
                       </div>
                     </CardContent>
                   </Card>

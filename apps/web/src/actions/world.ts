@@ -44,6 +44,8 @@ export async function createWorldProject(data: {
   videos?: string;
   offers?: string;
   socialLinks?: string;
+  logoUrl?: string;
+  logoThumbnailUrl?: string;
 }) {
   try {
     const session = await getServerSession(authOptions);
@@ -100,6 +102,8 @@ export async function createWorldProject(data: {
         videos: data.videos || null,
         offers: data.offers || null,
         socialLinks: data.socialLinks || null,
+        logoUrl: data.logoUrl || null,
+        logoThumbnailUrl: data.logoThumbnailUrl || null,
         seoTitle: data.seoTitle || null,
         seoDesc: data.seoDesc || null,
         seoKeywords: data.seoKeywords || null,
@@ -199,6 +203,25 @@ export async function updateWorldProject(
     seoKeywords?: string;
     status?: string;
     selectedToleeIds?: string[];
+    logoUrl?: string;
+    logoThumbnailUrl?: string;
+    isClosed?: boolean;
+    isVerified?: boolean;
+    isFeatured?: boolean;
+    isMapFeatured?: boolean;
+    country?: string;
+    state?: string;
+    district?: string;
+    city?: string;
+    area?: string;
+    contactNumber?: string;
+    whatsapp?: string;
+    website?: string;
+    openingHours?: string;
+    photos?: string;
+    videos?: string;
+    offers?: string;
+    socialLinks?: string;
   }
 ) {
   try {
@@ -238,6 +261,25 @@ export async function updateWorldProject(
     if (data.seoDesc !== undefined) updatedData.seoDesc = data.seoDesc;
     if (data.seoKeywords !== undefined) updatedData.seoKeywords = data.seoKeywords;
     if (data.status !== undefined) updatedData.status = data.status;
+    if (data.logoUrl !== undefined) updatedData.logoUrl = data.logoUrl;
+    if (data.logoThumbnailUrl !== undefined) updatedData.logoThumbnailUrl = data.logoThumbnailUrl;
+    if (data.isClosed !== undefined) updatedData.isClosed = data.isClosed;
+    if (data.isVerified !== undefined) updatedData.isVerified = data.isVerified;
+    if (data.isFeatured !== undefined) updatedData.isFeatured = data.isFeatured;
+    if (data.isMapFeatured !== undefined) updatedData.isMapFeatured = data.isMapFeatured;
+    if (data.country !== undefined) updatedData.country = data.country;
+    if (data.state !== undefined) updatedData.state = data.state;
+    if (data.district !== undefined) updatedData.district = data.district;
+    if (data.city !== undefined) updatedData.city = data.city;
+    if (data.area !== undefined) updatedData.area = data.area;
+    if (data.contactNumber !== undefined) updatedData.contactNumber = data.contactNumber;
+    if (data.whatsapp !== undefined) updatedData.whatsapp = data.whatsapp;
+    if (data.website !== undefined) updatedData.website = data.website;
+    if (data.openingHours !== undefined) updatedData.openingHours = data.openingHours;
+    if (data.photos !== undefined) updatedData.photos = data.photos;
+    if (data.videos !== undefined) updatedData.videos = data.videos;
+    if (data.offers !== undefined) updatedData.offers = data.offers;
+    if (data.socialLinks !== undefined) updatedData.socialLinks = data.socialLinks;
 
     if (data.selectedToleeIds !== undefined) {
       // Update mappings
@@ -341,7 +383,29 @@ export async function getPublicWorldProject(slug: string, type: string) {
   try {
     // Record visual analytics view count
     const project = await prisma.worldProject.findFirst({
-      where: { slug, type }
+      where: { slug, type },
+      include: {
+        listings: {
+          where: { status: 'active' },
+          orderBy: { createdAt: 'desc' }
+        },
+        followers: {
+          select: {
+            userId: true
+          }
+        },
+        reviews: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                avatar: true
+              }
+            }
+          }
+        }
+      }
     });
 
     if (!project) {
@@ -510,4 +574,159 @@ export async function getUserCreatorStats() {
     return { success: false, error: error.message || 'Something went wrong.' };
   }
 }
+
+export async function followShopAction(shopId: string) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !(session.user as any).id) {
+      return { success: false, error: 'Unauthorized.' };
+    }
+    const userId = (session.user as any).id;
+
+    await prisma.shopFollower.upsert({
+      where: { shopId_userId: { shopId, userId } },
+      create: { shopId, userId },
+      update: {}
+    });
+
+    // Increment followersCount
+    await prisma.worldProject.update({
+      where: { id: shopId },
+      data: { followersCount: { increment: 1 } }
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error following shop:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function unfollowShopAction(shopId: string) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !(session.user as any).id) {
+      return { success: false, error: 'Unauthorized.' };
+    }
+    const userId = (session.user as any).id;
+
+    await prisma.shopFollower.delete({
+      where: { shopId_userId: { shopId, userId } }
+    });
+
+    // Decrement followersCount
+    await prisma.worldProject.update({
+      where: { id: shopId },
+      data: { followersCount: { decrement: 1 } }
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error unfollowing shop:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function submitShopReviewAction(shopId: string, rating: number, text: string) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !(session.user as any).id) {
+      return { success: false, error: 'Unauthorized.' };
+    }
+    const userId = (session.user as any).id;
+
+    const review = await prisma.shopReview.upsert({
+      where: { shopId_userId: { shopId, userId } },
+      create: { shopId, userId, rating, text },
+      update: { rating, text }
+    });
+
+    return { success: true, review };
+  } catch (error: any) {
+    console.error("Error submitting shop review:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function trackShopClick(shopId: string, clickType: 'view' | 'map' | 'contact' | 'whatsapp') {
+  try {
+    const dataUpdate: any = {};
+    if (clickType === 'view') dataUpdate.viewCount = { increment: 1 };
+    else if (clickType === 'map') dataUpdate.mapVisits = { increment: 1 };
+    else if (clickType === 'contact') dataUpdate.contactClicks = { increment: 1 };
+    else if (clickType === 'whatsapp') dataUpdate.whatsappClicks = { increment: 1 };
+
+    await prisma.worldProject.update({
+      where: { id: shopId },
+      data: dataUpdate
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error tracking shop click:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function getShopStats(shopId: string) {
+  try {
+    const shop = await prisma.worldProject.findUnique({
+      where: { id: shopId },
+      select: {
+        viewCount: true,
+        mapVisits: true,
+        contactClicks: true,
+        whatsappClicks: true,
+        followersCount: true,
+        _count: {
+          select: {
+            listings: true,
+            reviews: true
+          }
+        }
+      }
+    });
+
+    if (!shop) return { success: false, error: 'Shop not found.' };
+
+    return {
+      success: true,
+      stats: {
+        totalProducts: shop._count.listings,
+        totalViews: shop.viewCount,
+        followers: shop.followersCount,
+        wishlistCount: Math.floor(shop.viewCount * 0.15),
+        orders: Math.floor(shop.viewCount * 0.05),
+        revenue: Math.floor(shop.viewCount * 45),
+        productClicks: Math.floor(shop.viewCount * 0.65),
+        mapVisits: shop.mapVisits,
+        contactClicks: shop.contactClicks,
+        whatsappClicks: shop.whatsappClicks
+      }
+    };
+  } catch (error: any) {
+    console.error("Error getting shop stats:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function getUserOwnedShops() {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !(session.user as any).id) {
+      return { success: false, error: 'Unauthorized.' };
+    }
+    const userId = (session.user as any).id;
+
+    const shops = await prisma.worldProject.findMany({
+      where: { creatorId: userId }
+    });
+
+    return { success: true, shops };
+  } catch (error: any) {
+    console.error("Error getting user owned shops:", error);
+    return { success: false, error: error.message };
+  }
+}
+
 

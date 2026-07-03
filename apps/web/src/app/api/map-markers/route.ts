@@ -34,7 +34,13 @@ export async function GET() {
         photos: true,
         videos: true,
         offers: true,
-        socialLinks: true
+        socialLinks: true,
+        logoUrl: true,
+        logoThumbnailUrl: true,
+        isClosed: true,
+        isVerified: true,
+        isFeatured: true,
+        isMapFeatured: true
       }
     });
 
@@ -163,7 +169,13 @@ export async function GET() {
         photos: p.photos,
         videos: p.videos,
         offers: p.offers,
-        socialLinks: p.socialLinks
+        socialLinks: p.socialLinks,
+        logoUrl: p.logoUrl,
+        logoThumbnailUrl: p.logoThumbnailUrl,
+        isClosed: p.isClosed,
+        isVerified: p.isVerified,
+        isFeatured: p.isFeatured,
+        isMapFeatured: p.isMapFeatured
       })),
       ...listings.map((l: any) => ({
         id: l.id,

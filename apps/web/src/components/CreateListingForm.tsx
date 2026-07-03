@@ -2,12 +2,14 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Camera, MapPin, X, ArrowLeft, Image as ImageIcon, CheckCircle2, Search, ShieldCheck } from 'lucide-react';
+import { Camera, MapPin, X, ArrowLeft, Image as ImageIcon, CheckCircle2, Search, ShieldCheck, ShoppingBag } from 'lucide-react';
 import { createListing, updateListing } from '@/actions/marketplace';
 import { getSidebarData } from '@/actions/user';
+import { getUserOwnedShops } from '@/actions/world';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 
 const CATEGORIES = [
@@ -65,13 +67,23 @@ export function CreateListingForm({ initialData, isEdit = false }: CreateListing
   const [isToleeModalOpen, setIsToleeModalOpen] = useState(false);
   const [targetStatus, setTargetStatus] = useState<'active' | 'draft'>('active');
 
-  // Fetch Tolees on mount
+  const [userShops, setUserShops] = useState<any[]>([]);
+  const [checkingShops, setCheckingShops] = useState(true);
+
+  // Fetch Tolees and check User Shops on mount
   useEffect(() => {
     getSidebarData().then(res => {
       if (res.success) {
         const allTolees = [...(res.managedTolees || []), ...(res.joinedTolees || [])];
         setJoinedTolees(allTolees);
       }
+    });
+
+    getUserOwnedShops().then(res => {
+      if (res.success && res.shops) {
+        setUserShops(res.shops);
+      }
+      setCheckingShops(false);
     });
   }, []);
 
@@ -185,6 +197,44 @@ export function CreateListingForm({ initialData, isEdit = false }: CreateListing
   const filteredTolees = joinedTolees.filter(t => 
     t.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  if (checkingShops) {
+    return (
+      <div className="min-h-screen bg-gray-100 dark:bg-zinc-950 pt-20 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500"></div>
+      </div>
+    );
+  }
+
+  if (!isEdit && userShops.length === 0) {
+    return (
+      <div className="min-h-screen bg-gray-100 dark:bg-zinc-950 pt-24 pb-12 px-4 flex items-center justify-center font-sans">
+        <div className="max-w-md w-full bg-white dark:bg-[#18181b] border border-gray-250 dark:border-zinc-800 rounded-3xl p-8 text-center shadow-xl">
+          <div className="w-16 h-16 bg-cyan-50 dark:bg-cyan-950/30 rounded-full flex items-center justify-center mx-auto mb-6 border border-cyan-100 dark:border-cyan-900/30">
+            <ShoppingBag className="w-8 h-8 text-cyan-500" />
+          </div>
+          <h2 className="text-2xl font-black text-gray-900 dark:text-white mb-3">Shop Needed</h2>
+          <p className="text-gray-500 dark:text-zinc-400 text-sm mb-8 leading-relaxed">
+            Before listing products in the Marketplace, you must create your shop. All listings must belong to a verified business shop.
+          </p>
+          <div className="space-y-3">
+            <Link href="/map">
+              <Button className="w-full bg-cyan-500 hover:bg-cyan-600 text-black font-black py-3 rounded-2xl shadow-lg shadow-cyan-500/10 active:scale-95 transition-all">
+                Create Shop 🏪
+              </Button>
+            </Link>
+            <Button 
+              variant="ghost" 
+              onClick={() => router.push('/marketplace')} 
+              className="w-full text-zinc-500 hover:text-zinc-650 font-bold"
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-[#121212] pt-20 flex flex-col md:flex-row">

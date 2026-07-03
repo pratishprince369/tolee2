@@ -15,6 +15,16 @@ export async function getListings() {
       },
       orderBy: { createdAt: 'desc' },
       include: {
+        shop: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            logoUrl: true,
+            logoThumbnailUrl: true,
+            isVerified: true
+          }
+        },
         seller: {
           select: {
             id: true,
@@ -48,6 +58,21 @@ export async function getListingById(id: string) {
     const listing = await prisma.listing.findUnique({
       where: { id },
       include: {
+        shop: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            logoUrl: true,
+            logoThumbnailUrl: true,
+            isVerified: true,
+            openingHours: true,
+            contactNumber: true,
+            whatsapp: true,
+            website: true,
+            locationText: true
+          }
+        },
         seller: {
           select: {
             id: true,
@@ -187,6 +212,15 @@ export async function createListing(data: {
       }
     }
 
+    // Fetch the seller's shop
+    const sellerShop = await prisma.worldProject.findFirst({
+      where: { creatorId: userId }
+    });
+
+    if (!sellerShop) {
+      return { success: false, error: 'You must own a shop before listing products.' };
+    }
+
     const listing = await prisma.listing.create({
       data: {
         title: safeTitle,
@@ -206,6 +240,7 @@ export async function createListing(data: {
         contactEmail: safeContactEmail,
         attributes: data.attributes ? data.attributes : undefined,
         sellerId: userId,
+        shopId: sellerShop.id,
         status: data.status || 'active',
         tolees: {
           create: data.selectedToleeIds.map(toleeId => ({
@@ -248,6 +283,30 @@ export async function createListing(data: {
             userId: memberId,
             type: 'marketplace',
             message: messageText.length > 250 ? messageText.substring(0, 247) + '...' : messageText,
+            link: `/marketplace/listing/${listing.id}`
+          })));
+        }
+
+        // Notify shop followers
+        const shopFollowers = await prisma.shopFollower.findMany({
+          where: {
+            shopId: sellerShop.id,
+            userId: { not: userId }
+          },
+          select: {
+            userId: true
+          }
+        });
+
+        if (shopFollowers.length > 0) {
+          const followerIds = shopFollowers.map(f => f.userId);
+          const shopName = sellerShop.name;
+          const followerMessage = `🏪 ${shopName} has posted a new product: "${safeTitle}" for ₹${data.price}!`;
+
+          await createSystemNotificationsMany(followerIds.map(followerId => ({
+            userId: followerId,
+            type: 'marketplace',
+            message: followerMessage,
             link: `/marketplace/listing/${listing.id}`
           })));
         }
