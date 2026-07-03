@@ -1431,8 +1431,44 @@ export default function InteractiveMapPage() {
       )}
 
       {/* Sidebar - Hotspots & Discovery List (Light Glassmorphic) */}
-      <div className="absolute left-4 top-20 bottom-4 w-80 bg-white/85 border border-zinc-200/60 backdrop-blur-xl rounded-2xl p-4 flex flex-col gap-4 z-10 shadow-xl pointer-events-auto overflow-hidden hidden md:flex">
+      <div className="absolute left-4 top-20 bottom-4 w-80 bg-white/85 border border-zinc-200/60 backdrop-blur-xl rounded-2xl p-4 flex flex-col gap-4 z-10 shadow-xl pointer-events-auto overflow-hidden hidden md:flex text-left">
         
+        {/* Desktop Create Options Dropdown */}
+        {session?.user && (
+          <div className="relative border-b border-zinc-200/60 pb-3 shrink-0">
+            <button
+              onClick={() => setIsCreateMenuOpen(!isCreateMenuOpen)}
+              className="w-full py-2.5 bg-gradient-to-r from-emerald-600 to-teal-500 text-white rounded-xl font-black text-xs uppercase tracking-wider transition-all shadow-md active:scale-98 flex items-center justify-center gap-1.5 border border-white/10"
+            >
+              <Plus className={`w-4 h-4 transition-transform duration-200 ${isCreateMenuOpen ? 'rotate-45' : ''}`} />
+              Create / Publish
+            </button>
+
+            {isCreateMenuOpen && (
+              <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-2xl z-50 py-2 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+                <button
+                  onClick={() => { enterPlacementMode('group'); setIsCreateMenuOpen(false); }}
+                  className="w-full px-4 py-2.5 text-left text-xs font-bold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900 flex items-center gap-2"
+                >
+                  <span>👥</span> Create Group (Tolee)
+                </button>
+                <button
+                  onClick={() => { enterPlacementMode('event'); setIsCreateMenuOpen(false); }}
+                  className="w-full px-4 py-2.5 text-left text-xs font-bold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900 flex items-center gap-2"
+                >
+                  <span>📅</span> Create Local Event
+                </button>
+                <button
+                  onClick={() => { enterPlacementMode('shop'); setIsCreateMenuOpen(false); }}
+                  className="w-full px-4 py-2.5 text-left text-xs font-bold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900 flex items-center gap-2"
+                >
+                  <span>🏪</span> Create Shop / Store
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Category Filters */}
         <div className="flex flex-wrap gap-1 border-b border-zinc-200/60 pb-3">
           {[
