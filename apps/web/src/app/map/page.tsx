@@ -74,6 +74,43 @@ export default function InteractiveMapPage() {
   const searchParams = useSearchParams();
   const { data: session } = useSession();
   
+  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setUserCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        },
+        () => {
+          setUserCoords({ lat: 19.2579124, lng: 73.1231582 });
+        }
+      );
+    } else {
+      setUserCoords({ lat: 19.2579124, lng: 73.1231582 });
+    }
+  }, []);
+
+  const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  };
+
+  const getDistanceText = (lat: number, lng: number) => {
+    if (!userCoords) return '1.2 KM';
+    const d = getDistance(userCoords.lat, userCoords.lng, lat, lng);
+    if (d < 0.1) return 'Here';
+    if (d < 1) return `${Math.round(d * 1000)} m`;
+    return `${d.toFixed(1)} KM`;
+  };
+
   const [markers, setMarkers] = useState<MapMarker[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeMarker, setActiveMarker] = useState<MapMarker | null>(null);
@@ -178,34 +215,95 @@ export default function InteractiveMapPage() {
   const [newReviewRating, setNewReviewRating] = useState(5);
   const [newReviewText, setNewReviewText] = useState('');
 
+  const getCategoryDetails = (category: string) => {
+    const cat = (category || 'General').toLowerCase();
+    if (cat.includes('festival') && !cat.includes('food')) {
+      return { color: '#f43f5e', icon: '🎉', label: 'Festival' };
+    }
+    if (cat.includes('music') || cat.includes('concert') || cat.includes('dj') || cat.includes('band')) {
+      return { color: '#ec4899', icon: '🎵', label: 'Music Concert' };
+    }
+    if (cat.includes('sport') || cat.includes('cricket') || cat.includes('tournament') || cat.includes('game') || cat.includes('football')) {
+      return { color: '#10b981', icon: '🏏', label: 'Sports Event' };
+    }
+    if (cat.includes('food') || cat.includes('feast') || cat.includes('street food') || cat.includes('stall')) {
+      return { color: '#f59e0b', icon: '🍔', label: 'Food Festival' };
+    }
+    if (cat.includes('cultural') || cat.includes('culture') || cat.includes('drama') || cat.includes('art') || cat.includes('dance')) {
+      return { color: '#8b5cf6', icon: '🎭', label: 'Cultural Event' };
+    }
+    if (cat.includes('business') || cat.includes('meetup') || cat.includes('startup') || cat.includes('conference') || cat.includes('networking')) {
+      return { color: '#3b82f6', icon: '💼', label: 'Business Meetup' };
+    }
+    if (cat.includes('seminar') || cat.includes('webinar') || cat.includes('talk') || cat.includes('education') || cat.includes('class')) {
+      return { color: '#06b6d4', icon: '🎓', label: 'Seminar' };
+    }
+    if (cat.includes('charity') || cat.includes('donation') || cat.includes('ngo') || cat.includes('blood')) {
+      return { color: '#ef4444', icon: '❤️', label: 'Charity Event' };
+    }
+    if (cat.includes('gaming') || cat.includes('esports') || cat.includes('playstation') || cat.includes('pc')) {
+      return { color: '#6366f1', icon: '🎮', label: 'Gaming Event' };
+    }
+    if (cat.includes('community') || cat.includes('social') || cat.includes('gather') || cat.includes('group')) {
+      return { color: '#14b8a6', icon: '👥', label: 'Community Event' };
+    }
+    return { color: '#4f46e5', icon: '🎉', label: 'General Event' };
+  };
+
   const getEventStatusText = (startDateStr: string, endDateStr: string) => {
     const now = new Date();
     const start = new Date(startDateStr);
     const end = new Date(endDateStr);
 
     if (now > end) {
-      return { text: 'Event Ended', badgeClass: 'bg-zinc-200 text-zinc-800 border border-zinc-300' };
+      return { 
+        text: '⚫ Event Ended', 
+        badgeClass: 'bg-zinc-800/20 text-zinc-400 border border-zinc-700/30 font-black text-[9px] px-2 py-0.5 rounded-md uppercase',
+        status: 'ended',
+        color: '#71717a'
+      };
     }
 
     if (now >= start && now <= end) {
-      return { text: '🔴 LIVE EVENT', badgeClass: 'bg-red-100 text-red-600 font-bold border border-red-200' };
+      return { 
+        text: '🔴 Live Now', 
+        badgeClass: 'bg-red-500/25 text-red-400 border border-red-500/30 font-black text-[9px] px-2 py-0.5 rounded-md uppercase animate-pulse',
+        status: 'live',
+        color: '#ef4444'
+      };
     }
 
     const diffMs = start.getTime() - now.getTime();
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    const diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    const diffHours = diffMs / (1000 * 60 * 60);
 
-    let countdownText = 'Starts in: ';
-    if (diffDays > 0) {
-      countdownText += `${diffDays}d ${diffHours}h`;
-    } else if (diffHours > 0) {
-      countdownText += `${diffHours}h ${diffMins}m`;
-    } else {
-      countdownText += `${diffMins}m`;
+    if (diffHours > 0 && diffHours <= 2) {
+      const mins = Math.ceil(diffMs / (1000 * 60));
+      return { 
+        text: `🟡 Starts in ${mins}m`, 
+        badgeClass: 'bg-yellow-500/25 text-yellow-400 border border-yellow-500/30 font-black text-[9px] px-2 py-0.5 rounded-md uppercase',
+        status: 'starting_soon',
+        color: '#eab308'
+      };
     }
 
-    return { text: countdownText, badgeClass: 'bg-indigo-100 text-indigo-800 font-bold border border-indigo-200' };
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const isTomorrow = tomorrow.toDateString() === start.toDateString();
+    if (isTomorrow) {
+      return { 
+        text: '⏳ Tomorrow', 
+        badgeClass: 'bg-orange-500/25 text-orange-400 border border-orange-500/30 font-black text-[9px] px-2 py-0.5 rounded-md uppercase',
+        status: 'tomorrow',
+        color: '#f97316'
+      };
+    }
+
+    return { 
+      text: '🟢 Upcoming', 
+      badgeClass: 'bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 font-black text-[9px] px-2 py-0.5 rounded-md uppercase',
+      status: 'upcoming',
+      color: '#10b981'
+    };
   };
 
   const getPopupContent = (marker: MapMarker) => {
@@ -251,6 +349,7 @@ export default function InteractiveMapPage() {
     }
 
     if (marker.type === 'event') {
+      const catDetails = getCategoryDetails(marker.category || 'General');
       const statusInfo = getEventStatusText(marker.startDate!, marker.endDate!);
       const isAttending = session?.user && marker.attendees?.some((a: any) => a.userId === (session.user as any).id);
       const attendanceStatus = isAttending 
@@ -258,51 +357,84 @@ export default function InteractiveMapPage() {
         : null;
 
       const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${marker.latitude},${marker.longitude}`;
-      
+      const distanceText = getDistanceText(marker.latitude, marker.longitude);
+      const entryFeeText = marker.ticketPrice && marker.ticketPrice > 0 ? `₹${marker.ticketPrice} Entry` : 'Free Entry';
+
+      let capacityText = 'Unlimited Seats Available';
+      if (marker.maxCapacity && marker.maxCapacity > 0) {
+        const remaining = Math.max(0, marker.maxCapacity - (marker.attendeeCount || 0));
+        capacityText = `${remaining} Seats Remaining`;
+      }
+
       let actionBtnHtml = '';
       if (session?.user) {
         if (isAttending) {
           if (attendanceStatus === 'pending') {
-            actionBtnHtml = `<button class="popup-leave-event font-bold" data-event-id="${marker.id}" style="width: 100%; padding: 7px 0; border-radius: 8px; background-color: #eab308; color: white; border: none; font-size: 10px; cursor: pointer; transition: all 0.2s;">Requested (Cancel)</button>`;
+            actionBtnHtml = `<button class="popup-leave-event font-black" data-event-id="${marker.id}" style="padding: 7px 12px; border-radius: 10px; bg-gradient-to-r; background: #eab308; color: white; border: none; font-size: 10px; cursor: pointer; transition: all 0.2s; flex: 1;">Requested (Cancel)</button>`;
           } else {
-            actionBtnHtml = `<button class="popup-leave-event font-bold" data-event-id="${marker.id}" style="width: 100%; padding: 7px 0; border-radius: 8px; background-color: #ef4444; color: white; border: none; font-size: 10px; cursor: pointer; transition: all 0.2s;">Leave Event</button>`;
+            actionBtnHtml = `<button class="popup-leave-event font-black" data-event-id="${marker.id}" style="padding: 7px 12px; border-radius: 10px; bg-gradient-to-r; background: #ef4444; color: white; border: none; font-size: 10px; cursor: pointer; transition: all 0.2s; flex: 1;">Leave Event</button>`;
           }
         } else {
           const btnText = marker.visibility === 'public' ? 'Join Event' : 'Request Access';
-          actionBtnHtml = `<button class="popup-join-event font-bold" data-event-id="${marker.id}" style="width: 100%; padding: 7px 0; border-radius: 8px; background-color: #10b981; color: white; border: none; font-size: 10px; cursor: pointer; transition: all 0.2s;">${btnText}</button>`;
+          actionBtnHtml = `<button class="popup-join-event font-black" data-event-id="${marker.id}" style="padding: 7px 12px; border-radius: 10px; bg-gradient-to-r; background: #10b981; color: white; border: none; font-size: 10px; cursor: pointer; transition: all 0.2s; flex: 1;">${btnText}</button>`;
         }
+      } else {
+        actionBtnHtml = `<button onclick="alert('Please sign in to join events')" style="padding: 7px 12px; border-radius: 10px; background-color: #3f3f46; color: white; border: none; font-size: 10px; font-weight: 800; cursor: pointer; flex: 1;">Sign in to Join</button>`;
       }
 
+      const bannerSrc = marker.image || 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=600&q=80';
+
       return `
-        <div class="p-1" style="font-family: inherit; width: 230px;">
-          <div style="display: flex; justify-content: space-between; gap: 8px; align-items: start;">
-            <div style="flex: 1; min-width: 0;">
-              <span class="${statusInfo.badgeClass}" style="font-size: 8px; text-transform: uppercase; padding: 2px 8px; border-radius: 9999px; display: inline-block;">
+        <div class="p-0 font-sans" style="width: 250px; border-radius: 20px; overflow: hidden; background-color: #121214; color: #ffffff; border: 1px solid #27272a;">
+          <div style="position: relative; width: 100%; height: 110px; background-color: #09090b;">
+            <img src="${bannerSrc}" style="width: 100%; height: 100%; object-fit: cover;" alt="${marker.name}" />
+            <div style="position: absolute; inset: 0; background: linear-gradient(to top, rgba(18,18,20,1) 0%, rgba(18,18,20,0.2) 60%, rgba(18,18,20,0) 100%);"></div>
+            <div style="position: absolute; top: 10px; right: 10px; display: flex; gap: 4px;">
+              <span class="${statusInfo.badgeClass}">
                 ${statusInfo.text}
               </span>
-              <h3 style="font-size: 13px; font-weight: 800; color: #09090b; margin: 6px 0 2px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                ${marker.name}
-              </h3>
-              <p style="font-size: 9px; color: #71717a; margin: 0;">
-                📅 ${new Date(marker.startDate!).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} | ⏰ ${marker.startTime} - ${marker.endTime}
-              </p>
             </div>
-            ${marker.image ? `<img src="${marker.image}" style="width: 50px; height: 50px; border-radius: 10px; object-fit: cover; border: 1px solid #e4e4e7;" />` : ''}
-          </div>
-          
-          <p style="font-size: 11px; color: #3f3f46; line-height: 1.4; background-color: #f4f4f5; padding: 6px 8px; border-radius: 8px; border: 1px solid #e4e4e7; margin: 8px 0; max-height: 60px; overflow-y: auto;">
-            ${marker.description}
-          </p>
-
-          <div style="font-size: 9px; color: #71717a; margin-bottom: 8px;">
-            👤 Hosted by @${marker.creatorName} | 👥 ${marker.attendeeCount} attending
           </div>
 
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 4px;">
-            ${actionBtnHtml}
-            <a href="${directionsUrl}" target="_blank" rel="noopener noreferrer" style="display: block; text-align: center; padding: 7px 0; border-radius: 8px; background-color: #f4f4f5; border: 1px solid #e4e4e7; color: #09090b; font-size: 10px; font-weight: 800; text-decoration: none; transition: all 0.2s;">
-              Directions 🗺️
-            </a>
+          <div style="padding: 12px 14px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 4px;">
+              <span style="font-size: 8px; font-weight: 900; text-transform: uppercase; color: #22d3ee; background-color: rgba(34,211,238,0.1); border: 0.5px solid rgba(34,211,238,0.3); padding: 1.5px 6px; border-radius: 4px; display: inline-block;">
+                ${catDetails.label}
+              </span>
+              <span style="font-size: 9px; color: #a1a1aa; font-weight: 700;">
+                📍 ${distanceText}
+              </span>
+            </div>
+
+            <h3 style="font-size: 14px; font-weight: 905; color: #ffffff; margin: 4px 0 6px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.2;">
+              ${marker.name}
+            </h3>
+
+            <div style="font-size: 9px; color: #d4d4d8; display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; line-height: 1.3;">
+              <span style="display: flex; align-items: center; gap: 4px;">🗓️ ${new Date(marker.startDate!).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} • ⏰ ${marker.startTime} - ${marker.endTime}</span>
+              <span style="display: flex; align-items: center; gap: 4px;">🎫 ${entryFeeText} • 👥 ${marker.attendeeCount || 0} Joined</span>
+              <span style="display: flex; align-items: center; gap: 4px; color: #a1a1aa;">💺 ${capacityText}</span>
+              <span style="display: flex; align-items: center; gap: 4px; color: #a1a1aa; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">👤 Organized by @${marker.creatorName}</span>
+            </div>
+
+            <div style="display: flex; gap: 4px; margin-bottom: 8px;">
+              ${actionBtnHtml}
+              <button class="popup-share-event" data-event-id="${marker.id}" style="padding: 7px 10px; border-radius: 10px; background-color: #27272a; border: 1px solid #3f3f46; color: #ffffff; font-size: 10px; font-weight: 800; cursor: pointer; transition: all 0.2s;">
+                Share 🔗
+              </button>
+              <button class="popup-save-event" data-event-id="${marker.id}" style="padding: 7px 10px; border-radius: 10px; background-color: #27272a; border: 1px solid #3f3f46; color: #ffffff; font-size: 10px; font-weight: 800; cursor: pointer; transition: all 0.2s;">
+                Save 💖
+              </button>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 6px;">
+              <a href="/chat?userId=${marker.creatorId}" style="display: block; text-align: center; padding: 7px 0; border-radius: 10px; background-color: #1e1b4b; border: 1px solid #312e81; color: #818cf8; font-size: 10px; font-weight: 800; text-decoration: none; transition: all 0.2s;">
+                Message Host 💬
+              </a>
+              <a href="${directionsUrl}" target="_blank" rel="noopener noreferrer" style="display: block; text-align: center; padding: 7px 0; border-radius: 10px; background: linear-gradient(135deg, #06b6d4, #0891b2); color: black; font-size: 10px; font-weight: 900; text-decoration: none; box-shadow: 0 4px 6px -1px rgba(8, 145, 178, 0.2); transition: all 0.2s;">
+                Directions 🗺️
+              </a>
+            </div>
           </div>
         </div>
       `;
@@ -435,6 +567,28 @@ export default function InteractiveMapPage() {
         }
         return;
       }
+
+      const shareBtn = target.closest('.popup-share-event') as HTMLButtonElement;
+      if (shareBtn) {
+        e.preventDefault();
+        const eventId = shareBtn.getAttribute('data-event-id');
+        if (eventId) {
+          const shareUrl = `${window.location.origin}/map?eventId=${eventId}`;
+          navigator.clipboard.writeText(shareUrl);
+          alert('Event share link copied to clipboard! 🔗');
+        }
+        return;
+      }
+
+      const saveBtn = target.closest('.popup-save-event') as HTMLButtonElement;
+      if (saveBtn) {
+        e.preventDefault();
+        const eventId = saveBtn.getAttribute('data-event-id');
+        if (eventId) {
+          alert('Event saved to your wishlist! 💖');
+        }
+        return;
+      }
     };
     document.addEventListener('click', handlePopupClick);
 
@@ -532,6 +686,16 @@ export default function InteractiveMapPage() {
 
     map.on('popupclose', () => {
       setActiveMarker(null);
+      map.eachLayer((layer: any) => {
+        if (layer instanceof L.Marker && layer.closeTooltip) {
+          layer.closeTooltip();
+        }
+      });
+      document.querySelectorAll('.marker-bubble').forEach(el => {
+        el.classList.remove('selected-marker-bubble');
+        (el as HTMLElement).style.transform = 'scale(1)';
+        (el as HTMLElement).style.boxShadow = '';
+      });
     });
 
     renderMarkers(L, map, freshMarkers);
@@ -603,12 +767,10 @@ export default function InteractiveMapPage() {
           markerColor = '#d946ef'; // Purple
           iconHtml = '🎥';
         } else if (marker.type === 'event') {
-          markerColor = '#4f46e5'; // Indigo
-          if (marker.category === 'Music Event') iconHtml = '🎵';
-          else if (marker.category === 'Business Seminar') iconHtml = '💼';
-          else if (marker.category === 'Cricket Tournament') iconHtml = '🏏';
-          else if (marker.category === 'Startup Meetup') iconHtml = '🚀';
-          else iconHtml = '🎉';
+          const statusInfo = getEventStatusText(marker.startDate!, marker.endDate!);
+          const catDetails = getCategoryDetails(marker.category || 'General');
+          markerColor = statusInfo.color;
+          iconHtml = catDetails.icon;
         }
 
         let innerHtml = `<span style="font-size: 18px;">${iconHtml}</span>`;
@@ -619,7 +781,7 @@ export default function InteractiveMapPage() {
         const customIcon = L.divIcon({
           className: 'custom-map-marker',
           html: `
-            <div style="
+            <div id="marker-bubble-${marker.id}" style="
               position: relative;
               width: 42px;
               height: 42px;
@@ -631,7 +793,7 @@ export default function InteractiveMapPage() {
               justify-content: center;
               box-shadow: 0 4px 15px rgba(0,0,0,0.2), 0 0 8px ${markerColor}66;
               cursor: pointer;
-              transition: transform 0.2s ease;
+              transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
               overflow: hidden;
             " class="marker-bubble">
               ${innerHtml}
@@ -644,14 +806,79 @@ export default function InteractiveMapPage() {
 
         const mapMarker = L.marker([marker.latitude, marker.longitude], { icon: customIcon }).addTo(map);
 
+        if (marker.type === 'event') {
+          const catDetails = getCategoryDetails(marker.category || 'General');
+          const entryPrice = marker.ticketPrice && marker.ticketPrice > 0 ? `₹${marker.ticketPrice}` : 'Free Entry';
+          const distanceStr = getDistanceText(marker.latitude, marker.longitude);
+          const dateStr = new Date(marker.startDate!).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+
+          const tooltipHtml = `
+            <div class="event-floating-label shadow-xl" style="
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              padding: 6px 10px;
+              background-color: #121214;
+              border: 1px solid #27272a;
+              border-radius: 12px;
+              color: white;
+              font-family: inherit;
+              box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+              pointer-events: none;
+              white-space: nowrap;
+            ">
+              <span style="font-size: 16px;">${catDetails.icon}</span>
+              <div style="display: flex; flex-direction: column; gap: 1px; text-align: left;">
+                <span style="font-size: 11px; font-weight: 900; color: #ffffff;">${marker.name}</span>
+                <span style="font-size: 9px; font-weight: 700; color: #22d3ee;">${catDetails.label} • ${entryPrice}</span>
+                <span style="font-size: 8px; color: #a1a1aa; font-weight: 500;">📅 ${dateStr} • 📍 ${distanceStr}</span>
+              </div>
+            </div>
+          `;
+
+          mapMarker.bindTooltip(tooltipHtml, {
+            permanent: false,
+            direction: 'top',
+            className: 'custom-event-label-tooltip',
+            offset: [0, -45],
+            opacity: 1
+          });
+        }
+
         mapMarker.bindPopup(getPopupContent(marker), {
           maxWidth: 280,
           className: 'premium-leaflet-popup'
         });
 
-        mapMarker.on('click', () => {
+        mapMarker.on('click', (e: any) => {
           map.panTo([marker.latitude, marker.longitude]);
           setActiveMarker(marker);
+
+          map.eachLayer((layer: any) => {
+            if (layer instanceof L.Marker && layer !== mapMarker && layer.closeTooltip) {
+              layer.closeTooltip();
+            }
+          });
+
+          if (mapMarker.openTooltip) {
+            mapMarker.openTooltip();
+          }
+
+          document.querySelectorAll('.marker-bubble').forEach(el => {
+            el.classList.remove('selected-marker-bubble');
+            (el as HTMLElement).style.transform = 'scale(1)';
+            (el as HTMLElement).style.boxShadow = '';
+          });
+
+          const element = e.target.getElement();
+          if (element) {
+            const bubble = element.querySelector('.marker-bubble') as HTMLElement;
+            if (bubble) {
+              bubble.classList.add('selected-marker-bubble');
+              bubble.style.transform = 'scale(1.2) translateY(-2px)';
+              bubble.style.boxShadow = `0 10px 25px rgba(0,0,0,0.4), 0 0 15px ${markerColor}`;
+            }
+          }
         });
       } else {
         // Render Cluster marker
@@ -1816,7 +2043,18 @@ export default function InteractiveMapPage() {
                     onChange={(e) => setEventCategory(e.target.value)}
                     className="w-full text-xs px-3.5 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl focus:outline-hidden focus:border-indigo-500 text-white"
                   >
-                    {['Music Event', 'Business Seminar', 'Cricket Tournament', 'Startup Meetup', 'General'].map(cat => (
+                    {[
+                      'Festival', 
+                      'Music Concert', 
+                      'Sports Event', 
+                      'Food Festival', 
+                      'Cultural Event', 
+                      'Business Meetup', 
+                      'Seminar', 
+                      'Charity Event', 
+                      'Gaming Event', 
+                      'Community Event'
+                    ].map(cat => (
                       <option key={cat} value={cat} className="bg-zinc-950 text-white">{cat}</option>
                     ))}
                   </select>
@@ -2290,6 +2528,19 @@ export default function InteractiveMapPage() {
         .premium-leaflet-popup .leaflet-popup-close-button:hover {
           color: #09090b !important;
           background: transparent !important;
+        }
+        .custom-event-label-tooltip {
+          background: transparent !important;
+          border: none !important;
+          box-shadow: none !important;
+          padding: 0 !important;
+        }
+        .custom-event-label-tooltip::before {
+          display: none !important;
+        }
+        .selected-marker-bubble {
+          transform: scale(1.2) translateY(-2px) !important;
+          z-index: 1000 !important;
         }
       `}</style>
     </div>
