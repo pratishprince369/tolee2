@@ -845,6 +845,45 @@ export default function InteractiveMapPage() {
           });
         }
 
+        const isShop = !['marketplace', 'group', 'meetup', 'live_chat', 'trending_reel', 'event'].includes(marker.type);
+        if (isShop) {
+          const offerText = marker.offers ? `🔥 Offer: ${marker.offers}` : '🏪 Business Listing';
+          const distanceStr = getDistanceText(marker.latitude, marker.longitude);
+          const statusText = marker.isClosed ? '🔴 Closed' : '🟢 Open Now';
+
+          const shopTooltipHtml = `
+            <div class="shop-floating-label shadow-xl" style="
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              padding: 6px 10px;
+              background-color: #0c0a09;
+              border: 1px solid #292524;
+              border-radius: 12px;
+              color: white;
+              font-family: inherit;
+              box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+              pointer-events: none;
+              white-space: nowrap;
+            ">
+              <span style="font-size: 16px;">🏪</span>
+              <div style="display: flex; flex-direction: column; gap: 1px; text-align: left;">
+                <span style="font-size: 11px; font-weight: 900; color: #ffffff;">${marker.name}</span>
+                <span style="font-size: 9px; font-weight: 700; color: #22d3ee;">${offerText}</span>
+                <span style="font-size: 8px; color: #a8a29e; font-weight: 500;">📍 ${distanceStr} • ${statusText}</span>
+              </div>
+            </div>
+          `;
+
+          mapMarker.bindTooltip(shopTooltipHtml, {
+            permanent: false,
+            direction: 'top',
+            className: 'custom-shop-label-tooltip',
+            offset: [0, -45],
+            opacity: 1
+          });
+        }
+
         mapMarker.bindPopup(getPopupContent(marker), {
           maxWidth: 280,
           className: 'premium-leaflet-popup'
@@ -2536,6 +2575,15 @@ export default function InteractiveMapPage() {
           padding: 0 !important;
         }
         .custom-event-label-tooltip::before {
+          display: none !important;
+        }
+        .custom-shop-label-tooltip {
+          background: transparent !important;
+          border: none !important;
+          box-shadow: none !important;
+          padding: 0 !important;
+        }
+        .custom-shop-label-tooltip::before {
           display: none !important;
         }
         .selected-marker-bubble {
