@@ -11,7 +11,7 @@ import {
   Star, UserPlus, Send, DollarSign, Tv 
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { createTolee } from '@/actions/tolee';
+import { createTolee, getUserOwnedTolees } from '@/actions/tolee';
 import { createEventAction, joinEventAction, leaveEventAction } from '@/actions/event';
 import { createWorldProject } from '@/actions/world';
 
@@ -148,7 +148,18 @@ export default function InteractiveMapPage() {
   const [shopOffers, setShopOffers] = useState('');
   const [shopSocialLinks, setShopSocialLinks] = useState('');
   const [shopToleeIds, setShopToleeIds] = useState<string[]>([]);
+  const [userTolees, setUserTolees] = useState<any[]>([]);
   const [creatingShop, setCreatingShop] = useState(false);
+
+  useEffect(() => {
+    if (session?.user) {
+      getUserOwnedTolees().then((res: any) => {
+        if (res?.success && res?.tolees) {
+          setUserTolees(res.tolees);
+        }
+      });
+    }
+  }, [session]);
 
   // Interactive Reviews Feed State (local mock persistent review logs)
   const [localReviews, setLocalReviews] = useState<Record<string, any[]>>({
@@ -2042,6 +2053,50 @@ export default function InteractiveMapPage() {
                     className="w-full text-xs px-3.5 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl focus:outline-hidden focus:border-cyan-500"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-black text-zinc-400 uppercase tracking-wider block mb-1">
+                  Select Tolee Group (Associate at least one)
+                </label>
+                {userTolees.length === 0 ? (
+                  <div className="p-3 bg-red-950/20 border border-red-900/50 rounded-xl text-center">
+                    <p className="text-[11px] text-red-400 font-bold">You don't own any Tolee groups yet.</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsShopDialogOpen(false);
+                        setIsGroupDialogOpen(true);
+                      }}
+                      className="mt-2 px-3 py-1 bg-red-800 hover:bg-red-750 text-white font-black text-[10px] uppercase rounded-lg"
+                    >
+                      Create a Tolee Group First
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5 max-h-32 overflow-y-auto border border-zinc-800 p-2.5 rounded-xl bg-zinc-900/50">
+                    {userTolees.map((tg: any) => {
+                      const checked = shopToleeIds.includes(tg.id);
+                      return (
+                        <label key={tg.id} className="flex items-center gap-2 text-xs font-bold text-zinc-300 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => {
+                              if (checked) {
+                                setShopToleeIds(shopToleeIds.filter(id => id !== tg.id));
+                              } else {
+                                setShopToleeIds([...shopToleeIds, tg.id]);
+                              }
+                            }}
+                            className="w-3.5 h-3.5 accent-cyan-500 rounded border-zinc-700 bg-zinc-800"
+                          />
+                          <span>{tg.name}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
