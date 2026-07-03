@@ -714,11 +714,34 @@ export default function InteractiveMapPage() {
 
   const renderMarkers = (L: any, map: any, markerList: MapMarker[]) => {
     const zoom = map.getZoom();
-    const threshold = 0.04 / Math.pow(2, zoom - 13);
+    const threshold = 0.008 / Math.pow(2, zoom - 13);
+
+    // Tiny coordinate offset helper to prevent exact overlapping markers from masking each other
+    const usedCoordinates = new Set<string>();
+    const adjustedMarkerList = markerList.map(marker => {
+      let lat = marker.latitude;
+      let lng = marker.longitude;
+      let coordKey = `${lat.toFixed(5)},${lng.toFixed(5)}`;
+      let attempts = 0;
+      
+      while (usedCoordinates.has(coordKey) && attempts < 10) {
+        lat += (Math.random() - 0.5) * 0.00035;
+        lng += (Math.random() - 0.5) * 0.00035;
+        coordKey = `${lat.toFixed(5)},${lng.toFixed(5)}`;
+        attempts++;
+      }
+      
+      usedCoordinates.add(coordKey);
+      return {
+        ...marker,
+        latitude: lat,
+        longitude: lng
+      };
+    });
 
     const clusters: { center: [number, number]; markers: MapMarker[] }[] = [];
 
-    markerList.forEach(marker => {
+    adjustedMarkerList.forEach(marker => {
       let addedToCluster = false;
       for (const cluster of clusters) {
         const dist = Math.sqrt(
