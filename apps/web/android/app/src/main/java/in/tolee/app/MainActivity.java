@@ -23,6 +23,7 @@ import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -275,6 +276,40 @@ public class MainActivity extends BridgeActivity {
                     view.loadDataWithBaseURL("https://tolee.in", offlinePage, "text/html", "UTF-8", null);
                 }
             }
+
+            @Override
+            public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+                Uri url = request.getUrl();
+                if (url != null && "local.tolee.in".equals(url.getHost())) {
+                    String path = url.getPath();
+                    String mediaUriStr = url.getQueryParameter("uri");
+                    
+                    if (mediaUriStr != null) {
+                        try {
+                            Uri mediaUri = Uri.parse(mediaUriStr);
+                            
+                            if ("/file".equals(path)) {
+                                String mimeType = getContentResolver().getType(mediaUri);
+                                if (mimeType == null) {
+                                    mimeType = "image/*";
+                                }
+                                java.io.InputStream stream = getContentResolver().openInputStream(mediaUri);
+                                return new WebResourceResponse(mimeType, "UTF-8", stream);
+                            } 
+                            
+                            else if ("/thumbnail".equals(path)) {
+                                java.io.InputStream stream = getMediaThumbnailStream(mediaUri);
+                                if (stream != null) {
+                                    return new WebResourceResponse("image/jpeg", "UTF-8", stream);
+                                }
+                            }
+                        } catch (Exception e) {
+                            Log.e(TAG, "Error serving local intercept request: " + url.toString(), e);
+                        }
+                    }
+                }
+                return super.shouldInterceptRequest(view, request);
+            }
         });
 
         webView.setWebChromeClient(new WebChromeClient() {
@@ -353,6 +388,70 @@ public class MainActivity extends BridgeActivity {
                 return true;
             }
         });
+    }
+
+    private java.io.InputStream getMediaThumbnailStream(Uri uri) {
+        try {
+            android.graphics.Bitmap bitmap = null;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                try {
+                    bitmap = getContentResolver().loadThumbnail(
+                        uri, 
+                        new android.util.Size(256, 256), 
+                        null
+                    );
+                } catch (Exception e) {
+                    Log.w(TAG, "loadThumbnail failed, trying alternative for " + uri, e);
+                }
+            }
+            
+            if (bitmap == null) {
+                String path = getRealPathFromURI(uri);
+                if (path != null) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        bitmap = android.media.ThumbnailUtils.createVideoThumbnail(
+                            new java.io.File(path), 
+                            new android.util.Size(256, 256), 
+                            null
+                        );
+                    } else {
+                        bitmap = android.media.ThumbnailUtils.createVideoThumbnail(
+                            path, 
+                            MediaStore.Video.Thumbnails.MINI_KIND
+                        );
+                    }
+                }
+            }
+            
+            if (bitmap != null) {
+                java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
+                bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 75, bos);
+                byte[] bitmapData = bos.toByteArray();
+                return new java.io.ByteArrayInputStream(bitmapData);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error generating thumbnail for " + uri, e);
+        }
+        return null;
+    }
+
+    private String getRealPathFromURI(Uri contentUri) {
+        String[] proj = { MediaStore.Video.Media.DATA };
+        Cursor cursor = null;
+        try {
+            cursor = getContentResolver().query(contentUri, proj, null, null, null);
+            if (cursor != null && cursor.moveToFirst()) {
+                int column_index = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DATA);
+                return cursor.getString(column_index);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Could not resolve real path from URI " + contentUri, e);
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
+        return null;
     }
 
     private void updateSocketUrl(String webUrl) {
@@ -610,7 +709,11 @@ public class MainActivity extends BridgeActivity {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 boolean hasImages = ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED;
                 boolean hasVideos = ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.READ_MEDIA_VIDEO) == PackageManager.PERMISSION_GRANTED;
-                return hasImages && hasVideos;
+                boolean hasPartial = false;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    hasPartial = ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED) == PackageManager.PERMISSION_GRANTED;
+                }
+                return hasImages || hasVideos || hasPartial;
             } else {
                 return ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
             }
@@ -620,7 +723,11 @@ public class MainActivity extends BridgeActivity {
         public void requestMediaPermissions() {
             runOnUiThread(() -> {
                 List<String> permissions = new ArrayList<>();
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    permissions.add(Manifest.permission.READ_MEDIA_IMAGES);
+                    permissions.add(Manifest.permission.READ_MEDIA_VIDEO);
+                    permissions.add(Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED);
+                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     permissions.add(Manifest.permission.READ_MEDIA_IMAGES);
                     permissions.add(Manifest.permission.READ_MEDIA_VIDEO);
                 } else {

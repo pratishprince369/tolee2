@@ -34,6 +34,21 @@ export function MediaPickerModal() {
 
   const isAndroid = typeof window !== 'undefined' && !!(window as any).AndroidBridge;
 
+  const getMediaUrl = (uri: string, type: 'image' | 'video') => {
+    if (!uri) return '';
+    if (!isAndroid) return uri;
+    const endpoint = type === 'video' ? 'thumbnail' : 'file';
+    return `https://local.tolee.in/${endpoint}?uri=${encodeURIComponent(uri)}`;
+  };
+
+  const getAlbumCoverUrl = (coverUri: string) => {
+    if (!coverUri) return '';
+    if (!isAndroid) return coverUri;
+    const isVideo = coverUri.includes('video');
+    const endpoint = isVideo ? 'thumbnail' : 'file';
+    return `https://local.tolee.in/${endpoint}?uri=${encodeURIComponent(coverUri)}`;
+  };
+
   // Listen for the global window triggers from Android WebView
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -241,7 +256,7 @@ export function MediaPickerModal() {
                   className="flex items-center gap-4 p-2 rounded-xl bg-zinc-900/40 hover:bg-zinc-900 border border-transparent hover:border-zinc-800/80 cursor-pointer transition-all"
                 >
                   <img 
-                    src={album.coverUri} 
+                    src={getAlbumCoverUrl(album.coverUri)} 
                     alt={album.name} 
                     className="w-14 h-14 rounded-lg object-cover bg-zinc-800"
                   />
@@ -349,7 +364,7 @@ export function MediaPickerModal() {
                     >
                       {/* Image cover */}
                       <img 
-                        src={item.uri} 
+                        src={getMediaUrl(item.uri, item.type)} 
                         alt="Gallery asset" 
                         loading="lazy"
                         className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
