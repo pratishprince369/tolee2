@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "in.tolee.app",
+      "sha256_cert_fingerprints": [
+        "7F:DD:74:33:54:56:F3:57:5A:68:E6:CD:A3:43:58:EF:3E:FE:52:7C:A9:58:46:8E:CA:9D:6D:72:B3:73:3F:07"
+      ]
+    }
+  }
+]
