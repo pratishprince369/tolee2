@@ -47,6 +47,7 @@ import {
 } from '@/actions/shoot';
 import { getCallLogs, deleteCallLog } from '@/actions/calls';
 import { CallInterface } from '@/components/CallInterface';
+import { checkPostAvailability } from '@/actions/post';
 import {
   Dialog,
   DialogContent,
@@ -82,6 +83,36 @@ function mergePollMessages(oldMsgs: any[] = [], pollMsgs: any[] = []) {
   return merged;
 }
 
+const formatLastMessage = (msgText: string) => {
+  if (!msgText) return 'No messages yet.';
+  
+  const prefixMatch = msgText.match(/^([^:]+):\s*__SHARED_CONTENT__:(.*)$/);
+  const isPlainShared = msgText.startsWith('__SHARED_CONTENT___') || msgText.startsWith('__SHARED_CONTENT__:');
+  
+  if (prefixMatch || isPlainShared) {
+    try {
+      const jsonStr = prefixMatch ? prefixMatch[2] : msgText.substring(19);
+      const sender = prefixMatch ? `${prefixMatch[1]}: ` : '';
+      const payload = JSON.parse(jsonStr);
+      if (payload.type === 'shared_video') {
+        return `${sender}🎥 Shared a Video`;
+      }
+      if (payload.type === 'shared_post') {
+        return `${sender}🖼️ Shared a Post`;
+      }
+      return `${sender}🔗 Shared Content`;
+    } catch (e) {
+      return msgText;
+    }
+  }
+  
+  if (msgText.includes('[CALL_LOG]:')) {
+    return '📞 Call Log';
+  }
+  
+  return msgText;
+};
+
 // WhatsApp-style date formatter for group separators
 function formatMessageDateSeparator(dateVal: string | Date) {
   const date = new Date(dateVal);
@@ -101,6 +132,129 @@ function formatMessageDateSeparator(dateVal: string | Date) {
   } else {
     return date.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
   }
+}
+
+interface SharedContentCardProps {
+  payload: {
+    type: string;
+    videoId: string;
+    creatorId: string;
+    creatorName: string;
+    creatorUsername: string;
+    creatorAvatar: string;
+    thumbnailUrl: string;
+    title: string;
+    caption: string;
+    likesCount: number;
+    viewsCount: number;
+    shareUrl: string;
+  };
+}
+
+function SharedContentCard({ payload }: SharedContentCardProps) {
+  const router = useRouter();
+  const [available, setAvailable] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    if (payload.videoId) {
+      checkPostAvailability(payload.videoId).then((res) => {
+        if (active) {
+          setAvailable(res.success ? res.available : false);
+        }
+      });
+    } else {
+      setAvailable(false);
+    }
+    return () => {
+      active = false;
+    };
+  }, [payload.videoId]);
+
+  const handleCardClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (available) {
+      router.push(`/reels?videoId=${payload.videoId}`);
+    }
+  };
+
+  if (available === null) {
+    return (
+      <div className="w-64 bg-zinc-100 dark:bg-zinc-900 rounded-2xl border border-zinc-200/50 dark:border-zinc-800/80 p-3.5 space-y-3 animate-pulse">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-800" />
+          <div className="w-24 h-4 bg-zinc-200 dark:bg-zinc-800 rounded" />
+        </div>
+        <div className="aspect-video w-full rounded-xl bg-zinc-200 dark:bg-zinc-800" />
+        <div className="w-3/4 h-3.5 bg-zinc-200 dark:bg-zinc-800 rounded" />
+      </div>
+    );
+  }
+
+  if (available === false) {
+    return (
+      <div className="w-64 bg-zinc-100 dark:bg-zinc-900 rounded-2xl border border-zinc-200/50 dark:border-zinc-800/80 p-4 text-center select-none">
+        <AlertCircle className="w-8 h-8 mx-auto text-zinc-400 dark:text-zinc-500 mb-2" />
+        <p className="text-[13px] font-bold text-zinc-500 dark:text-zinc-400">This video is no longer available.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div 
+      onClick={handleCardClick}
+      className="w-64 bg-zinc-100 hover:bg-zinc-200/80 dark:bg-zinc-900 dark:hover:bg-zinc-850/80 rounded-2xl border border-zinc-250/60 dark:border-zinc-800 shadow-sm cursor-pointer overflow-hidden transition-all duration-200 select-none group"
+    >
+      <div className="relative aspect-video w-full bg-black flex items-center justify-center overflow-hidden">
+        {payload.thumbnailUrl ? (
+          <img 
+            src={payload.thumbnailUrl} 
+            alt="Shared Video Preview" 
+            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+          />
+        ) : (
+          <div className="w-full h-full bg-zinc-950 flex items-center justify-center">
+            <span className="text-[11px] text-zinc-500">No Preview</span>
+          </div>
+        )}
+        <div className="absolute inset-0 bg-black/25 flex items-center justify-center">
+          <div className="w-10 h-10 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center backdrop-blur-md transition-all active:scale-95 shadow-md">
+            <Play className="w-4 h-4 text-white fill-white ml-0.5" />
+          </div>
+        </div>
+      </div>
+
+      <div className="p-3 space-y-2">
+        <div className="flex items-center justify-between gap-2 min-w-0">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <Avatar className="w-5.5 h-5.5 border border-zinc-200 dark:border-zinc-700">
+              <AvatarImage src={payload.creatorAvatar} />
+              <AvatarFallback className="text-[8px] bg-zinc-200 text-zinc-700">{payload.creatorName?.[0]}</AvatarFallback>
+            </Avatar>
+            <span className="text-[11px] font-bold text-zinc-800 dark:text-zinc-200 truncate">
+              @{payload.creatorUsername}
+            </span>
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <p className="text-[12px] font-semibold text-zinc-900 dark:text-zinc-50 leading-snug line-clamp-2 break-all">
+            {payload.title}
+          </p>
+          {payload.caption && payload.caption !== payload.title && (
+            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-normal line-clamp-2 break-words">
+              {payload.caption}
+            </p>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3 text-[10px] text-zinc-500 dark:text-zinc-400 font-medium pt-1.5 border-t border-zinc-200/50 dark:border-zinc-800/60">
+          <span className="flex items-center gap-0.5">👁 {payload.viewsCount || '0'}</span>
+          <span className="flex items-center gap-0.5">❤️ {payload.likesCount || '0'}</span>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function ChatPage() {
@@ -1000,7 +1154,7 @@ export default function ChatPage() {
                     </div>
                     <div className="flex justify-between items-center">
                       <p className="text-sm text-gray-500 dark:text-gray-400 truncate pr-2">
-                        {chat.lastMessage}
+                        {formatLastMessage(chat.lastMessage)}
                       </p>
                       {chat.unread > 0 && (
                         <div className="bg-primary text-primary-foreground text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full flex-shrink-0">
@@ -1452,6 +1606,19 @@ export default function ChatPage() {
                                         </div>
                                       </div>
                                     );
+                                  })()
+                                ) : msg.text.startsWith('__SHARED_CONTENT__:') ? (
+                                  (() => {
+                                    try {
+                                      const payload = JSON.parse(msg.text.substring(19));
+                                      return <SharedContentCard payload={payload} />;
+                                    } catch (e) {
+                                      return (
+                                        <p className="text-[14px] sm:text-[15px] leading-relaxed whitespace-pre-wrap break-words [word-break:break-word] [overflow-wrap:anywhere] flex-1 select-text">
+                                          {msg.text}
+                                        </p>
+                                      );
+                                    }
                                   })()
                                 ) : (
                                   <p className="text-[14px] sm:text-[15px] leading-relaxed whitespace-pre-wrap break-words [word-break:break-word] [overflow-wrap:anywhere] flex-1 select-text">

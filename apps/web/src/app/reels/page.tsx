@@ -139,7 +139,7 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
             }
           });
 
-          if (post && post.mediaUrls && post.postType === 'reel') {
+          if (post && post.mediaUrls && (post.postType === 'reel' || post.mediaTypes?.includes('video'))) {
             const firstTolee = post.tolees?.[0]?.tolee;
             const likedByMe = currentUserId ? post.likes.some((like: any) => like.userId === currentUserId) : false;
             const savedByMe = currentUserId ? post.savedBy.some((save: any) => save.userId === currentUserId) : false;

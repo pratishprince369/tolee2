@@ -1771,6 +1771,30 @@ export async function sharePostToFriends(
       return { success: false, error: 'No friends selected.' };
     }
 
+    // Fetch post details to get rich card metadata (author details, counts, media URLs)
+    const postDetails = await prisma.post.findUnique({
+      where: { id: postId },
+      include: {
+        author: {
+          select: {
+            username: true,
+            name: true,
+            avatar: true,
+            image: true
+          }
+        },
+        _count: {
+          select: {
+            likes: true,
+            comments: true,
+            views: true
+          }
+        }
+      }
+    });
+
+    const isVideo = postDetails?.mediaTypes?.split(',')[0] === 'video' || postDetails?.mediaTypes === 'video';
+
     // Deliver content to each selected friend
     for (const friendId of friendIds) {
       // 1. Get or create DM
@@ -1782,7 +1806,26 @@ export async function sharePostToFriends(
       const chatId = chatResult.chatId;
 
       // 2. Format a message that recipient will receive
-      const msgContent = `📢 Shared a Post/Reel from Tolee:\n"${previewText}"\n\n🔗 ${shareUrl}`;
+      let msgContent;
+      if (postDetails) {
+        const payload = {
+          type: isVideo ? 'shared_video' : 'shared_post',
+          videoId: postDetails.id,
+          creatorId: postDetails.authorId,
+          creatorName: postDetails.author.name || 'Creator',
+          creatorUsername: postDetails.author.username || 'creator',
+          creatorAvatar: postDetails.author.avatar || postDetails.author.image || '/default-user-avatar.svg',
+          thumbnailUrl: postDetails.mediaUrls ? postDetails.mediaUrls.split(',')[0] : '',
+          title: isVideo ? (postDetails.caption || 'Shared Video') : 'Shared Post',
+          caption: previewText || postDetails.caption || '',
+          likesCount: postDetails._count?.likes || 0,
+          viewsCount: postDetails._count?.views || 0,
+          shareUrl: shareUrl
+        };
+        msgContent = `__SHARED_CONTENT__:${JSON.stringify(payload)}`;
+      } else {
+        msgContent = `📢 Shared a Post/Reel from Tolee:\n"${previewText}"\n\n🔗 ${shareUrl}`;
+      }
 
       // 3. Create the message
       await prisma.message.create({
@@ -2422,6 +2465,21 @@ export async function getFreshPexelsVideoUrl(category = 'nature'): Promise<strin
     console.error('[getFreshPexelsVideoUrl error]:', err);
   }
   return null;
+}
+
+export async function checkPostAvailability(postId: string) {
+  try {
+    const post = await prisma.post.findUnique({
+      where: { id: postId },
+      select: { status: true, visibility: true }
+    });
+    if (!post || post.status !== 'published' || post.visibility === 'private') {
+      return { success: true, available: false };
+    }
+    return { success: true, available: true };
+  } catch (err) {
+    return { success: false, available: false };
+  }
 }
 
 
