@@ -24,7 +24,7 @@ import {
   getFreshPexelsVideoUrl
 } from '@/actions/post';
 import { toggleFollow } from '@/actions/user';
-import { HLSVideo, getSoundPreference, setSoundPreference } from '@/components/HLSVideo';
+import { HLSVideo, getSoundPreference, setSoundPreference, getDeviceNetworkStats } from '@/components/HLSVideo';
 import { useNetworkConfig } from '@/hooks/useNetworkConfig';
 import { videoMetadataCache } from '@/lib/videoCache';
 import { formatViewCount } from '@/lib/utils';
@@ -317,6 +317,20 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
   const network = useNetworkConfig();
   const lastIndexRef = useRef(0);
   const [direction, setDirection] = useState<'down' | 'up'>('down');
+  const [deviceStats, setDeviceStats] = useState({ preloadCount: 5, maxBuffer: 10, lowRAM: false });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const conn = (navigator as any).connection;
+    const updateStats = () => {
+      setDeviceStats(getDeviceNetworkStats());
+    };
+    updateStats();
+    if (conn) {
+      conn.addEventListener('change', updateStats);
+      return () => conn.removeEventListener('change', updateStats);
+    }
+  }, []);
 
   useEffect(() => {
     const activeIndex = isDesktop ? desktopActiveIndex : mobileActiveIndex;
@@ -330,9 +344,12 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
 
   const activeIndex = isDesktop ? desktopActiveIndex : mobileActiveIndex;
   
-  // Always preload 2 ahead + 1 behind for instant playback
   const shouldLoadSlide = (idx: number) => {
-    return idx >= activeIndex - 1 && idx <= activeIndex + 2;
+    const { preloadCount } = deviceStats;
+    const lookAhead = direction === 'down' ? preloadCount : Math.min(3, preloadCount);
+    const lookBehind = direction === 'up' ? preloadCount : 2;
+
+    return idx >= activeIndex - lookBehind && idx <= activeIndex + lookAhead;
   };
 
   /* ── Modal state ── */
@@ -1033,14 +1050,17 @@ const ReelSlide = memo(function ReelSlide({
         />
       )}
 
-      {/* ── Reel Loading Spinner ── */}
-      <div 
-        className={`absolute inset-0 z-10 flex items-center justify-center pointer-events-none transition-opacity duration-300 ${
-          isActive && !isReady && !isError ? 'opacity-100' : 'opacity-0'
-        }`}
-      >
-        <Loader2 className="w-10 h-10 text-white animate-spin" />
-      </div>
+      {/* ── Reel Loading Skeleton Shimmer ── */}
+      {isActive && !isReady && !isError && (
+        <div className="absolute inset-0 bg-zinc-950/20 backdrop-blur-xs flex flex-col justify-end p-6 pb-24 space-y-4 animate-pulse pointer-events-none z-10">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-white/20" />
+            <div className="w-24 h-4 bg-white/20 rounded-md" />
+          </div>
+          <div className="w-2/3 h-4 bg-white/10 rounded-md" />
+          <div className="w-1/2 h-3.5 bg-white/10 rounded-md" />
+        </div>
+      )}
 
       {/* ── Error Placeholder ── */}
       {isError && (
@@ -1238,14 +1258,17 @@ const AdReelSlide = memo(function AdReelSlide({
                   />
                 )}
 
-                {/* ── Ad Reel Loading Spinner ── */}
-                <div 
-                  className={`absolute inset-0 z-10 flex items-center justify-center pointer-events-none transition-opacity duration-300 ${
-                    isActive && !isReady && !isError ? 'opacity-100' : 'opacity-0'
-                  }`}
-                >
-                  <Loader2 className="w-10 h-10 text-white animate-spin" />
-                </div>
+                {/* ── Ad Reel Loading Skeleton Shimmer ── */}
+                {isActive && !isReady && !isError && (
+                  <div className="absolute inset-0 bg-zinc-950/20 backdrop-blur-xs flex flex-col justify-end p-6 pb-24 space-y-4 animate-pulse pointer-events-none z-10">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full bg-white/20" />
+                      <div className="w-24 h-4 bg-white/20 rounded-md" />
+                    </div>
+                    <div className="w-2/3 h-4 bg-white/10 rounded-md" />
+                    <div className="w-1/2 h-3.5 bg-white/10 rounded-md" />
+                  </div>
+                )}
 
                 {/* Error placeholder */}
                 {isError && (

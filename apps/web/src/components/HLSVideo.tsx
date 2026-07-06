@@ -42,6 +42,45 @@ export function setSoundPreference(isMuted: boolean) {
   window.dispatchEvent(new CustomEvent('tolee_sound_pref_change', { detail: { isMuted } }));
 }
 
+export interface DeviceStats {
+  preloadCount: number;
+  maxBuffer: number;
+  lowRAM: boolean;
+}
+
+export function getDeviceNetworkStats(): DeviceStats {
+  if (typeof window === 'undefined') {
+    return { preloadCount: 5, maxBuffer: 10, lowRAM: false };
+  }
+
+  const conn = (navigator as any).connection;
+  const memory = (navigator as any).deviceMemory || 8;
+  const lowRAM = memory <= 4;
+  
+  let preloadCount = 5;
+  let maxBuffer = 10;
+
+  if (conn) {
+    const type = conn.effectiveType;
+    const saveData = conn.saveData;
+    if (saveData) {
+      preloadCount = 2;
+      maxBuffer = 5;
+    } else if (type === '4g' || conn.downlink > 10) {
+      preloadCount = lowRAM ? 5 : 10;
+      maxBuffer = 15;
+    } else if (type === '3g' || conn.downlink > 2) {
+      preloadCount = 5;
+      maxBuffer = 8;
+    } else {
+      preloadCount = 2;
+      maxBuffer = 4;
+    }
+  }
+
+  return { preloadCount, maxBuffer, lowRAM };
+}
+
 interface HLSVideoProps extends React.VideoHTMLAttributes<HTMLVideoElement> {
   src: string;
   isActive?: boolean;
@@ -169,16 +208,18 @@ export const HLSVideo = forwardRef<HTMLVideoElement, HLSVideoProps>(
 
     if (src.endsWith('.m3u8') && Hls.isSupported()) {
       // HLS.js path
+      const stats = getDeviceNetworkStats();
       const hls = new Hls({
         enableWorker: true,
         capLevelToPlayerSize: true,
-        maxBufferLength: 4,       // Buffer only 4s initially for fast start
-        maxMaxBufferLength: 10,   // Allow up to 10s once playing
-        backBufferLength: 5,
+        maxBufferLength: isActiveRef.current ? (stats.lowRAM ? 6 : 12) : 2.5,
+        maxMaxBufferLength: isActiveRef.current ? (stats.lowRAM ? 10 : 20) : 5,
+        backBufferLength: 4,
         lowLatencyMode: true,
-        startLevel: 0,            // Lowest bitrate for instant startup
-        startFragPrefetch: true,  // Start downloading first fragment immediately
-        testBandwidth: false,     // Skip bandwidth test, start playing now
+        startLevel: -1,
+        startFragPrefetch: true,
+        testBandwidth: isActiveRef.current,
+        abrEwmaDefaultEstimate: 600000,
       });
       hlsRef.current = hls;
       hls.loadSource(src);
@@ -213,6 +254,13 @@ export const HLSVideo = forwardRef<HTMLVideoElement, HLSVideoProps>(
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
+
+    const stats = getDeviceNetworkStats();
+    if (hlsRef.current) {
+      hlsRef.current.config.maxBufferLength = isActive ? (stats.lowRAM ? 6 : 12) : 2.5;
+      hlsRef.current.config.maxMaxBufferLength = isActive ? (stats.lowRAM ? 10 : 20) : 5;
+      hlsRef.current.config.testBandwidth = isActive;
+    }
 
     if (isActive) {
       // STEP 1: Pause whatever is globally playing (even if it's from a
