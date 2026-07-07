@@ -13,32 +13,38 @@ export default async function NewsHubPage({ searchParams }: { searchParams: { ca
   const session = await getServerSession(authOptions);
   const currentCategory = searchParams.cat || 'All';
 
-  // Load news posts filtered by category if requested
-  const newsList = await prisma.newsPost.findMany({
-    where: {
-      post: {
-        status: 'published',
-        isArchived: false,
+  // Load news posts - wrapped in try-catch for graceful handling when table doesn't exist yet
+  let newsList: any[] = [];
+  try {
+    newsList = await prisma.newsPost.findMany({
+      where: {
+        post: {
+          status: 'published',
+          isArchived: false,
+        },
+        category: currentCategory !== 'All' ? currentCategory : undefined,
       },
-      category: currentCategory !== 'All' ? currentCategory : undefined,
-    },
-    include: {
-      post: {
-        include: {
-          author: {
-            select: {
-              name: true,
-              username: true,
-              image: true,
-            }
-          },
-          likes: true,
-          comments: true,
+      include: {
+        post: {
+          include: {
+            author: {
+              select: {
+                name: true,
+                username: true,
+                image: true,
+              }
+            },
+            likes: true,
+            comments: true,
+          }
         }
-      }
-    },
-    orderBy: { createdAt: 'desc' }
-  });
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+  } catch (e) {
+    // NewsPost table may not exist yet in production
+    newsList = [];
+  }
 
   const categories = [
     'All', 'Local News', 'Business', 'Technology', 'Real Estate', 

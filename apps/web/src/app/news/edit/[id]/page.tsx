@@ -13,10 +13,15 @@ export default async function EditNewsPage({ params }: { params: { id: string } 
   const userId = (session.user as any).id;
 
   // Retrieve the existing news article by post ID
-  const newsItem = await prisma.newsPost.findUnique({
-    where: { postId: params.id },
-    include: { post: true }
-  });
+  let newsItem: any = null;
+  try {
+    newsItem = await prisma.newsPost.findUnique({
+      where: { postId: params.id },
+      include: { post: true }
+    });
+  } catch (e) {
+    // NewsPost table may not exist yet
+  }
 
   if (!newsItem) {
     notFound();
