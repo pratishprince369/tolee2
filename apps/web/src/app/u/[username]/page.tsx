@@ -155,6 +155,17 @@ export default async function UserProfile({ params }: { params: { username: stri
       createdAt: true,
       isAnonymous: true,
       shareCount: true,
+      newsRelation: {
+        select: {
+          id: true,
+          headline: true,
+          slug: true,
+          summary: true,
+          category: true,
+          readingTime: true,
+          viewsCount: true,
+        }
+      },
       likes: {
         select: {
           userId: true
@@ -324,6 +335,44 @@ export default async function UserProfile({ params }: { params: { username: stri
     slug: t.tolee.slug
   }));
 
+  // Fetch user's news articles
+  let userNewsArticles: any[] = [];
+  try {
+    userNewsArticles = await prisma.newsPost.findMany({
+      where: {
+        post: {
+          authorId: user.id,
+          isArchived: false,
+          ...(isMe ? {} : { status: 'published' })
+        }
+      },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        post: {
+          select: {
+            id: true,
+            authorId: true,
+            mediaUrls: true,
+            mediaTypes: true,
+            status: true,
+            createdAt: true,
+            _count: {
+              select: {
+                likes: true,
+                comments: true,
+                views: true,
+              }
+            }
+          }
+        }
+      }
+    });
+  } catch (e) {
+    // NewsPost table may not exist yet
+  }
+
+  const isSuperAdmin = session?.user?.email === process.env.SUPER_ADMIN_EMAIL;
+
   return (
     <InstagramProfileView 
       user={{
@@ -335,7 +384,9 @@ export default async function UserProfile({ params }: { params: { username: stri
       savedPosts={savedPosts}
       resharedPosts={resharedPosts}
       tolees={myTolees}
+      newsArticles={userNewsArticles}
       isMe={isMe}
+      isSuperAdmin={isSuperAdmin}
       currentUserId={currentUserId}
       initialIsFollowing={isFollowing}
       initialFollowStatus={followStatus}

@@ -16,11 +16,20 @@ import {
 import { saveNewsDraft, publishNews } from '@/actions/news';
 import { askAIWriter } from '@/actions/ai-helper';
 import { getSidebarData } from '@/actions/user';
+import { uploadFile } from '@/lib/upload';
 
 interface Block {
   id: string;
   type: 'paragraph' | 'h1' | 'h2' | 'blockquote' | 'bullet_list' | 'numbered_list' | 'callout' | 'faq' | 'youtube';
   value: any; // text or object based on type
+}
+
+interface NewsMediaItem {
+  id: string;
+  url: string;
+  type: 'image' | 'video';
+  file?: File;
+  isCover?: boolean;
 }
 
 export function NewsEditor({ initialData }: { initialData?: any }) {
@@ -37,12 +46,36 @@ export function NewsEditor({ initialData }: { initialData?: any }) {
   const [language, setLanguage] = useState(initialData?.language || 'English');
   const [state, setState] = useState(initialData?.state || '');
   const [city, setCity] = useState(initialData?.city || '');
-  const [coverImage, setCoverImage] = useState(initialData?.post?.mediaUrls || '');
+  
+  // Media List Manager State
+  const [mediaList, setMediaList] = useState<NewsMediaItem[]>(() => {
+    if (initialData?.post?.mediaUrls) {
+      const urls = initialData.post.mediaUrls.split(/,(?=https?:\/\/)/).map((u: string) => u.trim()).filter(Boolean);
+      const types = initialData.post.mediaTypes ? initialData.post.mediaTypes.split(',').map((t: string) => t.trim()).filter(Boolean) : [];
+      return urls.map((url, idx) => ({
+        id: `existing-${idx}-${Date.now()}`,
+        url,
+        type: (types[idx] === 'video' ? 'video' : 'image') as 'image' | 'video',
+      }));
+    }
+    return [];
+  });
+
+  const [coverImage, setCoverImage] = useState('');
   const [coverCaption, setCoverCaption] = useState(initialData?.coverCaption || '');
   const [imageCredit, setImageCredit] = useState(initialData?.imageCredit || '');
   const [sourceUrl, setSourceUrl] = useState(initialData?.sourceUrl || '');
   const [externalRef, setExternalRef] = useState(initialData?.externalRef || '');
   const [visibility, setVisibility] = useState(initialData?.post?.visibility || 'public');
+
+  // Sync coverImage helper with first media URL in the list
+  useEffect(() => {
+    if (mediaList.length > 0 && mediaList[0]) {
+      setCoverImage(mediaList[0].url || (mediaList[0].file ? URL.createObjectURL(mediaList[0].file) : ''));
+    } else {
+      setCoverImage('');
+    }
+  }, [mediaList]);
 
   // Blocks Content State
   const [blocks, setBlocks] = useState<Block[]>(() => {
@@ -66,6 +99,7 @@ export function NewsEditor({ initialData }: { initialData?: any }) {
 
   // States
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('saved');
+  const [savingDraft, setSavingDraft] = useState(false);
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiResult, setAiResult] = useState('');
@@ -85,7 +119,7 @@ export function NewsEditor({ initialData }: { initialData?: any }) {
     });
   }, []);
 
-  // Real-time Slug Generation
+  // Real-Time Slug Generation
   useEffect(() => {
     if (!initialData?.slug && headline) {
       const generated = headline.toLowerCase().trim()
@@ -100,7 +134,7 @@ export function NewsEditor({ initialData }: { initialData?: any }) {
   const isDirty = useRef(false);
   useEffect(() => {
     isDirty.current = true;
-  }, [headline, slug, summary, metaDesc, keywords, tags, category, subcategory, language, state, city, coverImage, coverCaption, imageCredit, sourceUrl, externalRef, blocks, selectedToleeIds]);
+  }, [headline, slug, summary, metaDesc, keywords, tags, category, subcategory, language, state, city, mediaList, coverCaption, imageCredit, sourceUrl, externalRef, blocks, selectedToleeIds]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -109,10 +143,55 @@ export function NewsEditor({ initialData }: { initialData?: any }) {
       }
     }, 10000);
     return () => clearInterval(interval);
-  }, [headline, slug, summary, metaDesc, keywords, tags, category, subcategory, language, state, city, coverImage, coverCaption, imageCredit, sourceUrl, externalRef, blocks, selectedToleeIds]);
+  }, [headline, slug, summary, metaDesc, keywords, tags, category, subcategory, language, state, city, mediaList, coverCaption, imageCredit, sourceUrl, externalRef, blocks, selectedToleeIds]);
 
-  const triggerAutoSave = async () => {
+  const uploadNewMedia = async () => {
+    const uploadedList = [];
+    for (const item of mediaList) {
+      if (item.file) {
+        try {
+          const res = await uploadFile(item.file);
+          item.url = res.secure_url;
+          delete item.file;
+          uploadedList.push({
+            url: res.secure_url,
+            type: item.type
+          });
+        } catch (e) {
+          console.error("Cloudinary upload failed for item:", e);
+          throw new Error("Failed to upload some media files. Please check your connection.");
+        }
+      } else {
+        uploadedList.push({
+          url: item.url,
+          type: item.type
+        });
+      }
+    }
+    setMediaList([...mediaList]);
+    return {
+      urls: uploadedList.map(u => u.url).join(','),
+      types: uploadedList.map(u => u.type).join(',')
+    };
+  };
+
+  const triggerAutoSave = async (forceStatus?: string) => {
     setSaveStatus('saving');
+    
+    // Determine status: keep existing status (like published) or use forceStatus
+    const targetStatus = forceStatus || (initialData?.post?.status || 'draft');
+
+    let uploadedUrls = '';
+    let uploadedTypes = '';
+    try {
+      const mediaPayload = await uploadNewMedia();
+      uploadedUrls = mediaPayload.urls;
+      uploadedTypes = mediaPayload.types;
+    } catch (e) {
+      setSaveStatus('error');
+      return;
+    }
+
     const res = await saveNewsDraft({
       postId,
       headline,
@@ -131,8 +210,10 @@ export function NewsEditor({ initialData }: { initialData?: any }) {
       sourceUrl,
       externalRef,
       content: JSON.stringify(blocks),
-      mediaUrls: coverImage || undefined,
-      selectedToleeIds
+      mediaUrls: uploadedUrls || undefined,
+      mediaTypes: uploadedTypes || undefined,
+      selectedToleeIds,
+      status: targetStatus
     });
 
     if (res.success) {
@@ -141,6 +222,60 @@ export function NewsEditor({ initialData }: { initialData?: any }) {
       isDirty.current = false;
     } else {
       setSaveStatus('error');
+    }
+  };
+
+  // Save Draft explicitly
+  const handleSaveDraft = async () => {
+    setSavingDraft(true);
+    setSaveStatus('saving');
+    
+    let uploadedUrls = '';
+    let uploadedTypes = '';
+    try {
+      const mediaPayload = await uploadNewMedia();
+      uploadedUrls = mediaPayload.urls;
+      uploadedTypes = mediaPayload.types;
+    } catch (e: any) {
+      alert(e.message || 'Media upload failed.');
+      setSavingDraft(false);
+      setSaveStatus('error');
+      return;
+    }
+
+    const res = await saveNewsDraft({
+      postId,
+      headline,
+      slug,
+      summary,
+      metaDescription: metaDesc,
+      keywords,
+      tags,
+      category,
+      subcategory,
+      language,
+      state,
+      city,
+      coverCaption,
+      imageCredit,
+      sourceUrl,
+      externalRef,
+      content: JSON.stringify(blocks),
+      mediaUrls: uploadedUrls || undefined,
+      mediaTypes: uploadedTypes || undefined,
+      selectedToleeIds,
+      status: 'draft' // explicitly set/revert status to draft
+    });
+
+    setSavingDraft(false);
+    if (res.success) {
+      setPostId(res.postId);
+      setSaveStatus('saved');
+      isDirty.current = false;
+      alert('News draft saved successfully!');
+    } else {
+      setSaveStatus('error');
+      alert(res.error || 'Failed to save draft.');
     }
   };
 
@@ -159,17 +294,61 @@ export function NewsEditor({ initialData }: { initialData?: any }) {
     }
 
     setPublishing(true);
-    // 1. Ensure latest draft is saved first
-    await triggerAutoSave();
+
+    // 1. Upload media files & save latest with status 'published'
+    let uploadedUrls = '';
+    let uploadedTypes = '';
+    try {
+      const mediaPayload = await uploadNewMedia();
+      uploadedUrls = mediaPayload.urls;
+      uploadedTypes = mediaPayload.types;
+    } catch (e: any) {
+      setPubError(e.message || 'Media upload failed.');
+      setPublishing(false);
+      return;
+    }
+
+    const saveRes = await saveNewsDraft({
+      postId,
+      headline,
+      slug,
+      summary,
+      metaDescription: metaDesc,
+      keywords,
+      tags,
+      category,
+      subcategory,
+      language,
+      state,
+      city,
+      coverCaption,
+      imageCredit,
+      sourceUrl,
+      externalRef,
+      content: JSON.stringify(blocks),
+      mediaUrls: uploadedUrls || undefined,
+      mediaTypes: uploadedTypes || undefined,
+      selectedToleeIds,
+      status: 'published' // Ensure status is set to published
+    });
+
+    if (!saveRes.success) {
+      setPubError(saveRes.error || 'Failed to save updates before publishing.');
+      setPublishing(false);
+      return;
+    }
+
+    const currentPostId = postId || saveRes.postId;
 
     // 2. Publish
-    const res = await publishNews(postId!, {
+    const res = await publishNews(currentPostId!, {
       visibility,
       selectedToleeIds
     });
 
     setPublishing(false);
     if (res.success) {
+      alert('News published live successfully!');
       router.push(`/news/${res.slug}`);
     } else {
       setPubError(res.error || 'Failed to publish.');
@@ -339,12 +518,23 @@ export function NewsEditor({ initialData }: { initialData?: any }) {
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="hidden sm:flex items-center gap-1.5 rounded-xl text-gray-700 hover:text-gray-900" onClick={triggerAutoSave}>
-            <Save className="w-4 h-4" /> Save
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="hidden sm:flex items-center gap-1.5 rounded-xl text-gray-700 hover:text-gray-900" 
+            onClick={handleSaveDraft}
+            disabled={savingDraft || publishing}
+          >
+            <Save className="w-4 h-4" /> {savingDraft ? 'Saving...' : 'Save Draft'}
           </Button>
           
-          <Button size="sm" className="bg-[#0a7c85] hover:bg-[#086971] text-white font-extrabold rounded-xl px-4 flex items-center gap-1.5 shadow-sm shadow-[#0a7c85]/10" onClick={() => setActiveTab('publish')}>
-            <Globe className="w-4 h-4" /> Publish
+          <Button 
+            size="sm" 
+            className="bg-[#0a7c85] hover:bg-[#086971] text-white font-extrabold rounded-xl px-4 flex items-center gap-1.5 shadow-sm shadow-[#0a7c85]/10" 
+            onClick={() => setActiveTab('publish')}
+            disabled={savingDraft || publishing}
+          >
+            <Globe className="w-4 h-4" /> {initialData?.post?.status === 'published' ? 'Update & Publish' : 'Publish'}
           </Button>
 
           <Button variant="ghost" size="icon" onClick={() => setAiPanelOpen(true)} className="bg-purple-50 text-purple-600 hover:bg-purple-100 dark:bg-purple-950/20 dark:text-purple-400 rounded-full h-9 w-9">
@@ -429,22 +619,220 @@ export function NewsEditor({ initialData }: { initialData?: any }) {
                     </div>
                   </div>
 
-                  <div>
-                    <label className="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-wider block mb-1.5">Featured Cover Image (Cloudinary/Firebase URL)</label>
-                    <Input 
-                      placeholder="Paste cover photo URL..." 
-                      value={coverImage} 
-                      onChange={(e) => setCoverImage(e.target.value)} 
-                      className="text-xs rounded-xl focus-visible:ring-[#0a7c85] py-4"
-                    />
-                    {coverImage && (
-                      <div className="mt-3 aspect-video rounded-xl overflow-hidden bg-black border border-gray-200 dark:border-zinc-800 shadow-xs relative group max-h-48">
-                        <img src={coverImage} alt="Cover preview" className="w-full h-full object-cover" />
-                        <button type="button" onClick={() => setCoverImage('')} className="absolute top-2 right-2 bg-black/60 text-white rounded-full p-1.5 backdrop-blur-md hover:bg-black transition-colors">
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                  {/* Media Manager Section */}
+                  <div className="pt-4 border-t border-gray-100 dark:border-zinc-900/40 space-y-6">
+                    <div>
+                      <span className="text-[10px] font-black text-gray-400 dark:text-zinc-500 uppercase tracking-wider block mb-2.5">
+                        Featured Cover Image (First media item)
+                      </span>
+                      
+                      {mediaList.length > 0 && mediaList[0] ? (
+                        <div className="relative aspect-[16/9] w-full rounded-2xl overflow-hidden bg-black border border-gray-200 dark:border-zinc-800 shadow-xs group max-h-56">
+                          {mediaList[0].file ? (
+                            <img src={URL.createObjectURL(mediaList[0].file)} alt="Cover preview" className="w-full h-full object-cover" />
+                          ) : (
+                            <img src={mediaList[0].url} alt="Cover preview" className="w-full h-full object-cover" />
+                          )}
+                          
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                            <label className="bg-white/95 text-gray-800 px-3.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer hover:bg-white shadow-md transition-all">
+                              Replace Cover
+                              <input 
+                                type="file" 
+                                accept="image/*" 
+                                className="hidden" 
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    const newItem: NewsMediaItem = {
+                                      id: `cover-${Date.now()}`,
+                                      url: '',
+                                      type: 'image',
+                                      file,
+                                      isCover: true
+                                    };
+                                    setMediaList(prev => {
+                                      const copy = [...prev];
+                                      copy[0] = newItem;
+                                      return copy;
+                                    });
+                                  }
+                                }}
+                              />
+                            </label>
+                            <button 
+                              type="button" 
+                              onClick={() => setMediaList(prev => prev.slice(1))} 
+                              className="bg-red-600 hover:bg-red-700 text-white rounded-lg p-2 shadow-md transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <label className="border-2 border-dashed border-gray-200 dark:border-zinc-800 rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50/50 dark:hover:bg-zinc-900/30 transition-colors">
+                          <Plus className="w-6 h-6 text-gray-400 mb-1" />
+                          <span className="text-xs font-bold text-gray-600 dark:text-zinc-350">Add Cover Image</span>
+                          <span className="text-[10px] text-gray-400 mt-0.5">JPEG, PNG or WEBP</span>
+                          <input 
+                            type="file" 
+                            accept="image/*" 
+                            className="hidden" 
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const newItem: NewsMediaItem = {
+                                  id: `cover-${Date.now()}`,
+                                  url: '',
+                                  type: 'image',
+                                  file,
+                                  isCover: true
+                                };
+                                setMediaList(prev => [newItem, ...prev]);
+                              }
+                            }}
+                          />
+                        </label>
+                      )}
+                      
+                      <div className="grid grid-cols-2 gap-4 mt-3">
+                        <div>
+                          <label className="text-[9px] font-bold text-gray-400 dark:text-zinc-500 uppercase block mb-1">Cover Caption</label>
+                          <Input placeholder="Cover photo description..." value={coverCaption} onChange={(e) => setCoverCaption(e.target.value)} className="text-xs rounded-xl" />
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-bold text-gray-400 dark:text-zinc-500 uppercase block mb-1">Image Credit</label>
+                          <Input placeholder="Photo credit name..." value={imageCredit} onChange={(e) => setImageCredit(e.target.value)} className="text-xs rounded-xl" />
+                        </div>
                       </div>
-                    )}
+                    </div>
+
+                    {/* Gallery Section */}
+                    <div>
+                      <div className="flex justify-between items-center mb-3">
+                        <span className="text-[10px] font-black text-gray-400 dark:text-zinc-500 uppercase tracking-wider block">
+                          Media Gallery & Videos ({Math.max(0, mediaList.length - 1)})
+                        </span>
+                        <div className="flex gap-2">
+                          <label className="bg-indigo-50 hover:bg-indigo-100 text-indigo-600 dark:bg-indigo-950/20 dark:text-indigo-400 px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-colors">
+                            + Add Image
+                            <input 
+                              type="file" 
+                              accept="image/*" 
+                              multiple 
+                              className="hidden" 
+                              onChange={(e) => {
+                                const files = Array.from(e.target.files || []);
+                                const newItems = files.map((file, idx) => ({
+                                  id: `image-${Date.now()}-${idx}`,
+                                  url: '',
+                                  type: 'image' as const,
+                                  file
+                                }));
+                                setMediaList(prev => [...prev, ...newItems]);
+                              }}
+                            />
+                          </label>
+                          <label className="bg-indigo-50 hover:bg-indigo-100 text-indigo-600 dark:bg-indigo-950/20 dark:text-indigo-400 px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-colors">
+                            + Add Video
+                            <input 
+                              type="file" 
+                              accept="video/*" 
+                              className="hidden" 
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  const newItem = {
+                                    id: `video-${Date.now()}`,
+                                    url: '',
+                                    type: 'video' as const,
+                                    file
+                                  };
+                                  setMediaList(prev => [...prev, newItem]);
+                                }
+                              }}
+                            />
+                          </label>
+                        </div>
+                      </div>
+
+                      {mediaList.length <= 1 ? (
+                        <div className="text-center py-6 border border-dashed border-gray-150 dark:border-zinc-850 rounded-xl text-[11px] text-gray-400">
+                          No gallery images or videos. Cover image only.
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                          {mediaList.slice(1).map((item, index) => {
+                            const actualIndex = index + 1;
+                            const isVideo = item.type === 'video';
+                            const objectUrl = item.file ? URL.createObjectURL(item.file) : item.url;
+                            
+                            return (
+                              <div key={item.id} className="relative aspect-square bg-zinc-50 dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800 rounded-xl overflow-hidden group">
+                                {isVideo ? (
+                                  <div className="w-full h-full flex items-center justify-center relative bg-black">
+                                    <video src={objectUrl} className="w-full h-full object-cover" />
+                                    <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+                                      <Film className="w-5 h-5 text-white" />
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <img src={objectUrl} alt="Gallery item" className="w-full h-full object-cover" />
+                                )}
+
+                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-between p-2">
+                                  <div className="flex w-full justify-between items-center">
+                                    <span className="text-[9px] font-bold text-gray-300">#{actualIndex}</span>
+                                    <button 
+                                      type="button" 
+                                      onClick={() => setMediaList(prev => prev.filter(p => p.id !== item.id))} 
+                                      className="bg-red-500 hover:bg-red-600 text-white rounded p-1"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+
+                                  <div className="flex gap-1.5">
+                                    <button 
+                                      type="button" 
+                                      disabled={actualIndex === 1}
+                                      onClick={() => {
+                                        setMediaList(prev => {
+                                          const copy = [...prev];
+                                          const temp = copy[actualIndex];
+                                          copy[actualIndex] = copy[actualIndex - 1];
+                                          copy[actualIndex - 1] = temp;
+                                          return copy;
+                                        });
+                                      }}
+                                      className="bg-white/90 hover:bg-white text-gray-800 text-[10px] font-bold px-1.5 py-0.5 rounded disabled:opacity-40"
+                                    >
+                                      ←
+                                    </button>
+                                    <button 
+                                      type="button" 
+                                      disabled={actualIndex === mediaList.length - 1}
+                                      onClick={() => {
+                                        setMediaList(prev => {
+                                          const copy = [...prev];
+                                          const temp = copy[actualIndex];
+                                          copy[actualIndex] = copy[actualIndex + 1];
+                                          copy[actualIndex + 1] = temp;
+                                          return copy;
+                                        });
+                                      }}
+                                      className="bg-white/90 hover:bg-white text-gray-800 text-[10px] font-bold px-1.5 py-0.5 rounded disabled:opacity-40"
+                                    >
+                                      →
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -699,13 +1087,15 @@ export function NewsEditor({ initialData }: { initialData?: any }) {
                   </div>
 
                   <div className="pt-5 border-t border-gray-100 dark:border-zinc-900/40 flex justify-end gap-2.5">
-                    <Button variant="outline" size="sm" onClick={() => router.back()} disabled={publishing} className="rounded-xl">Cancel</Button>
+                    <Button variant="outline" size="sm" onClick={() => router.back()} disabled={publishing || savingDraft} className="rounded-xl">Cancel</Button>
                     <Button 
                       onClick={handlePublish} 
-                      disabled={publishing || headline.trim().length === 0} 
+                      disabled={publishing || savingDraft || headline.trim().length === 0} 
                       className="bg-[#0a7c85] hover:bg-[#086971] text-white font-extrabold px-6 rounded-xl shadow-xs"
                     >
-                      {publishing ? 'Publishing live...' : 'Confirm Publish Live'}
+                      {publishing 
+                        ? (initialData?.post?.status === 'published' ? 'Updating...' : 'Publishing live...') 
+                        : (initialData?.post?.status === 'published' ? 'Confirm Update & Publish' : 'Confirm Publish Live')}
                     </Button>
                   </div>
 

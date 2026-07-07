@@ -11,15 +11,22 @@ import {
   MessageCircle, Sparkles, HelpCircle, Film, Info, Quote, ChevronRight
 } from 'lucide-react';
 import { FollowButton } from '@/components/FollowButton';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
+import { PostCarousel } from '@/components/PostCarousel';
 
 export default async function NewsReaderPage({ params }: { params: { slug: string } }) {
   const news = await getNewsBySlug(params.slug);
+  const session = await getServerSession(authOptions);
 
   if (!news) {
     notFound();
   }
 
   const post = news.post;
+  const currentUserId = session?.user ? (session.user as any).id : null;
+  const isSuperAdmin = session?.user?.email === process.env.SUPER_ADMIN_EMAIL;
+  const canEdit = currentUserId === post.authorId || isSuperAdmin;
   const authorName = post.author?.name || 'Anonymous Creator';
   const authorUsername = post.author?.username || 'anonymous';
   const authorAvatar = post.author?.image || '/default-user-avatar.svg';
@@ -104,14 +111,25 @@ export default async function NewsReaderPage({ params }: { params: { slug: strin
             <Button size="sm" variant="outline" className="rounded-full flex items-center gap-1 text-xs">
               <Share2 className="w-3.5 h-3.5" /> Share
             </Button>
+            {canEdit && (
+              <Link href={`/news/edit/${post.id}`}>
+                <Button size="sm" variant="outline" className="rounded-full flex items-center gap-1 text-xs font-bold text-teal-600 hover:text-teal-700 hover:bg-teal-50/50 border-teal-200">
+                  Edit News
+                </Button>
+              </Link>
+            )}
           </div>
         </div>
 
-        {/* Hero Cover Image */}
+        {/* Hero Cover Image & Gallery */}
         {post.mediaUrls && (
           <div className="space-y-2">
-            <div className="aspect-video w-full rounded-3xl overflow-hidden bg-black border border-gray-150 dark:border-zinc-900 shadow-sm">
-              <img src={post.mediaUrls} alt={news.headline} className="w-full h-full object-cover" />
+            <div className="w-full rounded-3xl overflow-hidden bg-black border border-gray-150 dark:border-zinc-900 shadow-sm">
+              <PostCarousel 
+                mediaUrls={post.mediaUrls} 
+                mediaTypes={post.mediaTypes} 
+                postId={post.id} 
+              />
             </div>
             {(news.coverCaption || news.imageCredit) && (
               <div className="px-2 flex justify-between text-[11px] text-gray-400 dark:text-zinc-500 italic">

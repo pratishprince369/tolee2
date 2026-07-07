@@ -60,6 +60,10 @@ export async function createPost(data: {
     const safeContent = sanitizeText(data.content || '', 15000);
     const safeHeadline = sanitizeText(data.headline || '', 200);
 
+    if (data.postType === 'news' && !isDraft && (!safeHeadline || !safeHeadline.trim())) {
+      return { success: false, error: 'Headline is mandatory for news posts.' };
+    }
+
     if (!isDraft && !safeContent && !safeHeadline) {
       return { success: false, error: 'Post content cannot be empty.' };
     }
@@ -318,19 +322,17 @@ export async function getPosts(options?: { mediaType?: string; limit?: number })
         worldProjectId: true,
         isSimulation: true,
         isAnonymous: true,
-        // newsRelation: conditionally loaded only after migration
-        // Uncomment after running `prisma db push` on production:
-        // newsRelation: {
-        //   select: {
-        //     id: true,
-        //     headline: true,
-        //     slug: true,
-        //     summary: true,
-        //     category: true,
-        //     readingTime: true,
-        //     viewsCount: true,
-        //   }
-        // },
+        newsRelation: {
+          select: {
+            id: true,
+            headline: true,
+            slug: true,
+            summary: true,
+            category: true,
+            readingTime: true,
+            viewsCount: true,
+          }
+        },
         worldProject: {
           select: {
             id: true,

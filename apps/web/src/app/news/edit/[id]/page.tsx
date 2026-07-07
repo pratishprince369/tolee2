@@ -27,8 +27,9 @@ export default async function EditNewsPage({ params }: { params: { id: string } 
     notFound();
   }
 
-  // Ensure only the author (or an admin) can edit the draft
-  if (newsItem.post.authorId !== userId && (session.user as any).role !== 'admin') {
+  // Ensure only the author or super admin can edit
+  const isSuperAdmin = session.user.email === process.env.SUPER_ADMIN_EMAIL;
+  if (newsItem.post.authorId !== userId && !isSuperAdmin) {
     redirect('/');
   }
 

@@ -38,7 +38,9 @@ export async function saveNewsDraft(data: {
   sourceUrl?: string;
   externalRef?: string;
   content: string; // rich text JSON string
-  mediaUrls?: string; // cover image URL
+  mediaUrls?: string; // comma-separated URLs
+  mediaTypes?: string; // comma-separated types
+  status?: string; // optional status ('draft' | 'published')
   selectedToleeIds?: string[];
 }) {
   try {
@@ -47,6 +49,7 @@ export async function saveNewsDraft(data: {
       return { success: false, error: 'Unauthorized' };
     }
     const userId = (session.user as any).id;
+    const isSuperAdmin = (session.user as any).email === process.env.SUPER_ADMIN_EMAIL;
 
     // Generate slug if empty
     let slug = data.slug || data.headline.toLowerCase().trim()
@@ -72,13 +75,30 @@ export async function saveNewsDraft(data: {
 
     let post;
     if (data.postId) {
+      // Find existing post for security check
+      const existing = await prisma.post.findUnique({
+        where: { id: data.postId },
+        select: { authorId: true, status: true }
+      });
+
+      if (!existing) {
+        return { success: false, error: 'News post not found' };
+      }
+
+      if (existing.authorId !== userId && !isSuperAdmin) {
+        return { success: false, error: 'Unauthorized edit request' };
+      }
+
+      const targetStatus = data.status || existing.status;
+
       // Update existing post
       post = await prisma.post.update({
         where: { id: data.postId },
         data: {
           caption: data.headline,
-          mediaUrls: data.mediaUrls,
-          status: 'draft',
+          mediaUrls: data.mediaUrls || null,
+          mediaTypes: data.mediaTypes || null,
+          status: targetStatus,
         }
       });
 
@@ -133,9 +153,9 @@ export async function saveNewsDraft(data: {
           authorId: userId,
           caption: data.headline,
           postType: 'news',
-          mediaUrls: data.mediaUrls,
-          mediaTypes: data.mediaUrls ? 'image' : null,
-          status: 'draft',
+          mediaUrls: data.mediaUrls || null,
+          mediaTypes: data.mediaTypes || null,
+          status: data.status || 'draft',
           visibility: 'followers', // default restriction
         }
       });
@@ -294,7 +314,8 @@ export async function deleteNews(postId: string) {
       where: { id: postId }
     });
 
-    if (!post || (post.authorId !== userId && (session.user as any).role !== 'admin')) {
+    const isSuperAdmin = session.user.email === process.env.SUPER_ADMIN_EMAIL;
+    if (!post || (post.authorId !== userId && !isSuperAdmin)) {
       return { success: false, error: 'Unauthorized delete request' };
     }
 

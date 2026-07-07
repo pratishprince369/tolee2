@@ -28,7 +28,8 @@ import {
   Loader2,
   Trash2,
   Play,
-  Layers
+  Layers,
+  Newspaper
 } from 'lucide-react';
 import { formatViewCount } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -219,7 +220,9 @@ export function InstagramProfileView({
   savedPosts,
   resharedPosts = [],
   tolees,
+  newsArticles = [],
   isMe,
+  isSuperAdmin = false,
   currentUserId,
   initialIsFollowing,
   initialFollowStatus,
@@ -237,7 +240,9 @@ export function InstagramProfileView({
   savedPosts: any[];
   resharedPosts?: any[];
   tolees: any[];
+  newsArticles?: any[];
   isMe: boolean;
+  isSuperAdmin?: boolean;
   currentUserId: string | undefined;
   initialIsFollowing: boolean;
   initialFollowStatus?: 'approved' | 'pending' | null;
@@ -1271,6 +1276,7 @@ export function InstagramProfileView({
                 { key: 'reels', icon: <Film className="w-[21px] h-[21px] stroke-[1.8]" /> },
                 { key: 'reshares', icon: <Repeat className="w-[21px] h-[21px] stroke-[1.8]" /> },
                 { key: 'tolees', icon: <Users className="w-[21px] h-[21px] stroke-[1.8]" /> },
+                ...(newsArticles.length > 0 || isMe ? [{ key: 'news', icon: <Newspaper className="w-[21px] h-[21px] stroke-[1.8]" /> }] : []),
                 ...(isMe ? [{ key: 'saved', icon: <Bookmark className="w-[21px] h-[21px] stroke-[1.8]" /> }] : [])
               ].map(({ key, icon }) => (
                 <button
@@ -1557,6 +1563,95 @@ export function InstagramProfileView({
                     <div className="w-16 h-16 rounded-full border-2 border-gray-100 flex items-center justify-center mb-4 bg-gray-50"><Bookmark className="w-7 h-7 text-gray-200 stroke-[1.5]" /></div>
                     <h3 className="text-[16px] font-bold text-gray-900 mb-1">Save Posts</h3>
                     <p className="text-[12.5px] text-gray-400 max-w-[220px] leading-relaxed">Save photos and videos that you want to see again.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* News Panel */}
+            {activeTab === 'news' && (
+              <div className="animate-in fade-in duration-200 p-3">
+                {newsArticles.length > 0 ? (
+                  <div className="grid grid-cols-1 gap-3">
+                    {newsArticles.map((newsItem: any) => {
+                      const post = newsItem.post;
+                      const coverImg = post?.mediaUrls ? post.mediaUrls.split(/,(?=https?:\/\/)/)[0] : null;
+                      const canEditThis = isMe || isSuperAdmin;
+                      
+                      return (
+                        <div key={newsItem.id} className="bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800/80 rounded-2xl overflow-hidden hover:shadow-sm transition-all">
+                          <div className="flex gap-3 p-3">
+                            {/* Thumbnail */}
+                            <div 
+                              onClick={() => router.push(`/news/${newsItem.slug}`)}
+                              className="w-20 h-20 sm:w-24 sm:h-24 flex-shrink-0 rounded-xl overflow-hidden bg-indigo-50 dark:bg-indigo-950/20 cursor-pointer"
+                            >
+                              {coverImg ? (
+                                <img src={coverImg} alt={newsItem.headline} className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <Newspaper className="w-6 h-6 text-indigo-300" />
+                                </div>
+                              )}
+                            </div>
+                            
+                            {/* Text Info */}
+                            <div className="flex-1 min-w-0 flex flex-col justify-between">
+                              <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-[9px] font-black uppercase tracking-wider text-indigo-500 dark:text-indigo-400">{newsItem.category}</span>
+                                  {post?.status === 'draft' && (
+                                    <span className="text-[9px] font-black uppercase tracking-wider text-orange-500 bg-orange-50 dark:bg-orange-950/20 px-1.5 py-0.5 rounded">Draft</span>
+                                  )}
+                                </div>
+                                <h4 
+                                  onClick={() => router.push(`/news/${newsItem.slug}`)}
+                                  className="font-bold text-[13px] sm:text-[14px] text-gray-900 dark:text-white leading-snug line-clamp-2 cursor-pointer hover:text-indigo-600 transition-colors"
+                                >
+                                  {newsItem.headline}
+                                </h4>
+                              </div>
+                              
+                              <div className="flex items-center gap-3 mt-1.5">
+                                <span className="text-[10px] text-gray-400 flex items-center gap-0.5">
+                                  <Eye className="w-3 h-3" /> {newsItem.viewsCount || 0}
+                                </span>
+                                <span className="text-[10px] text-gray-400 flex items-center gap-0.5">
+                                  <Heart className="w-3 h-3" /> {post?._count?.likes || 0}
+                                </span>
+                                <span className="text-[10px] text-gray-400 flex items-center gap-0.5">
+                                  <MessageCircle className="w-3 h-3" /> {post?._count?.comments || 0}
+                                </span>
+                                {canEditThis && (
+                                  <button 
+                                    onClick={(e) => { e.stopPropagation(); router.push(`/news/edit/${post?.id}`); }}
+                                    className="ml-auto text-[10px] font-bold text-teal-600 hover:text-teal-700 hover:underline"
+                                  >
+                                    Edit
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-20 text-center px-6">
+                    <div className="w-16 h-16 rounded-full border-2 border-gray-100 flex items-center justify-center mb-4 bg-gray-50">
+                      <Newspaper className="w-7 h-7 text-gray-200 stroke-[1.5]" />
+                    </div>
+                    <h3 className="text-[16px] font-bold text-gray-900 mb-1">No News Articles</h3>
+                    <p className="text-[12.5px] text-gray-400 max-w-[220px] leading-relaxed">News articles published by this user will appear here.</p>
+                    {isMe && (
+                      <button 
+                        onClick={() => router.push('/news/create')}
+                        className="mt-4 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-full transition-colors"
+                      >
+                        Create First Article
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

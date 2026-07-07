@@ -8,9 +8,12 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Newspaper, PlusCircle, ArrowUpRight, Clock, Eye, MessageSquare, Heart } from 'lucide-react';
+import { NewsCardMenu } from '@/components/NewsCardMenu';
 
 export default async function NewsHubPage({ searchParams }: { searchParams: { cat?: string } }) {
   const session = await getServerSession(authOptions);
+  const currentUserId = session?.user ? (session.user as any).id : null;
+  const isSuperAdmin = session?.user?.email === process.env.SUPER_ADMIN_EMAIL;
   const currentCategory = searchParams.cat || 'All';
 
   // Load news posts - wrapped in try-catch for graceful handling when table doesn't exist yet
@@ -115,21 +118,38 @@ export default async function NewsHubPage({ searchParams }: { searchParams: { ca
                 <Card key={item.id} className="border-gray-100 dark:border-zinc-900/60 bg-white dark:bg-[#121212] rounded-3xl overflow-hidden shadow-xs hover:shadow-md transition-all duration-200 flex flex-col justify-between">
                   <div>
                     {/* Thumbnail Cover image */}
-                    {post.mediaUrls ? (
-                      <div className="aspect-video w-full overflow-hidden bg-black relative">
-                        <img src={post.mediaUrls} alt={item.headline} className="w-full h-full object-cover hover:scale-102 transition-transform duration-300" />
-                        <Badge className="absolute top-3 left-3 bg-black/60 backdrop-blur-md text-[10px] font-bold text-white uppercase px-2 py-0.5 rounded border-none">
-                          {item.category}
-                        </Badge>
-                      </div>
-                    ) : (
-                      <div className="aspect-video w-full bg-indigo-50 dark:bg-indigo-950/20 flex items-center justify-center relative">
-                        <Newspaper className="w-10 h-10 text-indigo-300 dark:text-indigo-900" />
-                        <Badge className="absolute top-3 left-3 bg-black/60 backdrop-blur-md text-[10px] font-bold text-white uppercase px-2 py-0.5 rounded border-none">
-                          {item.category}
-                        </Badge>
-                      </div>
-                    )}
+                    {(() => {
+                      const coverImg = post.mediaUrls ? post.mediaUrls.split(/,(?=https?:\/\/)/)[0] : null;
+                      return coverImg ? (
+                        <div className="aspect-video w-full overflow-hidden bg-black relative">
+                          <img src={coverImg} alt={item.headline} className="w-full h-full object-cover hover:scale-102 transition-transform duration-300" />
+                          <Badge className="absolute top-3 left-3 bg-black/60 backdrop-blur-md text-[10px] font-bold text-white uppercase px-2 py-0.5 rounded border-none">
+                            {item.category}
+                          </Badge>
+                          <div className="absolute top-3 right-3 z-10">
+                            <NewsCardMenu 
+                              postId={post.id} 
+                              slug={item.slug} 
+                              canEdit={currentUserId === post.authorId || isSuperAdmin} 
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="aspect-video w-full bg-indigo-50 dark:bg-indigo-950/20 flex items-center justify-center relative">
+                          <Newspaper className="w-10 h-10 text-indigo-300 dark:text-indigo-900" />
+                          <Badge className="absolute top-3 left-3 bg-black/60 backdrop-blur-md text-[10px] font-bold text-white uppercase px-2 py-0.5 rounded border-none">
+                            {item.category}
+                          </Badge>
+                          <div className="absolute top-3 right-3 z-10">
+                            <NewsCardMenu 
+                              postId={post.id} 
+                              slug={item.slug} 
+                              canEdit={currentUserId === post.authorId || isSuperAdmin} 
+                            />
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     <CardContent className="p-5 space-y-2">
                       <Link href={`/news/${item.slug}`}>
