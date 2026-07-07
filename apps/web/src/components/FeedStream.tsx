@@ -849,6 +849,21 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
 
   return (
     <div className="min-h-screen bg-[#fafafa] dark:bg-[#0a0a0a] font-sans text-gray-900 dark:text-gray-100">
+      {/* Sibling triggers for programmatic click placed at top of container to prevent scroll focus bugs */}
+      <div className="hidden">
+        <CreateRequirementModal onPost={handleNewPost}>
+          <button id="trigger-requirement">Trigger Requirement</button>
+        </CreateRequirementModal>
+        <CreatePostModal onPost={handleNewPost}>
+          <button id="trigger-normal-post">Trigger Normal Post</button>
+        </CreatePostModal>
+        <CreatePostModal onPost={handleNewPost} videoOnly={true}>
+          <button id="trigger-reel-post">Trigger Reel Post</button>
+        </CreatePostModal>
+        <CreatePostModal onPost={handleNewPost} defaultTab="news">
+          <button id="trigger-news-post">Trigger News Post</button>
+        </CreatePostModal>
+      </div>
       
       {/* Mobile Header (Sidebar is hidden on mobile) */}
       <header className="lg:hidden sticky top-0 z-50 w-full bg-white/95 dark:bg-[#0a0a0c]/95 backdrop-blur-md border-b border-zinc-100 dark:border-zinc-900 shadow-[0_2px_15px_rgba(0,0,0,0.02)] h-16 flex items-center justify-between px-5">
@@ -3139,22 +3154,7 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
           </div>
         </DialogContent>
       </Dialog>
- 
-      {/* Sibling triggers for programmatic click */}
-      <div className="hidden">
-        <CreateRequirementModal onPost={handleNewPost}>
-          <button id="trigger-requirement">Trigger Requirement</button>
-        </CreateRequirementModal>
-        <CreatePostModal onPost={handleNewPost}>
-          <button id="trigger-normal-post">Trigger Normal Post</button>
-        </CreatePostModal>
-        <CreatePostModal onPost={handleNewPost} videoOnly={true}>
-          <button id="trigger-reel-post">Trigger Reel Post</button>
-        </CreatePostModal>
-        <CreatePostModal onPost={handleNewPost} defaultTab="news">
-          <button id="trigger-news-post">Trigger News Post</button>
-        </CreatePostModal>
-      </div>
+
 
       {/* Quick Boost Modal */}
       <QuickBoostModal 
