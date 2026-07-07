@@ -47,7 +47,7 @@ export default async function NewsModerationPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] text-gray-900 dark:text-zinc-200 p-4 sm:p-6 lg:pl-72 pt-20">
+    <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] text-gray-900 dark:text-zinc-200 p-4 sm:p-6 lg:px-8 pt-20">
       <div className="max-w-6xl mx-auto space-y-6">
         
         {/* Header */}

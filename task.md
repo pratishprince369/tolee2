@@ -7,6 +7,7 @@
 - [x] Pages & Routing updates
     - [x] Overwrite `/news/page.tsx` to use `NewsFeedStream` and initial server-side load
     - [x] Integrate `<NewsEngagement />` at the bottom of the reader page at `/news/[slug]/page.tsx`
+    - [x] Fix desktop news feed container center alignment by removing duplicate `lg:pl-72` padding offset from news feed, author stats, and admin moderation console pages.
 - [/] Verification
     - [ ] Verify compilation success
     - [ ] Run git commands to commit and push changes
