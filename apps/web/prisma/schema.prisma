@@ -294,6 +294,42 @@ model Post {
 
   isSimulation   Boolean       @default(false)
   storyAnalytics PostStoryAnalytics?
+  newsRelation   NewsPost?
+}
+
+model NewsPost {
+  id              String    @id @default(cuid())
+  postId          String    @unique
+  post            Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  headline        String
+  slug            String    @unique
+  summary         String?
+  metaDescription String?
+  keywords        String?   // comma-separated
+  tags            String?   // comma-separated
+  category        String
+  subcategory     String?
+  language        String    @default("English")
+  region          String?
+  state           String?
+  district        String?
+  city            String?
+  coverCaption    String?
+  imageCredit     String?
+  sourceUrl       String?
+  externalRef     String?
+  content         String    // JSON string representing rich editor content blocks
+  viewsCount      Int       @default(0)
+  readingTime     Int       @default(1)
+  
+  // SEO, AEO, GEO Optimization scores
+  seoScore        Int       @default(0)
+  aeoScore        Int       @default(0)
+  geoScore        Int       @default(0)
+  scoreAnalysis   String?   // recommendations and audit details stored as JSON
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 }
 
 model PostTolee {

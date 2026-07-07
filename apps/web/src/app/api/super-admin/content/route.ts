@@ -110,7 +110,7 @@ export async function GET(req: NextRequest) {
         mediaUrls: p.mediaUrls,
         status: p.status,
         createdAt: p.createdAt,
-        type: p.postType === 'reel' ? 'reel' : 'post',
+        type: p.postType === 'reel' ? 'reel' : p.postType === 'news' ? 'news' : 'post',
         author: p.author,
         _count: p._count,
       }));

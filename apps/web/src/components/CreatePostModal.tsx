@@ -3,16 +3,18 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Image as ImageIcon, Video, Paperclip, CheckCircle2, ShieldCheck, Globe, Trophy, X, Sparkles } from 'lucide-react';
+import { Image as ImageIcon, Video, Paperclip, CheckCircle2, ShieldCheck, Globe, Trophy, X, Sparkles, Newspaper } from 'lucide-react';
 
 import { getSidebarData } from '@/actions/user';
 import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import { AIImageGeneratorModal } from '@/components/AIImageGeneratorModal';
 import { AIVideoGeneratorModal } from '@/components/AIVideoGeneratorModal';
 import { useUpload } from './UploadContext';
 
 export function CreatePostModal({ children, onPost, videoOnly = false, toleeId, toleeName, toleeSlug }: { children: React.ReactNode, onPost?: (post: any, postData?: any) => void, videoOnly?: boolean, toleeId?: string, toleeName?: string, toleeSlug?: string }) {
   const { data: session } = useSession();
+  const router = useRouter();
   const [postType, setPostType] = useState('regular'); // regular, win
   const [content, setContent] = useState('');
   const [selectedTolees, setSelectedTolees] = useState<string[]>(toleeId ? [toleeId] : []);
@@ -137,6 +139,15 @@ export function CreatePostModal({ children, onPost, videoOnly = false, toleeId, 
                 className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all flex items-center gap-1 ${postType === 'win' ? 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-500 shadow-sm' : 'text-gray-500'}`}
               >
                 <Trophy className="w-4 h-4" /> Win
+              </button>
+              <button 
+                onClick={() => {
+                  setIsOpen(false);
+                  router.push('/news/create');
+                }}
+                className="px-4 py-1.5 rounded-full text-sm font-semibold text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all flex items-center gap-1"
+              >
+                <Newspaper className="w-4 h-4" /> News
               </button>
             </div>
           )}

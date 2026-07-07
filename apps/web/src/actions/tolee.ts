@@ -127,6 +127,17 @@ export async function getToleeBySlug(slug: string) {
                     bannerImage: true,
                   }
                 },
+                newsRelation: {
+                  select: {
+                    id: true,
+                    headline: true,
+                    slug: true,
+                    summary: true,
+                    category: true,
+                    readingTime: true,
+                    viewsCount: true,
+                  }
+                },
                 author: {
                   select: {
                     id: true,

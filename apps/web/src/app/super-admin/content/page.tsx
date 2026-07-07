@@ -254,8 +254,17 @@ export default function ContentPage() {
                     
                     {/* Badge types & status */}
                     <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
-                      <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 20, background: '#1c1c1e', color: '#a1a1aa', border: '1px solid #27272a', textTransform: 'uppercase' }}>
-                        {item.type === 'world_project' ? `WORLD ${item.projectType}` : item.type}
+                      <span style={{
+                        fontSize: 10,
+                        fontWeight: 700,
+                        padding: '3px 8px',
+                        borderRadius: 20,
+                        background: item.type === 'news' ? '#1e1b4b' : '#1c1c1e',
+                        color: item.type === 'news' ? '#c7d2fe' : '#a1a1aa',
+                        border: item.type === 'news' ? '1px solid #312e81' : '1px solid #27272a',
+                        textTransform: 'uppercase'
+                      }}>
+                        {item.type === 'world_project' ? `WORLD ${item.projectType}` : item.type === 'news' ? '📰 News' : item.type}
                       </span>
                       <span style={{
                         fontSize: 10,

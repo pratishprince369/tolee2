@@ -180,6 +180,7 @@ export default async function ToleePage({ params }: { params: { slug: string } }
         role: p.post.author.id === dbTolee.ownerId ? 'Admin' : 'Member',
         isWin: p.post.postType === 'win',
         postType: p.post.postType,
+        newsRelation: (p.post as any).newsRelation || null,
         worldProjectId: p.post.worldProjectId || null,
         worldProject: p.post.worldProject || null,
         likedByMe,
