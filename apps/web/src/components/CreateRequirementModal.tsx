@@ -146,7 +146,7 @@ export function CreateRequirementModal({
       <DialogTrigger asChild>
         {children}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[550px] p-0 bg-white dark:bg-[#121212] overflow-y-auto max-h-[90vh] rounded-2xl border-gray-200 dark:border-gray-800">
+      <DialogContent className="sm:max-w-[550px] p-0 bg-white dark:bg-[#121212] overflow-y-auto max-h-[78vh] sm:max-h-[82vh] rounded-2xl border-gray-200 dark:border-gray-800">
 
         {/* Header */}
         <DialogHeader className="p-4 border-b border-gray-100 dark:border-gray-800 flex flex-row items-center justify-between">

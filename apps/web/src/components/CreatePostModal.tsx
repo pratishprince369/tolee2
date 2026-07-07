@@ -250,7 +250,7 @@ export function CreatePostModal({
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className="sm:max-w-[550px] p-0 bg-white dark:bg-[#121212] overflow-y-auto max-h-[90vh] rounded-2xl border-gray-200 dark:border-gray-800 relative"
+        className="sm:max-w-[550px] p-0 bg-white dark:bg-[#121212] overflow-y-auto max-h-[78vh] sm:max-h-[82vh] rounded-2xl border-gray-200 dark:border-gray-800 relative"
       >
         {/* Drag & drop overlay */}
         {isDragging && (
