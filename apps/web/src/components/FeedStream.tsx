@@ -977,7 +977,7 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
             </div>
             
             {/* Premium Desktop Action Grid (Horizontal Cards) */}
-            <div className="hidden sm:grid grid-cols-3 gap-4 mb-6">
+            <div className="hidden sm:grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
               {/* Box 1: Post Your Requirement */}
               <div 
                 onClick={() => document.getElementById('trigger-requirement')?.click()}
@@ -1023,6 +1023,22 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                 </h4>
                 <p className="text-[11.5px] text-gray-500 dark:text-zinc-400 leading-snug mt-1.5 max-w-[200px]">
                   Upload vertical videos with description to showcase your skills.
+                </p>
+              </div>
+
+              {/* Box 4: Post News */}
+              <div 
+                onClick={() => document.getElementById('trigger-news-post')?.click()}
+                className="group relative flex flex-col items-center text-center p-5 rounded-2xl border border-indigo-100 dark:border-indigo-950/20 bg-indigo-50/10 dark:bg-indigo-950/5 hover:bg-indigo-50/40 dark:hover:bg-indigo-950/15 hover:border-indigo-300 dark:hover:border-indigo-800/80 cursor-pointer shadow-sm hover:shadow-md hover:-translate-y-1 hover:scale-[1.02] transition-all duration-300 active:scale-[0.98]"
+              >
+                <div className="w-11 h-11 rounded-2xl bg-indigo-500 flex items-center justify-center text-white shadow-md shadow-indigo-500/20 group-hover:scale-105 transition-transform duration-300">
+                  <Newspaper className="w-5.5 h-5.5 stroke-[2.25]" />
+                </div>
+                <h4 className="font-extrabold text-[14.5px] text-indigo-600 dark:text-indigo-400 mt-4 group-hover:text-indigo-700 dark:group-hover:text-indigo-300 transition-colors">
+                  Post News
+                </h4>
+                <p className="text-[11.5px] text-gray-500 dark:text-zinc-400 leading-snug mt-1.5 max-w-[200px]">
+                  Publish simplified news updates, community articles or press releases.
                 </p>
               </div>
             </div>
@@ -3099,7 +3115,9 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
             <div 
               onClick={() => {
                 setIsQuickActionOpen(false);
-                router.push('/news/create');
+                setTimeout(() => {
+                  document.getElementById('trigger-news-post')?.click();
+                }, 150);
               }}
               className="group flex items-start gap-3.5 p-3.5 sm:p-4 rounded-2xl border border-indigo-100 dark:border-indigo-950/30 bg-indigo-50/20 dark:bg-indigo-950/10 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/20 hover:border-indigo-200 cursor-pointer transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0"
             >
@@ -3121,7 +3139,7 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
           </div>
         </DialogContent>
       </Dialog>
-
+ 
       {/* Sibling triggers for programmatic click */}
       <div className="hidden">
         <CreateRequirementModal onPost={handleNewPost}>
@@ -3132,6 +3150,9 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
         </CreatePostModal>
         <CreatePostModal onPost={handleNewPost} videoOnly={true}>
           <button id="trigger-reel-post">Trigger Reel Post</button>
+        </CreatePostModal>
+        <CreatePostModal onPost={handleNewPost} defaultTab="news">
+          <button id="trigger-news-post">Trigger News Post</button>
         </CreatePostModal>
       </div>
 

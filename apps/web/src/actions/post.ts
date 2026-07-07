@@ -19,6 +19,13 @@ export async function createPost(data: {
   subLocation?: string | null;
   status?: string;
   isAnonymous?: boolean;
+  // News fields
+  headline?: string;
+  summary?: string;
+  category?: string;
+  metaDescription?: string;
+  keywords?: string;
+  tags?: string;
 }) {
   try {
     const session = await getServerSession(authOptions);
@@ -48,9 +55,12 @@ export async function createPost(data: {
 
     const isDraft = data.status?.toLowerCase() === 'draft';
     const { sanitizeText } = require('@/lib/sanitize');
-    const safeContent = sanitizeText(data.content || '', 5000);
+    
+    // For news postType, the "headline" is the primary visual text. We sanitize the headline or content
+    const safeContent = sanitizeText(data.content || '', 15000);
+    const safeHeadline = sanitizeText(data.headline || '', 200);
 
-    if (!isDraft && !safeContent) {
+    if (!isDraft && !safeContent && !safeHeadline) {
       return { success: false, error: 'Post content cannot be empty.' };
     }
 
@@ -95,9 +105,29 @@ export async function createPost(data: {
       }
     }
 
+    // Auto-generate URL slug for news posts on the backend
+    let slug: string | undefined = undefined;
+    if (data.postType === 'news') {
+      const rawHeadline = data.headline || 'Untitled News';
+      slug = rawHeadline.toLowerCase().trim()
+        .replace(/[^\w\s-]/g, '')
+        .replace(/[\s_-]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+      
+      if (!slug) {
+        slug = `news-${Date.now()}`;
+      }
+
+      // Ensure uniqueness
+      const existingSlug = await prisma.newsPost.findFirst({ where: { slug } });
+      if (existingSlug) {
+        slug = `${slug}-${Math.floor(100 + Math.random() * 900)}`;
+      }
+    }
+
     const post = await prisma.post.create({
       data: {
-        caption: safeContent || '',
+        caption: data.postType === 'news' ? (safeHeadline || 'Untitled News') : (safeContent || ''),
         postType: data.postType,
         mediaUrls: data.media ? data.media.url : null,
         mediaTypes: data.media ? data.media.type : null,
@@ -105,13 +135,29 @@ export async function createPost(data: {
         mediaResourceTypes,
         location: data.location || null,
         subLocation: data.subLocation || null,
-        status: isDraft ? 'DRAFT' : 'published',
+        status: isDraft ? 'draft' : 'published',
         authorId: userId,
         isAnonymous: !!data.isAnonymous,
         tolees: data.toleeIds && data.toleeIds.length > 0 ? {
           create: data.toleeIds.map(id => ({
             toleeId: id
           }))
+        } : undefined,
+        newsRelation: data.postType === 'news' ? {
+          create: {
+            headline: data.headline || 'Untitled News',
+            slug: slug!,
+            summary: data.summary || '',
+            category: data.category || 'General News',
+            content: data.content || '',
+            metaDescription: data.metaDescription || '',
+            keywords: data.keywords || '',
+            tags: data.tags || '',
+            viewsCount: 0,
+            seoScore: 80,
+            aeoScore: 75,
+            geoScore: 70
+          }
         } : undefined
       },
       include: {
