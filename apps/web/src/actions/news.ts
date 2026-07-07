@@ -395,7 +395,7 @@ export async function getAuthorNewsStats() {
     let totalLikes = 0;
     let totalComments = 0;
 
-    const list = newsPosts.map(n => {
+    const list = newsPosts.map((n: any) => {
       totalViews += n.viewsCount;
       totalLikes += n.post.likes.length;
       totalComments += n.post.comments.length;
