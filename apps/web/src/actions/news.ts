@@ -366,6 +366,16 @@ export async function getNewsBySlug(slug: string) {
               include: {
                 tolee: true
               }
+            },
+            savedBy: {
+              select: {
+                userId: true,
+              }
+            },
+            reposts: {
+              select: {
+                userId: true,
+              }
             }
           }
         }
@@ -560,3 +570,139 @@ async function scanContentAI(headline: string, summary: string, content: string)
     return { clean: true }; // Fallback to avoid blocking on local connection failures
   }
 }
+
+// 6. Get paginated news posts feed
+export async function getNewsFeedPosts(options: {
+  category?: string;
+  page?: number;
+  limit?: number;
+}) {
+  try {
+    const session = await getServerSession(authOptions);
+    const currentUserId = session?.user ? (session.user as any).id : null;
+    const page = options.page || 1;
+    const limit = options.limit || 10;
+    const category = options.category || 'All';
+
+    const skip = (page - 1) * limit;
+
+    const newsList = await prisma.newsPost.findMany({
+      where: {
+        post: {
+          status: 'published',
+          isArchived: false,
+        },
+        category: category !== 'All' ? category : undefined,
+      },
+      include: {
+        post: {
+          include: {
+            author: {
+              select: {
+                id: true,
+                name: true,
+                username: true,
+                image: true,
+                isPrivate: true,
+              }
+            },
+            likes: {
+              select: {
+                userId: true,
+              }
+            },
+            comments: {
+              include: {
+                author: {
+                  select: {
+                    id: true,
+                    name: true,
+                    username: true,
+                    image: true,
+                  }
+                }
+              },
+              orderBy: { createdAt: 'desc' }
+            },
+            tolees: {
+              include: {
+                tolee: {
+                  select: {
+                    id: true,
+                    name: true,
+                    slug: true,
+                  }
+                }
+              }
+            },
+            savedBy: {
+              select: {
+                userId: true,
+              }
+            },
+            reposts: {
+              select: {
+                userId: true,
+              }
+            },
+            _count: {
+              select: {
+                likes: true,
+                comments: true,
+                views: true,
+                reposts: true,
+              }
+            }
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take: limit,
+    });
+
+    const mappedNews = newsList.map((item: any) => {
+      const post = item.post;
+      const firstTolee = post?.tolees?.[0]?.tolee || null;
+      
+      const likedByMe = currentUserId ? post?.likes?.some((like: any) => like.userId === currentUserId) : false;
+      const savedByMe = currentUserId ? post?.savedBy?.some((save: any) => save.userId === currentUserId) : false;
+      const repostedByMe = currentUserId ? post?.reposts?.some((rep: any) => rep.userId === currentUserId) : false;
+
+      return {
+        ...item,
+        likedByMe,
+        savedByMe,
+        repostedByMe,
+        post: {
+          ...post,
+          toleeName: firstTolee?.name || null,
+          toleeSlug: firstTolee?.slug || null,
+        }
+      };
+    });
+
+    // Check if there are more posts in the next batch
+    const nextBatchCount = await prisma.newsPost.count({
+      where: {
+        post: {
+          status: 'published',
+          isArchived: false,
+        },
+        category: category !== 'All' ? category : undefined,
+      },
+      skip: skip + limit,
+      take: 1,
+    });
+
+    return {
+      success: true,
+      news: mappedNews,
+      hasMore: nextBatchCount > 0,
+    };
+  } catch (err: any) {
+    console.error('Error fetching news feed posts:', err);
+    return { success: false, error: err.message || 'Failed to fetch news posts' };
+  }
+}
+

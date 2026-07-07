@@ -1,0 +1,12 @@
+- [x] Backend Actions & DB Fetching updates
+    - [x] Implement `getNewsFeedPosts` paginated server action inside `news.ts`
+    - [x] Include `savedBy` and `reposts` relation selections inside `getNewsBySlug` query in `news.ts`
+- [x] Front-End & Feed Stream updates
+    - [x] Create `NewsEngagement.tsx` client component with interactive Like, Comment, Repost, Save, Share buttons and quick comment composer
+    - [x] Create `NewsFeedStream.tsx` infinite scrolling client component with distinct news cards and background prefetching
+- [x] Pages & Routing updates
+    - [x] Overwrite `/news/page.tsx` to use `NewsFeedStream` and initial server-side load
+    - [x] Integrate `<NewsEngagement />` at the bottom of the reader page at `/news/[slug]/page.tsx`
+- [/] Verification
+    - [ ] Verify compilation success
+    - [ ] Run git commands to commit and push changes

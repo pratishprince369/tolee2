@@ -14,6 +14,7 @@ import { FollowButton } from '@/components/FollowButton';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { PostCarousel } from '@/components/PostCarousel';
+import { NewsEngagement } from '@/components/NewsEngagement';
 
 export default async function NewsReaderPage({ params }: { params: { slug: string } }) {
   const news = await getNewsBySlug(params.slug);
@@ -267,6 +268,23 @@ export default async function NewsReaderPage({ params }: { params: { slug: strin
             </Link>
           </div>
         )}
+
+        {/* Engagement Bar & Quick Comment Box */}
+        <div className="mt-8 pt-4 border-t border-gray-100 dark:border-zinc-900">
+          <NewsEngagement
+            postId={post.id}
+            initialLikes={post.likes?.length || 0}
+            initialComments={post.comments?.length || 0}
+            initialReposts={post.reposts?.length || 0}
+            initialViews={news.viewsCount || 0}
+            initialLikedByMe={currentUserId ? post.likes?.some((l: any) => l.userId === currentUserId) : false}
+            initialSavedByMe={currentUserId ? post.savedBy?.some((s: any) => s.userId === currentUserId) : false}
+            initialRepostedByMe={currentUserId ? post.reposts?.some((r: any) => r.userId === currentUserId) : false}
+            shareCount={post.shareCount || 0}
+            slug={news.slug}
+            headline={news.headline}
+          />
+        </div>
 
       </article>
     </div>
