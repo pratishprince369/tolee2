@@ -149,7 +149,14 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         media: uploadedItems.length > 0 ? { type: combinedTypes, url: combinedUrls } : null,
         location: postData.location || null,
         subLocation: postData.subLocation || null,
-        isAnonymous: !!postData.isAnonymous
+        isAnonymous: !!postData.isAnonymous,
+        // News fields
+        headline: postData.headline,
+        summary: postData.summary,
+        category: postData.category,
+        metaDescription: postData.metaDescription,
+        keywords: postData.keywords,
+        tags: postData.tags,
       });
 
       if (!result.success) {
