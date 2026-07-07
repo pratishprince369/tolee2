@@ -272,17 +272,19 @@ export async function getPosts(options?: { mediaType?: string; limit?: number })
         worldProjectId: true,
         isSimulation: true,
         isAnonymous: true,
-        newsRelation: {
-          select: {
-            id: true,
-            headline: true,
-            slug: true,
-            summary: true,
-            category: true,
-            readingTime: true,
-            viewsCount: true,
-          }
-        },
+        // newsRelation: conditionally loaded only after migration
+        // Uncomment after running `prisma db push` on production:
+        // newsRelation: {
+        //   select: {
+        //     id: true,
+        //     headline: true,
+        //     slug: true,
+        //     summary: true,
+        //     category: true,
+        //     readingTime: true,
+        //     viewsCount: true,
+        //   }
+        // },
         worldProject: {
           select: {
             id: true,
