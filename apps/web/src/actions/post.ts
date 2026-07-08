@@ -9,6 +9,7 @@ import { getOrCreatePersonalChat } from './chat';
 import { extractPublicIdFromUrl, extractResourceTypeFromUrl, destroyMultipleAssets } from '@/lib/cloudinary-cleanup';
 import { createSystemNotification, createSystemNotificationsMany } from '@/lib/notification-service';
 import { getSimulationSettings, getSimulatedEngagement, generateDynamicComments, detectCountryCode, getAICacheSync } from '@/lib/simulation';
+import { runNewsAIPipeline } from '@/lib/aiNews';
 
 export async function createPost(data: {
   content?: string;
@@ -129,6 +130,43 @@ export async function createPost(data: {
       }
     }
 
+    let newsCategory = data.category || 'General News';
+    let newsSummary = data.summary || '';
+    let newsContent = data.content || '';
+    let newsMetaDesc = data.metaDescription || '';
+    let newsKeywords = data.keywords || '';
+    let newsTags = data.tags || '';
+    let newsReadingTime = 1;
+    let newsScoreAnalysis = null;
+    let postStatus = isDraft ? 'draft' : 'published';
+    let aiReport = null;
+
+    if (data.postType === 'news' && !isDraft) {
+      try {
+        const aiResult = await runNewsAIPipeline({
+          headline: data.headline || 'Untitled News',
+          content: data.content || '',
+          mediaUrls: data.media ? data.media.url : null
+        });
+
+        newsCategory = aiResult.category;
+        newsSummary = aiResult.summary;
+        newsContent = aiResult.content;
+        newsMetaDesc = aiResult.metaDescription;
+        newsKeywords = aiResult.keywords;
+        newsTags = aiResult.tags;
+        newsReadingTime = aiResult.readingTime;
+        newsScoreAnalysis = aiResult.scoreAnalysis;
+
+        if (!aiResult.clean) {
+          postStatus = 'flagged_ai';
+          aiReport = aiResult.moderationReason;
+        }
+      } catch (aiErr) {
+        console.error("AI news pipeline failed, falling back to manual inputs:", aiErr);
+      }
+    }
+
     const post = await prisma.post.create({
       data: {
         caption: data.postType === 'news' ? (safeHeadline || 'Untitled News') : (safeContent || ''),
@@ -139,7 +177,8 @@ export async function createPost(data: {
         mediaResourceTypes,
         location: data.location || null,
         subLocation: data.subLocation || null,
-        status: isDraft ? 'draft' : 'published',
+        status: postStatus,
+        aiReport,
         authorId: userId,
         isAnonymous: !!data.isAnonymous,
         tolees: data.toleeIds && data.toleeIds.length > 0 ? {
@@ -151,16 +190,18 @@ export async function createPost(data: {
           create: {
             headline: data.headline || 'Untitled News',
             slug: slug!,
-            summary: data.summary || '',
-            category: data.category || 'General News',
-            content: data.content || '',
-            metaDescription: data.metaDescription || '',
-            keywords: data.keywords || '',
-            tags: data.tags || '',
+            summary: newsSummary,
+            category: newsCategory,
+            content: newsContent || data.content || '',
+            metaDescription: newsMetaDesc,
+            keywords: newsKeywords,
+            tags: newsTags,
             viewsCount: 0,
             seoScore: 80,
             aeoScore: 75,
-            geoScore: 70
+            geoScore: 70,
+            scoreAnalysis: newsScoreAnalysis,
+            readingTime: newsReadingTime
           }
         } : undefined
       },

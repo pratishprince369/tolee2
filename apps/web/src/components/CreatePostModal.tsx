@@ -310,131 +310,24 @@ export function CreatePostModal({
         <div className="px-4 pb-4 space-y-4">
           {postType === 'news' ? (
             <div className="space-y-3.5">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-wider block">News Headline *</label>
-                  <Input 
-                    placeholder="Enter headline..." 
-                    value={headline} 
-                    onChange={e => setHeadline(e.target.value)} 
-                    className="font-bold text-sm border-gray-200 dark:border-zinc-800 focus-visible:ring-[#0a7c85] rounded-xl"
-                  />
-                  <div className="flex gap-1.5 mt-1.5">
-                    <button 
-                      type="button" 
-                      onClick={() => runAIAssistance('headline')}
-                      disabled={isGeneratingAI}
-                      className="text-[9px] font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/20 px-1.5 py-0.5 rounded border border-purple-100 flex items-center gap-0.5"
-                    >
-                      <Sparkles className="w-2.5 h-2.5" /> AI Headline
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-wider block">Category</label>
-                  <select 
-                    value={category} 
-                    onChange={e => setCategory(e.target.value)} 
-                    className="w-full h-10 border border-gray-200 dark:border-zinc-800 bg-transparent rounded-xl px-3 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#0a7c85] dark:text-zinc-300"
-                  >
-                    <option value="General News" className="dark:bg-[#121212]">General News</option>
-                    <option value="Local News" className="dark:bg-[#121212]">Local News</option>
-                    <option value="Business" className="dark:bg-[#121212]">Business</option>
-                    <option value="Real Estate" className="dark:bg-[#121212]">Real Estate</option>
-                    <option value="Technology" className="dark:bg-[#121212]">Technology</option>
-                    <option value="Sports" className="dark:bg-[#121212]">Sports</option>
-                    <option value="Politics" className="dark:bg-[#121212]">Politics</option>
-                    <option value="Education" className="dark:bg-[#121212]">Education</option>
-                    <option value="Travel" className="dark:bg-[#121212]">Travel</option>
-                    <option value="Entertainment" className="dark:bg-[#121212]">Entertainment</option>
-                    <option value="Lifestyle" className="dark:bg-[#121212]">Lifestyle</option>
-                    <option value="Jobs" className="dark:bg-[#121212]">Jobs</option>
-                    <option value="Opinion" className="dark:bg-[#121212]">Opinion</option>
-                    <option value="Press Release" className="dark:bg-[#121212]">Press Release</option>
-                  </select>
-                </div>
-              </div>
-
               <div className="space-y-1">
-                <div className="flex justify-between items-center">
-                  <label className="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-wider block">Short Summary</label>
-                  <button 
-                    type="button"
-                    onClick={() => runAIAssistance('summary')}
-                    disabled={isGeneratingAI}
-                    className="text-[9px] font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/20 px-1.5 py-0.5 rounded border border-purple-100 flex items-center gap-0.5"
-                  >
-                    <Sparkles className="w-2.5 h-2.5" /> Auto Summarize
-                  </button>
-                </div>
-                <textarea 
-                  placeholder="Summarize the core of the news article..." 
-                  value={summary} 
-                  onChange={e => setSummary(e.target.value)} 
-                  className="w-full h-11 bg-transparent border border-gray-200 dark:border-zinc-800 rounded-xl p-2.5 text-xs sm:text-sm focus:ring-1 focus:ring-[#0a7c85] focus:outline-none"
+                <label className="text-[10px] font-bold text-[#0a7c85] dark:text-zinc-400 uppercase tracking-wider block">News Headline *</label>
+                <Input 
+                  placeholder="Enter News Headline..." 
+                  value={headline} 
+                  onChange={e => setHeadline(e.target.value)} 
+                  className="font-bold text-sm border-gray-200 dark:border-zinc-800 focus-visible:ring-[#0a7c85] rounded-xl"
                 />
               </div>
 
               <div className="space-y-1">
-                <div className="flex justify-between items-center">
-                  <label className="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-wider block">Full Article Content *</label>
-                  <button 
-                    type="button"
-                    onClick={() => runAIAssistance('content')}
-                    disabled={isGeneratingAI}
-                    className="text-[9px] font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/20 px-1.5 py-0.5 rounded border border-purple-100 flex items-center gap-0.5"
-                  >
-                    <Sparkles className="w-2.5 h-2.5" /> Polish content
-                  </button>
-                </div>
+                <label className="text-[10px] font-bold text-[#0a7c85] dark:text-zinc-400 uppercase tracking-wider block">News Content *</label>
                 <textarea 
-                  placeholder="Write full news article details..." 
+                  placeholder="Write your news article here..." 
                   value={content} 
                   onChange={e => setContent(e.target.value)} 
-                  className="w-full min-h-[120px] bg-transparent border border-gray-200 dark:border-zinc-800 rounded-xl p-3 text-xs sm:text-sm focus:ring-1 focus:ring-[#0a7c85] focus:outline-none"
+                  className="w-full min-h-[160px] bg-transparent border border-gray-200 dark:border-zinc-800 rounded-xl p-3 text-xs sm:text-sm focus:ring-1 focus:ring-[#0a7c85] focus:outline-none"
                 />
-              </div>
-
-              {/* Collapsable SEO block */}
-              <div className="border border-gray-150 dark:border-zinc-900 rounded-xl overflow-hidden">
-                <button 
-                  type="button" 
-                  onClick={() => setShowSeoSettings(!showSeoSettings)}
-                  className="w-full bg-gray-50 dark:bg-zinc-900/50 p-2.5 text-[10.5px] font-bold text-gray-600 dark:text-zinc-400 flex items-center justify-between"
-                >
-                  <span className="flex items-center gap-1"><Sparkles className="w-3.5 h-3.5 text-purple-500" /> SEO Meta Options (AI Suggest)</span>
-                  <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${showSeoSettings ? 'rotate-180' : ''}`} />
-                </button>
-                
-                {showSeoSettings && (
-                  <div className="p-3 space-y-3 bg-white dark:bg-[#121212] border-t border-gray-100 dark:border-zinc-900">
-                    <div className="flex justify-end">
-                      <button 
-                        type="button"
-                        onClick={() => runAIAssistance('seo')}
-                        disabled={isGeneratingAI}
-                        className="text-[9px] font-bold text-purple-600 bg-purple-50 px-2 py-0.5 rounded border border-purple-100"
-                      >
-                        Generate Meta info
-                      </button>
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wide block">Meta Description</label>
-                      <Input value={seoMetaDesc} onChange={e => setSeoMetaDesc(e.target.value)} placeholder="Search snippet text..." className="text-xs focus-visible:ring-[#0a7c85]" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="space-y-1">
-                        <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wide block">Keywords</label>
-                        <Input value={seoKeywords} onChange={e => setSeoKeywords(e.target.value)} placeholder="e.g. news, update" className="text-xs focus-visible:ring-[#0a7c85]" />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wide block">Tags</label>
-                        <Input value={seoTags} onChange={e => setSeoTags(e.target.value)} placeholder="e.g. india, local" className="text-xs focus-visible:ring-[#0a7c85]" />
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           ) : (
@@ -575,41 +468,7 @@ export function CreatePostModal({
 
         {/* Footer Actions */}
         <div className="p-4 bg-white dark:bg-[#121212] border-t border-gray-100 dark:border-gray-800 flex gap-2">
-          {postType === 'news' && (
-            <Button 
-              variant="outline"
-              className="flex-1 h-12 text-sm font-bold rounded-xl text-gray-700 hover:text-gray-900 border-gray-200 dark:border-zinc-800"
-              disabled={!isPostReady || isUploading}
-              onClick={async () => {
-                const firstSelectedTolee = joinedTolees.find(t => t.id === selectedTolees[0]);
-                const postData = {
-                  content,
-                  postType: 'news',
-                  status: 'draft',
-                  toleeName: selectedTolees.length === 1 ? firstSelectedTolee?.name : `${selectedTolees.length} Tolees`,
-                  toleeSlug: selectedTolees.length === 1 ? firstSelectedTolee?.slug : 'multiple',
-                  selectedToleeIds: selectedTolees,
-                  headline,
-                  summary,
-                  category,
-                  metaDescription: seoMetaDesc,
-                  keywords: seoKeywords,
-                  tags: seoTags,
-                };
-                startUpload(mediaList, postData, 'feed', onPost);
-                setContent('');
-                setHeadline('');
-                setSummary('');
-                setSeoMetaDesc('');
-                setSeoKeywords('');
-                setSeoTags('');
-                setMediaList([]);
-                setIsOpen(false);
-              }}
-            >
-              Save Draft
-            </Button>
-          )}
+
           <Button 
             className="flex-grow h-12 text-sm font-extrabold rounded-xl bg-[#0a7c85] hover:bg-[#086971] text-white"
             disabled={!isPostReady || isUploading}

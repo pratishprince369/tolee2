@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { createSystemNotification } from '@/lib/notification-service';
+import { runNewsAIPipeline } from '@/lib/aiNews';
 
 // NVIDIA NIM API configuration for Moderation and AI assistant functions
 const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY || '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';
@@ -231,30 +232,64 @@ export async function publishNews(postId: string, validationData: {
       return { success: false, error: 'News post not found or permission denied' };
     }
 
-    // A. Run AI Moderation Filters (Hate speech, spam, drugs)
-    const moderationResult = await scanContentAI(newsItem.headline, newsItem.summary || '', newsItem.content);
-    if (!moderationResult.clean) {
+    // Run AI news pipeline to populate category, summary, optimized content, and metadata
+    let newsCategory = newsItem.category;
+    let newsSummary = newsItem.summary || '';
+    let newsContent = newsItem.content;
+    let newsMetaDesc = newsItem.metaDescription || '';
+    let newsKeywords = newsItem.keywords || '';
+    let newsTags = newsItem.tags || '';
+    let newsReadingTime = newsItem.readingTime || 1;
+    let newsScoreAnalysis = newsItem.scoreAnalysis || null;
+    let postStatus = 'published';
+    let aiReport = null;
+
+    try {
+      const aiResult = await runNewsAIPipeline({
+        headline: newsItem.headline,
+        content: newsItem.content,
+        mediaUrls: newsItem.post.mediaUrls
+      });
+
+      newsCategory = aiResult.category;
+      newsSummary = aiResult.summary;
+      newsContent = aiResult.content;
+      newsMetaDesc = aiResult.metaDescription;
+      newsKeywords = aiResult.keywords;
+      newsTags = aiResult.tags;
+      newsReadingTime = aiResult.readingTime;
+      newsScoreAnalysis = aiResult.scoreAnalysis;
+
+      if (!aiResult.clean) {
+        postStatus = 'flagged_ai';
+        aiReport = aiResult.moderationReason;
+      }
+    } catch (aiErr) {
+      console.error("AI pipeline failed on draft publish:", aiErr);
+    }
+
+    if (postStatus === 'flagged_ai') {
       // Flag the post as AI flagged in database
       await prisma.post.update({
         where: { id: postId },
         data: {
           status: 'flagged_ai',
-          aiReport: moderationResult.reason,
+          aiReport,
         }
       });
       return {
         success: false,
-        error: `AI Content Filter Flagged this article: ${moderationResult.reason}. It has been submitted for admin manual review.`
+        error: `AI Content Filter Flagged this article: ${aiReport}. It has been submitted for admin manual review.`
       };
     }
 
-    // B. Calculate real-time SEO, AEO, and GEO optimization scores
+    // B. Calculate real-time SEO, AEO, and GEO optimization scores using automated/optimized parameters
     const seoMetrics = analyzeSEOMetrics({
       headline: newsItem.headline,
-      summary: newsItem.summary || '',
-      metaDesc: newsItem.metaDescription || '',
-      content: newsItem.content,
-      keywords: newsItem.keywords || '',
+      summary: newsSummary,
+      metaDesc: newsMetaDesc,
+      content: newsContent,
+      keywords: newsKeywords,
     });
 
     // C. Update database records to make the post public/live
@@ -269,10 +304,17 @@ export async function publishNews(postId: string, validationData: {
     await prisma.newsPost.update({
       where: { postId },
       data: {
+        category: newsCategory,
+        summary: newsSummary,
+        content: newsContent,
+        metaDescription: newsMetaDesc,
+        keywords: newsKeywords,
+        tags: newsTags,
+        readingTime: newsReadingTime,
         seoScore: seoMetrics.seoScore,
         aeoScore: seoMetrics.aeoScore,
         geoScore: seoMetrics.geoScore,
-        scoreAnalysis: JSON.stringify(seoMetrics.recommendations),
+        scoreAnalysis: newsScoreAnalysis || JSON.stringify(seoMetrics.recommendations),
       }
     });
 
