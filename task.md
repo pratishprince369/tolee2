@@ -12,6 +12,10 @@
     - [x] Overwrite `/news/page.tsx` to use `NewsFeedStream` and initial server-side load
     - [x] Integrate `<NewsEngagement />` at the bottom of the reader page at `/news/[slug]/page.tsx`
     - [x] Fix desktop news feed container center alignment by removing duplicate `lg:pl-72` padding offset from news feed, author stats, and admin moderation console pages.
+- [x] Reels loading optimization with Instagram/TikTok style preloading
+    - [x] Implement battery level checking hook in `ReelsStream.tsx`.
+    - [x] Define rolling preload queue strategy with `preload="metadata"` and `preload="auto"` ranges adapting to network effectiveTypes (5G/WiFi, 4G, slow, low battery).
+    - [x] Update HLSVideo component to support `autoStartLoad` and only begin fragment downloads on native `canplay` or active transitions to avoid buffering spinners.
 - [/] Verification
     - [ ] Verify compilation success
     - [ ] Run git commands to commit and push changes

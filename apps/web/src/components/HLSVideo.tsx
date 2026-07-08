@@ -209,6 +209,7 @@ export const HLSVideo = forwardRef<HTMLVideoElement, HLSVideoProps>(
     if (src.endsWith('.m3u8') && Hls.isSupported()) {
       // HLS.js path
       const stats = getDeviceNetworkStats();
+      const autoStartLoad = props.preload !== 'metadata' || isActiveRef.current;
       const hls = new Hls({
         enableWorker: true,
         capLevelToPlayerSize: true,
@@ -220,11 +221,13 @@ export const HLSVideo = forwardRef<HTMLVideoElement, HLSVideoProps>(
         startFragPrefetch: true,
         testBandwidth: isActiveRef.current,
         abrEwmaDefaultEstimate: 600000,
+        autoStartLoad,
       });
       hlsRef.current = hls;
       hls.loadSource(src);
       hls.attachMedia(video);
-      hls.once(Hls.Events.MANIFEST_PARSED, onReady);
+      // Wait for native canplay so we have actual video data buffered before playing
+      video.addEventListener('canplay', onReady, { once: true });
       hls.on(Hls.Events.ERROR, (_ev, data) => {
         if (data.fatal) {
           console.warn('[HLSVideo] Fatal HLS error:', data.type, data.details);
@@ -260,6 +263,9 @@ export const HLSVideo = forwardRef<HTMLVideoElement, HLSVideoProps>(
       hlsRef.current.config.maxBufferLength = isActive ? (stats.lowRAM ? 6 : 12) : 2.5;
       hlsRef.current.config.maxMaxBufferLength = isActive ? (stats.lowRAM ? 10 : 20) : 5;
       hlsRef.current.config.testBandwidth = isActive;
+      if (isActive) {
+        hlsRef.current.startLoad();
+      }
     }
 
     if (isActive) {

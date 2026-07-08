@@ -318,6 +318,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
   const lastIndexRef = useRef(0);
   const [direction, setDirection] = useState<'down' | 'up'>('down');
   const [deviceStats, setDeviceStats] = useState({ preloadCount: 5, maxBuffer: 10, lowRAM: false });
+  const [isLowBattery, setIsLowBattery] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -333,6 +334,31 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
   }, []);
 
   useEffect(() => {
+    if (typeof window === 'undefined' || !('getBattery' in navigator)) return;
+    let batteryObj: any = null;
+    
+    const handleBatteryChange = () => {
+      if (batteryObj) {
+        setIsLowBattery(!batteryObj.charging && batteryObj.level <= 0.2);
+      }
+    };
+
+    (navigator as any).getBattery().then((battery: any) => {
+      batteryObj = battery;
+      handleBatteryChange();
+      battery.addEventListener('chargingchange', handleBatteryChange);
+      battery.addEventListener('levelchange', handleBatteryChange);
+    });
+
+    return () => {
+      if (batteryObj) {
+        batteryObj.removeEventListener('chargingchange', handleBatteryChange);
+        batteryObj.removeEventListener('levelchange', handleBatteryChange);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     const activeIndex = isDesktop ? desktopActiveIndex : mobileActiveIndex;
     if (activeIndex > lastIndexRef.current) {
       setDirection('down');
@@ -343,13 +369,59 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
   }, [mobileActiveIndex, desktopActiveIndex, isDesktop]);
 
   const activeIndex = isDesktop ? desktopActiveIndex : mobileActiveIndex;
+
+  const getPreloadParams = (idx: number) => {
+    if (idx === activeIndex) {
+      return { shouldLoad: true, preload: 'auto' as const };
+    }
+
+    const distance = idx - activeIndex;
+
+    // Past slides
+    if (distance < 0) {
+      const lookBehind = direction === 'up' ? 3 : 2;
+      const shouldLoad = idx >= activeIndex - lookBehind;
+      return {
+        shouldLoad,
+        preload: shouldLoad ? ('auto' as const) : ('none' as const),
+      };
+    }
+
+    // Future slides - adaptive preloading counts
+    let maxPreloadCount = 10;
+    let autoBufferCount = 4;
+
+    const conn = typeof window !== 'undefined' ? (navigator as any).connection : null;
+    const type = conn ? conn.effectiveType : '4g';
+    const isSlow = type === '2g' || type === '3g' || (conn && conn.downlink < 2);
+
+    if (isSlow) {
+      maxPreloadCount = 3;
+      autoBufferCount = 1;
+    } else if (type === '4g' && conn && conn.downlink < 10) {
+      maxPreloadCount = 7;
+      autoBufferCount = 2;
+    }
+
+    // Battery saver mode
+    if (isLowBattery) {
+      maxPreloadCount = 3;
+      autoBufferCount = 1;
+    }
+
+    if (distance <= maxPreloadCount) {
+      if (distance <= autoBufferCount) {
+        return { shouldLoad: true, preload: 'auto' as const };
+      } else {
+        return { shouldLoad: true, preload: 'metadata' as const };
+      }
+    }
+
+    return { shouldLoad: false, preload: 'none' as const };
+  };
   
   const shouldLoadSlide = (idx: number) => {
-    const { preloadCount } = deviceStats;
-    const lookAhead = direction === 'down' ? preloadCount : Math.min(3, preloadCount);
-    const lookBehind = direction === 'up' ? preloadCount : 2;
-
-    return idx >= activeIndex - lookBehind && idx <= activeIndex + lookAhead;
+    return getPreloadParams(idx).shouldLoad;
   };
 
   /* ── Modal state ── */
@@ -662,6 +734,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
                   }
                 }
 
+                const preloadParams = getPreloadParams(index);
                 return (
                   <AdReelSlide
                     key={`ad-${item.data.id}-${index}`}
@@ -673,12 +746,14 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
                     contentId={precedingReelId}
                     toleeId={precedingToleeId}
                     onPlaybackFailed={handlePlaybackFailed}
-                    shouldLoad={shouldLoadSlide(index)}
+                    shouldLoad={preloadParams.shouldLoad}
+                    preload={preloadParams.preload}
                   />
                 );
               }
               const reel = item.data;
               const originalIndex = reels.findIndex(r => r.id === reel.id);
+              const preloadParams = getPreloadParams(index);
               return (
                 <ReelSlide
                   key={`reel-${reel.id}-${index}`}
@@ -693,7 +768,8 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
                   followStatus={followStates[reel.authorId]}
                   onFollow={() => handleFollowAuthor(reel.authorId, reel.author, reel.id)}
                   onPlaybackFailed={handlePlaybackFailed}
-                  shouldLoad={shouldLoadSlide(index)}
+                  shouldLoad={preloadParams.shouldLoad}
+                  preload={preloadParams.preload}
                   {...makeActions(reel, originalIndex)}
                 />
               );
@@ -775,42 +851,46 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
                     }
                   }
 
-                  return (
-                    <AdReelSlide
-                      key={`ad-${item.data.id}-${index}`}
-                      ad={item.data}
-                      index={index}
-                      isActive={isDesktop && index === desktopActiveIndex}
-                      desktop={true}
-                      onAdClick={handleAdClick}
-                      contentId={precedingReelId}
-                      toleeId={precedingToleeId}
-                      onPlaybackFailed={handlePlaybackFailed}
-                      shouldLoad={shouldLoadSlide(index)}
-                    />
-                  );
-                }
-                const reel = item.data;
-                const originalIndex = reels.findIndex(r => r.id === reel.id);
+                const preloadParams = getPreloadParams(index);
                 return (
-                  <ReelSlide
-                    key={`reel-${reel.id}-${index}`}
-                    reel={reel}
+                  <AdReelSlide
+                    key={`ad-${item.data.id}-${index}`}
+                    ad={item.data}
                     index={index}
-                    // Only activate if this layout is currently VISIBLE (desktop)
                     isActive={isDesktop && index === desktopActiveIndex}
-                    isMuted={isMuted}
-                    session={session}
                     desktop={true}
-                    onMuteToggle={() => handleSetIsMuted((m) => !m)}
-                    followStatus={followStates[reel.authorId]}
-                    onFollow={() => handleFollowAuthor(reel.authorId, reel.author, reel.id)}
+                    onAdClick={handleAdClick}
+                    contentId={precedingReelId}
+                    toleeId={precedingToleeId}
                     onPlaybackFailed={handlePlaybackFailed}
-                    shouldLoad={shouldLoadSlide(index)}
-                    {...makeActions(reel, originalIndex)}
+                    shouldLoad={preloadParams.shouldLoad}
+                    preload={preloadParams.preload}
                   />
                 );
-              })}
+              }
+              const reel = item.data;
+              const originalIndex = reels.findIndex(r => r.id === reel.id);
+              const preloadParams = getPreloadParams(index);
+              return (
+                <ReelSlide
+                  key={`reel-${reel.id}-${index}`}
+                  reel={reel}
+                  index={index}
+                  // Only activate if this layout is currently VISIBLE (desktop)
+                  isActive={isDesktop && index === desktopActiveIndex}
+                  isMuted={isMuted}
+                  session={session}
+                  desktop={true}
+                  onMuteToggle={() => handleSetIsMuted((m) => !m)}
+                  followStatus={followStates[reel.authorId]}
+                  onFollow={() => handleFollowAuthor(reel.authorId, reel.author, reel.id)}
+                  onPlaybackFailed={handlePlaybackFailed}
+                  shouldLoad={preloadParams.shouldLoad}
+                  preload={preloadParams.preload}
+                  {...makeActions(reel, originalIndex)}
+                />
+              );
+            })}
             </div>
 
             {/* Desktop right-side action bar */}
@@ -978,6 +1058,7 @@ const ReelSlide = memo(function ReelSlide({
   followStatus, onFollow,
   onPlaybackFailed,
   shouldLoad,
+  preload = 'auto',
 }: {
   reel: any; index: number; isActive: boolean; isMuted: boolean;
   session: any; desktop: boolean;
@@ -988,6 +1069,7 @@ const ReelSlide = memo(function ReelSlide({
   onFollow?: () => void;
   onPlaybackFailed?: (index: number, errDetail: string) => void;
   shouldLoad: boolean;
+  preload?: 'auto' | 'metadata' | 'none';
 }) {
   const [isReady, setIsReady] = useState(false);
   const [isError, setIsError] = useState(false);
@@ -1026,6 +1108,7 @@ const ReelSlide = memo(function ReelSlide({
         poster={getPosterUrl(reel.video)}
         isActive={isActive}
         shouldLoad={shouldLoad}
+        preload={preload}
         contentId={reel.id}
         contentType="reel"
         trafficSource="reels"
@@ -1182,6 +1265,7 @@ const AdReelSlide = memo(function AdReelSlide({
   toleeId,
   onPlaybackFailed,
   shouldLoad,
+  preload = 'auto',
 }: {
   ad: any;
   index: number;
@@ -1192,6 +1276,7 @@ const AdReelSlide = memo(function AdReelSlide({
   toleeId?: string;
   onPlaybackFailed?: (index: number, errDetail: string) => void;
   shouldLoad: boolean;
+  preload?: 'auto' | 'metadata' | 'none';
 }) {
   const [isReady, setIsReady] = useState(false);
   const [isError, setIsError] = useState(false);
@@ -1238,6 +1323,7 @@ const AdReelSlide = memo(function AdReelSlide({
                   poster={getPosterUrl(displayMedia)}
                   isActive={isActive}
                   shouldLoad={shouldLoad}
+                  preload={preload}
                   loop
                   muted
                   playsInline
