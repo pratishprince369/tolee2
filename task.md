@@ -16,6 +16,11 @@
     - [x] Implement battery level checking hook in `ReelsStream.tsx`.
     - [x] Define rolling preload queue strategy with `preload="metadata"` and `preload="auto"` ranges adapting to network effectiveTypes (5G/WiFi, 4G, slow, low battery).
     - [x] Update HLSVideo component to support `autoStartLoad` and only begin fragment downloads on native `canplay` or active transitions to avoid buffering spinners.
-- [/] Verification
-    - [ ] Verify compilation success
-    - [ ] Run git commands to commit and push changes
+- [x] Mobile profile dropdown menu navigation expansion (feature parity)
+    - [x] Expose all 17 navigation options in mobile profile dropdown menu
+    - [x] Sync notifications and chat counts in real-time
+    - [x] Add active indicator dot ● to AI Manager menu item
+    - [x] Support dynamic franchise status checks (My Franchise / Get Franchise)
+- [x] Verification
+    - [x] Verify compilation success
+    - [x] Run git commands to commit and push changes
