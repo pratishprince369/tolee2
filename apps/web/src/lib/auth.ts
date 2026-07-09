@@ -70,6 +70,16 @@ export const authOptions: NextAuthOptions = {
                   email_verified_at: new Date(),
                 }
               });
+
+              // Create welcome onboarding notification
+              await prisma.notification.create({
+                data: {
+                  userId: user.id,
+                  type: 'welcome',
+                  message: 'To start sharing posts, reels, news and videos, you must first join one or more Tolees (Groups). Join communities that match your interests and start sharing with people around you.',
+                  link: '/discover'
+                }
+              });
             }
 
             if (user.isSuspended) {
@@ -183,6 +193,27 @@ export const authOptions: NextAuthOptions = {
       }
     })
   ],
+  events: {
+    async createUser({ user }) {
+      try {
+        const welcomeNotif = await prisma.notification.findFirst({
+          where: { userId: user.id, type: 'welcome' }
+        });
+        if (!welcomeNotif) {
+          await prisma.notification.create({
+            data: {
+              userId: user.id,
+              type: 'welcome',
+              message: 'To start sharing posts, reels, news and videos, you must first join one or more Tolees (Groups). Join communities that match your interests and start sharing with people around you.',
+              link: '/discover'
+            }
+          });
+        }
+      } catch (err) {
+        console.error("Error creating welcome notification in createUser event:", err);
+      }
+    }
+  },
   callbacks: {
     async signIn({ user, account, profile }) {
       if (!user?.id) return true;

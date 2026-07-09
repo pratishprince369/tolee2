@@ -83,6 +83,16 @@ export async function POST(req: Request) {
       }
     });
 
+    // Create welcome onboarding notification
+    await prisma.notification.create({
+      data: {
+        userId: user.id,
+        type: 'welcome',
+        message: 'To start sharing posts, reels, news and videos, you must first join one or more Tolees (Groups). Join communities that match your interests and start sharing with people around you.',
+        link: '/discover'
+      }
+    });
+
     // --- FRANCHISE REFERRAL TRACKING ---
     const cookieStore = cookies();
     const referralCode = ref || cookieStore.get("tolee_referral_code")?.value;
