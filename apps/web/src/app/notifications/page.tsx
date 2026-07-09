@@ -60,6 +60,45 @@ export default async function NotificationsPage() {
               bgColor = 'bg-green-50 dark:bg-green-900/20';
             }
 
+            if (notification.type === 'welcome' || notification.type === 'welcome_reminder') {
+              const cardTitle = notification.type === 'welcome' ? 'Welcome to Tolee! 🎉' : "You're almost ready! 🚀";
+              return (
+                <Link key={notification.id} href={notification.link || '/discover'}>
+                  <Card className="border-teal-500/20 dark:border-teal-500/10 bg-gradient-to-br from-teal-50/40 via-white to-white dark:from-teal-950/20 dark:via-zinc-950 dark:to-zinc-950 hover:from-teal-50/60 dark:hover:from-teal-950/30 transition-all rounded-2xl mb-6 shadow-sm relative overflow-hidden group">
+                    <CardContent className="p-5 sm:p-6 flex flex-col sm:flex-row items-start gap-4">
+                      <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 bg-teal-100/80 dark:bg-teal-950 text-teal-600 dark:text-teal-400 font-extrabold text-2xl">
+                        {notification.type === 'welcome' ? '🎉' : '🚀'}
+                      </div>
+                      <div className="flex-1 space-y-2.5">
+                        <div>
+                          <h3 className="font-extrabold text-gray-900 dark:text-white text-base sm:text-lg">
+                            {cardTitle}
+                          </h3>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            {new Date(notification.createdAt).toLocaleDateString()} at {new Date(notification.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        </div>
+                        <p className="text-sm text-gray-600 dark:text-zinc-300 leading-relaxed max-w-xl">
+                          {notification.message}
+                        </p>
+                        <div className="pt-1.5 flex items-center">
+                          <span className="inline-flex items-center gap-1.5 bg-[#0a7c85] hover:bg-[#086971] text-white text-xs font-black rounded-xl px-4 py-2.5 shadow-sm transition-all group-hover:translate-x-0.5">
+                            <span>Join Groups</span>
+                            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M5 12h14M12 5l7 7-7 7" />
+                            </svg>
+                          </span>
+                        </div>
+                      </div>
+                      {!notification.isRead && (
+                        <div className="absolute top-4 right-4 w-2.5 h-2.5 bg-blue-500 rounded-full"></div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </Link>
+              );
+            }
+
             return (
               <Link key={notification.id} href={notification.link || '#'}>
                 <Card className={`border-gray-200 dark:border-gray-800 bg-white dark:bg-[#121212] hover:bg-gray-50 dark:hover:bg-[#1a1a1a] transition-colors rounded-xl mb-4 ${!notification.isRead ? 'border-l-4 border-l-blue-500' : ''}`}>

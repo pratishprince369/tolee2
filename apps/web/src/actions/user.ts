@@ -409,6 +409,49 @@ export async function getSidebarData() {
     }
     const userId = (session.user as any).id;
 
+    // --- ONBOARDING WELCOME NOTIFICATION TRIGGER ---
+    const hasWelcomeNotif = await prisma.notification.findFirst({
+      where: { userId, type: 'welcome' }
+    });
+
+    if (!hasWelcomeNotif) {
+      await createSystemNotification({
+        userId,
+        type: 'welcome',
+        message: 'To start sharing posts, reels, news and videos, you must first join one or more Tolees (Groups). Join communities that match your interests and start sharing with people around you.',
+        link: '/discover'
+      });
+    }
+
+    // --- ONBOARDING 24-HOUR REMINDER TRIGGER ---
+    const userJoinedToleeCount = await prisma.toleeMember.count({
+      where: { userId, status: 'approved' }
+    });
+
+    if (userJoinedToleeCount === 0) {
+      const currentUser = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { createdAt: true }
+      });
+      if (currentUser) {
+        const timeDiffMs = new Date().getTime() - new Date(currentUser.createdAt).getTime();
+        const oneDayMs = 24 * 60 * 60 * 1000;
+        if (timeDiffMs >= oneDayMs) {
+          const hasReminderNotif = await prisma.notification.findFirst({
+            where: { userId, type: 'welcome_reminder' }
+          });
+          if (!hasReminderNotif) {
+            await createSystemNotification({
+              userId,
+              type: 'welcome_reminder',
+              message: "Join your first Tolee to start sharing posts, reels, news and videos with the community.",
+              link: '/discover'
+            });
+          }
+        }
+      }
+    }
+
     // Fetch Tolees user manages
     const managedTolees = await prisma.tolee.findMany({
       where: { ownerId: userId },
