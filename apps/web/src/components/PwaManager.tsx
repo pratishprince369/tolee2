@@ -64,39 +64,29 @@ export function PwaManager() {
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e);
-      
-      // Check if dismissed permanently
-      const dismissed = localStorage.getItem('tolee_pwa_dismissed');
-      if (!dismissed && !checkStandalone()) {
-        // Delay showing banner by 3 seconds for better UX
-        const timer = setTimeout(() => {
-          setShowBanner(true);
-        }, 3000);
-        return () => clearTimeout(timer);
-      }
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
     // 4. Detect iOS devices for custom install guides
-    const detectIos = () => {
-      const userAgent = window.navigator.userAgent;
-      const isIosDevice = /iPad|iPhone|iPod/.test(userAgent) && !(window as any).MSStream;
-      const isSafari = userAgent.includes('Safari') && !userAgent.includes('Chrome') && !userAgent.includes('CriOS');
-      
-      setIsIos(isIosDevice);
+    const userAgent = window.navigator.userAgent;
+    const isIosDevice = /iPad|iPhone|iPod/.test(userAgent) && !(window as any).MSStream;
+    const isSafari = userAgent.includes('Safari') && !userAgent.includes('Chrome') && !userAgent.includes('CriOS');
+    
+    setIsIos(isIosDevice);
 
-      // Show iOS help prompt if they are on iOS Safari and not standalone
-      const dismissed = localStorage.getItem('tolee_pwa_dismissed');
-      if (isIosDevice && isSafari && !dismissed && !checkStandalone()) {
-        const timer = setTimeout(() => {
-          setShowBanner(true);
-        }, 4000);
-        return () => clearTimeout(timer);
-      }
-    };
-
-    detectIos();
+    // 5. Show banner on first visit if not dismissed or installed/standalone
+    const dismissed = localStorage.getItem('tolee_pwa_dismissed') === 'true';
+    if (!dismissed && !standalone) {
+      const delay = isIosDevice ? 4000 : 3000;
+      const timer = setTimeout(() => {
+        setShowBanner(true);
+      }, delay);
+      return () => {
+        clearTimeout(timer);
+        window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      };
+    }
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -104,20 +94,12 @@ export function PwaManager() {
   }, []);
 
   const handleInstallClick = async () => {
-    if (!deferredPrompt) return;
+    // Open the Google Play Store link directly
+    window.open('https://play.google.com/store/apps/details?id=in.tolee.app&pcampaignid=web_share', '_blank');
 
-    // Track click on PWA install
-    await trackInstallClick('android_chrome');
+    // Track click on Play Store install
+    await trackInstallClick('play_store');
 
-    // Show native browser install dialog
-    deferredPrompt.prompt();
-
-    // Await user's decision
-    const { outcome } = await deferredPrompt.userChoice;
-    console.log(`[PWA Prompt] User decision: ${outcome}`);
-
-    // Clean up
-    setDeferredPrompt(null);
     setShowBanner(false);
   };
 
@@ -142,8 +124,10 @@ export function PwaManager() {
             <img src="/logo.png" alt="Tolee" className="w-10 h-10 object-contain" />
           </div>
           <div className="flex flex-col min-w-0">
-            <h4 className="text-sm font-bold truncate">Install Tolee</h4>
-            <p className="text-xs text-zinc-400 truncate">tolee.in</p>
+            <h4 className="text-sm font-bold truncate">Install Tolee App</h4>
+            <p className="text-xs text-zinc-400 truncate">
+              {isIos ? 'tolee.in' : 'Get it on Google Play'}
+            </p>
           </div>
         </div>
 
@@ -174,13 +158,13 @@ export function PwaManager() {
               </div>
             </div>
           ) : (
-            /* Standard Android / Chrome Install Button */
+            /* Standard Android / Chrome Install Button redirecting to Play Store */
             <Button
               onClick={handleInstallClick}
               size="sm"
               className="bg-[#0a7c85] hover:bg-[#08636a] text-white text-xs font-bold rounded-xl h-9 px-4 active:scale-95 transition-all"
             >
-              Install
+              Get App
             </Button>
           )}
 
