@@ -49,6 +49,23 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
     setMounted(true);
   }, []);
 
+  useEffect(() => {
+    if (!mounted) return;
+    const targetPostId = searchParams?.get('postId');
+    if (targetPostId) {
+      setTimeout(() => {
+        const el = document.getElementById(`post-${targetPostId}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          el.classList.add('ring-2', 'ring-[#0a7c85]', 'ring-offset-2');
+          setTimeout(() => {
+            el.classList.remove('ring-2', 'ring-[#0a7c85]', 'ring-offset-2');
+          }, 3000);
+        }
+      }, 600);
+    }
+  }, [mounted, searchParams]);
+
   // Stories state
   const [storyGroups, setStoryGroups] = useState<any[]>([]);
   const [activeStoryGroupIndex, setActiveStoryGroupIndex] = useState<number | null>(null);
@@ -1266,7 +1283,7 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                   const bannerImg = wp.bannerImage || null;
 
                   return (
-                    <Card key={post.id} className="border-indigo-100 dark:border-indigo-950/30 shadow-md bg-white dark:bg-[#121212] overflow-hidden transition-all duration-300 hover:shadow-lg hover:border-indigo-200 dark:hover:border-indigo-800">
+                    <Card key={post.id} id={`post-${post.id}`} className="border-indigo-100 dark:border-indigo-950/30 shadow-md bg-white dark:bg-[#121212] overflow-hidden transition-all duration-300 hover:shadow-lg hover:border-indigo-200 dark:hover:border-indigo-800 transition-all duration-500">
                       
                       {/* Shared group/Tolee context banner */}
                       <div className="px-4 py-2.5 border-b border-indigo-50/50 dark:border-indigo-950/20 flex items-center justify-between bg-indigo-50/20 dark:bg-indigo-950/5">
@@ -1507,7 +1524,7 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                   const newsViewsCount = post.views || news?.viewsCount || 0;
 
                   return (
-                    <Card key={post.id} className="border-indigo-100 dark:border-indigo-950/20 shadow-[0_4px_24px_rgba(0,0,0,0.02)] bg-white dark:bg-[#121212] overflow-hidden transition-all duration-300 hover:shadow-lg rounded-[24px] mb-6">
+                    <Card key={post.id} id={`post-${post.id}`} className="border-indigo-100 dark:border-indigo-950/20 shadow-[0_4px_24px_rgba(0,0,0,0.02)] bg-white dark:bg-[#121212] overflow-hidden transition-all duration-300 hover:shadow-lg rounded-[24px] mb-6 transition-all duration-500">
                       {/* Shared group context banner */}
                       {post.toleeName && (
                         <div className="px-4 py-2 border-b border-indigo-50/50 dark:border-zinc-900 bg-indigo-50/20 dark:bg-zinc-900/10 flex items-center justify-between">
@@ -1661,7 +1678,7 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                   const currencySymbol = post.currency === 'INR' || post.currency === '₹' ? '₹' : post.currency || '₹';
 
                   return (
-                    <Card key={post.id} className="border-emerald-100 dark:border-emerald-950/30 shadow-md bg-white dark:bg-[#121212] overflow-hidden transition-all duration-300 hover:shadow-lg hover:border-emerald-200 dark:hover:border-emerald-800">
+                    <Card key={post.id} id={`post-${post.id}`} className="border-emerald-100 dark:border-emerald-950/30 shadow-md bg-white dark:bg-[#121212] overflow-hidden transition-all duration-300 hover:shadow-lg hover:border-emerald-200 dark:hover:border-emerald-800 transition-all duration-500">
                       
                       {/* Shared group/Tolee context banner */}
                       <div className="px-4 py-2.5 border-b border-emerald-50/50 dark:border-emerald-950/20 flex items-center justify-between bg-emerald-50/20 dark:bg-emerald-950/5">
@@ -1871,7 +1888,7 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                 }
 
                 return (
-                  <Card key={post.id} className="border-gray-200/60 dark:border-zinc-800/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] bg-white dark:bg-[#000000] rounded-none sm:rounded-3xl overflow-hidden transition-all duration-300 mb-6 border-x-0 sm:border-x">
+                  <Card key={post.id} id={`post-${post.id}`} className="border-gray-200/60 dark:border-zinc-800/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] bg-white dark:bg-[#000000] rounded-none sm:rounded-3xl overflow-hidden transition-all duration-300 mb-6 border-x-0 sm:border-x transition-all duration-500">
                     
                     {/* Tolee/Group Header */}
                     <div className="px-4 py-2.5 border-b border-gray-100 dark:border-zinc-900 flex items-center gap-2.5 bg-gray-50/50 dark:bg-zinc-900/10">

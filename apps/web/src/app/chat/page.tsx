@@ -173,8 +173,29 @@ function SharedContentCard({ payload }: SharedContentCardProps) {
 
   const handleCardClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (available) {
+    if (!available) return;
+
+    let contentType = (payload as any).contentType;
+    if (!contentType && payload.shareUrl) {
+      if (payload.shareUrl.includes('/screen/watch/')) {
+        contentType = 'screen';
+      } else if (payload.shareUrl.includes('/news/')) {
+        contentType = 'news';
+      } else if (payload.shareUrl.includes('/reels')) {
+        contentType = 'reel';
+      } else {
+        contentType = 'feed';
+      }
+    }
+
+    if (contentType === 'reel') {
       router.push(`/reels?videoId=${payload.videoId}`);
+    } else if (contentType === 'screen') {
+      router.push(`/screen/watch/${payload.videoId}`);
+    } else if (contentType === 'news') {
+      router.push(`/news/${payload.videoId}`);
+    } else {
+      router.push(`/feed?postId=${payload.videoId}`);
     }
   };
 

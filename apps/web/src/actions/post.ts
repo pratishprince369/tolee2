@@ -10,6 +10,7 @@ import { extractPublicIdFromUrl, extractResourceTypeFromUrl, destroyMultipleAsse
 import { createSystemNotification, createSystemNotificationsMany } from '@/lib/notification-service';
 import { getSimulationSettings, getSimulatedEngagement, generateDynamicComments, detectCountryCode, getAICacheSync } from '@/lib/simulation';
 import { runNewsAIPipeline } from '@/lib/aiNews';
+import { getMediaThumbnail } from '@/lib/media';
 
 export async function createPost(data: {
   content?: string;
@@ -1874,7 +1875,7 @@ export async function sharePostToFriends(
     }
 
     // Fetch post details to get rich card metadata (author details, counts, media URLs)
-    const postDetails = await prisma.post.findUnique({
+    let postDetails = await prisma.post.findUnique({
       where: { id: postId },
       include: {
         author: {
@@ -1895,7 +1896,44 @@ export async function sharePostToFriends(
       }
     });
 
-    const isVideo = postDetails?.mediaTypes?.split(',')[0] === 'video' || postDetails?.mediaTypes === 'video';
+    let screenDetails = null;
+    if (!postDetails) {
+      screenDetails = await prisma.screenVideo.findUnique({
+        where: { id: postId },
+        include: {
+          user: {
+            select: {
+              username: true,
+              name: true,
+              avatar: true,
+              image: true
+            }
+          },
+          _count: {
+            select: {
+              likes: true,
+              comments: true,
+              views: true
+            }
+          }
+        }
+      });
+    }
+
+    const isVideo = postDetails
+      ? (postDetails.postType === 'reel' || postDetails.postType === 'win' || postDetails.postType === 'news' || postDetails.mediaTypes?.split(',')[0] === 'video' || postDetails.mediaTypes === 'video')
+      : !!screenDetails;
+
+    let contentType = 'feed';
+    if (postDetails) {
+      if (postDetails.postType === 'reel') {
+        contentType = 'reel';
+      } else if (postDetails.postType === 'news') {
+        contentType = 'news';
+      }
+    } else if (screenDetails) {
+      contentType = 'screen';
+    }
 
     // Deliver content to each selected friend
     for (const friendId of friendIds) {
@@ -1909,19 +1947,26 @@ export async function sharePostToFriends(
 
       // 2. Format a message that recipient will receive
       let msgContent;
-      if (postDetails) {
+      if (postDetails || screenDetails) {
         const payload = {
           type: isVideo ? 'shared_video' : 'shared_post',
-          videoId: postDetails.id,
-          creatorId: postDetails.authorId,
-          creatorName: postDetails.author.name || 'Creator',
-          creatorUsername: postDetails.author.username || 'creator',
-          creatorAvatar: postDetails.author.avatar || postDetails.author.image || '/default-user-avatar.svg',
-          thumbnailUrl: postDetails.mediaUrls ? postDetails.mediaUrls.split(',')[0] : '',
-          title: isVideo ? (postDetails.caption || 'Shared Video') : 'Shared Post',
-          caption: previewText || postDetails.caption || '',
-          likesCount: postDetails._count?.likes || 0,
-          viewsCount: postDetails._count?.views || 0,
+          contentType,
+          videoId: postId,
+          creatorId: postDetails ? postDetails.authorId : (screenDetails?.userId || ''),
+          creatorName: postDetails ? (postDetails.author.name || 'Creator') : (screenDetails?.user.name || 'Creator'),
+          creatorUsername: postDetails ? (postDetails.author.username || 'creator') : (screenDetails?.user.username || 'creator'),
+          creatorAvatar: postDetails 
+            ? (postDetails.author.avatar || postDetails.author.image || '/default-user-avatar.svg') 
+            : (screenDetails?.user.avatar || screenDetails?.user.image || '/default-user-avatar.svg'),
+          thumbnailUrl: postDetails 
+            ? (postDetails.mediaUrls ? getMediaThumbnail(postDetails.mediaUrls.split(',')[0]) : '') 
+            : (screenDetails?.thumbnailUrl || (screenDetails?.muxPlaybackId ? `https://image.mux.com/${screenDetails.muxPlaybackId}/thumbnail.png?width=640&height=360&fit_mode=smartcrop` : '') || screenDetails?.mediaUrl || ''),
+          title: postDetails 
+            ? (isVideo ? (postDetails.caption || 'Shared Video') : 'Shared Post') 
+            : (screenDetails?.title || 'Shared Screen Video'),
+          caption: previewText || (postDetails ? postDetails.caption : screenDetails?.description) || '',
+          likesCount: postDetails ? (postDetails._count?.likes || 0) : (screenDetails?.likesCount || screenDetails?._count?.likes || 0),
+          viewsCount: postDetails ? (postDetails._count?.views || 0) : (screenDetails?.viewsCount || screenDetails?._count?.views || 0),
           shareUrl: shareUrl
         };
         msgContent = `__SHARED_CONTENT__:${JSON.stringify(payload)}`;
@@ -2575,10 +2620,25 @@ export async function checkPostAvailability(postId: string) {
       where: { id: postId },
       select: { status: true, visibility: true }
     });
-    if (!post || post.status !== 'published' || post.visibility === 'private') {
-      return { success: true, available: false };
+    if (post) {
+      if (post.status !== 'published' || post.visibility === 'private') {
+        return { success: true, available: false };
+      }
+      return { success: true, available: true };
     }
-    return { success: true, available: true };
+
+    const screenVid = await prisma.screenVideo.findUnique({
+      where: { id: postId },
+      select: { status: true, visibility: true }
+    });
+    if (screenVid) {
+      if (screenVid.status !== 'published' || screenVid.visibility === 'private') {
+        return { success: true, available: false };
+      }
+      return { success: true, available: true };
+    }
+
+    return { success: true, available: false };
   } catch (err) {
     return { success: false, available: false };
   }
