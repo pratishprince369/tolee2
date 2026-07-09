@@ -250,7 +250,7 @@ export function CreatePostModal({
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className="sm:max-w-[550px] p-0 bg-white dark:bg-[#121212] overflow-y-auto max-h-[78vh] sm:max-h-[82vh] rounded-2xl border-gray-200 dark:border-gray-800 relative"
+        className="w-[calc(100vw-1.5rem)] sm:w-full sm:max-w-[550px] h-[85vh] h-[85dvh] sm:h-auto sm:max-h-[85vh] p-0 bg-white dark:bg-[#121212] rounded-2xl border-gray-200 dark:border-gray-800 flex flex-col overflow-hidden relative"
       >
         {/* Drag & drop overlay */}
         {isDragging && (
@@ -262,213 +262,215 @@ export function CreatePostModal({
           </div>
         )}
 
-        {/* Header */}
-        <DialogHeader className="p-4 border-b border-gray-100 dark:border-gray-800 flex flex-row items-center justify-between">
-          <DialogTitle className="text-xl font-bold">{videoOnly ? 'Upload Reel' : 'Create Post'}</DialogTitle>
+        {/* Sticky Header */}
+        <DialogHeader className="p-4 pr-12 border-b border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 flex-shrink-0">
+          <DialogTitle className="text-xl font-bold text-left">{videoOnly ? 'Upload Reel' : 'Create Post'}</DialogTitle>
           {!videoOnly && (
-            <div className="flex bg-gray-100 dark:bg-gray-900 rounded-full p-1 border border-gray-200 dark:border-gray-800 select-none">
+            <div className="flex w-full sm:w-auto bg-gray-100 dark:bg-gray-900 rounded-full p-1 border border-gray-200 dark:border-gray-800 select-none">
               <button 
                 type="button"
                 onClick={() => setPostType('regular')}
-                className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${postType === 'regular' ? 'bg-white dark:bg-black shadow-sm text-[#0a7c85]' : 'text-gray-500 hover:text-gray-700'}`}
+                className={`flex-1 sm:flex-none text-center px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold transition-all ${postType === 'regular' ? 'bg-white dark:bg-black shadow-sm text-[#0a7c85]' : 'text-gray-500 hover:text-gray-700'}`}
               >
                 Post
               </button>
               <button 
                 type="button"
                 onClick={() => setPostType('win')}
-                className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all flex items-center gap-1 ${postType === 'win' ? 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-500 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                className={`flex-1 sm:flex-none text-center px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-1 ${postType === 'win' ? 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-500 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
               >
-                <Trophy className="w-4 h-4" /> Win
+                <Trophy className="w-3.5 h-3.5" /> Win
               </button>
               <button 
                 type="button"
                 onClick={() => setPostType('news')}
-                className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all flex items-center gap-1 ${postType === 'news' ? 'bg-[#e6f4f5] dark:bg-[#0a7c85]/20 text-[#0a7c85] shadow-sm' : 'text-gray-500 hover:text-[#0a7c85]'}`}
+                className={`flex-1 sm:flex-none text-center px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-1 ${postType === 'news' ? 'bg-[#e6f4f5] dark:bg-[#0a7c85]/20 text-[#0a7c85] shadow-sm' : 'text-gray-500 hover:text-[#0a7c85]'}`}
               >
-                <Newspaper className="w-4 h-4" /> News
+                <Newspaper className="w-3.5 h-3.5" /> News
               </button>
             </div>
           )}
         </DialogHeader>
 
-        {/* User Info */}
-        <div className="p-4 flex items-center gap-3">
-          <Avatar className="w-10 h-10">
-            <AvatarImage src={session?.user?.image || '/default-user-avatar.svg'} />
-            <AvatarFallback>{session?.user?.name?.[0] || 'ME'}</AvatarFallback>
-          </Avatar>
-          <div>
-            <h3 className="font-bold text-gray-900 dark:text-white">{session?.user?.name || 'Anonymous User'}</h3>
-            <span className="text-xs text-gray-500 flex items-center gap-1">
-              <Globe className="w-3 h-3 text-[#0a7c85]" /> Visible to {selectedTolees.length} selected Tolees
-            </span>
+        {/* Scrollable Content Body */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0 scrollbar-thin">
+          {/* User Info */}
+          <div className="flex items-center gap-3">
+            <Avatar className="w-10 h-10">
+              <AvatarImage src={session?.user?.image || '/default-user-avatar.svg'} />
+              <AvatarFallback>{session?.user?.name?.[0] || 'ME'}</AvatarFallback>
+            </Avatar>
+            <div>
+              <h3 className="font-bold text-gray-900 dark:text-white">{session?.user?.name || 'Anonymous User'}</h3>
+              <span className="text-xs text-gray-500 flex items-center gap-1">
+                <Globe className="w-3 h-3 text-[#0a7c85]" /> Visible to {selectedTolees.length} selected Tolees
+              </span>
+            </div>
           </div>
-        </div>
 
-        {/* Form Inputs based on Post Type */}
-        <div className="px-4 pb-4 space-y-4">
-          {postType === 'news' ? (
-            <div className="space-y-3.5">
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-[#0a7c85] dark:text-zinc-400 uppercase tracking-wider block">News Headline *</label>
-                <Input 
-                  placeholder="Enter News Headline..." 
-                  value={headline} 
-                  onChange={e => setHeadline(e.target.value)} 
-                  className="font-bold text-sm border-gray-200 dark:border-zinc-800 focus-visible:ring-[#0a7c85] rounded-xl"
-                />
+          {/* Form Inputs based on Post Type */}
+          <div className="space-y-4">
+            {postType === 'news' ? (
+              <div className="space-y-3.5">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-[#0a7c85] dark:text-zinc-400 uppercase tracking-wider block">News Headline *</label>
+                  <Input 
+                    placeholder="Enter News Headline..." 
+                    value={headline} 
+                    onChange={e => setHeadline(e.target.value)} 
+                    className="font-bold text-sm border-gray-200 dark:border-zinc-800 focus-visible:ring-[#0a7c85] rounded-xl"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-[#0a7c85] dark:text-zinc-400 uppercase tracking-wider block">News Content *</label>
+                  <textarea 
+                    placeholder="Write your news article here..." 
+                    value={content} 
+                    onChange={e => setContent(e.target.value)} 
+                    className="w-full min-h-[160px] bg-transparent border border-gray-200 dark:border-zinc-800 rounded-xl p-3 text-xs sm:text-sm focus:ring-1 focus:ring-[#0a7c85] focus:outline-none"
+                  />
+                </div>
               </div>
+            ) : (
+              <textarea
+                placeholder={postType === 'win' ? "Share your recent win with the community! 🚀" : "What do you want to share?"}
+                className="w-full min-h-[120px] bg-transparent border-none focus:ring-0 resize-none text-[16px] text-gray-900 dark:text-white placeholder:text-gray-400"
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+              />
+            )}
+          </div>
 
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-[#0a7c85] dark:text-zinc-400 uppercase tracking-wider block">News Content *</label>
-                <textarea 
-                  placeholder="Write your news article here..." 
-                  value={content} 
-                  onChange={e => setContent(e.target.value)} 
-                  className="w-full min-h-[160px] bg-transparent border border-gray-200 dark:border-zinc-800 rounded-xl p-3 text-xs sm:text-sm focus:ring-1 focus:ring-[#0a7c85] focus:outline-none"
-                />
+          {/* Media Preview Grid */}
+          {mediaList.length > 0 && (
+            <div>
+              <label className="text-[11px] font-bold text-gray-500 dark:text-zinc-400 uppercase tracking-wider block mb-2">Attached Media ({mediaList.length})</label>
+              <div className="grid grid-cols-3 gap-2">
+                {mediaList.map((item, idx) => (
+                  <div key={idx} className="relative aspect-square rounded-xl overflow-hidden bg-black border border-gray-200 dark:border-gray-800 group/thumb shadow-sm">
+                    <button 
+                      type="button"
+                      onClick={(e) => { 
+                        e.stopPropagation(); 
+                        setMediaList(prev => prev.filter((_, i) => i !== idx)); 
+                      }} 
+                      className="absolute top-1.5 right-1.5 z-10 bg-black/60 hover:bg-black/85 text-white rounded-full p-1 backdrop-blur-md transition-all duration-200 hover:scale-105 active:scale-90"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                    {item.type === 'image' ? (
+                      <img src={item.url} alt={`Preview ${idx}`} className="w-full h-full object-cover" />
+                    ) : (
+                      <video src={item.url} className="w-full h-full object-cover" muted playsInline />
+                    )}
+                    <div className="absolute bottom-1.5 left-1.5 bg-black/60 backdrop-blur-md rounded px-1.5 py-0.5 text-[9px] font-extrabold text-white">
+                      {idx + 1}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
-          ) : (
-            <textarea
-              placeholder={postType === 'win' ? "Share your recent win with the community! 🚀" : "What do you want to share?"}
-              className="w-full min-h-[100px] bg-transparent border-none focus:ring-0 resize-none text-[17px] text-gray-900 dark:text-white placeholder:text-gray-400"
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-            />
           )}
-        </div>
 
-        {/* Media Preview Grid */}
-        {mediaList.length > 0 && (
-          <div className="px-4 pb-4">
-            <label className="text-[11px] font-bold text-gray-500 dark:text-zinc-400 uppercase tracking-wider block mb-2">Attached Media ({mediaList.length})</label>
-            <div className="grid grid-cols-3 gap-2">
-              {mediaList.map((item, idx) => (
-                <div key={idx} className="relative aspect-square rounded-xl overflow-hidden bg-black border border-gray-200 dark:border-gray-800 group/thumb shadow-sm">
-                  <button 
+          {/* Upload Media / AI Image Button Section */}
+          <div className="py-3 border-t border-b border-gray-100 dark:border-gray-800 flex flex-col xs:flex-row justify-between items-start xs:items-center gap-2">
+            <span className="text-sm font-medium text-gray-500">Upload Media</span>
+            <div className="flex flex-wrap gap-1.5 items-center w-full xs:w-auto">
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleFileChange} 
+                className="hidden" 
+                multiple
+              />
+              {!videoOnly && (
+                <>
+                  <Button 
                     type="button"
-                    onClick={(e) => { 
-                      e.stopPropagation(); 
-                      setMediaList(prev => prev.filter((_, i) => i !== idx)); 
-                    }} 
-                    className="absolute top-1.5 right-1.5 z-10 bg-black/60 hover:bg-black/85 text-white rounded-full p-1 backdrop-blur-md transition-all duration-200 hover:scale-105 active:scale-90"
+                    onClick={() => setAiModalOpen(true)} 
+                    variant="ghost" 
+                    className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/40 rounded-xl h-9 px-2.5 font-bold text-xs flex items-center gap-1 border border-purple-200/60 dark:border-purple-800/50 bg-purple-50/30 dark:bg-purple-950/20 mr-1 shadow-sm transition-transform duration-200 hover:scale-[1.02]"
                   >
-                    <X className="w-3 h-3" />
-                  </button>
-                  {item.type === 'image' ? (
-                    <img src={item.url} alt={`Preview ${idx}`} className="w-full h-full object-cover" />
-                  ) : (
-                    <video src={item.url} className="w-full h-full object-cover" muted playsInline />
-                  )}
-                  <div className="absolute bottom-1.5 left-1.5 bg-black/60 backdrop-blur-md rounded px-1.5 py-0.5 text-[9px] font-extrabold text-white">
-                    {idx + 1}
+                    <Sparkles className="w-3.5 h-3.5 fill-purple-600/10" />
+                    <span>AI Image</span>
+                  </Button>
+                </>
+              )}
+              {!videoOnly && (
+                <Button onClick={() => triggerFileInput('image/*')} variant="ghost" size="icon" className="text-green-500 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-950 rounded-full h-10 w-10">
+                  <ImageIcon className="w-6 h-6" />
+                </Button>
+              )}
+              <Button onClick={() => triggerFileInput('video/*')} variant="ghost" size="icon" className="text-blue-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-full h-10 w-10">
+                <Video className="w-6 h-6" />
+              </Button>
+              {!videoOnly && (
+                <Button onClick={() => triggerFileInput('*/*')} variant="ghost" size="icon" className="text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full h-10 w-10">
+                  <Paperclip className="w-5 h-5" />
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* Target Tolees Section (styled as modern card) */}
+          <div className="p-3.5 bg-gray-50 dark:bg-[#151515] rounded-2xl border border-gray-100 dark:border-zinc-850">
+            <div className="flex justify-between items-center mb-3">
+              <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300">
+                Post to these Tolees <span className="text-red-500">*</span>
+              </h4>
+              {joinedTolees.length > 0 && (
+                <button 
+                  onClick={selectAll}
+                  className="text-xs font-bold text-[#0a7c85] hover:underline"
+                >
+                  {selectedTolees.length === joinedTolees.length ? 'Deselect All' : 'Select All'}
+                </button>
+              )}
+            </div>
+            
+            <div className="space-y-2 max-h-[130px] overflow-y-auto pr-2 scrollbar-thin">
+              {joinedTolees.map((tolee) => (
+                <div 
+                  key={tolee.id}
+                  onClick={() => toggleTolee(tolee.id)}
+                  className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${
+                    selectedTolees.includes(tolee.id) 
+                      ? 'border-[#0a7c85] bg-[#0a7c85]/5 dark:bg-[#0a7c85]/10' 
+                      : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-[#121212] hover:border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-md bg-gray-250 dark:bg-gray-800 flex items-center justify-center font-bold text-xs">
+                      {tolee.name.charAt(0)}
+                    </div>
+                    <div>
+                      <h5 className="font-semibold text-sm">{tolee.name}</h5>
+                      {tolee.isPrivate && (
+                        <span className="text-[10px] text-gray-500 flex items-center gap-1 mt-0.5">
+                          <ShieldCheck className="w-3 h-3" /> Private Group
+                        </span>
+                      )}
+                    </div>
                   </div>
+                  
+                  {selectedTolees.includes(tolee.id) ? (
+                    <CheckCircle2 className="w-6 h-6 text-[#0a7c85]" />
+                  ) : (
+                    <div className="w-6 h-6 rounded-full border-2 border-gray-300 dark:border-gray-700" />
+                  )}
                 </div>
               ))}
             </div>
-          </div>
-        )}
-
-        {/* Upload Media / AI Image Button Section */}
-        <div className="px-4 py-2 border-t border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
-          <span className="text-sm font-medium text-gray-500">Upload Media</span>
-          <div className="flex gap-2 items-center">
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              onChange={handleFileChange} 
-              className="hidden" 
-              multiple
-            />
-            {!videoOnly && (
-              <>
-                <Button 
-                  type="button"
-                  onClick={() => setAiModalOpen(true)} 
-                  variant="ghost" 
-                  className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/40 rounded-xl h-9 px-2.5 font-bold text-xs flex items-center gap-1 border border-purple-200/60 dark:border-purple-800/50 bg-purple-50/30 dark:bg-purple-950/20 mr-1 shadow-sm transition-transform duration-200 hover:scale-[1.02]"
-                >
-                  <Sparkles className="w-3.5 h-3.5 fill-purple-600/10" />
-                  <span>AI Image</span>
-                </Button>
-              </>
-            )}
-            {!videoOnly && (
-              <Button onClick={() => triggerFileInput('image/*')} variant="ghost" size="icon" className="text-green-500 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-950 rounded-full h-10 w-10">
-                <ImageIcon className="w-6 h-6" />
-              </Button>
-            )}
-            <Button onClick={() => triggerFileInput('video/*')} variant="ghost" size="icon" className="text-blue-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-full h-10 w-10">
-              <Video className="w-6 h-6" />
-            </Button>
-            {!videoOnly && (
-              <Button onClick={() => triggerFileInput('*/*')} variant="ghost" size="icon" className="text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full h-10 w-10">
-                <Paperclip className="w-5 h-5" />
-              </Button>
+            
+            {selectedTolees.length === 0 && (
+              <p className="text-xs text-red-500 mt-2 font-medium">Please select at least one Tolee.</p>
             )}
           </div>
         </div>
 
-        {/* Target Tolees Section */}
-        <div className="p-4 bg-gray-50 dark:bg-[#1a1a1a]">
-          <div className="flex justify-between items-center mb-3">
-            <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300">
-              Post to these Tolees <span className="text-red-500">*</span>
-            </h4>
-            {joinedTolees.length > 0 && (
-              <button 
-                onClick={selectAll}
-                className="text-xs font-bold text-[#0a7c85] hover:underline"
-              >
-                {selectedTolees.length === joinedTolees.length ? 'Deselect All' : 'Select All'}
-              </button>
-            )}
-          </div>
-          
-          <div className="space-y-2 max-h-[130px] overflow-y-auto pr-2">
-            {joinedTolees.map((tolee) => (
-              <div 
-                key={tolee.id}
-                onClick={() => toggleTolee(tolee.id)}
-                className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${
-                  selectedTolees.includes(tolee.id) 
-                    ? 'border-[#0a7c85] bg-[#0a7c85]/5 dark:bg-[#0a7c85]/10' 
-                    : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-[#121212] hover:border-gray-300'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-md bg-gray-250 dark:bg-gray-800 flex items-center justify-center font-bold text-xs">
-                    {tolee.name.charAt(0)}
-                  </div>
-                  <div>
-                    <h5 className="font-semibold text-sm">{tolee.name}</h5>
-                    {tolee.isPrivate && (
-                      <span className="text-[10px] text-gray-500 flex items-center gap-1 mt-0.5">
-                        <ShieldCheck className="w-3 h-3" /> Private Group
-                      </span>
-                    )}
-                  </div>
-                </div>
-                
-                {selectedTolees.includes(tolee.id) ? (
-                  <CheckCircle2 className="w-6 h-6 text-[#0a7c85]" />
-                ) : (
-                  <div className="w-6 h-6 rounded-full border-2 border-gray-300 dark:border-gray-700" />
-                )}
-              </div>
-            ))}
-          </div>
-          
-          {selectedTolees.length === 0 && (
-            <p className="text-xs text-red-500 mt-2 font-medium">Please select at least one Tolee.</p>
-          )}
-        </div>
-
-        {/* Footer Actions */}
-        <div className="p-4 bg-white dark:bg-[#121212] border-t border-gray-100 dark:border-gray-800 flex gap-2">
-
+        {/* Sticky Footer Actions */}
+        <div className="p-4 bg-white dark:bg-[#121212] border-t border-gray-100 dark:border-gray-800 flex gap-2 flex-shrink-0">
           <Button 
             className="flex-grow h-12 text-sm font-extrabold rounded-xl bg-[#0a7c85] hover:bg-[#086971] text-white"
             disabled={!isPostReady || isUploading}
