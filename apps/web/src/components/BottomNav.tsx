@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Home, Compass, Film, MessageCircle, Menu, User, Settings, Globe, Store, LogOut, MessageSquare, Map, Briefcase, Award } from 'lucide-react';
+import { Home, Compass, Film, MessageCircle, Menu, User, Settings, Globe, Store, LogOut, MessageSquare, Map, Briefcase, Award, Newspaper, Tv, Bot, Bell, Megaphone, Zap, HelpCircle } from 'lucide-react';
 import { useSession, signOut } from 'next-auth/react';
 import { getSidebarData } from '@/actions/user';
 import {
@@ -19,6 +19,7 @@ export function BottomNav() {
   const router = useRouter();
   const { data: session, status } = useSession();
   const [unreadChats, setUnreadChats] = React.useState(0);
+  const [unreadNotifications, setUnreadNotifications] = React.useState(0);
   const [franchiseStatus, setFranchiseStatus] = React.useState<string | null>(null);
   const isAuthenticated = status === 'authenticated';
 
@@ -27,6 +28,7 @@ export function BottomNav() {
       getSidebarData().then(res => {
         if (res.success) {
           setUnreadChats(res.unreadMessages || 0);
+          setUnreadNotifications(res.unreadNotifications || 0);
           setFranchiseStatus((res as any).franchiseStatus || null);
         }
       });
@@ -34,6 +36,7 @@ export function BottomNav() {
         getSidebarData().then(res => {
           if (res.success) {
             setUnreadChats(res.unreadMessages || 0);
+            setUnreadNotifications(res.unreadNotifications || 0);
             setFranchiseStatus((res as any).franchiseStatus || null);
           }
         });
@@ -77,7 +80,7 @@ export function BottomNav() {
                   )}
                 </div>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56" align="end" side="top" sideOffset={10}>
+              <DropdownMenuContent className="w-64 max-h-[75vh] overflow-y-auto scrollbar-thin select-none" align="end" side="top" sideOffset={10}>
                 <div className="px-2 py-1.5 text-xs font-normal text-muted-foreground">
                   <div className="flex flex-col space-y-1">
                     <p className="text-sm font-medium leading-none text-foreground">{session?.user?.name}</p>
@@ -87,35 +90,93 @@ export function BottomNav() {
                   </div>
                 </div>
                 <DropdownMenuSeparator />
+                
+                {/* ── Social Group ── */}
                 <DropdownMenuItem onClick={() => router.push('/u/me')} className="cursor-pointer flex w-full items-center">
-                  <User className="mr-2 h-4 w-4" />
+                  <User className="mr-2 h-4 w-4 text-zinc-500" />
                   <span>My Profile</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => router.push('/settings')} className="cursor-pointer flex w-full items-center">
-                  <Settings className="mr-2 h-4 w-4" />
+                  <Settings className="mr-2 h-4 w-4 text-zinc-500" />
                   <span>Settings</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => router.push('/feedback')} className="cursor-pointer flex w-full items-center">
-                  <MessageSquare className="mr-2 h-4 w-4" />
-                  <span>Send Feedback</span>
+                <DropdownMenuItem onClick={() => router.push('/my-tolees')} className="cursor-pointer flex w-full items-center">
+                  <Globe className="mr-2 h-4 w-4 text-zinc-500" />
+                  <span>My Tolees</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push('/news')} className="cursor-pointer flex w-full items-center">
+                  <Newspaper className="mr-2 h-4 w-4 text-zinc-500" />
+                  <span>Tolee News</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push('/screen')} className="cursor-pointer flex w-full items-center">
+                  <Tv className="mr-2 h-4 w-4 text-zinc-500" />
+                  <span>Tolee Screen</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push('/ai-manager')} className="cursor-pointer flex w-full items-center justify-between">
+                  <div className="flex items-center">
+                    <Bot className="mr-2 h-4 w-4 text-zinc-500" />
+                    <span>AI Manager</span>
+                  </div>
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse mr-1" />
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push('/notifications')} className="cursor-pointer flex w-full items-center justify-between">
+                  <div className="flex items-center">
+                    <Bell className="mr-2 h-4 w-4 text-zinc-500" />
+                    <span>Notifications</span>
+                  </div>
+                  {unreadNotifications > 0 && (
+                    <span className="bg-primary text-primary-foreground text-[9px] px-2 py-0.5 rounded-full font-bold">
+                      {unreadNotifications}
+                    </span>
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push('/chat')} className="cursor-pointer flex w-full items-center justify-between">
+                  <div className="flex items-center">
+                    <MessageCircle className="mr-2 h-4 w-4 text-zinc-500" />
+                    <span>Chats</span>
+                  </div>
+                  {unreadChats > 0 && (
+                    <span className="bg-primary text-primary-foreground text-[9px] px-2 py-0.5 rounded-full font-bold">
+                      {unreadChats}
+                    </span>
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push('/marketplace')} className="cursor-pointer flex w-full items-center">
+                  <Store className="mr-2 h-4 w-4 text-zinc-500" />
+                  <span>Marketplace</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push('/world')} className="cursor-pointer flex w-full items-center">
+                  <Globe className="mr-2 h-4 w-4 text-zinc-500" />
+                  <span>Tolee World</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => router.push('/map')} className="cursor-pointer flex w-full items-center">
-                  <Map className="mr-2 h-4 w-4" />
+                  <Map className="mr-2 h-4 w-4 text-zinc-500" />
                   <span>Live Map</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => router.push('/my-tolees')} className="cursor-pointer flex w-full items-center">
-                  <Globe className="mr-2 h-4 w-4" />
-                  <span>My Tolees</span>
+
+                <DropdownMenuSeparator />
+
+                {/* ── Creator & Business Group ── */}
+                <DropdownMenuItem onClick={() => router.push('/ads-manager')} className="cursor-pointer flex w-full items-center">
+                  <Megaphone className="mr-2 h-4 w-4 text-zinc-500" />
+                  <span>Ads Manager</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push('/creator-program')} className="cursor-pointer flex w-full items-center justify-between text-purple-600 dark:text-purple-400">
+                  <div className="flex items-center">
+                    <Zap className="mr-2 h-4 w-4 text-purple-500" />
+                    <span className="font-semibold">Creator Program</span>
+                  </div>
+                  <span className="text-[8px] font-black uppercase text-white bg-[#0a7c85] px-1.5 py-0.5 rounded">NEW</span>
                 </DropdownMenuItem>
                 {franchiseStatus === 'active' || franchiseStatus === 'suspended' ? (
                   <DropdownMenuItem onClick={() => router.push('/franchise/dashboard')} className="cursor-pointer flex w-full items-center">
-                    <Briefcase className="mr-2 h-4 w-4 text-zinc-700 dark:text-zinc-300" />
+                    <Briefcase className="mr-2 h-4 w-4 text-zinc-500" />
                     <span>My Franchise</span>
                   </DropdownMenuItem>
                 ) : (
                   <DropdownMenuItem onClick={() => router.push('/franchise')} className="cursor-pointer flex w-full items-center justify-between">
                     <div className="flex items-center">
-                      <Store className="mr-2 h-4 w-4" />
+                      <Store className="mr-2 h-4 w-4 text-zinc-500" />
                       <span>Get Franchise</span>
                     </div>
                     {franchiseStatus === 'pending' && (
@@ -123,10 +184,19 @@ export function BottomNav() {
                     )}
                   </DropdownMenuItem>
                 )}
-                <DropdownMenuItem onClick={() => router.push('/marketplace')} className="cursor-pointer flex w-full items-center">
-                  <Store className="mr-2 h-4 w-4" />
-                  <span>Marketplace</span>
+
+                <DropdownMenuSeparator />
+
+                {/* ── Support & Feedback Group ── */}
+                <DropdownMenuItem onClick={() => router.push('/contact')} className="cursor-pointer flex w-full items-center">
+                  <HelpCircle className="mr-2 h-4 w-4 text-zinc-500" />
+                  <span>Help & Support</span>
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push('/feedback')} className="cursor-pointer flex w-full items-center">
+                  <MessageSquare className="mr-2 h-4 w-4 text-zinc-500" />
+                  <span>Send Feedback</span>
+                </DropdownMenuItem>
+
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => signOut({ callbackUrl: '/' })} className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/50">
                   <LogOut className="mr-2 h-4 w-4" />
