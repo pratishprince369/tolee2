@@ -101,6 +101,7 @@ export default async function GlobalFeedPage() {
           locationText: post.locationText || null,
           worldProjectId: post.worldProjectId || null,
           worldProject: post.worldProject || null,
+          newsRelation: post.newsRelation || null,
         };
       });
     }

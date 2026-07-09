@@ -1562,19 +1562,23 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                       <CardContent className="p-0">
                         {/* Cover Image */}
                         {post.mediaUrls ? (
-                          <div className="aspect-video w-full overflow-hidden bg-black relative">
-                            <img src={post.mediaUrls.split(/,(?=https?:\/\/)/)[0]} alt={newsHeadline} className="w-full h-full object-cover hover:scale-[1.01] transition-transform duration-300" />
-                            <Badge className="absolute top-3 left-3 bg-black/60 backdrop-blur-md text-[9px] font-bold text-white uppercase px-2 py-0.5 rounded border-none">
-                              {newsCategory}
-                            </Badge>
-                          </div>
+                          <Link href={`/news/${newsSlug}`}>
+                            <div className="aspect-video w-full overflow-hidden bg-black relative cursor-pointer">
+                              <img src={post.mediaUrls.split(/,(?=https?:\/\/)/)[0]} alt={newsHeadline} className="w-full h-full object-cover hover:scale-[1.01] transition-transform duration-300" />
+                              <Badge className="absolute top-3 left-3 bg-black/60 backdrop-blur-md text-[9px] font-bold text-white uppercase px-2 py-0.5 rounded border-none">
+                                {newsCategory}
+                              </Badge>
+                            </div>
+                          </Link>
                         ) : (
-                          <div className="aspect-video w-full bg-indigo-50/50 dark:bg-indigo-950/10 flex items-center justify-center relative">
-                            <Newspaper className="w-10 h-10 text-indigo-300 dark:text-indigo-900/60" />
-                            <Badge className="absolute top-3 left-3 bg-black/60 backdrop-blur-md text-[9px] font-bold text-white uppercase px-2 py-0.5 rounded border-none">
-                              {newsCategory}
-                            </Badge>
-                          </div>
+                          <Link href={`/news/${newsSlug}`}>
+                            <div className="aspect-video w-full bg-indigo-50/50 dark:bg-indigo-950/10 flex items-center justify-center relative cursor-pointer">
+                              <Newspaper className="w-10 h-10 text-indigo-300 dark:text-indigo-900/60" />
+                              <Badge className="absolute top-3 left-3 bg-black/60 backdrop-blur-md text-[9px] font-bold text-white uppercase px-2 py-0.5 rounded border-none">
+                                {newsCategory}
+                              </Badge>
+                            </div>
+                          </Link>
                         )}
 
                         <div className="p-4 space-y-2">

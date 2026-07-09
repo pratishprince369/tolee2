@@ -379,7 +379,7 @@ export async function deleteNews(postId: string) {
 // 4. Retrieve single News Post by Slug
 export async function getNewsBySlug(slug: string) {
   try {
-    const news = await prisma.newsPost.findUnique({
+    let news = await prisma.newsPost.findUnique({
       where: { slug },
       include: {
         post: {
@@ -423,6 +423,59 @@ export async function getNewsBySlug(slug: string) {
         }
       }
     });
+
+    // Fallback: If not found by slug, try searching by NewsPost id or Post id
+    if (!news) {
+      news = await prisma.newsPost.findFirst({
+        where: {
+          OR: [
+            { id: slug },
+            { postId: slug }
+          ]
+        },
+        include: {
+          post: {
+            include: {
+              author: {
+                select: {
+                  id: true,
+                  name: true,
+                  username: true,
+                  image: true,
+                }
+              },
+              likes: true,
+              comments: {
+                include: {
+                  author: {
+                    select: {
+                      id: true,
+                      name: true,
+                      image: true,
+                    }
+                  }
+                }
+              },
+              tolees: {
+                include: {
+                  tolee: true
+                }
+              },
+              savedBy: {
+                select: {
+                  userId: true,
+                }
+              },
+              reposts: {
+                select: {
+                  userId: true,
+                }
+              }
+            }
+          }
+        }
+      });
+    }
 
     if (news) {
       // Increment views count asynchronously
