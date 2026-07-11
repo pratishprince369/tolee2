@@ -1037,3 +1037,52 @@ export async function getMemberLiveStatus(toleeId: string) {
     return { success: false, status: null };
   }
 }
+
+export async function getToleeById(id: string) {
+  try {
+    const session = await getServerSession(authOptions);
+    const currentUserId = (session?.user as any)?.id;
+
+    const tolee = await prisma.tolee.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        description: true,
+        avatar: true,
+        coverImage: true,
+        isPrivate: true,
+        ownerId: true,
+        _count: {
+          select: {
+            members: true
+          }
+        }
+      }
+    });
+
+    if (!tolee) {
+      return { success: false, error: 'Tolee not found' };
+    }
+
+    let isMember = false;
+    let membershipStatus = null;
+    if (currentUserId) {
+      const membership = await prisma.toleeMember.findUnique({
+        where: {
+          userId_toleeId: {
+            userId: currentUserId,
+            toleeId: id
+          }
+        }
+      });
+      isMember = membership?.status === 'approved';
+      membershipStatus = membership?.status || null;
+    }
+
+    return { success: true, tolee, isMember, membershipStatus };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Failed to fetch Tolee' };
+  }
+}

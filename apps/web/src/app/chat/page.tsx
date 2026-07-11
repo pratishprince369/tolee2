@@ -40,7 +40,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuPortal
 } from "@/components/ui/dropdown-menu";
-import { muteGroupNotifications, leaveToleeGroup } from '@/actions/tolee';
+import { muteGroupNotifications, leaveToleeGroup, joinTolee, getToleeById } from '@/actions/tolee';
 import { 
   getUserPromotionPreferences, 
   incrementShootClick 
@@ -293,6 +293,70 @@ export default function ChatPage() {
   const queryToleeId = searchParams?.get('toleeId') || '';
 
   const [activeChat, setActiveChat] = useState<string>('');
+  const [nonMemberGroup, setNonMemberGroup] = useState<any | null>(null);
+  const [isJoiningGroup, setIsJoiningGroup] = useState(false);
+
+  // Synchronize activeChat with query parameters
+  useEffect(() => {
+    if (chats.length === 0) return;
+
+    if (queryToleeId) {
+      const matchedChat = chats.find(c => c.toleeId === queryToleeId);
+      if (matchedChat) {
+        if (activeChat !== matchedChat.id) {
+          setActiveChat(matchedChat.id);
+        }
+        if (activeSidebarTab !== 'groups') {
+          setActiveSidebarTab('groups');
+        }
+      }
+    } else if (queryChatId) {
+      const matchedChat = chats.find(c => c.id === queryChatId);
+      if (matchedChat) {
+        if (activeChat !== queryChatId) {
+          setActiveChat(queryChatId);
+        }
+        if (activeSidebarTab !== 'personal') {
+          setActiveSidebarTab('personal');
+        }
+      }
+    }
+  }, [queryToleeId, queryChatId, chats]);
+
+  // Handle active chat scrolling in sidebar
+  useEffect(() => {
+    if (activeChat) {
+      setTimeout(() => {
+        const el = document.getElementById(`chat-item-${activeChat}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }, 300);
+    }
+  }, [activeChat]);
+
+  // Non-member group lookup validation
+  useEffect(() => {
+    if (!queryToleeId) {
+      setNonMemberGroup(null);
+      return;
+    }
+
+    getToleeById(queryToleeId).then(res => {
+      if (res.success && res.tolee) {
+        if (!res.isMember) {
+          setNonMemberGroup({
+            ...res.tolee,
+            membershipStatus: res.membershipStatus
+          });
+        } else {
+          setNonMemberGroup(null);
+        }
+      } else {
+        setNonMemberGroup(null);
+      }
+    });
+  }, [queryToleeId, chats]);
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
@@ -414,16 +478,23 @@ export default function ChatPage() {
       });
       
       let currentActive = activeChat;
-      if (queryToleeId && !activeChat) {
+      if (queryToleeId) {
         const matchedChat = res.chats.find(c => c.toleeId === queryToleeId);
         if (matchedChat) {
-          setActiveChat(matchedChat.id);
+          if (activeChat !== matchedChat.id) {
+            setActiveChat(matchedChat.id);
+          }
           currentActive = matchedChat.id;
+        } else {
+          if (activeChat) {
+            setActiveChat('');
+          }
+          currentActive = '';
         }
-      }
-
-      if (!currentActive && queryChatId && !activeChat) {
-        setActiveChat(queryChatId);
+      } else if (queryChatId) {
+        if (activeChat !== queryChatId) {
+          setActiveChat(queryChatId);
+        }
         currentActive = queryChatId;
       } else if (res.chats.length > 0 && !activeChat) {
         if (typeof window !== 'undefined' && window.innerWidth >= 768) {
@@ -1121,6 +1192,7 @@ export default function ChatPage() {
               {filteredChats.map((chat) => (
                 <div 
                   key={chat.id} 
+                  id={`chat-item-${chat.id}`}
                   onClick={() => {
                     setActiveChat(chat.id);
                     markChatNotificationsAsRead(chat.id);
@@ -2106,6 +2178,54 @@ export default function ChatPage() {
             )}
 
           </>
+        ) : nonMemberGroup ? (
+          <div className="flex-1 flex flex-col items-center justify-center text-center p-8 z-10 select-none max-w-lg mx-auto space-y-6">
+            <div className="relative">
+              <Avatar className="w-24 h-24 border-4 border-[#0a7c85]/20 shadow-md">
+                <AvatarImage src={nonMemberGroup.avatar || '/default-tolee-avatar.svg'} />
+                <AvatarFallback className="text-2xl bg-zinc-200 text-zinc-700">{nonMemberGroup.name[0]?.toUpperCase()}</AvatarFallback>
+              </Avatar>
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-2xl font-black text-gray-900 dark:text-white">{nonMemberGroup.name}</h2>
+              <p className="text-xs font-bold text-gray-450 dark:text-zinc-400 uppercase tracking-wider">
+                {nonMemberGroup._count?.members || 0} Members
+              </p>
+              {nonMemberGroup.description && (
+                <p className="text-sm text-gray-500 dark:text-zinc-400 max-w-md mx-auto italic">
+                  "{nonMemberGroup.description}"
+                </p>
+              )}
+            </div>
+            <div className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-200/50 dark:border-zinc-800 p-5 rounded-2xl space-y-3">
+              <AlertCircle className="w-8 h-8 text-amber-500 mx-auto" />
+              <p className="text-[13px] font-bold text-zinc-600 dark:text-zinc-350">
+                Join this Tolee to participate in the group chat.
+              </p>
+            </div>
+            <Button
+              onClick={async () => {
+                setIsJoiningGroup(true);
+                try {
+                  const res = await joinTolee(nonMemberGroup.id);
+                  if (res.success) {
+                    await fetchChats();
+                    setNonMemberGroup(null);
+                  } else {
+                    alert(res.error || 'Failed to join group.');
+                  }
+                } catch (err: any) {
+                  alert(err.message || 'Error joining group.');
+                } finally {
+                  setIsJoiningGroup(false);
+                }
+              }}
+              disabled={isJoiningGroup}
+              className="px-8 py-3 rounded-full font-bold bg-[#0a7c85] hover:bg-[#0a7c85]/90 text-white shadow-md transition-all active:scale-95"
+            >
+              {isJoiningGroup ? 'Joining...' : nonMemberGroup.isPrivate ? 'Request to Join Group' : 'Join Group'}
+            </Button>
+          </div>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-center p-8 z-10 select-none">
             <div className="w-24 h-24 bg-gray-100 dark:bg-gray-900 rounded-full flex items-center justify-center mb-6 shadow-sm">
