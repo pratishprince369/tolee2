@@ -5,9 +5,8 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { X, ChevronLeft, ChevronRight, Volume2, VolumeX, Pause, Play, Send, MoreVertical, Trash2, Download, AlertTriangle, Music } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { HLSVideo } from '@/components/HLSVideo';
-import { markStoryAsViewed } from '@/actions/story';
-import { deleteStory } from '@/actions/highlight';
-import { checkPostStatus, incrementViewOriginalPostClick } from '@/actions/post';
+// Server actions replaced with API fetch calls to avoid pulling massive
+// post.ts module (2689 lines) into the client bundle which caused TDZ errors.
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -99,13 +98,17 @@ export function StoryViewer({
         const parsed = JSON.parse(activeStory.overlays);
         if (parsed?.sharedPost?.id) {
           setSharedPostStatus('loading');
-          checkPostStatus(parsed.sharedPost.id).then((res) => {
+          fetch('/api/post/check-status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ postId: parsed.sharedPost.id })
+          }).then(r => r.json()).then((res) => {
             if (res.success) {
               setSharedPostStatus(res.status as any);
             } else {
               setSharedPostStatus('deleted');
             }
-          });
+          }).catch(() => setSharedPostStatus('deleted'));
           return;
         }
       } catch (e) {
@@ -170,7 +173,11 @@ export function StoryViewer({
     }
 
     if (activeStory && !activeStory.viewed) {
-      markStoryAsViewed(activeStory.id).then((res) => {
+      fetch('/api/story/mark-viewed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ storyId: activeStory.id })
+      }).then(r => r.json()).then((res) => {
         if (res.success && onStoryViewed) {
           onStoryViewed(activeStory.id, activeGroup.user.id);
         }
@@ -353,7 +360,12 @@ export function StoryViewer({
     setIsDeletingStory(true);
     setDeleteError(null);
     try {
-      const res = await deleteStory(activeStory.id);
+      const deleteRes = await fetch('/api/story/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ storyId: activeStory.id })
+      });
+      const res = await deleteRes.json();
       if (res.success) {
         setShowDeleteConfirm(false);
         setShowOwnerMenu(false);
@@ -488,7 +500,11 @@ export function StoryViewer({
                           return;
                         }
                         const postId = parsedOverlays.sharedPost.id;
-                        await incrementViewOriginalPostClick(postId);
+                        await fetch('/api/post/increment-view-click', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ postId })
+                        });
                         onClose(); // close story viewer
                         router.push(`/feed?postId=${postId}&fromStory=true`);
                       }}
@@ -630,7 +646,11 @@ export function StoryViewer({
                         onClick={async (e) => {
                           e.stopPropagation();
                           const postId = parsedOverlays.sharedPost.id;
-                          await incrementViewOriginalPostClick(postId);
+                          await fetch('/api/post/increment-view-click', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ postId })
+                          });
                           onClose();
                           router.push(`/feed?postId=${postId}&fromStory=true`);
                         }}
