@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -53,8 +54,43 @@ export function NewsEngagement({
   const [modalComments, setModalComments] = useState<any[]>([]);
   const [isModalLoading, setIsModalLoading] = useState(false);
   const [replyingTo, setReplyingTo] = useState<{ commentId: string; authorName: string } | null>(null);
+  const [highlightedCommentId, setHighlightedCommentId] = useState<string | null>(null);
 
   const composerInputRef = useRef<HTMLInputElement>(null);
+  const modalComposerRef = useRef<HTMLInputElement>(null);
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const commentId = searchParams?.get('commentId');
+    if (commentId) {
+      openCommentsModal();
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (modalComments.length === 0) return;
+    const commentId = searchParams?.get('commentId');
+    if (commentId) {
+      const targetExists = modalComments.some((c: any) => c.id === commentId);
+      if (targetExists) {
+        setTimeout(() => {
+          const el = document.getElementById(`comment-${commentId}`);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setHighlightedCommentId(commentId);
+            setTimeout(() => {
+              modalComposerRef.current?.focus();
+            }, 300);
+            setTimeout(() => {
+              setHighlightedCommentId(null);
+            }, 3000);
+          }
+        }, 500);
+      } else {
+        alert('This comment is no longer available.');
+      }
+    }
+  }, [modalComments, searchParams]);
 
   const handleLike = async () => {
     // Optimistic update
@@ -247,7 +283,15 @@ export function NewsEngagement({
               </div>
             ) : modalComments.length > 0 ? (
               modalComments.map((comment: any, idx: number) => (
-                <div key={idx} className="flex gap-3">
+                <div 
+                  key={idx} 
+                  id={`comment-${comment.id}`}
+                  className={`flex gap-3 transition-all duration-500 rounded-xl p-2 ${
+                    highlightedCommentId === comment.id 
+                      ? 'bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200/50 dark:border-yellow-900/30 scale-102 shadow-sm animate-pulse' 
+                      : ''
+                  }`}
+                >
                   <Avatar className="w-9 h-9 shrink-0 border border-gray-100 dark:border-zinc-800">
                     <AvatarImage src={comment.author?.image || comment.author?.avatar || '/default-user-avatar.svg'} />
                     <AvatarFallback>{comment.author?.name?.[0] || 'U'}</AvatarFallback>
@@ -276,6 +320,33 @@ export function NewsEngagement({
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Bottom composer inside dialog */}
+          <div className="border-t border-gray-100 dark:border-zinc-800 p-3 shrink-0 flex gap-2 items-center">
+            <Avatar className="w-8 h-8 shrink-0">
+              <AvatarImage src={(session?.user as any)?.image || '/default-user-avatar.svg'} />
+              <AvatarFallback>{session?.user?.name?.[0] || 'U'}</AvatarFallback>
+            </Avatar>
+            <div className="flex-1 flex gap-2 items-center bg-gray-100 dark:bg-zinc-900 rounded-full px-3 py-1">
+              <input
+                ref={modalComposerRef}
+                placeholder="Write a comment..."
+                value={commentText}
+                onChange={(e) => setCommentText(e.target.value)}
+                className="flex-1 bg-transparent border-none outline-none shadow-none text-xs h-8 text-gray-950 dark:text-gray-50 placeholder-gray-400"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleQuickCommentSubmit();
+                }}
+              />
+              <button
+                onClick={handleQuickCommentSubmit}
+                disabled={!commentText.trim()}
+                className={`p-1.5 rounded-full text-indigo-600 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all ${!commentText.trim() ? 'opacity-40 cursor-not-allowed' : 'opacity-100 hover:scale-110'}`}
+              >
+                <Send className="w-4 h-4 fill-current" />
+              </button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

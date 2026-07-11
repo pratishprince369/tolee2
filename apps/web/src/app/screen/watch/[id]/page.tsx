@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { 
   ArrowLeft, Eye, Calendar, Loader2, Play, Pause, Tv, Share2, 
@@ -55,8 +55,10 @@ interface PageProps {
 
 export default function WatchVideoPage({ params }: PageProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { data: session } = useSession();
   const currentUserId = session?.user ? (session.user as any).id : null;
+  const [highlightedCommentId, setHighlightedCommentId] = useState<string | null>(null);
 
   const [video, setVideo] = useState<any>(null);
   const [recommended, setRecommended] = useState<any[]>([]);
@@ -176,6 +178,39 @@ export default function WatchVideoPage({ params }: PageProps) {
       loadComments();
     }
   }, [video]);
+
+  useEffect(() => {
+    if (comments.length === 0) return;
+    const commentId = searchParams?.get('commentId');
+    const replyId = searchParams?.get('replyId');
+    if (commentId) {
+      const targetId = replyId || commentId;
+      const targetExists = comments.some((c: any) => 
+        c.id === targetId || (c.replies && c.replies.some((r: any) => r.id === targetId))
+      );
+
+      if (targetExists) {
+        setTimeout(() => {
+          const el = document.getElementById(`comment-${targetId}`);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setHighlightedCommentId(targetId);
+            
+            setReplyTargetCommentId(commentId);
+            setTimeout(() => {
+              document.getElementById(`reply-input-${commentId}`)?.focus();
+            }, 300);
+
+            setTimeout(() => {
+              setHighlightedCommentId(null);
+            }, 3000);
+          }
+        }, 500);
+      } else {
+        alert("This comment is no longer available.");
+      }
+    }
+  }, [comments, searchParams]);
 
   // Load Playlists
   const loadUserPlaylists = async () => {
@@ -1122,7 +1157,15 @@ export default function WatchVideoPage({ params }: PageProps) {
                   const isReplyFormOpen = replyTargetCommentId === comment.id;
 
                   return (
-                    <div key={comment.id} className="space-y-3 border-b border-zinc-150 dark:border-zinc-900 pb-3">
+                    <div 
+                      key={comment.id} 
+                      id={`comment-${comment.id}`}
+                      className={`space-y-3 border-b border-zinc-150 dark:border-zinc-900 pb-3 transition-all duration-500 rounded-xl p-2 ${
+                        highlightedCommentId === comment.id 
+                          ? 'bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-250/30 dark:border-yellow-900/30 scale-102 shadow-sm animate-pulse' 
+                          : ''
+                      }`}
+                    >
                       
                       {/* Top comment detail */}
                       <div className="flex gap-3">
@@ -1213,7 +1256,15 @@ export default function WatchVideoPage({ params }: PageProps) {
                       {comment.replies && comment.replies.length > 0 && (
                         <div className="pl-12 space-y-3">
                           {comment.replies.map((reply: any) => (
-                            <div key={reply.id} className="flex gap-2.5">
+                            <div 
+                              key={reply.id} 
+                              id={`comment-${reply.id}`}
+                              className={`flex gap-2.5 transition-all duration-500 rounded-xl p-1.5 ${
+                                highlightedCommentId === reply.id 
+                                  ? 'bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-250/30 dark:border-yellow-900/30 scale-102 shadow-sm animate-pulse' 
+                                  : ''
+                              }`}
+                            >
                               <Avatar className="w-7 h-7 border border-zinc-200 dark:border-zinc-800">
                                 <AvatarImage src={reply.user.avatar} />
                                 <AvatarFallback className="bg-zinc-200 dark:bg-zinc-800 text-[10px] font-bold text-teal-600">
@@ -1244,6 +1295,7 @@ export default function WatchVideoPage({ params }: PageProps) {
                           className="pl-12 flex gap-2"
                         >
                           <input
+                            id={`reply-input-${comment.id}`}
                             type="text"
                             required
                             placeholder="Write a reply..."

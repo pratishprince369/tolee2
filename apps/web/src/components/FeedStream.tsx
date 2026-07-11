@@ -49,23 +49,6 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
     setMounted(true);
   }, []);
 
-  useEffect(() => {
-    if (!mounted) return;
-    const targetPostId = searchParams?.get('postId');
-    if (targetPostId) {
-      setTimeout(() => {
-        const el = document.getElementById(`post-${targetPostId}`);
-        if (el) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          el.classList.add('ring-2', 'ring-[#0a7c85]', 'ring-offset-2');
-          setTimeout(() => {
-            el.classList.remove('ring-2', 'ring-[#0a7c85]', 'ring-offset-2');
-          }, 3000);
-        }
-      }, 600);
-    }
-  }, [mounted, searchParams]);
-
   // Stories state
   const [storyGroups, setStoryGroups] = useState<any[]>([]);
   const [activeStoryGroupIndex, setActiveStoryGroupIndex] = useState<number | null>(null);
@@ -330,6 +313,7 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
   const [likedComments, setLikedComments] = useState<Record<string, boolean>>({});
   const [visibleCommentsCount, setVisibleCommentsCount] = useState(10);
   const [expandedCommentReplies, setExpandedCommentReplies] = useState<Record<string, boolean>>({});
+  const [highlightedCommentId, setHighlightedCommentId] = useState<string | null>(null);
   
   // Drag gestures state
   const [translateY, setTranslateY] = useState(0);
@@ -357,6 +341,72 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
       console.error('Failed to load liked comments', e);
     }
   }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
+    const targetPostId = searchParams?.get('postId');
+    const commentId = searchParams?.get('commentId');
+    if (targetPostId) {
+      setTimeout(() => {
+        const el = document.getElementById(`post-${targetPostId}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          el.classList.add('ring-2', 'ring-[#0a7c85]', 'ring-offset-2');
+          setTimeout(() => {
+            el.classList.remove('ring-2', 'ring-[#0a7c85]', 'ring-offset-2');
+          }, 3000);
+        }
+      }, 600);
+
+      if (commentId) {
+        openCommentsModal(targetPostId);
+      }
+    }
+  }, [mounted, searchParams]);
+
+  useEffect(() => {
+    if (!mounted || modalComments.length === 0) return;
+    const commentId = searchParams?.get('commentId');
+    const replyId = searchParams?.get('replyId');
+    if (commentId) {
+      const targetId = replyId || commentId;
+      const targetExists = modalComments.some(c => 
+        c.id === targetId || (modalComments.some(child => child.parentId === c.id && child.id === targetId))
+      );
+
+      if (targetExists) {
+        if (replyId) {
+          setExpandedCommentReplies(prev => ({ ...prev, [commentId]: true }));
+        }
+
+        setTimeout(() => {
+          const el = document.getElementById(`comment-${targetId}`);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setHighlightedCommentId(targetId);
+            
+            const targetComment = modalComments.find(c => c.id === targetId) || 
+                                  modalComments.find(c => c.parentId === commentId && c.id === targetId);
+            const authorName = targetComment?.author?.username || targetComment?.author?.name || 'User';
+
+            setReplyingTo({
+              commentId: commentId,
+              authorName
+            });
+            setTimeout(() => {
+              composerInputRef.current?.focus();
+            }, 300);
+
+            setTimeout(() => {
+              setHighlightedCommentId(null);
+            }, 3000);
+          }
+        }, 500);
+      } else {
+        alert("This comment is no longer available.");
+      }
+    }
+  }, [modalComments, searchParams, mounted]);
 
   const [animateShow, setAnimateShow] = useState(false);
 
@@ -534,7 +584,15 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
     };
     
     return (
-      <div key={comment.id} className={`flex gap-2.5 ${isReply ? 'ml-8 mt-2.5 border-l border-gray-100 dark:border-gray-800 pl-3' : 'mt-4'}`}>
+      <div 
+        key={comment.id} 
+        id={`comment-${comment.id}`}
+        className={`flex gap-2.5 ${isReply ? 'ml-8 mt-2.5 border-l border-gray-100 dark:border-gray-800 pl-3' : 'mt-4'} transition-all duration-500 rounded-xl p-2 ${
+          highlightedCommentId === comment.id 
+            ? 'bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200/50 dark:border-yellow-900/30 scale-102 shadow-sm animate-pulse' 
+            : ''
+        }`}
+      >
         <Avatar className={`${isReply ? 'w-7 h-7' : 'w-9 h-9'} shrink-0 border border-gray-100 dark:border-gray-800`}>
           <AvatarImage src={comment.author?.avatar || '/default-user-avatar.svg'} />
           <AvatarFallback>{comment.author?.name?.[0] || 'U'}</AvatarFallback>

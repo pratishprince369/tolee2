@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { getOrCreatePersonalChat } from '@/actions/chat';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -108,6 +108,12 @@ function useIsDesktop(): boolean {
 export function ReelsStream({ initialReels }: { initialReels: any[] }) {
   const { data: session } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleAdClick = async (e: React.MouseEvent, ad: any) => {
     e.preventDefault();
@@ -456,6 +462,24 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
       (slides[idx] as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }, []);
+
+  useEffect(() => {
+    if (!mounted || itemsToRender.length === 0) return;
+    const targetVideoId = searchParams?.get('videoId');
+    if (targetVideoId) {
+      const idx = itemsToRender.findIndex(item => item.type === 'reel' && item.data.id === targetVideoId);
+      if (idx !== -1) {
+        setTimeout(() => {
+          if (isDesktop) {
+            scrollToReel(desktopScrollRef, idx);
+          } else {
+            scrollToReel(mobileScrollRef, idx);
+          }
+          openCommentsModal(targetVideoId);
+        }, 800);
+      }
+    }
+  }, [mounted, searchParams, itemsToRender, isDesktop, scrollToReel]);
 
   const [retriedUrls, setRetriedUrls] = useState<Record<string, number>>({});
 
@@ -1635,6 +1659,52 @@ function ReelsDetailsContent({
   const [replyingTo, setReplyingTo] = useState<{ commentId: string; authorName: string } | null>(null);
   const [expandedReplies, setExpandedReplies] = useState<Record<string, boolean>>({});
   const composerInputRef = useRef<HTMLInputElement>(null);
+  const searchParams = useSearchParams();
+  const [highlightedCommentId, setHighlightedCommentId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (comments.length === 0) return;
+    const commentId = searchParams?.get('commentId');
+    const replyId = searchParams?.get('replyId');
+    if (commentId) {
+      const targetId = replyId || commentId;
+      const targetExists = comments.some((c: any) => 
+        c.id === targetId || (comments.some((child: any) => child.parentId === c.id && child.id === targetId))
+      );
+
+      if (targetExists) {
+        if (replyId) {
+          setExpandedReplies(prev => ({ ...prev, [commentId]: true }));
+        }
+
+        setTimeout(() => {
+          const el = document.getElementById(`comment-${targetId}`);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setHighlightedCommentId(targetId);
+
+            const targetComment = comments.find((c: any) => c.id === targetId) || 
+                                  comments.find((c: any) => c.parentId === commentId && c.id === targetId);
+            const authorName = targetComment?.author?.username || targetComment?.author?.name || 'User';
+
+            setReplyingTo({
+              commentId: commentId,
+              authorName
+            });
+            setTimeout(() => {
+              composerInputRef.current?.focus();
+            }, 300);
+
+            setTimeout(() => {
+              setHighlightedCommentId(null);
+            }, 3000);
+          }
+        }, 500);
+      } else {
+        alert("This comment is no longer available.");
+      }
+    }
+  }, [comments, searchParams]);
 
   const [likedComments, setLikedComments] = useState<Record<string, boolean>>(() => {
     if (typeof window === 'undefined') return {};
@@ -1743,7 +1813,15 @@ function ReelsDetailsContent({
     const isExpanded = expandedReplies[comment.id];
 
     return (
-      <div key={comment.id} className={`flex flex-col ${isReply ? 'ml-10 mt-3' : 'mt-4'}`}>
+      <div 
+        key={comment.id} 
+        id={`comment-${comment.id}`}
+        className={`flex flex-col ${isReply ? 'ml-10 mt-3' : 'mt-4'} transition-all duration-500 rounded-xl p-2 ${
+          highlightedCommentId === comment.id 
+            ? 'bg-yellow-950/30 border border-yellow-900/30 scale-102 shadow-sm animate-pulse' 
+            : ''
+        }`}
+      >
         <div className="flex gap-3 items-start">
           <Avatar className={`${isReply ? 'w-7 h-7' : 'w-8 h-8'} shrink-0 border border-gray-700`}>
             <AvatarImage src={getValidAvatarUrl(comment.author?.avatar)} />

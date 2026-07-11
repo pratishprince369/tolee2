@@ -1053,16 +1053,98 @@ export async function addComment(postId: string, content: string, parentId?: str
 
     // Create notification for post author
     const post = await prisma.post.findUnique({
-      where: { id: postId }
+      where: { id: postId },
+      include: { newsRelation: true }
     });
 
-    if (post && post.authorId !== userId) {
-      await createSystemNotification({
-        userId: post.authorId,
-        type: 'comment',
-        message: `${comment.author.username || comment.author.name} commented on your post: "${safeContent.substring(0, 20)}${safeContent.length > 20 ? '...' : ''}"`,
-        link: `/feed?postId=${postId}`
-      });
+    if (post) {
+      const commentIdParam = parentId || comment.id;
+      let linkUrl = '';
+      if (post.postType === 'reel') {
+        linkUrl = `/reels?videoId=${postId}&commentId=${commentIdParam}`;
+      } else if (post.newsRelation) {
+        linkUrl = `/news/${post.newsRelation.slug}?commentId=${commentIdParam}`;
+      } else {
+        linkUrl = `/feed?postId=${postId}&commentId=${commentIdParam}`;
+      }
+      if (parentId) {
+        linkUrl += `&replyId=${comment.id}`;
+      }
+
+      // 1. Notify Post Author (only for top-level comments)
+      if (post.authorId !== userId && !parentId) {
+        const itemType = post.postType === 'reel' ? 'reel' : post.newsRelation ? 'news article' : 'post';
+        await createSystemNotification({
+          userId: post.authorId,
+          type: 'comment',
+          message: `${comment.author.username || comment.author.name} commented on your ${itemType}: "${safeContent.substring(0, 20)}${safeContent.length > 20 ? '...' : ''}"`,
+          link: linkUrl
+        });
+      }
+
+      // 2. Notify Parent Comment Author & Thread Participants (for replies)
+      let parentCommentAuthorId: string | null = null;
+      if (parentId) {
+        const parentComment = await prisma.comment.findUnique({
+          where: { id: parentId },
+          include: { author: true }
+        });
+        if (parentComment) {
+          parentCommentAuthorId = parentComment.authorId;
+          if (parentComment.authorId !== userId) {
+            await createSystemNotification({
+              userId: parentComment.authorId,
+              type: 'reply',
+              message: `${comment.author.username || comment.author.name} replied to your comment: "${safeContent.substring(0, 20)}${safeContent.length > 20 ? '...' : ''}"`,
+              link: linkUrl
+            });
+          }
+
+          // Thread participation notification for others
+          const otherReplies = await prisma.comment.findMany({
+            where: {
+              parentId,
+              authorId: {
+                notIn: [userId, post.authorId, parentComment.authorId].filter(Boolean) as string[]
+              }
+            },
+            select: { authorId: true }
+          });
+          const uniqueOtherUserIds = Array.from(new Set(otherReplies.map(r => r.authorId)));
+          for (const otherUserId of uniqueOtherUserIds) {
+            await createSystemNotification({
+              userId: otherUserId,
+              type: 'reply',
+              message: `${comment.author.username || comment.author.name} replied in a thread you participated in.`,
+              link: linkUrl
+            });
+          }
+        }
+      }
+
+      // 3. Notify Tagged Mentions (@username)
+      const mentions = safeContent.match(/@(\w+)/g);
+      if (mentions) {
+        const mentionedUsernames = mentions.map(m => m.slice(1));
+        const usersToNotify = await prisma.user.findMany({
+          where: {
+            username: { in: mentionedUsernames },
+            id: { not: userId }
+          },
+          select: { id: true }
+        });
+        for (const u of usersToNotify) {
+          const alreadyNotified = u.id === post.authorId || (parentCommentAuthorId && u.id === parentCommentAuthorId);
+          if (!alreadyNotified) {
+            await createSystemNotification({
+              userId: u.id,
+              type: 'mention',
+              message: `${comment.author.username || comment.author.name} mentioned you in a comment.`,
+              link: linkUrl
+            });
+          }
+        }
+      }
     }
 
     return { success: true, comment };

@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import Mux from '@mux/mux-node';
 import { getSimulationSettings } from '@/lib/simulation';
+import { createSystemNotification } from '@/lib/notification-service';
 
 const MUX_TOKEN_ID = process.env.MUX_TOKEN_ID || '0f358a94-4bdf-403e-bb8a-02ee17b68b66';
 const MUX_TOKEN_SECRET = process.env.MUX_TOKEN_SECRET || 'GiZ6iyNUthNh1Kt1BEYph8zVv24R4CINmTl64k7l0lyRzdvehcZlHCcndb0Gcn8KdsVnv5n3XBc';
@@ -439,6 +440,93 @@ export async function addScreenVideoComment(videoId: string, text: string, paren
         }
       }
     });
+
+    // Create notifications for Tolee Screen comments
+    const videoObj = await prisma.screenVideo.findUnique({
+      where: { id: videoId }
+    });
+
+    if (videoObj) {
+      const commentIdParam = parentId || comment.id;
+      let linkUrl = `/screen/watch/${videoId}?commentId=${commentIdParam}`;
+      if (parentId) {
+        linkUrl += `&replyId=${comment.id}`;
+      }
+
+      // 1. Notify Video Author (only for top-level comments)
+      if (videoObj.userId !== userId && !parentId) {
+        await createSystemNotification({
+          userId: videoObj.userId,
+          type: 'comment',
+          message: `${comment.user.username || comment.user.name} commented on your Screen video: "${text.substring(0, 20)}${text.length > 20 ? '...' : ''}"`,
+          link: linkUrl
+        });
+      }
+
+      // 2. Notify Parent Comment Author & Thread Participants (for replies)
+      let parentCommentAuthorId: string | null = null;
+      if (parentId) {
+        const parentComment = await prisma.screenVideoComment.findUnique({
+          where: { id: parentId },
+          include: { user: true }
+        });
+        if (parentComment) {
+          parentCommentAuthorId = parentComment.userId;
+          if (parentComment.userId !== userId) {
+            await createSystemNotification({
+              userId: parentComment.userId,
+              type: 'reply',
+              message: `${comment.user.username || comment.user.name} replied to your comment on Screen video: "${text.substring(0, 20)}${text.length > 20 ? '...' : ''}"`,
+              link: linkUrl
+            });
+          }
+
+          // Thread participation notification for others
+          const otherReplies = await prisma.screenVideoComment.findMany({
+            where: {
+              parentId,
+              userId: {
+                notIn: [userId, videoObj.userId, parentComment.userId].filter(Boolean) as string[]
+              }
+            },
+            select: { userId: true }
+          });
+          const uniqueOtherUserIds = Array.from(new Set(otherReplies.map(r => r.userId)));
+          for (const otherUserId of uniqueOtherUserIds) {
+            await createSystemNotification({
+              userId: otherUserId,
+              type: 'reply',
+              message: `${comment.user.username || comment.user.name} replied in a thread you participated in.`,
+              link: linkUrl
+            });
+          }
+        }
+      }
+
+      // 3. Notify Tagged Mentions (@username)
+      const mentions = text.match(/@(\w+)/g);
+      if (mentions) {
+        const mentionedUsernames = mentions.map(m => m.slice(1));
+        const usersToNotify = await prisma.user.findMany({
+          where: {
+            username: { in: mentionedUsernames },
+            id: { not: userId }
+          },
+          select: { id: true }
+        });
+        for (const u of usersToNotify) {
+          const alreadyNotified = u.id === videoObj.userId || (parentCommentAuthorId && u.id === parentCommentAuthorId);
+          if (!alreadyNotified) {
+            await createSystemNotification({
+              userId: u.id,
+              type: 'mention',
+              message: `${comment.user.username || comment.user.name} mentioned you in a comment.`,
+              link: linkUrl
+            });
+          }
+        }
+      }
+    }
 
     return { success: true, comment: JSON.parse(JSON.stringify(comment)) };
   } catch (err) {
