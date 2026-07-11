@@ -47,12 +47,19 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Only handle static assets and the root page '/'
+  const isStaticAsset = url.pathname.match(/\.(png|jpg|jpeg|svg|ico|json|js|css)$/);
+  const isRootPage = url.pathname === '/';
+  
+  if (!isStaticAsset && !isRootPage) {
+    return; // Let browser handle it natively
+  }
+
   // Network-first with cache fallback strategy
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        // Cache success responses for static assets and page route
-        if (response.status === 200 && (url.pathname === '/' || url.pathname.match(/\.(png|jpg|jpeg|svg|ico|json|js|css)$/))) {
+        if (response.status === 200) {
           const responseClone = response.clone();
           caches.open(CACHE_NAME).then((cache) => {
             cache.put(event.request, responseClone);
@@ -65,6 +72,8 @@ self.addEventListener('fetch', (event) => {
           if (cachedResponse) {
             return cachedResponse;
           }
+          // Fallback response for browser navigations to prevent service worker crashes
+          return new Response('Network error occurred', { status: 503, statusText: 'Service Unavailable' });
         });
       })
   );
