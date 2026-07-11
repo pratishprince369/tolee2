@@ -1297,7 +1297,7 @@ export default function ChatPage() {
         {activeChatDetails ? (
           <>
             {/* Chat Header */}
-            <div className="h-16 flex items-center justify-between px-3 sm:px-4 lg:px-6 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md border-b border-zinc-150/80 dark:border-zinc-900 z-20 min-w-0 shadow-sm sticky top-0">
+            <div className="h-16 shrink-0 flex items-center justify-between px-3 sm:px-4 lg:px-6 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md border-b border-zinc-150/80 dark:border-zinc-900 z-20 min-w-0 shadow-sm sticky top-0">
               <div 
                 className="flex items-center gap-2 sm:gap-3 cursor-pointer min-w-0 flex-1"
                 onClick={() => {
@@ -1499,7 +1499,7 @@ export default function ChatPage() {
             <div 
               ref={scrollContainerRef}
               onScroll={handleScroll}
-              className="flex-1 p-3 lg:p-6 z-10 overflow-y-auto h-full scroll-smooth scrollbar-none"
+              className="flex-1 min-h-0 p-3 lg:p-6 z-10 overflow-y-auto scroll-smooth scrollbar-none"
             >
               <div className="flex flex-col gap-1 min-h-full justify-end">
                 {/* Lazy history load loader */}
