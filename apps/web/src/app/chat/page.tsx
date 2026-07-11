@@ -40,14 +40,13 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuPortal
 } from "@/components/ui/dropdown-menu";
-import { muteGroupNotifications, leaveToleeGroup } from '@/actions/tolee';
+
 import { 
   getUserPromotionPreferences, 
   incrementShootClick 
 } from '@/actions/shoot';
 import { getCallLogs, deleteCallLog } from '@/actions/calls';
 import { CallInterface } from '@/components/CallInterface';
-import { checkPostAvailability } from '@/actions/post';
 import {
   Dialog,
   DialogContent,
@@ -158,11 +157,18 @@ function SharedContentCard({ payload }: SharedContentCardProps) {
   useEffect(() => {
     let active = true;
     if (payload.videoId) {
-      checkPostAvailability(payload.videoId).then((res) => {
-        if (active) {
-          setAvailable(res.success ? res.available : false);
-        }
-      });
+      fetch(`/api/post/check-availability?videoId=${payload.videoId}`)
+        .then(r => r.json())
+        .then((res) => {
+          if (active) {
+            setAvailable(res.success ? res.available : false);
+          }
+        })
+        .catch(() => {
+          if (active) {
+            setAvailable(false);
+          }
+        });
     } else {
       setAvailable(false);
     }
@@ -941,7 +947,12 @@ export default function ChatPage() {
   // Group Settings
   const handleMuteGroup = async (toleeId: string, duration?: '1h' | '8h' | '24h' | 'until_turned_on') => {
     try {
-      const res = await muteGroupNotifications(toleeId, duration);
+      const res = await fetch('/api/tolee/mute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ toleeId, duration })
+      }).then(r => r.json());
+
       if (res.success) {
         setChats(prev => prev.map(chat => {
           if (chat.toleeId === toleeId) {
@@ -958,7 +969,12 @@ export default function ChatPage() {
   const handleLeaveGroup = async (toleeId: string) => {
     try {
       if (confirm('Are you sure you want to leave this group?')) {
-        const res = await leaveToleeGroup(toleeId);
+        const res = await fetch('/api/tolee/leave', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ toleeId })
+        }).then(r => r.json());
+
         if (res.success) {
           setChats(prev => prev.filter(c => c.toleeId !== toleeId));
           if (activeChat && chats.find(c => c.id === activeChat)?.toleeId === toleeId) {
