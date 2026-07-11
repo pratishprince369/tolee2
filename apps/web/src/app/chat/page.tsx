@@ -40,7 +40,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuPortal
 } from "@/components/ui/dropdown-menu";
-import { muteGroupNotifications, leaveToleeGroup, joinTolee, getToleeById } from '@/actions/tolee';
+import { muteGroupNotifications, leaveToleeGroup } from '@/actions/tolee';
 import { 
   getUserPromotionPreferences, 
   incrementShootClick 
@@ -342,20 +342,25 @@ export default function ChatPage() {
       return;
     }
 
-    getToleeById(queryToleeId).then(res => {
-      if (res.success && res.tolee) {
-        if (!res.isMember) {
-          setNonMemberGroup({
-            ...res.tolee,
-            membershipStatus: res.membershipStatus
-          });
+    fetch(`/api/tolee/details?toleeId=${queryToleeId}`)
+      .then(r => r.json())
+      .then(res => {
+        if (res.success && res.tolee) {
+          if (!res.isMember) {
+            setNonMemberGroup({
+              ...res.tolee,
+              membershipStatus: res.membershipStatus
+            });
+          } else {
+            setNonMemberGroup(null);
+          }
         } else {
           setNonMemberGroup(null);
         }
-      } else {
+      })
+      .catch(() => {
         setNonMemberGroup(null);
-      }
-    });
+      });
   }, [queryToleeId, chats]);
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -2207,7 +2212,12 @@ export default function ChatPage() {
               onClick={async () => {
                 setIsJoiningGroup(true);
                 try {
-                  const res = await joinTolee(nonMemberGroup.id);
+                  const res = await fetch('/api/tolee/join', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ toleeId: nonMemberGroup.id })
+                  }).then(r => r.json());
+
                   if (res.success) {
                     await fetchChats();
                     setNonMemberGroup(null);
