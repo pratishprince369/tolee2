@@ -1217,7 +1217,7 @@ export default function ChatPage() {
                       <div className={chat.hasActiveStories ? 'p-[2px] bg-white dark:bg-zinc-950 rounded-full' : ''}>
                         <Avatar className="w-12 h-12 border border-zinc-100 dark:border-zinc-800">
                           <AvatarImage src={chat.avatar || (chat.isGroup ? '/default-tolee-avatar.svg' : '/default-user-avatar.svg')} />
-                          <AvatarFallback>{chat.name[0]}</AvatarFallback>
+                          <AvatarFallback>{chat.name ? chat.name[0] : 'C'}</AvatarFallback>
                         </Avatar>
                       </div>
                     </div>
@@ -1304,7 +1304,7 @@ export default function ChatPage() {
                     <Avatar className="w-10 h-10 border border-zinc-200/80 dark:border-zinc-800 shadow-sm flex-shrink-0 bg-teal-50 text-teal-800 font-bold dark:bg-zinc-900 dark:text-white">
                       <AvatarImage src={activeChatDetails.avatar} />
                       <AvatarFallback className="bg-teal-50 text-teal-850 dark:bg-zinc-800 dark:text-teal-355 font-bold">
-                        {activeChatDetails.name[0]?.toUpperCase()}
+                        {activeChatDetails.name ? activeChatDetails.name[0]?.toUpperCase() : 'C'}
                       </AvatarFallback>
                     </Avatar>
                   </div>
@@ -2010,7 +2010,7 @@ export default function ChatPage() {
                         <div className="flex flex-col items-center py-8 bg-zinc-50 dark:bg-zinc-900/40 gap-3 border-b border-zinc-100 dark:border-zinc-900">
                           <Avatar className="w-24 h-24 border-4 border-white dark:border-zinc-850 shadow-lg select-none">
                             <AvatarImage src={groupDetails.groupInfo.avatar} />
-                            <AvatarFallback className="text-3xl font-bold bg-teal-50 text-teal-800">{groupDetails.groupInfo.name[0]}</AvatarFallback>
+                            <AvatarFallback className="text-3xl font-bold bg-teal-50 text-teal-800">{groupDetails.groupInfo.name ? groupDetails.groupInfo.name[0] : 'G'}</AvatarFallback>
                           </Avatar>
                           <div className="text-center px-4">
                             <h3 className="text-lg font-black text-gray-900 dark:text-white leading-tight">{groupDetails.groupInfo.name}</h3>
@@ -2047,7 +2047,7 @@ export default function ChatPage() {
                                 <div className="flex items-center gap-2.5 min-w-0">
                                   <Avatar className="w-8 h-8 border border-zinc-100 dark:border-zinc-800 select-none">
                                     <AvatarImage src={member.avatar} />
-                                    <AvatarFallback className="text-[10px] font-bold bg-teal-50 text-teal-850">{member.name[0]}</AvatarFallback>
+                                    <AvatarFallback className="text-[10px] font-bold bg-teal-50 text-teal-850">{member.name ? member.name[0] : 'M'}</AvatarFallback>
                                   </Avatar>
                                   <div className="min-w-0">
                                     <p className="text-xs font-bold text-gray-900 dark:text-white truncate">
@@ -2183,7 +2183,7 @@ export default function ChatPage() {
             <div className="relative">
               <Avatar className="w-24 h-24 border-4 border-[#0a7c85]/20 shadow-md">
                 <AvatarImage src={nonMemberGroup.avatar || '/default-tolee-avatar.svg'} />
-                <AvatarFallback className="text-2xl bg-zinc-200 text-zinc-700">{nonMemberGroup.name[0]?.toUpperCase()}</AvatarFallback>
+                <AvatarFallback className="text-2xl bg-zinc-200 text-zinc-700">{nonMemberGroup.name ? nonMemberGroup.name[0]?.toUpperCase() : 'G'}</AvatarFallback>
               </Avatar>
             </div>
             <div className="space-y-2">
