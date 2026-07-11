@@ -289,6 +289,77 @@ export default function ChatPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  // --- State & Ref Declarations ---
+  const [activeChat, setActiveChat] = useState<string>('');
+  const [nonMemberGroup, setNonMemberGroup] = useState<any | null>(null);
+  const [isJoiningGroup, setIsJoiningGroup] = useState(false);
+
+  const [newMessage, setNewMessage] = useState('');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [loading, setLoading] = useState(true);
+
+  const queryTab = searchParams?.get('tab') || 'groups';
+  const [activeSidebarTab, setActiveSidebarTab] = useState<'groups' | 'personal'>('groups');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [promoPrefs, setPromoPrefs] = useState<{ receivePromotions: boolean; isMuted: boolean }>({
+    receivePromotions: true,
+    isMuted: false
+  });
+
+  const [chats, setChats] = useState<any[]>([]);
+  const [messagesByChat, setMessagesByChat] = useState<Record<string, any[]>>({});
+  const [typingUsers, setTypingUsers] = useState<string[]>([]);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTypingEmitRef = useRef<number>(0);
+
+  // --- Scrolling, Infinite Scroll & New Message Badge States & Refs ---
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [isNearBottom, setIsNearBottom] = useState(true);
+  const [showNewMessagesBadge, setShowNewMessagesBadge] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [hasMoreHistory, setHasMoreHistory] = useState<Record<string, boolean>>({});
+
+  const prevMessagesLength = useRef(0);
+  const prevActiveChat = useRef('');
+
+  // --- In-Chat Message Search States ---
+  const [isSearchingInChat, setIsSearchingInChat] = useState(false);
+  const [chatSearchQuery, setChatSearchQuery] = useState('');
+  const [searchMatches, setSearchMatches] = useState<string[]>([]);
+  const [currentSearchMatchIndex, setCurrentSearchMatchIndex] = useState(0);
+
+  // --- Attachment Modal ---
+  const [showAttachmentModal, setShowAttachmentModal] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+
+  // --- Emoji Picker ---
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
+
+  // --- Group Info Panel ---
+  const [showGroupInfo, setShowGroupInfo] = useState(false);
+  const [groupDetails, setGroupDetails] = useState<any | null>(null);
+  const [loadingGroupDetails, setLoadingGroupDetails] = useState(false);
+
+  // --- Calling & Call History Dialog States ───
+  const [showCallLogsModal, setShowCallLogsModal] = useState(false);
+  const [callLogs, setCallLogs] = useState<any[]>([]);
+  const [loadingCallLogs, setLoadingCallLogs] = useState(false);
+  const [showGroupMembersModal, setShowGroupMembersModal] = useState(false);
+
+  // --- Story/Status Viewer States ---
+  const [activeStoryUser, setActiveStoryUser] = useState<{ id: string; name: string; avatar: string } | null>(null);
+  const [activeStories, setActiveStories] = useState<any[]>([]);
+  const [selectedStorySlideId, setSelectedStorySlideId] = useState<string | null>(null);
+
+  // --- Custom Context Menu ---
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; message: any } | null>(null);
+  const [replyingToMessage, setReplyingToMessage] = useState<any | null>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // --- Sync Redirection & Query Parameters ---
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/');
@@ -297,10 +368,6 @@ export default function ChatPage() {
 
   const queryChatId = searchParams?.get('chatId') || searchParams?.get('id') || '';
   const queryToleeId = searchParams?.get('toleeId') || '';
-
-  const [activeChat, setActiveChat] = useState<string>('');
-  const [nonMemberGroup, setNonMemberGroup] = useState<any | null>(null);
-  const [isJoiningGroup, setIsJoiningGroup] = useState(false);
 
   // Synchronize activeChat with query parameters
   useEffect(() => {
@@ -368,70 +435,6 @@ export default function ChatPage() {
         setNonMemberGroup(null);
       });
   }, [queryToleeId, chats]);
-  const [newMessage, setNewMessage] = useState('');
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [loading, setLoading] = useState(true);
-
-  const queryTab = searchParams?.get('tab') || 'groups';
-  const [activeSidebarTab, setActiveSidebarTab] = useState<'groups' | 'personal'>('groups');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [promoPrefs, setPromoPrefs] = useState<{ receivePromotions: boolean; isMuted: boolean }>({
-    receivePromotions: true,
-    isMuted: false
-  });
-
-  const [chats, setChats] = useState<any[]>([]);
-  const [messagesByChat, setMessagesByChat] = useState<Record<string, any[]>>({});
-  const [typingUsers, setTypingUsers] = useState<string[]>([]);
-  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastTypingEmitRef = useRef<number>(0);
-
-  // --- Scrolling, Infinite Scroll & New Message Badge States & Refs ---
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const [isNearBottom, setIsNearBottom] = useState(true);
-  const [showNewMessagesBadge, setShowNewMessagesBadge] = useState(false);
-  const [loadingHistory, setLoadingHistory] = useState(false);
-  const [hasMoreHistory, setHasMoreHistory] = useState<Record<string, boolean>>({});
-
-  const prevMessagesLength = useRef(0);
-  const prevActiveChat = useRef('');
-
-  // --- In-Chat Message Search States ---
-  const [isSearchingInChat, setIsSearchingInChat] = useState(false);
-  const [chatSearchQuery, setChatSearchQuery] = useState('');
-  const [searchMatches, setSearchMatches] = useState<string[]>([]);
-  const [currentSearchMatchIndex, setCurrentSearchMatchIndex] = useState(0);
-
-  // --- Attachment Modal ---
-  const [showAttachmentModal, setShowAttachmentModal] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const imageInputRef = useRef<HTMLInputElement>(null);
-  const videoInputRef = useRef<HTMLInputElement>(null);
-
-  // --- Emoji Picker ---
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const emojiPickerRef = useRef<HTMLDivElement>(null);
-
-  // --- Group Info Panel ---
-  const [showGroupInfo, setShowGroupInfo] = useState(false);
-  const [groupDetails, setGroupDetails] = useState<any | null>(null);
-  const [loadingGroupDetails, setLoadingGroupDetails] = useState(false);
-
-  // --- Calling & Call History Dialog States ───
-  const [showCallLogsModal, setShowCallLogsModal] = useState(false);
-  const [callLogs, setCallLogs] = useState<any[]>([]);
-  const [loadingCallLogs, setLoadingCallLogs] = useState(false);
-  const [showGroupMembersModal, setShowGroupMembersModal] = useState(false);
-
-  // --- Story/Status Viewer States ---
-  const [activeStoryUser, setActiveStoryUser] = useState<{ id: string; name: string; avatar: string } | null>(null);
-  const [activeStories, setActiveStories] = useState<any[]>([]);
-  const [selectedStorySlideId, setSelectedStorySlideId] = useState<string | null>(null);
-
-  // --- Custom Context Menu ---
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; message: any } | null>(null);
-  const [replyingToMessage, setReplyingToMessage] = useState<any | null>(null);
-  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const COMMON_EMOJIS = [
     '😀','😁','😂','🤣','😃','😄','😅','😆','😉','😊',
