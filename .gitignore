@@ -17,3 +17,7 @@ apps/web/download_branding.js
 test-results/
 playwright-report/
 .playwright-artifacts*/
+
+# Do not track any markdown files in Git
+*.md
+
