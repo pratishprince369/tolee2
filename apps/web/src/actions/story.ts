@@ -4,7 +4,6 @@ import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
-import { getOrCreatePersonalChat, sendRealChatMessage } from './chat';
 
 export async function fetchFeedStories() {
   try {
@@ -319,49 +318,3 @@ export async function fetchStoryViewers(storyId: string) {
   }
 }
 
-export async function sendStoryReply(storyId: string, authorId: string, text: string) {
-  try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user || !(session.user as any).id) {
-      return { success: false, error: 'Unauthorized' };
-    }
-    const currentUserId = (session.user as any).id;
-    if (currentUserId === authorId) {
-      return { success: false, error: 'Cannot reply to your own story' };
-    }
-
-    // 1. Get or create the personal DM chat between current user and author
-    const chatRes = await getOrCreatePersonalChat(authorId);
-    if (!chatRes.success || !chatRes.chatId) {
-      return { success: false, error: chatRes.error || 'Failed to start chat' };
-    }
-
-    // 2. Fetch story info to create context
-    const story = await prisma.story.findUnique({
-      where: { id: storyId },
-      select: { mediaUrl: true, mediaType: true, thumbnailUrl: true, authorId: true, createdAt: true }
-    });
-
-    const contextPrefix = `[Replied to your story ${story?.mediaType || 'media'}]:`;
-    const messageContent = `${contextPrefix} "${text}"`;
-
-    // 3. Send message in chat with story reply metadata
-    const sendRes = await sendRealChatMessage(
-      chatRes.chatId,
-      messageContent,
-      undefined,
-      story ? {
-        storyId,
-        storyType: story.mediaType,
-        // Use thumbnailUrl for video stories so preview shows image not blank video
-        storyThumbnail: story.thumbnailUrl || story.mediaUrl,
-        storyUploaderId: story.authorId,
-        storyCreatedAt: story.createdAt
-      } : undefined
-    );
-    return sendRes;
-  } catch (error) {
-    console.error('Error sending story reply:', error);
-    return { success: false, error: 'Failed to send reply' };
-  }
-}

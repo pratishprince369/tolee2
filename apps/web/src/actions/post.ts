@@ -5,7 +5,6 @@ import { revalidatePath } from 'next/cache';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { headers } from 'next/headers';
-import { getOrCreatePersonalChat } from './chat';
 import { extractPublicIdFromUrl, extractResourceTypeFromUrl, destroyMultipleAssets } from '@/lib/cloudinary-cleanup';
 import { createSystemNotification, createSystemNotificationsMany } from '@/lib/notification-service';
 import { getSimulationSettings, getSimulatedEngagement, generateDynamicComments, detectCountryCode, getAICacheSync } from '@/lib/simulation';
@@ -1937,13 +1936,53 @@ export async function sharePostToFriends(
 
     // Deliver content to each selected friend
     for (const friendId of friendIds) {
-      // 1. Get or create DM
-      const chatResult = await getOrCreatePersonalChat(friendId);
-      if (!chatResult.success || !chatResult.chatId) {
-        console.error(`Failed to get/create personal chat with user ${friendId}`);
+      // 1. Get or create DM (inlined to avoid circular dependency)
+      let chatId = null;
+      try {
+        const existingDms = await prisma.chat.findMany({
+          where: {
+            isGroupChat: false,
+            participants: {
+              some: { userId }
+            }
+          },
+          include: {
+            participants: true
+          }
+        });
+
+        const targetChat = existingDms.find(chat => 
+          chat.participants.some(p => p.userId === friendId)
+        );
+
+        if (targetChat) {
+          if (targetChat.status === 'declined') {
+            await prisma.chat.update({
+              where: { id: targetChat.id },
+              data: { status: 'pending', requestSenderId: null }
+            });
+          }
+          chatId = targetChat.id;
+        } else {
+          const newChat = await prisma.chat.create({
+            data: {
+              isGroupChat: false,
+              status: 'pending',
+              requestSenderId: null,
+              participants: {
+                create: [
+                  { userId },
+                  { userId: friendId }
+                ]
+              }
+            }
+          });
+          chatId = newChat.id;
+        }
+      } catch (err) {
+        console.error("Error inline creating personal chat in sharePostToFriends:", err);
         continue;
       }
-      const chatId = chatResult.chatId;
 
       // 2. Format a message that recipient will receive
       let msgContent;

@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { X, ChevronLeft, ChevronRight, Volume2, VolumeX, Pause, Play, Send, MoreVertical, Trash2, Download, AlertTriangle, Music } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { HLSVideo } from '@/components/HLSVideo';
-import { markStoryAsViewed, sendStoryReply } from '@/actions/story';
+import { markStoryAsViewed } from '@/actions/story';
 import { deleteStory } from '@/actions/highlight';
 import { checkPostStatus, incrementViewOriginalPostClick } from '@/actions/post';
 import { useRouter } from 'next/navigation';
@@ -311,7 +311,16 @@ export function StoryViewer({
     setIsPaused(true);
 
     try {
-      const res = await sendStoryReply(activeStory.id, activeGroup.user.id, textToSend.trim());
+      const res = await fetch('/api/story/reply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          storyId: activeStory.id,
+          authorId: activeGroup.user.id,
+          text: textToSend.trim()
+        })
+      }).then(r => r.json());
+
       if (res.success) {
         setReplyStatus('success');
         setReplyText('');
