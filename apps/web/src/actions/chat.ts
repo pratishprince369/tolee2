@@ -100,6 +100,7 @@ export async function fetchRealChatData() {
         id: msg.id,
         sender: msg.sender.name || msg.sender.username || 'User',
         senderId: msg.senderId,
+        senderUsername: msg.sender.username || null,
         senderAvatar: msg.sender.avatar || msg.sender.image || '/default-user-avatar.svg',
         text: msg.content,
         mediaUrl: msg.mediaUrl || null,
@@ -110,7 +111,9 @@ export async function fetchRealChatData() {
         replyTo: msg.parent ? {
           id: msg.parent.id,
           text: msg.parent.content,
-          sender: msg.parent.sender.name || msg.parent.sender.username || 'User'
+          sender: msg.parent.sender.name || msg.parent.sender.username || 'User',
+          senderId: msg.parent.senderId,
+          senderUsername: msg.parent.sender.username || null
         } : null,
         storyId: msg.storyId || null,
         storyType: msg.storyType || null,
@@ -208,6 +211,7 @@ export async function fetchRealChatData() {
         id: msg.id,
         sender: msg.sender.name || msg.sender.username || 'User',
         senderId: msg.senderId,
+        senderUsername: msg.sender.username || null,
         senderAvatar: msg.sender.avatar || msg.sender.image || '/default-user-avatar.svg',
         text: msg.content,
         mediaUrl: msg.mediaUrl || null,
@@ -225,7 +229,9 @@ export async function fetchRealChatData() {
         replyTo: msg.parent ? {
           id: msg.parent.id,
           text: msg.parent.content,
-          sender: msg.parent.sender.name || msg.parent.sender.username || 'User'
+          sender: msg.parent.sender.name || msg.parent.sender.username || 'User',
+          senderId: msg.parent.senderId,
+          senderUsername: msg.parent.sender.username || null
         } : null,
         storyId: msg.storyId || null,
         storyType: msg.storyType || null,
@@ -435,6 +441,7 @@ export async function sendRealChatMessage(
         id: message.id,
         sender: message.sender.name || message.sender.username || 'User',
         senderId: message.senderId,
+        senderUsername: message.sender.username || null,
         senderAvatar: message.sender.avatar || message.sender.image || '/default-user-avatar.svg',
         text: message.content,
         time: message.createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -442,7 +449,9 @@ export async function sendRealChatMessage(
         replyTo: message.parent ? {
           id: message.parent.id,
           text: message.parent.content,
-          sender: message.parent.sender.name || message.parent.sender.username || 'User'
+          sender: message.parent.sender.name || message.parent.sender.username || 'User',
+          senderId: message.parent.senderId,
+          senderUsername: message.parent.sender.username || null
         } : null,
         storyId: message.storyId || null,
         storyType: message.storyType || null,
@@ -633,6 +642,7 @@ export async function fetchChatMessages(chatId: string, beforeMessageId?: string
       id: msg.id,
       sender: msg.sender.name || msg.sender.username || 'User',
       senderId: msg.senderId,
+      senderUsername: msg.sender.username || null,
       senderAvatar: msg.sender.avatar || msg.sender.image || '/default-user-avatar.svg',
       text: msg.content,
       mediaUrl: msg.mediaUrl || null,
@@ -650,7 +660,9 @@ export async function fetchChatMessages(chatId: string, beforeMessageId?: string
       replyTo: msg.parent ? {
         id: msg.parent.id,
         text: msg.parent.content,
-        sender: msg.parent.sender.name || msg.parent.sender.username || 'User'
+        sender: msg.parent.sender.name || msg.parent.sender.username || 'User',
+        senderId: msg.parent.senderId,
+        senderUsername: msg.parent.sender.username || null
       } : null,
       storyId: msg.storyId || null,
       storyType: msg.storyType || null,

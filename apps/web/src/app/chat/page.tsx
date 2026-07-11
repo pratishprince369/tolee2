@@ -1005,7 +1005,9 @@ export default function ChatPage() {
       replyTo: replyingToMessage ? {
         id: replyingToMessage.id,
         text: replyingToMessage.text,
-        sender: replyingToMessage.sender
+        sender: replyingToMessage.sender,
+        senderId: replyingToMessage.senderId,
+        senderUsername: replyingToMessage.senderUsername || null
       } : null
     };
     
@@ -1097,6 +1099,15 @@ export default function ChatPage() {
   const isPending = isPersonalDM && activeChatDetails.status === 'pending';
   const isDeclined = isPersonalDM && activeChatDetails.status === 'declined';
   const currentUserId = (session?.user as any)?.id;
+  const navigateToProfile = (username?: string | null, userId?: string) => {
+    if (userId === currentUserId) {
+      router.push('/u/me');
+    } else if (username && username.trim() !== '') {
+      router.push(`/u/${username}`);
+    } else if (userId) {
+      router.push(`/u/${userId}`);
+    }
+  };
   const isRequestSender = isPersonalDM && activeChatDetails.requestSenderId === currentUserId;
 
   const filteredChats = chats.filter(chat => {
@@ -1301,11 +1312,10 @@ export default function ChatPage() {
               <div 
                 className="flex items-center gap-2 sm:gap-3 cursor-pointer min-w-0 flex-1"
                 onClick={() => {
-                  if (!activeChatDetails.isGroup && activeChatDetails.username) {
-                    router.push(`/u/${activeChatDetails.username}`);
+                  if (!activeChatDetails.isGroup) {
+                    navigateToProfile(activeChatDetails.username, activeChatDetails.recipientId);
                   } else if (activeChatDetails.isGroup) {
                     handleGroupDetailsOpen();
-                    setShowGroupMembersModal(true);
                   }
                 }}
               >
@@ -1541,7 +1551,10 @@ export default function ChatPage() {
 
                         <div className={`flex w-full gap-2 sm:gap-3 my-0.5 ${msg.isMe ? 'justify-end' : 'justify-start'} min-w-0`}>
                           {!msg.isMe && (
-                            <Avatar className="w-8 h-8 sm:w-9 sm:h-9 flex-shrink-0 mt-0.5 shadow-sm border border-zinc-200/50 dark:border-zinc-800/85">
+                            <Avatar 
+                              className="w-8 h-8 sm:w-9 sm:h-9 flex-shrink-0 mt-0.5 shadow-sm border border-zinc-200/50 dark:border-zinc-800/85 cursor-pointer hover:opacity-90 transition-opacity"
+                              onClick={() => navigateToProfile(msg.senderUsername, msg.senderId)}
+                            >
                               <AvatarImage src={msg.senderAvatar} />
                               <AvatarFallback className="bg-teal-50 text-teal-850 dark:bg-zinc-850 dark:text-teal-355 font-bold text-xs">
                                 {msg.sender[0]?.toUpperCase()}
@@ -1551,7 +1564,12 @@ export default function ChatPage() {
                           
                           <div className="flex flex-col max-w-[82%] sm:max-w-[70%] min-w-0">
                             {!msg.isMe && activeChatDetails.isGroup && (
-                              <span className="text-[11px] text-gray-500 font-semibold mb-0.5 ml-1 truncate">{msg.sender}</span>
+                              <span 
+                                className="text-[11px] text-gray-500 font-semibold mb-0.5 ml-1 truncate cursor-pointer hover:underline"
+                                onClick={() => navigateToProfile(msg.senderUsername, msg.senderId)}
+                              >
+                                {msg.sender}
+                              </span>
                             )}
                             
                             <div 
@@ -1577,12 +1595,24 @@ export default function ChatPage() {
                                     e.stopPropagation();
                                     scrollToMessageId(msg.replyTo.id);
                                   }}
-                                  className="mb-1 p-2 rounded-xl bg-black/5 dark:bg-white/5 border-l-4 border-primary text-left cursor-pointer hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+                                  className={`mb-1 p-2 rounded-xl bg-black/5 dark:bg-white/5 border-l-4 text-left cursor-pointer hover:bg-black/10 dark:hover:bg-white/10 transition-colors ${
+                                    msg.isMe ? 'border-white/60' : 'border-primary'
+                                  }`}
                                 >
-                                  <p className="text-[10px] font-bold text-primary dark:text-teal-400 truncate">
+                                  <p 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      navigateToProfile(msg.replyTo.senderUsername, msg.replyTo.senderId);
+                                    }}
+                                    className={`text-[10px] font-bold truncate hover:underline cursor-pointer ${
+                                      msg.isMe ? 'text-white dark:text-white' : 'text-primary dark:text-teal-400'
+                                    }`}
+                                  >
                                     {msg.replyTo.sender}
                                   </p>
-                                  <p className="text-xs text-gray-500 dark:text-zinc-400 truncate leading-snug">
+                                  <p className={`text-xs truncate leading-snug ${
+                                    msg.isMe ? 'text-white/80 dark:text-zinc-300' : 'text-gray-500 dark:text-zinc-400'
+                                  }`}>
                                     {msg.replyTo.text}
                                   </p>
                                 </div>
@@ -2047,8 +2077,11 @@ export default function ChatPage() {
 
                         {/* Members List */}
                         <div className="p-4 border-b border-zinc-100 dark:border-zinc-900">
-                          <div className="flex justify-between items-center mb-3">
-                            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                          <div 
+                            onClick={() => setShowGroupMembersModal(true)}
+                            className="flex justify-between items-center mb-3 cursor-pointer hover:opacity-80 group"
+                          >
+                            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider group-hover:underline">
                               Members ({groupDetails.members.length})
                             </h4>
                             <span className="text-[10px] bg-green-500/10 text-green-600 dark:text-green-400 font-extrabold px-2 py-0.5 rounded-full select-none">
@@ -2061,10 +2094,8 @@ export default function ChatPage() {
                               <div 
                                 key={member.id} 
                                 onClick={() => {
-                                  if (member.id !== currentUserId) {
-                                    router.push(`/u/${member.username}`);
-                                    setShowGroupInfo(false);
-                                  }
+                                  navigateToProfile(member.username, member.id);
+                                  setShowGroupInfo(false);
                                 }}
                                 className="flex items-center justify-between p-2 rounded-xl hover:bg-zinc-50 dark:hover:bg-zinc-900/40 cursor-pointer transition-colors"
                               >
@@ -2419,10 +2450,8 @@ export default function ChatPage() {
                   <div 
                     key={member.id} 
                     onClick={() => {
-                      if (member.id !== currentUserId) {
-                        router.push(`/u/${member.username}`);
-                        setShowGroupMembersModal(false);
-                      }
+                      navigateToProfile(member.username, member.id);
+                      setShowGroupMembersModal(false);
                     }}
                     className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-900/40 hover:bg-zinc-900 border border-zinc-900 transition-colors cursor-pointer"
                   >
