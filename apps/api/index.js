@@ -646,6 +646,53 @@ io.on('connection', (socket) => {
     io.to(roomName).emit('meeting-qa-updated', qa);
   });
 
+  // 9. Real-time general chat messages relay
+  socket.on('send-chat-message', ({ chatId, senderId, senderName, senderAvatar, text, mediaUrl, isGroup, receiverId, createdAt, time, replyTo }) => {
+    console.log(`[Signaling] Chat message sent in chat ${chatId} by user ${senderId}`);
+    
+    const messagePayload = {
+      id: 'msg-' + Math.random().toString(36).substr(2, 9),
+      sender: senderName,
+      senderId,
+      senderAvatar,
+      text,
+      mediaUrl,
+      isRead: false,
+      createdAt,
+      time,
+      isMe: false,
+      replyTo
+    };
+
+    if (isGroup) {
+      // Group chat - broadcast to the room
+      socket.to(`chat-${chatId}`).emit('chat-message-received', {
+        chatId,
+        message: messagePayload
+      });
+    } else if (receiverId) {
+      // Personal chat - send to receiver's sockets
+      const receiverSockets = activeUsers.get(receiverId);
+      if (receiverSockets) {
+        receiverSockets.forEach(sid => {
+          io.to(sid).emit('chat-message-received', {
+            chatId,
+            message: messagePayload
+          });
+        });
+      }
+    }
+  });
+
+  socket.on('join-chat-rooms', ({ chatIds }) => {
+    if (Array.isArray(chatIds)) {
+      chatIds.forEach(id => {
+        socket.join(`chat-${id}`);
+        console.log(`[Signaling] Socket ${socket.id} joined group chat room: chat-${id}`);
+      });
+    }
+  });
+
   // 8. Disconnect Cleanup
   socket.on('disconnecting', () => {
     socket.rooms.forEach(room => {

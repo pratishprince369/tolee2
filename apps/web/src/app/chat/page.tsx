@@ -23,11 +23,12 @@ import { TypingIndicator } from '@/components/TypingIndicator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StoryViewer } from '@/components/StoryViewer';
+import { io, Socket } from 'socket.io-client';
 import { 
   Search, MoreVertical, Phone, Video, Paperclip, Smile, Send, Check, CheckCheck, 
   EyeOff, Users, ShieldCheck, PlusCircle, MessageCircle, ChevronLeft, X, 
   Image as ImageIcon, AlertCircle, BellOff, LogOut, Clock, Copy, Reply, Trash2, ArrowRight,
-  PhoneOff, VideoOff, Play
+  PhoneOff, VideoOff, Play, Pin
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -85,6 +86,7 @@ function mergePollMessages(oldMsgs: any[] = [], pollMsgs: any[] = []) {
 const formatLastMessage = (msgText: string) => {
   if (!msgText) return 'No messages yet.';
   
+  // 1. Check for shared content JSON payload
   const prefixMatch = msgText.match(/^([^:]+):\s*__SHARED_CONTENT__:(.*)$/);
   const isPlainShared = msgText.startsWith('__SHARED_CONTENT___') || msgText.startsWith('__SHARED_CONTENT__:');
   
@@ -93,22 +95,80 @@ const formatLastMessage = (msgText: string) => {
       const jsonStr = prefixMatch ? prefixMatch[2] : msgText.substring(19);
       const sender = prefixMatch ? `${prefixMatch[1]}: ` : '';
       const payload = JSON.parse(jsonStr);
-      if (payload.type === 'shared_video') {
-        return `${sender}🎥 Shared a Video`;
+      if (payload.type === 'shared_video' || payload.type === 'video') {
+        return `${sender}🎥 Video`;
       }
-      if (payload.type === 'shared_post') {
-        return `${sender}🖼️ Shared a Post`;
+      if (payload.type === 'shared_post' || payload.type === 'post') {
+        return `${sender}📷 Photo`;
+      }
+      if (payload.type === 'shared_reel' || payload.type === 'reel') {
+        return `${sender}🎬 Shared Reel`;
+      }
+      if (payload.type === 'shared_news' || payload.type === 'news') {
+        return `${sender}📰 Shared News`;
+      }
+      if (payload.type === 'shared_product' || payload.type === 'product') {
+        return `${sender}🛍 Shared Product`;
+      }
+      if (payload.type === 'location' || payload.type === 'shared_location') {
+        return `${sender}📍 Location`;
       }
       return `${sender}🔗 Shared Content`;
     } catch (e) {
-      return msgText;
+      // Fallback
     }
   }
-  
-  if (msgText.includes('[CALL_LOG]:')) {
-    return '📞 Call Log';
+
+  // 2. Extract sender prefix if present (e.g. "Amit:\nHello everyone" or "Amit: Hello")
+  const senderMatch = msgText.match(/^([^:]+):\s*([\s\S]*)$/);
+  const sender = senderMatch ? `${senderMatch[1]}: ` : '';
+  const body = senderMatch ? senderMatch[2].trim() : msgText.trim();
+
+  // 3. Check call logs
+  if (body.includes('[CALL_LOG]:')) {
+    return `${sender}📞 Call Log`;
   }
-  
+
+  // 4. Check attachment strings [📎 filename]
+  if (body.includes('[📎') || body.includes('📎')) {
+    const lowerBody = body.toLowerCase();
+    if (lowerBody.endsWith('.pdf]') || lowerBody.endsWith('.pdf')) {
+      return `${sender}📄 PDF`;
+    }
+    if (lowerBody.endsWith('.mp3]') || lowerBody.endsWith('.mp3') ||
+        lowerBody.endsWith('.wav]') || lowerBody.endsWith('.wav') ||
+        lowerBody.endsWith('.ogg]') || lowerBody.endsWith('.ogg') ||
+        lowerBody.endsWith('.m4a]') || lowerBody.endsWith('.m4a')) {
+      return `${sender}🎵 Audio`;
+    }
+    if (lowerBody.endsWith('.mp4]') || lowerBody.endsWith('.mp4') ||
+        lowerBody.endsWith('.webm]') || lowerBody.endsWith('.webm') ||
+        lowerBody.endsWith('.mov]') || lowerBody.endsWith('.mov')) {
+      return `${sender}🎥 Video`;
+    }
+    if (lowerBody.endsWith('.jpg]') || lowerBody.endsWith('.jpg') ||
+        lowerBody.endsWith('.png]') || lowerBody.endsWith('.png') ||
+        lowerBody.endsWith('.gif]') || lowerBody.endsWith('.gif') ||
+        lowerBody.endsWith('.jpeg]') || lowerBody.endsWith('.jpeg')) {
+      return `${sender}📷 Photo`;
+    }
+    return `${sender}📄 Document`;
+  }
+
+  // 5. Check stickers or reactions
+  if (body.includes('[sticker]') || body.includes('[Sticker]')) {
+    return `${sender}😊 Sticker`;
+  }
+  if (body.includes('[reaction]') || body.includes('[Reaction]')) {
+    return `${sender}👍 Reaction`;
+  }
+
+  // If it's a single emoji or starts with a reaction emoji, it could be a reaction
+  const singleEmojiPattern = /^[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDC00-\uDFFF]$/;
+  if (singleEmojiPattern.test(body)) {
+    return `${sender}👍 Reaction`;
+  }
+
   return msgText;
 };
 
@@ -290,7 +350,15 @@ export default function ChatPage() {
   const searchParams = useSearchParams();
 
   // --- State & Ref Declarations ---
+  const currentUserId = (session?.user as any)?.id;
+  const activeChatRef = useRef('');
+  
   const [activeChat, setActiveChat] = useState<string>('');
+  
+  useEffect(() => {
+    activeChatRef.current = activeChat;
+  }, [activeChat]);
+
   const [nonMemberGroup, setNonMemberGroup] = useState<any | null>(null);
   const [isJoiningGroup, setIsJoiningGroup] = useState(false);
 
@@ -307,6 +375,9 @@ export default function ChatPage() {
   });
 
   const [chats, setChats] = useState<any[]>([]);
+  const [socket, setSocket] = useState<any>(null);
+  const [pinnedChatIds, setPinnedChatIds] = useState<string[]>([]);
+  const [mutedChatIds, setMutedChatIds] = useState<string[]>([]);
   const [messagesByChat, setMessagesByChat] = useState<Record<string, any[]>>({});
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -462,10 +533,123 @@ export default function ChatPage() {
     return () => clearInterval(presenceId);
   }, []);
 
+  // Load Pin/Mute states from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const pinned = localStorage.getItem('tolee_pinned_chats');
+        if (pinned) setPinnedChatIds(JSON.parse(pinned));
+        const muted = localStorage.getItem('tolee_muted_chats');
+        if (muted) setMutedChatIds(JSON.parse(muted));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }, []);
+
+  // Socket client connection and event listeners
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 
+      (window.location.hostname === 'localhost' || 
+       window.location.hostname === '127.0.0.1' || 
+       window.location.hostname.startsWith('192.168.') || 
+       window.location.hostname.startsWith('10.') || 
+       window.location.hostname.startsWith('172.')
+        ? `http://${window.location.hostname}:4000` 
+        : `https://api.tolee.in`);
+
+    const s = io(SOCKET_URL, {
+      transports: ['websocket', 'polling']
+    });
+
+    s.on('connect', () => {
+      console.log('[Chat Client] Connected to signaling server:', s.id);
+      s.emit('register-user', { userId: currentUserId });
+      
+      // Re-emit group rooms on connect
+      if (chats.length > 0) {
+        const groupChatIds = chats.filter(c => c.isGroup).map(c => c.id);
+        s.emit('join-chat-rooms', { chatIds: groupChatIds });
+      }
+    });
+
+    s.on('chat-message-received', ({ chatId, message }) => {
+      console.log('[Chat Client] Real-time message received:', message);
+
+      // Append to messagesByChat
+      setMessagesByChat(prev => {
+        const msgs = prev[chatId] || [];
+        if (msgs.some(m => m.id === message.id)) return prev;
+        return {
+          ...prev,
+          [chatId]: [...msgs, message]
+        };
+      });
+
+      // Update chats list details
+      setChats(prev => {
+        const chatIndex = prev.findIndex(c => c.id === chatId);
+        if (chatIndex === -1) return prev;
+
+        const updatedChats = [...prev];
+        const chat = updatedChats[chatIndex];
+        const isCurrentActive = activeChatRef.current === chatId;
+        const unreadCount = isCurrentActive ? 0 : (chat.unread || 0) + 1;
+
+        // Play sound if not muted
+        const isMuted = mutedChatIds.includes(chatId) || chat.isMuted;
+        if (!isCurrentActive && !isMuted) {
+          try {
+            const audio = new Audio('/notification.mp3');
+            audio.volume = 0.5;
+            audio.play().catch(() => {});
+          } catch (_) {}
+        }
+
+        updatedChats[chatIndex] = {
+          ...chat,
+          lastMessage: `${message.sender}: ${message.text}`,
+          time: message.time,
+          lastMessageCreatedAt: message.createdAt,
+          unread: unreadCount
+        };
+
+        return updatedChats;
+      });
+
+      // Auto-mark as read if active
+      if (activeChatRef.current === chatId) {
+        markChatNotificationsAsRead(chatId);
+        markChatMessagesAsRead(chatId);
+      }
+    });
+
+    setSocket(s);
+
+    return () => {
+      s.disconnect();
+    };
+  }, [currentUserId, mutedChatIds]);
+
+  // Join group rooms when chats are loaded or socket changes
+  useEffect(() => {
+    if (socket && chats.length > 0) {
+      const groupChatIds = chats.filter(c => c.isGroup).map(c => c.id);
+      socket.emit('join-chat-rooms', { chatIds: groupChatIds });
+    }
+  }, [socket, chats]);
+
   const fetchChats = async () => {
     const res = await fetchRealChatData();
     if (res.success && res.chats && res.messagesByChat) {
-      setChats(res.chats);
+      const updatedChats = res.chats.map(chat => ({
+        ...chat,
+        isMuted: chat.isMuted || mutedChatIds.includes(chat.id),
+        unread: chat.id === activeChat ? 0 : chat.unread
+      }));
+      setChats(updatedChats);
       
       setMessagesByChat(prev => {
         const mergedObj: Record<string, any[]> = {};
@@ -553,8 +737,8 @@ export default function ChatPage() {
       getUserPromotionPreferences(activeChatDetails.otherUserId).then(res => {
         if (res.success) {
           setPromoPrefs({
-            receivePromotions: res.receivePromotions,
-            isMuted: res.isMuted
+            receivePromotions: !!res.receivePromotions,
+            isMuted: !!res.isMuted
           });
         }
       });
@@ -587,8 +771,6 @@ export default function ChatPage() {
     return () => clearInterval(id);
   }, [activeChat]);
 
-  const activeChatRef = useRef(activeChat);
-  
   useEffect(() => {
     const prevChat = activeChatRef.current;
     activeChatRef.current = activeChat;
@@ -672,7 +854,7 @@ export default function ChatPage() {
     const res = await fetchUserActiveStories(userId);
     if (res.success && res.stories.length > 0) {
       if (storyId) {
-        const exists = res.stories.some(s => s.id === storyId);
+        const exists = res.stories.some((s: any) => s.id === storyId);
         if (!exists) {
           alert("This story is no longer available.");
           return;
@@ -821,7 +1003,7 @@ export default function ChatPage() {
       setMessagesByChat(prev => {
         const existing = prev[activeChat] || [];
         const uniqueFetched = fetchedMsgs.filter(
-          fm => !existing.some(em => em.id === fm.id)
+          (fm: any) => !existing.some((em: any) => em.id === fm.id)
         );
 
         return {
@@ -1018,7 +1200,7 @@ export default function ChatPage() {
     
     setChats(prev => prev.map(chat => 
       chat.id === activeChat 
-        ? { ...chat, lastMessage: `Me: ${newMessage}`, time: newMsg.time }
+        ? { ...chat, lastMessage: `Me: ${newMessage}`, time: newMsg.time, lastMessageCreatedAt: new Date().toISOString() }
         : chat
     ));
     
@@ -1039,6 +1221,26 @@ export default function ChatPage() {
           [activeChat]: msgs.map(m => m.id === tempId ? res.message : m)
         };
       });
+
+      // Emit socket event for real-time relay
+      if (socket) {
+        const currentUserId = (session?.user as any)?.id;
+        const activeChatDetails = chats.find(c => c.id === activeChat);
+        socket.emit('send-chat-message', {
+          chatId: activeChat,
+          senderId: currentUserId,
+          senderName: session?.user?.name || 'User',
+          senderAvatar: session?.user?.image || '/default-user-avatar.svg',
+          text: contentToSend,
+          mediaUrl: (res.message as any).mediaUrl || null,
+          isGroup: activeChatDetails?.isGroup || false,
+          receiverId: activeChatDetails?.otherUserId || null,
+          createdAt: (res.message as any).createdAt || new Date().toISOString(),
+          time: res.message.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          replyTo: res.message.replyTo || null
+        });
+      }
+
       fetchChats();
     } else {
       console.error("Failed to send message:", res?.error);
@@ -1098,7 +1300,6 @@ export default function ChatPage() {
   const isPersonalDM = activeChatDetails && !activeChatDetails.isGroup;
   const isPending = isPersonalDM && activeChatDetails.status === 'pending';
   const isDeclined = isPersonalDM && activeChatDetails.status === 'declined';
-  const currentUserId = (session?.user as any)?.id;
   const navigateToProfile = (username?: string | null, userId?: string) => {
     if (userId === currentUserId) {
       router.push('/u/me');
@@ -1110,22 +1311,59 @@ export default function ChatPage() {
   };
   const isRequestSender = isPersonalDM && activeChatDetails.requestSenderId === currentUserId;
 
-  const filteredChats = chats.filter(chat => {
-    if (activeSidebarTab === 'groups') {
-      if (!chat.isGroup) return false;
-    } else if (activeSidebarTab === 'personal') {
-      if (chat.isGroup) return false;
+  const togglePinChat = (chatId: string) => {
+    let nextPinned = [...pinnedChatIds];
+    if (nextPinned.includes(chatId)) {
+      nextPinned = nextPinned.filter(id => id !== chatId);
+    } else {
+      nextPinned.push(chatId);
     }
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      return (
-        chat.name?.toLowerCase().includes(q) || 
-        chat.username?.toLowerCase().includes(q) || 
-        chat.lastMessage?.toLowerCase().includes(q)
-      );
+    setPinnedChatIds(nextPinned);
+    localStorage.setItem('tolee_pinned_chats', JSON.stringify(nextPinned));
+  };
+
+  const toggleMuteChat = (chatId: string, isGroup: boolean) => {
+    let nextMuted = [...mutedChatIds];
+    if (nextMuted.includes(chatId)) {
+      nextMuted = nextMuted.filter(id => id !== chatId);
+    } else {
+      nextMuted.push(chatId);
     }
-    return true;
-  });
+    setMutedChatIds(nextMuted);
+    localStorage.setItem('tolee_muted_chats', JSON.stringify(nextMuted));
+
+    // Also update chats state
+    setChats(prev => prev.map(c => c.id === chatId ? { ...c, isMuted: !c.isMuted } : c));
+  };
+
+  const filteredChats = chats
+    .filter(chat => {
+      if (activeSidebarTab === 'groups') {
+        if (!chat.isGroup) return false;
+      } else if (activeSidebarTab === 'personal') {
+        if (chat.isGroup) return false;
+      }
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        return (
+          chat.name?.toLowerCase().includes(q) || 
+          chat.username?.toLowerCase().includes(q) || 
+          chat.lastMessage?.toLowerCase().includes(q) ||
+          (chat.phone && chat.phone.toLowerCase().includes(q))
+        );
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      const aPinned = pinnedChatIds.includes(a.id);
+      const bPinned = pinnedChatIds.includes(b.id);
+      if (aPinned && !bPinned) return -1;
+      if (!aPinned && bPinned) return 1;
+
+      const aTime = a.lastMessageCreatedAt ? new Date(a.lastMessageCreatedAt).getTime() : 0;
+      const bTime = b.lastMessageCreatedAt ? new Date(b.lastMessageCreatedAt).getTime() : 0;
+      return bTime - aTime;
+    });
 
   return (
     <div className="w-full flex h-[calc(100dvh-8rem)] md:h-[calc(100vh-4rem)] bg-white dark:bg-[#0a0a0a] overflow-hidden border-b border-zinc-100 dark:border-gray-800 lg:border-none relative">
@@ -1138,10 +1376,8 @@ export default function ChatPage() {
           <div className="flex gap-2">
             <Button variant="ghost" size="icon" className="text-gray-500 rounded-full hover:bg-zinc-50 dark:hover:bg-zinc-900"><PlusCircle className="w-5 h-5 stroke-[1.5]" /></Button>
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="text-gray-500 rounded-full hover:bg-zinc-50 dark:hover:bg-zinc-900 h-9 w-9">
-                  <MoreVertical className="w-5 h-5 stroke-[1.5]" />
-                </Button>
+              <DropdownMenuTrigger className="text-gray-500 rounded-full hover:bg-zinc-50 dark:hover:bg-zinc-900 h-9 w-9 flex items-center justify-center focus:outline-none">
+                <MoreVertical className="w-5 h-5 stroke-[1.5]" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-lg border-zinc-150/80 dark:border-zinc-900 bg-zinc-950 text-white">
                 <DropdownMenuItem onClick={() => setShowCallLogsModal(true)} className="cursor-pointer">
@@ -1231,8 +1467,10 @@ export default function ChatPage() {
                   onClick={() => {
                     setActiveChat(chat.id);
                     markChatNotificationsAsRead(chat.id);
+                    markChatMessagesAsRead(chat.id);
+                    setChats(prev => prev.map(c => c.id === chat.id ? { ...c, unread: 0 } : c));
                   }}
-                  className={`flex items-center gap-3 p-3 mx-2 rounded-2xl cursor-pointer transition-all duration-200 ${
+                  className={`group flex items-center gap-3 p-3 mx-2 rounded-2xl cursor-pointer transition-all duration-200 ${
                     activeChat === chat.id 
                       ? 'bg-zinc-100/80 dark:bg-zinc-800/60 shadow-sm' 
                       : 'hover:bg-zinc-50 dark:hover:bg-zinc-900/30'
@@ -1261,9 +1499,9 @@ export default function ChatPage() {
                     )}
                   </div>
                   
-                  <div className="flex-grow min-w-0">
-                    <div className="flex justify-between items-baseline mb-0.5">
-                      <h3 className={`font-semibold text-[15px] truncate flex items-center gap-1.5 ${activeChat === chat.id ? 'text-primary dark:text-zinc-100' : 'text-gray-900 dark:text-white'}`}>
+                  <div className="flex-grow min-w-0 flex items-center justify-between">
+                    <div className="min-w-0 pr-2">
+                      <h3 className={`font-semibold text-[15px] truncate flex items-center gap-1.5 ${chat.unread > 0 ? 'font-bold text-gray-900 dark:text-white' : activeChat === chat.id ? 'text-primary dark:text-zinc-100' : 'text-gray-900 dark:text-white'}`}>
                         {chat.name}
                         {!chat.isGroup && chat.status === 'pending' && (
                           <span className="bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-400 text-[9px] font-black uppercase px-1.5 py-0.5 rounded border border-yellow-200 dark:border-yellow-900/40">
@@ -1276,19 +1514,46 @@ export default function ChatPage() {
                           </span>
                         )}
                       </h3>
-                      <span className={`text-xs whitespace-nowrap ml-2 ${chat.unread > 0 ? 'text-primary dark:text-teal-400 font-bold' : 'text-gray-500'}`}>
-                        {chat.time}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <p className="text-sm text-gray-500 dark:text-gray-400 truncate pr-2">
+                      <p className={`text-sm truncate pr-2 mt-0.5 ${chat.unread > 0 ? 'font-semibold text-zinc-900 dark:text-zinc-100' : 'text-gray-500 dark:text-gray-400'}`}>
                         {formatLastMessage(chat.lastMessage)}
                       </p>
-                      {chat.unread > 0 && (
-                        <div className="bg-primary text-primary-foreground text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full flex-shrink-0">
-                          {chat.unread}
-                        </div>
-                      )}
+                    </div>
+
+                    <div className="flex flex-col items-end gap-1.5 ml-2 flex-shrink-0">
+                      <span className={`text-xs whitespace-nowrap ${chat.unread > 0 ? 'text-emerald-500 dark:text-teal-400 font-bold' : 'text-gray-500'}`}>
+                        {chat.time}
+                      </span>
+                      <div className="flex items-center gap-1.5 min-h-[20px]">
+                        {pinnedChatIds.includes(chat.id) && (
+                          <Pin className="w-3.5 h-3.5 text-zinc-400 fill-zinc-400 rotate-[45deg]" />
+                        )}
+                        {(mutedChatIds.includes(chat.id) || chat.isMuted) && (
+                          <BellOff className="w-3.5 h-3.5 text-zinc-400" />
+                        )}
+                        {chat.unread > 0 ? (
+                          <div className="bg-emerald-500 dark:bg-teal-500 text-white text-[10px] font-extrabold w-5 h-5 flex items-center justify-center rounded-full">
+                            {chat.unread}
+                          </div>
+                        ) : (
+                          <div className="w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger onClick={(e) => e.stopPropagation()} className="w-6 h-6 rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-800 flex items-center justify-center focus:outline-none">
+                                <MoreVertical className="w-3.5 h-3.5 text-zinc-500" />
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                                <DropdownMenuItem onClick={() => togglePinChat(chat.id)}>
+                                  <Pin className="w-4 h-4 mr-2" />
+                                  {pinnedChatIds.includes(chat.id) ? 'Unpin chat' : 'Pin chat'}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => toggleMuteChat(chat.id, chat.isGroup)}>
+                                  <BellOff className="w-4 h-4 mr-2" />
+                                  {(mutedChatIds.includes(chat.id) || chat.isMuted) ? 'Unmute chat' : 'Mute chat'}
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1390,10 +1655,8 @@ export default function ChatPage() {
                 </Button>
                 {activeChatDetails.isGroup ? (
                   <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="text-zinc-500 hover:text-primary dark:hover:text-teal-400 rounded-full hover:bg-zinc-100/60 dark:hover:bg-zinc-900 h-9 w-9 p-0 flex items-center justify-center transition-all duration-200">
-                        <MoreVertical className="w-4.5 h-4.5 stroke-[2]" />
-                      </Button>
+                    <DropdownMenuTrigger className="text-zinc-500 hover:text-primary dark:hover:text-teal-400 rounded-full hover:bg-zinc-100/60 dark:hover:bg-zinc-900 h-9 w-9 p-0 flex items-center justify-center transition-all duration-200 focus:outline-none">
+                      <MoreVertical className="w-4.5 h-4.5 stroke-[2]" />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-lg border-zinc-150/80 dark:border-zinc-900">
                       <DropdownMenuItem onClick={handleGroupDetailsOpen} className="cursor-pointer">
@@ -1633,7 +1896,7 @@ export default function ChatPage() {
                                     if (msg.storyUploaderId === msg.senderId) {
                                       uploaderName = msg.sender;
                                       uploaderAvatar = msg.senderAvatar || '/default-user-avatar.svg';
-                                    } else if (msg.storyUploaderId === userId) {
+                                    } else if (msg.storyUploaderId === currentUserId) {
                                       uploaderName = session?.user?.name || 'You';
                                       uploaderAvatar = session?.user?.image || '/default-user-avatar.svg';
                                     } else {
