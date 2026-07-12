@@ -37,6 +37,10 @@ function getChannelAndTitle(type: string, groupName?: string): { channelId: stri
       return { channelId: 'social', title: '📌 Local Requirement' };
     case 'live':
       return { channelId: 'groups', title: '🔴 Live Now' };
+    case 'location_reminder':
+      return { channelId: 'social', title: '📍 Complete Your Profile' };
+    case 'phone_reminder':
+      return { channelId: 'social', title: '📱 Verify Your Mobile Number' };
     default:
       return { channelId: 'default', title: 'Tolee Alert' };
   }

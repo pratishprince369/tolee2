@@ -21,10 +21,11 @@ import {
   XCircle, 
   AlertTriangle,
   Smartphone,
-  Check
+  Check,
+  MapPin
 } from 'lucide-react';
 import { useSession, signOut } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   getUserSettings,
   updateAccountSettings,
@@ -32,12 +33,16 @@ import {
   updatePrivacySettings,
   changePassword,
   deleteUserAccount,
-  logoutOtherSessions
+  logoutOtherSessions,
+  updateUserLocation,
+  sendPhoneOTP,
+  verifyPhoneOTP
 } from '@/actions/user';
 
 export default function SettingsPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   // Navigation state
   const [activeTab, setActiveTab] = useState<'account' | 'notifications' | 'privacy' | 'security' | 'billing'>('account');
@@ -50,6 +55,21 @@ export default function SettingsPage() {
   // Field states
   const [email, setEmail] = useState('');
   const [preferredLanguage, setPreferredLanguage] = useState('English (US)');
+  const [name, setName] = useState('');
+  const [bio, setBio] = useState('');
+  const [location, setLocation] = useState('');
+  const [subLocation, setSubLocation] = useState('');
+  const [phone, setPhone] = useState('');
+  const [phoneVerified, setPhoneVerified] = useState(false);
+  const [avatar, setAvatar] = useState('');
+
+  // OTP field states
+  const [newPhone, setNewPhone] = useState('');
+  const [countryCode, setCountryCode] = useState('+91');
+  const [otpCode, setOtpCode] = useState('');
+  const [isOtpSent, setIsOtpSent] = useState(false);
+  const [otpError, setOtpError] = useState('');
+  const [otpLoading, setOtpLoading] = useState(false);
   
   // Notification states
   const [notifPush, setNotifPush] = useState(true);
@@ -91,6 +111,14 @@ export default function SettingsPage() {
           setEmail(s.email || '');
           setPreferredLanguage(s.preferredLanguage || 'English (US)');
           
+          setName(s.name || '');
+          setBio(s.bio || '');
+          setLocation(s.location || '');
+          setSubLocation(s.subLocation || '');
+          setPhone(s.phone || '');
+          setPhoneVerified(s.phoneVerified || false);
+          setAvatar(s.avatar || s.image || '');
+          
           // Notifications
           setNotifPush(s.pushNotifications);
           setNotifChat(s.chatNotifications);
@@ -113,6 +141,85 @@ export default function SettingsPage() {
       });
     }
   }, [status, router]);
+
+  // Deep Link Highlighting
+  useEffect(() => {
+    const tab = searchParams?.get('tab');
+    if (tab === 'account' || tab === 'notifications' || tab === 'privacy' || tab === 'security' || tab === 'billing') {
+      setActiveTab(tab as any);
+    }
+    
+    const highlight = searchParams?.get('highlight');
+    if (highlight) {
+      setTimeout(() => {
+        const el = document.getElementById(`settings-${highlight}-section`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          el.classList.add('ring-2', 'ring-[#0a7c85]', 'ring-offset-2', 'transition-all', 'duration-500');
+          setTimeout(() => {
+            el.classList.remove('ring-2', 'ring-[#0a7c85]', 'ring-offset-2');
+          }, 4000);
+        }
+      }, 800);
+    }
+  }, [searchParams]);
+
+  const handleSaveLocation = async () => {
+    setIsSubmitting(true);
+    const res = await updateUserLocation(location, subLocation);
+    setIsSubmitting(false);
+    if (res.success) {
+      showToast('Location updated successfully!', 'success');
+      router.refresh();
+    } else {
+      showToast(res.error || 'Failed to update location.', 'error');
+    }
+  };
+
+  const handleSendOtp = async () => {
+    if (!newPhone.trim()) {
+      setOtpError('Mobile number is required.');
+      return;
+    }
+    if (!/^\d{10}$/.test(newPhone.trim())) {
+      setOtpError('Please enter a valid 10-digit mobile number.');
+      return;
+    }
+    setOtpLoading(true);
+    setOtpError('');
+    const fullPhone = `${countryCode}${newPhone.trim()}`;
+    const res = await sendPhoneOTP(fullPhone);
+    setOtpLoading(false);
+    if (res.success) {
+      setIsOtpSent(true);
+      showToast('OTP sent successfully!', 'success');
+    } else {
+      setOtpError(res.error || 'Failed to send OTP.');
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!otpCode.trim()) {
+      setOtpError('OTP code is required.');
+      return;
+    }
+    setOtpLoading(true);
+    setOtpError('');
+    const fullPhone = `${countryCode}${newPhone.trim()}`;
+    const res = await verifyPhoneOTP(fullPhone, otpCode);
+    setOtpLoading(false);
+    if (res.success) {
+      setPhone(fullPhone);
+      setPhoneVerified(true);
+      setIsOtpSent(false);
+      setOtpCode('');
+      setNewPhone('');
+      showToast('Mobile number verified successfully!', 'success');
+      router.refresh();
+    } else {
+      setOtpError(res.error || 'Invalid OTP. Please try again.');
+    }
+  };
 
   // Show auto-dismiss toast
   const showToast = (message: string, type: 'success' | 'error') => {
@@ -377,6 +484,50 @@ export default function SettingsPage() {
             {/* 1. ACCOUNT SETTINGS TAB */}
             {activeTab === 'account' && (
               <>
+                {/* Progressive Profile Completion Card */}
+                {(() => {
+                  const checklistItems = [
+                    { label: 'Name', checked: !!name.trim() },
+                    { label: 'Email', checked: !!email.trim() },
+                    { label: 'Location', checked: !!location.trim() },
+                    { label: 'Mobile Number', checked: !!phone.trim() && phoneVerified },
+                    { label: 'Profile Photo', checked: !!avatar.trim() },
+                    { label: 'Bio', checked: !!bio.trim() },
+                  ];
+                  const checkedCount = checklistItems.filter(item => item.checked).length;
+                  const completionPercentage = Math.round((checkedCount / checklistItems.length) * 100);
+
+                  return (
+                    <Card className="border-teal-500/20 dark:border-teal-900/30 shadow-xl bg-gradient-to-br from-teal-50/20 via-white to-white dark:from-teal-950/5 dark:via-zinc-950 dark:to-zinc-950 rounded-2xl overflow-hidden mb-6">
+                      <CardContent className="p-6">
+                        <div className="flex justify-between items-center mb-3">
+                          <h3 className="font-extrabold text-lg text-gray-900 dark:text-zinc-100 flex items-center gap-2">
+                            ✨ Progressive Profile Completion
+                          </h3>
+                          <span className="text-teal-600 dark:text-teal-400 font-extrabold text-xl">{completionPercentage}%</span>
+                        </div>
+                        <div className="w-full bg-gray-150 dark:bg-zinc-800 h-3 rounded-full mb-6 overflow-hidden">
+                          <div className="bg-[#0a7c85] h-full transition-all duration-500" style={{ width: `${completionPercentage}%` }} />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                          {checklistItems.map((item, idx) => (
+                            <div key={idx} className="flex items-center gap-2 text-xs font-semibold text-gray-700 dark:text-zinc-300">
+                              <span className={`w-4 h-4 rounded-full flex items-center justify-center border text-[9px] font-bold ${
+                                item.checked 
+                                  ? 'bg-teal-500 border-teal-500 text-white' 
+                                  : 'border-zinc-350 dark:border-zinc-750 text-transparent'
+                              }`}>
+                                ✓
+                              </span>
+                              <span className={item.checked ? 'line-through opacity-70' : ''}>{item.label}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })()}
+
                 <Card className="border-white/40 dark:border-zinc-800/40 shadow-xl bg-white/80 dark:bg-[#121814]/90 backdrop-blur-md overflow-hidden rounded-2xl">
                   <CardHeader className="bg-primary/5 border-b border-zinc-100 dark:border-zinc-800/50">
                     <CardTitle className="text-xl font-bold text-gray-900 dark:text-zinc-100">Account Information</CardTitle>
@@ -400,7 +551,7 @@ export default function SettingsPage() {
                         <Lock className="w-3.5 h-3.5" /> Email address cannot be changed at this time for verification stability.
                       </p>
                     </div>
-
+ 
                     {/* Language selector */}
                     <div className="space-y-2">
                       <Label htmlFor="language" className="font-semibold text-gray-800 dark:text-zinc-200 flex items-center gap-2">
@@ -419,7 +570,7 @@ export default function SettingsPage() {
                         Select your platform language preference. Saved preferences load automatically.
                       </p>
                     </div>
-
+ 
                     <Button 
                       onClick={handleSaveAccount} 
                       disabled={isSubmitting}
@@ -427,6 +578,164 @@ export default function SettingsPage() {
                     >
                       {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Changes'}
                     </Button>
+                  </CardContent>
+                </Card>
+
+                {/* Location Settings Card */}
+                <Card id="settings-location-section" className="border-white/40 dark:border-zinc-800/40 shadow-xl bg-white/80 dark:bg-[#121814]/90 backdrop-blur-md overflow-hidden rounded-2xl">
+                  <CardHeader className="bg-primary/5 border-b border-zinc-100 dark:border-zinc-800/50">
+                    <CardTitle className="text-xl font-bold text-gray-900 dark:text-zinc-100 flex items-center gap-2">
+                      <MapPin className="w-5 h-5 text-teal-605" /> Location Settings
+                    </CardTitle>
+                    <CardDescription className="dark:text-zinc-400">Specify your location to customize your local feed, events, and recommendations.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-6 space-y-5">
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="location-city" className="font-semibold text-gray-850 dark:text-zinc-200">Primary Location (City)</Label>
+                        <Input 
+                          id="location-city"
+                          placeholder="e.g. Mumbai, Delhi, Pune"
+                          value={location}
+                          onChange={(e) => setLocation(e.target.value)}
+                          className="w-full h-11 bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-primary"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="location-area" className="font-semibold text-gray-850 dark:text-zinc-200">Sub-Location / Area (Optional)</Label>
+                        <Input 
+                          id="location-area"
+                          placeholder="e.g. Kalyan, Ghatkopar"
+                          value={subLocation}
+                          onChange={(e) => setSubLocation(e.target.value)}
+                          className="w-full h-11 bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-primary"
+                        />
+                      </div>
+                    </div>
+                    
+                    {/* Benefits Messaging */}
+                    <div className="bg-teal-500/5 dark:bg-teal-500/10 border border-teal-500/10 dark:border-teal-500/20 rounded-2xl p-4 text-xs space-y-2 text-gray-600 dark:text-zinc-300">
+                      <p className="font-bold text-teal-700 dark:text-teal-400">📍 Your location helps you:</p>
+                      <ul className="list-disc pl-4 space-y-1">
+                        <li>Discover nearby Tolees and communities.</li>
+                        <li>Find local events, shops and meetups in your area.</li>
+                        <li>Connect with nearby people.</li>
+                        <li>View localized posts and updates on the Live Map.</li>
+                      </ul>
+                    </div>
+
+                    <Button 
+                      onClick={handleSaveLocation} 
+                      disabled={isSubmitting}
+                      className="font-bold bg-primary hover:bg-primary/90 text-primary-foreground w-full sm:w-auto h-11 px-6 rounded-xl shadow-md transition-all flex items-center justify-center gap-2"
+                    >
+                      {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Location'}
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                {/* Mobile Verification Card */}
+                <Card id="settings-phone-section" className="border-white/40 dark:border-zinc-800/40 shadow-xl bg-white/80 dark:bg-[#121814]/90 backdrop-blur-md overflow-hidden rounded-2xl">
+                  <CardHeader className="bg-primary/5 border-b border-zinc-100 dark:border-zinc-800/50">
+                    <CardTitle className="text-xl font-bold text-gray-900 dark:text-zinc-100 flex items-center gap-2">
+                      <Smartphone className="w-5 h-5 text-teal-605" /> Mobile Verification
+                    </CardTitle>
+                    <CardDescription className="dark:text-zinc-400">Link your verified mobile number to secure your account and unlock communication features.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-6 space-y-5">
+                    {phoneVerified ? (
+                      <div className="flex items-center gap-3 bg-green-500/10 border border-green-500/20 rounded-2xl p-4 text-green-600 dark:text-green-400">
+                        <CheckCircle className="w-6 h-6 shrink-0" />
+                        <div>
+                          <p className="font-bold text-sm">Mobile Number Verified</p>
+                          <p className="text-xs opacity-90 mt-0.5">Linked: {phone}</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {otpError && (
+                          <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs font-semibold rounded-xl text-center">
+                            {otpError}
+                          </div>
+                        )}
+
+                        {!isOtpSent ? (
+                          <div className="space-y-3">
+                            <Label htmlFor="phone-input" className="font-semibold text-gray-850 dark:text-zinc-200">Mobile Number</Label>
+                            <div className="flex gap-2">
+                              <select
+                                value={countryCode}
+                                onChange={(e) => setCountryCode(e.target.value)}
+                                className="px-3 border border-zinc-200 dark:border-zinc-850 rounded-xl bg-white dark:bg-zinc-950 text-sm font-semibold focus:outline-none"
+                              >
+                                <option value="+91">🇮🇳 +91</option>
+                                <option value="+1">🇺🇸 +1</option>
+                                <option value="+44">🇬🇧 +44</option>
+                                <option value="+971">🇦🇪 +971</option>
+                              </select>
+                              <Input 
+                                id="phone-input"
+                                type="tel"
+                                placeholder="Enter 10-digit number"
+                                value={newPhone}
+                                onChange={(e) => setNewPhone(e.target.value.replace(/\D/g, '').substring(0, 10))}
+                                className="flex-grow h-11 bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 rounded-xl font-semibold tracking-wide focus:ring-2 focus:ring-primary"
+                              />
+                            </div>
+                            <Button 
+                              onClick={handleSendOtp} 
+                              disabled={otpLoading}
+                              className="font-bold bg-primary hover:bg-primary/90 text-primary-foreground h-11 px-6 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 mt-2"
+                            >
+                              {otpLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Send Verification OTP'}
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                              We sent a 6-digit OTP code to <strong className="text-gray-900 dark:text-white">{countryCode} {newPhone}</strong>. Please enter it below.
+                            </div>
+                            <div className="flex gap-2 items-center">
+                              <Input 
+                                type="text"
+                                placeholder="6-digit OTP"
+                                value={otpCode}
+                                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').substring(0, 6))}
+                                className="w-36 h-11 bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 rounded-xl font-bold text-center tracking-widest text-lg"
+                              />
+                              <Button 
+                                onClick={handleVerifyOtp} 
+                                disabled={otpLoading}
+                                className="font-bold bg-primary hover:bg-primary/90 text-primary-foreground h-11 px-6 rounded-xl shadow-md transition-all flex items-center justify-center gap-2"
+                              >
+                                {otpLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Verify OTP'}
+                              </Button>
+                              <Button 
+                                variant="outline"
+                                onClick={() => {
+                                  setIsOtpSent(false);
+                                  setOtpCode('');
+                                }}
+                                className="h-11 rounded-xl text-xs"
+                              >
+                                Change Number
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    
+                    {/* Benefits Messaging */}
+                    <div className="bg-teal-500/5 dark:bg-teal-500/10 border border-teal-500/10 dark:border-teal-500/20 rounded-2xl p-4 text-xs space-y-2 text-gray-600 dark:text-zinc-300">
+                      <p className="font-bold text-teal-700 dark:text-teal-400">📱 Your mobile number helps:</p>
+                      <ul className="list-disc pl-4 space-y-1">
+                        <li>Secure your account with multi-factor trust.</li>
+                        <li>Recover your account seamlessly.</li>
+                        <li>Enable trusted communication.</li>
+                        <li>Prevent duplicate/fake accounts.</li>
+                      </ul>
+                    </div>
                   </CardContent>
                 </Card>
 

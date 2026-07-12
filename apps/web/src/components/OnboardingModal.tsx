@@ -38,8 +38,9 @@ export function OnboardingModal() {
   const [countryCode, setCountryCode] = useState('+91');
   const [phoneNumber, setPhoneNumber] = useState('');
 
-  // Check if onboarding is required
+  // Check if onboarding is required - DISABLED in onboarding redesign (users explore first)
   useEffect(() => {
+    /* 
     if (status !== 'authenticated' || !session?.user) return;
 
     const checkStatus = async () => {
@@ -59,6 +60,7 @@ export function OnboardingModal() {
     };
 
     checkStatus();
+    */
   }, [session, status]);
 
   // Handle step 1: Location submit

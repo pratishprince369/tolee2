@@ -896,6 +896,14 @@ export async function getUserSettings() {
       where: { id: userId },
       select: {
         id: true,
+        name: true,
+        bio: true,
+        location: true,
+        subLocation: true,
+        phone: true,
+        phoneVerified: true,
+        avatar: true,
+        image: true,
         email: true,
         preferredLanguage: true,
         isPrivate: true,
@@ -1423,6 +1431,88 @@ export async function getFollowingList(profileUserId: string) {
   }
 }
 
+export async function triggerOnboardingNotificationIfNeeded(sessionCount: number) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !(session.user as any).id) {
+      return { success: false, error: 'Unauthorized' };
+    }
+    const userId = (session.user as any).id;
 
+    // Fetch user profile status
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        location: true,
+        phone: true,
+        phoneVerified: true
+      }
+    });
 
+    if (!user) {
+      return { success: false, error: 'User not found' };
+    }
 
+    const hasLocation = !!user.location;
+    const hasVerifiedPhone = !!user.phone && user.phoneVerified;
+
+    // Condition 1: 2nd or 3rd session -> Location Reminder
+    if (!hasLocation && (sessionCount === 2 || sessionCount === 3)) {
+      const existingNotif = await prisma.notification.findFirst({
+        where: { userId, type: 'location_reminder' },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      let shouldSend = false;
+      if (!existingNotif) {
+        shouldSend = true;
+      } else if (existingNotif.isRead) {
+        const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+        if (existingNotif.createdAt < threeDaysAgo) {
+          shouldSend = true;
+        }
+      }
+
+      if (shouldSend) {
+        await createSystemNotification({
+          userId,
+          type: 'location_reminder',
+          message: '📍 Complete Your Profile: Update your location to discover nearby Tolees, local events, and connect with people in your area.',
+          link: '/settings?tab=account&highlight=location'
+        });
+      }
+    }
+
+    // Condition 2: 4th or later session -> Mobile Number Reminder
+    if (!hasVerifiedPhone && sessionCount >= 4) {
+      const existingNotif = await prisma.notification.findFirst({
+        where: { userId, type: 'phone_reminder' },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      let shouldSend = false;
+      if (!existingNotif) {
+        shouldSend = true;
+      } else if (existingNotif.isRead) {
+        const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+        if (existingNotif.createdAt < threeDaysAgo) {
+          shouldSend = true;
+        }
+      }
+
+      if (shouldSend) {
+        await createSystemNotification({
+          userId,
+          type: 'phone_reminder',
+          message: '📱 Verify Your Mobile Number: Secure your account, enable trusted communication, and recover your account easily.',
+          link: '/settings?tab=account&highlight=phone'
+        });
+      }
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error in triggerOnboardingNotificationIfNeeded:', error);
+    return { success: false, error: 'Failed to process onboarding notification check' };
+  }
+}

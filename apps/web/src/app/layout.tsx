@@ -15,6 +15,7 @@ export const metadata: Metadata = {
 import { Providers } from "@/components/Providers";
 import { BottomNav } from "@/components/BottomNav";
 import { OnboardingModal } from "@/components/OnboardingModal";
+import { OnboardingReminder } from "@/components/OnboardingReminder";
 import { UsernameSetupModal } from "@/components/UsernameSetupModal";
 import { AuthModal } from "@/components/AuthModal";
 import { PushNotificationManager } from "@/components/PushNotificationManager";
@@ -58,6 +59,7 @@ export default async function RootLayout({
       <body className="antialiased min-h-screen bg-background flex flex-col">
         <Providers>
           <OnboardingModal />
+          <OnboardingReminder />
           <UsernameSetupModal />
           <AuthModal />
           <PushNotificationManager />
