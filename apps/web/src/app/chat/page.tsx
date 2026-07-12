@@ -383,6 +383,16 @@ export default function ChatPage() {
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTypingEmitRef = useRef<number>(0);
 
+  // --- Left Panel Independent Scroll Viewports & Pagination Limit ---
+  const groupsScrollRef = useRef<HTMLDivElement>(null);
+  const personalScrollRef = useRef<HTMLDivElement>(null);
+  const [visibleChatsLimit, setVisibleChatsLimit] = useState(30);
+
+  // Reset pagination limit on search or tab change
+  useEffect(() => {
+    setVisibleChatsLimit(30);
+  }, [searchQuery, activeSidebarTab]);
+
   // --- Scrolling, Infinite Scroll & New Message Badge States & Refs ---
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isNearBottom, setIsNearBottom] = useState(true);
@@ -641,6 +651,30 @@ export default function ChatPage() {
     }
   }, [socket, chats]);
 
+  const handleGroupsScroll = () => {
+    const container = groupsScrollRef.current;
+    if (!container) return;
+    const { scrollTop, clientHeight, scrollHeight } = container;
+    if (scrollTop + clientHeight >= scrollHeight - 100) {
+      const groupsCount = chats.filter(c => c.isGroup).length;
+      if (visibleChatsLimit < groupsCount) {
+        setVisibleChatsLimit(prev => prev + 30);
+      }
+    }
+  };
+
+  const handlePersonalScroll = () => {
+    const container = personalScrollRef.current;
+    if (!container) return;
+    const { scrollTop, clientHeight, scrollHeight } = container;
+    if (scrollTop + clientHeight >= scrollHeight - 100) {
+      const personalCount = chats.filter(c => !c.isGroup).length;
+      if (visibleChatsLimit < personalCount) {
+        setVisibleChatsLimit(prev => prev + 30);
+      }
+    }
+  };
+
   const fetchChats = async () => {
     const res = await fetchRealChatData();
     if (res.success && res.chats && res.messagesByChat) {
@@ -730,6 +764,18 @@ export default function ChatPage() {
       }
     }
   }, [activeChat, chats]);
+
+  // Auto scroll to active chat item inside the list
+  useEffect(() => {
+    if (activeChat) {
+      requestAnimationFrame(() => {
+        const element = document.getElementById(`chat-item-${activeChat}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      });
+    }
+  }, [activeChat]);
 
   useEffect(() => {
     const activeChatDetails = chats.find(c => c.id === activeChat);
@@ -1336,13 +1382,8 @@ export default function ChatPage() {
     setChats(prev => prev.map(c => c.id === chatId ? { ...c, isMuted: !c.isMuted } : c));
   };
 
-  const filteredChats = chats
+  const allFilteredChats = chats
     .filter(chat => {
-      if (activeSidebarTab === 'groups') {
-        if (!chat.isGroup) return false;
-      } else if (activeSidebarTab === 'personal') {
-        if (chat.isGroup) return false;
-      }
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         return (
@@ -1364,6 +1405,12 @@ export default function ChatPage() {
       const bTime = b.lastMessageCreatedAt ? new Date(b.lastMessageCreatedAt).getTime() : 0;
       return bTime - aTime;
     });
+
+  const groupChatsList = allFilteredChats.filter(chat => chat.isGroup);
+  const personalChatsList = allFilteredChats.filter(chat => !chat.isGroup);
+
+  const paginatedGroupChats = groupChatsList.slice(0, visibleChatsLimit);
+  const paginatedPersonalChats = personalChatsList.slice(0, visibleChatsLimit);
 
   return (
     <div className="w-full flex h-[calc(100dvh-8rem)] md:h-[calc(100vh-4rem)] bg-white dark:bg-[#0a0a0a] overflow-hidden border-b border-zinc-100 dark:border-gray-800 lg:border-none relative">
@@ -1434,7 +1481,13 @@ export default function ChatPage() {
         </div>
 
         {/* Chat List */}
-        <ScrollArea className="flex-1">
+        {/* Chat List - Groups */}
+        <div 
+          ref={groupsScrollRef}
+          onScroll={handleGroupsScroll}
+          className={`flex-grow overflow-y-auto overflow-x-hidden ${activeSidebarTab === 'groups' ? 'flex flex-col' : 'hidden'}`}
+          style={{ WebkitOverflowScrolling: 'touch' }}
+        >
           {loading ? (
             <div className="flex flex-col gap-1 p-2">
               {[1, 2, 3, 4, 5].map((n) => (
@@ -1450,17 +1503,15 @@ export default function ChatPage() {
                 </div>
               ))}
             </div>
-          ) : filteredChats.length === 0 ? (
+          ) : groupChatsList.length === 0 ? (
             <div className="p-8 text-center text-gray-500 text-sm leading-relaxed">
               {searchQuery 
                 ? 'No conversations matched your search.' 
-                : activeSidebarTab === 'groups' 
-                  ? "You haven't joined any Tolees yet." 
-                  : "No personal conversations yet."}
+                : "You haven't joined any Tolees yet."}
             </div>
           ) : (
             <div className="flex flex-col">
-              {filteredChats.map((chat) => (
+              {paginatedGroupChats.map((chat) => (
                 <div 
                   key={chat.id} 
                   id={`chat-item-${chat.id}`}
@@ -1560,7 +1611,139 @@ export default function ChatPage() {
               ))}
             </div>
           )}
-        </ScrollArea>
+        </div>
+
+        {/* Chat List - Personal */}
+        <div 
+          ref={personalScrollRef}
+          onScroll={handlePersonalScroll}
+          className={`flex-grow overflow-y-auto overflow-x-hidden ${activeSidebarTab === 'personal' ? 'flex flex-col' : 'hidden'}`}
+          style={{ WebkitOverflowScrolling: 'touch' }}
+        >
+          {loading ? (
+            <div className="flex flex-col gap-1 p-2">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <div key={n} className="flex items-center gap-3 p-3 rounded-xl">
+                  <Skeleton className="w-12 h-12 rounded-full shrink-0" />
+                  <div className="flex-grow space-y-2.5">
+                    <div className="flex justify-between items-center">
+                      <Skeleton className="h-4 w-28 rounded" />
+                      <Skeleton className="h-3 w-10 rounded" />
+                    </div>
+                    <Skeleton className="h-3.5 w-11/12 rounded" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : personalChatsList.length === 0 ? (
+            <div className="p-8 text-center text-gray-500 text-sm leading-relaxed">
+              {searchQuery 
+                ? 'No conversations matched your search.' 
+                : "No personal conversations yet."}
+            </div>
+          ) : (
+            <div className="flex flex-col">
+              {paginatedPersonalChats.map((chat) => (
+                <div 
+                  key={chat.id} 
+                  id={`chat-item-${chat.id}`}
+                  onClick={() => {
+                    setActiveChat(chat.id);
+                    markChatNotificationsAsRead(chat.id);
+                    markChatMessagesAsRead(chat.id);
+                    setChats(prev => prev.map(c => c.id === chat.id ? { ...c, unread: 0 } : c));
+                  }}
+                  className={`group flex items-center gap-3 p-3 mx-2 rounded-2xl cursor-pointer transition-all duration-200 ${
+                    activeChat === chat.id 
+                      ? 'bg-zinc-100/80 dark:bg-zinc-800/60 shadow-sm' 
+                      : 'hover:bg-zinc-50 dark:hover:bg-zinc-900/30'
+                  }`}
+                >
+                  <div className="relative">
+                    {/* Golden Story Ring Wrapper */}
+                    <div 
+                      onClick={(e) => {
+                        if (chat.hasActiveStories) {
+                          e.stopPropagation();
+                          openStoryViewer(chat.otherUserId, chat.name, chat.avatar);
+                        }
+                      }}
+                      className={chat.hasActiveStories ? 'p-[2px] story-ring transition-transform hover:scale-105 active:scale-95' : ''}
+                    >
+                      <div className={chat.hasActiveStories ? 'p-[2px] bg-white dark:bg-zinc-950 rounded-full' : ''}>
+                        <Avatar className="w-12 h-12 border border-zinc-100 dark:border-zinc-800">
+                          <AvatarImage src={chat.avatar || (chat.isGroup ? '/default-tolee-avatar.svg' : '/default-user-avatar.svg')} />
+                          <AvatarFallback>{chat.name ? chat.name[0] : 'C'}</AvatarFallback>
+                        </Avatar>
+                      </div>
+                    </div>
+                    {(chat.online === 'Online') && (
+                      <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white dark:border-[#121212] rounded-full z-10"></div>
+                    )}
+                  </div>
+                  
+                  <div className="flex-grow min-w-0 flex items-center justify-between">
+                    <div className="min-w-0 pr-2">
+                      <h3 className={`font-semibold text-[15px] truncate flex items-center gap-1.5 ${chat.unread > 0 ? 'font-bold text-gray-900 dark:text-white' : activeChat === chat.id ? 'text-primary dark:text-zinc-100' : 'text-gray-900 dark:text-white'}`}>
+                        {chat.name}
+                        {!chat.isGroup && chat.status === 'pending' && (
+                          <span className="bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-400 text-[9px] font-black uppercase px-1.5 py-0.5 rounded border border-yellow-200 dark:border-yellow-900/40">
+                            Request
+                          </span>
+                        )}
+                        {chat.isPromotion && !chat.isGroup && (
+                          <span className="inline-flex items-center gap-0.5 bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full border border-amber-200 dark:border-amber-800/40 flex-shrink-0">
+                            Promoted
+                          </span>
+                        )}
+                      </h3>
+                      <p className={`text-sm truncate pr-2 mt-0.5 ${chat.unread > 0 ? 'font-semibold text-zinc-900 dark:text-zinc-100' : 'text-gray-500 dark:text-gray-400'}`}>
+                        {formatLastMessage(chat.lastMessage)}
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col items-end gap-1.5 ml-2 flex-shrink-0">
+                      <span className={`text-xs whitespace-nowrap ${chat.unread > 0 ? 'text-emerald-500 dark:text-teal-400 font-bold' : 'text-gray-500'}`}>
+                        {chat.time}
+                      </span>
+                      <div className="flex items-center gap-1.5 min-h-[20px]">
+                        {pinnedChatIds.includes(chat.id) && (
+                          <Pin className="w-3.5 h-3.5 text-zinc-400 fill-zinc-400 rotate-[45deg]" />
+                        )}
+                        {(mutedChatIds.includes(chat.id) || chat.isMuted) && (
+                          <BellOff className="w-3.5 h-3.5 text-zinc-400" />
+                        )}
+                        {chat.unread > 0 ? (
+                          <div className="bg-emerald-500 dark:bg-teal-500 text-white text-[10px] font-extrabold w-5 h-5 flex items-center justify-center rounded-full">
+                            {chat.unread}
+                          </div>
+                        ) : (
+                          <div className="w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger onClick={(e) => e.stopPropagation()} className="w-6 h-6 rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-800 flex items-center justify-center focus:outline-none">
+                                <MoreVertical className="w-3.5 h-3.5 text-zinc-500" />
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                                <DropdownMenuItem onClick={() => togglePinChat(chat.id)}>
+                                  <Pin className="w-4 h-4 mr-2" />
+                                  {pinnedChatIds.includes(chat.id) ? 'Unpin chat' : 'Pin chat'}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => toggleMuteChat(chat.id, chat.isGroup)}>
+                                  <BellOff className="w-4 h-4 mr-2" />
+                                  {(mutedChatIds.includes(chat.id) || chat.isMuted) ? 'Unmute chat' : 'Mute chat'}
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Right Chat Window */}
