@@ -685,26 +685,26 @@ const CATEGORY_TEMPLATES_BY_COUNTRY: Record<string, Record<string, {
 
 const HARDCODED_GROUPS_BY_COUNTRY: Record<string, Record<string, number>> = {
   IN: {
-    'mumbai business group': 2400000,
-    'startup india': 850000,
-    'real estate investors': 5500000,
-    'travel community': 120000,
-    'fitness club': 2100000,
-    'gurgaon real estate agents': 2125168,
-    'flats for rent in noida': 760594,
-    'property in dubai': 1634347
+    'mumbai business group': 62400,
+    'startup india': 55200,
+    'real estate investors': 68900,
+    'travel community': 42100,
+    'fitness club': 58300,
+    'gurgaon real estate agents': 61800,
+    'flats for rent in noida': 48500,
+    'property in dubai': 54600
   },
   US: {
-    'nyc startups': 320000,
-    'silicon valley developers': 850000,
-    'us real estate investors': 1200000,
-    'travel usa': 450000
+    'nyc startups': 59200,
+    'silicon valley developers': 67500,
+    'us real estate investors': 63100,
+    'travel usa': 41600
   },
   AE: {
-    'dubai business club': 180000,
-    'dubai developers': 95000,
-    'property in dubai': 1634347,
-    'uae lifestyle': 220000
+    'dubai business club': 52300,
+    'dubai developers': 49800,
+    'property in dubai': 54600,
+    'uae lifestyle': 56700
   }
 };
 
@@ -1502,6 +1502,57 @@ const HARDCODED_GROUPS_ALL = {
   ...HARDCODED_GROUPS_BY_COUNTRY.AE
 };
 
+// Helper to detect if a group is a pre-seeded/fake simulated group
+export function isFakeGroup(name: string): boolean {
+  const lowerName = name.toLowerCase().trim();
+  
+  // "Runwal" is always real, never fake!
+  if (lowerName.includes('runwal')) {
+    return false;
+  }
+
+  // Pre-seeded/fake group keywords based on the groups in the DB and config
+  const fakeKeywords = [
+    'mumbai business group',
+    'startup india',
+    'real estate investors',
+    'travel community',
+    'fitness club',
+    'gurgaon real estate',
+    'flats for rent',
+    'property in dubai',
+    'nyc startups',
+    'silicon valley developers',
+    'us real estate',
+    'travel usa',
+    'dubai business',
+    'dubai developers',
+    'uae lifestyle',
+    'gold jewellery',
+    'एक करोड हिंदूचा',
+    'largest group',
+    'business group',
+    'investors group',
+    'property group',
+    'auditors guild',
+    'i love my india',
+    'ai automation society',
+    'sabaka mangal ho',
+    'kalyan city',
+    'real estate group',
+    'puneकर',
+    'gorakhpur',
+    'all india business',
+    'dubai investors',
+    'delhi property',
+    'noida busines',
+    'mumbai largest',
+    'surat largest'
+  ];
+
+  return fakeKeywords.some(keyword => lowerName.includes(keyword));
+}
+
 // Generate deterministic member count for a group
 export function getGroupMemberCount(
   groupId: string,
@@ -1512,6 +1563,12 @@ export function getGroupMemberCount(
   max: number
 ): number {
   if (!isSimulationOn) return realCount;
+
+  // If this is a real user-created group, return the real member count!
+  if (!isFakeGroup(name)) {
+    return realCount;
+  }
+
   const lowerName = name.toLowerCase().trim();
   
   if ((HARDCODED_GROUPS_ALL as any)[lowerName] !== undefined) {
@@ -1523,8 +1580,12 @@ export function getGroupMemberCount(
     hash = groupId.charCodeAt(i) + ((hash << 5) - hash);
   }
   hash = Math.abs(hash);
-  const range = max - min;
-  return min + (hash % (range || 1));
+
+  // Reduce fallback simulated group count range to 50k - 90k
+  const localMin = 50000;
+  const localMax = 90000;
+  const range = localMax - localMin;
+  return localMin + (hash % (range || 1));
 }
 
 // Deterministically format compact count strings
