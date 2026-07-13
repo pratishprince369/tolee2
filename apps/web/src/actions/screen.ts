@@ -40,11 +40,11 @@ async function seedSimulatedScreenVideos() {
     // If no simulated users exist, create a few
     if (simUsers.length === 0) {
       const mockCreators = [
-        { name: 'Tech Gyan', email: 'techgyan@simulation.tolee', avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150', username: 'techgyan' },
-        { name: 'Finance Guruji', email: 'guruji@simulation.tolee', avatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150', username: 'finance_guruji' },
-        { name: 'Gaming Zone', email: 'gaming@simulation.tolee', avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150', username: 'gaming_zone' },
-        { name: 'Chef Rasoi', email: 'chef@simulation.tolee', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150', username: 'chef_rasoi' },
-        { name: 'Fitness Mantra', email: 'fitness@simulation.tolee', avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150', username: 'fitness_mantra' }
+        { name: 'Tech Gyan', email: 'techgyan@simulation.tolee', avatar: 'https://images.unsplash.com/photo-1607990283143-e81e7a2c93ab?w=150&auto=format&fit=crop&q=80', username: 'techgyan' },
+        { name: 'Finance Guruji', email: 'guruji@simulation.tolee', avatar: 'https://images.unsplash.com/photo-1566492031773-4f4e44671857?w=150&auto=format&fit=crop&q=80', username: 'finance_guruji' },
+        { name: 'Gaming Zone', email: 'gaming@simulation.tolee', avatar: 'https://images.unsplash.com/photo-1624561172888-ac93c696e10c?w=150&auto=format&fit=crop&q=80', username: 'gaming_zone' },
+        { name: 'Chef Rasoi', email: 'chef@simulation.tolee', avatar: 'https://images.unsplash.com/photo-1573140247632-f8fd74997d5c?w=150&auto=format&fit=crop&q=80', username: 'chef_rasoi' },
+        { name: 'Fitness Mantra', email: 'fitness@simulation.tolee', avatar: 'https://images.unsplash.com/photo-1607746882042-944635dfe10e?w=150&auto=format&fit=crop&q=80', username: 'fitness_mantra' }
       ];
 
       for (const mc of mockCreators) {
