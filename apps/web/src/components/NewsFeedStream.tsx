@@ -13,6 +13,7 @@ import { NewsCardMenu } from '@/components/NewsCardMenu';
 import { NewsEngagement } from '@/components/NewsEngagement';
 import { getNewsFeedPosts } from '@/actions/news';
 import { ViewTracker } from '@/components/ViewTracker';
+import { OptimisticPostCard } from '@/components/OptimisticPostCard';
 
 interface NewsFeedStreamProps {
   initialNews: any[];
@@ -172,6 +173,7 @@ export function NewsFeedStream({
 
       {/* News Feed Cards List */}
       <div className="space-y-6">
+        <OptimisticPostCard />
         {newsPosts.map((item) => {
           const post = item.post;
           const coverImg = post?.mediaUrls ? post.mediaUrls.split(/,(?=https?:\/\/)/)[0] : null;

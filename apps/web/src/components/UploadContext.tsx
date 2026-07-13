@@ -20,6 +20,7 @@ export interface UploadTask {
   uploadType: 'feed' | 'reel';
   successMessage?: string;
   errorMessage?: string;
+  postData?: any;
 }
 
 interface UploadContextType {
@@ -84,6 +85,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
       totalProgress: 0,
       state: filesCount > 0 ? 'uploading' : 'processing',
       uploadType,
+      postData,
     });
 
     try {

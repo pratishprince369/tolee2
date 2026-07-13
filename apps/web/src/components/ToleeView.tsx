@@ -18,6 +18,7 @@ import {
 
 import { CreatePostModal } from '@/components/CreatePostModal';
 import { PostCarousel } from '@/components/PostCarousel';
+import { OptimisticPostCard } from '@/components/OptimisticPostCard';
 import { ManageToleeModal } from '@/components/ManageToleeModal';
 import { createPost, toggleLike, addComment, getLikes, getComments, toggleSavePost, toggleRepost, getReposts, updatePostVisibility, deletePostPermanently, editPostCaption } from '@/actions/post';
 import { joinTolee, leaveToleeGroup, startLiveSession, endLiveSession, requestToJoinLive, handleLiveJoinRequest, getLiveJoinRequests, getMemberLiveStatus } from '@/actions/tolee';
@@ -1339,13 +1340,16 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                 )}
 
                 {/* Posts Feed */}
-                {activeTab === 'community' && (() => {
-                  const visiblePosts = localPosts.filter((post: any) => 
-                    !hiddenPostIds.includes(post.id) &&
-                    !hiddenUsernames.includes(post.author) &&
-                    !hiddenToleeNames.includes(tolee.name)
-                  );
-                  return visiblePosts.map((post: any) => {
+                {activeTab === 'community' && (
+                  <>
+                    <OptimisticPostCard />
+                    {(() => {
+                      const visiblePosts = localPosts.filter((post: any) => 
+                        !hiddenPostIds.includes(post.id) &&
+                        !hiddenUsernames.includes(post.author) &&
+                        !hiddenToleeNames.includes(tolee.name)
+                      );
+                      return visiblePosts.map((post: any) => {
                     if (post.postType === 'world_project') {
                       const wp = post.worldProject;
                       if (!wp) return null;
@@ -1958,8 +1962,10 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                     );
                   });
                 })()}
+              </>
+            )}
 
-                  {activeTab === 'live' && (
+            {activeTab === 'live' && (
                   <div className="space-y-6">
                     {/* Header Banner */}
                     <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-teal-900 to-indigo-950 p-8 text-white shadow-xl border border-teal-500/20">

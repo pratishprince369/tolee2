@@ -13,6 +13,7 @@ import Link from 'next/link';
 
 import { CreatePostModal } from '@/components/CreatePostModal';
 import { CreateRequirementModal } from '@/components/CreateRequirementModal';
+import { OptimisticPostCard } from '@/components/OptimisticPostCard';
 import { uploadFile } from '@/lib/upload';
 import { createPost, toggleLike, addComment, getLikes, getComments, toggleSavePost, toggleRepost, getReposts, updatePostVisibility, deletePostPermanently, editPostCaption, archivePost, incrementStoryEngagement, getPostStoryAnalytics } from '@/actions/post';
 import { toggleFollow } from '@/actions/user';
@@ -1134,6 +1135,7 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
             </div>
 
             {/* Global Feed Stream */}
+            <OptimisticPostCard />
             {(() => {
               const visiblePosts = feedPosts.filter(post => 
                 !hiddenPostIds.includes(post.id) &&
