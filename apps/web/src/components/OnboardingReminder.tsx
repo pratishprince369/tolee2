@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import { triggerOnboardingNotificationIfNeeded } from '@/actions/user';
+import { triggerOnboardingNotificationIfNeeded, triggerReferralInviteNotification } from '@/actions/user';
 
 export function OnboardingReminder() {
   const { data: session, status } = useSession();
@@ -27,6 +27,31 @@ export function OnboardingReminder() {
       triggerOnboardingNotificationIfNeeded(newCount).catch((err) => {
         console.error('Failed to trigger onboarding notification:', err);
       });
+    }
+  }, [session, status]);
+
+  useEffect(() => {
+    if (status !== 'authenticated' || !session?.user) return;
+    const userId = (session.user as any).id;
+    if (!userId) return;
+
+    const lastSentKey = `tolee_referral_invite_sent_${userId}`;
+    const lastSent = localStorage.getItem(lastSentKey);
+    const now = Date.now();
+    const cooldown = 24 * 60 * 60 * 1000; // 24 hours (once per day)
+
+    if (!lastSent || now - parseInt(lastSent, 10) > cooldown) {
+      const timer = setTimeout(() => {
+        triggerReferralInviteNotification().then((res) => {
+          if (res.success) {
+            localStorage.setItem(lastSentKey, now.toString());
+          }
+        }).catch((err) => {
+          console.error('Failed to trigger referral invite notification:', err);
+        });
+      }, 5000); // 5 seconds delay
+
+      return () => clearTimeout(timer);
     }
   }, [session, status]);
 

@@ -19,6 +19,7 @@ const navItems = [
   { href: '/super-admin/agentic-ai', label: 'Agentic AI Reels', icon: '🤖' },
   { href: '/super-admin/tolee-screen', label: 'Tolee Screen', icon: '📺' },
   { href: '/super-admin/franchise', label: 'Franchise Program', icon: '🏪' },
+  { href: '/super-admin/referrals', label: 'Referrals & Rewards', icon: '🤝' },
   { href: '/super-admin/shops', label: 'Shops & Listings', icon: '🏪' },
   { href: '/super-admin/simulation', label: 'Simulation Mode', icon: '🟢' },
 ];

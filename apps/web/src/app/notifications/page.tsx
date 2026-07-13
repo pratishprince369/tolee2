@@ -4,13 +4,25 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Bell, Heart, MessageCircle, UserPlus, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
 import { PendingFollowRequests } from '@/components/PendingFollowRequests';
+import { ReferralNotificationActions } from '@/components/ReferralNotificationActions';
+import { prisma } from '@/lib/prisma';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
 
 export default async function NotificationsPage() {
-  const [res, pendingRes] = await Promise.all([
+  const session = await getServerSession(authOptions);
+  const currentUserId = (session?.user as any)?.id;
+
+  const [res, pendingRes, userProfile] = await Promise.all([
     getNotifications(),
-    getPendingFollowRequests()
+    getPendingFollowRequests(),
+    currentUserId ? prisma.user.findUnique({
+      where: { id: currentUserId },
+      select: { id: true, username: true }
+    }) : Promise.resolve(null)
   ]);
   
+  const referralCode = userProfile?.username || userProfile?.id || '';
   const notifications = res.success ? res.notifications : [];
   const pendingRequests = pendingRes.success ? pendingRes.requests : [];
   
@@ -58,6 +70,80 @@ export default async function NotificationsPage() {
               Icon = UserPlus;
               iconColor = 'text-green-500';
               bgColor = 'bg-green-50 dark:bg-green-900/20';
+            }
+
+            if (notification.type === 'referral_invite') {
+              return (
+                <Card key={notification.id} className="border-indigo-500/20 dark:border-indigo-500/10 bg-gradient-to-br from-indigo-50/40 via-white to-white dark:from-indigo-950/20 dark:via-zinc-950 dark:to-zinc-950 hover:from-indigo-50/60 dark:hover:from-indigo-950/30 transition-all rounded-2xl mb-6 shadow-sm relative overflow-hidden group">
+                  <CardContent className="p-5 sm:p-6 flex flex-col sm:flex-row items-start gap-4">
+                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 bg-indigo-100/80 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 font-extrabold text-2xl animate-pulse">
+                      🎉
+                    </div>
+                    <div className="flex-1 space-y-2.5">
+                      <div>
+                        <h3 className="font-extrabold text-gray-900 dark:text-white text-base sm:text-lg">
+                          🎉 Earn ₹500 in Your Ads Wallet!
+                        </h3>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {new Date(notification.createdAt).toLocaleDateString()} at {new Date(notification.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                      <p className="text-sm text-gray-600 dark:text-zinc-300 leading-relaxed max-w-xl">
+                        {notification.message}
+                      </p>
+                      
+                      {/* Copy & Share Buttons client actions */}
+                      <ReferralNotificationActions referralCode={referralCode} />
+                    </div>
+                    {!notification.isRead && (
+                      <div className="absolute top-4 right-4 w-2.5 h-2.5 bg-blue-500 rounded-full"></div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            }
+
+            if (notification.type === 'referral_joined') {
+              return (
+                <Card key={notification.id} className="border-emerald-500/20 dark:border-emerald-500/10 bg-gradient-to-br from-emerald-50/40 via-white to-white dark:from-emerald-950/20 dark:via-zinc-950 dark:to-zinc-950 hover:from-emerald-50/60 dark:hover:from-emerald-950/30 transition-all rounded-2xl mb-6 shadow-sm relative overflow-hidden group">
+                  <CardContent className="p-5 sm:p-6 flex flex-col sm:flex-row items-start gap-4">
+                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 bg-emerald-100/80 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 font-extrabold text-2xl">
+                      🤝
+                    </div>
+                    <div className="flex-1 space-y-2.5">
+                      <div>
+                        <h3 className="font-extrabold text-gray-900 dark:text-white text-base sm:text-lg">
+                          🎉 Congratulations! New Referral Joined
+                        </h3>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {new Date(notification.createdAt).toLocaleDateString()} at {new Date(notification.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                      <p className="text-sm text-gray-600 dark:text-zinc-300 leading-relaxed max-w-xl">
+                        {notification.message}
+                      </p>
+                      
+                      <div className="pt-2 flex flex-wrap items-center gap-3">
+                        <Link 
+                          href="/ads-manager?tab=wallet" 
+                          className="inline-flex items-center gap-1.5 bg-[#00ba88] hover:bg-[#009e74] text-white text-xs font-black rounded-xl px-4 py-2.5 shadow-sm transition-all"
+                        >
+                          <span>View Ads Wallet</span>
+                        </Link>
+                        <Link 
+                          href="/ads-manager?tab=overview" 
+                          className="inline-flex items-center gap-1.5 bg-gray-150 hover:bg-gray-200 text-gray-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-white text-xs font-black rounded-xl px-4 py-2.5 shadow-sm transition-all"
+                        >
+                          <span>View Referral History</span>
+                        </Link>
+                      </div>
+                    </div>
+                    {!notification.isRead && (
+                      <div className="absolute top-4 right-4 w-2.5 h-2.5 bg-blue-500 rounded-full"></div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
             }
 
             if (notification.type === 'welcome' || notification.type === 'welcome_reminder') {

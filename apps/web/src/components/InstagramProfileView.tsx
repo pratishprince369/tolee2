@@ -27,12 +27,14 @@ import {
   Camera,
   Loader2,
   Trash2,
+  Newspaper,
+  UserPlus,
   Play,
-  Layers,
-  Newspaper
+  Layers
 } from 'lucide-react';
 import { formatViewCount } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { ProfileReferralsPanel } from '@/components/ProfileReferralsPanel';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -1277,7 +1279,8 @@ export function InstagramProfileView({
                 { key: 'reshares', icon: <Repeat className="w-[21px] h-[21px] stroke-[1.8]" /> },
                 { key: 'tolees', icon: <Users className="w-[21px] h-[21px] stroke-[1.8]" /> },
                 ...(newsArticles.length > 0 || isMe ? [{ key: 'news', icon: <Newspaper className="w-[21px] h-[21px] stroke-[1.8]" /> }] : []),
-                ...(isMe ? [{ key: 'saved', icon: <Bookmark className="w-[21px] h-[21px] stroke-[1.8]" /> }] : [])
+                ...(isMe ? [{ key: 'saved', icon: <Bookmark className="w-[21px] h-[21px] stroke-[1.8]" /> }] : []),
+                ...(isMe ? [{ key: 'referrals', icon: <UserPlus className="w-[21px] h-[21px] stroke-[1.8]" /> }] : [])
               ].map(({ key, icon }) => (
                 <button
                   key={key}
@@ -1684,6 +1687,11 @@ export function InstagramProfileView({
                   </div>
                 )}
               </div>
+            )}
+
+            {/* Referrals Panel */}
+            {activeTab === 'referrals' && isMe && (
+              <ProfileReferralsPanel userId={user.id} username={user.username} />
             )}
           </div>
         )}

@@ -3,14 +3,15 @@ import { prisma } from "@/lib/prisma";
 
 const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=in.tolee.app&pcampaignid=web_share";
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: { code: string } }
-) {
+export async function GET(req: NextRequest) {
   try {
-    const { code } = params;
     const searchParams = req.nextUrl.searchParams;
+    const code = searchParams.get("code") || searchParams.get("ref");
     const source = searchParams.get("source") || "web";
+
+    if (!code) {
+      return NextResponse.redirect(PLAY_STORE_URL);
+    }
 
     // 1. Resolve referrer user to check if it's a valid user referral
     const referrer = await prisma.user.findFirst({
@@ -75,7 +76,7 @@ export async function GET(
 
     return response;
   } catch (error) {
-    console.error("[Referral Redirect Error]:", error);
+    console.error("[Referral Query Redirect Error]:", error);
     return NextResponse.redirect(PLAY_STORE_URL);
   }
 }

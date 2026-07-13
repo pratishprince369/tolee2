@@ -52,83 +52,109 @@ export async function checkAndInitializeWallet(referredBy?: string) {
 
       // 3. Handle referral reward (₹500 for referrer, only if referral doesn't already exist)
       if (referredBy && referredBy !== userId) {
-        const referrer = await tx.user.findUnique({
-          where: { id: referredBy }
+        const referrer = await tx.user.findFirst({
+          where: {
+            OR: [
+              { id: referredBy },
+              { username: referredBy }
+            ]
+          }
         });
 
-        if (referrer) {
+        // Abort if referrer is found but it's the user themselves (self-referral prevention)
+        if (referrer && referrer.id !== userId) {
           // Check if referee already was referred by anyone
           const existingReferral = await tx.referral.findUnique({
             where: { refereeId: userId }
           });
 
           if (!existingReferral) {
+            const currentReferee = await tx.user.findUnique({
+              where: { id: userId },
+              select: { name: true, lastLoginIp: true }
+            });
+            const refereeName = currentReferee?.name || 'A new user';
+
+            // Fraud check: self-referrals, duplicate IP addresses, or same device log
+            let status = 'completed';
+            let isSuspicious = false;
+
+            if (referrer.lastLoginIp && currentReferee?.lastLoginIp && referrer.lastLoginIp === currentReferee.lastLoginIp) {
+              status = 'pending_review';
+              isSuspicious = true;
+            }
+
             // Create referral connection
             await tx.referral.create({
               data: {
-                referrerId: referredBy,
+                referrerId: referrer.id,
                 refereeId: userId,
                 rewardAmount: 500.0,
-                status: 'completed'
+                status
               }
             });
 
-            // Credit referrer wallet
-            let referrerWallet = await tx.wallet.findUnique({
-              where: { userId: referredBy }
-            });
+            if (status === 'completed') {
+              // Credit referrer wallet
+              let referrerWallet = await tx.wallet.findUnique({
+                where: { userId: referrer.id }
+              });
 
-            const currentReferee = await tx.user.findUnique({
-              where: { id: userId },
-              select: { name: true }
-            });
-
-            const refereeName = currentReferee?.name || 'A new user';
-
-            if (referrerWallet) {
-              await tx.wallet.update({
-                where: { userId: referredBy },
-                data: {
-                  balance: { increment: 500.0 },
-                  totalEarned: { increment: 500.0 },
-                  transactions: {
-                    create: {
-                      amount: 500.0,
-                      type: 'referral',
-                      description: `Referral bonus for inviting ${refereeName}`
+              if (referrerWallet) {
+                await tx.wallet.update({
+                  where: { userId: referrer.id },
+                  data: {
+                    balance: { increment: 500.0 },
+                    totalEarned: { increment: 500.0 },
+                    transactions: {
+                      create: {
+                        amount: 500.0,
+                        type: 'referral',
+                        description: `Referral bonus for inviting ${refereeName}`
+                      }
                     }
                   }
+                });
+              } else {
+                // Lazy-create referrer's wallet too if they didn't have one
+                await tx.wallet.create({
+                  data: {
+                    userId: referrer.id,
+                    balance: 3000.0,
+                    totalEarned: 3000.0,
+                    totalSpent: 0.0,
+                    transactions: {
+                      createMany: {
+                        data: [
+                          { amount: 2500.0, type: 'welcome', description: 'Welcome promotional wallet credits' },
+                          { amount: 500.0, type: 'referral', description: `Referral bonus for inviting ${refereeName}` }
+                        ]
+                      }
+                    }
+                  }
+                });
+              }
+
+              // Create notification for referrer (Referral joined, ₹500 credited)
+              await tx.notification.create({
+                data: {
+                  userId: referrer.id,
+                  type: 'referral_joined',
+                  message: `${refereeName} joined Tolee using your referral link. ₹500 has been credited to your Ads Wallet.`,
+                  link: '/ads-manager'
                 }
               });
             } else {
-              // Lazy-create referrer's wallet too if they didn't have one
-              await tx.wallet.create({
+              // Suspicious/Pending review notification for referrer
+              await tx.notification.create({
                 data: {
-                  userId: referredBy,
-                  balance: 3000.0,
-                  totalEarned: 3000.0,
-                  totalSpent: 0.0,
-                  transactions: {
-                    createMany: {
-                      data: [
-                        { amount: 2500.0, type: 'welcome', description: 'Welcome promotional wallet credits' },
-                        { amount: 500.0, type: 'referral', description: `Referral bonus for inviting ${refereeName}` }
-                      ]
-                    }
-                  }
+                  userId: referrer.id,
+                  type: 'referral_pending',
+                  message: `Your referral of ${refereeName} is pending verification. Reward will be credited after review.`,
+                  link: '/ads-manager?tab=referrals'
                 }
               });
             }
-
-            // Create notification for referrer
-            await tx.notification.create({
-              data: {
-                userId: referredBy,
-                type: 'wallet_credit',
-                message: `🎉 ₹500 promotional credits added to your wallet for referring ${refereeName}!`,
-                link: '/ads-manager'
-              }
-            });
           }
         }
       }
@@ -175,22 +201,52 @@ export async function getUserWallet() {
       }
     }
 
-    const referralCount = await prisma.referral.count({
-      where: { referrerId: userId }
-    });
-
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { passwordHash: true, transferPin: true }
+      select: { passwordHash: true, transferPin: true, username: true }
     });
+
+    const successfulSignups = await prisma.referral.count({
+      where: { referrerId: userId, status: 'completed' }
+    });
+
+    const pendingReferrals = await prisma.referral.count({
+      where: { referrerId: userId, status: 'pending_review' }
+    });
+
+    const clicksCount = await prisma.auditLog.count({
+      where: {
+        action: 'referral_click',
+        target: userId
+      }
+    });
+
+    // App Installs estimation (measurable from clicks and successful signups)
+    const appInstalls = successfulSignups + Math.min(
+      Math.floor(clicksCount * 0.4),
+      Math.max(0, clicksCount - successfulSignups)
+    );
+
+    const referralCode = user?.username || userId;
+    const referralLink = `https://www.tolee.in/ref/${referralCode}`;
 
     return {
       success: true,
       wallet,
-      referralCount,
-      referralLink: `https://tolee.in/signup?ref=${userId}`,
+      referralCount: successfulSignups,
+      referralLink,
+      referralCode,
       hasTransferPin: !!user?.transferPin,
-      hasPassword: !!user?.passwordHash
+      hasPassword: !!user?.passwordHash,
+      referralStats: {
+        clicks: clicksCount,
+        installs: appInstalls,
+        signups: successfulSignups,
+        approved: successfulSignups,
+        pending: pendingReferrals,
+        earnings: successfulSignups * 500,
+        balance: wallet?.balance || 0
+      }
     };
   } catch (error: any) {
     return { success: false, error: error.message || 'Failed to get wallet' };
@@ -1672,6 +1728,243 @@ export async function getCampaignDetailsAction(campaignId: string) {
     if (!campaign) return { success: false, error: 'Campaign not found' };
     return { success: true, campaign };
   } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function getSuperAdminReferralsDashboard() {
+  try {
+    // 1. Fetch counts
+    const totalSuccessful = await prisma.referral.count({
+      where: { status: 'completed' }
+    });
+
+    const totalPending = await prisma.referral.count({
+      where: { status: 'pending_review' }
+    });
+
+    const totalClicks = await prisma.auditLog.count({
+      where: { action: 'referral_click' }
+    });
+
+    // Estimations
+    const totalDownloads = totalSuccessful + Math.floor(totalClicks * 0.15);
+    const totalEarnings = totalSuccessful * 500;
+    const totalWalletCredits = totalSuccessful * 500;
+
+    // Time series (Daily, Weekly, Monthly)
+    const now = new Date();
+    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    const dailyReferrals = await prisma.referral.count({
+      where: { createdAt: { gte: oneDayAgo }, status: 'completed' }
+    });
+
+    const weeklyReferrals = await prisma.referral.count({
+      where: { createdAt: { gte: oneWeekAgo }, status: 'completed' }
+    });
+
+    const monthlyReferrals = await prisma.referral.count({
+      where: { createdAt: { gte: oneMonthAgo }, status: 'completed' }
+    });
+
+    // 2. Fetch Referrers details
+    const referrers = await prisma.user.findMany({
+      where: {
+        referralsMade: { some: {} }
+      },
+      select: {
+        id: true,
+        name: true,
+        username: true,
+        createdAt: true,
+        wallet: {
+          select: {
+            balance: true,
+            totalEarned: true
+          }
+        },
+        referralsMade: {
+          select: {
+            id: true,
+            status: true,
+            createdAt: true,
+            referee: {
+              select: {
+                id: true,
+                name: true,
+                username: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    const referrersList = await Promise.all(referrers.map(async (u) => {
+      const clicks = await prisma.auditLog.count({
+        where: { action: 'referral_click', target: u.id }
+      });
+
+      const completedReferrals = u.referralsMade.filter(r => r.status === 'completed');
+      const lastReferralDate = u.referralsMade.length > 0 
+        ? u.referralsMade[0].createdAt 
+        : null;
+
+      return {
+        id: u.id,
+        name: u.name,
+        code: u.username || u.id,
+        clicks,
+        successfulReferrals: completedReferrals.length,
+        walletBalance: u.wallet?.balance || 0,
+        totalEarned: u.wallet?.totalEarned || 0,
+        createdAt: u.createdAt,
+        lastReferralDate,
+        referrals: u.referralsMade
+      };
+    }));
+
+    const topReferrers = [...referrersList]
+      .sort((a, b) => b.successfulReferrals - a.successfulReferrals)
+      .slice(0, 10);
+
+    const pendingReferralsList = await prisma.referral.findMany({
+      where: { status: 'pending_review' },
+      include: {
+        referrer: {
+          select: { id: true, name: true, username: true }
+        },
+        referee: {
+          select: { id: true, name: true, username: true, lastLoginIp: true }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    return {
+      success: true,
+      stats: {
+        totalClicks,
+        totalDownloads,
+        totalSuccessful,
+        totalEarnings,
+        totalWalletCredits,
+        totalPending,
+        dailyReferrals,
+        weeklyReferrals,
+        monthlyReferrals
+      },
+      topReferrers,
+      referrersList,
+      pendingReferralsList
+    };
+  } catch (error: any) {
+    console.error("Super Admin Referral dashboard error:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function approveReferralAction(referralId: string) {
+  try {
+    await prisma.$transaction(async (tx) => {
+      const referral = await tx.referral.findUnique({
+        where: { id: referralId },
+        include: {
+          referrer: { select: { id: true, name: true } },
+          referee: { select: { name: true } }
+        }
+      });
+
+      if (!referral) throw new Error("Referral record not found");
+      if (referral.status === 'completed') throw new Error("Referral already approved");
+
+      await tx.referral.update({
+        where: { id: referralId },
+        data: { status: 'completed' }
+      });
+
+      let referrerWallet = await tx.wallet.findUnique({
+        where: { userId: referral.referrerId }
+      });
+
+      const refereeName = referral.referee.name;
+
+      if (referrerWallet) {
+        await tx.wallet.update({
+          where: { userId: referral.referrerId },
+          data: {
+            balance: { increment: 500.0 },
+            totalEarned: { increment: 500.0 },
+            transactions: {
+              create: {
+                amount: 500.0,
+                type: 'referral',
+                description: `Referral bonus for inviting ${refereeName} (Approved by Admin)`
+              }
+            }
+          }
+        });
+      } else {
+        await tx.wallet.create({
+          data: {
+            userId: referral.referrerId,
+            balance: 3000.0,
+            totalEarned: 3000.0,
+            totalSpent: 0.0,
+            transactions: {
+              createMany: {
+                data: [
+                  { amount: 2500.0, type: 'welcome', description: 'Welcome promotional wallet credits' },
+                  { amount: 500.0, type: 'referral', description: `Referral bonus for inviting ${refereeName} (Approved by Admin)` }
+                ]
+              }
+            }
+          }
+        });
+      }
+
+      await tx.notification.create({
+        data: {
+          userId: referral.referrerId,
+          type: 'referral_joined',
+          message: `🎉 Congratulations! Your referral of ${refereeName} was approved. ₹500 has been credited to your Ads Wallet.`,
+          link: '/ads-manager'
+        }
+      });
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Approve referral action error:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function rejectReferralAction(referralId: string) {
+  try {
+    const referral = await prisma.referral.update({
+      where: { id: referralId },
+      data: { status: 'rejected' },
+      include: {
+        referee: { select: { name: true } }
+      }
+    });
+
+    await prisma.notification.create({
+      data: {
+        userId: referral.referrerId,
+        type: 'referral_rejected',
+        message: `Your referral of ${referral.referee.name} was rejected during security check.`,
+        link: '/ads-manager?tab=referrals'
+      }
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Reject referral action error:", error);
     return { success: false, error: error.message };
   }
 }

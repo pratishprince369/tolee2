@@ -1516,3 +1516,32 @@ export async function triggerOnboardingNotificationIfNeeded(sessionCount: number
     return { success: false, error: 'Failed to process onboarding notification check' };
   }
 }
+
+export async function triggerReferralInviteNotification() {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !(session.user as any).id) {
+      return { success: false, error: 'Unauthorized' };
+    }
+    const userId = (session.user as any).id;
+
+    // Check if referral invite already exists to avoid duplication
+    const existingNotif = await prisma.notification.findFirst({
+      where: { userId, type: 'referral_invite' }
+    });
+
+    if (!existingNotif) {
+      await createSystemNotification({
+        userId,
+        type: 'referral_invite',
+        message: "Invite your friends to Tolee. Whenever someone joins using your referral link, you'll receive ₹500 in your Ads Wallet after a successful referral.",
+        link: '/settings?tab=account' // Fallback page redirect
+      });
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error in triggerReferralInviteNotification:', error);
+    return { success: false, error: 'Failed to trigger referral invite notification' };
+  }
+}
