@@ -31,7 +31,7 @@ export function AdsWalletWelcomeModal() {
       const hasShown = localStorage.getItem(welcomeShownKey);
 
       if (!hasShown) {
-        const referredBy = localStorage.getItem('tolee_referred_by') || undefined;
+        const referredBy = localStorage.getItem('tolee_referred_by') || localStorage.getItem('tolee_referral_code') || undefined;
         
         checkAndInitializeWallet(referredBy).then((res) => {
           if (res.success) {
@@ -40,6 +40,12 @@ export function AdsWalletWelcomeModal() {
             setIsOpen(true);
             // Clear referral once applied
             localStorage.removeItem('tolee_referred_by');
+            localStorage.removeItem('tolee_referral_code');
+            try {
+              document.cookie = 'tolee_referral_code=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+            } catch (cookieErr) {
+              // Ignore cookie clearing errors
+            }
           }
         });
       }
