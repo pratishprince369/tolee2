@@ -16,12 +16,8 @@ export function OptimisticPostCard() {
   const { task, retryUpload, cancelUpload } = useUpload();
   const [objectUrls, setObjectUrls] = useState<string[]>([]);
 
-  // We only show this card if a post is uploading, processing, or failed to upload
-  if (task.state === 'idle' || task.state === 'success' || !task.postData) {
-    return null;
-  }
-
   // Generate object URLs for local File previews to ensure media displays instantly
+  // IMPORTANT: This useEffect MUST be above the conditional return to satisfy React's Rules of Hooks.
   useEffect(() => {
     if (task.mediaItems && task.mediaItems.length > 0) {
       const urls = task.mediaItems.map(item => {
@@ -44,6 +40,11 @@ export function OptimisticPostCard() {
       setObjectUrls([]);
     }
   }, [task.mediaItems]);
+
+  // We only show this card if a post is uploading, processing, or failed to upload
+  if (task.state === 'idle' || task.state === 'success' || !task.postData) {
+    return null;
+  }
 
   const pData = task.postData;
   const isAnon = !!pData.isAnonymous;
