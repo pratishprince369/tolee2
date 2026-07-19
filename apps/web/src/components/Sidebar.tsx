@@ -7,7 +7,7 @@ import { Home, Compass, Film, MessageCircle, Bell, PlusCircle, Settings, ShieldC
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { useSession } from 'next-auth/react';
-import { getSidebarData } from '@/actions/user';
+import { getSidebarDataCached } from '@/lib/sidebar-data';
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -30,7 +30,7 @@ export function Sidebar() {
 
   React.useEffect(() => {
     if (isAuthenticated) {
-      getSidebarData().then((res: any) => {
+      getSidebarDataCached().then((res: any) => {
         if (res.success) {
           setData({
             managedTolees: res.managedTolees || [],
@@ -79,7 +79,7 @@ export function Sidebar() {
         <div className="relative space-y-1.5 mb-8">
           {activeIndex !== -1 && (
             <div 
-              className="absolute left-0 right-0 h-11 bg-gradient-to-r from-[#0E9F9A] to-[#087A76] rounded-xl transition-all duration-[250ms] ease-in-out shadow-sm shadow-[#0E9F9A]/15"
+              className="absolute left-0 right-0 h-11 bg-gradient-to-r from-[#0E9F9A] to-[#087A76] rounded-xl transition-all duration-150 ease-in-out shadow-sm shadow-[#0E9F9A]/15"
               style={{
                 top: `${activeIndex * 50}px`,
                 pointerEvents: 'none',
@@ -94,7 +94,7 @@ export function Sidebar() {
               <Link key={item.name} href={item.href} className="relative block z-10">
                 <Button 
                   variant="ghost" 
-                  className={`w-full justify-start rounded-xl h-11 text-[14px] font-semibold transition-all duration-[250ms] ease-in-out group hover:scale-[1.01] active:scale-[0.99] ${
+                  className={`w-full justify-start rounded-xl h-11 text-[14px] font-semibold transition-all duration-150 ease-in-out group hover:scale-[1.01] active:scale-[0.99] ${
                     isActive 
                       ? 'bg-transparent text-white font-bold' 
                       : (item as any).isCreator
@@ -102,7 +102,7 @@ export function Sidebar() {
                       : 'text-[#1F2937] dark:text-zinc-200 hover:bg-[#EAF9F8] dark:hover:bg-[#0E9F9A]/10 hover:text-[#0E9F9A]'
                   }`}
                 >
-                  <Icon className={`w-4 h-4 mr-3 flex-shrink-0 transition-colors duration-[250ms] ${
+                  <Icon className={`w-4 h-4 mr-3 flex-shrink-0 transition-colors duration-150 ${
                     isActive 
                       ? 'text-white' 
                       : 'text-[#6B7280] group-hover:text-[#0E9F9A]'
@@ -115,7 +115,7 @@ export function Sidebar() {
                     <span className="ml-auto text-[9px] px-2 py-0.5 rounded-full font-extrabold bg-[#0E9F9A] text-white shadow-sm">NEW</span>
                   )}
                   {item.badge && (
-                    <span className={`ml-auto text-[10px] px-2 py-0.5 rounded-full font-bold transition-all duration-[250ms] ${
+                    <span className={`ml-auto text-[10px] px-2 py-0.5 rounded-full font-bold transition-all duration-150 ${
                       isActive ? 'bg-white text-[#087A76]' : 'bg-[#0E9F9A] text-white'
                     }`}>
                       {item.badge}
@@ -141,7 +141,7 @@ export function Sidebar() {
             <div className="space-y-1.5">
               {managedTolees.map((tolee) => (
                 <Link key={tolee.id} href={`/t/${tolee.slug}`}>
-                  <Button variant="ghost" className="w-full justify-start rounded-xl h-11 px-2.5 text-sm font-semibold text-[#1F2937] dark:text-zinc-300 bg-white dark:bg-zinc-900/20 hover:bg-[#EAF9F8] dark:hover:bg-[#0E9F9A]/10 border border-[#E5E7EB] dark:border-zinc-900/40 hover:border-[#E5E7EB] dark:hover:border-zinc-800 hover:text-[#0E9F9A] transition-all duration-[250ms] overflow-hidden group shadow-sm hover:shadow">
+                  <Button variant="ghost" className="w-full justify-start rounded-xl h-11 px-2.5 text-sm font-semibold text-[#1F2937] dark:text-zinc-300 bg-white dark:bg-zinc-900/20 hover:bg-[#EAF9F8] dark:hover:bg-[#0E9F9A]/10 border border-[#E5E7EB] dark:border-zinc-900/40 hover:border-[#E5E7EB] dark:hover:border-zinc-800 hover:text-[#0E9F9A] transition-all duration-150 overflow-hidden group shadow-sm hover:shadow">
                     <div className="w-8 h-8 mr-3 rounded-full overflow-hidden flex-shrink-0 border border-zinc-200 dark:border-zinc-800 group-hover:border-[#0E9F9A]/30 transition-all duration-200 shadow-sm relative">
                       <img src={tolee.avatar || `https://i.pravatar.cc/150?u=${tolee.id}`} alt={tolee.name} className="w-full h-full object-cover" />
                     </div>
@@ -165,7 +165,7 @@ export function Sidebar() {
             <div className="space-y-1.5">
               {joinedTolees.map((tolee) => (
                 <Link key={tolee.id} href={`/t/${tolee.slug}`}>
-                  <Button variant="ghost" className="w-full justify-start rounded-xl h-11 px-2.5 text-sm font-semibold text-[#1F2937] dark:text-zinc-300 bg-white dark:bg-zinc-900/20 hover:bg-[#EAF9F8] dark:hover:bg-[#0E9F9A]/10 border border-[#E5E7EB] dark:border-zinc-900/40 hover:border-[#E5E7EB] dark:hover:border-zinc-800 hover:text-[#0E9F9A] transition-all duration-[250ms] overflow-hidden group shadow-sm hover:shadow">
+                  <Button variant="ghost" className="w-full justify-start rounded-xl h-11 px-2.5 text-sm font-semibold text-[#1F2937] dark:text-zinc-300 bg-white dark:bg-zinc-900/20 hover:bg-[#EAF9F8] dark:hover:bg-[#0E9F9A]/10 border border-[#E5E7EB] dark:border-zinc-900/40 hover:border-[#E5E7EB] dark:hover:border-zinc-800 hover:text-[#0E9F9A] transition-all duration-150 overflow-hidden group shadow-sm hover:shadow">
                     <div className="w-8 h-8 mr-3 rounded-full overflow-hidden flex-shrink-0 border border-zinc-200 dark:border-zinc-800 group-hover:border-[#0E9F9A]/30 transition-all duration-200 shadow-sm">
                       <img src={tolee.avatar || `https://i.pravatar.cc/150?u=${tolee.id}`} alt={tolee.name} className="w-full h-full object-cover" />
                     </div>
@@ -196,13 +196,13 @@ export function Sidebar() {
         {isAuthenticated && (
           <>
             <Link href="/settings" className="w-full block mb-2">
-              <Button variant="ghost" className="w-full justify-start rounded-xl h-10 text-sm font-semibold text-[#1F2937] dark:text-zinc-300 hover:bg-[#EAF9F8] dark:hover:bg-[#0E9F9A]/10 hover:text-[#0E9F9A] transition-all duration-[250ms]">
+              <Button variant="ghost" className="w-full justify-start rounded-xl h-10 text-sm font-semibold text-[#1F2937] dark:text-zinc-300 hover:bg-[#EAF9F8] dark:hover:bg-[#0E9F9A]/10 hover:text-[#0E9F9A] transition-all duration-150">
                 <Settings className="w-4 h-4 mr-3 flex-shrink-0" />
                 Settings & Privacy
               </Button>
             </Link>
             <Link href="/feedback" className="w-full block mb-2">
-              <Button variant="ghost" className="w-full justify-start rounded-xl h-10 text-sm font-semibold text-[#1F2937] dark:text-zinc-300 hover:bg-[#EAF9F8] dark:hover:bg-[#0E9F9A]/10 hover:text-[#0E9F9A] transition-all duration-[250ms]">
+              <Button variant="ghost" className="w-full justify-start rounded-xl h-10 text-sm font-semibold text-[#1F2937] dark:text-zinc-300 hover:bg-[#EAF9F8] dark:hover:bg-[#0E9F9A]/10 hover:text-[#0E9F9A] transition-all duration-150">
                 <MessageSquare className="w-4 h-4 mr-3 flex-shrink-0" />
                 Send Feedback
               </Button>

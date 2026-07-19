@@ -409,40 +409,6 @@ export async function getSidebarData() {
     }
     const userId = (session.user as any).id;
 
-    // --- ONBOARDING 24-HOUR REMINDER TRIGGER ---
-    const userJoinedToleeCount = await prisma.toleeMember.count({
-      where: { userId, status: 'approved' }
-    });
-
-    if (userJoinedToleeCount === 0) {
-      const hasWelcomeNotif = await prisma.notification.findFirst({
-        where: { userId, type: 'welcome' }
-      });
-      if (hasWelcomeNotif) {
-        const currentUser = await prisma.user.findUnique({
-          where: { id: userId },
-          select: { createdAt: true }
-        });
-        if (currentUser) {
-          const timeDiffMs = new Date().getTime() - new Date(currentUser.createdAt).getTime();
-          const oneDayMs = 24 * 60 * 60 * 1000;
-          if (timeDiffMs >= oneDayMs) {
-            const hasReminderNotif = await prisma.notification.findFirst({
-              where: { userId, type: 'welcome_reminder' }
-            });
-            if (!hasReminderNotif) {
-              await createSystemNotification({
-                userId,
-                type: 'welcome_reminder',
-                message: "Join your first Tolee to start sharing posts, reels, news and videos with the community.",
-                link: '/discover'
-              });
-            }
-          }
-        }
-      }
-    }
-
     // Fetch Tolees user manages
     const managedTolees = await prisma.tolee.findMany({
       where: { ownerId: userId },
@@ -1445,7 +1411,8 @@ export async function triggerOnboardingNotificationIfNeeded(sessionCount: number
       select: {
         location: true,
         phone: true,
-        phoneVerified: true
+        phoneVerified: true,
+        createdAt: true
       }
     });
 
@@ -1507,6 +1474,34 @@ export async function triggerOnboardingNotificationIfNeeded(sessionCount: number
           message: '📱 Verify Your Mobile Number: Secure your account, enable trusted communication, and recover your account easily.',
           link: '/settings?tab=account&highlight=phone'
         });
+      }
+    }
+
+    // 24-hour welcome reminder check (moved from getSidebarData to run only once per session)
+    const userJoinedToleeCount = await prisma.toleeMember.count({
+      where: { userId, status: 'approved' }
+    });
+
+    if (userJoinedToleeCount === 0) {
+      const hasWelcomeNotif = await prisma.notification.findFirst({
+        where: { userId, type: 'welcome' }
+      });
+      if (hasWelcomeNotif) {
+        const timeDiffMs = Date.now() - new Date(user.createdAt).getTime();
+        const oneDayMs = 24 * 60 * 60 * 1000;
+        if (timeDiffMs >= oneDayMs) {
+          const hasReminderNotif = await prisma.notification.findFirst({
+            where: { userId, type: 'welcome_reminder' }
+          });
+          if (!hasReminderNotif) {
+            await createSystemNotification({
+              userId,
+              type: 'welcome_reminder',
+              message: "Join your first Tolee to start sharing posts, reels, news and videos with the community.",
+              link: '/discover'
+            });
+          }
+        }
       }
     }
 

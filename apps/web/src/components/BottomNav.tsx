@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Home, Compass, Film, MessageCircle, Menu, User, Settings, Globe, Store, LogOut, MessageSquare, Map, Briefcase, Award, Newspaper, Tv, Bot, Bell, Megaphone, Zap, HelpCircle } from 'lucide-react';
 import { useSession, signOut } from 'next-auth/react';
-import { getSidebarData } from '@/actions/user';
+import { getSidebarDataCached } from '@/lib/sidebar-data';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,7 +25,7 @@ export function BottomNav() {
 
   React.useEffect(() => {
     if (session?.user) {
-      getSidebarData().then(res => {
+      getSidebarDataCached().then(res => {
         if (res.success) {
           setUnreadChats(res.unreadMessages || 0);
           setUnreadNotifications(res.unreadNotifications || 0);
@@ -33,7 +33,7 @@ export function BottomNav() {
         }
       });
       const interval = setInterval(() => {
-        getSidebarData().then(res => {
+        getSidebarDataCached().then(res => {
           if (res.success) {
             setUnreadChats(res.unreadMessages || 0);
             setUnreadNotifications(res.unreadNotifications || 0);
