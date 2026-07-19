@@ -24,6 +24,7 @@ import { ApkPromoManager } from "@/components/ApkPromoManager";
 import { PwaManager } from "@/components/PwaManager";
 import { MediaPickerModal } from "@/components/MediaPickerModal";
 import AnalyticsTracker from "@/components/AnalyticsTracker";
+import { RoutePrefetcher } from "@/components/RoutePrefetcher";
 import { Suspense } from "react";
 import { prisma } from "@/lib/prisma";
 
@@ -59,6 +60,7 @@ export default async function RootLayout({
       </head>
       <body className="antialiased min-h-screen bg-background flex flex-col">
         <Providers>
+          <RoutePrefetcher />
           <OnboardingModal />
           <OnboardingReminder />
           <AdsWalletWelcomeModal />

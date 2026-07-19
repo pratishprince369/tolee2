@@ -33,12 +33,14 @@ export const metadata: Metadata = {
   },
 };
 
+import { ClientRedirect } from '@/components/ClientRedirect';
+
 export default async function Home() {
   const session = await getServerSession(authOptions);
   const isAuthenticated = !!session?.user;
 
   if (isAuthenticated) {
-    redirect('/feed');
+    return <ClientRedirect to="/feed" />;
   }
 
   let tolees: any[] = [];
