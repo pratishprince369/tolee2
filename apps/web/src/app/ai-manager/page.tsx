@@ -11,7 +11,8 @@ import {
   Paperclip, Send, Check, Image as ImageIcon, Video, X, Bot, 
   Globe, MapPin, Sparkles, ChevronRight, Target, DollarSign, 
   ArrowRight, ShieldCheck, RefreshCw, Upload, CheckSquare, PlusCircle,
-  BarChart3, Inbox, Calendar, ShieldAlert, Mic, User, MessageSquare, Briefcase, Trash2
+  BarChart3, Inbox, Calendar, ShieldAlert, Mic, User, MessageSquare, Briefcase, Trash2,
+  Menu, ChevronLeft, Copy, Edit, Bookmark, Star, Archive, History, Plus
 } from 'lucide-react';
 import { createPost, addComment } from '@/actions/post';
 import { fetchRealChatData, getOrCreatePersonalChat } from '@/actions/chat';
@@ -68,12 +69,20 @@ function AIManagerContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   
-  const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
+  const [activeTab, setActiveTab] = useState<ActiveTab>('copywriter');
   const [flowState, setFlowState] = useState<FlowState>('idle');
   const [aiMessages, setAiMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [aiTyping, setAiTyping] = useState(false);
   const [availableGroups, setAvailableGroups] = useState<any[]>([]);
+
+  // Collapsible Left Sidebar States
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+  // Multi-Session States
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string>('default');
 
   // Layout Analyzer states
   const [analyzerImage, setAnalyzerImage] = useState<string | null>(null);
@@ -192,40 +201,119 @@ function AIManagerContent() {
     }
   };
 
-  // Initialize and load chat history defensively
+  // Initialize and load chat history/sessions defensively
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
-        const stored = localStorage.getItem('tolee_ai_manager_history');
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          const isBroken = parsed.some((m: any) => typeof m !== 'object' || m.actions || m.card);
-          if (isBroken) {
-            throw new Error("Broken non-serializable JSX in legacy history");
-          }
-          setAiMessages(parsed);
-          
-          const lastMsg = parsed[parsed.length - 1];
-          if (lastMsg && !lastMsg.isMe) {
-            if (lastMsg.text.includes("organic post")) setFlowState('post_caption');
-            else if (lastMsg.text.includes("sponsored ad")) setFlowState('ad_text');
-            else setFlowState('idle');
+        const storedSessions = localStorage.getItem('tolee_ai_manager_sessions');
+        if (storedSessions) {
+          const parsed = JSON.parse(storedSessions);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setSessions(parsed);
+            const activeId = localStorage.getItem('tolee_ai_manager_active_session_id') || parsed[0].id;
+            setActiveSessionId(activeId);
+            const activeSess = parsed.find((s: any) => s.id === activeId);
+            if (activeSess) {
+              setAiMessages(activeSess.messages || []);
+              setFlowState(activeSess.flowState || 'idle');
+            }
+          } else {
+            initializeDefaultSession();
           }
         } else {
-          resetToWelcome();
+          initializeDefaultSession();
         }
       } catch (err) {
-        console.warn("Clearing corrupted chat history:", err);
-        localStorage.removeItem('tolee_ai_manager_history');
-        resetToWelcome();
+        console.error("Failed to load sessions:", err);
+        initializeDefaultSession();
       }
     }
   }, []);
+
+  function initializeDefaultSession() {
+    const welcomeMsg = addBotMessage(
+      `Welcome to Tolee AI Manager! 👋 I'm here to help you grow your business and audience on Tolee.\n\nI can help you build your audience by organic group posting, or launch a direct sponsored ad campaign to display your business across Tolee!`
+    );
+    const defaultSess = {
+      id: 'default',
+      title: 'Tolee AI Chat Assistant',
+      messages: [welcomeMsg],
+      flowState: 'idle' as FlowState
+    };
+    setSessions([defaultSess]);
+    setActiveSessionId('default');
+    setAiMessages([welcomeMsg]);
+    setFlowState('idle');
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('tolee_ai_manager_sessions', JSON.stringify([defaultSess]));
+      localStorage.setItem('tolee_ai_manager_active_session_id', 'default');
+    }
+  }
+
+  const createNewChat = () => {
+    const newId = 'sess-' + Date.now();
+    const welcomeMsg = addBotMessage(
+      `Welcome to Tolee AI Manager! 👋 I'm here to help you grow your business and audience on Tolee.\n\nI can help you build your audience by organic group posting, or launch a direct sponsored ad campaign to display your business across Tolee!`
+    );
+    const newSess = {
+      id: newId,
+      title: 'New Chat - ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      messages: [welcomeMsg],
+      flowState: 'idle' as FlowState
+    };
+    const updated = [newSess, ...sessions.filter(s => s.messages?.length > 1 || s.id !== 'default')];
+    setSessions(updated);
+    setActiveSessionId(newId);
+    setAiMessages([welcomeMsg]);
+    setFlowState('idle');
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('tolee_ai_manager_sessions', JSON.stringify(updated));
+      localStorage.setItem('tolee_ai_manager_active_session_id', newId);
+    }
+    setDraftTitle('');
+    setDraftCaption('');
+    setDraftMedia(null);
+    setDraftGroups([]);
+    setDraftLocation('');
+    setDraftAudience('');
+    setGeneratedImageUrl(null);
+    setImagePrompt('');
+  };
+
+  const selectSession = (id: string) => {
+    setActiveSessionId(id);
+    const sess = sessions.find((s: any) => s.id === id);
+    if (sess) {
+      setAiMessages(sess.messages || []);
+      setFlowState(sess.flowState || 'idle');
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('tolee_ai_manager_active_session_id', id);
+      }
+    }
+  };
 
   const saveHistory = (msgs: Message[]) => {
     setAiMessages(msgs);
     if (typeof window !== 'undefined') {
       localStorage.setItem('tolee_ai_manager_history', JSON.stringify(msgs));
+      
+      setSessions(prev => {
+        const updated = prev.map(s => {
+          if (s.id === activeSessionId) {
+            let title = s.title;
+            if (title.startsWith('New Chat') || title === 'Tolee AI Chat Assistant') {
+              const firstUserMsg = msgs.find(m => m.isMe);
+              if (firstUserMsg) {
+                title = firstUserMsg.text.length > 25 ? firstUserMsg.text.substring(0, 25) + '...' : firstUserMsg.text;
+              }
+            }
+            return { ...s, messages: msgs, flowState, title };
+          }
+          return s;
+        });
+        localStorage.setItem('tolee_ai_manager_sessions', JSON.stringify(updated));
+        return updated;
+      });
     }
   };
 
@@ -239,7 +327,7 @@ function AIManagerContent() {
     }
   }, [aiMessages, aiTyping, flowState, activeTab]);
 
-  const addBotMessage = (text: string) => {
+  function addBotMessage(text: string) {
     const newMsg: Message = {
       id: 'ai-' + Date.now() + Math.random(),
       sender: 'AI Tolee Manager',
@@ -250,9 +338,9 @@ function AIManagerContent() {
       isAI: true
     };
     return newMsg;
-  };
+  }
 
-  const addUserMessage = (text: string, media?: { type: 'image' | 'video'; url: string; name: string } | null) => {
+  function addUserMessage(text: string, media?: { type: 'image' | 'video'; url: string; name: string } | null) {
     const newMsg: Message = {
       id: 'usr-' + Date.now() + Math.random(),
       sender: 'Me',
@@ -264,7 +352,7 @@ function AIManagerContent() {
       media
     };
     return newMsg;
-  };
+  }
 
   const resetToWelcome = () => {
     setFlowState('idle');
@@ -630,15 +718,130 @@ function AIManagerContent() {
     } else if (flowState === 'ad_text') {
       handleAdText(text);
     } else {
-      const uMsg = addUserMessage(text);
-      setAiTyping(true);
-      setTimeout(() => {
-        const bMsg = addBotMessage(
-          `I am currently guided in step-by-step setup mode. Let's restart our setup to keep everything structured!`
-        );
-        setAiMessages(prev => [...prev, uMsg, bMsg]);
-        setAiTyping(false);
-      }, 800);
+      handleSendMessage(text);
+    }
+  };
+
+  const handleSendMessage = async (text: string) => {
+    const uMsg = addUserMessage(text);
+    const updatedMsgs = [...aiMessages, uMsg];
+    saveHistory(updatedMsgs);
+    setAiTyping(true);
+
+    try {
+      const response = await fetch('/api/ai-manager', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: updatedMsgs
+        })
+      });
+      const data = await response.json();
+      if (data.success && data.text) {
+        const bMsg = addBotMessage(data.text);
+        if (data.draft) {
+          bMsg.draft = data.draft;
+        }
+        saveHistory([...updatedMsgs, bMsg]);
+      } else {
+        throw new Error(data.error || 'Failed to generate response');
+      }
+    } catch (err: any) {
+      console.error("General chat error:", err);
+      const bErr = addBotMessage(`Apologies, I encountered an issue: ${err.message || 'Server connection timed out'}. Please try again!`);
+      saveHistory([...updatedMsgs, bErr]);
+    } finally {
+      setAiTyping(false);
+    }
+  };
+
+  const SUGGESTED_CARDS = [
+    { label: '📝 Create Social Post', prompt: 'Create a social media post for my Kalyan real estate group.' },
+    { label: '🎥 Create Reel Script', prompt: 'Write a viral 30-second Reel script about food promotions.' },
+    { label: '📰 Write News Article', prompt: 'Write a brief news article about local market trends.' },
+    { label: '📢 Create Advertisement', prompt: 'Draft a sponsored ad campaign for Kalyan-Dombivli.' },
+    { label: '📅 Weekly Content Calendar', prompt: 'Help me plan a weekly posting calendar for my restaurant.' },
+    { label: '📆 Monthly Planner', prompt: 'Generate a monthly growth plan for Kalyan shop owners.' },
+    { label: '💬 Reply to Comments', prompt: 'Help me draft custom replies to comment enquiries.' },
+    { label: '📨 Manage Inbox', prompt: 'Summarize my unread leads and group chat inquiries.' },
+    { label: '📈 Grow My Followers', prompt: 'Suggest 5 tips to grow Kalyan group members.' },
+    { label: '🎯 Marketing Strategy', prompt: 'Draft a WhatsApp & Tolee local marketing strategy.' },
+    { label: '🏠 Real Estate Promotion', prompt: 'Write a promotional post for a 2BHK flat in Kalyan.' },
+    { label: '🍽 Restaurant Promotion', prompt: 'Write a promotional offer copy for local biryani delivery.' },
+    { label: '🏪 Shop Promotion', prompt: 'Draft a products list post with price and discount hook.' },
+    { label: '📍 Local Business Promotion', prompt: 'Write a local business campaign for Maharashtra clients.' },
+  ];
+
+  const handleSuggestionClick = (promptText: string) => {
+    if (promptText.toLowerCase().includes('create a social media post') || promptText.toLowerCase().includes('create a post')) {
+      startPostFlow();
+    } else if (promptText.toLowerCase().includes('sponsored ad') || promptText.toLowerCase().includes('advertisement')) {
+      startAdFlow();
+    } else {
+      handleSendMessage(promptText);
+    }
+  };
+
+  const handleCopyText = (text: string) => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+      alert("Text copied to clipboard!");
+    }
+  };
+
+  const handleEditText = (text: string) => {
+    setNewMessage(text);
+  };
+
+  const handleRegenerateMsg = (msg: Message) => {
+    const index = aiMessages.findIndex(m => m.id === msg.id);
+    if (index > 0) {
+      const lastUserMsg = aiMessages.slice(0, index).reverse().find(m => m.isMe);
+      if (lastUserMsg) {
+        handleSendMessage(lastUserMsg.text);
+      }
+    }
+  };
+
+  const handleTranslateMsg = (msg: Message) => {
+    const hindiTranslations: Record<string, string> = {
+      "Welcome to Tolee AI Manager! 👋 I'm here to help you grow your business and audience on Tolee.\n\nI can help you build your audience by organic group posting, or launch a direct sponsored ad campaign to display your business across Tolee!":
+      "टोली एआई मैनेजर में आपका स्वागत है! 👋 मैं यहां टोली पर आपके व्यवसाय और दर्शकों को बढ़ाने में आपकी मदद करने के लिए हूं।\n\nमैं ऑर्गेनिक ग्रुप पोस्टिंग द्वारा आपके दर्शकों को बढ़ाने में आपकी मदद कर सकता हूं, या पूरे टोली में आपके व्यवसाय को प्रदर्शित करने के लिए एक सीधा प्रायोजित विज्ञापन अभियान शुरू कर सकता हूं!",
+      "I am currently guided in step-by-step setup mode. Let's restart our setup to keep everything structured!":
+      "मैं वर्तमान में चरण-दर-चरण सेटअप मोड में आपका मार्गदर्शन कर रहा हूँ। सब कुछ व्यवस्थित रखने के लिए आइए अपना सेटअप पुनः आरंभ करें!",
+    };
+    const originalText = msg.draft?.caption || msg.text;
+    const translated = hindiTranslations[originalText] || `[अनुवाद]: ${originalText}\n\n(यह संदेश स्थानीय हिंदी/मराठी दर्शकों के लिए अनुकूलित है!)`;
+    alert(translated);
+  };
+
+  const handlePublishPostDirectly = async (draft: any) => {
+    if (!draft) return;
+    if (availableGroups.length === 0) {
+      alert("No joined Tolee groups found to publish to. Please join a Tolee first!");
+      return;
+    }
+    setAiTyping(true);
+    try {
+      const targetToleeId = availableGroups[0].id;
+      const targetToleeName = availableGroups[0].name;
+      const finalContent = `${draft.title}\n\n${draft.caption}\n\n${draft.hashtags?.join(' ') || ''}`;
+      const res = await createPost({
+        content: finalContent,
+        postType: 'regular',
+        media: null,
+        toleeIds: [targetToleeId]
+      });
+      if (res.success) {
+        alert(`Successfully posted to Tolee group: "${targetToleeName}"!`);
+      } else {
+        alert(`Failed to post: ${res.error}`);
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert("Failed to publish post: " + err.message);
+    } finally {
+      setAiTyping(false);
     }
   };
 
@@ -801,116 +1004,225 @@ function AIManagerContent() {
     }
   };
 
-  // Voice Assistant Simulation
+  // Voice Assistant with SpeechRecognition & Simulation Fallback
   const handleToggleVoice = () => {
     if (isVoiceActive) {
       setIsVoiceActive(false);
-      if (voiceTranscript) {
-        setActiveTab('copywriter');
-        setFlowState('post_caption');
-        handlePostCaption(voiceTranscript);
-        setVoiceTranscript('');
+      return;
+    }
+
+    if (typeof window !== 'undefined') {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        const rec = new SpeechRecognition();
+        rec.continuous = false;
+        rec.interimResults = false;
+        rec.lang = 'en-US';
+
+        rec.onstart = () => {
+          setIsVoiceActive(true);
+          setVoiceTranscript('Listening... Speak now.');
+        };
+
+        rec.onresult = (e: any) => {
+          const resultText = e.results[0][0].transcript;
+          setVoiceTranscript(resultText);
+          setNewMessage(resultText);
+          setTimeout(() => {
+            handleSendMessage(resultText);
+            setVoiceTranscript('');
+          }, 1000);
+        };
+
+        rec.onerror = (err: any) => {
+          console.error("Speech recognition error:", err);
+          setIsVoiceActive(false);
+          setVoiceTranscript('Error: Could not access microphone.');
+        };
+
+        rec.onend = () => {
+          setIsVoiceActive(false);
+        };
+
+        rec.start();
+      } else {
+        // Simulation Fallback
+        setIsVoiceActive(true);
+        setVoiceTranscript('Simulating voice input...');
+        
+        const phrases = [
+          "Create a post for my Kalyan real estate group.",
+          "Write a 30-second Reel script about food promotions.",
+          "Create Kalyan property advertisement details.",
+          "Remind me tomorrow at 10 AM to call the client."
+        ];
+        const randomText = phrases[Math.floor(Math.random() * phrases.length)];
+        
+        setTimeout(() => {
+          setVoiceTranscript(randomText);
+          setNewMessage(randomText);
+          setIsVoiceActive(false);
+          setTimeout(() => {
+            handleSendMessage(randomText);
+            setVoiceTranscript('');
+          }, 1000);
+        }, 2000);
       }
-    } else {
-      setIsVoiceActive(true);
-      setVoiceTranscript('Loading voice transcription...');
-      
-      const phrases = [
-        "Create an organic post announcing our new residential property site in Kalyan East with a daily budget review.",
-        "Draft a creative post about our cafe special cheese burst garlic bread combo offer.",
-        "Write a trending topic post about real estate investment opportunities in Thane."
-      ];
-      
-      setTimeout(() => {
-        setVoiceTranscript(phrases[Math.floor(Math.random() * phrases.length)]);
-      }, 2000);
     }
   };
   return (
-    <div className="flex h-[calc(100vh-4rem)] md:h-screen w-full bg-white dark:bg-[#09090b] overflow-hidden text-gray-900 dark:text-gray-100 font-sans">
+    <div className="flex h-[calc(100vh-4rem)] md:h-screen w-full bg-white dark:bg-[#09090b] overflow-hidden text-gray-900 dark:text-gray-100 font-sans relative">
       
-      {/* 1. Left Navigation Sidebar on Desktop */}
-      <div className="hidden lg:flex flex-col w-64 bg-zinc-50/40 dark:bg-[#0b0b0d] border-r border-zinc-200/50 dark:border-zinc-900/60 shrink-0">
-        {/* Workspace Brand */}
-        <div className="h-16 flex items-center gap-3 px-5 border-b border-zinc-200/50 dark:border-zinc-900/60 shrink-0 bg-zinc-50/50 dark:bg-black/20 backdrop-blur-md">
-          <Avatar className="w-8 h-8 border border-zinc-200/60 dark:border-zinc-800">
-            <AvatarImage src="https://api.dicebear.com/7.x/bottts/svg?seed=ToleeManager" />
-            <AvatarFallback>AI</AvatarFallback>
-          </Avatar>
-          <div className="flex flex-col">
-            <span className="text-[13px] font-black text-gray-800 dark:text-white flex items-center gap-1">
-              AI Manager
-              <Bot className="w-3.5 h-3.5 text-zinc-400" />
-            </span>
-            <span className="text-[8px] font-extrabold text-zinc-400 dark:text-zinc-500 tracking-wider uppercase">Tolee Growth Workspace</span>
+      {/* Overlay backdrop for mobile when sidebar is opened */}
+      {isMobileSidebarOpen && (
+        <div 
+          onClick={() => setIsMobileSidebarOpen(false)}
+          className="lg:hidden fixed inset-0 bg-black/40 backdrop-blur-sm z-40 transition-opacity duration-150"
+        />
+      )}
+
+      {/* 1. Left Navigation Sidebar (Collapsible) */}
+      <div 
+        className={`fixed lg:relative inset-y-0 left-0 z-50 flex flex-col bg-zinc-50 dark:bg-[#0b0b0d] border-r border-zinc-200/60 dark:border-zinc-900/60 transition-all duration-150 ease-in-out shrink-0
+          ${isSidebarCollapsed ? 'w-0 border-r-0 lg:w-0' : 'w-72'}
+          ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        `}
+      >
+        {/* Workspace Brand Header */}
+        <div className="h-16 flex items-center justify-between px-5 border-b border-zinc-200/50 dark:border-zinc-900/60 shrink-0 bg-zinc-50/50 dark:bg-black/20">
+          <div className="flex items-center gap-3">
+            <Avatar className="w-8 h-8 border border-zinc-200/60 dark:border-zinc-800">
+              <AvatarImage src="https://api.dicebear.com/7.x/bottts/svg?seed=ToleeManager" />
+              <AvatarFallback>AI</AvatarFallback>
+            </Avatar>
+            <div className="flex flex-col">
+              <span className="text-[13px] font-black text-gray-800 dark:text-white flex items-center gap-1">
+                AI Workspace
+                <Sparkles className="w-3.5 h-3.5 text-zinc-400 animate-pulse" />
+              </span>
+              <span className="text-[8px] font-extrabold text-[#0E9F9A] tracking-wider uppercase">Tolee Assistant</span>
+            </div>
+          </div>
+          {/* Collapse Button inside Sidebar */}
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => setIsSidebarCollapsed(true)} 
+            className="hidden lg:flex w-8 h-8 rounded-lg text-zinc-400 hover:text-zinc-650"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </Button>
+        </div>
+
+        {/* Sidebar Navigation Items */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {/* New Chat Action */}
+          <Button 
+            onClick={() => {
+              createNewChat();
+              setActiveTab('copywriter');
+              setIsMobileSidebarOpen(false);
+            }} 
+            className="w-full justify-start rounded-xl h-11 border border-zinc-250/60 bg-[#EAF9F8] text-[#0E9F9A] hover:bg-[#0E9F9A]/15 text-xs font-bold gap-2.5 shadow-sm active:scale-[0.98] transition-all"
+          >
+            <Plus className="w-4 h-4" />
+            New Chat
+          </Button>
+
+          {/* Recent Chat Sessions List */}
+          <div className="space-y-1">
+            <span className="text-[10px] font-extrabold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider px-2 block mb-1">Recent Chats</span>
+            <div className="space-y-0.5 max-h-48 overflow-y-auto pr-1 scrollbar-none">
+              {sessions.map((sess) => {
+                const isActive = activeSessionId === sess.id && activeTab === 'copywriter';
+                return (
+                  <Button
+                    key={sess.id}
+                    onClick={() => {
+                      selectSession(sess.id);
+                      setActiveTab('copywriter');
+                      setIsMobileSidebarOpen(false);
+                    }}
+                    variant="ghost"
+                    className={`w-full justify-start text-xs rounded-xl h-9 px-3 gap-2.5 font-medium transition-colors truncate ${isActive ? 'bg-[#EAF9F8] text-[#0E9F9A] dark:bg-[#0E9F9A]/10 font-bold' : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900/50'}`}
+                  >
+                    <MessageSquare className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate text-left w-full block">{sess.title}</span>
+                  </Button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Growth Tools Group */}
+          <div className="space-y-1 border-t border-zinc-200/50 dark:border-zinc-900/40 pt-3">
+            <span className="text-[10px] font-extrabold text-zinc-400 dark:text-zinc-550 uppercase tracking-wider px-2 block mb-1">Growth Tools</span>
+            <div className="space-y-1">
+              <SidebarTabButton active={activeTab === 'dashboard'} icon={<BarChart3 className="w-4 h-4" />} label="Growth Dashboard" onClick={() => { setActiveTab('dashboard'); setIsMobileSidebarOpen(false); }} />
+              <SidebarTabButton active={activeTab === 'analyzer'} icon={<ImageIcon className="w-4 h-4" />} label="Doc Layout Analyzer" onClick={() => { setActiveTab('analyzer'); setIsMobileSidebarOpen(false); }} />
+              <SidebarTabButton active={activeTab === 'inbox'} icon={<Inbox className="w-4 h-4" />} label="Priority Inbox" onClick={() => { setActiveTab('inbox'); setIsMobileSidebarOpen(false); }} badge={dashboardData?.comments?.length} />
+              <SidebarTabButton active={activeTab === 'leads'} icon={<Target className="w-4 h-4" />} label="AI Leads Hub" onClick={() => { setActiveTab('leads'); setIsMobileSidebarOpen(false); }} badge={dashboardData?.leads?.length} badgeColor="bg-emerald-500" />
+              <SidebarTabButton active={activeTab === 'calendar'} icon={<Calendar className="w-4 h-4" />} label="Content Calendar" onClick={() => { setActiveTab('calendar'); setIsMobileSidebarOpen(false); }} />
+              <SidebarTabButton active={activeTab === 'community'} icon={<ShieldAlert className="w-4 h-4" />} label="Community Guard" onClick={() => { setActiveTab('community'); setIsMobileSidebarOpen(false); }} />
+              <SidebarTabButton active={activeTab === 'business'} icon={<Briefcase className="w-4 h-4" />} label="Ad Campaign Coach" onClick={() => { setActiveTab('business'); setIsMobileSidebarOpen(false); }} />
+            </div>
           </div>
         </div>
 
-        {/* Tab Buttons */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-1.5">
-          <SidebarTabButton active={activeTab === 'dashboard'} icon={<BarChart3 className="w-4 h-4" />} label="Growth Dashboard" onClick={() => setActiveTab('dashboard')} />
-          <SidebarTabButton active={activeTab === 'copywriter'} icon={<Sparkles className="w-4 h-4" />} label="Copywriter & Creator" onClick={() => setActiveTab('copywriter')} />
-          <SidebarTabButton active={activeTab === 'analyzer'} icon={<ImageIcon className="w-4 h-4" />} label="Doc Layout Analyzer" onClick={() => setActiveTab('analyzer')} />
-          <SidebarTabButton active={activeTab === 'inbox'} icon={<Inbox className="w-4 h-4" />} label="Priority Inbox" onClick={() => setActiveTab('inbox')} badge={dashboardData?.comments?.length} />
-          <SidebarTabButton active={activeTab === 'leads'} icon={<Target className="w-4 h-4" />} label="AI Leads Hub" onClick={() => setActiveTab('leads')} badge={dashboardData?.leads?.length} badgeColor="bg-emerald-500" />
-          <SidebarTabButton active={activeTab === 'calendar'} icon={<Calendar className="w-4 h-4" />} label="Content Calendar" onClick={() => setActiveTab('calendar')} />
-          <SidebarTabButton active={activeTab === 'community'} icon={<ShieldAlert className="w-4 h-4" />} label="Community Guard" onClick={() => setActiveTab('community')} />
-          <SidebarTabButton active={activeTab === 'business'} icon={<Briefcase className="w-4 h-4" />} label="Ad Campaign Coach" onClick={() => setActiveTab('business')} />
-        </div>
-
-        {/* User context footer */}
-        <div className="p-4 border-t border-zinc-200/50 dark:border-zinc-900/60 flex items-center gap-3">
+        {/* User Context Footer */}
+        <div className="p-4 border-t border-zinc-200/50 dark:border-zinc-900/60 flex items-center gap-3 bg-zinc-50/50 dark:bg-black/10">
           <Avatar className="w-8 h-8 border border-zinc-200/60 dark:border-zinc-800">
             <AvatarImage src={session?.user?.image || '/default-user-avatar.svg'} />
             <AvatarFallback>{session?.user?.name?.[0]}</AvatarFallback>
           </Avatar>
           <div className="flex flex-col truncate">
             <span className="text-xs font-bold text-gray-800 dark:text-zinc-200 truncate">{session?.user?.name || 'Creator'}</span>
-            <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-semibold truncate">@{ (session?.user as any)?.username || 'user' }</span>
+            <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-semibold truncate">@{ (session?.user as any)?.username || 'creator' }</span>
           </div>
         </div>
       </div>
 
       {/* 2. Main Content Workspace */}
-      <div className="flex-grow flex flex-col overflow-hidden">
+      <div className="flex-grow flex flex-col overflow-hidden bg-white dark:bg-[#09090b]">
         
-        {/* Mobile View Navigation (only on screens < lg) */}
-        <div className="lg:hidden flex flex-col bg-white dark:bg-[#0c0c0e] border-b border-zinc-200/50 dark:border-zinc-900/60 shrink-0">
-          {/* Top Header Row */}
-          <div className="h-12 flex items-center px-4 justify-between border-b border-zinc-100 dark:border-zinc-900/40">
-            <div className="flex items-center gap-2">
-              <Avatar className="w-7 h-7 border border-zinc-200/60 dark:border-zinc-800">
-                <AvatarImage src="https://api.dicebear.com/7.x/bottts/svg?seed=ToleeManager" />
-                <AvatarFallback>AI</AvatarFallback>
-              </Avatar>
-              <span className="text-xs font-black text-gray-800 dark:text-white flex items-center gap-1">
-                AI Manager
-                <Bot className="w-3.5 h-3.5 text-zinc-400" />
-              </span>
-            </div>
+        {/* Unified Top Header Bar */}
+        <div className="h-14 border-b border-zinc-200/50 dark:border-zinc-900/60 flex items-center px-4 justify-between bg-zinc-50/40 dark:bg-[#0c0c0e] shrink-0">
+          <div className="flex items-center gap-2.5">
+            {/* Sidebar toggle button (desktop) */}
+            {isSidebarCollapsed && (
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => setIsSidebarCollapsed(false)} 
+                className="hidden lg:flex w-8 h-8 rounded-lg text-zinc-500"
+              >
+                <Menu className="w-4.5 h-4.5" />
+              </Button>
+            )}
+            {/* Sidebar toggle button (mobile) */}
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => setIsMobileSidebarOpen(true)} 
+              className="lg:hidden w-8 h-8 rounded-lg text-zinc-500"
+            >
+              <Menu className="w-4.5 h-4.5" />
+            </Button>
             
+            <span className="text-sm font-black text-zinc-850 dark:text-white flex items-center gap-1.5">
+              Tolee AI Workspace
+              <Bot className="w-4 h-4 text-[#0E9F9A] animate-pulse" />
+            </span>
+          </div>
+
+          <div className="flex items-center gap-3">
             {isVoiceActive ? (
-              <span className="flex items-center gap-1 text-[10px] font-black text-red-500 uppercase tracking-widest animate-pulse">
+              <span className="flex items-center gap-1.5 text-[10px] font-black text-red-500 uppercase tracking-widest animate-pulse bg-red-50 dark:bg-red-950/20 px-2.5 py-1 rounded-full border border-red-500/10">
                 <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span> Live Mic
               </span>
             ) : (
-              <span className="text-[9px] font-extrabold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">Tolee Growth</span>
+              <span className="text-[10px] font-extrabold text-[#0E9F9A] bg-[#EAF9F8] dark:bg-[#0E9F9A]/10 px-2.5 py-1 rounded-full border border-[#0E9F9A]/15 uppercase tracking-wider">Premium Growth Assistant</span>
             )}
-          </div>
-          
-          {/* Horizontally Scrollable Tabs Row */}
-          <div 
-            className="flex items-center gap-2 overflow-x-auto px-4 py-2.5 bg-zinc-50/30 dark:bg-black/10 scrollbar-none [&::-webkit-scrollbar]:hidden"
-            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-          >
-            <MobileTabButton active={activeTab === 'dashboard'} icon={<BarChart3 className="w-3.5 h-3.5" />} label="Growth Dashboard" onClick={() => setActiveTab('dashboard')} />
-            <MobileTabButton active={activeTab === 'copywriter'} icon={<Sparkles className="w-3.5 h-3.5" />} label="Copywriter & Creator" onClick={() => setActiveTab('copywriter')} />
-            <MobileTabButton active={activeTab === 'analyzer'} icon={<ImageIcon className="w-3.5 h-3.5" />} label="Doc Layout Analyzer" onClick={() => setActiveTab('analyzer')} />
-            <MobileTabButton active={activeTab === 'inbox'} icon={<Inbox className="w-3.5 h-3.5" />} label="Priority Inbox" onClick={() => setActiveTab('inbox')} badge={dashboardData?.comments?.length} />
-            <MobileTabButton active={activeTab === 'leads'} icon={<Target className="w-3.5 h-3.5" />} label="AI Leads Hub" onClick={() => setActiveTab('leads')} badge={dashboardData?.leads?.length} badgeColor="bg-emerald-500" />
-            <MobileTabButton active={activeTab === 'calendar'} icon={<Calendar className="w-3.5 h-3.5" />} label="Content Calendar" onClick={() => setActiveTab('calendar')} />
-            <MobileTabButton active={activeTab === 'community'} icon={<ShieldAlert className="w-3.5 h-3.5" />} label="Community Guard" onClick={() => setActiveTab('community')} />
-            <MobileTabButton active={activeTab === 'business'} icon={<Briefcase className="w-3.5 h-3.5" />} label="Ad Campaign Coach" onClick={() => setActiveTab('business')} />
           </div>
         </div>
 
@@ -1060,60 +1372,201 @@ function AIManagerContent() {
           {/* TAB 2: COPYWRITER & CREATIVE (chatbot chat wizard) */}
           {activeTab === 'copywriter' && (
             <div className="flex flex-col h-full bg-white dark:bg-[#09090b] relative">
-              {/* Header inside pane */}
+              {/* Header inside chat workspace */}
               <div className="h-14 border-b border-zinc-200/50 dark:border-zinc-900 bg-zinc-50/50 dark:bg-[#0c0c0e] flex items-center justify-between px-6 sticky top-0 z-20 shrink-0">
                 <div className="flex items-center gap-2">
-                  <Bot className="w-4 h-4 text-zinc-500 animate-pulse" />
-                  <span className="text-sm font-extrabold text-zinc-800 dark:text-zinc-200">Copywriter Chat Assistant</span>
+                  <Bot className="w-4 h-4 text-[#0E9F9A] animate-pulse" />
+                  <span className="text-sm font-extrabold text-zinc-800 dark:text-zinc-200">AI Assistant Workspace</span>
                 </div>
                 <Button onClick={clearChatHistory} variant="ghost" size="sm" className="text-xs text-zinc-500 hover:text-red-500 font-bold rounded-lg h-8">
-                  Reset Flow
+                  Reset Chat
                 </Button>
               </div>
 
               {/* Chat Message Scroll Area */}
               <div className="flex-1 overflow-hidden relative">
                 <ScrollArea className="h-full px-4 py-6 pb-40">
-                  <div className="max-w-3xl mx-auto space-y-4">
+                  <div className="max-w-3xl mx-auto space-y-6">
                     
-                    {aiMessages.map((msg) => (
-                      <div key={msg.id} className={`flex w-full gap-2 sm:gap-3 ${msg.isMe ? 'justify-end' : 'justify-start'}`}>
-                        {!msg.isMe && (
-                          <Avatar className="w-8 h-8 flex-shrink-0 mt-0.5 border border-zinc-200/60 dark:border-zinc-800 hidden sm:block">
-                            <AvatarImage src={msg.senderAvatar} />
-                            <AvatarFallback>AI</AvatarFallback>
-                          </Avatar>
-                        )}
-                        
-                        <div className={`flex flex-col max-w-[85%] ${msg.isMe ? 'items-end' : 'items-start'}`}>
-                          {msg.media && (
-                            <div className="mb-1 rounded-2xl overflow-hidden max-w-sm border border-zinc-200 dark:border-zinc-850 shadow-sm">
-                              <img src={msg.media.url} alt="Attached" className="w-full object-cover max-h-60" />
+                    {/* Welcome greeting shown inside the chat when there are no user messages */}
+                    {aiMessages.filter(m => m.isMe).length === 0 && (
+                      <div className="max-w-2xl mx-auto py-4 space-y-6 animate-in fade-in duration-300">
+                        <div className="space-y-4 text-center sm:text-left">
+                          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-zinc-900 dark:text-white">
+                            👋 Hello, Welcome Back!
+                          </h1>
+                          <p className="text-sm text-zinc-650 dark:text-zinc-350 leading-relaxed font-semibold">
+                            I'm your <strong className="text-[#0E9F9A]">Tolee AI Assistant</strong>. I'm here to help you save time, grow your business, and manage your daily work. Ask me to draft posts, launch ads, schedule reminders or plan templates!
+                          </p>
+                          
+                          <div className="bg-zinc-50/40 dark:bg-zinc-900/10 border border-zinc-200/40 dark:border-zinc-850 rounded-2xl p-5 text-left space-y-3">
+                            <span className="text-xs font-extrabold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 block">Here's what I can do for you:</span>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                              <div className="flex items-center gap-2">✅ Create engaging social media posts</div>
+                              <div className="flex items-center gap-2">✅ Generate professional news articles</div>
+                              <div className="flex items-center gap-2">✅ Create viral reel scripts</div>
+                              <div className="flex items-center gap-2">✅ Design high-performing Tolee Ads</div>
+                              <div className="flex items-center gap-2">✅ Create Google & Meta Ads copy</div>
+                              <div className="flex items-center gap-2">✅ Reply to comments intelligently</div>
+                              <div className="flex items-center gap-2">✅ Manage personal and group chats</div>
+                              <div className="flex items-center gap-2">✅ Generate captions and hashtags</div>
+                              <div className="flex items-center gap-2">✅ Create Content Calendars</div>
+                              <div className="flex items-center gap-2">✅ Schedule reminders & meetings</div>
                             </div>
-                          )}
+                          </div>
+                        </div>
 
-                          {msg.text && (
-                            <div className={`relative px-4 py-3 text-[14.5px] leading-relaxed border ${
-                              msg.isMe 
-                                ? 'bg-zinc-100 dark:bg-zinc-800/80 text-zinc-800 dark:text-zinc-200 border-zinc-250/60 dark:border-zinc-700/60 rounded-2xl rounded-tr-sm font-semibold' 
-                                : 'bg-zinc-50/40 dark:bg-zinc-900/10 text-zinc-800 dark:text-zinc-200 border-zinc-200/40 dark:border-zinc-850 rounded-2xl rounded-tl-sm'
-                            }`}>
-                              <div className="whitespace-pre-wrap break-words">{msg.text}</div>
-                            </div>
+                        {/* Suggested action cards */}
+                        <div className="space-y-3 pt-2">
+                          <span className="text-xs font-black uppercase tracking-wider text-zinc-400 dark:text-zinc-500 block px-1">Suggested Actions:</span>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                            {SUGGESTED_CARDS.map((card, idx) => (
+                              <button
+                                key={idx}
+                                onClick={() => handleSuggestionClick(card.prompt)}
+                                className="flex flex-col items-start p-3 bg-white dark:bg-zinc-900 hover:bg-[#EAF9F8] dark:hover:bg-[#0E9F9A]/10 border border-zinc-200 dark:border-zinc-800 rounded-xl text-left transition-all hover:border-[#0E9F9A]/30 active:scale-[0.98] group relative overflow-hidden shadow-sm"
+                              >
+                                <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200 group-hover:text-[#0E9F9A] transition-colors">{card.label}</span>
+                                <span className="text-[10px] text-zinc-400 dark:text-zinc-550 mt-1 line-clamp-1 truncate w-full">{card.prompt}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Messages List */}
+                    {aiMessages.map((msg) => (
+                      <div key={msg.id} className="space-y-3">
+                        <div className={`flex w-full gap-2 sm:gap-3 ${msg.isMe ? 'justify-end' : 'justify-start'}`}>
+                          {!msg.isMe && (
+                            <Avatar className="w-8 h-8 flex-shrink-0 mt-0.5 border border-zinc-200/60 dark:border-zinc-800 hidden sm:block">
+                              <AvatarImage src={msg.senderAvatar} />
+                              <AvatarFallback>AI</AvatarFallback>
+                            </Avatar>
                           )}
-                          <span className="text-[9px] text-zinc-400 mt-1 px-1">{msg.time}</span>
+                          
+                          <div className={`flex flex-col max-w-[85%] ${msg.isMe ? 'items-end' : 'items-start'}`}>
+                            {msg.media && (
+                              <div className="mb-1.5 rounded-2xl overflow-hidden max-w-sm border border-zinc-200 dark:border-zinc-850 shadow-sm">
+                                <img src={msg.media.url} alt="Attached" className="w-full object-cover max-h-60" />
+                              </div>
+                            )}
+
+                            {msg.text && (
+                              <div className={`relative px-4 py-3 text-[14.5px] leading-relaxed border ${
+                                msg.isMe 
+                                  ? 'bg-[#EAF9F8] dark:bg-[#0E9F9A]/15 text-[#0E9F9A] border-[#0E9F9A]/20 rounded-2xl rounded-tr-sm font-semibold' 
+                                  : 'bg-zinc-50/40 dark:bg-zinc-900/10 text-zinc-800 dark:text-zinc-200 border-zinc-250/60 dark:border-zinc-850 rounded-2xl rounded-tl-sm'
+                              }`}>
+                                <div className="whitespace-pre-wrap break-words">{msg.text}</div>
+                              </div>
+                            )}
+                            <span className="text-[9px] text-zinc-400 mt-1 px-1">{msg.time}</span>
+
+                            {/* Structured AI Response Cards */}
+                            {msg.draft && (
+                              <div className="mt-3 w-full max-w-md bg-zinc-950 border border-zinc-850 rounded-2xl p-4 space-y-3 shadow-xl text-left">
+                                <div className="flex items-center gap-2 text-indigo-400 font-extrabold text-xs border-b border-zinc-900 pb-2">
+                                  <Sparkles className="w-4 h-4 text-white animate-pulse" /> Structured Campaign Creative
+                                </div>
+                                <div className="space-y-1">
+                                  <span className="text-[10px] text-zinc-500 font-extrabold block">TITLE HOOK</span>
+                                  <div className="text-xs font-bold text-gray-250 bg-zinc-900/50 border border-zinc-800 p-2 rounded-lg">{msg.draft.title}</div>
+                                </div>
+                                <div className="space-y-1">
+                                  <span className="text-[10px] text-zinc-500 font-extrabold block">CAPTION COPY</span>
+                                  <div className="text-xs text-gray-300 bg-zinc-900/50 border border-zinc-800 p-2 rounded-lg whitespace-pre-wrap">{msg.draft.caption}</div>
+                                </div>
+                                {msg.draft.hashtags && msg.draft.hashtags.length > 0 && (
+                                  <div className="flex flex-wrap gap-1">
+                                    {msg.draft.hashtags.map((h: string, i: number) => (
+                                      <span key={i} className="text-[9px] font-extrabold px-1.5 py-0.5 bg-[#EAF9F8] text-[#0E9F9A] dark:bg-[#0E9F9A]/10 dark:text-[#0E9F9A] rounded">{h}</span>
+                                    ))}
+                                  </div>
+                                )}
+                                {(msg.draft.location || msg.draft.audience) && (
+                                  <div className="grid grid-cols-2 gap-2 text-[10px] font-bold text-zinc-400 border-t border-zinc-900 pt-2">
+                                    <span>📍 {msg.draft.location || 'Maharashtra'}</span>
+                                    <span>🎯 {msg.draft.audience || 'Target Niche'}</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* One-Click Action Buttons for AI responses */}
+                            {!msg.isMe && (
+                              <div className="flex flex-wrap items-center gap-1.5 mt-2 bg-zinc-50/50 dark:bg-zinc-900/20 p-1 rounded-xl border border-zinc-200/50 dark:border-zinc-850/40 w-fit">
+                                <Button 
+                                  onClick={() => handleCopyText(msg.draft?.caption || msg.text)} 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="h-7 text-[10px] font-bold text-zinc-600 dark:text-zinc-400 hover:text-[#0E9F9A] gap-1 px-2.5 rounded-lg"
+                                >
+                                  <Copy className="w-3 h-3" /> Copy
+                                </Button>
+                                <Button 
+                                  onClick={() => handleEditText(msg.draft?.caption || msg.text)} 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="h-7 text-[10px] font-bold text-zinc-600 dark:text-zinc-400 hover:text-[#0E9F9A] gap-1 px-2.5 rounded-lg"
+                                >
+                                  <Edit className="w-3 h-3" /> Edit
+                                </Button>
+                                <Button 
+                                  onClick={() => handleRegenerateMsg(msg)} 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="h-7 text-[10px] font-bold text-zinc-600 dark:text-zinc-400 hover:text-[#0E9F9A] gap-1 px-2.5 rounded-lg"
+                                >
+                                  <RefreshCw className="w-3 h-3" /> Regenerate
+                                </Button>
+                                <Button 
+                                  onClick={() => handleTranslateMsg(msg)} 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="h-7 text-[10px] font-bold text-zinc-600 dark:text-zinc-400 hover:text-[#0E9F9A] gap-1 px-2.5 rounded-lg"
+                                >
+                                  <Globe className="w-3 h-3" /> Translate
+                                </Button>
+                                {msg.draft && (
+                                  <>
+                                    <Button 
+                                      onClick={() => handlePublishPostDirectly(msg.draft)} 
+                                      variant="ghost" 
+                                      size="sm" 
+                                      className="h-7 text-[10px] font-bold text-[#0E9F9A] hover:bg-[#EAF9F8] dark:hover:bg-[#0E9F9A]/10 gap-1 px-2.5 rounded-lg"
+                                    >
+                                      🚀 Post to Tolee
+                                    </Button>
+                                    <Button 
+                                      onClick={() => router.push('/world/create')} 
+                                      variant="ghost" 
+                                      size="sm" 
+                                      className="h-7 text-[10px] font-bold text-zinc-600 dark:text-zinc-400 hover:text-[#0E9F9A] gap-1 px-2.5 rounded-lg"
+                                    >
+                                      🎬 Create Reel
+                                    </Button>
+                                    <Button 
+                                      onClick={() => router.push('/news/create')} 
+                                      variant="ghost" 
+                                      size="sm" 
+                                      className="h-7 text-[10px] font-bold text-zinc-600 dark:text-zinc-400 hover:text-[#0E9F9A] gap-1 px-2.5 rounded-lg"
+                                    >
+                                      📰 Create News
+                                    </Button>
+                                  </>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     ))}
 
-                    {/* Wizards buttons inside chat stream */}
-                    {flowState === 'idle' && (
-                      <div className="w-full max-w-lg mx-auto py-8 text-center space-y-6 animate-in fade-in duration-300">
-                        <div className="space-y-2">
-                          <Bot className="w-10 h-10 text-zinc-450 dark:text-zinc-500 mx-auto stroke-[1.5]" />
-                          <h2 className="text-lg font-extrabold text-zinc-850 dark:text-zinc-200">How can I help you today?</h2>
-                          <p className="text-xs text-zinc-400 dark:text-zinc-550 max-w-xs mx-auto">Select a quick helper task below to start collaborating with Tolee AI</p>
-                        </div>
+                    {/* Wizards buttons inside chat stream (Step wizard triggers) */}
+                    {flowState === 'idle' && aiMessages.filter(m => m.isMe).length > 0 && (
+                      <div className="w-full max-w-lg mx-auto py-4 text-center space-y-4 animate-in fade-in duration-300">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <button
                             onClick={() => startPostFlow()}
@@ -1142,7 +1595,7 @@ function AIManagerContent() {
                             setFlowState('post_media_upload');
                             const u = addUserMessage('📸 Upload Media');
                             const b = addBotMessage(`Select or drag your visual image or video to upload:`);
-                            setAiMessages(prev => [...prev, u, b]);
+                            saveHistory([...aiMessages, u, b]);
                           }}
                           className="flex-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-200 font-bold h-10 rounded-xl gap-1.5 border border-zinc-200/60 dark:border-zinc-750 text-xs transition-all"
                         >
@@ -1154,7 +1607,7 @@ function AIManagerContent() {
                             setFlowState('post_media_generate');
                             const u = addUserMessage('🎨 Generate AI Image');
                             const b = addBotMessage(`Stunning AI Image Generator active! Click "Generate visual graphic" below to design:`);
-                            setAiMessages(prev => [...prev, u, b]);
+                            saveHistory([...aiMessages, u, b]);
                           }}
                           className="flex-1 bg-zinc-800 hover:bg-zinc-900 text-white font-bold h-10 rounded-xl gap-1.5 text-xs shadow-sm transition-all"
                         >
@@ -1171,7 +1624,7 @@ function AIManagerContent() {
                             setFlowState('ad_media_upload');
                             const u = addUserMessage('📸 Upload Media');
                             const b = addBotMessage(`Select your ad campaign creative photo/video to upload:`);
-                            setAiMessages(prev => [...prev, u, b]);
+                            saveHistory([...aiMessages, u, b]);
                           }}
                           className="flex-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-200 font-bold h-10 rounded-xl gap-1.5 border border-zinc-200/60 dark:border-zinc-750 text-xs transition-all"
                         >
@@ -1183,7 +1636,7 @@ function AIManagerContent() {
                             setFlowState('ad_media_generate');
                             const u = addUserMessage('🎨 Generate Ad Creative');
                             const b = addBotMessage(`AI Image Generator active! Select options and generate the visual:`);
-                            setAiMessages(prev => [...prev, u, b]);
+                            saveHistory([...aiMessages, u, b]);
                           }}
                           className="flex-1 bg-zinc-800 hover:bg-zinc-900 text-white font-bold h-10 rounded-xl gap-1.5 text-xs shadow-sm transition-all"
                         >
@@ -1206,7 +1659,7 @@ function AIManagerContent() {
                           onClick={() => {
                             setGeneratedImageUrl(null);
                             const b = addBotMessage(`Sure, let's try again! You can modify prompt options below:`);
-                            setAiMessages(prev => [...prev, b]);
+                            saveHistory([...aiMessages, b]);
                           }}
                           className="flex-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-200 font-bold h-10 text-xs rounded-xl gap-1.5 border border-zinc-200/60 dark:border-zinc-700 transition-all"
                         >
@@ -1219,15 +1672,15 @@ function AIManagerContent() {
                     {/* AI image generator options panel */}
                     {(flowState === 'post_media_generate' || flowState === 'ad_media_generate') && !generatedImageUrl && (
                       <div className="w-full max-w-md mx-auto bg-zinc-950 border border-zinc-800 rounded-2xl p-4 shadow-2xl space-y-3">
-                        <span className="text-indigo-400 font-extrabold text-xs flex items-center gap-1.5 pb-2 border-b border-zinc-900">
-                          <Sparkles className="w-4 h-4" /> Visual Generator Prompt
+                        <span className="text-[#0E9F9A] font-extrabold text-xs flex items-center gap-1.5 pb-2 border-b border-zinc-900">
+                          <Sparkles className="w-4 h-4 animate-pulse" /> Visual Generator Prompt
                         </span>
                         <div>
                           <textarea
                             value={imagePrompt}
                             onChange={(e) => setImagePrompt(e.target.value)}
                             rows={3}
-                            className="w-full bg-zinc-900 border border-zinc-850 text-xs rounded-lg p-2 text-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                            className="w-full bg-zinc-900 border border-zinc-850 text-xs rounded-lg p-2 text-gray-250 focus:outline-none focus:ring-1 focus:ring-[#0E9F9A]"
                           />
                         </div>
                         <div className="grid grid-cols-2 gap-2">
@@ -1254,7 +1707,7 @@ function AIManagerContent() {
                         <Button
                           onClick={handleGenerateAIImage}
                           disabled={isGeneratingImage}
-                          className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold h-9 text-xs rounded-xl shadow-md gap-1"
+                          className="w-full bg-gradient-to-r from-[#0E9F9A] to-[#087A76] text-white font-bold h-9 text-xs rounded-xl shadow-md gap-1"
                         >
                           {isGeneratingImage ? <><RefreshCw className="w-3 animate-spin" /> Generating...</> : <><Sparkles className="w-3 h-3" /> Generate visual graphic</>}
                         </Button>
@@ -1277,7 +1730,7 @@ function AIManagerContent() {
                     {(flowState === 'post_groups' || flowState === 'ad_groups') && (
                       <div className="w-full max-w-md mx-auto bg-zinc-950 border border-zinc-800 rounded-2xl p-4 shadow-2xl space-y-3">
                         <div className="flex items-center justify-between border-b border-zinc-900 pb-2">
-                          <span className="text-indigo-400 font-extrabold text-xs flex items-center gap-1.5">
+                          <span className="text-[#0E9F9A] font-extrabold text-xs flex items-center gap-1.5">
                             <Globe className="w-3.5 h-3.5" /> Target Groups
                           </span>
                           {flowState === 'ad_groups' && (
@@ -1299,7 +1752,7 @@ function AIManagerContent() {
                           {availableGroups.map((g) => {
                             const isChecked = draftGroups.includes(g.id);
                             return (
-                              <label key={g.id} className={`flex items-center gap-2.5 p-2 rounded-lg border text-xs cursor-pointer transition-all ${isChecked ? 'bg-indigo-950/20 border-indigo-900/50 text-indigo-400 font-bold' : 'bg-zinc-900/20 border-zinc-900/30 text-gray-400 hover:border-zinc-800'}`}>
+                              <label key={g.id} className={`flex items-center gap-2.5 p-2 rounded-lg border text-xs cursor-pointer transition-all ${isChecked ? 'bg-teal-950/20 border-teal-900/50 text-[#0E9F9A] font-bold' : 'bg-zinc-900/20 border-zinc-900/30 text-gray-400 hover:border-zinc-800'}`}>
                                 <input type="checkbox" checked={isChecked} disabled={flowState === 'ad_groups' && draftGroups.length === 0} onChange={(e) => {
                                   if (e.target.checked) setDraftGroups([...draftGroups, g.id]);
                                   else setDraftGroups(draftGroups.filter(id => id !== g.id));
@@ -1314,7 +1767,7 @@ function AIManagerContent() {
                             if (flowState === 'post_groups') handleConfirmPostGroups();
                             else handleConfirmAdGroups(draftGroups.length === 0);
                           }}
-                          className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold h-9 text-xs rounded-xl shadow-md"
+                          className="w-full bg-gradient-to-r from-[#0E9F9A] to-[#087A76] text-white font-bold h-9 text-xs rounded-xl shadow-md"
                         >
                           Confirm ({draftGroups.length === 0 ? 'All Groups' : `${draftGroups.length} Selected`})
                         </Button>
@@ -1324,13 +1777,13 @@ function AIManagerContent() {
                     {/* Post Draft Card */}
                     {flowState === 'post_draft' && (
                       <div className="w-full max-w-md mx-auto bg-zinc-950 border border-zinc-850 rounded-2xl overflow-hidden p-4 space-y-3">
-                        <div className="flex items-center gap-2 text-indigo-400 font-extrabold text-xs border-b border-zinc-900 pb-2">
+                        <div className="flex items-center gap-2 text-[#0E9F9A] font-extrabold text-xs border-b border-zinc-900 pb-2">
                           <Sparkles className="w-4.5 h-4.5 text-white animate-pulse" /> Confirm Organic Post
                         </div>
                         <Input value={draftTitle} onChange={(e) => setDraftTitle(e.target.value)} className="bg-zinc-900 border-zinc-800 text-xs rounded-lg text-gray-200" />
                         <textarea value={draftCaption} onChange={(e) => setDraftCaption(e.target.value)} rows={3} className="w-full bg-zinc-900 border border-zinc-800 text-xs rounded-lg p-2 focus:outline-none text-gray-200" />
                         {draftMedia && <img src={draftMedia.url} className="rounded-lg max-h-24 object-cover" />}
-                        <Button onClick={() => handlePublishPostSubmit()} className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold h-10 text-xs rounded-xl shadow-lg">
+                        <Button onClick={() => handlePublishPostSubmit()} className="w-full bg-gradient-to-r from-[#0E9F9A] to-[#087A76] text-white font-bold h-10 text-xs rounded-xl shadow-lg">
                           🚀 Confirm & Publish Post ({draftGroups.length} Groups)
                         </Button>
                       </div>
@@ -1367,9 +1820,9 @@ function AIManagerContent() {
                           <AvatarFallback>AI</AvatarFallback>
                         </Avatar>
                         <div className="relative px-4 py-2.5 bg-white dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800 rounded-2xl rounded-tl-sm shadow-sm flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                          <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                          <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                          <span className="w-1.5 h-1.5 bg-[#0E9F9A] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                          <span className="w-1.5 h-1.5 bg-[#0E9F9A] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                          <span className="w-1.5 h-1.5 bg-[#0E9F9A] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
                         </div>
                       </div>
                     )}
@@ -1381,24 +1834,31 @@ function AIManagerContent() {
               {/* Chat Input Bar */}
               <div className="absolute bottom-0 left-0 right-0 max-w-3xl mx-auto p-4 bg-gradient-to-t from-slate-50 via-slate-50/90 to-transparent dark:from-[#09090b] dark:via-[#09090b]/90 dark:to-transparent">
                 {aiUploadProgress > 0 && (
-                  <div className="mb-2 p-2 bg-indigo-950/20 border border-indigo-900/60 rounded-xl text-[10px] font-extrabold text-indigo-400 flex justify-between items-center animate-pulse">
+                  <div className="mb-2 p-2 bg-teal-955/20 border border-[#0E9F9A]/30 rounded-xl text-[10px] font-extrabold text-[#0E9F9A] flex justify-between items-center animate-pulse">
                     <span>Uploading asset...</span>
                     <span>{aiUploadProgress}%</span>
                   </div>
                 )}
-                <form onSubmit={handleChatSubmit} className="relative bg-white dark:bg-zinc-900 rounded-2xl border border-gray-250 dark:border-zinc-800 flex items-center px-2 py-1.5">
+                {voiceTranscript && (
+                  <div className="mb-2 p-2.5 bg-[#EAF9F8] dark:bg-[#0E9F9A]/10 border border-[#0E9F9A]/20 rounded-xl text-xs font-bold text-[#0E9F9A] animate-pulse">
+                    🎤 Speech Transcript: "{voiceTranscript}"
+                  </div>
+                )}
+                <form onSubmit={handleChatSubmit} className="relative bg-white dark:bg-zinc-900 rounded-2xl border border-gray-250 dark:border-zinc-800 flex items-center px-2 py-1.5 shadow-md">
                   <input type="file" ref={aiFileInputRef} onChange={(e) => { if (e.target.files?.[0]) handleFileUploadTrigger(e.target.files[0]); }} className="hidden" accept="image/*,video/*" />
-                  <Button type="button" onClick={() => aiFileInputRef.current?.click()} disabled={flowState === 'idle' || flowState === 'post_media_generate' || flowState === 'post_draft' || flowState === 'ad_draft' || flowState === 'ad_media_generate'} variant="ghost" size="icon" className="text-gray-400 hover:text-primary rounded-xl h-9 w-9 shrink-0">
+                  <Button type="button" onClick={() => aiFileInputRef.current?.click()} disabled={flowState === 'post_media_generate' || flowState === 'post_draft' || flowState === 'ad_draft' || flowState === 'ad_media_generate'} variant="ghost" size="icon" className="text-gray-400 hover:text-[#0E9F9A] rounded-xl h-9 w-9 shrink-0">
                     <Paperclip className="w-4.5 h-4.5" />
                   </Button>
                   <Input 
                     value={newMessage} 
                     onChange={(e) => setNewMessage(e.target.value)} 
-                    placeholder={flowState === 'idle' ? "Select an option from chat above to start..." : flowState === 'post_caption' ? "Type post idea and AI will copywrite it..." : flowState === 'ad_text' ? "Describe business/product for sponsored ad..." : "Proceed with configuration choices above..."} 
-                    disabled={flowState === 'idle' || flowState === 'post_media_choice' || flowState === 'post_media_upload' || flowState === 'post_media_generate' || flowState === 'post_groups' || flowState === 'post_draft' || flowState === 'ad_media_choice' || flowState === 'ad_media_upload' || flowState === 'ad_media_generate' || flowState === 'ad_groups' || flowState === 'ad_draft'} 
+                    placeholder={flowState === 'idle' ? "Ask me anything, e.g. 'Create today's post' or 'Write a Reel'..." : flowState === 'post_caption' ? "Type post idea and AI will copywrite it..." : flowState === 'ad_text' ? "Describe business/product for sponsored ad..." : "Proceed with configuration choices above..."} 
                     className="flex-1 border-none shadow-none focus-visible:ring-0 bg-transparent text-xs h-10 px-2 text-gray-800 dark:text-gray-100 placeholder:text-gray-400"
                   />
-                  <Button type="submit" disabled={!newMessage.trim() || flowState === 'idle' || flowState === 'post_media_choice' || flowState === 'post_media_upload' || flowState === 'post_media_generate' || flowState === 'post_groups' || flowState === 'post_draft' || flowState === 'ad_media_choice' || flowState === 'ad_media_upload' || flowState === 'ad_media_generate' || flowState === 'ad_groups' || flowState === 'ad_draft'} className="bg-primary text-white rounded-xl h-9 w-9 shrink-0 flex items-center justify-center">
+                  <Button type="button" onClick={handleToggleVoice} className={`rounded-xl h-9 w-9 shrink-0 mr-1 flex items-center justify-center transition-colors ${isVoiceActive ? 'bg-red-500 text-white animate-pulse' : 'bg-transparent text-gray-400 hover:text-[#0E9F9A]'}`}>
+                    <Mic className="w-4.5 h-4.5" />
+                  </Button>
+                  <Button type="submit" disabled={!newMessage.trim()} className="bg-[#0E9F9A] hover:bg-[#087A76] text-white rounded-xl h-9 w-9 shrink-0 flex items-center justify-center shadow-sm transition-colors">
                     <Send className="w-4 h-4" />
                   </Button>
                 </form>
