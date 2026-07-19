@@ -1,0 +1,480 @@
+# Existing Project Prompt – Tolee AI Manager (User Experience Flow)
+
+## Objective
+
+Completely redesign the **Tolee AI Manager** into a modern **ChatGPT-style AI Workspace** where users can naturally interact with AI to manage their entire Tolee experience. The AI Manager should no longer feel like a traditional dashboard—it should function as an intelligent personal assistant that understands the user's needs and helps them perform tasks through conversation.
+
+**Important:** This redesign is for the **user experience when they open the AI Manager from the left-side navigation menu**. All existing AI features and business logic must continue working without interruption.
+
+---
+
+# User Journey
+
+## Step 1 – User Clicks "AI Manager"
+
+When the user clicks **AI Manager** from the left sidebar:
+
+- Open a dedicated AI Workspace page.
+- Do **NOT** show the current dashboard layout.
+- Replace it with a clean, ChatGPT-inspired interface.
+- The page should load instantly with a lightweight, modern UI.
+
+---
+
+# Step 2 – AI Workspace Layout
+
+### Left Sidebar (Collapsible)
+
+Move the existing AI modules into a collapsible sidebar similar to ChatGPT.
+
+Include:
+
+- ➕ New Chat
+- 🕘 Recent Chats
+- 📁 Saved AI Projects
+- 📚 Prompt Library
+- 🧠 AI Templates
+- 📜 AI History
+- ⭐ Favourite Chats
+- 📦 Archived Chats
+- ⚙ Settings
+
+### Sidebar Behaviour
+
+Desktop:
+- Collapse / Expand
+
+Mobile:
+- Swipe Left → Hide
+- Swipe Right → Show
+
+The behaviour should feel exactly like ChatGPT.
+
+---
+
+# Step 3 – Welcome Screen
+
+Whenever the user opens AI Manager for the first time, starts a new chat, or returns after a long period of inactivity, the AI should automatically greet them.
+
+Example:
+
+👋 Hello, Welcome Back!
+
+I'm your **Tolee AI Assistant**.
+
+I'm here to help you save time, grow your business, and manage your daily work.
+
+Here's what I can do for you:
+
+✅ Create engaging social media posts
+
+✅ Generate professional news articles
+
+✅ Create viral reel scripts
+
+✅ Design high-performing Tolee Ads
+
+✅ Create Google Ads & Meta Ads content
+
+✅ Reply to comments intelligently
+
+✅ Manage personal and group chats
+
+✅ Generate captions and hashtags
+
+✅ Create weekly & monthly content calendars
+
+✅ Schedule reminders
+
+✅ Organize meetings
+
+✅ Track daily tasks
+
+✅ Suggest trending topics
+
+✅ Improve engagement and followers
+
+Ask me anything to get started.
+
+---
+
+# Step 4 – Suggested Action Cards
+
+Below the welcome message, display interactive suggestion cards.
+
+Examples:
+
+📝 Create Social Post
+
+🎥 Create Reel Script
+
+📰 Write News Article
+
+📢 Create Advertisement
+
+📅 Weekly Content Calendar
+
+📆 Monthly Planner
+
+💬 Reply to Comments
+
+📨 Manage Inbox
+
+📈 Grow My Followers
+
+🎯 Marketing Strategy
+
+🏠 Real Estate Promotion
+
+🍽 Restaurant Promotion
+
+🏪 Shop Promotion
+
+📍 Local Business Promotion
+
+Clicking any card should automatically populate the prompt input and start the AI conversation.
+
+---
+
+# Step 5 – ChatGPT Style Conversation
+
+The center of the screen should be a conversational chat window.
+
+Example:
+
+----------------------------------------------------
+
+Tolee AI Manager
+
+How can I help you today?
+
+----------------------------------------------------
+
+👤 User
+
+Create a post for my Real Estate Group.
+
+----------------------------------------------------
+
+🤖 AI
+
+Sure!
+
+Please tell me:
+
+• Project Name
+
+• Location
+
+• Price
+
+• Target Audience
+
+I'll create a high-converting post for you.
+
+----------------------------------------------------
+
+Responses should stream naturally, just like ChatGPT.
+
+---
+
+# Step 6 – AI Capabilities
+
+The AI should support:
+
+## Content Creation
+
+- Feed Posts
+- Reels
+- News Articles
+- Blogs
+- Product Descriptions
+- Property Listings
+- Captions
+- Hashtags
+- SEO Content
+- AEO & GEO Optimized Content
+
+---
+
+## Advertisement
+
+Generate:
+
+- Tolee Ads
+- Google Ads
+- Meta Ads
+- Headlines
+- CTAs
+- Banner Text
+- Promotional Content
+
+---
+
+## Community Management
+
+The AI can:
+
+- Reply to comments
+- Suggest replies
+- Moderate comments
+- Remove spam
+- Highlight important conversations
+
+---
+
+## Chat Management
+
+The AI can:
+
+- Draft replies
+- Suggest responses
+- Summarize unread chats
+- Organize conversations
+- Highlight important messages
+
+---
+
+## Calendar Management
+
+Generate:
+
+- Weekly Content Calendar
+- Monthly Content Calendar
+- Posting Schedule
+- Campaign Timeline
+
+The AI should help schedule:
+
+- Feed Posts
+- Reels
+- Stories
+- Ads
+- Blogs
+- News
+
+---
+
+## Reminder Assistant
+
+Users can type:
+
+"Remind me tomorrow at 10 AM to call the client."
+
+or
+
+"Remind me every Monday to publish a Reel."
+
+The AI should:
+
+- Save the reminder
+- Confirm it
+- Integrate it with Tolee Notifications
+
+Examples:
+
+• Meeting Reminder
+
+• EMI Reminder
+
+• Rent Reminder
+
+• Birthday Reminder
+
+• Anniversary Reminder
+
+• Client Follow-up
+
+• Property Visit
+
+• Daily Tasks
+
+---
+
+## Meeting Planner
+
+Example:
+
+Tomorrow 3 PM
+
+Meeting with Rahul
+
+The AI should automatically create:
+
+- Meeting Reminder
+- Notification
+- Daily Schedule Entry
+
+---
+
+# Step 7 – Voice Assistant
+
+Keep the microphone button.
+
+Improve it so users can say:
+
+"Create today's post."
+
+"Write a Reel."
+
+"Create a property advertisement."
+
+"Remind me tomorrow."
+
+The speech should convert directly into AI prompts.
+
+---
+
+# Step 8 – AI Workspace Memory
+
+Maintain:
+
+- Recent Chats
+- Saved Chats
+- Favourite Chats
+- Archived Chats
+- Conversation History
+
+Users should be able to continue previous conversations at any time.
+
+---
+
+# Step 9 – AI Response Cards
+
+Instead of plain text, AI should generate structured cards.
+
+Example:
+
+--------------------------------
+
+Social Media Post
+
+Headline
+
+Caption
+
+Hashtags
+
+CTA
+
+[Copy]
+
+[Edit]
+
+[Post to Tolee]
+
+--------------------------------
+
+---
+
+# Step 10 – One-Click Actions
+
+Every AI response should include:
+
+- Copy
+- Edit
+- Regenerate
+- Translate
+- Save Draft
+- Schedule
+- Post to Tolee
+- Create Reel
+- Create News
+
+---
+
+# Step 11 – Smart Personalization
+
+The AI should understand the user's profile and business category.
+
+Examples:
+
+If the user is a Real Estate Agent:
+
+- Suggest property promotions
+- Buyer campaigns
+- Builder marketing
+
+If Restaurant:
+
+- Food offers
+- Festival promotions
+
+If Shop Owner:
+
+- Product marketing
+
+If News Creator:
+
+- Trending news
+- Breaking news ideas
+
+---
+
+# Step 12 – Trending Suggestions
+
+The AI should proactively recommend:
+
+- Trending Topics
+- Trending Hashtags
+- Trending News
+- Viral Ideas
+- Festival Campaigns
+- Business Opportunities
+- Community Growth Tips
+
+---
+
+# Step 13 – Responsive Experience
+
+The AI Manager must work perfectly on:
+
+- Desktop
+- Laptop
+- Tablet
+- Mobile Web
+- Android App
+- Future iOS App
+
+---
+
+# Step 14 – Smooth User Experience
+
+Provide polished but lightweight interactions.
+
+Include:
+
+- AI typing indicator
+- Response streaming
+- Auto-scroll to latest response
+- Smooth sidebar open/close
+- Smooth suggestion card interaction
+
+Avoid heavy animations that affect performance.
+
+---
+
+# Step 15 – Preserve Existing Functionality
+
+This redesign is a UI/UX enhancement only.
+
+Do NOT break or remove any existing AI functionality.
+
+Ensure all existing modules continue working:
+
+- Growth Dashboard
+- Copywriter & Creator
+- Doc Layout Analyzer
+- Priority Inbox
+- AI Leads Hub
+- Content Calendar
+- Community Guard
+- Ad Campaign Coach
+
+Where appropriate, surface these capabilities through the conversational interface while preserving their underlying functionality.
+
+---
+
+# Expected Result
+
+When a user clicks **AI Manager** from the left navigation menu, they should feel like they have opened a professional AI assistant similar to ChatGPT. The interface should immediately explain everything the AI can do, guide the user with helpful suggestions, and allow them to manage posts, ads, news, comments, chats, reminders, meetings, calendars, and business growth through a single intelligent conversational workspace. The experience must be modern, responsive, lightweight, and fully compatible with all existing Tolee functionality without introducing regressions.
