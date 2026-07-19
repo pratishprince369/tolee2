@@ -47,6 +47,24 @@ export function BottomNav() {
 
   if (!isAuthenticated) return null;
 
+  const getDropdownItemClass = (href: string) => {
+    const isActive = pathname === href;
+    return `cursor-pointer flex w-full items-center px-3 py-2.5 rounded-lg transition-all duration-200 group focus:outline-none ${
+      isActive 
+        ? 'bg-gradient-to-r from-[#0E9F9A] to-[#087A76] text-white font-bold shadow-sm shadow-[#0E9F9A]/10 focus:bg-gradient-to-r focus:from-[#0E9F9A] focus:to-[#087A76] focus:text-white' 
+        : 'text-[#1F2937] dark:text-zinc-200 hover:bg-[#EAF9F8] dark:hover:bg-[#0E9F9A]/10 hover:text-[#0E9F9A] focus:bg-[#EAF9F8] dark:focus:bg-[#0E9F9A]/10 focus:text-[#0E9F9A]'
+    }`;
+  };
+
+  const getDropdownIconClass = (href: string, isCreator?: boolean) => {
+    const isActive = pathname === href;
+    return `mr-2.5 h-4 w-4 flex-shrink-0 transition-colors duration-200 ${
+      isActive 
+        ? 'text-white' 
+        : isCreator ? 'text-purple-500' : 'text-[#6B7280] group-hover:text-[#0E9F9A] group-focus:text-[#0E9F9A]'
+    }`;
+  };
+
   const navItems = [
     { name: 'Feed', href: '/feed', icon: Home },
     { name: 'Discover', href: '/discover', icon: Compass },
@@ -61,8 +79,8 @@ export function BottomNav() {
       {navItems.map((item) => {
         const Icon = item.icon;
         const isActive = pathname === item.href || (pathname.startsWith('/t/') && item.name === 'Feed');
-        const activeColor = pathname === '/reels' ? 'text-white' : 'text-[#0a7c85] dark:text-white';
-        const inactiveColor = pathname === '/reels' ? 'text-zinc-500 hover:text-white' : 'text-zinc-400 hover:text-[#0a7c85] dark:hover:text-white';
+        const activeColor = pathname === '/reels' ? 'text-white' : 'text-[#0E9F9A] dark:text-white';
+        const inactiveColor = pathname === '/reels' ? 'text-zinc-500 hover:text-white' : 'text-zinc-400 hover:text-[#0E9F9A] dark:hover:text-white';
 
         if (item.isAvatar) {
           return (
@@ -70,13 +88,13 @@ export function BottomNav() {
               <DropdownMenuTrigger className="relative w-full h-full flex flex-col items-center justify-center focus:outline-none select-none">
                 <div className={`flex flex-col items-center justify-center w-full h-full relative pb-1.5 transition-colors duration-200 ${isActive ? activeColor : inactiveColor}`}>
                   <div className="relative">
-                    <div className={`w-7 h-7 rounded-full overflow-hidden border transition-all duration-300 ${isActive ? (pathname === '/reels' ? 'border-white border-2' : 'border-[#0a7c85] dark:border-white border-2 scale-105') : 'border-zinc-250 dark:border-zinc-800'}`}>
+                    <div className={`w-7 h-7 rounded-full overflow-hidden border transition-all duration-300 ${isActive ? (pathname === '/reels' ? 'border-white border-2' : 'border-[#0E9F9A] dark:border-white border-2 scale-105') : 'border-zinc-250 dark:border-zinc-800'}`}>
                       <img src={(!session?.user?.image || session.user.image === 'null' || session.user.image === 'undefined' || session.user.image.trim() === '') ? '/default-user-avatar.svg' : session.user.image} alt="Profile" className="w-full h-full object-cover" />
                     </div>
                   </div>
                   <span className="text-[10px] mt-[4px] font-semibold leading-none">{item.name}</span>
                   {isActive && (
-                    <span className={`absolute bottom-0 w-1 h-1 rounded-full animate-in fade-in zoom-in duration-300 ${pathname === '/reels' ? 'bg-white' : 'bg-[#0a7c85] dark:bg-white'}`} />
+                    <span className={`absolute bottom-0 w-1 h-1 rounded-full animate-in fade-in zoom-in duration-300 ${pathname === '/reels' ? 'bg-white' : 'bg-[#0E9F9A] dark:bg-white'}`} />
                   )}
                 </div>
               </DropdownMenuTrigger>
@@ -92,108 +110,122 @@ export function BottomNav() {
                 <DropdownMenuSeparator />
                 
                 {/* ── Social Group ── */}
-                <DropdownMenuItem onClick={() => router.push('/u/me')} className="cursor-pointer flex w-full items-center">
-                  <User className="mr-2 h-4 w-4 text-zinc-500" />
+                <DropdownMenuItem onClick={() => router.push('/u/me')} className={getDropdownItemClass('/u/me')}>
+                  <User className={getDropdownIconClass('/u/me')} />
                   <span>My Profile</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => router.push('/settings')} className="cursor-pointer flex w-full items-center">
-                  <Settings className="mr-2 h-4 w-4 text-zinc-500" />
+                <DropdownMenuItem onClick={() => router.push('/settings')} className={getDropdownItemClass('/settings')}>
+                  <Settings className={getDropdownIconClass('/settings')} />
                   <span>Settings</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => router.push('/my-tolees')} className="cursor-pointer flex w-full items-center">
-                  <Globe className="mr-2 h-4 w-4 text-zinc-500" />
+                <DropdownMenuItem onClick={() => router.push('/my-tolees')} className={getDropdownItemClass('/my-tolees')}>
+                  <Globe className={getDropdownIconClass('/my-tolees')} />
                   <span>My Tolees</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => router.push('/news')} className="cursor-pointer flex w-full items-center">
-                  <Newspaper className="mr-2 h-4 w-4 text-zinc-500" />
+                <DropdownMenuItem onClick={() => router.push('/news')} className={getDropdownItemClass('/news')}>
+                  <Newspaper className={getDropdownIconClass('/news')} />
                   <span>Tolee News</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => router.push('/screen')} className="cursor-pointer flex w-full items-center">
-                  <Tv className="mr-2 h-4 w-4 text-zinc-500" />
+                <DropdownMenuItem onClick={() => router.push('/screen')} className={getDropdownItemClass('/screen')}>
+                  <Tv className={getDropdownIconClass('/screen')} />
                   <span>Tolee Screen</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => router.push('/ai-manager')} className="cursor-pointer flex w-full items-center justify-between">
-                  <div className="flex items-center">
-                    <Bot className="mr-2 h-4 w-4 text-zinc-500" />
-                    <span>AI Manager</span>
+                <DropdownMenuItem onClick={() => router.push('/ai-manager')} className={getDropdownItemClass('/ai-manager')}>
+                  <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center">
+                      <Bot className={getDropdownIconClass('/ai-manager')} />
+                      <span>AI Manager</span>
+                    </div>
+                    {pathname !== '/ai-manager' && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#F59E0B] animate-pulse mr-1 border border-white dark:border-zinc-950" />
+                    )}
                   </div>
-                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse mr-1" />
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => router.push('/notifications')} className="cursor-pointer flex w-full items-center justify-between">
-                  <div className="flex items-center">
-                    <Bell className="mr-2 h-4 w-4 text-zinc-500" />
-                    <span>Notifications</span>
+                <DropdownMenuItem onClick={() => router.push('/notifications')} className={getDropdownItemClass('/notifications')}>
+                  <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center">
+                      <Bell className={getDropdownIconClass('/notifications')} />
+                      <span>Notifications</span>
+                    </div>
+                    {unreadNotifications > 0 && (
+                      <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold transition-all duration-200 ${pathname === '/notifications' ? 'bg-white text-[#087A76]' : 'bg-[#0E9F9A] text-white'}`}>
+                        {unreadNotifications}
+                      </span>
+                    )}
                   </div>
-                  {unreadNotifications > 0 && (
-                    <span className="bg-primary text-primary-foreground text-[9px] px-2 py-0.5 rounded-full font-bold">
-                      {unreadNotifications}
-                    </span>
-                  )}
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => router.push('/chat')} className="cursor-pointer flex w-full items-center justify-between">
-                  <div className="flex items-center">
-                    <MessageCircle className="mr-2 h-4 w-4 text-zinc-500" />
-                    <span>Chats</span>
+                <DropdownMenuItem onClick={() => router.push('/chat')} className={getDropdownItemClass('/chat')}>
+                  <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center">
+                      <MessageCircle className={getDropdownIconClass('/chat')} />
+                      <span>Chats</span>
+                    </div>
+                    {unreadChats > 0 && (
+                      <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold transition-all duration-200 ${pathname === '/chat' ? 'bg-white text-[#087A76]' : 'bg-[#0E9F9A] text-white'}`}>
+                        {unreadChats}
+                      </span>
+                    )}
                   </div>
-                  {unreadChats > 0 && (
-                    <span className="bg-primary text-primary-foreground text-[9px] px-2 py-0.5 rounded-full font-bold">
-                      {unreadChats}
-                    </span>
-                  )}
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => router.push('/marketplace')} className="cursor-pointer flex w-full items-center">
-                  <Store className="mr-2 h-4 w-4 text-zinc-500" />
+                <DropdownMenuItem onClick={() => router.push('/marketplace')} className={getDropdownItemClass('/marketplace')}>
+                  <Store className={getDropdownIconClass('/marketplace')} />
                   <span>Marketplace</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => router.push('/world')} className="cursor-pointer flex w-full items-center">
-                  <Globe className="mr-2 h-4 w-4 text-zinc-500" />
+                <DropdownMenuItem onClick={() => router.push('/world')} className={getDropdownItemClass('/world')}>
+                  <Globe className={getDropdownIconClass('/world')} />
                   <span>Tolee World</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => router.push('/map')} className="cursor-pointer flex w-full items-center">
-                  <Map className="mr-2 h-4 w-4 text-zinc-500" />
+                <DropdownMenuItem onClick={() => router.push('/map')} className={getDropdownItemClass('/map')}>
+                  <Map className={getDropdownIconClass('/map')} />
                   <span>Live Map</span>
                 </DropdownMenuItem>
 
                 <DropdownMenuSeparator />
 
                 {/* ── Creator & Business Group ── */}
-                <DropdownMenuItem onClick={() => router.push('/ads-manager')} className="cursor-pointer flex w-full items-center">
-                  <Megaphone className="mr-2 h-4 w-4 text-zinc-500" />
+                <DropdownMenuItem onClick={() => router.push('/ads-manager')} className={getDropdownItemClass('/ads-manager')}>
+                  <Megaphone className={getDropdownIconClass('/ads-manager')} />
                   <span>Ads Manager</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => router.push('/creator-program')} className="cursor-pointer flex w-full items-center justify-between text-purple-600 dark:text-purple-400">
-                  <div className="flex items-center">
-                    <Zap className="mr-2 h-4 w-4 text-purple-500" />
-                    <span className="font-semibold">Creator Program</span>
+                <DropdownMenuItem onClick={() => router.push('/creator-program')} className={getDropdownItemClass('/creator-program')}>
+                  <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center">
+                      <Zap className={getDropdownIconClass('/creator-program', true)} />
+                      <span className="font-semibold">Creator Program</span>
+                    </div>
+                    {pathname !== '/creator-program' && (
+                      <span className="text-[8px] font-extrabold uppercase text-white bg-[#0E9F9A] px-1.5 py-0.5 rounded shadow-sm">NEW</span>
+                    )}
                   </div>
-                  <span className="text-[8px] font-black uppercase text-white bg-[#0a7c85] px-1.5 py-0.5 rounded">NEW</span>
                 </DropdownMenuItem>
                 {franchiseStatus === 'active' || franchiseStatus === 'suspended' ? (
-                  <DropdownMenuItem onClick={() => router.push('/franchise/dashboard')} className="cursor-pointer flex w-full items-center">
-                    <Briefcase className="mr-2 h-4 w-4 text-zinc-500" />
+                  <DropdownMenuItem onClick={() => router.push('/franchise/dashboard')} className={getDropdownItemClass('/franchise/dashboard')}>
+                    <Briefcase className={getDropdownIconClass('/franchise/dashboard')} />
                     <span>My Franchise</span>
                   </DropdownMenuItem>
                 ) : (
-                  <DropdownMenuItem onClick={() => router.push('/franchise')} className="cursor-pointer flex w-full items-center justify-between">
-                    <div className="flex items-center">
-                      <Store className="mr-2 h-4 w-4 text-zinc-500" />
-                      <span>Get Franchise</span>
+                  <DropdownMenuItem onClick={() => router.push('/franchise')} className={getDropdownItemClass('/franchise')}>
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex items-center">
+                        <Store className={getDropdownIconClass('/franchise')} />
+                        <span>Get Franchise</span>
+                      </div>
+                      {franchiseStatus === 'pending' && (
+                        <span className="text-[8px] font-black uppercase text-amber-600 bg-amber-500/10 border border-amber-500/15 px-1.5 py-0.5 rounded">Pending</span>
+                      )}
                     </div>
-                    {franchiseStatus === 'pending' && (
-                      <span className="text-[8px] font-black uppercase text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded">Pending</span>
-                    )}
                   </DropdownMenuItem>
                 )}
 
                 <DropdownMenuSeparator />
 
                 {/* ── Support & Feedback Group ── */}
-                <DropdownMenuItem onClick={() => router.push('/contact')} className="cursor-pointer flex w-full items-center">
-                  <HelpCircle className="mr-2 h-4 w-4 text-zinc-500" />
+                <DropdownMenuItem onClick={() => router.push('/contact')} className={getDropdownItemClass('/contact')}>
+                  <HelpCircle className={getDropdownIconClass('/contact')} />
                   <span>Help & Support</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => router.push('/feedback')} className="cursor-pointer flex w-full items-center">
-                  <MessageSquare className="mr-2 h-4 w-4 text-zinc-500" />
+                <DropdownMenuItem onClick={() => router.push('/feedback')} className={getDropdownItemClass('/feedback')}>
+                  <MessageSquare className={getDropdownIconClass('/feedback')} />
                   <span>Send Feedback</span>
                 </DropdownMenuItem>
 
@@ -225,7 +257,7 @@ export function BottomNav() {
               </div>
               <span className="text-[10px] mt-[4px] font-semibold leading-none">{item.name}</span>
               {isActive && (
-                <span className={`absolute bottom-0 w-1 h-1 rounded-full animate-in fade-in zoom-in duration-300 ${pathname === '/reels' ? 'bg-white' : 'bg-[#0a7c85] dark:bg-white'}`} />
+                <span className={`absolute bottom-0 w-1 h-1 rounded-full animate-in fade-in zoom-in duration-300 ${pathname === '/reels' ? 'bg-white' : 'bg-[#0E9F9A] dark:bg-white'}`} />
               )}
             </div>
           </Link>
