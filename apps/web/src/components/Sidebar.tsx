@@ -91,7 +91,7 @@ export function Sidebar() {
             const isActive = pathname === item.href || (pathname.startsWith('/t/') && item.name === 'Feed');
             
             return (
-              <Link key={item.name} href={item.href}>
+              <Link key={item.name} href={item.href} className="relative block z-10">
                 <Button 
                   variant="ghost" 
                   className={`w-full justify-start rounded-xl h-11 text-[14px] font-semibold transition-all duration-[250ms] ease-in-out group hover:scale-[1.01] active:scale-[0.99] ${
