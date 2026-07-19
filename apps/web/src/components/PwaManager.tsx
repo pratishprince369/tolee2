@@ -139,7 +139,7 @@ export function PwaManager() {
               <Button
                 onClick={handleIosInstallClick}
                 size="sm"
-                className="bg-[#0a7c85] hover:bg-[#08636a] text-white text-xs font-bold rounded-xl h-9 px-3 flex items-center gap-1.5"
+                className="bg-[#0E9F9A] hover:bg-[#087A76] text-white text-xs font-bold rounded-xl h-9 px-3 flex items-center gap-1.5"
               >
                 <Smartphone className="h-3.5 w-3.5" />
                 <span>How to Install</span>
@@ -162,7 +162,7 @@ export function PwaManager() {
             <Button
               onClick={handleInstallClick}
               size="sm"
-              className="bg-[#0a7c85] hover:bg-[#08636a] text-white text-xs font-bold rounded-xl h-9 px-4 active:scale-95 transition-all"
+              className="bg-[#0E9F9A] hover:bg-[#087A76] text-white text-xs font-bold rounded-xl h-9 px-4 active:scale-95 transition-all"
             >
               Get App
             </Button>
