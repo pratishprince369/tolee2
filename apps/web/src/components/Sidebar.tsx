@@ -3,16 +3,125 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Compass, Film, MessageCircle, Bell, PlusCircle, Settings, ShieldCheck, Store, Bot, Globe, Megaphone, Zap, MessageSquare, Map, Tv, Newspaper, Crown, Plus, Users } from 'lucide-react';
+import { Home, Compass, Film, MessageCircle, Bell, Settings, Store, Bot, Globe, Megaphone, Zap, MessageSquare, Map, Tv, Newspaper, Crown, Plus } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { useSession } from 'next-auth/react';
 import { getSidebarDataCached } from '@/lib/sidebar-data';
 
+interface SidebarNavItemProps {
+  name: string;
+  href: string;
+  icon: any;
+  isActive: boolean;
+  isCreator?: boolean;
+  badge?: string | null;
+  hasPulse?: boolean;
+  onClick: (href: string) => void;
+}
+
+const SidebarNavItem = React.memo(function SidebarNavItem({
+  name,
+  href,
+  icon: Icon,
+  isActive,
+  isCreator,
+  badge,
+  hasPulse,
+  onClick
+}: SidebarNavItemProps) {
+  return (
+    <Link href={href} className="relative block z-10" onClick={() => onClick(href)}>
+      <Button 
+        variant="ghost" 
+        className={`w-full justify-start rounded-xl h-11 text-[14px] font-semibold transition-colors duration-105 ease-in-out group ${
+          isActive 
+            ? 'bg-gradient-to-r from-[#0E9F9A] to-[#087A76] text-white font-bold shadow-sm shadow-[#0E9F9A]/15' 
+            : isCreator
+            ? 'text-[#0E9F9A] dark:text-purple-400 hover:bg-[#EAF9F8] dark:hover:bg-[#0E9F9A]/10 hover:text-[#0E9F9A]'
+            : 'text-[#1F2937] dark:text-zinc-200 hover:bg-[#EAF9F8] dark:hover:bg-[#0E9F9A]/10 hover:text-[#0E9F9A]'
+        }`}
+      >
+        <Icon className={`w-4 h-4 mr-3 flex-shrink-0 transition-colors duration-105 ${
+          isActive 
+            ? 'text-white' 
+            : 'text-[#6B7280] group-hover:text-[#0E9F9A]'
+        }`} />
+        {name}
+        {hasPulse && (
+          <span className="ml-auto w-2 h-2 rounded-full bg-[#F59E0B] animate-pulse mr-1 border border-white dark:border-zinc-900" />
+        )}
+        {isCreator && !isActive && (
+          <span className="ml-auto text-[9px] px-2 py-0.5 rounded-full font-extrabold bg-[#0E9F9A] text-white shadow-sm">NEW</span>
+        )}
+        {badge && (
+          <span className={`ml-auto text-[10px] px-2 py-0.5 rounded-full font-bold transition-colors duration-105 ${
+            isActive ? 'bg-white text-[#087A76]' : 'bg-[#0E9F9A] text-white'
+          }`}>
+            {badge}
+          </span>
+        )}
+      </Button>
+    </Link>
+  );
+});
+
+interface ToleeNavItemProps {
+  id: string;
+  name: string;
+  slug: string;
+  avatar: string;
+  role: 'owner' | 'member';
+}
+
+const ToleeNavItem = React.memo(function ToleeNavItem({
+  id,
+  name,
+  slug,
+  avatar,
+  role
+}: ToleeNavItemProps) {
+  return (
+    <Link href={`/t/${slug}`}>
+      <Button 
+        variant="ghost" 
+        className="w-full justify-start rounded-xl h-11 px-2.5 text-sm font-semibold text-[#1F2937] dark:text-zinc-300 bg-white dark:bg-zinc-900/20 hover:bg-[#EAF9F8] dark:hover:bg-[#0E9F9A]/10 border border-[#E5E7EB] dark:border-zinc-900/40 hover:border-[#E5E7EB] dark:hover:border-zinc-800 hover:text-[#0E9F9A] transition-colors duration-105 overflow-hidden group shadow-sm"
+      >
+        <div className="w-8 h-8 mr-3 rounded-full overflow-hidden flex-shrink-0 border border-zinc-200 dark:border-zinc-800 group-hover:border-[#0E9F9A]/30 transition-colors duration-105 relative">
+          <img src={avatar || `https://i.pravatar.cc/150?u=${id}`} alt={name} className="w-full h-full object-cover" />
+        </div>
+        <span className="truncate group-hover:text-[#0E9F9A] transition-colors">{name}</span>
+        {role === 'owner' ? (
+          <div className="ml-auto bg-amber-500/10 text-[#F59E0B] p-1 rounded-md shadow-sm border border-amber-500/15 flex items-center justify-center" title="Owner">
+            <Crown className="w-3.5 h-3.5 fill-amber-500/10 text-[#F59E0B]" />
+          </div>
+        ) : (
+          <div className="ml-auto bg-[#EAF9F8] text-[#0E9F9A] dark:bg-[#0E9F9A]/10 dark:text-[#0E9F9A] px-1.5 py-0.5 rounded text-[9px] font-extrabold border border-[#0E9F9A]/10 shadow-sm">
+            Member
+          </div>
+        )}
+      </Button>
+    </Link>
+  );
+});
+
 export function Sidebar() {
   const pathname = usePathname();
   const { status } = useSession();
   const isAuthenticated = status === 'authenticated';
+
+  const [clickedPath, setClickedPath] = React.useState<string | null>(null);
+
+  // Sync clicked path on pathname change
+  React.useEffect(() => {
+    setClickedPath(null);
+  }, [pathname]);
+
+  const activePath = clickedPath || pathname;
+
+  const handleItemClick = React.useCallback((href: string) => {
+    setClickedPath(href);
+  }, []);
 
   const [data, setData] = React.useState<{
     managedTolees: any[],
@@ -44,7 +153,7 @@ export function Sidebar() {
     }
   }, [isAuthenticated, pathname]);
 
-  const mainNav = isAuthenticated ? [
+  const mainNav = React.useMemo(() => isAuthenticated ? [
     { name: 'Feed', href: '/feed', icon: Home },
     { name: 'Discover', href: '/discover', icon: Compass },
     { name: 'Reels', href: '/reels', icon: Film },
@@ -64,12 +173,10 @@ export function Sidebar() {
     { name: 'Tolee Screen', href: '/screen', icon: Tv },
     { name: 'Live Map', href: '/map', icon: Map },
     { name: 'Creator Program', href: '/creator-program', icon: Zap, isCreator: true },
-  ];
+  ], [isAuthenticated, data.unreadMessages, data.unreadNotifications]);
 
   const managedTolees = data.managedTolees;
   const joinedTolees = data.joinedTolees;
-  
-  const activeIndex = mainNav.findIndex(item => pathname === item.href || (pathname.startsWith('/t/') && item.name === 'Feed'));
 
   return (
     <aside className="w-64 fixed left-0 top-16 h-[calc(100vh-4rem)] border-r border-[#E5E7EB] dark:border-zinc-900 bg-white dark:bg-zinc-950 overflow-hidden hidden lg:flex flex-col z-40">
@@ -77,52 +184,20 @@ export function Sidebar() {
         
         {/* Main Nav */}
         <div className="relative space-y-1.5 mb-8">
-          {activeIndex !== -1 && (
-            <div 
-              className="absolute left-0 right-0 h-11 bg-gradient-to-r from-[#0E9F9A] to-[#087A76] rounded-xl transition-all duration-150 ease-in-out shadow-sm shadow-[#0E9F9A]/15"
-              style={{
-                top: `${activeIndex * 50}px`,
-                pointerEvents: 'none',
-              }}
-            />
-          )}
           {mainNav.map((item) => {
-            const Icon = item.icon;
-            const isActive = pathname === item.href || (pathname.startsWith('/t/') && item.name === 'Feed');
-            
+            const isActive = activePath === item.href || (activePath.startsWith('/t/') && item.name === 'Feed');
             return (
-              <Link key={item.name} href={item.href} className="relative block z-10">
-                <Button 
-                  variant="ghost" 
-                  className={`w-full justify-start rounded-xl h-11 text-[14px] font-semibold transition-all duration-150 ease-in-out group hover:scale-[1.01] active:scale-[0.99] ${
-                    isActive 
-                      ? 'bg-transparent text-white font-bold' 
-                      : (item as any).isCreator
-                      ? 'text-[#0E9F9A] dark:text-purple-400 hover:bg-[#EAF9F8] dark:hover:bg-[#0E9F9A]/10 hover:text-[#0E9F9A]'
-                      : 'text-[#1F2937] dark:text-zinc-200 hover:bg-[#EAF9F8] dark:hover:bg-[#0E9F9A]/10 hover:text-[#0E9F9A]'
-                  }`}
-                >
-                  <Icon className={`w-4 h-4 mr-3 flex-shrink-0 transition-colors duration-150 ${
-                    isActive 
-                      ? 'text-white' 
-                      : 'text-[#6B7280] group-hover:text-[#0E9F9A]'
-                  }`} />
-                  {item.name}
-                  {item.name === 'AI Manager' && !isActive && (
-                    <span className="ml-auto w-2 h-2 rounded-full bg-[#F59E0B] animate-pulse mr-1 border border-white dark:border-zinc-900" />
-                  )}
-                  {(item as any).isCreator && !isActive && (
-                    <span className="ml-auto text-[9px] px-2 py-0.5 rounded-full font-extrabold bg-[#0E9F9A] text-white shadow-sm">NEW</span>
-                  )}
-                  {item.badge && (
-                    <span className={`ml-auto text-[10px] px-2 py-0.5 rounded-full font-bold transition-all duration-150 ${
-                      isActive ? 'bg-white text-[#087A76]' : 'bg-[#0E9F9A] text-white'
-                    }`}>
-                      {item.badge}
-                    </span>
-                  )}
-                </Button>
-              </Link>
+              <SidebarNavItem
+                key={item.name}
+                name={item.name}
+                href={item.href}
+                icon={item.icon}
+                isActive={isActive}
+                isCreator={(item as any).isCreator}
+                badge={item.badge}
+                hasPulse={item.name === 'AI Manager' && !isActive}
+                onClick={handleItemClick}
+              />
             );
           })}
         </div>
@@ -133,24 +208,21 @@ export function Sidebar() {
             <div className="flex items-center justify-between px-3 mb-3">
               <h3 className="text-[11px] font-bold text-[#6B7280] dark:text-zinc-500 uppercase tracking-wider">Tolees You Manage</h3>
               <Link href="/create-tolee">
-                <Button variant="ghost" size="icon" className="w-7 h-7 rounded-lg border border-[#E5E7EB] dark:border-zinc-800 text-[#6B7280] hover:text-[#0E9F9A] hover:border-[#0E9F9A] bg-white dark:bg-zinc-900/50 shadow-sm hover:shadow hover:rotate-90 transition-all duration-300 flex items-center justify-center">
+                <Button variant="ghost" size="icon" className="w-7 h-7 rounded-lg border border-[#E5E7EB] dark:border-zinc-800 text-[#6B7280] hover:text-[#0E9F9A] hover:border-[#0E9F9A] bg-white dark:bg-zinc-900/50 shadow-sm hover:shadow transition-colors duration-105 flex items-center justify-center">
                   <Plus className="w-3.5 h-3.5" />
                 </Button>
               </Link>
             </div>
             <div className="space-y-1.5">
               {managedTolees.map((tolee) => (
-                <Link key={tolee.id} href={`/t/${tolee.slug}`}>
-                  <Button variant="ghost" className="w-full justify-start rounded-xl h-11 px-2.5 text-sm font-semibold text-[#1F2937] dark:text-zinc-300 bg-white dark:bg-zinc-900/20 hover:bg-[#EAF9F8] dark:hover:bg-[#0E9F9A]/10 border border-[#E5E7EB] dark:border-zinc-900/40 hover:border-[#E5E7EB] dark:hover:border-zinc-800 hover:text-[#0E9F9A] transition-all duration-150 overflow-hidden group shadow-sm hover:shadow">
-                    <div className="w-8 h-8 mr-3 rounded-full overflow-hidden flex-shrink-0 border border-zinc-200 dark:border-zinc-800 group-hover:border-[#0E9F9A]/30 transition-all duration-200 shadow-sm relative">
-                      <img src={tolee.avatar || `https://i.pravatar.cc/150?u=${tolee.id}`} alt={tolee.name} className="w-full h-full object-cover" />
-                    </div>
-                    <span className="truncate group-hover:text-[#0E9F9A] transition-colors">{tolee.name}</span>
-                    <div className="ml-auto bg-amber-500/10 text-[#F59E0B] p-1 rounded-md shadow-sm border border-amber-500/15 flex items-center justify-center transition-transform duration-200 group-hover:scale-105" title="Owner">
-                      <Crown className="w-3.5 h-3.5 fill-amber-500/10 text-[#F59E0B]" />
-                    </div>
-                  </Button>
-                </Link>
+                <ToleeNavItem
+                  key={tolee.id}
+                  id={tolee.id}
+                  name={tolee.name}
+                  slug={tolee.slug}
+                  avatar={tolee.avatar}
+                  role="owner"
+                />
               ))}
             </div>
           </div>
@@ -164,17 +236,14 @@ export function Sidebar() {
             </div>
             <div className="space-y-1.5">
               {joinedTolees.map((tolee) => (
-                <Link key={tolee.id} href={`/t/${tolee.slug}`}>
-                  <Button variant="ghost" className="w-full justify-start rounded-xl h-11 px-2.5 text-sm font-semibold text-[#1F2937] dark:text-zinc-300 bg-white dark:bg-zinc-900/20 hover:bg-[#EAF9F8] dark:hover:bg-[#0E9F9A]/10 border border-[#E5E7EB] dark:border-zinc-900/40 hover:border-[#E5E7EB] dark:hover:border-zinc-800 hover:text-[#0E9F9A] transition-all duration-150 overflow-hidden group shadow-sm hover:shadow">
-                    <div className="w-8 h-8 mr-3 rounded-full overflow-hidden flex-shrink-0 border border-zinc-200 dark:border-zinc-800 group-hover:border-[#0E9F9A]/30 transition-all duration-200 shadow-sm">
-                      <img src={tolee.avatar || `https://i.pravatar.cc/150?u=${tolee.id}`} alt={tolee.name} className="w-full h-full object-cover" />
-                    </div>
-                    <span className="truncate group-hover:text-[#0E9F9A] transition-colors">{tolee.name}</span>
-                    <div className="ml-auto bg-[#EAF9F8] text-[#0E9F9A] dark:bg-[#0E9F9A]/10 dark:text-[#0E9F9A] px-1.5 py-0.5 rounded text-[9px] font-extrabold border border-[#0E9F9A]/10 shadow-sm transition-transform duration-200 group-hover:scale-105">
-                      Member
-                    </div>
-                  </Button>
-                </Link>
+                <ToleeNavItem
+                  key={tolee.id}
+                  id={tolee.id}
+                  name={tolee.name}
+                  slug={tolee.slug}
+                  avatar={tolee.avatar}
+                  role="member"
+                />
               ))}
             </div>
           </div>
@@ -196,13 +265,13 @@ export function Sidebar() {
         {isAuthenticated && (
           <>
             <Link href="/settings" className="w-full block mb-2">
-              <Button variant="ghost" className="w-full justify-start rounded-xl h-10 text-sm font-semibold text-[#1F2937] dark:text-zinc-300 hover:bg-[#EAF9F8] dark:hover:bg-[#0E9F9A]/10 hover:text-[#0E9F9A] transition-all duration-150">
+              <Button variant="ghost" className="w-full justify-start rounded-xl h-10 text-sm font-semibold text-[#1F2937] dark:text-zinc-300 hover:bg-[#EAF9F8] dark:hover:bg-[#0E9F9A]/10 hover:text-[#0E9F9A] transition-colors duration-105">
                 <Settings className="w-4 h-4 mr-3 flex-shrink-0" />
                 Settings & Privacy
               </Button>
             </Link>
             <Link href="/feedback" className="w-full block mb-2">
-              <Button variant="ghost" className="w-full justify-start rounded-xl h-10 text-sm font-semibold text-[#1F2937] dark:text-zinc-300 hover:bg-[#EAF9F8] dark:hover:bg-[#0E9F9A]/10 hover:text-[#0E9F9A] transition-all duration-150">
+              <Button variant="ghost" className="w-full justify-start rounded-xl h-10 text-sm font-semibold text-[#1F2937] dark:text-zinc-300 hover:bg-[#EAF9F8] dark:hover:bg-[#0E9F9A]/10 hover:text-[#0E9F9A] transition-colors duration-105">
                 <MessageSquare className="w-4 h-4 mr-3 flex-shrink-0" />
                 Send Feedback
               </Button>
