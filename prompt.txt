@@ -1,0 +1,224 @@
+# Existing Project Performance Optimization Prompt (Tolee)
+
+## Objective
+
+Optimize the left sidebar navigation to make the website feel lightweight, fast, and highly responsive. Currently, the mouse hover animation and active menu transition are making the application feel heavy and sluggish.
+
+IMPORTANT:
+This is a performance optimization task only.
+
+Do NOT change:
+- Existing UI layout
+- Existing menu structure
+- Existing routing
+- Existing functionality
+- Existing permissions
+- Existing business logic
+
+Only optimize the interaction speed and animation performance.
+
+----------------------------------------------------
+1. Remove Heavy Hover Animation
+----------------------------------------------------
+
+The current left sidebar menu has unnecessary hover animations that make the UI feel slow.
+
+Remove:
+
+• Heavy hover transitions
+• Large translate animations
+• Scaling animations
+• Shadow animations
+• Expensive CSS effects
+• Blur effects
+• Long animation durations
+
+Replace them with a lightweight hover effect.
+
+New Hover Behavior:
+
+• Background changes instantly (or within 100–150ms)
+• Icon color changes smoothly
+• Text color changes smoothly
+• No movement or sliding effect
+• No scaling
+• No bounce
+• No delay
+
+The sidebar should feel as responsive as Facebook, WhatsApp Web, or LinkedIn.
+
+----------------------------------------------------
+2. Optimize Active Menu Highlight
+----------------------------------------------------
+
+Currently, when a user clicks a sidebar menu, the active button takes noticeable time to update.
+
+Fix this behavior.
+
+Requirements:
+
+• Active menu should highlight immediately.
+• Active state should update within a few milliseconds.
+• Remove delayed transitions.
+• Remove unnecessary animation on active state.
+• Prevent waiting for page animation before highlighting.
+
+The user should receive instant visual feedback after clicking.
+
+----------------------------------------------------
+3. Optimize Sidebar Rendering
+----------------------------------------------------
+
+Audit the sidebar component.
+
+Prevent unnecessary re-renders by:
+
+• React.memo()
+• useMemo()
+• useCallback()
+
+Only where appropriate.
+
+Avoid re-rendering the entire sidebar when only the active menu changes.
+
+----------------------------------------------------
+4. Remove Expensive CSS
+----------------------------------------------------
+
+Remove any expensive CSS properties such as:
+
+• filter: blur()
+• backdrop-filter
+• large box-shadow
+• multiple layered shadows
+• heavy gradients on hover
+• expensive transforms
+
+Keep the design clean and lightweight.
+
+----------------------------------------------------
+5. Optimize Click Response
+----------------------------------------------------
+
+Every menu item should respond instantly.
+
+When clicking:
+
+Feed
+
+Discover
+
+Reels
+
+Chats
+
+Tolee News
+
+Marketplace
+
+Notifications
+
+AI Manager
+
+Tolee Screen
+
+Ads Manager
+
+Live Map
+
+Creator Program
+
+The active state should appear immediately without any lag.
+
+----------------------------------------------------
+6. Optimize Transition Timing
+----------------------------------------------------
+
+If transitions are required, use only lightweight values.
+
+Recommended:
+
+transition-duration:
+100ms–150ms
+
+Avoid:
+
+300ms
+500ms
+700ms
+1 second
+
+The UI should feel fast and responsive.
+
+----------------------------------------------------
+7. Preserve Existing Design
+----------------------------------------------------
+
+Do NOT redesign the sidebar.
+
+Maintain:
+
+• Same icons
+• Same colors
+• Same spacing
+• Same typography
+• Same layout
+
+Only improve responsiveness and performance.
+
+----------------------------------------------------
+8. Maintain Existing Functionality
+----------------------------------------------------
+
+Do NOT affect:
+
+Navigation
+
+Routing
+
+Notifications
+
+Unread counters
+
+Permissions
+
+Authentication
+
+Role-based menus
+
+Responsive behavior
+
+Any existing functionality
+
+----------------------------------------------------
+9. Performance Audit
+----------------------------------------------------
+
+Review the sidebar for:
+
+• Unnecessary event listeners
+• Duplicate state updates
+• Unnecessary useEffect hooks
+• Repeated calculations
+• Inline functions causing re-renders
+• Duplicate CSS
+
+Optimize everything while preserving behavior.
+
+----------------------------------------------------
+10. Expected Result
+----------------------------------------------------
+
+After optimization:
+
+✔ Sidebar feels lightweight.
+✔ Hover response is instant.
+✔ Menu click feedback is immediate.
+✔ Active menu highlights instantly.
+✔ No lag while navigating.
+✔ Lower CPU usage.
+✔ Reduced unnecessary rendering.
+✔ Smooth experience on low-end devices.
+✔ Better desktop and mobile performance.
+
+The overall experience should feel similar to professional applications like Facebook, WhatsApp Web, Instagram, and LinkedIn, where navigation is immediate and animations never make the interface feel slow or heavy.
