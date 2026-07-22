@@ -10,11 +10,6 @@ export const revalidate = 0;
 
 export default async function ReelsPage({ searchParams }: { searchParams: { videoId?: string } }) {
   const session = await getServerSession(authOptions);
-  
-  if (!session?.user) {
-    redirect('/');
-  }
-  
   const currentUserId = (session?.user as any)?.id;
 
   // Fetch real posts from DB

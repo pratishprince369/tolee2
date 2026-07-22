@@ -61,6 +61,9 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
 
   return (
     <div style={{ minHeight: '100vh', background: '#09090b', display: 'flex', fontFamily: "'Inter', sans-serif" }}>
+      <head>
+        <meta name="robots" content="noindex,nofollow,noarchive,nosnippet" />
+      </head>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }

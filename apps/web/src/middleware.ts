@@ -16,7 +16,6 @@ const securityHeaders = {
 // Route prefixes requiring authentication
 const authRoutes = [
   "/feed",
-  "/reels",
   "/chat",
   "/notifications",
   "/create-tolee",
@@ -29,6 +28,40 @@ const authRoutes = [
   "/marketplace/edit",
 ];
 
+// Routes that MUST NOT be indexed by search engines or AI bots
+const noindexRoutes = [
+  "/api",
+  "/graphql",
+  "/rest",
+  "/rpc",
+  "/server",
+  "/backend",
+  "/internal",
+  "/functions",
+  "/webhook",
+  "/auth",
+  "/socket",
+  "/admin",
+  "/super-admin",
+  "/dashboard",
+  "/settings",
+  "/chat",
+  "/messages",
+  "/ads",
+  "/ai-manager",
+  "/notifications",
+  "/my-tolees",
+  "/creator-dashboard",
+  "/create-tolee",
+  "/marketplace/create",
+  "/marketplace/edit",
+  "/auth/forgot-password",
+  "/forgot-password",
+  "/auth/signin",
+  "/auth/signup",
+  "/auth/verify-email",
+];
+
 // Wrap standard NextAuth withAuth middleware
 const authMiddleware = withAuth(
   function middleware(req) {
@@ -37,6 +70,14 @@ const authMiddleware = withAuth(
     Object.entries(securityHeaders).forEach(([key, val]) => {
       response.headers.set(key, val);
     });
+
+    // Check if the current route should be blocked from indexing
+    const { pathname } = req.nextUrl;
+    const isNoindexRoute = noindexRoutes.some(route => pathname === route || pathname.startsWith(route + "/"));
+    if (isNoindexRoute) {
+      response.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive, nosnippet, noimageindex");
+    }
+
     return response;
   },
   {
@@ -55,11 +96,16 @@ export default function middleware(req: NextRequest, event: any) {
     return (authMiddleware as any)(req, event);
   }
 
-  // 2. For all other routes (APIs, public routes, landing), apply security headers & CORS
+  // 2. For all other routes (APIs, public routes, landing), apply security headers, CORS & Robots tags
   const response = NextResponse.next();
   Object.entries(securityHeaders).forEach(([key, val]) => {
     response.headers.set(key, val);
   });
+
+  const isNoindexRoute = noindexRoutes.some(route => pathname === route || pathname.startsWith(route + "/"));
+  if (isNoindexRoute) {
+    response.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive, nosnippet, noimageindex");
+  }
 
   const origin = req.headers.get("origin") || "";
   response.headers.set("Access-Control-Allow-Origin", origin || "*");
