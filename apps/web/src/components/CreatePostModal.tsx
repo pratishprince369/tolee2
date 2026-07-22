@@ -13,6 +13,7 @@ import { useRouter } from 'next/navigation';
 import { AIImageGeneratorModal } from '@/components/AIImageGeneratorModal';
 import { AIVideoGeneratorModal } from '@/components/AIVideoGeneratorModal';
 import { useUpload } from './UploadContext';
+import { PostCarousel } from '@/components/PostCarousel';
 import { askAIWriter } from '@/actions/ai-helper';
 
 export function CreatePostModal({ 
@@ -344,27 +345,40 @@ export function CreatePostModal({
 
           {/* Media Preview Grid */}
           {mediaList.length > 0 && (
-            <div>
-              <label className="text-[11px] font-bold text-gray-500 dark:text-zinc-400 uppercase tracking-wider block mb-2">Attached Media ({mediaList.length})</label>
-              <div className="grid grid-cols-3 gap-2">
+            <div className="space-y-3">
+              <label className="text-[11px] font-bold text-gray-500 dark:text-zinc-400 uppercase tracking-wider block">
+                Attached Media ({mediaList.length}) - Preview
+              </label>
+              
+              {/* Full adaptive uncropped preview */}
+              <div className="relative w-full rounded-2xl overflow-hidden border border-zinc-150 dark:border-zinc-800 shadow-sm bg-neutral-900 dark:bg-zinc-950 flex items-center justify-center">
+                <PostCarousel 
+                  mediaUrls={mediaList.map(item => item.url).join(',')} 
+                  mediaTypes={mediaList.map(item => item.type).join(',')} 
+                  postId="preview" 
+                />
+              </div>
+
+              {/* Thumbnails below for individual deletion */}
+              <div className="grid grid-cols-5 gap-2 pt-1">
                 {mediaList.map((item, idx) => (
-                  <div key={idx} className="relative aspect-square rounded-xl overflow-hidden bg-black border border-gray-200 dark:border-gray-800 group/thumb shadow-sm">
+                  <div key={idx} className="relative aspect-square rounded-lg overflow-hidden bg-black border border-gray-200 dark:border-gray-800 group/thumb shadow-sm">
                     <button 
                       type="button"
                       onClick={(e) => { 
                         e.stopPropagation(); 
                         setMediaList(prev => prev.filter((_, i) => i !== idx)); 
                       }} 
-                      className="absolute top-1.5 right-1.5 z-10 bg-black/60 hover:bg-black/85 text-white rounded-full p-1 backdrop-blur-md transition-all duration-200 hover:scale-105 active:scale-90"
+                      className="absolute top-1 right-1 z-10 bg-black/60 hover:bg-black/85 text-white rounded-full p-0.5 backdrop-blur-md transition-all duration-200 hover:scale-105 active:scale-90"
                     >
-                      <X className="w-3 h-3" />
+                      <X className="w-2.5 h-2.5" />
                     </button>
                     {item.type === 'image' ? (
                       <img src={item.url} alt={`Preview ${idx}`} className="w-full h-full object-cover" />
                     ) : (
                       <video src={item.url} className="w-full h-full object-cover" muted playsInline />
                     )}
-                    <div className="absolute bottom-1.5 left-1.5 bg-black/60 backdrop-blur-md rounded px-1.5 py-0.5 text-[9px] font-extrabold text-white">
+                    <div className="absolute bottom-1 left-1 bg-black/60 backdrop-blur-md rounded px-1 py-0.5 text-[8px] font-extrabold text-white">
                       {idx + 1}
                     </div>
                   </div>

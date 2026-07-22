@@ -219,6 +219,43 @@ function CarouselVideo({ src, isActive, shouldLoad, postId }: CarouselVideoProps
   );
 }
 
+function useMediaAspectRatio(url?: string, type?: 'image' | 'video' | string) {
+  const [aspectRatio, setAspectRatio] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!url) return;
+
+    if (type === 'video') {
+      const video = document.createElement('video');
+      video.src = url;
+      video.preload = 'metadata';
+      const handleLoadedMetadata = () => {
+        if (video.videoWidth && video.videoHeight) {
+          setAspectRatio(video.videoWidth / video.videoHeight);
+        }
+      };
+      video.addEventListener('loadedmetadata', handleLoadedMetadata);
+      return () => {
+        video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      };
+    } else {
+      const img = new Image();
+      img.src = url;
+      const handleLoad = () => {
+        if (img.naturalWidth && img.naturalHeight) {
+          setAspectRatio(img.naturalWidth / img.naturalHeight);
+        }
+      };
+      img.addEventListener('load', handleLoad);
+      return () => {
+        img.removeEventListener('load', handleLoad);
+      };
+    }
+  }, [url, type]);
+
+  return aspectRatio;
+}
+
 export function PostCarousel({ mediaUrls, mediaTypes, postId }: PostCarouselProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const touchStartX = useRef<number | null>(null);
@@ -229,21 +266,25 @@ export function PostCarousel({ mediaUrls, mediaTypes, postId }: PostCarouselProp
     if (postId && mediaUrls) {
       videoMetadataCache.set(postId, {
         id: postId,
-        video: mediaUrls.split(/,(?=https?:\/\/)/)[0],
-        thumbnailUrl: getPosterUrl(mediaUrls.split(/,(?=https?:\/\/)/)[0]),
+        video: mediaUrls.split(/,(?=(?:https?:\/\/|blob:))/i)[0],
+        thumbnailUrl: getPosterUrl(mediaUrls.split(/,(?=(?:https?:\/\/|blob:))/i)[0]),
         mediaUrls,
         mediaTypes,
       });
     }
   }, [postId, mediaUrls, mediaTypes]);
 
-  const urls = mediaUrls ? mediaUrls.split(/,(?=https?:\/\/)/).map(url => url.trim()).filter(Boolean) : [];
+  const urls = mediaUrls ? mediaUrls.split(/,(?=(?:https?:\/\/|blob:))/i).map(url => url.trim()).filter(Boolean) : [];
   const rawTypes = mediaTypes ? mediaTypes.split(',').map(t => t.trim().toLowerCase()) : [];
   
   const items = urls.map((url, idx) => ({
     url,
     type: rawTypes[idx] || (url.includes('.mp4') || url.includes('video') ? 'video' : 'image')
   }));
+
+  const firstItem = items[0];
+  const detectedRatio = useMediaAspectRatio(firstItem?.url, firstItem?.type);
+  const displayRatio = detectedRatio || 4/5;
 
   if (items.length === 0) return null;
 
@@ -280,7 +321,11 @@ export function PostCarousel({ mediaUrls, mediaTypes, postId }: PostCarouselProp
       ref={containerRef}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
-      className="relative w-full aspect-[4/5] bg-neutral-900 dark:bg-zinc-950 overflow-hidden group/carousel select-none rounded-xl sm:rounded-2xl border border-zinc-150 dark:border-zinc-800 shadow-sm"
+      className="relative w-full bg-neutral-900 dark:bg-zinc-950 overflow-hidden group/carousel select-none rounded-xl sm:rounded-2xl border border-zinc-150 dark:border-zinc-800 shadow-sm"
+      style={{
+        aspectRatio: `${displayRatio}`,
+        maxHeight: '620px',
+      }}
     >
       {/* Slide number pill */}
       {items.length > 1 && (
@@ -298,7 +343,7 @@ export function PostCarousel({ mediaUrls, mediaTypes, postId }: PostCarouselProp
         }}
       >
         {items.map((item, idx) => (
-          <div key={idx} className="h-full relative overflow-hidden flex items-center justify-center" style={{ width: `${100 / items.length}%` }}>
+          <div key={idx} className="h-full relative overflow-hidden flex items-center justify-center bg-neutral-900 dark:bg-zinc-950" style={{ width: `${100 / items.length}%` }}>
             {item.type === 'video' ? (
               <CarouselVideo 
                 src={item.url} 
@@ -310,7 +355,7 @@ export function PostCarousel({ mediaUrls, mediaTypes, postId }: PostCarouselProp
               <img 
                 src={item.url} 
                 alt={`Media ${idx + 1}`} 
-                className="w-full h-full object-cover select-none pointer-events-none"
+                className="w-full h-full object-contain select-none pointer-events-none"
                 draggable={false}
               />
             )}

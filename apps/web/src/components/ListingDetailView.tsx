@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -13,6 +13,43 @@ import {
 } from 'lucide-react';
 import { deleteListing, updateListingStatus } from '@/actions/marketplace';
 import { QuickBoostModal } from './QuickBoostModal';
+
+function useMediaAspectRatio(url?: string, type?: 'image' | 'video' | string) {
+  const [aspectRatio, setAspectRatio] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!url) return;
+
+    if (type === 'video') {
+      const video = document.createElement('video');
+      video.src = url;
+      video.preload = 'metadata';
+      const handleLoadedMetadata = () => {
+        if (video.videoWidth && video.videoHeight) {
+          setAspectRatio(video.videoWidth / video.videoHeight);
+        }
+      };
+      video.addEventListener('loadedmetadata', handleLoadedMetadata);
+      return () => {
+        video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      };
+    } else {
+      const img = new Image();
+      img.src = url;
+      const handleLoad = () => {
+        if (img.naturalWidth && img.naturalHeight) {
+          setAspectRatio(img.naturalWidth / img.naturalHeight);
+        }
+      };
+      img.addEventListener('load', handleLoad);
+      return () => {
+        img.removeEventListener('load', handleLoad);
+      };
+    }
+  }, [url, type]);
+
+  return aspectRatio;
+}
 
 interface ListingDetailViewProps {
   listing: any;
@@ -29,6 +66,10 @@ export function ListingDetailView({ listing, currentUserId, relatedListings = []
 
   const images = listing.images ? listing.images.split(',') : [];
   const isOwner = listing.sellerId === currentUserId;
+
+  const activeImage = images[activeImageIndex];
+  const detectedRatio = useMediaAspectRatio(activeImage, 'image');
+  const displayRatio = detectedRatio || 4/3;
 
   const handleShare = () => {
     navigator.clipboard.writeText(window.location.href);
@@ -116,11 +157,17 @@ export function ListingDetailView({ listing, currentUserId, relatedListings = []
                 </div>
               )}
               {images.length > 0 ? (
-                <div className="aspect-[4/3] w-full relative group">
+                <div 
+                  className="w-full relative group bg-neutral-900 dark:bg-zinc-950 flex items-center justify-center"
+                  style={{
+                    aspectRatio: `${displayRatio}`,
+                    maxHeight: '520px',
+                  }}
+                >
                   <img 
                     src={images[activeImageIndex]} 
                     alt={listing.title} 
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain"
                   />
                   {images.length > 1 && (
                     <>
