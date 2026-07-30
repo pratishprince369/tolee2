@@ -19,8 +19,33 @@ import {
   Eye,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { formatDistanceToNow } from 'date-fns';
 import { toggleLike, addComment, toggleSavePost } from '@/actions/post';
+
+function formatDistanceToNow(date: Date, options?: { addSuffix?: boolean }) {
+  const now = new Date().getTime();
+  const past = date.getTime();
+  const diffInSeconds = Math.max(0, Math.floor((now - past) / 1000));
+
+  if (diffInSeconds < 60) return 'just now';
+  let result = '';
+  if (diffInSeconds < 3600) {
+    const mins = Math.floor(diffInSeconds / 60);
+    result = `${mins}m`;
+  } else if (diffInSeconds < 86400) {
+    const hours = Math.floor(diffInSeconds / 3600);
+    result = `${hours}h`;
+  } else if (diffInSeconds < 2592000) {
+    const days = Math.floor(diffInSeconds / 86400);
+    result = `${days}d`;
+  } else if (diffInSeconds < 31536000) {
+    const months = Math.floor(diffInSeconds / 2592000);
+    result = `${months}mo`;
+  } else {
+    const years = Math.floor(diffInSeconds / 31536000);
+    result = `${years}y`;
+  }
+  return options?.addSuffix ? `${result} ago` : result;
+}
 import { useSession } from 'next-auth/react';
 import { ShareModal } from '@/components/ShareModal';
 

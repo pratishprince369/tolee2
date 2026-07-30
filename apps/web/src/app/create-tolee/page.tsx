@@ -328,8 +328,8 @@ export default function CreateToleePage() {
   return (
     <div className="flex h-screen bg-[#f0f2f5] dark:bg-black overflow-hidden font-sans">
       {step === 1 ? (
-        {/* STEP 1: PURPOSE SELECTION WIZARD */}
         <div className="flex-1 overflow-y-auto p-6 max-w-6xl mx-auto w-full custom-scrollbar">
+          {/* STEP 1: PURPOSE SELECTION WIZARD */}
           <div className="p-4 flex items-center justify-between border-b border-gray-200 dark:border-gray-800 mb-6">
             <div className="flex items-center gap-3">
               <Link href="/discover">
@@ -406,8 +406,8 @@ export default function CreateToleePage() {
           </div>
         </div>
       ) : (
-        {/* STEP 2: COMMON SETUP FORM */}
         <>
+          {/* STEP 2: COMMON SETUP FORM */}
           {/* LEFT SIDEBAR (Configuration) */}
           <div className="w-full md:w-[380px] bg-white dark:bg-[#121212] flex flex-col h-full border-r border-gray-200 dark:border-gray-800 shadow-sm z-10">
             <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
