@@ -475,7 +475,8 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
           } else {
             scrollToReel(mobileScrollRef, idx);
           }
-          openCommentsModal(targetVideoId);
+          // NOTE: Do NOT call openCommentsModal here.
+          // Comments should only open when the user explicitly taps the comment button.
         }, 800);
       }
     }
