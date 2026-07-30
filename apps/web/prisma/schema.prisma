@@ -97,6 +97,9 @@ model User {
   screenLikes       ScreenVideoLike[]
   screenComments    ScreenVideoComment[]
   screenPlaylists   ScreenVideoPlaylist[]
+  aiMemories        AIMemory[]
+  aiTasks           AITask[]
+  aiReminders       AIReminder[]
 
   // Subscription System (Creator ↔ Subscriber)
   subscribers       Subscription[]       @relation("CreatorSubscriptions")
@@ -1719,4 +1722,43 @@ model ShopReview {
   createdAt DateTime @default(now())
 
   @@unique([shopId, userId])
+}
+
+model AIMemory {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category    String   // "personal", "finance", "vehicle", "health", "family", "preference", "document"
+  key         String   // e.g. "wife_birthday", "car_insurance_due", "passport_expiry"
+  value       String   // Text content or JSON data
+  isSensitive Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model AITask {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  category    String   @default("personal") // "personal", "work", "community", "crm", "health"
+  status      String   @default("pending")  // "pending", "in_progress", "completed"
+  dueDate     DateTime?
+  isRecurring Boolean  @default(false)
+  recurrence  String?  // "daily", "weekly", "monthly"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model AIReminder {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  type        String   // "birthday", "meeting", "emi", "insurance", "medicine", "custom"
+  remindAt    DateTime
+  isDismissed Boolean  @default(false)
+  metadata    String?  // Extra JSON data
+  createdAt   DateTime @default(now())
 }
