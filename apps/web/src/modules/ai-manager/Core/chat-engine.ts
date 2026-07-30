@@ -1,11 +1,11 @@
 import { SYSTEM_PROMPTS } from './prompt-manager';
 
 export async function callNvidiaLLM(messages: { role: string; content: string }[], systemPrompt?: string) {
-  const apiKey = process.env.NVIDIA_API_KEY || "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";
+  const apiKey = process.env.NVIDIA_API_KEY || "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";
 
-  // Fast models in order of response speed (sub-second)
+  // Fast high-performance models in priority order
   const models = [
-    "mistralai/mistral-7b-instruct-v0.3",
+    "mistralai/mistral-medium-3.5-128b",
     "meta/llama-3.1-8b-instruct",
     "meta/llama-3.3-70b-instruct"
   ];
@@ -13,7 +13,7 @@ export async function callNvidiaLLM(messages: { role: string; content: string }[
   for (const model of models) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3500); // Strict 3.5s timeout
+      const timeoutId = setTimeout(() => controller.abort(), 4000); // 4s timeout
 
       const fullMessages = [
         { role: "system", content: systemPrompt || SYSTEM_PROMPTS.PERSONAL_EMPLOYEE },
@@ -24,7 +24,8 @@ export async function callNvidiaLLM(messages: { role: string; content: string }[
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey}`
+          "Authorization": `Bearer ${apiKey}`,
+          "Accept": "application/json"
         },
         signal: controller.signal,
         body: JSON.stringify({
