@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Hls from 'hls.js';
 import { Volume2, VolumeX, Play, Pause } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 /* ─────────────────────────────────────────────────────────────────────
    GLOBAL/STATIC REGISTRIES for cross-post coordination (No React Overhead)
@@ -64,6 +65,7 @@ interface AutoplayVideoProps extends React.VideoHTMLAttributes<HTMLVideoElement>
 }
 
 export function AutoplayVideo({ src, postId, className, ...props }: AutoplayVideoProps) {
+  const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -281,10 +283,15 @@ export function AutoplayVideo({ src, postId, className, ...props }: AutoplayVide
     setProgress(pct);
   };
 
+  const handleVideoClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    router.push(`/reels?videoId=${postId}`);
+  };
+
   return (
     <div
       ref={containerRef}
-      onClick={togglePlayPause}
+      onClick={handleVideoClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       className="relative w-full overflow-hidden bg-black cursor-pointer rounded-2xl flex items-center justify-center select-none"

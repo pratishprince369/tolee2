@@ -116,6 +116,7 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
         dbReels.unshift(targetReel);
       } else {
         try {
+          // 1. Try Post
           const post = await prisma.post.findUnique({
             where: { id: targetVideoId },
             include: {
@@ -134,72 +135,241 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
             }
           });
 
-          if (post && post.mediaUrls && (post.postType === 'reel' || post.mediaTypes?.includes('video'))) {
-            const firstTolee = post.tolees?.[0]?.tolee;
-            const likedByMe = currentUserId ? post.likes.some((like: any) => like.userId === currentUserId) : false;
-            const savedByMe = currentUserId ? post.savedBy.some((save: any) => save.userId === currentUserId) : false;
-            const repostedByMe = currentUserId ? post.reposts.some((rep: any) => rep.userId === currentUserId) : false;
-            const repostsCount = post._count?.reposts || 0;
-            const mostRecentRepost = post.reposts?.[0];
-            const resharedByUser = mostRecentRepost ? {
-              username: mostRecentRepost.user.username,
-              name: mostRecentRepost.user.name,
-              avatar: mostRecentRepost.user.avatar || '/default-user-avatar.svg'
-            } : null;
+          if (post) {
+            const isAuthorized = post.visibility !== 'only_me' || post.authorId === currentUserId;
+            const isPublished = post.status === 'published';
+            const hasVideo = post.mediaUrls && (post.postType === 'reel' || post.mediaTypes?.includes('video'));
 
-            let isFollowing = false;
-            let followStatus = null;
-            if (currentUserId) {
-              const follow = await prisma.follow.findFirst({
-                where: { followerId: currentUserId, followingId: post.author.id }
+            if (!isAuthorized || !isPublished || !hasVideo) {
+              dbReels.unshift({
+                id: targetVideoId,
+                isUnavailable: true,
+                caption: 'This video is no longer available.',
+                author: 'Unavailable',
+                video: '',
+                likes: 0,
+                comments: 0,
+                views: 0
               });
-              if (follow) {
-                isFollowing = follow.status === 'approved';
-                followStatus = follow.status;
+            } else {
+              const firstTolee = post.tolees?.[0]?.tolee;
+              const likedByMe = currentUserId ? post.likes.some((like: any) => like.userId === currentUserId) : false;
+              const savedByMe = currentUserId ? post.savedBy?.some((save: any) => save.userId === currentUserId) : false;
+              const repostedByMe = currentUserId ? post.reposts?.some((rep: any) => rep.userId === currentUserId) : false;
+              const repostsCount = post._count?.reposts || 0;
+              const mostRecentRepost = post.reposts?.[0];
+              const resharedByUser = mostRecentRepost ? {
+                username: mostRecentRepost.user.username,
+                name: mostRecentRepost.user.name,
+                avatar: mostRecentRepost.user.avatar || '/default-user-avatar.svg'
+              } : null;
+
+              let isFollowing = false;
+              let followStatus = null;
+              if (currentUserId) {
+                const follow = await prisma.follow.findFirst({
+                  where: { followerId: currentUserId, followingId: post.author.id }
+                });
+                if (follow) {
+                  isFollowing = follow.status === 'approved';
+                  followStatus = follow.status;
+                }
+              }
+
+              const activeStory = await prisma.story.findFirst({
+                where: { authorId: post.author.id, expiresAt: { gte: new Date() } }
+              });
+              const hasActiveStory = !!activeStory;
+
+              const singleReel = {
+                id: post.id,
+                authorId: post.author.id,
+                authorIsPrivate: post.author.isPrivate || false,
+                visibility: post.visibility,
+                video: post.mediaUrls.split(/,(?=https?:\/\/)/)[0],
+                author: post.author.username,
+                authorAvatar: post.author.avatar || '/default-user-avatar.svg',
+                toleeName: firstTolee?.name || null,
+                toleeSlug: firstTolee?.slug || null,
+                toleeId: firstTolee?.id || null,
+                role: firstTolee?.ownerId === post.author.id ? 'Admin' : 'Member',
+                caption: post.caption || '',
+                likes: post.likes?.length || 0,
+                comments: post.comments?.length || 0,
+                views: post._count?.views || 0,
+                shares: '0',
+                reposts: repostsCount,
+                audio: 'Original Audio',
+                isVerified: false,
+                likedByMe,
+                savedByMe,
+                repostedByMe,
+                resharedByUser,
+                isFollowing,
+                followStatus,
+                hasActiveStory,
+                location: post.location || null,
+                subLocation: post.subLocation || null,
+                createdAt: post.createdAt,
+                duration: 15,
+                aspectRatio: '9:16',
+                videoType: 'hls',
+                audioInfo: 'Original Audio',
+              };
+              dbReels.unshift(singleReel);
+            }
+          } else {
+            // 2. Try ScreenVideo
+            const screenVid = await prisma.screenVideo.findUnique({
+              where: { id: targetVideoId },
+              include: {
+                user: true,
+                likes: true,
+                comments: true,
+                _count: { select: { likes: true, comments: true, views: true } }
+              }
+            });
+
+            if (screenVid) {
+              const isAuthorized = screenVid.visibility !== 'only_me' || screenVid.userId === currentUserId;
+              const isPublished = screenVid.status === 'published';
+
+              if (!isAuthorized || !isPublished) {
+                dbReels.unshift({
+                  id: targetVideoId,
+                  isUnavailable: true,
+                  caption: 'This video is no longer available.',
+                  author: 'Unavailable',
+                  video: '',
+                  likes: 0,
+                  comments: 0,
+                  views: 0
+                });
+              } else {
+                const likedByMe = currentUserId ? screenVid.likes.some((like: any) => like.userId === currentUserId) : false;
+                let isFollowing = false;
+                let followStatus = null;
+                if (currentUserId) {
+                  const follow = await prisma.follow.findFirst({
+                    where: { followerId: currentUserId, followingId: screenVid.user.id }
+                  });
+                  if (follow) {
+                    isFollowing = follow.status === 'approved';
+                    followStatus = follow.status;
+                  }
+                }
+
+                const singleReel = {
+                  id: screenVid.id,
+                  authorId: screenVid.userId,
+                  authorIsPrivate: false,
+                  visibility: screenVid.visibility,
+                  video: screenVid.mediaUrl,
+                  author: screenVid.user.username || 'creator',
+                  authorAvatar: screenVid.user.avatar || '/default-user-avatar.svg',
+                  toleeName: null,
+                  toleeSlug: null,
+                  toleeId: null,
+                  role: 'Member',
+                  caption: screenVid.title || screenVid.description || '',
+                  likes: screenVid.likes?.length || screenVid.likesCount || 0,
+                  comments: screenVid.comments?.length || 0,
+                  views: screenVid.viewsCount || screenVid._count?.views || 0,
+                  shares: '0',
+                  reposts: 0,
+                  audio: 'Original Audio',
+                  isVerified: false,
+                  likedByMe,
+                  savedByMe: false,
+                  repostedByMe: false,
+                  resharedByUser: null,
+                  isFollowing,
+                  followStatus,
+                  hasActiveStory: false,
+                  location: null,
+                  subLocation: null,
+                  createdAt: screenVid.createdAt,
+                  duration: 15,
+                  aspectRatio: '9:16',
+                  videoType: 'mp4',
+                  audioInfo: 'Original Audio',
+                };
+                dbReels.unshift(singleReel);
+              }
+            } else {
+              // 3. Try Listing
+              const listing = await prisma.listing.findUnique({
+                where: { id: targetVideoId },
+                include: { seller: true }
+              });
+
+              if (listing) {
+                const isAuthorized = listing.status === 'active';
+                const videoUrl = listing.images?.split(',').find(url => url.includes('.mp4') || url.includes('.m3u8') || url.includes('video') || url.includes('.mov') || url.includes('.webm'));
+
+                if (!isAuthorized || !videoUrl) {
+                  dbReels.unshift({
+                    id: targetVideoId,
+                    isUnavailable: true,
+                    caption: 'This video is no longer available.',
+                    author: 'Unavailable',
+                    video: '',
+                    likes: 0,
+                    comments: 0,
+                    views: 0
+                  });
+                } else {
+                  const singleReel = {
+                    id: listing.id,
+                    authorId: listing.sellerId,
+                    authorIsPrivate: false,
+                    visibility: 'public',
+                    video: videoUrl,
+                    author: listing.seller.username || 'seller',
+                    authorAvatar: listing.seller.avatar || '/default-user-avatar.svg',
+                    toleeName: null,
+                    toleeSlug: null,
+                    toleeId: null,
+                    role: 'Seller',
+                    caption: `${listing.title} - ${listing.price ? `₹${listing.price.toLocaleString('en-IN')}` : 'Free'}`,
+                    likes: 0,
+                    comments: 0,
+                    views: listing.viewCount || 0,
+                    shares: '0',
+                    reposts: 0,
+                    audio: 'Original Audio',
+                    isVerified: false,
+                    likedByMe: false,
+                    savedByMe: false,
+                    repostedByMe: false,
+                    resharedByUser: null,
+                    isFollowing: false,
+                    followStatus: null,
+                    hasActiveStory: false,
+                    location: listing.locationText || null,
+                    subLocation: null,
+                    createdAt: listing.createdAt,
+                    duration: 15,
+                    aspectRatio: '9:16',
+                    videoType: videoUrl.includes('.m3u8') ? 'hls' : 'mp4',
+                    audioInfo: 'Original Audio',
+                  };
+                  dbReels.unshift(singleReel);
+                }
+              } else {
+                // 4. Not found anywhere
+                dbReels.unshift({
+                  id: targetVideoId,
+                  isUnavailable: true,
+                  caption: 'This video is no longer available.',
+                  author: 'Unavailable',
+                  video: '',
+                  likes: 0,
+                  comments: 0,
+                  views: 0
+                });
               }
             }
-
-            const activeStory = await prisma.story.findFirst({
-              where: { authorId: post.author.id, expiresAt: { gte: new Date() } }
-            });
-            const hasActiveStory = !!activeStory;
-
-            const singleReel = {
-              id: post.id,
-              authorId: post.author.id,
-              authorIsPrivate: post.author.isPrivate || false,
-              visibility: post.visibility,
-              video: post.mediaUrls.split(/,(?=https?:\/\/)/)[0],
-              author: post.author.username,
-              authorAvatar: post.author.avatar || '/default-user-avatar.svg',
-              toleeName: firstTolee?.name || null,
-              toleeSlug: firstTolee?.slug || null,
-              toleeId: firstTolee?.id || null,
-              role: firstTolee?.ownerId === post.author.id ? 'Admin' : 'Member',
-              caption: post.caption || '',
-              likes: post.likes?.length || 0,
-              comments: post.comments?.length || 0,
-              views: post._count?.views || 0,
-              shares: '0',
-              reposts: repostsCount,
-              audio: 'Original Audio',
-              isVerified: false,
-              likedByMe,
-              savedByMe,
-              repostedByMe,
-              resharedByUser,
-              isFollowing,
-              followStatus,
-              hasActiveStory,
-              location: post.location || null,
-              subLocation: post.subLocation || null,
-              createdAt: post.createdAt,
-              duration: 15,
-              aspectRatio: '9:16',
-              videoType: 'hls',
-              audioInfo: 'Original Audio',
-            };
-            dbReels.unshift(singleReel);
           }
         } catch (err) {
           console.error("Failed to query direct target video for reels:", err);

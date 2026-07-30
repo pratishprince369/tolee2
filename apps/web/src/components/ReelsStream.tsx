@@ -8,7 +8,7 @@ import {
   Heart, MessageCircle, Send, MoreVertical, Music,
   Volume2, VolumeX, ShieldCheck, Plus, Bookmark, Repeat,
   ChevronUp, ChevronDown, Eye, Rocket, MapPin, Smile, X,
-  Loader2, AlertCircle
+  Loader2, AlertCircle, ChevronLeft
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
@@ -714,7 +714,15 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
 
         {/* Mobile top bar */}
         <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between px-4 py-4 pointer-events-auto bg-gradient-to-b from-black/60 to-transparent">
-          <h1 className="text-xl font-bold text-white drop-shadow-md">Reels</h1>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => router.back()}
+              className="flex items-center justify-center w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 active:bg-white/30 backdrop-blur-sm border border-white/30 text-white transition-all mr-1"
+            >
+              <ChevronLeft className="w-5 h-5 text-white" strokeWidth={2.5} />
+            </button>
+            <h1 className="text-xl font-bold text-white drop-shadow-md">Reels</h1>
+          </div>
           <div className="flex items-center gap-3">
             {session?.user && (
               <CreatePostModal onPost={handleNewPost} videoOnly>
@@ -809,7 +817,15 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
 
         {/* Desktop top bar */}
         <div className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-6 py-4 bg-gradient-to-b from-black/80 to-transparent pointer-events-none">
-          <h1 className="text-2xl font-black text-white tracking-tight pointer-events-auto select-none">Reels</h1>
+          <div className="flex items-center gap-3 pointer-events-auto">
+            <button
+              onClick={() => router.back()}
+              className="flex items-center justify-center w-9 h-9 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur-sm border border-white/20 text-white transition-all hover:scale-105 active:scale-95 cursor-pointer"
+            >
+              <ChevronLeft className="w-5 h-5 text-white" strokeWidth={2.5} />
+            </button>
+            <h1 className="text-2xl font-black text-white tracking-tight select-none">Reels</h1>
+          </div>
           <div className="flex items-center gap-3 pointer-events-auto">
             {session?.user && (
               <CreatePostModal onPost={handleNewPost} videoOnly>
@@ -1097,6 +1113,24 @@ const ReelSlide = memo(function ReelSlide({
 }) {
   const [isReady, setIsReady] = useState(false);
   const [isError, setIsError] = useState(false);
+
+  if (reel.isUnavailable) {
+    return (
+      <div
+        data-index={index}
+        className="reel-container w-full h-full snap-start snap-always relative flex flex-col items-center justify-center overflow-hidden bg-black text-center p-6 select-none"
+        style={{ scrollSnapStop: 'always' }}
+      >
+        <div className="max-w-xs bg-zinc-900/60 backdrop-blur-md p-6 rounded-2xl border border-zinc-800 text-white shadow-xl">
+          <AlertCircle className="w-12 h-12 mx-auto text-zinc-500 mb-4" />
+          <h3 className="text-sm font-black mb-2">Video Unavailable</h3>
+          <p className="text-xs text-zinc-400 leading-relaxed font-semibold">
+            This video is no longer available. It may have been deleted, set to private, or expired.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   useEffect(() => {
     if (isActive) {
