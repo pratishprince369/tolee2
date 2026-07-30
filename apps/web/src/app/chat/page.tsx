@@ -259,7 +259,8 @@ function SharedContentCard({ payload }: SharedContentCardProps) {
     if (!available) return;
 
     if (contentType === 'reel') {
-      router.push(`/reels?videoId=${payload.videoId}`);
+      // Deep-link directly to the exact reel — no generic timeline
+      router.push(`/reel/${payload.videoId}`);
     } else if (contentType === 'screen') {
       router.push(`/screen/watch/${payload.videoId}`);
     } else if (contentType === 'news') {
@@ -267,7 +268,8 @@ function SharedContentCard({ payload }: SharedContentCardProps) {
     } else if (contentType === 'marketplace') {
       router.push(`/marketplace/listing/${payload.videoId}`);
     } else {
-      router.push(`/feed?postId=${payload.videoId}`);
+      // Deep-link directly to the exact post — no feed scrolling
+      router.push(`/post/${payload.videoId}`);
     }
   };
 

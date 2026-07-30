@@ -2927,6 +2927,126 @@ export async function checkPostAvailability(postId: string) {
   }
 }
 
+// ─── Deep Linking: Fetch a single post by ID ───────────────────────────────
+export async function getPostById(id: string) {
+  try {
+    const session = await getServerSession(authOptions);
+    const currentUserId = (session?.user as any)?.id;
 
+    const post = await prisma.post.findUnique({
+      where: { id },
+      include: {
+        author: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+            avatar: true,
+            isPrivate: true,
+          },
+        },
+        tolees: {
+          select: {
+            tolee: {
+              select: { id: true, name: true, slug: true, ownerId: true },
+            },
+          },
+        },
+        likes: { select: { userId: true } },
+        savedBy: { select: { userId: true } },
+        reposts: {
+          orderBy: { createdAt: 'desc' },
+          include: {
+            user: {
+              select: { id: true, name: true, username: true, avatar: true },
+            },
+          },
+        },
+        comments: {
+          where: { parentId: null },
+          orderBy: { createdAt: 'desc' },
+          take: 30,
+          include: {
+            author: {
+              select: { id: true, name: true, username: true, avatar: true },
+            },
+            likes: { select: { userId: true } },
+            replies: {
+              orderBy: { createdAt: 'asc' },
+              take: 5,
+              include: {
+                author: {
+                  select: { id: true, name: true, username: true, avatar: true },
+                },
+              },
+            },
+          },
+        },
+        newsRelation: {
+          select: {
+            id: true,
+            headline: true,
+            slug: true,
+            summary: true,
+            category: true,
+            readingTime: true,
+            viewsCount: true,
+          },
+        },
+        _count: {
+          select: { likes: true, comments: true, reposts: true, views: true },
+        },
+      },
+    });
 
+    if (!post) return { success: false, post: null, error: 'Post not found' };
 
+    // Authorization check
+    const isOwner = post.authorId === currentUserId;
+    const isPublic = post.visibility === 'public' && !post.author?.isPrivate;
+    if (!isOwner && !isPublic && post.visibility === 'only_me') {
+      return { success: false, post: null, error: 'Not authorized' };
+    }
+
+    const firstTolee = post.tolees?.[0]?.tolee;
+    const likedByMe = currentUserId ? post.likes.some((l: any) => l.userId === currentUserId) : false;
+    const savedByMe = currentUserId ? post.savedBy.some((s: any) => s.userId === currentUserId) : false;
+    const repostedByMe = currentUserId ? post.reposts.some((r: any) => r.userId === currentUserId) : false;
+
+    const mappedPost = {
+      id: post.id,
+      authorId: post.author?.id || null,
+      author: post.author?.username || post.author?.name || 'Anonymous',
+      authorName: post.author?.name || post.author?.username || 'Anonymous',
+      authorAvatar: post.author?.avatar || '/default-user-avatar.svg',
+      authorIsPrivate: post.author?.isPrivate || false,
+      toleeName: firstTolee?.name || null,
+      toleeSlug: firstTolee?.slug || null,
+      postType: post.postType,
+      caption: post.caption || '',
+      mediaUrls: post.mediaUrls || '',
+      mediaTypes: post.mediaTypes || '',
+      image: post.mediaTypes?.split(',')[0] === 'image' ? post.mediaUrls?.split(/,(?=https?:\/\/)/)[0] : null,
+      video: post.mediaTypes?.split(',')[0] === 'video' ? post.mediaUrls?.split(/,(?=https?:\/\/)/)[0] : null,
+      visibility: post.visibility,
+      location: post.location || null,
+      subLocation: post.subLocation || null,
+      likes: post._count?.likes || 0,
+      comments: post._count?.comments || 0,
+      reposts: post._count?.reposts || 0,
+      views: post._count?.views || 0,
+      likedByMe,
+      savedByMe,
+      repostedByMe,
+      commentsList: post.comments || [],
+      newsRelation: post.newsRelation || null,
+      createdAt: post.createdAt.toISOString(),
+      isSimulation: post.isSimulation || false,
+    };
+
+    return { success: true, post: mappedPost };
+  } catch (err) {
+    console.error('[getPostById] Error:', err);
+    return { success: false, post: null, error: 'Server error' };
+  }
+}
