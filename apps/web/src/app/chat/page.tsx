@@ -28,7 +28,7 @@ import {
   Search, MoreVertical, Phone, Video, Paperclip, Smile, Send, Check, CheckCheck, 
   EyeOff, Users, ShieldCheck, PlusCircle, MessageCircle, ChevronLeft, X, 
   Image as ImageIcon, AlertCircle, BellOff, LogOut, Clock, Copy, Reply, Trash2, ArrowRight,
-  PhoneOff, VideoOff, Play, Pin
+  PhoneOff, VideoOff, Play, Pin, Clapperboard, Newspaper, MapPin
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -207,12 +207,29 @@ interface SharedContentCardProps {
     likesCount: number;
     viewsCount: number;
     shareUrl: string;
+    contentType?: string;
+    deepLink?: string;
+    newsCategory?: string;
+    newsReadingTime?: number;
+    newsPublisher?: string;
+    listingPrice?: number;
+    listingLocation?: string;
   };
 }
 
 function SharedContentCard({ payload }: SharedContentCardProps) {
   const router = useRouter();
   const [available, setAvailable] = useState<boolean | null>(null);
+
+  const contentType = payload.contentType || (() => {
+    if (payload.shareUrl) {
+      if (payload.shareUrl.includes('/screen/watch/')) return 'screen';
+      if (payload.shareUrl.includes('/news/')) return 'news';
+      if (payload.shareUrl.includes('/reels')) return 'reel';
+      if (payload.shareUrl.includes('/marketplace/listing/')) return 'marketplace';
+    }
+    return 'feed';
+  })();
 
   useEffect(() => {
     let active = true;
@@ -241,25 +258,14 @@ function SharedContentCard({ payload }: SharedContentCardProps) {
     e.stopPropagation();
     if (!available) return;
 
-    let contentType = (payload as any).contentType;
-    if (!contentType && payload.shareUrl) {
-      if (payload.shareUrl.includes('/screen/watch/')) {
-        contentType = 'screen';
-      } else if (payload.shareUrl.includes('/news/')) {
-        contentType = 'news';
-      } else if (payload.shareUrl.includes('/reels')) {
-        contentType = 'reel';
-      } else {
-        contentType = 'feed';
-      }
-    }
-
     if (contentType === 'reel') {
       router.push(`/reels?videoId=${payload.videoId}`);
     } else if (contentType === 'screen') {
       router.push(`/screen/watch/${payload.videoId}`);
     } else if (contentType === 'news') {
       router.push(`/news/${payload.videoId}`);
+    } else if (contentType === 'marketplace') {
+      router.push(`/marketplace/listing/${payload.videoId}`);
     } else {
       router.push(`/feed?postId=${payload.videoId}`);
     }
@@ -280,66 +286,219 @@ function SharedContentCard({ payload }: SharedContentCardProps) {
 
   if (available === false) {
     return (
-      <div className="w-64 bg-zinc-100 dark:bg-zinc-900 rounded-2xl border border-zinc-200/50 dark:border-zinc-800/80 p-4 text-center select-none">
-        <AlertCircle className="w-8 h-8 mx-auto text-zinc-400 dark:text-zinc-500 mb-2" />
-        <p className="text-[13px] font-bold text-zinc-500 dark:text-zinc-400">This video is no longer available.</p>
+      <div className="w-64 bg-zinc-100 dark:bg-zinc-950 rounded-2xl border border-zinc-200/50 dark:border-zinc-800/85 p-5 text-center select-none shadow-sm">
+        <AlertCircle className="w-8 h-8 mx-auto text-zinc-400 dark:text-zinc-650 mb-2.5" />
+        <p className="text-xs font-bold text-zinc-500 dark:text-zinc-400">This content is no longer available.</p>
       </div>
     );
   }
 
-  return (
-    <div 
-      onClick={handleCardClick}
-      className="w-64 bg-zinc-100 hover:bg-zinc-200/80 dark:bg-zinc-900 dark:hover:bg-zinc-850/80 rounded-2xl border border-zinc-250/60 dark:border-zinc-800 shadow-sm cursor-pointer overflow-hidden transition-all duration-200 select-none group"
-    >
-      <div className="relative aspect-video w-full bg-black flex items-center justify-center overflow-hidden">
+  const isVideo = payload.type === 'shared_video' || contentType === 'reel' || contentType === 'screen';
+
+  const renderMedia = () => {
+    if (contentType === 'reel') {
+      return (
+        <div className="relative aspect-[3/4] w-full bg-zinc-950 flex items-center justify-center overflow-hidden border-b border-zinc-100 dark:border-zinc-900">
+          {payload.thumbnailUrl ? (
+            <img 
+              src={payload.thumbnailUrl} 
+              alt="Shared Reel" 
+              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+              loading="lazy"
+            />
+          ) : (
+            <div className="w-full h-full bg-zinc-900 flex items-center justify-center">
+              <Clapperboard className="w-8 h-8 text-zinc-700" />
+            </div>
+          )}
+          <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+            <div className="w-12 h-12 bg-white/25 hover:bg-white/35 rounded-full flex items-center justify-center backdrop-blur-md transition-all active:scale-95 shadow-md border border-white/20">
+              <Play className="w-5 h-5 text-white fill-white ml-0.5" />
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (isVideo) {
+      return (
+        <div className="relative aspect-video w-full bg-zinc-950 flex items-center justify-center overflow-hidden border-b border-zinc-100 dark:border-zinc-900">
+          {payload.thumbnailUrl ? (
+            <img 
+              src={payload.thumbnailUrl} 
+              alt="Shared Video" 
+              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+              loading="lazy"
+            />
+          ) : (
+            <div className="w-full h-full bg-zinc-900 flex items-center justify-center">
+              <Play className="w-8 h-8 text-zinc-700" />
+            </div>
+          )}
+          <div className="absolute inset-0 bg-black/25 flex items-center justify-center">
+            <div className="w-10 h-10 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center backdrop-blur-md transition-all active:scale-95 shadow-md border border-white/10">
+              <Play className="w-4 h-4 text-white fill-white ml-0.5" />
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="relative aspect-[4/3] w-full bg-zinc-950 flex items-center justify-center overflow-hidden border-b border-zinc-100 dark:border-zinc-900">
         {payload.thumbnailUrl ? (
           <img 
             src={payload.thumbnailUrl} 
-            alt="Shared Video Preview" 
+            alt="Shared Post" 
             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+            loading="lazy"
           />
         ) : (
-          <div className="w-full h-full bg-zinc-950 flex items-center justify-center">
-            <span className="text-[11px] text-zinc-500">No Preview</span>
+          <div className="w-full h-full bg-zinc-900 flex items-center justify-center">
+            <ImageIcon className="w-8 h-8 text-zinc-700" />
           </div>
         )}
-        <div className="absolute inset-0 bg-black/25 flex items-center justify-center">
-          <div className="w-10 h-10 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center backdrop-blur-md transition-all active:scale-95 shadow-md">
-            <Play className="w-4 h-4 text-white fill-white ml-0.5" />
-          </div>
-        </div>
       </div>
+    );
+  };
 
-      <div className="p-3 space-y-2">
-        <div className="flex items-center justify-between gap-2 min-w-0">
-          <div className="flex items-center gap-1.5 min-w-0">
-            <Avatar className="w-5.5 h-5.5 border border-zinc-200 dark:border-zinc-700">
-              <AvatarImage src={payload.creatorAvatar} />
-              <AvatarFallback className="text-[8px] bg-zinc-200 text-zinc-700">{payload.creatorName?.[0]}</AvatarFallback>
-            </Avatar>
-            <span className="text-[11px] font-bold text-zinc-800 dark:text-zinc-200 truncate">
-              @{payload.creatorUsername}
+  const renderFooter = () => {
+    if (contentType === 'news') {
+      return (
+        <div className="p-3 space-y-1.5 bg-white dark:bg-zinc-950">
+          {payload.newsCategory && (
+            <span className="inline-block text-[9px] font-black uppercase tracking-wider text-teal-600 dark:text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded-[4px] select-none">
+              {payload.newsCategory}
             </span>
-          </div>
-        </div>
-
-        <div className="space-y-1">
-          <p className="text-[12px] font-semibold text-zinc-900 dark:text-zinc-50 leading-snug line-clamp-2 break-all">
+          )}
+          <p className="text-[12px] font-bold text-zinc-900 dark:text-zinc-50 leading-snug line-clamp-2 select-text">
             {payload.title}
           </p>
           {payload.caption && payload.caption !== payload.title && (
-            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-normal line-clamp-2 break-words">
+            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-normal line-clamp-1 truncate select-text">
+              {payload.caption}
+            </p>
+          )}
+          <div className="flex items-center justify-between text-[9px] text-zinc-400 dark:text-zinc-500 font-bold pt-2 border-t border-zinc-100 dark:border-zinc-900">
+            <span>{payload.newsPublisher || 'Tolee News'}</span>
+            <span>⏱️ {payload.newsReadingTime || 1} min read</span>
+          </div>
+        </div>
+      );
+    }
+
+    if (contentType === 'marketplace') {
+      return (
+        <div className="p-3 space-y-1.5 bg-white dark:bg-zinc-950">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[12px] font-bold text-zinc-900 dark:text-zinc-50 leading-snug line-clamp-1 truncate select-text">
+              {payload.title}
+            </p>
+            <span className="text-[11px] font-extrabold text-teal-600 dark:text-teal-400 shrink-0">
+              {payload.listingPrice ? `₹${payload.listingPrice.toLocaleString('en-IN')}` : 'Free'}
+            </span>
+          </div>
+          {payload.caption && (
+            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-normal line-clamp-2 select-text">
+              {payload.caption}
+            </p>
+          )}
+          {payload.listingLocation && (
+            <div className="flex items-center gap-1 text-[9px] text-zinc-400 dark:text-zinc-500 font-bold pt-2 border-t border-zinc-100 dark:border-zinc-900">
+              <MapPin className="w-3 h-3 text-zinc-400 dark:text-zinc-650" />
+              <span className="truncate">{payload.listingLocation}</span>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    if (contentType === 'requirement') {
+      return (
+        <div className="p-3 space-y-2 bg-white dark:bg-zinc-950">
+          <div className="flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 font-extrabold uppercase tracking-wide select-none">
+            <Pin className="w-3.5 h-3.5 rotate-45 shrink-0" />
+            <span>Local Requirement</span>
+          </div>
+          <p className="text-[12px] font-bold text-zinc-900 dark:text-zinc-50 leading-snug line-clamp-3 select-text">
+            {payload.caption || payload.title}
+          </p>
+          <div className="flex items-center justify-between text-[9px] text-zinc-400 dark:text-zinc-500 font-bold pt-2 border-t border-zinc-100 dark:border-zinc-900">
+            <span>Active Need</span>
+            <span>📍 Tolee Feed</span>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="p-3 space-y-2 bg-white dark:bg-zinc-950">
+        <div className="space-y-1">
+          <p className="text-[12px] font-bold text-zinc-900 dark:text-zinc-50 leading-snug line-clamp-2 select-text">
+            {payload.title}
+          </p>
+          {payload.caption && payload.caption !== payload.title && (
+            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-normal line-clamp-2 select-text">
               {payload.caption}
             </p>
           )}
         </div>
-
-        <div className="flex items-center gap-3 text-[10px] text-zinc-500 dark:text-zinc-400 font-medium pt-1.5 border-t border-zinc-200/50 dark:border-zinc-800/60">
-          <span className="flex items-center gap-0.5">👁 {payload.viewsCount || '0'}</span>
+        <div className="flex items-center gap-3 text-[10px] text-zinc-400 dark:text-zinc-500 font-bold pt-2 border-t border-zinc-100 dark:border-zinc-900">
           <span className="flex items-center gap-0.5">❤️ {payload.likesCount || '0'}</span>
+          <span className="flex items-center gap-0.5">👁️ {payload.viewsCount || '0'}</span>
         </div>
       </div>
+    );
+  };
+
+  return (
+    <div 
+      onClick={handleCardClick}
+      className="w-64 bg-white dark:bg-zinc-950 hover:shadow-md rounded-2xl border border-zinc-200/60 dark:border-zinc-800 shadow-xs cursor-pointer overflow-hidden transition-all duration-200 select-none group"
+    >
+      {/* Header */}
+      <div className="p-2.5 flex items-center gap-2 border-b border-zinc-100 dark:border-zinc-900 bg-zinc-50/50 dark:bg-zinc-900/30">
+        <Avatar className="w-6 h-6 border border-zinc-200/50 dark:border-zinc-850">
+          <AvatarImage src={payload.creatorAvatar} />
+          <AvatarFallback className="text-[9px] bg-zinc-200 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-400 font-black">
+            {payload.creatorName?.[0]}
+          </AvatarFallback>
+        </Avatar>
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-black text-zinc-900 dark:text-white truncate">
+            {payload.creatorName}
+          </p>
+          <p className="text-[9px] text-zinc-400 dark:text-zinc-500 truncate">
+            @{payload.creatorUsername}
+          </p>
+        </div>
+        {contentType === 'reel' && (
+          <span className="text-[9px] font-black tracking-wider uppercase bg-red-500/10 text-red-500 px-1.5 py-0.5 rounded-md flex items-center gap-1 select-none shrink-0">
+            <Clapperboard className="w-2.5 h-2.5" /> Reel
+          </span>
+        )}
+        {contentType === 'news' && (
+          <span className="text-[9px] font-black tracking-wider uppercase bg-teal-500/10 text-teal-600 dark:text-teal-400 px-1.5 py-0.5 rounded-md flex items-center gap-1 select-none shrink-0">
+            <Newspaper className="w-2.5 h-2.5" /> News
+          </span>
+        )}
+        {contentType === 'requirement' && (
+          <span className="text-[9px] font-black tracking-wider uppercase bg-blue-500/10 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded-md flex items-center gap-1 select-none shrink-0">
+            <Pin className="w-2.5 h-2.5 rotate-45" /> Need
+          </span>
+        )}
+        {contentType === 'marketplace' && (
+          <span className="text-[9px] font-black tracking-wider uppercase bg-amber-500/10 text-amber-600 dark:text-amber-500 px-1.5 py-0.5 rounded-md flex items-center gap-1 select-none shrink-0">
+            Shop
+          </span>
+        )}
+      </div>
+
+      {/* Media Preview Component */}
+      {renderMedia()}
+
+      {/* Footer Content */}
+      {renderFooter()}
     </div>
   );
 }

@@ -1949,18 +1949,20 @@ export async function sharePostToFriends(
       return { success: false, error: 'Unauthorized' };
     }
     const currentUserId = (session.user as any).id;
+    const userId = currentUserId;
     const senderName = session.user.name || 'A friend';
 
     if (friendIds.length === 0) {
       return { success: false, error: 'No friends selected.' };
     }
 
-    // Fetch post details to get rich card metadata (author details, counts, media URLs)
+    // 1. Try finding in Post
     let postDetails = await prisma.post.findUnique({
       where: { id: postId },
       include: {
         author: {
           select: {
+            id: true,
             username: true,
             name: true,
             avatar: true,
@@ -1977,6 +1979,7 @@ export async function sharePostToFriends(
       }
     });
 
+    // 2. Try finding in ScreenVideo
     let screenDetails = null;
     if (!postDetails) {
       screenDetails = await prisma.screenVideo.findUnique({
@@ -1984,6 +1987,7 @@ export async function sharePostToFriends(
         include: {
           user: {
             select: {
+              id: true,
               username: true,
               name: true,
               avatar: true,
@@ -2001,19 +2005,159 @@ export async function sharePostToFriends(
       });
     }
 
+    // 3. Try finding in NewsPost
+    let newsDetails = null;
+    if (!postDetails && !screenDetails) {
+      newsDetails = await prisma.newsPost.findFirst({
+        where: { OR: [{ id: postId }, { slug: postId }, { postId: postId }] },
+        include: {
+          post: {
+            include: {
+              author: {
+                select: {
+                  id: true,
+                  username: true,
+                  name: true,
+                  avatar: true,
+                  image: true
+                }
+              },
+              _count: {
+                select: {
+                  likes: true,
+                  comments: true,
+                  views: true
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // 4. Try finding in Listing
+    let listingDetails = null;
+    if (!postDetails && !screenDetails && !newsDetails) {
+      listingDetails = await prisma.listing.findUnique({
+        where: { id: postId },
+        include: {
+          seller: {
+            select: {
+              id: true,
+              username: true,
+              name: true,
+              avatar: true,
+              image: true
+            }
+          }
+        }
+      });
+    }
+
     const isVideo = postDetails
       ? (postDetails.postType === 'reel' || postDetails.postType === 'win' || postDetails.postType === 'news' || postDetails.mediaTypes?.split(',')[0] === 'video' || postDetails.mediaTypes === 'video')
-      : !!screenDetails;
+      : (screenDetails ? true : false);
 
     let contentType = 'feed';
+    let creatorId = '';
+    let creatorName = 'Creator';
+    let creatorUsername = 'creator';
+    let creatorAvatar = '/default-user-avatar.svg';
+    let thumbnailUrl = '';
+    let title = 'Shared Content';
+    let caption = previewText || '';
+    let likesCount = 0;
+    let viewsCount = 0;
+
+    let newsCategory = '';
+    let newsReadingTime = 1;
+    let newsPublisher = 'Tolee News';
+    let listingPrice = 0;
+    let listingLocation = '';
+
     if (postDetails) {
+      creatorId = postDetails.author.id;
+      creatorName = postDetails.author.name || 'Creator';
+      creatorUsername = postDetails.author.username || 'creator';
+      creatorAvatar = postDetails.author.avatar || postDetails.author.image || '/default-user-avatar.svg';
+      
       if (postDetails.postType === 'reel') {
         contentType = 'reel';
       } else if (postDetails.postType === 'news') {
         contentType = 'news';
+        const associatedNews = await prisma.newsPost.findUnique({ where: { postId: postDetails.id } });
+        if (associatedNews) {
+          newsCategory = associatedNews.category || '';
+          newsReadingTime = associatedNews.readingTime || 1;
+          newsPublisher = creatorName;
+        }
+      } else if (postDetails.postType === 'requirement') {
+        contentType = 'requirement';
+      } else {
+        contentType = 'feed';
       }
+
+      thumbnailUrl = postDetails.mediaUrls ? postDetails.mediaUrls.split(/,(?=https?:\/\/)/)[0] : '';
+      title = postDetails.caption || (contentType === 'requirement' ? 'Requirement' : 'Shared Post');
+      caption = previewText || postDetails.caption || '';
+      likesCount = postDetails._count?.likes || 0;
+      viewsCount = postDetails._count?.views || 0;
+
     } else if (screenDetails) {
       contentType = 'screen';
+      creatorId = screenDetails.userId;
+      creatorName = screenDetails.user.name || 'Creator';
+      creatorUsername = screenDetails.user.username || 'creator';
+      creatorAvatar = screenDetails.user.avatar || screenDetails.user.image || '/default-user-avatar.svg';
+      thumbnailUrl = screenDetails.thumbnailUrl || (screenDetails.muxPlaybackId ? `https://image.mux.com/${screenDetails.muxPlaybackId}/thumbnail.png?width=640&height=360&fit_mode=smartcrop` : '') || screenDetails.mediaUrl || '';
+      title = screenDetails.title || 'Shared Screen Video';
+      caption = previewText || screenDetails.description || '';
+      likesCount = screenDetails.likesCount || screenDetails._count?.likes || 0;
+      viewsCount = screenDetails.viewsCount || screenDetails._count?.views || 0;
+
+    } else if (newsDetails) {
+      contentType = 'news';
+      const author = newsDetails.post?.author;
+      creatorId = author?.id || '';
+      creatorName = author?.name || 'Creator';
+      creatorUsername = author?.username || 'creator';
+      creatorAvatar = author?.avatar || author?.image || '/default-user-avatar.svg';
+      
+      thumbnailUrl = newsDetails.post?.mediaUrls?.split(/,(?=https?:\/\/)/)[0] || '';
+      title = newsDetails.headline || 'Shared News Article';
+      caption = previewText || newsDetails.summary || '';
+      likesCount = newsDetails.post?._count?.likes || 0;
+      viewsCount = newsDetails.viewsCount || 0;
+      newsCategory = newsDetails.category || '';
+      newsReadingTime = newsDetails.readingTime || 1;
+      newsPublisher = creatorName;
+
+    } else if (listingDetails) {
+      contentType = 'marketplace';
+      creatorId = listingDetails.seller.id;
+      creatorName = listingDetails.seller.name || 'Seller';
+      creatorUsername = listingDetails.seller.username || 'seller';
+      creatorAvatar = listingDetails.seller.avatar || listingDetails.seller.image || '/default-user-avatar.svg';
+      
+      thumbnailUrl = listingDetails.images?.split(',')[0] || '';
+      title = listingDetails.title || 'Marketplace Item';
+      caption = previewText || listingDetails.description || '';
+      likesCount = 0;
+      viewsCount = listingDetails.viewCount || 0;
+      listingPrice = listingDetails.price || 0;
+      listingLocation = listingDetails.locationText || '';
+    }
+
+    if (!thumbnailUrl) {
+      if (contentType === 'news') {
+        thumbnailUrl = 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=400&auto=format&fit=crop';
+      } else if (contentType === 'reel') {
+        thumbnailUrl = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&auto=format&fit=crop';
+      } else if (contentType === 'marketplace') {
+        thumbnailUrl = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&auto=format&fit=crop';
+      } else {
+        thumbnailUrl = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&auto=format&fit=crop';
+      }
     }
 
     // Deliver content to each selected friend
@@ -2068,27 +2212,27 @@ export async function sharePostToFriends(
 
       // 2. Format a message that recipient will receive
       let msgContent;
-      if (postDetails || screenDetails) {
+      if (postDetails || screenDetails || newsDetails || listingDetails) {
         const payload = {
           type: isVideo ? 'shared_video' : 'shared_post',
           contentType,
           videoId: postId,
-          creatorId: postDetails ? postDetails.authorId : (screenDetails?.userId || ''),
-          creatorName: postDetails ? (postDetails.author.name || 'Creator') : (screenDetails?.user.name || 'Creator'),
-          creatorUsername: postDetails ? (postDetails.author.username || 'creator') : (screenDetails?.user.username || 'creator'),
-          creatorAvatar: postDetails 
-            ? (postDetails.author.avatar || postDetails.author.image || '/default-user-avatar.svg') 
-            : (screenDetails?.user.avatar || screenDetails?.user.image || '/default-user-avatar.svg'),
-          thumbnailUrl: postDetails 
-            ? (postDetails.mediaUrls ? getMediaThumbnail(postDetails.mediaUrls.split(',')[0]) : '') 
-            : (screenDetails?.thumbnailUrl || (screenDetails?.muxPlaybackId ? `https://image.mux.com/${screenDetails.muxPlaybackId}/thumbnail.png?width=640&height=360&fit_mode=smartcrop` : '') || screenDetails?.mediaUrl || ''),
-          title: postDetails 
-            ? (isVideo ? (postDetails.caption || 'Shared Video') : 'Shared Post') 
-            : (screenDetails?.title || 'Shared Screen Video'),
-          caption: previewText || (postDetails ? postDetails.caption : screenDetails?.description) || '',
-          likesCount: postDetails ? (postDetails._count?.likes || 0) : (screenDetails?.likesCount || screenDetails?._count?.likes || 0),
-          viewsCount: postDetails ? (postDetails._count?.views || 0) : (screenDetails?.viewsCount || screenDetails?._count?.views || 0),
-          shareUrl: shareUrl
+          creatorId,
+          creatorName,
+          creatorUsername,
+          creatorAvatar,
+          thumbnailUrl,
+          title,
+          caption,
+          likesCount,
+          viewsCount,
+          shareUrl,
+          deepLink: `/chat/redirect?type=${contentType}&id=${postId}`,
+          newsCategory,
+          newsReadingTime,
+          newsPublisher,
+          listingPrice,
+          listingLocation
         };
         msgContent = `__SHARED_CONTENT__:${JSON.stringify(payload)}`;
       } else {
@@ -2754,6 +2898,24 @@ export async function checkPostAvailability(postId: string) {
     });
     if (screenVid) {
       if (screenVid.status !== 'published' || screenVid.visibility === 'private') {
+        return { success: true, available: false };
+      }
+      return { success: true, available: true };
+    }
+
+    const news = await prisma.newsPost.findFirst({
+      where: { OR: [{ id: postId }, { slug: postId }, { postId: postId }] }
+    });
+    if (news) {
+      return { success: true, available: true };
+    }
+
+    const listing = await prisma.listing.findUnique({
+      where: { id: postId },
+      select: { status: true }
+    });
+    if (listing) {
+      if (listing.status !== 'active') {
         return { success: true, available: false };
       }
       return { success: true, available: true };
