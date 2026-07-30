@@ -23,6 +23,7 @@ import { PushNotificationManager } from "@/components/PushNotificationManager";
 import { ApkPromoManager } from "@/components/ApkPromoManager";
 import { PwaManager } from "@/components/PwaManager";
 import { MediaPickerModal } from "@/components/MediaPickerModal";
+import { GlobalAlarmListener } from "@/components/GlobalAlarmListener";
 import AnalyticsTracker from "@/components/AnalyticsTracker";
 import { RoutePrefetcher } from "@/components/RoutePrefetcher";
 import { Suspense } from "react";
@@ -61,6 +62,7 @@ export default async function RootLayout({
       <body className="antialiased min-h-screen bg-background flex flex-col">
         <Providers>
           <RoutePrefetcher />
+          <GlobalAlarmListener />
           <OnboardingModal />
           <OnboardingReminder />
           <AdsWalletWelcomeModal />
@@ -86,7 +88,6 @@ export default async function RootLayout({
             </div>
           </div>
           
-          {/* Global Bottom Navigation - visible only on small screens */}
           <BottomNav />
         </Providers>
       </body>

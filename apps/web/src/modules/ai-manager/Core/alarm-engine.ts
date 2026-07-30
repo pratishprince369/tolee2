@@ -20,7 +20,7 @@ export function playRingtoneAlarm() {
       osc.type = 'sine';
       osc.frequency.setValueAtTime(toggle ? 880 : 1046, audioCtx.currentTime); // High pitch alarm frequency
       
-      gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.35);
 
       osc.connect(gain);
@@ -36,7 +36,7 @@ export function playRingtoneAlarm() {
   }
 }
 
-// Stop Audio Ringtone Alarm
+// Stop Audio Ringtone Alarm & Speech Instantly
 export function stopRingtoneAlarm() {
   if (alarmInterval) {
     clearInterval(alarmInterval);
@@ -48,12 +48,15 @@ export function stopRingtoneAlarm() {
     } catch (e) {}
     audioCtx = null;
   }
+  if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+    window.speechSynthesis.cancel();
+  }
 }
 
 // AI Voice Speech Synthesis
 export function speakAlarmVoice(text: string) {
   if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-    window.speechSynthesis.cancel(); // Stop previous speech
+    window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.rate = 1.0;
     utterance.pitch = 1.1;

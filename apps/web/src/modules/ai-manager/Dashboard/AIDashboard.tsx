@@ -4,8 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { 
   Bot, Sparkles, Calendar, CheckSquare, Users, MessageSquare, 
-  Brain, Newspaper, LayoutDashboard, Send, User, ChevronRight,
-  BellRing, Volume2, VolumeX, Clock, Check
+  Brain, Newspaper, LayoutDashboard
 } from 'lucide-react';
 import { DailySummaryGrid } from '../Components/DailySummaryGrid';
 import { VoiceInputDock } from '../Components/VoiceInputDock';
@@ -16,20 +15,7 @@ import { AICRM } from '../CRM/AICRM';
 import { AICommunity } from '../Community/AICommunity';
 import { AINews } from '../News/AINews';
 import { AIMemorySettings } from '../Settings/AIMemorySettings';
-import { 
-  getAIDashboardSummary, 
-  processAIPersonalMessage, 
-  getDueAIReminders, 
-  dismissAIReminder, 
-  snoozeAIReminder 
-} from '@/actions/ai-manager';
-import { 
-  playRingtoneAlarm, 
-  stopRingtoneAlarm, 
-  speakAlarmVoice, 
-  triggerSystemNotification 
-} from '../Core/alarm-engine';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { getAIDashboardSummary, processAIPersonalMessage } from '@/actions/ai-manager';
 import { Button } from '@/components/ui/button';
 
 export type AIModuleTab = 
@@ -50,13 +36,6 @@ interface Message {
   time: string;
 }
 
-interface ActiveAlarm {
-  id: string;
-  title: string;
-  type: string;
-  remindAt: Date | string;
-}
-
 export function AIDashboard() {
   const { data: session } = useSession();
   const [activeTab, setActiveTab] = useState<AIModuleTab>('dashboard');
@@ -71,7 +50,6 @@ export function AIDashboard() {
   });
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [activeAlarm, setActiveAlarm] = useState<ActiveAlarm | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -81,48 +59,6 @@ export function AIDashboard() {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-
-  // 🚨 Real-time Alarm Ringing Poller (Checks database every 4 seconds)
-  useEffect(() => {
-    const checkAlarms = async () => {
-      if (activeAlarm) return; // Already ringing an alarm
-
-      const res = await getDueAIReminders();
-      if (res.success && res.dueReminders && res.dueReminders.length > 0) {
-        const due = res.dueReminders[0];
-        setActiveAlarm(due as any);
-
-        // 1. Play Loud Ringtone Audio Alarm
-        playRingtoneAlarm();
-
-        // 2. Speak AI Voice Alarm Announcement
-        speakAlarmVoice(`Sir! Alarm alert! Time for your reminder: ${due.title}`);
-
-        // 3. Trigger Web Browser Push Notification
-        triggerSystemNotification("⏰ TOLEE AI ALARM REMINDER", due.title);
-      }
-    };
-
-    checkAlarms();
-    const interval = setInterval(checkAlarms, 4000);
-    return () => clearInterval(interval);
-  }, [activeAlarm]);
-
-  const handleStopAlarm = async () => {
-    if (!activeAlarm) return;
-    stopRingtoneAlarm();
-    await dismissAIReminder(activeAlarm.id);
-    setActiveAlarm(null);
-    loadSummary();
-  };
-
-  const handleSnoozeAlarm = async () => {
-    if (!activeAlarm) return;
-    stopRingtoneAlarm();
-    await snoozeAIReminder(activeAlarm.id, 5);
-    setActiveAlarm(null);
-    loadSummary();
-  };
 
   const loadSummary = async () => {
     const res = await getAIDashboardSummary();
@@ -160,50 +96,6 @@ export function AIDashboard() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-65px)] bg-slate-50 dark:bg-[#09090b] relative">
-      {/* 🚨 RINGING AUDIO ALARM POPUP MODAL */}
-      {activeAlarm && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-zinc-900 border border-violet-500/50 rounded-3xl p-6 sm:p-8 max-w-md w-full text-center space-y-6 shadow-2xl relative overflow-hidden">
-            {/* Glowing Ringing Background Pulse */}
-            <div className="absolute -top-24 -left-24 w-48 h-48 bg-rose-500/20 rounded-full blur-3xl animate-ping" />
-            <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-violet-500/20 rounded-full blur-3xl animate-ping" />
-
-            <div className="inline-flex p-4 rounded-full bg-rose-100 dark:bg-rose-950/50 text-rose-600 animate-bounce">
-              <BellRing className="w-10 h-10 sm:w-12 sm:h-12" />
-            </div>
-
-            <div>
-              <span className="text-xs font-bold tracking-widest text-rose-500 uppercase">⏰ ALARM RINGING NOW</span>
-              <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white mt-1">
-                {activeAlarm.title}
-              </h2>
-              <p className="text-xs text-slate-500 dark:text-zinc-400 mt-2">
-                Tolee AI Alarm Engine is playing loud ringtone and voice alert.
-              </p>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex items-center gap-3 pt-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleSnoozeAlarm}
-                className="flex-1 rounded-2xl py-6 border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-zinc-300 font-bold hover:bg-slate-100 dark:hover:bg-zinc-800"
-              >
-                <Clock className="w-4 h-4 mr-2" /> Snooze 5 Min
-              </Button>
-              <Button
-                type="button"
-                onClick={handleStopAlarm}
-                className="flex-1 rounded-2xl py-6 bg-rose-600 hover:bg-rose-700 text-white font-bold shadow-lg shadow-rose-600/30"
-              >
-                <Check className="w-4 h-4 mr-2" /> Stop Alarm
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Top AI Navigation Bar */}
       <div className="sticky top-0 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md border-b border-slate-200 dark:border-zinc-800 z-20 px-4 py-2">
         <div className="max-w-6xl mx-auto flex items-center justify-between overflow-x-auto no-scrollbar gap-2">
