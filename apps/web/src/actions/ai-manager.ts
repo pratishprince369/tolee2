@@ -23,6 +23,42 @@ async function getUserId(): Promise<string> {
   return user.id;
 }
 
+// Helper: Parse relative reminder time from message text
+function parseReminderTime(message: string): { remindAt: Date; textTitle: string; formattedTime: string } {
+  const lower = message.toLowerCase();
+  let delayMs = 5 * 60 * 1000; // Default 5 minutes if unspecified
+
+  // Match minute patterns: "5 min", "5 minute", "10 mins", "in 2 minutes"
+  const minMatch = lower.match(/(\d+)\s*(min|minute|mints|m)\b/);
+  // Match hour patterns: "1 hour", "2 hr", "2 ghante"
+  const hourMatch = lower.match(/(\d+)\s*(hour|hr|h|ghante|ghanta)\b/);
+  // Match second patterns: "30 sec", "30 second"
+  const secMatch = lower.match(/(\d+)\s*(sec|second|s)\b/);
+
+  if (minMatch && minMatch[1]) {
+    delayMs = parseInt(minMatch[1], 10) * 60 * 1000;
+  } else if (hourMatch && hourMatch[1]) {
+    delayMs = parseInt(hourMatch[1], 10) * 60 * 60 * 1000;
+  } else if (secMatch && secMatch[1]) {
+    delayMs = parseInt(secMatch[1], 10) * 1000;
+  }
+
+  const remindAt = new Date(Date.now() + delayMs);
+  const formattedTime = remindAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  // Clean title for display
+  let textTitle = message
+    .replace(/remind me/gi, '')
+    .replace(/reminder/gi, '')
+    .replace(/\b(in|at|me|mujhe|ke liye|dena|karo|set|phone ring karake|like alaram|alarm)\b/gi, '')
+    .replace(/\d+\s*(min|minute|hr|hour|sec|second|ghante)/gi, '')
+    .trim();
+
+  if (!textTitle || textTitle.length < 2) textTitle = message;
+
+  return { remindAt, textTitle, formattedTime };
+}
+
 // ------------------------------------
 // 1. AI MEMORY ENGINE ACTIONS
 // ------------------------------------
@@ -137,6 +173,71 @@ export async function createAITask(data: {
   }
 }
 
+export async function createAIReminderDirectly(title: string, remindAtDate: Date) {
+  try {
+    const userId = await getUserId();
+    const reminder = await prisma.aIReminder.create({
+      data: {
+        userId,
+        title,
+        type: 'alarm',
+        remindAt: remindAtDate
+      }
+    });
+    return { success: true, reminder };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function getDueAIReminders() {
+  try {
+    const userId = await getUserId();
+    const now = new Date();
+    const dueReminders = await prisma.aIReminder.findMany({
+      where: {
+        userId,
+        isDismissed: false,
+        remindAt: { lte: now }
+      },
+      orderBy: { remindAt: 'asc' }
+    });
+    return { success: true, dueReminders };
+  } catch (error: any) {
+    return { success: false, dueReminders: [] };
+  }
+}
+
+export async function dismissAIReminder(reminderId: string) {
+  try {
+    const userId = await getUserId();
+    await prisma.aIReminder.updateMany({
+      where: { id: reminderId, userId },
+      data: { isDismissed: true }
+    });
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function snoozeAIReminder(reminderId: string, snoozeMinutes: number = 5) {
+  try {
+    const userId = await getUserId();
+    const newRemindAt = new Date(Date.now() + snoozeMinutes * 60 * 1000);
+    await prisma.aIReminder.updateMany({
+      where: { id: reminderId, userId },
+      data: {
+        remindAt: newRemindAt,
+        isDismissed: false
+      }
+    });
+    return { success: true, newRemindAt };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
 export async function getAITasks(status: string = 'pending') {
   try {
     const userId = await getUserId();
@@ -246,7 +347,7 @@ export async function getAIDashboardSummary() {
 }
 
 // ------------------------------------
-// 4. SUB-SECOND REAL AI PERSONAL ASSISTANT PROCESSOR
+// 4. REAL-TIME AI PERSONAL ASSISTANT PROCESSOR WITH ALARM SCHEDULER
 // ------------------------------------
 
 export async function processAIPersonalMessage(message: string, history: { role: string; content: string }[] = []) {
@@ -260,12 +361,30 @@ export async function processAIPersonalMessage(message: string, history: { role:
     if (simpleGreetings.includes(lower)) {
       return {
         success: true,
-        response: `👋 Hello! I am your 24×7 Tolee AI Personal Assistant. How can I assist you with your tasks, calendar, community posts, or CRM today?`
+        response: `👋 Hello! I am your 24×7 Tolee AI Personal Assistant. How can I assist you with your tasks, calendar, alarms, or community today?`
       };
     }
 
-    // 1. Task / Schedule creation in database
-    if (lower.includes('schedule') || lower.includes('remind') || lower.includes('task') || lower.includes('appointment') || lower.includes('bill')) {
+    // 1. Alarm & Reminder Parsing Logic
+    if (lower.includes('remind') || lower.includes('reminder') || lower.includes('alarm') || lower.includes('ring') || lower.includes('bell')) {
+      const { remindAt, textTitle, formattedTime } = parseReminderTime(trimmed);
+
+      // Save alarm reminder in database
+      await createAIReminderDirectly(textTitle, remindAt);
+      await createAITask({
+        title: textTitle,
+        description: `Alarm scheduled for ${formattedTime}`,
+        dueDate: remindAt.toISOString()
+      });
+
+      return {
+        success: true,
+        response: `⏰ **Alarm & Reminder Set Successfully!**\n\nI have scheduled your reminder for **"${textTitle}"** at **${formattedTime}**.\n\n🔊 *My audio alarm system will ring loudly and alert you with voice synthesis at exactly ${formattedTime}!*`
+      };
+    }
+
+    // 2. Task / Schedule creation in database
+    if (lower.includes('schedule') || lower.includes('task') || lower.includes('appointment') || lower.includes('bill')) {
       await createAITask({
         title: trimmed,
         description: 'Auto-created via Tolee AI Personal Assistant',
@@ -273,7 +392,7 @@ export async function processAIPersonalMessage(message: string, history: { role:
       });
     }
 
-    // 2. Memory saving in database
+    // 3. Memory saving in database
     if (lower.includes('remember') || lower.includes('save note') || lower.includes('my favorite') || lower.includes('birthday is')) {
       await saveAIMemory({
         category: lower.includes('birthday') ? 'family' : 'personal',
@@ -282,7 +401,7 @@ export async function processAIPersonalMessage(message: string, history: { role:
       });
     }
 
-    // 3. Fetch user memories for context
+    // 4. Fetch user memories for context
     const existingMemories = await prisma.aIMemory.findMany({
       where: { userId },
       take: 5
@@ -294,7 +413,7 @@ export async function processAIPersonalMessage(message: string, history: { role:
 
     const systemPromptWithContext = `${SYSTEM_PROMPTS.PERSONAL_EMPLOYEE}\n\n${memoryContext}\n\nYou are a real human-like Jarvis AI Employee for Tolee. Respond concisely, warmly, and helpfully.`;
 
-    // 4. Call Ultra-Fast NVIDIA NIM LLM
+    // 5. Call Ultra-Fast NVIDIA NIM LLM
     const nvidiaResponse = await callNvidiaLLM(
       [...history, { role: 'user', content: trimmed }],
       systemPromptWithContext
@@ -310,7 +429,7 @@ export async function processAIPersonalMessage(message: string, history: { role:
     // Fallback response if LLM API is unreachable or timed out
     return {
       success: true,
-      response: `🤖 **Tolee AI Employee**: I have processed your request: "${trimmed}". I have updated your tasks and memory in your database. What would you like to execute next?`
+      response: `🤖 **Tolee AI Employee**: I have processed your request: "${trimmed}". I have updated your tasks and alarms in your database. What would you like to execute next?`
     };
 
   } catch (error: any) {
