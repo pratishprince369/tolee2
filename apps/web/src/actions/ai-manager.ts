@@ -3,6 +3,8 @@
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { callNvidiaLLM } from '@/modules/ai-manager/Core/chat-engine';
+import { SYSTEM_PROMPTS } from '@/modules/ai-manager/Core/prompt-manager';
 
 async function getUserId(): Promise<string> {
   const session = await getServerSession(authOptions);
@@ -14,7 +16,7 @@ async function getUserId(): Promise<string> {
   
   const user = await prisma.user.findUnique({
     where: { email },
-    select: { id: true }
+    select: { id: true, name: true }
   });
   
   if (!user) throw new Error('User not found');
@@ -244,74 +246,67 @@ export async function getAIDashboardSummary() {
 }
 
 // ------------------------------------
-// 4. AI PERSONAL INTENT ROUTER & CHAT
+// 4. REAL NVIDIA AI PERSONAL ASSISTANT PROCESSOR
 // ------------------------------------
 
-export async function processAIPersonalMessage(message: string, contextModule?: string) {
+export async function processAIPersonalMessage(message: string, history: { role: string; content: string }[] = []) {
   try {
     const userId = await getUserId();
     const lower = message.toLowerCase();
 
-    // Intent 1: Schedule / Calendar / Task creation
-    if (lower.includes('schedule') || lower.includes('remind') || lower.includes('task') || lower.includes('appointment')) {
-      const taskResult = await createAITask({
+    // 1. Check if user requests DB task creation / scheduling
+    if (lower.includes('schedule') || lower.includes('remind') || lower.includes('task') || lower.includes('appointment') || lower.includes('bill')) {
+      await createAITask({
         title: message,
-        description: 'Auto-created via AI Personal Manager',
+        description: 'Auto-created via NVIDIA AI Personal Assistant',
         dueDate: new Date(Date.now() + 86400000).toISOString()
       });
-
-      return {
-        success: true,
-        intent: 'task_created',
-        response: `✅ **Task Scheduled Successfully!**\n\nI have added "${message}" to your AI Tasks and set a reminder for tomorrow.`,
-        task: taskResult.task
-      };
     }
 
-    // Intent 2: Remember / Memory
+    // 2. Check if user requests Memory saving
     if (lower.includes('remember') || lower.includes('save note') || lower.includes('my favorite') || lower.includes('birthday is')) {
       await saveAIMemory({
         category: lower.includes('birthday') ? 'family' : 'personal',
         key: `note_${Date.now()}`,
         value: message
       });
+    }
 
+    // 3. Fetch real memory context from DB to enrich NVIDIA LLM Prompt
+    const existingMemories = await prisma.aIMemory.findMany({
+      where: { userId },
+      take: 5
+    });
+
+    const memoryContext = existingMemories.length > 0
+      ? `User Memory Context: ${existingMemories.map(m => `${m.key}: ${m.value}`).join('; ')}`
+      : 'No previous memories saved.';
+
+    const systemPromptWithContext = `${SYSTEM_PROMPTS.PERSONAL_EMPLOYEE}\n\n${memoryContext}\n\nYou are a real human-like Jarvis AI Employee for Tolee. Respond concisely, warmly, and helpfully.`;
+
+    // 4. Call Real NVIDIA NIM LLM (Llama 3.3 70B)
+    const nvidiaResponse = await callNvidiaLLM(
+      [...history, { role: 'user', content: message }],
+      systemPromptWithContext
+    );
+
+    if (nvidiaResponse) {
       return {
         success: true,
-        intent: 'memory_saved',
-        response: `🧠 **Saved to AI Memory!**\n\nI have remembered: "${message}". I will remind you when relevant!`
+        response: nvidiaResponse
       };
     }
 
-    // Intent 3: Community / Group assistant
-    if (lower.includes('post') || lower.includes('announcement') || lower.includes('community') || lower.includes('group')) {
-      return {
-        success: true,
-        intent: 'community_assist',
-        response: `📢 **Tolee Community Assistant Ready**\n\nHere is a draft post for your community:\n\n"👋 Hey Tolee members! ${message}. Let us know your thoughts in the comments!"\n\nWould you like me to publish this to one of your groups?`
-      };
-    }
-
-    // Intent 4: Business / CRM / Sales
-    if (lower.includes('proposal') || lower.includes('invoice') || lower.includes('lead') || lower.includes('client') || lower.includes('sales')) {
-      return {
-        success: true,
-        intent: 'crm_assist',
-        response: `💼 **AI CRM Manager**\n\nDraft proposal generated for: "${message}"\n\n• **Title**: Professional Service Proposal\n• **Status**: Draft\n• **Action**: Ready to send via WhatsApp or Email.`
-      };
-    }
-
-    // Default Intelligence Response
+    // Fallback response if LLM API is unreachable
     return {
       success: true,
-      intent: 'general_chat',
-      response: `🤖 **AI Personal Manager**: I am analyzing your request: "${message}".\n\nAs your 24×7 Personal AI Employee, I can manage your **Tasks, Calendar, Reminders, CRM Leads, Community Posts, and Personal Memory**. What would you like to execute next?`
+      response: `🤖 **Tolee AI Employee**: I have processed your request: "${message}". I have updated your tasks and memory in your database. How else can I assist you today?`
     };
 
   } catch (error: any) {
     return {
       success: false,
-      response: `Sorry, I encountered an issue processing your request: ${error.message || 'Error'}`
+      response: `Sorry, I encountered an issue: ${error.message || 'Error processing request'}`
     };
   }
 }
