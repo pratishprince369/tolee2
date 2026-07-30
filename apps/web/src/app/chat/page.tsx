@@ -2557,9 +2557,16 @@ export default function ChatPage() {
                                     <p className="text-[10px] text-gray-400 truncate">@{member.username}</p>
                                   </div>
                                 </div>
-                                {member.isOnline && (
-                                  <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0 select-none"></span>
-                                )}
+                                <div className="flex items-center gap-2 flex-shrink-0 select-none">
+                                  {member.role === 'admin' && (
+                                    <span className="text-[10px] font-bold bg-primary text-white dark:bg-teal-600 dark:text-white px-2 py-0.5 rounded-full">
+                                      Admin
+                                    </span>
+                                  )}
+                                  {member.isOnline && (
+                                    <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0"></span>
+                                  )}
+                                </div>
                               </div>
                             ))}
                           </div>
@@ -2915,9 +2922,16 @@ export default function ChatPage() {
                         <p className="text-[10px] text-zinc-400">@{member.username}</p>
                       </div>
                     </div>
-                    {member.isOnline && (
-                      <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse border-2 border-zinc-950 shrink-0" />
-                    )}
+                    <div className="flex items-center gap-2 shrink-0 select-none">
+                      {member.role === 'admin' && (
+                        <span className="text-[10px] font-bold bg-primary text-white dark:bg-teal-600 dark:text-white px-2 py-0.5 rounded-full">
+                          Admin
+                        </span>
+                      )}
+                      {member.isOnline && (
+                        <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse border-2 border-zinc-950 shrink-0" />
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

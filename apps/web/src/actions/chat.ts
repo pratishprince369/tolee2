@@ -802,13 +802,33 @@ export async function fetchGroupChatDetails(chatId: string) {
       const isOnline = member.showActivityStatus && (
         member.lastActiveAt && (new Date().getTime() - new Date(member.lastActiveAt).getTime()) < 35000
       );
+      const memberRecord = tolee.members.find(m => m.userId === member.id);
+      let role = memberRecord?.role || 'member';
+      if (member.id === tolee.ownerId) {
+        role = 'admin';
+      }
       return {
         id: member.id,
         name: member.name || member.username || 'User',
         username: member.username || '',
         avatar: member.avatar || member.image || '/default-user-avatar.svg',
-        isOnline
+        isOnline,
+        role
       };
+    });
+
+    members.sort((a, b) => {
+      const isAAdmin = a.role === 'admin';
+      const isBAdmin = b.role === 'admin';
+      if (isAAdmin && !isBAdmin) return -1;
+      if (!isAAdmin && isBAdmin) return 1;
+
+      const isAMod = a.role === 'moderator';
+      const isBMod = b.role === 'moderator';
+      if (isAMod && !isBMod) return -1;
+      if (!isAMod && isBMod) return 1;
+
+      return 0;
     });
 
     // Fetch shared media (messages in this chat containing attachments)
