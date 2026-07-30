@@ -2463,7 +2463,8 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
             </Card>
 
           </div>
-        )}
+        </div>
+      )}
       </main>
 
       {/* Facebook Style Comments Modal */}

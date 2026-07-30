@@ -714,13 +714,17 @@ export async function getUserOwnedTolees() {
   }
 }
 
-export async function deleteTolee(id: string) {
+export async function deleteTolee(id: string, confirmationText?: string) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user || !(session.user as any).id) {
       return { success: false, error: 'Unauthorized' };
     }
     const userId = (session.user as any).id;
+
+    if (confirmationText !== undefined && confirmationText.trim().toUpperCase() !== 'DELETE') {
+      return { success: false, error: 'Please type DELETE to confirm group deletion.' };
+    }
 
     const tolee = await prisma.tolee.findUnique({
       where: { id },
@@ -1226,44 +1230,6 @@ export async function transferToleeOwnership(toleeId: string, newOwnerUserId: st
   } catch (err: any) {
     console.error("Error transferring ownership:", err);
     return { success: false, error: err.message || 'Failed to transfer ownership' };
-  }
-}
-
-export async function deleteTolee(toleeId: string, confirmationText: string) {
-  try {
-    const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id;
-    if (!userId) return { success: false, error: 'Unauthorized' };
-
-    if (confirmationText.trim().toUpperCase() !== 'DELETE') {
-      return { success: false, error: 'Please type DELETE to confirm group deletion.' };
-    }
-
-    const tolee = await prisma.tolee.findUnique({
-      where: { id: toleeId },
-      select: { id: true, ownerId: true, name: true, slug: true }
-    });
-
-    if (!tolee) return { success: false, error: 'Group not found' };
-
-    if (tolee.ownerId !== userId) {
-      return { success: false, error: 'Only the Founder can permanently delete this group.' };
-    }
-
-    // Cascade cleanup in transaction
-    await prisma.$transaction([
-      prisma.toleePost.deleteMany({ where: { toleeId } }),
-      prisma.toleeMember.deleteMany({ where: { toleeId } }),
-      prisma.toleeJoinRequest.deleteMany({ where: { toleeId } }),
-      prisma.tolee.delete({ where: { id: toleeId } })
-    ]);
-
-    revalidatePath('/discover');
-    revalidatePath('/my-tolees');
-    return { success: true };
-  } catch (err: any) {
-    console.error("Error deleting Tolee:", err);
-    return { success: false, error: err.message || 'Failed to delete group' };
   }
 }
 
