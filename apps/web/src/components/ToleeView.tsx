@@ -14,11 +14,12 @@ import {
   Trophy, Users, Calendar, BookOpen, Star, ShieldCheck,
   TrendingUp, PlayCircle, StopCircle, MapPin, Globe, AlertTriangle, Search, Repeat, Store,
   UtensilsCrossed, ShoppingBag, CheckCircle2, Lock,
-  VideoOff, Mic, MicOff, Monitor, Radio, Sparkles
+  VideoOff, Mic, MicOff, Monitor, Radio, Sparkles, Settings
 } from 'lucide-react';
 
 import { CreatePostModal } from '@/components/CreatePostModal';
 import { ToleeCOSDashboard } from '@/components/ToleeCOSDashboard';
+import { ToleeGroupSettings } from '@/components/ToleeGroupSettings';
 import { PostCarousel } from '@/components/PostCarousel';
 import { OptimisticPostCard } from '@/components/OptimisticPostCard';
 import { ManageToleeModal } from '@/components/ManageToleeModal';
@@ -1179,6 +1180,12 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                     <AlertTriangle className="w-4 h-4" />
                     Report Group
                   </DropdownMenuItem>
+                  {(isAdmin || tolee?.ownerId === currentUserId) && (
+                    <DropdownMenuItem onClick={() => setActiveTab('settings')} className="flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400 cursor-pointer">
+                      <Settings className="w-4 h-4" />
+                      Group Settings ⚙️
+                    </DropdownMenuItem>
+                  )}
                   {isMember && !isAdmin && (
                     <>
                       <DropdownMenuSeparator className="my-1 border-gray-100 dark:border-zinc-900" />
@@ -1208,16 +1215,40 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                 {tab === 'dashboard' ? 'COS Workspace ⚡' : tab === 'live' ? 'Live Masterclass 🎓' : tab}
               </button>
             ))}
+            {(isAdmin || tolee?.ownerId === currentUserId) && (
+              <button 
+                key="settings"
+                onClick={() => setActiveTab('settings')}
+                className={`px-6 py-4 text-sm font-bold uppercase tracking-wider whitespace-nowrap border-b-2 transition-colors flex items-center gap-1.5 ${
+                  activeTab === 'settings' 
+                    ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 font-extrabold' 
+                    : 'border-transparent text-gray-500 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                <Settings className="w-4 h-4" /> Group Settings ⚙️
+              </button>
+            )}
           </div>
         </div>
       </div>
 
       {/* Main Content Area */}
       <main className="container mx-auto px-4 pt-8 pb-24 max-w-6xl">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
-          {/* Left Column - Feed / Main Content */}
-          <div className="lg:col-span-2 space-y-6">
+        {/* Full-width Group Settings Tab */}
+        {activeTab === 'settings' ? (
+          <div className="w-full">
+            <ToleeGroupSettings 
+              tolee={tolee} 
+              currentUserId={currentUserId || undefined} 
+              isOwner={tolee?.ownerId === currentUserId} 
+              isAdmin={isAdmin} 
+            />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            {/* Left Column - Feed / Main Content */}
+            <div className="lg:col-span-2 space-y-6">
             
             {/* COS Dashboard Tab */}
             {activeTab === 'dashboard' && (
@@ -2432,7 +2463,7 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
             </Card>
 
           </div>
-        </div>
+        )}
       </main>
 
       {/* Facebook Style Comments Modal */}

@@ -1089,3 +1089,267 @@ export async function getToleeById(id: string) {
     return { success: false, error: err.message || 'Failed to fetch Tolee' };
   }
 }
+
+// ==========================================
+// GROUP SETTINGS & GOVERNANCE SERVER ACTIONS
+// ==========================================
+
+export async function updateGroupSettings(toleeId: string, settingsData: {
+  name?: string;
+  description?: string;
+  category?: string;
+  isPrivate?: boolean;
+  isSearchable?: boolean;
+  rules?: string;
+  membershipQuestions?: string;
+  welcomeMessage?: string;
+  pendingPostApproval?: boolean;
+  coverImage?: string;
+  avatar?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  websiteUrl?: string;
+  customSlug?: string;
+}) {
+  try {
+    const session = await getServerSession(authOptions);
+    const userId = (session?.user as any)?.id;
+    if (!userId) return { success: false, error: 'Unauthorized' };
+
+    const tolee = await prisma.tolee.findUnique({
+      where: { id: toleeId },
+      include: { members: true }
+    });
+
+    if (!tolee) return { success: false, error: 'Group not found' };
+
+    const isOwner = tolee.ownerId === userId;
+    const member = tolee.members.find(m => m.userId === userId && m.status === 'approved');
+    const isAdmin = member?.role === 'admin' || isOwner;
+
+    if (!isAdmin) {
+      return { success: false, error: 'Only admins can modify group settings.' };
+    }
+
+    const updatePayload: any = {};
+    if (settingsData.name) updatePayload.name = sanitizeText(settingsData.name, 80);
+    if (settingsData.description !== undefined) updatePayload.description = sanitizeText(settingsData.description, 1000);
+    if (settingsData.category) updatePayload.category = sanitizeText(settingsData.category, 50);
+    if (settingsData.isPrivate !== undefined) updatePayload.isPrivate = settingsData.isPrivate;
+    if (settingsData.rules !== undefined) updatePayload.rules = sanitizeText(settingsData.rules, 3000);
+    if (settingsData.membershipQuestions !== undefined) updatePayload.membershipQuestions = sanitizeText(settingsData.membershipQuestions, 2000);
+    if (settingsData.welcomeMessage !== undefined) updatePayload.welcomeMessage = sanitizeText(settingsData.welcomeMessage, 1000);
+    if (settingsData.pendingPostApproval !== undefined) updatePayload.pendingPostApproval = settingsData.pendingPostApproval;
+    if (settingsData.coverImage !== undefined) updatePayload.coverImage = settingsData.coverImage;
+    if (settingsData.avatar !== undefined) updatePayload.avatar = settingsData.avatar;
+
+    if (settingsData.isSearchable !== undefined) {
+      const typeMatch = tolee.tags?.match(/type:([a-z_]+)/);
+      const typeStr = typeMatch ? typeMatch[1] : (tolee.category || 'general');
+      updatePayload.tags = `type:${typeStr},searchable:${settingsData.isSearchable}`;
+    }
+
+    const updated = await prisma.tolee.update({
+      where: { id: toleeId },
+      data: updatePayload
+    });
+
+    revalidatePath(`/t/${updated.slug}`);
+    revalidatePath(`/create-tolee`);
+    return { success: true, tolee: updated };
+  } catch (err: any) {
+    console.error("Error updating group settings:", err);
+    return { success: false, error: err.message || 'Failed to update settings' };
+  }
+}
+
+export async function transferToleeOwnership(toleeId: string, newOwnerUserId: string) {
+  try {
+    const session = await getServerSession(authOptions);
+    const currentUserId = (session?.user as any)?.id;
+    if (!currentUserId) return { success: false, error: 'Unauthorized' };
+
+    const tolee = await prisma.tolee.findUnique({
+      where: { id: toleeId },
+      select: { id: true, ownerId: true, name: true, slug: true }
+    });
+
+    if (!tolee) return { success: false, error: 'Group not found' };
+
+    if (tolee.ownerId !== currentUserId) {
+      return { success: false, error: 'Only the Founder can transfer group ownership.' };
+    }
+
+    if (currentUserId === newOwnerUserId) {
+      return { success: false, error: 'You are already the owner of this group.' };
+    }
+
+    const targetMember = await prisma.toleeMember.findUnique({
+      where: {
+        userId_toleeId: {
+          userId: newOwnerUserId,
+          toleeId
+        }
+      }
+    });
+
+    if (!targetMember || targetMember.status !== 'approved') {
+      return { success: false, error: 'The selected user is not an approved member of this group.' };
+    }
+
+    await prisma.$transaction([
+      prisma.tolee.update({
+        where: { id: toleeId },
+        data: { ownerId: newOwnerUserId }
+      }),
+      prisma.toleeMember.update({
+        where: {
+          userId_toleeId: {
+            userId: newOwnerUserId,
+            toleeId
+          }
+        },
+        data: { role: 'admin' }
+      })
+    ]);
+
+    await createSystemNotification({
+      userId: newOwnerUserId,
+      type: 'TOLEE_OWNERSHIP_TRANSFERRED',
+      title: '👑 Group Ownership Transferred',
+      message: `You are now the Founder & Super Admin of ${tolee.name}.`,
+      link: `/t/${tolee.slug}`
+    });
+
+    revalidatePath(`/t/${tolee.slug}`);
+    return { success: true };
+  } catch (err: any) {
+    console.error("Error transferring ownership:", err);
+    return { success: false, error: err.message || 'Failed to transfer ownership' };
+  }
+}
+
+export async function deleteTolee(toleeId: string, confirmationText: string) {
+  try {
+    const session = await getServerSession(authOptions);
+    const userId = (session?.user as any)?.id;
+    if (!userId) return { success: false, error: 'Unauthorized' };
+
+    if (confirmationText.trim().toUpperCase() !== 'DELETE') {
+      return { success: false, error: 'Please type DELETE to confirm group deletion.' };
+    }
+
+    const tolee = await prisma.tolee.findUnique({
+      where: { id: toleeId },
+      select: { id: true, ownerId: true, name: true, slug: true }
+    });
+
+    if (!tolee) return { success: false, error: 'Group not found' };
+
+    if (tolee.ownerId !== userId) {
+      return { success: false, error: 'Only the Founder can permanently delete this group.' };
+    }
+
+    // Cascade cleanup in transaction
+    await prisma.$transaction([
+      prisma.toleePost.deleteMany({ where: { toleeId } }),
+      prisma.toleeMember.deleteMany({ where: { toleeId } }),
+      prisma.toleeJoinRequest.deleteMany({ where: { toleeId } }),
+      prisma.tolee.delete({ where: { id: toleeId } })
+    ]);
+
+    revalidatePath('/discover');
+    revalidatePath('/my-tolees');
+    return { success: true };
+  } catch (err: any) {
+    console.error("Error deleting Tolee:", err);
+    return { success: false, error: err.message || 'Failed to delete group' };
+  }
+}
+
+export async function updateMemberRole(toleeId: string, targetUserId: string, newRole: string) {
+  try {
+    const session = await getServerSession(authOptions);
+    const userId = (session?.user as any)?.id;
+    if (!userId) return { success: false, error: 'Unauthorized' };
+
+    const tolee = await prisma.tolee.findUnique({
+      where: { id: toleeId },
+      select: { id: true, ownerId: true, slug: true }
+    });
+
+    if (!tolee) return { success: false, error: 'Group not found' };
+
+    const callerMember = await prisma.toleeMember.findUnique({
+      where: { userId_toleeId: { userId, toleeId } }
+    });
+
+    const isCallerAdmin = callerMember?.role === 'admin' || tolee.ownerId === userId;
+    if (!isCallerAdmin) {
+      return { success: false, error: 'Only group admins can update member roles.' };
+    }
+
+    if (targetUserId === tolee.ownerId && newRole !== 'admin') {
+      return { success: false, error: 'Cannot demote the Founder.' };
+    }
+
+    await prisma.toleeMember.update({
+      where: {
+        userId_toleeId: {
+          userId: targetUserId,
+          toleeId
+        }
+      },
+      data: { role: newRole }
+    });
+
+    revalidatePath(`/t/${tolee.slug}`);
+    return { success: true };
+  } catch (err: any) {
+    console.error("Error updating member role:", err);
+    return { success: false, error: err.message || 'Failed to update member role' };
+  }
+}
+
+export async function sendEmergencyGroupBroadcast(toleeId: string, broadcastMessage: string) {
+  try {
+    const session = await getServerSession(authOptions);
+    const userId = (session?.user as any)?.id;
+    if (!userId) return { success: false, error: 'Unauthorized' };
+
+    const tolee = await prisma.tolee.findUnique({
+      where: { id: toleeId },
+      include: {
+        members: { where: { status: 'approved' }, select: { userId: true } }
+      }
+    });
+
+    if (!tolee) return { success: false, error: 'Group not found' };
+
+    const isOwner = tolee.ownerId === userId;
+    const callerMember = tolee.members.find(m => m.userId === userId);
+    const isAdmin = callerMember || isOwner;
+
+    if (!isAdmin) {
+      return { success: false, error: 'Only admins can send emergency broadcasts.' };
+    }
+
+    const memberIds = tolee.members.map(m => m.userId).filter(id => id !== userId);
+
+    if (memberIds.length > 0) {
+      await createSystemNotificationsMany({
+        userIds: memberIds,
+        type: 'TOLEE_EMERGENCY_BROADCAST',
+        title: `🚨 Emergency Announcement: ${tolee.name}`,
+        message: broadcastMessage,
+        link: `/t/${tolee.slug}`
+      });
+    }
+
+    return { success: true, count: memberIds.length };
+  } catch (err: any) {
+    console.error("Error sending emergency broadcast:", err);
+    return { success: false, error: err.message || 'Failed to send broadcast' };
+  }
+}
+
