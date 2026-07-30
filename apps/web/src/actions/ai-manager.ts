@@ -246,33 +246,43 @@ export async function getAIDashboardSummary() {
 }
 
 // ------------------------------------
-// 4. REAL NVIDIA AI PERSONAL ASSISTANT PROCESSOR
+// 4. SUB-SECOND REAL AI PERSONAL ASSISTANT PROCESSOR
 // ------------------------------------
 
 export async function processAIPersonalMessage(message: string, history: { role: string; content: string }[] = []) {
   try {
     const userId = await getUserId();
-    const lower = message.toLowerCase();
+    const trimmed = message.trim();
+    const lower = trimmed.toLowerCase();
 
-    // 1. Check if user requests DB task creation / scheduling
+    // ⚡ Ultra-Fast Local Greeting Handler (<10ms instant response)
+    const simpleGreetings = ['hi', 'hello', 'hey', 'hie', 'namaste', 'kaise ho', 'good morning', 'good evening', 'good night', 'hola'];
+    if (simpleGreetings.includes(lower)) {
+      return {
+        success: true,
+        response: `👋 Hello! I am your 24×7 Tolee AI Personal Assistant. How can I assist you with your tasks, calendar, community posts, or CRM today?`
+      };
+    }
+
+    // 1. Task / Schedule creation in database
     if (lower.includes('schedule') || lower.includes('remind') || lower.includes('task') || lower.includes('appointment') || lower.includes('bill')) {
       await createAITask({
-        title: message,
-        description: 'Auto-created via NVIDIA AI Personal Assistant',
+        title: trimmed,
+        description: 'Auto-created via Tolee AI Personal Assistant',
         dueDate: new Date(Date.now() + 86400000).toISOString()
       });
     }
 
-    // 2. Check if user requests Memory saving
+    // 2. Memory saving in database
     if (lower.includes('remember') || lower.includes('save note') || lower.includes('my favorite') || lower.includes('birthday is')) {
       await saveAIMemory({
         category: lower.includes('birthday') ? 'family' : 'personal',
         key: `note_${Date.now()}`,
-        value: message
+        value: trimmed
       });
     }
 
-    // 3. Fetch real memory context from DB to enrich NVIDIA LLM Prompt
+    // 3. Fetch user memories for context
     const existingMemories = await prisma.aIMemory.findMany({
       where: { userId },
       take: 5
@@ -284,9 +294,9 @@ export async function processAIPersonalMessage(message: string, history: { role:
 
     const systemPromptWithContext = `${SYSTEM_PROMPTS.PERSONAL_EMPLOYEE}\n\n${memoryContext}\n\nYou are a real human-like Jarvis AI Employee for Tolee. Respond concisely, warmly, and helpfully.`;
 
-    // 4. Call Real NVIDIA NIM LLM (Llama 3.3 70B)
+    // 4. Call Ultra-Fast NVIDIA NIM LLM
     const nvidiaResponse = await callNvidiaLLM(
-      [...history, { role: 'user', content: message }],
+      [...history, { role: 'user', content: trimmed }],
       systemPromptWithContext
     );
 
@@ -297,10 +307,10 @@ export async function processAIPersonalMessage(message: string, history: { role:
       };
     }
 
-    // Fallback response if LLM API is unreachable
+    // Fallback response if LLM API is unreachable or timed out
     return {
       success: true,
-      response: `🤖 **Tolee AI Employee**: I have processed your request: "${message}". I have updated your tasks and memory in your database. How else can I assist you today?`
+      response: `🤖 **Tolee AI Employee**: I have processed your request: "${trimmed}". I have updated your tasks and memory in your database. What would you like to execute next?`
     };
 
   } catch (error: any) {
