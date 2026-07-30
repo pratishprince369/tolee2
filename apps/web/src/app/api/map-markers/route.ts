@@ -68,6 +68,7 @@ export async function GET() {
     // 3. Fetch location-based Tolee groups
     const toleeGroups = await prisma.tolee.findMany({
       where: {
+        isPublicVisible: true,
         latitude: { not: null },
         longitude: { not: null }
       },

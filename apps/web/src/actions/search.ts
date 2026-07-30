@@ -134,6 +134,7 @@ export async function performSearch(
       searchType === 'all' || searchType === 'groups' || searchType === 'trending'
         ? prisma.tolee.findMany({
             where: {
+              isPublicVisible: true,
               OR: [
                 { name: { contains: cleanQuery, mode: 'insensitive' } },
                 { description: { contains: cleanQuery, mode: 'insensitive' } },
@@ -466,7 +467,10 @@ export async function getSearchSuggestions(query: string): Promise<any[]> {
         take: 4
       }),
       prisma.tolee.findMany({
-        where: { name: { contains: cleanQuery, mode: 'insensitive' } },
+        where: {
+          isPublicVisible: true,
+          name: { contains: cleanQuery, mode: 'insensitive' }
+        },
         select: { id: true, name: true, avatar: true, category: true },
         take: 3
       }),
@@ -716,6 +720,9 @@ export async function getTrendingContent(): Promise<{
 
     // 3. Trending Tolee groups: Groups with the most members
     const tolees = await prisma.tolee.findMany({
+      where: {
+        isPublicVisible: true
+      },
       include: {
         members: true
       },

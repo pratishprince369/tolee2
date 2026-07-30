@@ -29,7 +29,7 @@ export function ToleeGroupSettings({ tolee, currentUserId, isOwner = false, isAd
   const [description, setDescription] = useState(tolee.description || '');
   const [category, setCategory] = useState(tolee.category || 'general');
   const [isPrivate, setIsPrivate] = useState<boolean>(tolee.isPrivate || false);
-  const [isSearchable, setIsSearchable] = useState<boolean>(!tolee.tags?.includes('searchable:false'));
+  const [isSearchable, setIsSearchable] = useState<boolean>(tolee.isPublicVisible !== false);
   const [rules, setRules] = useState(tolee.rules || '');
   const [questions, setQuestions] = useState(tolee.membershipQuestions || '');
   const [welcomeMessage, setWelcomeMessage] = useState(tolee.welcomeMessage || '');

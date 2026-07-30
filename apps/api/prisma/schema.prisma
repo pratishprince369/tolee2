@@ -180,6 +180,7 @@ model Tolee {
   // Settings
   pendingPostApproval Boolean @default(false)
   broadcastMode   Boolean  @default(false)
+  isPublicVisible Boolean  @default(true) // false = hidden from Discover, Search, Map
   
   // Monetization
   price           Float    @default(0) // 0 means free

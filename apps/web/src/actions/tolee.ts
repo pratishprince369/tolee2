@@ -69,12 +69,20 @@ export async function getToleeBySlug(slug: string) {
         avatar: true,
         coverImage: true,
         isPrivate: true,
+        isPublicVisible: true,
         ownerId: true,
+        category: true,
+        tags: true,
+        rules: true,
+        membershipQuestions: true,
+        welcomeMessage: true,
+        pendingPostApproval: true,
         isLive: true,
         liveHostId: true,
         liveSessionType: true,
         liveStartedAt: true,
         liveViewerCount: true,
+        price: true,
         owner: {
           select: {
             id: true,
@@ -398,7 +406,8 @@ export async function createTolee(data: {
         district: data.district || null,
         city: data.city || null,
         area: data.area || null,
-        tags: data.tags || (data.toleeType ? `type:${data.toleeType},searchable:${data.isSearchable !== false}` : null),
+        tags: data.tags || (data.toleeType ? `type:${data.toleeType}` : null),
+        isPublicVisible: data.isPublicVisible !== false, // default true
         membershipQuestions: safeMembershipQuestions,
         rules: safeRules,
         welcomeMessage: safeWelcomeMessage,
@@ -1148,9 +1157,7 @@ export async function updateGroupSettings(toleeId: string, settingsData: {
     if (settingsData.avatar !== undefined) updatePayload.avatar = settingsData.avatar;
 
     if (settingsData.isSearchable !== undefined) {
-      const typeMatch = tolee.tags?.match(/type:([a-z_]+)/);
-      const typeStr = typeMatch ? typeMatch[1] : (tolee.category || 'general');
-      updatePayload.tags = `type:${typeStr},searchable:${settingsData.isSearchable}`;
+      updatePayload.isPublicVisible = settingsData.isSearchable;
     }
 
     const updated = await prisma.tolee.update({

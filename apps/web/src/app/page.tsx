@@ -47,6 +47,9 @@ export default async function Home() {
 
   try {
     const dbTolees = await prisma.tolee.findMany({
+      where: {
+        isPublicVisible: true
+      },
       select: {
         id: true,
         name: true,

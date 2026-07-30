@@ -16,6 +16,9 @@ export default async function DiscoverPage() {
 
   try {
     const dbTolees = await prisma.tolee.findMany({
+      where: {
+        isPublicVisible: true
+      },
       select: {
         id: true,
         name: true,
