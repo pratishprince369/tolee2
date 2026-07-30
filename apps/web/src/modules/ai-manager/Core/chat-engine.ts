@@ -1,6 +1,6 @@
 import { SYSTEM_PROMPTS } from './prompt-manager';
 
-// Key Rotation Pool for LLMs
+// 5-Key API Rotation Pool
 export function getLLMKeyPool(): string[] {
   const keys = [
     process.env.NVIDIA_API_KEY,
@@ -9,25 +9,30 @@ export function getLLMKeyPool(): string[] {
     process.env.NVIDIA_API_KEY_4,
     process.env.NVIDIA_API_KEY_5,
     "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",
-    "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"
+    "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",
+    "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",
+    "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",
+    "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"
   ];
   return Array.from(new Set(keys.filter((k): k is string => Boolean(k && k.trim()))));
 }
 
-// Multi-Key Failover Engine for LLM Chat
+// Multi-Key & Multi-Model High Speed Failover Engine
 export async function callNvidiaLLM(messages: { role: string; content: string }[], systemPrompt?: string) {
   const keyPool = getLLMKeyPool();
   const models = [
+    "deepseek-ai/deepseek-v4-flash",
+    "stepfun-ai/step-3.7-flash",
     "mistralai/mistral-medium-3.5-128b",
     "meta/llama-3.1-8b-instruct",
-    "meta/llama-3.3-70b-instruct"
+    "nvidia/nemotron-3-ultra-550b-a55b"
   ];
 
   for (const apiKey of keyPool) {
     for (const model of models) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 4000); // 4s timeout
+        const timeoutId = setTimeout(() => controller.abort(), 3500); // 3.5s timeout for ultra speed
 
         const fullMessages = [
           { role: "system", content: systemPrompt || SYSTEM_PROMPTS.PERSONAL_EMPLOYEE },
@@ -56,14 +61,12 @@ export async function callNvidiaLLM(messages: { role: string; content: string }[
         if (res.ok) {
           const data = await res.json();
           const content = data.choices?.[0]?.message?.content;
-          if (content) {
+          if (content && content.trim()) {
             return content;
           }
-        } else {
-          console.warn(`[LLM Failover] Key ending with ...${apiKey.slice(-6)} returned ${res.status}. Switching to next key/model...`);
         }
       } catch (error: any) {
-        console.warn(`[LLM Failover] Key ending with ...${apiKey.slice(-6)} timed out or failed. Trying next key in pool...`);
+        // Silently failover to next key and model
       }
     }
   }
@@ -75,11 +78,10 @@ export async function callNvidiaLLM(messages: { role: string; content: string }[
 export async function generateAIImageWithFallback(prompt: string): Promise<string | null> {
   const keyPool = getLLMKeyPool();
 
-  // 1. Try NVIDIA Image Generation Endpoint with Key Rotation Pool
   for (const apiKey of keyPool) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
 
       const res = await fetch("https://integrate.api.nvidia.com/v1/genai/stabilityai/sdxl-turbo", {
         method: "POST",
@@ -107,10 +109,9 @@ export async function generateAIImageWithFallback(prompt: string): Promise<strin
         }
       }
     } catch (err) {
-      console.warn(`[Image Failover] Key ...${apiKey.slice(-6)} failed for image generation. Trying next key...`);
+      // Silently failover to next key
     }
   }
 
-  // 2. High-Speed Fallback Image Service
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512&nologo=true`;
 }
