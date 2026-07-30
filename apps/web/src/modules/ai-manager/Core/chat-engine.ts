@@ -1,18 +1,13 @@
 import { SYSTEM_PROMPTS } from './prompt-manager';
 
-// 5-Key API Rotation Pool
+// Safe 5-Key Environment Variable Rotation Pool
 export function getLLMKeyPool(): string[] {
   const keys = [
     process.env.NVIDIA_API_KEY,
     process.env.NVIDIA_API_KEY_2,
     process.env.NVIDIA_API_KEY_3,
     process.env.NVIDIA_API_KEY_4,
-    process.env.NVIDIA_API_KEY_5,
-    "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",
-    "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",
-    "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",
-    "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",
-    "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"
+    process.env.NVIDIA_API_KEY_5
   ];
   return Array.from(new Set(keys.filter((k): k is string => Boolean(k && k.trim()))));
 }
