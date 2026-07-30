@@ -845,7 +845,8 @@ export default function CreateToleePage() {
             </div>
           </div>
         </div>
-      </div>
+      </>
+      )}
 
       {/* MAP LOCATION PICKER MODAL */}
       {isMapModalOpen && (
