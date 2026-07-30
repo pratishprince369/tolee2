@@ -2341,7 +2341,7 @@ export function InstagramProfileView({
           isOpen={shareModalOpen}
           onClose={() => setShareModalOpen(false)}
           postId={selectedPost.id}
-          shareUrl={selectedPost.toleeSlug ? `${window.location.origin}/t/${selectedPost.toleeSlug}` : `${window.location.origin}/u/${selectedPost.author || user.username}`}
+          shareUrl={`${window.location.origin}${selectedPost.postType === 'reel' ? '/reel/' : '/post/'}${selectedPost.id}`}
           previewText={selectedPost.caption || 'Check out this post on Tolee!'}
           postMediaUrl={selectedPost.mediaUrls}
           postMediaType={selectedPost.mediaTypes}

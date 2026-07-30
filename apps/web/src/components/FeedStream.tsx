@@ -3095,7 +3095,7 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
             setSelectedPostForShare(null);
           }}
           postId={selectedPostForShare.id}
-          shareUrl={`${window.location.origin}/t/${selectedPostForShare.toleeSlug}`}
+          shareUrl={`${window.location.origin}${selectedPostForShare.postType === 'reel' ? '/reel/' : '/post/'}${selectedPostForShare.id}`}
           previewText={selectedPostForShare.content || 'Check out this post on Tolee!'}
           postMediaUrl={selectedPostForShare.mediaUrls}
           postMediaType={selectedPostForShare.mediaTypes}

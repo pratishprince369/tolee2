@@ -997,7 +997,7 @@ export async function toggleLike(postId: string) {
           userId: post.authorId,
           type: 'like',
           message: `${user.username || user.name} liked your post.`,
-          link: `/feed?postId=${postId}`
+          link: `/post/${postId}`
         });
       }
 
@@ -1065,7 +1065,7 @@ export async function addComment(postId: string, content: string, parentId?: str
       } else if (post.newsRelation) {
         linkUrl = `/news/${post.newsRelation.slug}?commentId=${commentIdParam}`;
       } else {
-        linkUrl = `/feed?postId=${postId}&commentId=${commentIdParam}`;
+        linkUrl = `/post/${postId}?commentId=${commentIdParam}`;
       }
       if (parentId) {
         linkUrl += `&replyId=${comment.id}`;
@@ -1308,7 +1308,7 @@ export async function toggleRepost(postId: string) {
           userId: post.authorId,
           type: 'repost',
           message: `${user.username || user.name} reposted your post.`,
-          link: `/feed?postId=${postId}`
+          link: `/post/${postId}`
         });
       }
 
@@ -1395,7 +1395,7 @@ export async function resharePostToTolees(postId: string, toleeIds: string[]) {
           userId: post.authorId,
           type: 'repost',
           message: `${user.username || user.name} reposted your post.`,
-          link: `/feed?postId=${postId}`
+          link: `/post/${postId}`
         });
       }
     }
@@ -2213,6 +2213,21 @@ export async function sharePostToFriends(
       // 2. Format a message that recipient will receive
       let msgContent;
       if (postDetails || screenDetails || newsDetails || listingDetails) {
+        const origin = shareUrl ? new URL(shareUrl).origin : 'https://tolee.com';
+        const finalShareUrl = contentType === 'reel' 
+          ? `${origin}/reel/${postId}` 
+          : contentType === 'screen' 
+          ? `${origin}/screen/watch/${postId}` 
+          : contentType === 'news' 
+          ? `${origin}/news/${postId}` 
+          : contentType === 'marketplace' 
+          ? `${origin}/marketplace/listing/${postId}` 
+          : `${origin}/post/${postId}`;
+
+        const mediaCount = postDetails?.mediaUrls 
+          ? postDetails.mediaUrls.split(/,(?=https?:\/\/)/).length 
+          : 1;
+
         const payload = {
           type: isVideo ? 'shared_video' : 'shared_post',
           contentType,
@@ -2226,8 +2241,9 @@ export async function sharePostToFriends(
           caption,
           likesCount,
           viewsCount,
-          shareUrl,
-          deepLink: `/chat/redirect?type=${contentType}&id=${postId}`,
+          shareUrl: finalShareUrl,
+          deepLink: contentType === 'reel' ? `/reel/${postId}` : `/post/${postId}`,
+          mediaCount,
           newsCategory,
           newsReadingTime,
           newsPublisher,

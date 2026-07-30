@@ -1012,7 +1012,7 @@ export function ProfileFeedView({
           isOpen={shareModalOpen}
           onClose={() => { setShareModalOpen(false); setSelectedPostForShare(null); }}
           postId={selectedPostForShare.id}
-          shareUrl={selectedPostForShare.toleeSlug ? `${window.location.origin}/t/${selectedPostForShare.toleeSlug}` : `${window.location.origin}/u/${user.username}`}
+          shareUrl={`${window.location.origin}${selectedPostForShare.postType === 'reel' ? '/reel/' : '/post/'}${selectedPostForShare.id}`}
           previewText={selectedPostForShare.previewText || 'Check out this post on Tolee!'}
           postMediaUrl={selectedPostForShare.mediaUrls}
           postMediaType={selectedPostForShare.mediaTypes}

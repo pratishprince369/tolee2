@@ -662,7 +662,7 @@ export function ProfileReelsView({
           isOpen={shareModalOpen}
           onClose={() => { setShareModalOpen(false); setSelectedReelForShare(null); }}
           postId={selectedReelForShare.id}
-          shareUrl={selectedReelForShare.toleeSlug ? `${window.location.origin}/t/${selectedReelForShare.toleeSlug}` : `${window.location.origin}/u/${selectedReelForShare.author}`}
+          shareUrl={`${window.location.origin}/reel/${selectedReelForShare.id}`}
           previewText={selectedReelForShare.caption || 'Check out this reel on Tolee!'}
           postMediaUrl={selectedReelForShare.video}
           postMediaType="video"

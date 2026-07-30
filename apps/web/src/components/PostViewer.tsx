@@ -16,11 +16,13 @@ import {
   MoreHorizontal,
   ArrowLeft,
   MapPin,
+  Eye,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { formatDistanceToNow } from 'date-fns';
 import { toggleLike, addComment, toggleSavePost } from '@/actions/post';
 import { useSession } from 'next-auth/react';
+import { ShareModal } from '@/components/ShareModal';
 
 interface PostViewerProps {
   post: {
@@ -65,6 +67,7 @@ export default function PostViewer({ post }: PostViewerProps) {
   const [submittingComment, setSubmittingComment] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [muted, setMuted] = useState(true);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
 
   // Carousel support
   const allMediaUrls = post.mediaUrls
@@ -76,6 +79,14 @@ export default function PostViewer({ post }: PostViewerProps) {
   const currentMediaUrl = allMediaUrls[carouselIdx] || '';
   const currentMediaType = allMediaTypes[carouselIdx] || 'image';
   const isMultiple = allMediaUrls.length > 1;
+
+  const handleBack = () => {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back();
+    } else {
+      router.push('/chat');
+    }
+  };
 
   const handleLike = async () => {
     if (!session?.user) return;
@@ -156,7 +167,7 @@ export default function PostViewer({ post }: PostViewerProps) {
       {/* ── Top bar ── */}
       <div className="sticky top-0 z-50 flex items-center gap-3 px-4 py-3 bg-black/80 backdrop-blur-md border-b border-white/5">
         <button
-          onClick={() => router.back()}
+          onClick={handleBack}
           className="w-9 h-9 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors"
           aria-label="Go back"
         >
@@ -393,17 +404,29 @@ export default function PostViewer({ post }: PostViewerProps) {
                     {commentsCount > 0 ? commentsCount.toLocaleString() : ''}
                   </span>
                 </button>
-                <button className="group" aria-label="Share">
+                <button
+                  onClick={() => setShareModalOpen(true)}
+                  className="group flex items-center gap-1.5"
+                  aria-label="Share"
+                >
                   <Share2 className="w-6 h-6 text-white transition-transform group-hover:scale-110" />
                 </button>
               </div>
-              <button onClick={handleSave} className="group" aria-label="Save">
-                <Bookmark
-                  className={`w-6 h-6 transition-transform group-hover:scale-110 ${
-                    saved ? 'text-white fill-white' : 'text-white'
-                  }`}
-                />
-              </button>
+              <div className="flex items-center gap-3">
+                {post.views > 0 && (
+                  <div className="flex items-center gap-1 text-xs text-zinc-500">
+                    <Eye className="w-4 h-4" />
+                    <span>{post.views.toLocaleString()}</span>
+                  </div>
+                )}
+                <button onClick={handleSave} className="group" aria-label="Save">
+                  <Bookmark
+                    className={`w-6 h-6 transition-transform group-hover:scale-110 ${
+                      saved ? 'text-white fill-white' : 'text-white'
+                    }`}
+                  />
+                </button>
+              </div>
             </div>
 
             <p className="text-[11px] text-zinc-500">{timeAgo}</p>
@@ -440,6 +463,22 @@ export default function PostViewer({ post }: PostViewerProps) {
           </div>
         </div>
       </div>
+
+      {shareModalOpen && (
+        <ShareModal
+          isOpen={shareModalOpen}
+          onClose={() => setShareModalOpen(false)}
+          postId={post.id}
+          shareUrl={`${typeof window !== 'undefined' ? window.location.origin : ''}/post/${post.id}`}
+          previewText={post.caption || 'Check out this post on Tolee!'}
+          postMediaUrl={post.mediaUrls}
+          postMediaType={post.mediaTypes}
+          postAuthor={post.author}
+          postAuthorAvatar={post.authorAvatar}
+          postCaption={post.caption}
+        />
+      )}
     </div>
   );
 }
+

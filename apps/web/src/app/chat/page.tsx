@@ -27,7 +27,7 @@ import { io, Socket } from 'socket.io-client';
 import { 
   Search, MoreVertical, Phone, Video, Paperclip, Smile, Send, Check, CheckCheck, 
   EyeOff, Users, ShieldCheck, PlusCircle, MessageCircle, ChevronLeft, X, 
-  Image as ImageIcon, AlertCircle, BellOff, LogOut, Clock, Copy, Reply, Trash2, ArrowRight,
+  Image as ImageIcon, AlertCircle, BellOff, LogOut, Clock, Copy, Reply, Trash2, ArrowRight, Layers,
   PhoneOff, VideoOff, Play, Pin, Clapperboard, Newspaper, MapPin
 } from 'lucide-react';
 import {
@@ -214,6 +214,7 @@ interface SharedContentCardProps {
     newsPublisher?: string;
     listingPrice?: number;
     listingLocation?: string;
+    mediaCount?: number;
   };
 }
 
@@ -360,6 +361,12 @@ function SharedContentCard({ payload }: SharedContentCardProps) {
             <ImageIcon className="w-8 h-8 text-zinc-700" />
           </div>
         )}
+        {payload.mediaCount && payload.mediaCount > 1 ? (
+          <div className="absolute top-2.5 right-2.5 bg-black/75 backdrop-blur-md px-2 py-0.5 rounded-md text-[10px] font-bold text-white flex items-center gap-1 shadow-md border border-white/10">
+            <Layers className="w-3 h-3 text-white" />
+            <span>+{payload.mediaCount - 1} Photos</span>
+          </div>
+        ) : null}
       </div>
     );
   };
@@ -2361,10 +2368,11 @@ export default function ChatPage() {
                                       </div>
                                     );
                                   })()
-                                ) : msg.text.startsWith('__SHARED_CONTENT__:') ? (
+                                ) : msg.text.includes('__SHARED_CONTENT__:') ? (
                                   (() => {
                                     try {
-                                      const payload = JSON.parse(msg.text.substring(19));
+                                      const jsonIdx = msg.text.indexOf('__SHARED_CONTENT__:');
+                                      const payload = JSON.parse(msg.text.substring(jsonIdx + 19));
                                       return <SharedContentCard payload={payload} />;
                                     } catch (e) {
                                       return (

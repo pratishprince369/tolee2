@@ -506,7 +506,7 @@ export function StoryViewer({
                           body: JSON.stringify({ postId })
                         });
                         onClose(); // close story viewer
-                        router.push(`/feed?postId=${postId}&fromStory=true`);
+                        router.push(`/post/${postId}?fromStory=true`);
                       }}
                       className="absolute top-[25%] left-[6%] right-[6%] z-20 bg-black/60 backdrop-blur-md rounded-2xl p-4 border border-white/10 flex flex-col gap-3 pointer-events-auto select-none shadow-xl cursor-pointer hover:bg-black/70 active:scale-[0.99] transition-all"
                     >
@@ -652,7 +652,7 @@ export function StoryViewer({
                             body: JSON.stringify({ postId })
                           });
                           onClose();
-                          router.push(`/feed?postId=${postId}&fromStory=true`);
+                          router.push(`/post/${postId}?fromStory=true`);
                         }}
                         className="flex items-center gap-1.5 px-6 py-2.5 bg-white text-black font-extrabold text-[12px] uppercase tracking-wider rounded-full shadow-xl hover:bg-zinc-100 active:scale-95 transition-all"
                       >

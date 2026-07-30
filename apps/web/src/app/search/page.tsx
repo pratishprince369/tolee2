@@ -167,7 +167,7 @@ export default function SearchPage() {
     } else if (item.type === 'reel') {
       router.push(`/reels?id=${item.id}`);
     } else {
-      router.push(`/feed?postId=${item.id}`);
+      router.push(`/post/${item.id}`);
     }
   };
 
@@ -380,7 +380,7 @@ export default function SearchPage() {
                     {hashtagData.topPosts.map((post: any) => (
                       <div
                         key={post.id}
-                        onClick={() => router.push(`/feed?postId=${post.id}`)}
+                        onClick={() => router.push(`/post/${post.id}`)}
                         className="group relative aspect-square rounded-2xl overflow-hidden bg-zinc-900 shadow-md cursor-pointer border border-gray-200/50 dark:border-zinc-800/80 active:scale-[0.98] transition-all duration-200"
                       >
                         {post.mediaUrls ? (
@@ -419,7 +419,7 @@ export default function SearchPage() {
                     {hashtagData.recentPosts.map((post: any) => (
                       <div
                         key={post.id}
-                        onClick={() => router.push(`/feed?postId=${post.id}`)}
+                        onClick={() => router.push(`/post/${post.id}`)}
                         className="group relative aspect-square rounded-2xl overflow-hidden bg-zinc-900 shadow-md cursor-pointer border border-gray-200/50 dark:border-zinc-800/80 active:scale-[0.98] transition-all duration-200"
                       >
                         {post.mediaUrls ? (
