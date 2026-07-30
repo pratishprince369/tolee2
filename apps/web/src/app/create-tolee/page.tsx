@@ -1,23 +1,39 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent } from '@/components/ui/card';
-import { X, Globe, Lock, ImageIcon, Monitor, Smartphone, CheckCircle2 } from 'lucide-react';
+import { 
+  X, Globe, Lock, ImageIcon, Monitor, Smartphone, CheckCircle2, 
+  ArrowRight, ArrowLeft, Search, Eye, EyeOff, Sparkles, Building2,
+  Briefcase, TrendingUp, PartyPopper, GraduationCap, School, ShoppingCart,
+  Landmark, HeartHandshake, Factory, ClipboardList, Stethoscope, Home,
+  Utensils, Sun, Users
+} from 'lucide-react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { createTolee } from '@/actions/tolee';
-import { useRef } from 'react';
+import { TOLEE_TYPE_REGISTRY } from '@/modules/tolee-types/registry';
+
+const ICON_MAP: Record<string, any> = {
+  Building2, Briefcase, TrendingUp, PartyPopper, GraduationCap,
+  School, ShoppingCart, Landmark, HeartHandshake, Factory,
+  ClipboardList, Stethoscope, Home, Utensils, Sun, Users
+};
 
 export default function CreateToleePage() {
   const router = useRouter();
   const { data: session } = useSession();
   
+  const [step, setStep] = useState<1 | 2>(1);
+  const [selectedType, setSelectedType] = useState<string>('society');
+  const [isPublicVisible, setIsPublicVisible] = useState<boolean>(true);
+
   const [name, setName] = useState('');
-  const [privacy, setPrivacy] = useState<'public' | 'private' | null>(null);
+  const [privacy, setPrivacy] = useState<'public' | 'private' | null>('public');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
   const [location, setLocation] = useState('');
@@ -278,8 +294,11 @@ export default function CreateToleePage() {
     const result = await createTolee({
       name,
       isPrivate: privacy === 'private',
+      toleeType: selectedType,
+      isSearchable: isPublicVisible,
+      isPublicVisible: isPublicVisible,
       description,
-      category,
+      category: selectedType,
       location: address || `${city}, ${stateName}`,
       rules,
       membershipQuestions: questions,
@@ -308,20 +327,106 @@ export default function CreateToleePage() {
 
   return (
     <div className="flex h-screen bg-[#f0f2f5] dark:bg-black overflow-hidden font-sans">
-      {/* LEFT SIDEBAR (Configuration) */}
-      <div className="w-full md:w-[360px] bg-white dark:bg-[#121212] flex flex-col h-full border-r border-gray-200 dark:border-gray-800 shadow-sm z-10">
-        <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex items-center gap-3">
-          <Link href="/discover">
-            <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-700 transition">
-              <X className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+      {step === 1 ? (
+        /* STEP 1: PURPOSE SELECTION WIZARD */
+        <div className="flex-1 overflow-y-auto p-6 max-w-6xl mx-auto w-full custom-scrollbar">
+          <div className="p-4 flex items-center justify-between border-b border-gray-200 dark:border-gray-800 mb-6">
+            <div className="flex items-center gap-3">
+              <Link href="/discover">
+                <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-700 transition">
+                  <X className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+                </div>
+              </Link>
+              <div className="text-sm font-semibold text-gray-500">Step 1 of 2: Select Tolee Purpose</div>
             </div>
-          </Link>
-          <Link href="/discover" className="text-sm text-gray-500 hover:underline">Tolees</Link>
-          <span className="text-sm text-gray-500">&gt; Create Tolee</span>
-        </div>
+            <span className="text-xs font-bold px-3 py-1 bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 rounded-full">
+              Community Operating System (COS)
+            </span>
+          </div>
 
-        <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-          <h1 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">Create Tolee</h1>
+          <div className="text-center max-w-2xl mx-auto mb-8">
+            <h1 className="text-3xl font-black text-gray-900 dark:text-white">What type of Tolee do you want to create?</h1>
+            <p className="text-sm text-gray-500 mt-2">
+              Select a community purpose. Tolee automatically provisions dedicated SaaS business modules, governance roles, and AI assistants tailored for your type.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8">
+            {Object.values(TOLEE_TYPE_REGISTRY).map((typeItem) => {
+              const IconComp = ICON_MAP[typeItem.icon] || Users;
+              const isSelected = selectedType === typeItem.id;
+              return (
+                <div
+                  key={typeItem.id}
+                  onClick={() => setSelectedType(typeItem.id)}
+                  className={`p-5 rounded-2xl border cursor-pointer transition-all duration-200 relative flex flex-col justify-between ${
+                    isSelected
+                      ? 'bg-indigo-50/80 dark:bg-indigo-950/40 border-indigo-600 ring-2 ring-indigo-600/20 shadow-md scale-[1.02]'
+                      : 'bg-white dark:bg-[#141414] border-gray-200 dark:border-gray-800 hover:border-indigo-400 hover:shadow-sm'
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className={`p-3 rounded-xl ${isSelected ? 'bg-indigo-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'}`}>
+                        <IconComp className="w-6 h-6" />
+                      </div>
+                      <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500">
+                        {typeItem.categoryTag}
+                      </span>
+                    </div>
+
+                    <h3 className="font-bold text-base text-gray-900 dark:text-white mb-1">{typeItem.title}</h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 mb-3">{typeItem.description}</p>
+                  </div>
+
+                  <div>
+                    <div className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-2.5 py-1 rounded-lg w-fit mb-2">
+                      👥 {typeItem.estimatedMembers}
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {typeItem.features.slice(0, 2).map((f) => (
+                        <span key={f.id} className="text-[10px] text-gray-500 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">
+                          ✓ {f.name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="flex justify-center pb-12">
+            <Button
+              onClick={() => setStep(2)}
+              className="h-13 px-8 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-sm shadow-lg flex items-center gap-2"
+            >
+              Continue to Setup ({TOLEE_TYPE_REGISTRY[selectedType]?.title}) <ArrowRight className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      ) : (
+        /* STEP 2: COMMON SETUP FORM */
+        <>
+          {/* LEFT SIDEBAR (Configuration) */}
+          <div className="w-full md:w-[380px] bg-white dark:bg-[#121212] flex flex-col h-full border-r border-gray-200 dark:border-gray-800 shadow-sm z-10">
+            <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
+              <button 
+                onClick={() => setStep(1)}
+                className="flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:underline"
+              >
+                <ArrowLeft className="w-4 h-4" /> Back to Purpose
+              </button>
+              <span className="text-xs font-bold text-gray-500">Step 2 of 2</span>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+              <div className="flex items-center justify-between mb-4">
+                <h1 className="text-xl font-bold text-gray-900 dark:text-white">Tolee Setup</h1>
+                <span className="px-2.5 py-1 text-xs font-bold rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+                  {TOLEE_TYPE_REGISTRY[selectedType]?.title}
+                </span>
+              </div>
 
           <div className="flex items-center gap-3 mb-6">
             <Avatar className="w-12 h-12">
@@ -439,6 +544,41 @@ export default function CreateToleePage() {
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* Public Search & Discovery Visibility (User Request) */}
+            <div className="p-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/30 space-y-2.5 my-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-xs font-bold text-gray-900 dark:text-white">Public Search & Explore Visibility</h4>
+                  <p className="text-[11px] text-gray-500">Allow this Tolee to be discovered by public users on Search & Map?</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setIsPublicVisible(true)}
+                  className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1.5 ${
+                    isPublicVisible
+                      ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                      : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700'
+                  }`}
+                >
+                  <Eye className="w-3.5 h-3.5" /> Visible (Public)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsPublicVisible(false)}
+                  className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1.5 ${
+                    !isPublicVisible
+                      ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 border-gray-900 shadow-sm'
+                      : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700'
+                  }`}
+                >
+                  <EyeOff className="w-3.5 h-3.5" /> Hidden (Secret)
+                </button>
+              </div>
             </div>
 
             {/* Tags (Optional) */}

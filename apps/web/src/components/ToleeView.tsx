@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 
 import { CreatePostModal } from '@/components/CreatePostModal';
+import { ToleeCOSDashboard } from '@/components/ToleeCOSDashboard';
 import { PostCarousel } from '@/components/PostCarousel';
 import { OptimisticPostCard } from '@/components/OptimisticPostCard';
 import { ManageToleeModal } from '@/components/ManageToleeModal';
@@ -1194,7 +1195,7 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
 
           {/* Tolee Navigation Tabs */}
           <div className="flex overflow-x-auto hide-scrollbar border-b border-gray-100 dark:border-gray-800">
-            {['about', 'community', 'live', 'classroom', 'calendar', 'members', 'leaderboard', 'marketplace'].map((tab) => (
+            {['dashboard', 'community', 'about', 'live', 'classroom', 'calendar', 'members', 'leaderboard', 'marketplace'].map((tab) => (
               <button 
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -1204,7 +1205,7 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                     : 'border-transparent text-gray-500 hover:text-gray-900 dark:hover:text-white'
                 }`}
               >
-                {tab === 'live' ? 'Live Masterclass 🎓' : tab}
+                {tab === 'dashboard' ? 'COS Workspace ⚡' : tab === 'live' ? 'Live Masterclass 🎓' : tab}
               </button>
             ))}
           </div>
@@ -1218,6 +1219,11 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
           {/* Left Column - Feed / Main Content */}
           <div className="lg:col-span-2 space-y-6">
             
+            {/* COS Dashboard Tab */}
+            {activeTab === 'dashboard' && (
+              <ToleeCOSDashboard tolee={tolee} />
+            )}
+
             {/* Create Post Card */}
             {activeTab === 'community' && isMember && (
               <Card className="border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden bg-white dark:bg-[#121212]">
