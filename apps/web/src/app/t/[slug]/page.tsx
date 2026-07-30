@@ -137,7 +137,8 @@ export default async function ToleePage({ params }: { params: { slug: string } }
       liveHostId: dbTolee.liveHostId,
       liveSessionType: dbTolee.liveSessionType,
       liveStartedAt: dbTolee.liveStartedAt,
-      liveViewerCount: dbTolee.liveViewerCount
+      liveViewerCount: dbTolee.liveViewerCount,
+      ownerId: dbTolee.ownerId
     },
     posts: dbTolee.posts.map((p: any) => {
       const authorName = p.post.author.username || p.post.author.name || 'Unknown User';
