@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 
+import { getContentPermanentUrl, copyContentUrl } from '@/lib/shareService';
 import { 
   Grid, 
   Film, 
@@ -2084,13 +2085,13 @@ export function InstagramProfileView({
                   setActiveOptionsPost(null);
                 }} className="py-4 text-amber-500 font-semibold hover:bg-white/5 active:bg-white/10 transition-colors w-full outline-none text-[15px]">Archive Post</button>
                 <button onClick={async () => { if (window.confirm("Permanently delete this post?")) { const res = await deletePostPermanently(activeOptionsPost.id); if (res.success) { setProfilePosts((posts: any[]) => posts.filter((p: any) => p.id !== activeOptionsPost.id)); setProfileSavedPosts((saved: any[]) => saved.filter((s: any) => s.post.id !== activeOptionsPost.id)); setProfileResharedPosts((reshared: any[]) => reshared.filter((r: any) => r.id !== activeOptionsPost.id)); if (selectedPost && selectedPost.id === activeOptionsPost.id) setSelectedPost(null); alert('Post deleted.'); } else alert(res.error || 'Failed.'); } setActiveOptionsPost(null); }} className="py-4 text-red-500 font-bold hover:bg-white/5 active:bg-white/10 transition-colors w-full outline-none text-[15px]">Delete Permanently</button>
-                <button onClick={async () => { const shareUrl = `${window.location.origin}/u/${activeOptionsPost.author || user.username}`; try { await navigator.clipboard.writeText(shareUrl); alert('Link copied!'); } catch (err) { console.error(err); } setActiveOptionsPost(null); }} className="py-4 text-white font-semibold hover:bg-white/5 active:bg-white/10 transition-colors w-full outline-none text-[15px]">Copy Link</button>
+                <button onClick={async () => { try { await copyContentUrl(activeOptionsPost); alert('Link copied!'); } catch (err) { console.error(err); } setActiveOptionsPost(null); }} className="py-4 text-white font-semibold hover:bg-white/5 active:bg-white/10 transition-colors w-full outline-none text-[15px]">Copy Link</button>
               </>
             ) : (
               <>
                 <button onClick={() => { alert('Thank you for reporting.'); setActiveOptionsPost(null); }} className="py-4 text-red-500 font-bold hover:bg-white/5 active:bg-white/10 transition-colors w-full outline-none text-[15px]">Report as Spam</button>
                 <button onClick={() => { alert('Posts hidden from feed.'); setActiveOptionsPost(null); }} className="py-4 text-white font-semibold hover:bg-white/5 active:bg-white/10 transition-colors w-full outline-none text-[15px]">Hide Posts from This User</button>
-                <button onClick={async () => { if (activeOptionsPost) { const shareUrl = `${window.location.origin}/u/${activeOptionsPost.author || user.username}`; try { await navigator.clipboard.writeText(shareUrl); alert('Link copied!'); } catch (err) { console.error(err); } } setActiveOptionsPost(null); }} className="py-4 text-white font-semibold hover:bg-white/5 active:bg-white/10 transition-colors w-full outline-none text-[15px]">Copy Link</button>
+                <button onClick={async () => { if (activeOptionsPost) { try { await copyContentUrl(activeOptionsPost); alert('Link copied!'); } catch (err) { console.error(err); } } setActiveOptionsPost(null); }} className="py-4 text-white font-semibold hover:bg-white/5 active:bg-white/10 transition-colors w-full outline-none text-[15px]">Copy Link</button>
                 <button onClick={() => { alert('We will show you fewer posts like this.'); setActiveOptionsPost(null); }} className="py-4 text-white font-semibold hover:bg-white/5 active:bg-white/10 transition-colors w-full outline-none text-[15px]">Not Interested</button>
               </>
             )}
@@ -2341,7 +2342,7 @@ export function InstagramProfileView({
           isOpen={shareModalOpen}
           onClose={() => setShareModalOpen(false)}
           postId={selectedPost.id}
-          shareUrl={`${window.location.origin}${selectedPost.postType === 'reel' ? '/reel/' : '/post/'}${selectedPost.id}`}
+          shareUrl={getContentPermanentUrl(selectedPost)}
           previewText={selectedPost.caption || 'Check out this post on Tolee!'}
           postMediaUrl={selectedPost.mediaUrls}
           postMediaType={selectedPost.mediaTypes}

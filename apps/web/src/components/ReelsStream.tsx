@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
+import { getContentPermanentUrl, copyContentUrl } from '@/lib/shareService';
 import { useSession } from 'next-auth/react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -1071,7 +1072,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
           isOpen={shareModalOpen}
           onClose={() => { setShareModalOpen(false); setSelectedReelForShare(null); }}
           postId={selectedReelForShare.id}
-          shareUrl={`${window.location.origin}/reel/${selectedReelForShare.id}`}
+          shareUrl={getContentPermanentUrl({ id: selectedReelForShare.id, postType: 'reel' })}
           previewText={selectedReelForShare.caption || 'Check out this reel on Tolee!'}
           postMediaUrl={selectedReelForShare.video}
           postMediaType="video"
@@ -2166,12 +2167,12 @@ function OptionsModal({ open, onClose, reel, session, setReels, hiddenReelIds, s
               ))}
               {reel.visibility !== 'public' && <button onClick={async () => { const res = await updatePostVisibility(reel.id, 'public'); if (res.success) setReels((r: any[]) => r.map((x) => x.id === reel.id ? { ...x, visibility: 'public' } : x)); onClose(); }} className="py-4 text-white font-semibold hover:bg-white/5 w-full outline-none text-[15px]">Make Public</button>}
               <button onClick={async () => { if (window.confirm('Delete this reel permanently?')) { const res = await deletePostPermanently(reel.id); if (res.success) setReels((r: any[]) => r.filter((x: any) => x.id !== reel.id)); } onClose(); }} className="py-4 text-red-500 font-bold hover:bg-white/5 w-full outline-none text-[15px]">Delete Permanently</button>
-              <button onClick={async () => { try { await navigator.clipboard.writeText(`${window.location.origin}/u/${reel.author}`); alert('Link copied!'); } catch {} onClose(); }} className="py-4 text-white font-semibold hover:bg-white/5 w-full outline-none text-[15px]">Copy Link</button>
+              <button onClick={async () => { try { await copyContentUrl({ id: reel.id, postType: 'reel' }); alert('Link copied!'); } catch {} onClose(); }} className="py-4 text-white font-semibold hover:bg-white/5 w-full outline-none text-[15px]">Copy Link</button>
             </>
           ) : (
             <>
               <button onClick={() => { setHiddenReelIds((p: string[]) => [...p, reel.id]); alert('Reported.'); onClose(); }} className="py-4 text-red-500 font-bold hover:bg-white/5 w-full outline-none text-[15px]">Report</button>
-              <button onClick={async () => { try { await navigator.clipboard.writeText(`${window.location.origin}/u/${reel.author}`); alert('Link copied!'); } catch {} onClose(); }} className="py-4 text-white font-semibold hover:bg-white/5 w-full outline-none text-[15px]">Copy Link</button>
+              <button onClick={async () => { try { await copyContentUrl({ id: reel.id, postType: 'reel' }); alert('Link copied!'); } catch {} onClose(); }} className="py-4 text-white font-semibold hover:bg-white/5 w-full outline-none text-[15px]">Copy Link</button>
               <button onClick={() => { handleShare(reel); onClose(); }} className="py-4 text-white font-semibold hover:bg-white/5 w-full outline-none text-[15px]">Share To...</button>
               <button onClick={() => { setHiddenReelIds((p: string[]) => [...p, reel.id]); alert('Noted.'); onClose(); }} className="py-4 text-white font-semibold hover:bg-white/5 w-full outline-none text-[15px]">Not Interested</button>
             </>

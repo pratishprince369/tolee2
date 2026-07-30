@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { getContentPermanentUrl, copyContentUrl } from '@/lib/shareService';
 import { useSession } from 'next-auth/react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent, CardHeader, CardFooter } from '@/components/ui/card';
@@ -2730,9 +2731,8 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                 </button>
                 <button 
                   onClick={async () => {
-                    const shareUrl = `${window.location.origin}/t/${activeOptionsPost.toleeSlug}`;
                     try {
-                      await navigator.clipboard.writeText(shareUrl);
+                      await copyContentUrl(activeOptionsPost);
                       alert('Post link copied to clipboard!');
                     } catch (err) {
                       console.error('Failed to copy link:', err);
@@ -2785,9 +2785,8 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                 <button 
                   onClick={async () => {
                     if (activeOptionsPost) {
-                      const shareUrl = `${window.location.origin}/t/${activeOptionsPost.toleeSlug}`;
                       try {
-                        await navigator.clipboard.writeText(shareUrl);
+                        await copyContentUrl(activeOptionsPost);
                         alert('Post link copied to clipboard!');
                       } catch (err) {
                         console.error('Failed to copy link:', err);
@@ -2908,7 +2907,7 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
             setSelectedPostForShare(null);
           }}
           postId={selectedPostForShare.id}
-          shareUrl={`${window.location.origin}${selectedPostForShare.postType === 'reel' ? '/reel/' : '/post/'}${selectedPostForShare.id}`}
+          shareUrl={getContentPermanentUrl(selectedPostForShare)}
           previewText={selectedPostForShare.content || 'Check out this post on Tolee!'}
           postMediaUrl={selectedPostForShare.mediaUrls}
           postMediaType={selectedPostForShare.mediaTypes}

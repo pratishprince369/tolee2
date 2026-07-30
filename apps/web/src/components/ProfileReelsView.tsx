@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
+import { getContentPermanentUrl, copyContentUrl } from '@/lib/shareService';
 import { useSession } from 'next-auth/react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -662,7 +663,7 @@ export function ProfileReelsView({
           isOpen={shareModalOpen}
           onClose={() => { setShareModalOpen(false); setSelectedReelForShare(null); }}
           postId={selectedReelForShare.id}
-          shareUrl={`${window.location.origin}/reel/${selectedReelForShare.id}`}
+          shareUrl={getContentPermanentUrl({ id: selectedReelForShare.id, postType: 'reel' })}
           previewText={selectedReelForShare.caption || 'Check out this reel on Tolee!'}
           postMediaUrl={selectedReelForShare.video}
           postMediaType="video"
@@ -967,7 +968,7 @@ function OptionsModal({ open, onClose, reel, session, setReels, hiddenReelIds, s
           <button 
             onClick={() => {
               if (reel) {
-                navigator.clipboard.writeText(`${window.location.origin}/post/${reel.id}`);
+                copyContentUrl({ id: reel.id, postType: 'reel' });
                 alert("Link copied to clipboard!");
               }
               onClose();

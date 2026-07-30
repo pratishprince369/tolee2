@@ -109,7 +109,7 @@ export function ShareModal({
 
   const handleCopyLink = async () => {
     try {
-      await navigator.clipboard.writeText(shareUrl);
+      await navigator.clipboard.writeText(finalShareUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
 
@@ -131,7 +131,7 @@ export function ShareModal({
       await navigator.share({
         title: 'Tolee Content',
         text: previewText || 'Check out this awesome content on Tolee!',
-        url: shareUrl,
+        url: finalShareUrl,
       });
 
       // Increment share count in DB
@@ -156,7 +156,7 @@ export function ShareModal({
   const handleSendInstant = async (friendId: string, friendName: string) => {
     setSharing(true);
     try {
-      const res = await sharePostToFriends(postId, [friendId], shareUrl, previewText);
+      const res = await sharePostToFriends(postId, [friendId], finalShareUrl, previewText);
       if (res.success && res.shareCount !== undefined) {
         if (onShareSuccess) {
           onShareSuccess(res.shareCount);
@@ -177,7 +177,7 @@ export function ShareModal({
     if (selectedIds.length === 0) return;
     setSharing(true);
     try {
-      const res = await sharePostToFriends(postId, selectedIds, shareUrl, previewText);
+      const res = await sharePostToFriends(postId, selectedIds, finalShareUrl, previewText);
       if (res.success && res.shareCount !== undefined) {
         if (onShareSuccess) {
           onShareSuccess(res.shareCount);

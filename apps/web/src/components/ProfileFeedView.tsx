@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { getContentPermanentUrl, copyContentUrl } from '@/lib/shareService';
 import { useSession } from 'next-auth/react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent, CardHeader, CardFooter } from '@/components/ui/card';
@@ -883,7 +884,7 @@ export function ProfileFeedView({
                     <button 
                       onClick={async () => {
                         try {
-                          await navigator.clipboard.writeText(`${window.location.origin}/post/${activeOptionsPost.id}`);
+                          await copyContentUrl(activeOptionsPost);
                           alert("Link copied to clipboard!");
                         } catch (err) {
                           console.error(err);
@@ -953,7 +954,7 @@ export function ProfileFeedView({
                     <button 
                       onClick={async () => {
                         try {
-                          await navigator.clipboard.writeText(`${window.location.origin}/post/${activeOptionsPost.id}`);
+                          await copyContentUrl(activeOptionsPost);
                           alert("Link copied to clipboard!");
                         } catch (err) {
                           console.error(err);
@@ -1012,7 +1013,7 @@ export function ProfileFeedView({
           isOpen={shareModalOpen}
           onClose={() => { setShareModalOpen(false); setSelectedPostForShare(null); }}
           postId={selectedPostForShare.id}
-          shareUrl={`${window.location.origin}${selectedPostForShare.postType === 'reel' ? '/reel/' : '/post/'}${selectedPostForShare.id}`}
+          shareUrl={getContentPermanentUrl(selectedPostForShare)}
           previewText={selectedPostForShare.previewText || 'Check out this post on Tolee!'}
           postMediaUrl={selectedPostForShare.mediaUrls}
           postMediaType={selectedPostForShare.mediaTypes}

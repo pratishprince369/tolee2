@@ -239,16 +239,16 @@ function SharedContentCard({ payload }: SharedContentCardProps) {
         .then(r => r.json())
         .then((res) => {
           if (active) {
-            setAvailable(res.success ? res.available : false);
+            setAvailable(res.success ? res.available : true);
           }
         })
         .catch(() => {
           if (active) {
-            setAvailable(false);
+            setAvailable(true);
           }
         });
     } else {
-      setAvailable(false);
+      setAvailable(true);
     }
     return () => {
       active = false;
@@ -257,7 +257,12 @@ function SharedContentCard({ payload }: SharedContentCardProps) {
 
   const handleCardClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!available) return;
+    if (available === false) return;
+
+    if (payload.deepLink) {
+      router.push(payload.deepLink);
+      return;
+    }
 
     if (contentType === 'reel') {
       // Deep-link directly to the exact reel — no generic timeline

@@ -11,6 +11,7 @@ import { Heart, MessageCircle, Send, MoreHorizontal, Image as ImageIcon, Video, 
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
 
+import { getContentPermanentUrl, copyContentUrl } from '@/lib/shareService';
 import { CreatePostModal } from '@/components/CreatePostModal';
 import { CreateRequirementModal } from '@/components/CreateRequirementModal';
 import { OptimisticPostCard } from '@/components/OptimisticPostCard';
@@ -2907,9 +2908,8 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                 </button>
                 <button 
                   onClick={async () => {
-                    const shareUrl = `${window.location.origin}/t/${activeOptionsPost.toleeSlug}`;
                     try {
-                      await navigator.clipboard.writeText(shareUrl);
+                      await copyContentUrl(activeOptionsPost);
                       alert('Post link copied to clipboard!');
                     } catch (err) {
                       console.error('Failed to copy link:', err);
@@ -2962,9 +2962,8 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                 <button 
                   onClick={async () => {
                     if (activeOptionsPost) {
-                      const shareUrl = `${window.location.origin}/t/${activeOptionsPost.toleeSlug}`;
                       try {
-                        await navigator.clipboard.writeText(shareUrl);
+                        await copyContentUrl(activeOptionsPost);
                         alert('Post link copied to clipboard!');
                       } catch (err) {
                         console.error('Failed to copy link:', err);
@@ -3095,7 +3094,7 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
             setSelectedPostForShare(null);
           }}
           postId={selectedPostForShare.id}
-          shareUrl={`${window.location.origin}${selectedPostForShare.postType === 'reel' ? '/reel/' : '/post/'}${selectedPostForShare.id}`}
+          shareUrl={getContentPermanentUrl(selectedPostForShare)}
           previewText={selectedPostForShare.content || 'Check out this post on Tolee!'}
           postMediaUrl={selectedPostForShare.mediaUrls}
           postMediaType={selectedPostForShare.mediaTypes}
