@@ -29,7 +29,7 @@ export default function CreateToleePage() {
   const { data: session } = useSession();
   
   const [step, setStep] = useState<1 | 2>(1);
-  const [selectedType, setSelectedType] = useState<string>('society');
+  const [selectedType, setSelectedType] = useState<string>('general');
   const [isPublicVisible, setIsPublicVisible] = useState<boolean>(true);
 
   const [name, setName] = useState('');

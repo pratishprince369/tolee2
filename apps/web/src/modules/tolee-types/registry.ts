@@ -1,6 +1,32 @@
 import { ToleeTypeConfig } from './types';
 
 export const TOLEE_TYPE_REGISTRY: Record<string, ToleeTypeConfig> = {
+  general: {
+    id: 'general',
+    slug: 'general',
+    title: 'General Community Group',
+    icon: 'Users',
+    description: 'Standard open social group for general discussions, sharing posts, chat, and media.',
+    estimatedMembers: 'Unlimited',
+    categoryTag: 'General Community',
+    defaultPrivacy: 'public',
+    defaultSearchable: true,
+    roles: [
+      { id: 'admin', name: 'Group Admin', description: 'Group Creator', canManageSettings: true, canManageMembers: true },
+      { id: 'moderator', name: 'Moderator', description: 'Content Reviewer' },
+      { id: 'member', name: 'Member', description: 'Community Member', isDefault: true, canPostContent: true }
+    ],
+    features: [
+      { id: 'group_posts', name: 'Feed & Discussions', iconName: 'MessageSquare', description: 'Share images, videos, and thoughts', enabledByDefault: true, category: 'core' },
+      { id: 'group_chat', name: 'Group Chat Room', iconName: 'Send', description: 'Real-time group chat and media sharing', enabledByDefault: true, category: 'core' }
+    ],
+    aiAssistant: {
+      name: 'Community Assistant AI',
+      roleDescription: 'General AI Assistant for group discussions, topic suggestions, and post creation.',
+      systemPrompt: 'You are the General Community AI Assistant. Help members write engaging posts and answer queries.',
+      suggestedPrompts: ['Suggest discussion topic for group', 'Write welcome post for new members', 'Draft a weekend group poll']
+    }
+  },
   society: {
     id: 'society',
     slug: 'society',
@@ -31,6 +57,35 @@ export const TOLEE_TYPE_REGISTRY: Record<string, ToleeTypeConfig> = {
       roleDescription: 'Handles resident complaints, drafts meeting notices, and tracks maintenance deadlines.',
       systemPrompt: 'You are the Society Management AI Assistant for Tolee. Help residents resolve maintenance queries and draft official society notices.',
       suggestedPrompts: ['Draft a notice for upcoming AGMs', 'How do I pay maintenance bill?', 'Raise a plumbing complaint']
+    }
+  },
+  coaching_class: {
+    id: 'coaching_class',
+    slug: 'coaching-class',
+    title: 'Coaching Class & Tuition',
+    icon: 'GraduationCap',
+    description: 'Coaching institute, batch attendance, fee reminders, test series, and study materials.',
+    estimatedMembers: '30 - 500 Students',
+    categoryTag: 'Coaching & Tuition',
+    defaultPrivacy: 'private',
+    defaultSearchable: true,
+    roles: [
+      { id: 'director', name: 'Institute Director / Tutor', description: 'Head Administrator', canManageSettings: true, canManageMembers: true, canManagePayments: true },
+      { id: 'teacher', name: 'Faculty / Teacher', description: 'Subject Instructor' },
+      { id: 'student', name: 'Student', description: 'Enrolled Student', isDefault: true, canPostContent: true },
+      { id: 'parent', name: 'Parent', description: 'Parent / Guardian' }
+    ],
+    features: [
+      { id: 'batch_schedule', name: 'Batch Schedule & Attendance', iconName: 'Clock', description: 'Track daily batch attendance and timetable', enabledByDefault: true, category: 'operations' },
+      { id: 'test_series', name: 'Test Series & Marks Log', iconName: 'Award', description: 'Publish mock test results and student rankings', enabledByDefault: true, category: 'operations' },
+      { id: 'fee_reminders', name: 'Fee Collection & Reminders', iconName: 'Receipt', description: 'Send digital fee receipts and monthly installment alerts', enabledByDefault: true, category: 'finance' },
+      { id: 'study_notes', name: 'DPPs & Study Materials', iconName: 'BookOpen', description: 'Share PDFs, question banks, and video lectures', enabledByDefault: true, category: 'core' }
+    ],
+    aiAssistant: {
+      name: 'Tuition AI Tutor',
+      roleDescription: 'Generates practice questions, test solutions, and student progress summaries.',
+      systemPrompt: 'You are the Coaching Institute AI Tutor. Generate practice quizzes, explain difficult study topics, and draft parent updates.',
+      suggestedPrompts: ['Generate 5 algebra practice questions', 'Draft fee reminder message for batch A', 'Tips for board exam preparation']
     }
   },
   office: {
