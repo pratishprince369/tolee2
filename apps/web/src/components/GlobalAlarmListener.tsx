@@ -36,7 +36,43 @@ export function GlobalAlarmListener() {
   const [missedAlerts, setMissedAlerts] = useState<MissedReminder[]>([]);
   const dismissedIdsRef = useRef<Set<string>>(new Set());
 
-  // 1. Check for Missed Reminders silently on login/mount (no loud audio alarm)
+  // 1. Service Worker & Push Notification Setup on Mount
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    // Register Service Worker for Mobile PWA & Push Notifications
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch((err) => {
+        console.warn('SW registration failed:', err);
+      });
+
+      // Listen to Service Worker Action Signals (e.g. Stop or Snooze from Android Notification Tray)
+      const handleSWMessage = (event: MessageEvent) => {
+        if (event.data?.type === 'STOP_ALARM_SIGNAL') {
+          stopRingtoneAlarm();
+          if (event.data.reminderId) {
+            dismissedIdsRef.current.add(event.data.reminderId);
+            dismissAIReminder(event.data.reminderId);
+          }
+          setActiveAlarm(null);
+        } else if (event.data?.type === 'SNOOZE_ALARM_SIGNAL') {
+          stopRingtoneAlarm();
+          if (event.data.reminderId) {
+            dismissedIdsRef.current.add(event.data.reminderId);
+            snoozeAIReminder(event.data.reminderId, 5);
+          }
+          setActiveAlarm(null);
+        }
+      };
+
+      navigator.serviceWorker.addEventListener('message', handleSWMessage);
+      return () => {
+        navigator.serviceWorker.removeEventListener('message', handleSWMessage);
+      };
+    }
+  }, []);
+
+  // 2. Check for Missed Reminders silently on login/mount (no loud audio alarm)
   useEffect(() => {
     if (!session?.user) return;
 
@@ -52,7 +88,7 @@ export function GlobalAlarmListener() {
     checkMissed();
   }, [session]);
 
-  // 2. Active Alarm Poller (Runs every 4 seconds for due reminders)
+  // 3. Active Alarm Poller (Runs every 4 seconds for due reminders)
   useEffect(() => {
     if (!session?.user) return;
 
