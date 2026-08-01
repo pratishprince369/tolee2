@@ -79,7 +79,9 @@ export function AIDashboard() {
     setMessages((prev) => [...prev, userMsg]);
     setIsLoading(true);
 
-    const result = await processAIPersonalMessage(text);
+    const clientISO = new Date().toISOString();
+    const timeZone = typeof window !== 'undefined' && window.Intl ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'Asia/Kolkata';
+    const result = await processAIPersonalMessage(text, [], clientISO, timeZone);
 
     const aiMsg: Message = {
       id: `ai_${Date.now()}`,

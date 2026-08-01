@@ -1752,13 +1752,22 @@ model AITask {
 }
 
 model AIReminder {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title       String
-  type        String   // "birthday", "meeting", "emi", "insurance", "medicine", "custom"
-  remindAt    DateTime
-  isDismissed Boolean  @default(false)
-  metadata    String?  // Extra JSON data
-  createdAt   DateTime @default(now())
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title         String
+  description   String?
+  type          String    @default("custom")
+  remindAt      DateTime
+  timeZone      String?
+  status        String    @default("PENDING") // PENDING, TRIGGERED, SNOOZED, COMPLETED, MISSED, ARCHIVED
+  isRecurring   Boolean   @default(false)
+  recurrence    String?   // daily, weekly, monthly, yearly
+  isDismissed   Boolean   @default(false)
+  metadata      String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt @default(now())
+  triggeredAt   DateTime?
+  completedAt   DateTime?
+  lastSnoozedAt DateTime?
 }

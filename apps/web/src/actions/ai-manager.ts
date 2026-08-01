@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { callNvidiaLLM } from '@/modules/ai-manager/Core/chat-engine';
 import { SYSTEM_PROMPTS } from '@/modules/ai-manager/Core/prompt-manager';
+import { parseNaturalLanguageReminder } from '@/modules/ai-manager/Core/reminder-parser';
 
 async function getUserId(): Promise<string> {
   const session = await getServerSession(authOptions);
@@ -23,40 +24,27 @@ async function getUserId(): Promise<string> {
   return user.id;
 }
 
-// Helper: Parse relative reminder time from message text
-function parseReminderTime(message: string): { remindAt: Date; textTitle: string; formattedTime: string } {
-  const lower = message.toLowerCase();
-  let delayMs = 5 * 60 * 1000; // Default 5 minutes if unspecified
-
-  // Match minute patterns: "5 min", "5 minute", "10 mins", "in 2 minutes"
-  const minMatch = lower.match(/(\d+)\s*(min|minute|mints|m)\b/);
-  // Match hour patterns: "1 hour", "2 hr", "2 ghante"
-  const hourMatch = lower.match(/(\d+)\s*(hour|hr|h|ghante|ghanta)\b/);
-  // Match second patterns: "30 sec", "30 second"
-  const secMatch = lower.match(/(\d+)\s*(sec|second|s)\b/);
-
-  if (minMatch && minMatch[1]) {
-    delayMs = parseInt(minMatch[1], 10) * 60 * 1000;
-  } else if (hourMatch && hourMatch[1]) {
-    delayMs = parseInt(hourMatch[1], 10) * 60 * 60 * 1000;
-  } else if (secMatch && secMatch[1]) {
-    delayMs = parseInt(secMatch[1], 10) * 1000;
+// Compute Next Trigger Date for Recurring Reminders
+function computeNextRecurrence(currentRemindAt: Date, recurrence: string | null): Date {
+  const next = new Date(currentRemindAt.getTime());
+  if (!recurrence) {
+    next.setDate(next.getDate() + 1);
+    return next;
   }
 
-  const remindAt = new Date(Date.now() + delayMs);
-  const formattedTime = remindAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-  // Clean title for display
-  let textTitle = message
-    .replace(/remind me/gi, '')
-    .replace(/reminder/gi, '')
-    .replace(/\b(in|at|me|mujhe|ke liye|dena|karo|set|phone ring karake|like alaram|alarm)\b/gi, '')
-    .replace(/\d+\s*(min|minute|hr|hour|sec|second|ghante)/gi, '')
-    .trim();
-
-  if (!textTitle || textTitle.length < 2) textTitle = message;
-
-  return { remindAt, textTitle, formattedTime };
+  const rec = recurrence.toLowerCase();
+  if (rec.includes('daily') || rec.includes('day')) {
+    next.setDate(next.getDate() + 1);
+  } else if (rec.includes('weekly') || rec.includes('every_monday')) {
+    next.setDate(next.getDate() + 7);
+  } else if (rec.includes('monthly')) {
+    next.setMonth(next.getMonth() + 1);
+  } else if (rec.includes('yearly')) {
+    next.setFullYear(next.getFullYear() + 1);
+  } else {
+    next.setDate(next.getDate() + 1);
+  }
+  return next;
 }
 
 // ------------------------------------
@@ -131,7 +119,7 @@ export async function deleteAIMemory(id: string) {
 }
 
 // ------------------------------------
-// 2. AI TASKS & REMINDERS ACTIONS
+// 2. AI TASKS & REMINDERS ACTIONS (WITH LIFECYCLE & DEDUPLICATION)
 // ------------------------------------
 
 export async function createAITask(data: {
@@ -156,83 +144,227 @@ export async function createAITask(data: {
       }
     });
 
-    if (data.dueDate) {
-      await prisma.aIReminder.create({
-        data: {
-          userId,
-          title: `Task Reminder: ${data.title}`,
-          type: data.category || 'custom',
-          remindAt: new Date(data.dueDate)
-        }
-      });
-    }
-
     return { success: true, task };
   } catch (error: any) {
     return { success: false, error: error.message || 'Failed to create task' };
   }
 }
 
-export async function createAIReminderDirectly(title: string, remindAtDate: Date) {
+// Smart Deduplicating Reminder Creator
+export async function createOrUpdateAIReminder(data: {
+  title: string;
+  description?: string;
+  remindAt: Date;
+  timeZone?: string;
+  isRecurring?: boolean;
+  recurrence?: string;
+}) {
   try {
     const userId = await getUserId();
+
+    // Deduplication check: Look for existing active reminder with same title
+    const existing = await prisma.aIReminder.findFirst({
+      where: {
+        userId,
+        title: data.title,
+        status: { in: ['PENDING', 'SNOOZED'] },
+        isDismissed: false
+      }
+    });
+
+    if (existing) {
+      const updated = await prisma.aIReminder.update({
+        where: { id: existing.id },
+        data: {
+          remindAt: data.remindAt,
+          timeZone: data.timeZone || existing.timeZone,
+          isRecurring: data.isRecurring ?? existing.isRecurring,
+          recurrence: data.recurrence || existing.recurrence,
+          status: 'PENDING',
+          isDismissed: false
+        }
+      });
+      return { success: true, reminder: updated, isUpdate: true };
+    }
+
     const reminder = await prisma.aIReminder.create({
       data: {
         userId,
-        title,
+        title: data.title,
+        description: data.description || null,
         type: 'alarm',
-        remindAt: remindAtDate
+        remindAt: data.remindAt,
+        timeZone: data.timeZone || 'Asia/Kolkata',
+        status: 'PENDING',
+        isRecurring: data.isRecurring ?? false,
+        recurrence: data.recurrence || null,
+        isDismissed: false
       }
     });
-    return { success: true, reminder };
+    return { success: true, reminder, isUpdate: false };
   } catch (error: any) {
     return { success: false, error: error.message };
   }
 }
 
+// Get Currently Due Active Reminders (Within last 2 minutes window to avoid ringing old missed alarms)
 export async function getDueAIReminders() {
   try {
     const userId = await getUserId();
     const now = new Date();
+    // Only fetch reminders due now where time offset is within last 2 minutes
+    const twoMinutesAgo = new Date(now.getTime() - 2 * 60 * 1000);
+
     const dueReminders = await prisma.aIReminder.findMany({
       where: {
         userId,
         isDismissed: false,
-        remindAt: { lte: now }
+        status: { in: ['PENDING', 'SNOOZED'] },
+        remindAt: {
+          gte: twoMinutesAgo,
+          lte: now
+        }
       },
       orderBy: { remindAt: 'asc' }
     });
+
     return { success: true, dueReminders };
   } catch (error: any) {
     return { success: false, dueReminders: [] };
   }
 }
 
+// Get Missed Reminders (Scheduled > 2 mins ago but never completed)
+export async function getMissedAIReminders() {
+  try {
+    const userId = await getUserId();
+    const now = new Date();
+    const twoMinutesAgo = new Date(now.getTime() - 2 * 60 * 1000);
+
+    const missed = await prisma.aIReminder.findMany({
+      where: {
+        userId,
+        isDismissed: false,
+        status: 'PENDING',
+        remindAt: { lt: twoMinutesAgo }
+      },
+      orderBy: { remindAt: 'desc' },
+      take: 5
+    });
+
+    // Mark status as MISSED in database silently
+    if (missed.length > 0) {
+      await prisma.aIReminder.updateMany({
+        where: { id: { in: missed.map(m => m.id) } },
+        data: { status: 'MISSED', isDismissed: true }
+      });
+    }
+
+    return { success: true, missedReminders: missed };
+  } catch (error: any) {
+    return { success: false, missedReminders: [] };
+  }
+}
+
+// Dismiss / Stop Alarm
 export async function dismissAIReminder(reminderId: string) {
   try {
     const userId = await getUserId();
-    await prisma.aIReminder.updateMany({
-      where: { id: reminderId, userId },
-      data: { isDismissed: true }
+    const reminder = await prisma.aIReminder.findFirst({
+      where: { id: reminderId, userId }
     });
+
+    if (!reminder) return { success: false, error: 'Reminder not found' };
+
+    // If Recurring: calculate next trigger date
+    if (reminder.isRecurring) {
+      const nextRemindAt = computeNextRecurrence(reminder.remindAt, reminder.recurrence);
+      await prisma.aIReminder.update({
+        where: { id: reminderId },
+        data: {
+          remindAt: nextRemindAt,
+          status: 'PENDING',
+          isDismissed: false,
+          completedAt: new Date()
+        }
+      });
+    } else {
+      // One-Time: Mark as COMPLETED & Dismissed permanently
+      await prisma.aIReminder.update({
+        where: { id: reminderId },
+        data: {
+          status: 'COMPLETED',
+          isDismissed: true,
+          completedAt: new Date()
+        }
+      });
+    }
+
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };
   }
 }
 
+// Snooze Alarm for 5 Minutes
 export async function snoozeAIReminder(reminderId: string, snoozeMinutes: number = 5) {
   try {
     const userId = await getUserId();
     const newRemindAt = new Date(Date.now() + snoozeMinutes * 60 * 1000);
+
     await prisma.aIReminder.updateMany({
       where: { id: reminderId, userId },
       data: {
         remindAt: newRemindAt,
-        isDismissed: false
+        status: 'SNOOZED',
+        isDismissed: false,
+        lastSnoozedAt: new Date()
       }
     });
     return { success: true, newRemindAt };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+// Get Full Reminder History with Filter Status
+export async function getAIReminderHistory(filterStatus: string = 'all') {
+  try {
+    const userId = await getUserId();
+    let whereClause: any = { userId };
+
+    if (filterStatus === 'pending') {
+      whereClause.status = 'PENDING';
+      whereClause.isDismissed = false;
+    } else if (filterStatus === 'completed') {
+      whereClause.status = 'COMPLETED';
+    } else if (filterStatus === 'recurring') {
+      whereClause.isRecurring = true;
+    } else if (filterStatus === 'missed') {
+      whereClause.status = 'MISSED';
+    } else if (filterStatus === 'archived') {
+      whereClause.status = 'ARCHIVED';
+    }
+
+    const reminders = await prisma.aIReminder.findMany({
+      where: whereClause,
+      orderBy: { remindAt: 'desc' },
+      take: 50
+    });
+
+    return { success: true, reminders };
+  } catch (error: any) {
+    return { success: false, reminders: [] };
+  }
+}
+
+export async function deleteAIReminder(reminderId: string) {
+  try {
+    const userId = await getUserId();
+    await prisma.aIReminder.deleteMany({
+      where: { id: reminderId, userId }
+    });
+    return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };
   }
@@ -273,7 +405,8 @@ export async function getAIReminders() {
     const reminders = await prisma.aIReminder.findMany({
       where: {
         userId,
-        isDismissed: false
+        isDismissed: false,
+        status: { in: ['PENDING', 'SNOOZED'] }
       },
       orderBy: { remindAt: 'asc' },
       take: 10
@@ -299,7 +432,7 @@ export async function getAIDashboardSummary() {
         orderBy: { dueDate: 'asc' }
       }),
       prisma.aIReminder.findMany({
-        where: { userId, isDismissed: false },
+        where: { userId, isDismissed: false, status: { in: ['PENDING', 'SNOOZED'] } },
         take: 5,
         orderBy: { remindAt: 'asc' }
       }),
@@ -347,10 +480,15 @@ export async function getAIDashboardSummary() {
 }
 
 // ------------------------------------
-// 4. REAL-TIME AI PERSONAL ASSISTANT PROCESSOR WITH ALARM SCHEDULER
+// 4. REAL-TIME AI PERSONAL ASSISTANT PROCESSOR WITH NATURAL LANGUAGE PARSER
 // ------------------------------------
 
-export async function processAIPersonalMessage(message: string, history: { role: string; content: string }[] = []) {
+export async function processAIPersonalMessage(
+  message: string, 
+  history: { role: string; content: string }[] = [],
+  clientLocalISO?: string,
+  timeZone?: string
+) {
   try {
     const userId = await getUserId();
     const trimmed = message.trim();
@@ -365,21 +503,37 @@ export async function processAIPersonalMessage(message: string, history: { role:
       };
     }
 
-    // 1. Alarm & Reminder Parsing Logic
-    if (lower.includes('remind') || lower.includes('reminder') || lower.includes('alarm') || lower.includes('ring') || lower.includes('bell')) {
-      const { remindAt, textTitle, formattedTime } = parseReminderTime(trimmed);
+    // 1. Natural Language Alarm & Reminder Parser
+    if (lower.includes('remind') || lower.includes('reminder') || lower.includes('alarm') || lower.includes('ring') || lower.includes('wake me') || lower.includes('call ')) {
+      const { title, remindAt, formattedTimeStr, isRecurring, recurrence } = parseNaturalLanguageReminder(
+        trimmed, 
+        clientLocalISO, 
+        timeZone
+      );
 
-      // Save alarm reminder in database
-      await createAIReminderDirectly(textTitle, remindAt);
-      await createAITask({
-        title: textTitle,
-        description: `Alarm scheduled for ${formattedTime}`,
-        dueDate: remindAt.toISOString()
+      // Create or Update deduplicated reminder in database
+      const result = await createOrUpdateAIReminder({
+        title,
+        remindAt,
+        timeZone: timeZone || 'Asia/Kolkata',
+        isRecurring,
+        recurrence
       });
+
+      await createAITask({
+        title,
+        description: `Alarm scheduled for ${formattedTimeStr}${isRecurring ? ` (Recurring: ${recurrence})` : ''}`,
+        dueDate: remindAt.toISOString(),
+        isRecurring,
+        recurrence
+      });
+
+      const recurringBadge = isRecurring ? ` (🔁 Repeating: ${recurrence})` : '';
+      const updateNotice = result.isUpdate ? ' (Updated existing active reminder)' : '';
 
       return {
         success: true,
-        response: `⏰ **Alarm & Reminder Set Successfully!**\n\nI have scheduled your reminder for **"${textTitle}"** at **${formattedTime}**.\n\n🔊 *My audio alarm system will ring loudly and alert you with voice synthesis at exactly ${formattedTime}!*`
+        response: `✅ **Reminder Scheduled!**${updateNotice}\n\nI will remind you for **"${title}"** at **${formattedTimeStr}**${recurringBadge}.\n\n🔊 *My audio alarm engine will ring loudly on your device at exactly ${formattedTimeStr}!*`
       };
     }
 
@@ -411,7 +565,9 @@ export async function processAIPersonalMessage(message: string, history: { role:
       ? `User Memory Context: ${existingMemories.map(m => `${m.key}: ${m.value}`).join('; ')}`
       : 'No previous memories saved.';
 
-    const systemPromptWithContext = `${SYSTEM_PROMPTS.PERSONAL_EMPLOYEE}\n\n${memoryContext}\n\nYou are a real human-like Jarvis AI Employee for Tolee. Respond concisely, warmly, and helpfully.`;
+    const userTimeContext = clientLocalISO ? `User Current Device Time: ${new Date(clientLocalISO).toLocaleString()}` : '';
+
+    const systemPromptWithContext = `${SYSTEM_PROMPTS.PERSONAL_EMPLOYEE}\n\n${memoryContext}\n${userTimeContext}\n\nYou are a real human-like Jarvis AI Employee for Tolee. Respond concisely, warmly, and helpfully.`;
 
     // 5. Call Ultra-Fast NVIDIA NIM LLM
     const nvidiaResponse = await callNvidiaLLM(
