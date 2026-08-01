@@ -517,6 +517,36 @@ io.on('connection', (socket) => {
     io.to(`tolee-${toleeId}`).emit('tolee-join-request', { toleeId, userId, name, avatar });
   });
 
+  socket.on('tolee-member-join-request', async ({ toleeId, userId }) => {
+    console.log(`[Tolee Member Join Request] User ${userId} requested to join Tolee ${toleeId}`);
+    try {
+      const count = await prisma.toleeMember.count({
+        where: { toleeId, status: 'pending' }
+      });
+      io.to(`tolee-${toleeId}`).emit('tolee-member-join-request', { toleeId, requestCount: count });
+    } catch (err) {
+      console.error("Error handling tolee-member-join-request socket event:", err);
+      io.to(`tolee-${toleeId}`).emit('tolee-member-join-request', { toleeId });
+    }
+  });
+
+  socket.on('tolee-member-approval-update', async ({ toleeId, requestCount }) => {
+    console.log(`[Tolee Member Approval Update] Tolee ${toleeId} updated pending count: ${requestCount}`);
+    if (typeof requestCount === 'number') {
+      io.to(`tolee-${toleeId}`).emit('tolee-member-approval-update', { toleeId, requestCount });
+    } else {
+      try {
+        const count = await prisma.toleeMember.count({
+          where: { toleeId, status: 'pending' }
+        });
+        io.to(`tolee-${toleeId}`).emit('tolee-member-approval-update', { toleeId, requestCount: count });
+      } catch (err) {
+        console.error("Error handling tolee-member-approval-update socket event:", err);
+        io.to(`tolee-${toleeId}`).emit('tolee-member-approval-update', { toleeId });
+      }
+    }
+  });
+
   socket.on('tolee-join-response', ({ toleeId, userId, approved }) => {
     console.log(`[Live signaling] Admin response for user ${userId} in Tolee ${toleeId}: ${approved}`);
     io.to(`tolee-${toleeId}`).emit('tolee-join-response', { toleeId, userId, approved });

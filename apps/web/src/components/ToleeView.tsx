@@ -24,7 +24,7 @@ import { PostCarousel } from '@/components/PostCarousel';
 import { OptimisticPostCard } from '@/components/OptimisticPostCard';
 import { ManageToleeModal } from '@/components/ManageToleeModal';
 import { createPost, toggleLike, addComment, getLikes, getComments, toggleSavePost, toggleRepost, getReposts, updatePostVisibility, deletePostPermanently, editPostCaption } from '@/actions/post';
-import { joinTolee, leaveToleeGroup, startLiveSession, endLiveSession, requestToJoinLive, handleLiveJoinRequest, getLiveJoinRequests, getMemberLiveStatus } from '@/actions/tolee';
+import { joinTolee, leaveToleeGroup, startLiveSession, endLiveSession, requestToJoinLive, handleLiveJoinRequest, getLiveJoinRequests, getMemberLiveStatus, getPendingGroupRequests } from '@/actions/tolee';
 import { io } from 'socket.io-client';
 import { createMeeting, getToleeMeetings, updateMeetingStatus } from '@/actions/meeting';
 
@@ -51,17 +51,31 @@ import { Loader2 } from 'lucide-react';
 import { ReShareModal } from '@/components/ReShareModal';
 import { ShareModal } from '@/components/ShareModal';
 import { ViewTracker } from '@/components/ViewTracker';
-import { formatViewCount } from '@/lib/utils';
+import { formatViewCount, cn } from '@/lib/utils';
 import { triggerAuthModal } from '@/components/AuthModal';
 
 export function ToleeView({ toleeData, currentUserId }: { toleeData: any, currentUserId: string | null }) {
   const { data: session } = useSession();
   const router = useRouter();
   const { tolee, posts, leaderboard, membershipStatus, role } = toleeData || {};
-  const isAdmin = role === 'admin';
+  const isOwner = !!(currentUserId && tolee?.ownerId === currentUserId);
+  const isSuperAdmin = (session?.user as any)?.role === 'SUPER_ADMIN';
+  const isAdmin = role === 'admin' || isOwner || isSuperAdmin;
+  const isModerator = role === 'moderator' || isAdmin;
+  const canApproveMembers = !!tolee?.isPrivate && (isOwner || isAdmin || role === 'admin' || role === 'moderator');
   const isMember = membershipStatus === 'approved';
   
   const [activeTab, setActiveTab] = useState(isMember ? 'community' : 'about');
+  const [settingsSubTab, setSettingsSubTab] = useState<string>('general');
+  const [pendingCount, setPendingCount] = useState<number>(() => {
+    if (Array.isArray(toleeData?.pendingRequests)) {
+      return toleeData.pendingRequests.length;
+    }
+    if (Array.isArray(tolee?.pendingRequests)) {
+      return tolee.pendingRequests.length;
+    }
+    return 0;
+  });
   const [isJoining, setIsJoining] = useState(false);
   
   const searchParams = useSearchParams();
@@ -74,10 +88,28 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
       window.history.replaceState({ ...window.history.state, as: newUrl, url: newUrl }, '', newUrl);
     }
     const tabParam = searchParams?.get('tab');
-    if (tabParam === 'live' && isMember) {
+    const subtabParam = searchParams?.get('subtab');
+    if (tabParam === 'settings') {
+      setActiveTab('settings');
+      if (subtabParam) {
+        setSettingsSubTab(subtabParam);
+      }
+    } else if (tabParam === 'live' && isMember) {
       setActiveTab('live');
     }
   }, [searchParams, isMember]);
+
+  const handleOpenMemberApproval = () => {
+    setSettingsSubTab('members');
+    setActiveTab('settings');
+  };
+
+  const handleRequestChange = (newCount: number) => {
+    setPendingCount(newCount);
+    if (socketRef.current) {
+      socketRef.current.emit('tolee-member-approval-update', { toleeId: tolee.id, requestCount: newCount });
+    }
+  };
 
   // Masterclass Live Stage States
   const [isLive, setIsLive] = useState(tolee?.isLive || false);
@@ -725,6 +757,34 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
       }
     });
 
+    socket.on('tolee-member-join-request', ({ toleeId, requestCount }: any) => {
+      if (toleeId === tolee.id) {
+        if (typeof requestCount === 'number') {
+          setPendingCount(requestCount);
+        } else {
+          getPendingGroupRequests(tolee.id).then(res => {
+            if (res.success && Array.isArray(res.requests)) {
+              setPendingCount(res.requests.length);
+            }
+          });
+        }
+      }
+    });
+
+    socket.on('tolee-member-approval-update', ({ toleeId, requestCount }: any) => {
+      if (toleeId === tolee.id) {
+        if (typeof requestCount === 'number') {
+          setPendingCount(requestCount);
+        } else {
+          getPendingGroupRequests(tolee.id).then(res => {
+            if (res.success && Array.isArray(res.requests)) {
+              setPendingCount(res.requests.length);
+            }
+          });
+        }
+      }
+    });
+
     return () => {
       if (socketRef.current) {
         socketRef.current.disconnect();
@@ -1056,8 +1116,11 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
       return;
     }
     setIsJoining(true);
-    await joinTolee(tolee.id);
+    const res = await joinTolee(tolee.id);
     setIsJoining(false);
+    if (res.success && res.status === 'pending' && socketRef.current) {
+      socketRef.current.emit('tolee-member-join-request', { toleeId: tolee.id, userId: currentUserId });
+    }
   };
 
   const handleCopyLink = () => {
@@ -1089,7 +1152,6 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
   };
 
   const isPending = membershipStatus === 'pending';
-  const isModerator = role === 'moderator' || isAdmin;
 
   return (
     <div className="min-h-screen bg-[#fafafa] dark:bg-[#0a0a0a] font-sans text-gray-900 dark:text-gray-100 w-full max-w-full overflow-x-hidden">
@@ -1135,14 +1197,38 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                   🔴 LIVE NOW
                 </Button>
               )}
-              {isAdmin ? (
-                <div className="flex flex-1 md:flex-initial gap-2 min-w-0">
+              {isAdmin || canApproveMembers ? (
+                <div className="flex flex-1 md:flex-initial gap-2 min-w-0 flex-wrap sm:flex-nowrap items-center">
                   <ManageToleeModal tolee={tolee}>
-                    <Button variant="outline" className="flex-1 font-bold px-4 text-sm shadow-md truncate">Manage Tolee</Button>
+                    <Button variant="outline" className="flex-1 font-bold px-4 text-sm shadow-md truncate h-10 rounded-xl">Manage Tolee</Button>
                   </ManageToleeModal>
+
+                  {canApproveMembers && (
+                    <Button
+                      onClick={handleOpenMemberApproval}
+                      className={cn(
+                        "flex-1 font-bold px-3 text-sm shadow-md gap-1.5 transition-all truncate h-10 rounded-xl flex items-center justify-center border cursor-pointer",
+                        pendingCount > 0
+                          ? "bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-700 text-white border-amber-400/80 shadow-orange-500/30 animate-pulse ring-2 ring-amber-400/50"
+                          : "border-gray-300 dark:border-gray-700 bg-white dark:bg-zinc-900 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-zinc-800"
+                      )}
+                    >
+                      <Users className="w-4 h-4 text-current flex-shrink-0" />
+                      <span className="truncate flex items-center gap-1">
+                        <span className="hidden sm:inline">Member Approval</span>
+                        <span className="sm:hidden">Approval</span>
+                        {pendingCount > 0 && (
+                          <span className="ml-1 px-1.5 py-0.5 text-xs font-black rounded-full bg-white text-orange-600 shadow-sm border border-orange-200">
+                            {pendingCount}
+                          </span>
+                        )}
+                      </span>
+                    </Button>
+                  )}
+
                   <Button 
                     onClick={() => router.push(`/chat?toleeId=${tolee.id}`)}
-                    className="flex-1 font-bold px-4 text-sm shadow-md bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white gap-1.5 transition-all truncate"
+                    className="flex-1 font-bold px-4 text-sm shadow-md bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white gap-1.5 transition-all truncate h-10 rounded-xl"
                   >
                     <MessageCircle className="w-4 h-4 text-white flex-shrink-0" />
                     <span className="truncate">Chat Room</span>
@@ -1249,6 +1335,8 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
               currentUserId={currentUserId || undefined} 
               isOwner={tolee?.ownerId === currentUserId} 
               isAdmin={isAdmin} 
+              initialTab={settingsSubTab}
+              onRequestChange={handleRequestChange}
             />
           </div>
         ) : (

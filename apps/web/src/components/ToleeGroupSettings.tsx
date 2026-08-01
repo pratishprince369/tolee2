@@ -21,10 +21,18 @@ interface ToleeGroupSettingsProps {
   currentUserId?: string;
   isOwner?: boolean;
   isAdmin?: boolean;
+  initialTab?: string;
+  onRequestChange?: (count: number) => void;
 }
 
-export function ToleeGroupSettings({ tolee, currentUserId, isOwner = false, isAdmin = false }: ToleeGroupSettingsProps) {
-  const [activeTab, setActiveTab] = useState<string>('general');
+export function ToleeGroupSettings({ tolee, currentUserId, isOwner = false, isAdmin = false, initialTab = 'general', onRequestChange }: ToleeGroupSettingsProps) {
+  const [activeTab, setActiveTab] = useState<string>(initialTab);
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
@@ -53,6 +61,12 @@ export function ToleeGroupSettings({ tolee, currentUserId, isOwner = false, isAd
       fetchRequests();
     }
   }, [tolee.id]);
+
+  useEffect(() => {
+    if (onRequestChange) {
+      onRequestChange(pendingRequests.length);
+    }
+  }, [pendingRequests.length, onRequestChange]);
 
   const fetchRequests = async () => {
     setLoadingRequests(true);

@@ -327,7 +327,7 @@ export async function joinTolee(toleeId: string) {
           message: status === 'pending' 
             ? `${user.username || user.name} requested to join ${tolee.name}.`
             : `${user.username || user.name} joined ${tolee.name}.`,
-          link: `/t/${tolee.slug}`
+          link: status === 'pending' ? `/t/${tolee.slug}?tab=settings&subtab=members` : `/t/${tolee.slug}`
         });
       }
     }
@@ -481,6 +481,9 @@ export async function getTrendingTolees() {
   try {
     // Try to get trending by member count first
     let tolees = await prisma.tolee.findMany({
+      where: {
+        isPublicVisible: true
+      },
       take: 12,
       select: {
         id: true,
@@ -512,6 +515,9 @@ export async function getTrendingTolees() {
     // If no tolees found with members, just get the most recent ones
     if (tolees.length === 0) {
       tolees = await prisma.tolee.findMany({
+        where: {
+          isPublicVisible: true
+        },
         take: 12,
         select: {
           id: true,
@@ -1197,6 +1203,8 @@ export async function updateGroupSettings(toleeId: string, settingsData: {
 
     if (settingsData.isSearchable !== undefined) {
       updatePayload.isPublicVisible = settingsData.isSearchable;
+    } else if (settingsData.isPublicVisible !== undefined) {
+      updatePayload.isPublicVisible = settingsData.isPublicVisible;
     }
 
     const updated = await prisma.tolee.update({
@@ -1383,7 +1391,7 @@ export async function getPendingGroupRequests(toleeId: string) {
       where: { userId_toleeId: { userId, toleeId } }
     });
 
-    const isAdmin = callerMember?.role === 'admin' || tolee.ownerId === userId;
+    const isAdmin = callerMember?.role === 'admin' || callerMember?.role === 'moderator' || tolee.ownerId === userId;
     if (!isAdmin) return { success: false, error: 'Only admins can view pending requests', requests: [] };
 
     const requests = await prisma.toleeMember.findMany({
@@ -1435,7 +1443,7 @@ export async function approveJoinRequest(toleeId: string, targetUserId: string) 
       where: { userId_toleeId: { userId, toleeId } }
     });
 
-    const isAdmin = callerMember?.role === 'admin' || tolee.ownerId === userId;
+    const isAdmin = callerMember?.role === 'admin' || callerMember?.role === 'moderator' || tolee.ownerId === userId;
     if (!isAdmin) return { success: false, error: 'Only admins can approve join requests.' };
 
     await prisma.toleeMember.update({
@@ -1501,7 +1509,7 @@ export async function rejectJoinRequest(toleeId: string, targetUserId: string) {
       where: { userId_toleeId: { userId, toleeId } }
     });
 
-    const isAdmin = callerMember?.role === 'admin' || tolee.ownerId === userId;
+    const isAdmin = callerMember?.role === 'admin' || callerMember?.role === 'moderator' || tolee.ownerId === userId;
     if (!isAdmin) return { success: false, error: 'Only admins can reject join requests.' };
 
     await prisma.toleeMember.delete({
