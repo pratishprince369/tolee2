@@ -11,12 +11,13 @@ import { sanitizeText } from '@/lib/sanitize';
 import { getSimulationSettings, getGroupMemberCount, getSimulatedEngagement, generateDynamicGroupPosts, detectCountryCode } from '@/lib/simulation';
 
 
-export async function getTolees() {
+export async function getTolees(includeInvisible: boolean = false) {
   try {
     const simSettings = await getSimulationSettings();
     const isSimOn = simSettings.simulationMode;
 
     const tolees = await prisma.tolee.findMany({
+      where: includeInvisible ? {} : { isPublicVisible: true },
       include: {
         members: true,
       }
@@ -1205,6 +1206,8 @@ export async function updateGroupSettings(toleeId: string, settingsData: {
 
     revalidatePath(`/t/${updated.slug}`);
     revalidatePath(`/create-tolee`);
+    revalidatePath('/discover');
+    revalidatePath('/');
     return { success: true, tolee: updated };
   } catch (err: any) {
     console.error("Error updating group settings:", err);

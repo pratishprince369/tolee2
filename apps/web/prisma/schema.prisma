@@ -159,6 +159,7 @@ model User {
 
   createdEvents        Event[]           @relation("UserEvents")
   eventAttendees       EventAttendee[]
+  toleeJoinRequests    ToleeJoinRequest[]
 }
 
 model EmailLog {
@@ -226,6 +227,7 @@ model Tolee {
   liveJoinRequests     LiveJoinRequest[]
   meetings             Meeting[]           @relation("ToleeMeeting")
   chats                Chat[]
+  joinRequests         ToleeJoinRequest[]
 }
 
 model ToleeMember {
@@ -248,6 +250,23 @@ model ToleeMember {
   toleeId   String
   user      User     @relation(fields: [userId], references: [id])
   tolee     Tolee    @relation(fields: [toleeId], references: [id])
+
+  @@unique([userId, toleeId])
+}
+
+model ToleeJoinRequest {
+  id          String    @id @default(cuid())
+  toleeId     String
+  userId      String
+  status      String    @default("pending") // "pending", "approved", "rejected"
+  requestedAt DateTime  @default(now())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  approvedBy  String?
+  approvedAt  DateTime?
+
+  tolee       Tolee     @relation(fields: [toleeId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, toleeId])
 }
