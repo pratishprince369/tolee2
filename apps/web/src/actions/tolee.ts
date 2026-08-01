@@ -296,6 +296,26 @@ export async function joinTolee(toleeId: string) {
       }
     });
 
+    if (status === 'approved') {
+      try {
+        let chat = await prisma.chat.findFirst({
+          where: { OR: [{ toleeId }, { name: tolee.name, isGroupChat: true }] }
+        });
+        if (!chat) {
+          chat = await prisma.chat.create({
+            data: { name: tolee.name, isGroupChat: true, toleeId }
+          });
+        }
+        await prisma.chatParticipant.upsert({
+          where: { chatId_userId: { chatId: chat.id, userId } },
+          create: { chatId: chat.id, userId },
+          update: {}
+        });
+      } catch (chatErr) {
+        console.error("Error adding participant to chat:", chatErr);
+      }
+    }
+
     // Create notification for Tolee owner
     if (tolee.ownerId && tolee.ownerId !== userId) {
       const user = await prisma.user.findUnique({ where: { id: userId } });
@@ -426,6 +446,24 @@ export async function createTolee(data: {
         }
       }
     });
+
+    // Automatically create Chat room linked to this Tolee
+    try {
+      await prisma.chat.create({
+        data: {
+          name: tolee.name,
+          isGroupChat: true,
+          toleeId: tolee.id,
+          participants: {
+            create: {
+              userId
+            }
+          }
+        }
+      });
+    } catch (chatErr) {
+      console.error("Error creating group chat room on creation:", chatErr);
+    }
 
     revalidatePath('/discover');
     revalidatePath('/feed');
@@ -1325,4 +1363,159 @@ export async function sendEmergencyGroupBroadcast(toleeId: string, broadcastMess
     return { success: false, error: err.message || 'Failed to send broadcast' };
   }
 }
+
+export async function getPendingGroupRequests(toleeId: string) {
+  try {
+    const session = await getServerSession(authOptions);
+    const userId = (session?.user as any)?.id;
+    if (!userId) return { success: false, error: 'Unauthorized', requests: [] };
+
+    const tolee = await prisma.tolee.findUnique({
+      where: { id: toleeId },
+      select: { ownerId: true }
+    });
+    if (!tolee) return { success: false, error: 'Group not found', requests: [] };
+
+    const callerMember = await prisma.toleeMember.findUnique({
+      where: { userId_toleeId: { userId, toleeId } }
+    });
+
+    const isAdmin = callerMember?.role === 'admin' || tolee.ownerId === userId;
+    if (!isAdmin) return { success: false, error: 'Only admins can view pending requests', requests: [] };
+
+    const requests = await prisma.toleeMember.findMany({
+      where: { toleeId, status: 'pending' },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+            avatar: true,
+            createdAt: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    return {
+      success: true,
+      requests: requests.map(r => ({
+        id: r.id,
+        userId: r.userId,
+        name: r.user.name || r.user.username || 'Anonymous User',
+        username: r.user.username || '',
+        avatar: r.user.avatar || '/default-user-avatar.svg',
+        requestedAt: r.createdAt
+      }))
+    };
+  } catch (err: any) {
+    console.error("Error fetching pending requests:", err);
+    return { success: false, error: err.message, requests: [] };
+  }
+}
+
+export async function approveJoinRequest(toleeId: string, targetUserId: string) {
+  try {
+    const session = await getServerSession(authOptions);
+    const userId = (session?.user as any)?.id;
+    if (!userId) return { success: false, error: 'Unauthorized' };
+
+    const tolee = await prisma.tolee.findUnique({
+      where: { id: toleeId },
+      select: { id: true, name: true, slug: true, ownerId: true }
+    });
+    if (!tolee) return { success: false, error: 'Group not found' };
+
+    const callerMember = await prisma.toleeMember.findUnique({
+      where: { userId_toleeId: { userId, toleeId } }
+    });
+
+    const isAdmin = callerMember?.role === 'admin' || tolee.ownerId === userId;
+    if (!isAdmin) return { success: false, error: 'Only admins can approve join requests.' };
+
+    await prisma.toleeMember.update({
+      where: {
+        userId_toleeId: {
+          userId: targetUserId,
+          toleeId
+        }
+      },
+      data: {
+        status: 'approved',
+        role: 'member'
+      }
+    });
+
+    try {
+      let chat = await prisma.chat.findFirst({
+        where: { OR: [{ toleeId }, { name: tolee.name, isGroupChat: true }] }
+      });
+      if (!chat) {
+        chat = await prisma.chat.create({
+          data: { name: tolee.name, isGroupChat: true, toleeId }
+        });
+      }
+      await prisma.chatParticipant.upsert({
+        where: { chatId_userId: { chatId: chat.id, userId: targetUserId } },
+        create: { chatId: chat.id, userId: targetUserId },
+        update: {}
+      });
+    } catch (chatErr) {
+      console.error("Error adding approved user to chat:", chatErr);
+    }
+
+    await createSystemNotification({
+      userId: targetUserId,
+      type: 'TOLEE_JOIN_APPROVED',
+      title: '🎉 Join Request Approved!',
+      message: `Your request to join ${tolee.name} was approved by group admin.`,
+      link: `/t/${tolee.slug}`
+    });
+
+    revalidatePath(`/t/${tolee.slug}`);
+    return { success: true };
+  } catch (err: any) {
+    console.error("Error approving join request:", err);
+    return { success: false, error: err.message || 'Failed to approve join request' };
+  }
+}
+
+export async function rejectJoinRequest(toleeId: string, targetUserId: string) {
+  try {
+    const session = await getServerSession(authOptions);
+    const userId = (session?.user as any)?.id;
+    if (!userId) return { success: false, error: 'Unauthorized' };
+
+    const tolee = await prisma.tolee.findUnique({
+      where: { id: toleeId },
+      select: { id: true, name: true, slug: true, ownerId: true }
+    });
+    if (!tolee) return { success: false, error: 'Group not found' };
+
+    const callerMember = await prisma.toleeMember.findUnique({
+      where: { userId_toleeId: { userId, toleeId } }
+    });
+
+    const isAdmin = callerMember?.role === 'admin' || tolee.ownerId === userId;
+    if (!isAdmin) return { success: false, error: 'Only admins can reject join requests.' };
+
+    await prisma.toleeMember.delete({
+      where: {
+        userId_toleeId: {
+          userId: targetUserId,
+          toleeId
+        }
+      }
+    });
+
+    revalidatePath(`/t/${tolee.slug}`);
+    return { success: true };
+  } catch (err: any) {
+    console.error("Error rejecting join request:", err);
+    return { success: false, error: err.message || 'Failed to reject join request' };
+  }
+}
+
 

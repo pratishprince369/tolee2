@@ -1,15 +1,19 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Settings, Globe, Lock, Shield, Users, UserCheck, AlertTriangle, 
   Trash2, QrCode, Share2, Bell, Sparkles, MessageSquare, Check, 
   Info, Eye, EyeOff, FileText, CheckCircle2, ChevronRight, Sliders,
-  DollarSign, Activity, Zap, Radio, Crown, AlertCircle, Save, RefreshCw
+  DollarSign, Activity, Zap, Radio, Crown, AlertCircle, Save, RefreshCw,
+  UserPlus, CheckCircle, XCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { updateGroupSettings, transferToleeOwnership, deleteTolee, updateMemberRole, sendEmergencyGroupBroadcast } from '@/actions/tolee';
+import { 
+  updateGroupSettings, transferToleeOwnership, deleteTolee, updateMemberRole, 
+  sendEmergencyGroupBroadcast, approveJoinRequest, rejectJoinRequest, getPendingGroupRequests 
+} from '@/actions/tolee';
 import { TOLEE_TYPE_REGISTRY } from '@/modules/tolee-types/registry';
 
 interface ToleeGroupSettingsProps {
@@ -24,6 +28,12 @@ export function ToleeGroupSettings({ tolee, currentUserId, isOwner = false, isAd
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
+  // Pending Join Requests State
+  const [pendingRequests, setPendingRequests] = useState<any[]>(tolee?.pendingRequests || []);
+  const [loadingRequests, setLoadingRequests] = useState(false);
+  const [processingUserId, setProcessingUserId] = useState<string | null>(null);
+  const [requestFeedback, setRequestFeedback] = useState<string | null>(null);
+
   // Form State
   const [name, setName] = useState(tolee.name || '');
   const [description, setDescription] = useState(tolee.description || '');
@@ -36,6 +46,50 @@ export function ToleeGroupSettings({ tolee, currentUserId, isOwner = false, isAd
   const [pendingPostApproval, setPendingPostApproval] = useState<boolean>(tolee.pendingPostApproval || false);
   const [coverImage, setCoverImage] = useState(tolee.coverImage || '');
   const [avatar, setAvatar] = useState(tolee.avatar || '');
+
+  // Fetch pending requests on load
+  useEffect(() => {
+    if (isAdmin || isOwner) {
+      fetchRequests();
+    }
+  }, [tolee.id]);
+
+  const fetchRequests = async () => {
+    setLoadingRequests(true);
+    const res = await getPendingGroupRequests(tolee.id);
+    setLoadingRequests(false);
+    if (res.success && res.requests) {
+      setPendingRequests(res.requests);
+    }
+  };
+
+  const handleApprove = async (userId: string) => {
+    setProcessingUserId(userId);
+    setRequestFeedback(null);
+    const res = await approveJoinRequest(tolee.id, userId);
+    setProcessingUserId(null);
+    if (res.success) {
+      setPendingRequests(prev => prev.filter(r => r.userId !== userId));
+      setRequestFeedback('✅ Member join request approved successfully!');
+      setTimeout(() => setRequestFeedback(null), 3000);
+    } else {
+      alert(`Failed to approve request: ${res.error}`);
+    }
+  };
+
+  const handleReject = async (userId: string) => {
+    setProcessingUserId(userId);
+    setRequestFeedback(null);
+    const res = await rejectJoinRequest(tolee.id, userId);
+    setProcessingUserId(null);
+    if (res.success) {
+      setPendingRequests(prev => prev.filter(r => r.userId !== userId));
+      setRequestFeedback('❌ Join request declined.');
+      setTimeout(() => setRequestFeedback(null), 3000);
+    } else {
+      alert(`Failed to reject request: ${res.error}`);
+    }
+  };
 
   // Emergency Broadcast State
   const [broadcastMsg, setBroadcastMsg] = useState('');
@@ -204,6 +258,28 @@ export function ToleeGroupSettings({ tolee, currentUserId, isOwner = false, isAd
 
       {/* RIGHT CONTENT PANEL */}
       <div className="flex-1 p-6 overflow-y-auto">
+        {/* PENDING REQUESTS ALERT BANNER */}
+        {pendingRequests.length > 0 && (
+          <div className="mb-4 p-4 rounded-xl bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/10 border border-amber-500/40 flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <Bell className="w-5 h-5 text-amber-600 dark:text-amber-400 animate-bounce" />
+              <div>
+                <h4 className="font-extrabold text-xs text-gray-900 dark:text-white">
+                  {pendingRequests.length} Pending Join Request(s)
+                </h4>
+                <p className="text-[11px] text-gray-500">Users are waiting for your approval to join this private group.</p>
+              </div>
+            </div>
+            <Button
+              onClick={() => setActiveTab('members')}
+              size="sm"
+              className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg shadow-sm"
+            >
+              Review Requests
+            </Button>
+          </div>
+        )}
+
         {saveSuccess && (
           <div className="mb-4 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-xs font-bold flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-500" /> Settings updated successfully!
@@ -363,7 +439,63 @@ export function ToleeGroupSettings({ tolee, currentUserId, isOwner = false, isAd
           <div className="space-y-6">
             <div>
               <h2 className="text-xl font-extrabold text-gray-900 dark:text-white">Members & Approval Settings</h2>
-              <p className="text-xs text-gray-500 mt-1">Configure membership screening and approval questions.</p>
+              <p className="text-xs text-gray-500 mt-1">Review pending join requests and configure membership screening.</p>
+            </div>
+
+            {/* PENDING JOIN REQUESTS CARD */}
+            <div className="p-5 rounded-2xl border border-amber-500/30 bg-amber-50/30 dark:bg-amber-950/20 space-y-4 max-w-xl">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <UserPlus className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                  <h3 className="font-extrabold text-sm text-gray-900 dark:text-white">
+                    Pending Join Requests ({pendingRequests.length})
+                  </h3>
+                </div>
+                {loadingRequests && <RefreshCw className="w-4 h-4 animate-spin text-amber-600" />}
+              </div>
+
+              {requestFeedback && (
+                <div className="p-3 rounded-xl bg-white dark:bg-gray-900 border border-emerald-500/30 text-xs font-bold text-emerald-600">
+                  {requestFeedback}
+                </div>
+              )}
+
+              {pendingRequests.length === 0 ? (
+                <p className="text-xs text-gray-500 italic">No pending join requests right now.</p>
+              ) : (
+                <div className="space-y-2 max-h-80 overflow-y-auto">
+                  {pendingRequests.map((req: any) => (
+                    <div key={req.userId} className="p-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <img src={req.avatar || '/default-user-avatar.svg'} alt={req.name} className="w-10 h-10 rounded-full object-cover border border-gray-200 dark:border-gray-800 flex-shrink-0" />
+                        <div className="min-w-0">
+                          <h4 className="font-bold text-xs text-gray-900 dark:text-white truncate">{req.name}</h4>
+                          {req.username && <p className="text-[11px] text-gray-500 truncate">@{req.username}</p>}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <Button
+                          onClick={() => handleApprove(req.userId)}
+                          disabled={processingUserId === req.userId}
+                          size="sm"
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 h-8 rounded-lg flex items-center gap-1"
+                        >
+                          <CheckCircle className="w-3.5 h-3.5" /> Accept
+                        </Button>
+                        <Button
+                          onClick={() => handleReject(req.userId)}
+                          disabled={processingUserId === req.userId}
+                          size="sm"
+                          variant="outline"
+                          className="border-red-300 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 text-xs font-bold px-3 h-8 rounded-lg flex items-center gap-1"
+                        >
+                          <XCircle className="w-3.5 h-3.5" /> Decline
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="space-y-4 max-w-xl">

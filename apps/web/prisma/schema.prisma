@@ -225,6 +225,7 @@ model Tolee {
   liveViewerCount      Int                 @default(0)
   liveJoinRequests     LiveJoinRequest[]
   meetings             Meeting[]           @relation("ToleeMeeting")
+  chats                Chat[]
 }
 
 model ToleeMember {
@@ -233,6 +234,7 @@ model ToleeMember {
   points    Int      @default(0) // Points earned specifically in this Tolee
   status    String   @default("approved") // "pending", "approved", "rejected" - for private Tolee
   joinedAt  DateTime @default(now())
+  createdAt DateTime @default(now())
 
   // Subscription tracking
   subscriptionStatus String @default("active") // "active", "past_due", "canceled"
@@ -589,6 +591,8 @@ model Chat {
   isGroupChat     Boolean   @default(false)
   isPromotion     Boolean   @default(false)
   name            String?
+  toleeId         String?   @unique
+  tolee           Tolee?    @relation(fields: [toleeId], references: [id], onDelete: Cascade)
   createdAt       DateTime  @default(now())
   status          String    @default("accepted") // "pending", "accepted", "declined"
   requestSenderId String?

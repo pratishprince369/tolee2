@@ -1136,10 +1136,17 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                 </Button>
               )}
               {isAdmin ? (
-                <div className="flex-1 md:flex-initial">
+                <div className="flex flex-1 md:flex-initial gap-2 min-w-0">
                   <ManageToleeModal tolee={tolee}>
-                    <Button variant="outline" className="w-full font-bold px-6 shadow-md">Manage Tolee</Button>
+                    <Button variant="outline" className="flex-1 font-bold px-4 text-sm shadow-md truncate">Manage Tolee</Button>
                   </ManageToleeModal>
+                  <Button 
+                    onClick={() => router.push(`/chat?toleeId=${tolee.id}`)}
+                    className="flex-1 font-bold px-4 text-sm shadow-md bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white gap-1.5 transition-all truncate"
+                  >
+                    <MessageCircle className="w-4 h-4 text-white flex-shrink-0" />
+                    <span className="truncate">Chat Room</span>
+                  </Button>
                 </div>
               ) : isMember ? (
                 <div className="flex flex-1 gap-2 min-w-0">

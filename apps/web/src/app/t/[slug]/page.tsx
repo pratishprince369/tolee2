@@ -119,6 +119,41 @@ export default async function ToleePage({ params }: { params: { slug: string } }
     avatar: m.user.avatar || '/default-user-avatar.svg'
   }));
 
+  // Fetch pending join requests if current user is owner or admin
+  let pendingRequests: any[] = [];
+  const isAdminUser = currentUserId && (dbTolee.ownerId === currentUserId || role === 'admin');
+  if (isAdminUser) {
+    const pendingDbMembers = await prisma.toleeMember.findMany({
+      where: {
+        toleeId: dbTolee.id,
+        status: 'pending'
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+            avatar: true,
+            createdAt: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    pendingRequests = pendingDbMembers.map((m: any) => ({
+      id: m.id,
+      userId: m.userId,
+      name: m.user.name || m.user.username || 'Anonymous User',
+      username: m.user.username || '',
+      avatar: getValidAvatarUrl(m.user.avatar),
+      requestedAt: m.createdAt
+    }));
+  }
+
   const toleeData = {
     tolee: {
       id: dbTolee.id,
@@ -231,7 +266,8 @@ export default async function ToleePage({ params }: { params: { slug: string } }
       createdAt: l.createdAt
     })) : [],
     membershipStatus,
-    role
+    role,
+    pendingRequests
   };
 
   // Merge community posts and shared marketplace listings chronologically
