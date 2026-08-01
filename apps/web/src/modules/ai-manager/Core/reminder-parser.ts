@@ -1,7 +1,11 @@
+import { getUserDeviceTimeInfo } from './time-service';
+
 export interface ParsedReminderResult {
   title: string;
   remindAt: Date;
   formattedTimeStr: string;
+  currentTimeStr: string;
+  minsOffset: number;
   isRecurring: boolean;
   recurrence?: string;
 }
@@ -11,12 +15,15 @@ export function parseNaturalLanguageReminder(
   userDeviceISO?: string,
   userTimeZone?: string
 ): ParsedReminderResult {
-  const baseDate = userDeviceISO ? new Date(userDeviceISO) : new Date();
+  const timeZone = userTimeZone || 'Asia/Kolkata';
+  const timeInfo = getUserDeviceTimeInfo(userDeviceISO, timeZone);
+  const baseDate = timeInfo.deviceDate;
   const lower = message.toLowerCase().trim();
 
   let targetDate = new Date(baseDate.getTime());
   let isRecurring = false;
   let recurrence: string | undefined = undefined;
+  let minsOffset = 5;
 
   // 1. Check Recurring Rules
   if (lower.includes('every day') || lower.includes('daily') || lower.includes('har roz') || lower.includes('rozana')) {
@@ -42,19 +49,21 @@ export function parseNaturalLanguageReminder(
   const secMatch = lower.match(/(\d+)\s*(sec|second|s)\b/);
 
   if (minMatch && minMatch[1]) {
-    const mins = parseInt(minMatch[1], 10);
-    targetDate = new Date(baseDate.getTime() + mins * 60 * 1000);
+    minsOffset = parseInt(minMatch[1], 10);
+    targetDate = new Date(baseDate.getTime() + minsOffset * 60 * 1000);
   } else if (hourMatch && hourMatch[1]) {
     const hrs = parseInt(hourMatch[1], 10);
+    minsOffset = hrs * 60;
     targetDate = new Date(baseDate.getTime() + hrs * 60 * 60 * 1000);
   } else if (secMatch && secMatch[1]) {
     const secs = parseInt(secMatch[1], 10);
+    minsOffset = Math.ceil(secs / 60);
     targetDate = new Date(baseDate.getTime() + secs * 1000);
   } 
-  // 3. Absolute Time of Day (e.g. "at 7 AM", "at 8:30 PM", "7 am ko")
+  // 3. Absolute Time of Day (e.g. "at 7 AM", "at 8:30 PM", "7 am ko", "8 baje")
   else {
-    const timeMatch = lower.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/);
-    if (timeMatch && (lower.includes('at ') || lower.includes('am') || lower.includes('pm') || lower.includes('baaje') || lower.includes('ko'))) {
+    const timeMatch = lower.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm|baje)?/);
+    if (timeMatch && (lower.includes('at ') || lower.includes('am') || lower.includes('pm') || lower.includes('baje') || lower.includes('baaje') || lower.includes('ko'))) {
       let hours = parseInt(timeMatch[1], 10);
       const minutes = timeMatch[2] ? parseInt(timeMatch[2], 10) : 0;
       const meridiem = timeMatch[3];
@@ -68,51 +77,59 @@ export function parseNaturalLanguageReminder(
       if (targetDate.getTime() <= baseDate.getTime()) {
         targetDate.setDate(targetDate.getDate() + 1);
       }
+      minsOffset = Math.round((targetDate.getTime() - baseDate.getTime()) / 60000);
     } 
     // 4. Natural Context Phrases
     else if (lower.includes('tonight') || lower.includes('aaj raat')) {
       targetDate.setHours(21, 0, 0, 0);
       if (targetDate.getTime() <= baseDate.getTime()) targetDate.setDate(targetDate.getDate() + 1);
+      minsOffset = Math.round((targetDate.getTime() - baseDate.getTime()) / 60000);
     } else if (lower.includes('this evening') || lower.includes('aaj shaam')) {
       targetDate.setHours(18, 0, 0, 0);
       if (targetDate.getTime() <= baseDate.getTime()) targetDate.setDate(targetDate.getDate() + 1);
+      minsOffset = Math.round((targetDate.getTime() - baseDate.getTime()) / 60000);
     } else if (lower.includes('after lunch')) {
       targetDate.setHours(14, 0, 0, 0);
       if (targetDate.getTime() <= baseDate.getTime()) targetDate.setDate(targetDate.getDate() + 1);
+      minsOffset = Math.round((targetDate.getTime() - baseDate.getTime()) / 60000);
     } else if (lower.includes('after office') || lower.includes('office baad')) {
       targetDate.setHours(18, 0, 0, 0);
       if (targetDate.getTime() <= baseDate.getTime()) targetDate.setDate(targetDate.getDate() + 1);
+      minsOffset = Math.round((targetDate.getTime() - baseDate.getTime()) / 60000);
     } else if (lower.includes('tomorrow') || lower.includes('kal')) {
       targetDate.setDate(targetDate.getDate() + 1);
-      targetDate.setHours(9, 0, 0, 0); // Default 9 AM tomorrow if no specific time given
+      targetDate.setHours(9, 0, 0, 0);
+      minsOffset = Math.round((targetDate.getTime() - baseDate.getTime()) / 60000);
     } else {
-      // Fallback: 5 minutes from now if no time pattern detected
+      minsOffset = 5;
       targetDate = new Date(baseDate.getTime() + 5 * 60 * 1000);
     }
   }
 
-  // Format title
+  // 5. Clean Title Formatting
   let cleanTitle = message
     .replace(/remind me/gi, '')
     .replace(/reminder/gi, '')
     .replace(/wake me/gi, '')
     .replace(/call/gi, '')
-    .replace(/\b(in|at|me|mujhe|ke liye|dena|karo|set|phone ring karake|like alaram|alarm|baad|ko|every|day|daily|weekly)\b/gi, '')
-    .replace(/\d+\s*(min|minute|hr|hour|sec|second|ghante|baaje|am|pm)/gi, '')
+    .replace(/\b(mujhe|mujho|mujhey|ke liye|dena|dijiye|karo|karne|set|ring|alarm|baad|ko|baje|me|mein|in|at|every|day|daily|weekly|do)\b/gi, '')
+    .replace(/\d+\s*(min|minute|mints|hr|hour|sec|second|ghante|baaje|am|pm)/gi, '')
     .trim();
 
   if (!cleanTitle || cleanTitle.length < 2) cleanTitle = message;
+  // Capitalize title cleanly
+  cleanTitle = cleanTitle.charAt(0).toUpperCase() + cleanTitle.slice(1);
 
-  const formattedTimeStr = targetDate.toLocaleTimeString([], { 
-    hour: '2-digit', 
-    minute: '2-digit',
-    hour12: true 
-  });
+  // 6. Timezone-Aware Formatted Strings using Intl.DateTimeFormat
+  const targetTimeInfo = getUserDeviceTimeInfo(targetDate.toISOString(), timeZone);
+  const currentTimeInfo = getUserDeviceTimeInfo(baseDate.toISOString(), timeZone);
 
   return {
     title: cleanTitle,
     remindAt: targetDate,
-    formattedTimeStr,
+    formattedTimeStr: targetTimeInfo.formattedTime,
+    currentTimeStr: currentTimeInfo.formattedTime,
+    minsOffset,
     isRecurring,
     recurrence
   };

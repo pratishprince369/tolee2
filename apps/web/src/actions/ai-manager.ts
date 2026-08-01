@@ -540,7 +540,7 @@ export async function processAIPersonalMessage(
 
     // 1. Natural Language Alarm & Reminder Parser
     if (lower.includes('remind') || lower.includes('reminder') || lower.includes('alarm') || lower.includes('ring') || lower.includes('wake me') || lower.includes('call ')) {
-      const { title, remindAt, formattedTimeStr, isRecurring, recurrence } = parseNaturalLanguageReminder(
+      const parsed = parseNaturalLanguageReminder(
         trimmed, 
         timeInfo.isoString, 
         timeInfo.timeZone
@@ -548,27 +548,30 @@ export async function processAIPersonalMessage(
 
       // Create or Update deduplicated reminder in database
       const result = await createOrUpdateAIReminder({
-        title,
-        remindAt,
+        title: parsed.title,
+        remindAt: parsed.remindAt,
         timeZone: timeInfo.timeZone,
-        isRecurring,
-        recurrence
+        isRecurring: parsed.isRecurring,
+        recurrence: parsed.recurrence
       });
 
       await createAITask({
-        title,
-        description: `Alarm scheduled for ${formattedTimeStr}${isRecurring ? ` (Recurring: ${recurrence})` : ''}`,
-        dueDate: remindAt.toISOString(),
-        isRecurring,
-        recurrence
+        title: parsed.title,
+        description: `Alarm scheduled for ${parsed.formattedTimeStr}${parsed.isRecurring ? ` (Recurring: ${parsed.recurrence})` : ''}`,
+        dueDate: parsed.remindAt.toISOString(),
+        isRecurring: parsed.isRecurring,
+        recurrence: parsed.recurrence
       });
 
-      const recurringBadge = isRecurring ? ` (🔁 Repeating: ${recurrence})` : '';
+      const recurringBadge = parsed.isRecurring ? ` (🔁 Repeating: ${parsed.recurrence})` : '';
       const updateNotice = result.isUpdate ? ' (Updated existing active reminder)' : '';
+      const durationStr = parsed.minsOffset >= 60 
+        ? `${Math.floor(parsed.minsOffset / 60)} hour${parsed.minsOffset >= 120 ? 's' : ''}${parsed.minsOffset % 60 ? ` ${parsed.minsOffset % 60} mins` : ''}`
+        : `${parsed.minsOffset} minute${parsed.minsOffset > 1 ? 's' : ''}`;
 
       return {
         success: true,
-        response: `✅ **Reminder Scheduled!**${updateNotice}\n\nI will remind you for **"${title}"** at **${formattedTimeStr}**${recurringBadge}.\n\n🔊 *My audio alarm engine will ring loudly on your device at exactly ${formattedTimeStr}!*`
+        response: `✅ **Sure! Reminder Scheduled.**${updateNotice}\n\nCurrent device time is **${parsed.currentTimeStr}**.\n\nI will remind you for **"${parsed.title}"** in **${durationStr}**, exactly at **${parsed.formattedTimeStr}**${recurringBadge}.\n\n🔊 *My audio alarm engine will ring loudly on your device at exactly ${parsed.formattedTimeStr}!*`
       };
     }
 
