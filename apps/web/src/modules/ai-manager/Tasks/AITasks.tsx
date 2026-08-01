@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   CheckSquare, Plus, Trash2, CheckCircle2, Circle, Clock, 
-  Repeat, AlertTriangle, Archive, Calendar, BellRing 
+  Repeat, AlertTriangle, Archive, Calendar, BellRing, BellOff 
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,14 +13,17 @@ import {
   updateAITaskStatus, 
   getAIReminderHistory, 
   deleteAIReminder, 
-  dismissAIReminder 
+  dismissAIReminder,
+  dismissAllAIReminders 
 } from '@/actions/ai-manager';
+import { stopRingtoneAlarm } from '@/modules/ai-manager/Core/alarm-engine';
 
 export function AITasks() {
   const [tasks, setTasks] = useState<any[]>([]);
   const [reminders, setReminders] = useState<any[]>([]);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [loading, setLoading] = useState(false);
+  const [turningOff, setTurningOff] = useState(false);
   const [activeTab, setActiveTab] = useState<'pending' | 'completed' | 'recurring' | 'missed' | 'archived'>('pending');
 
   useEffect(() => {
@@ -63,6 +66,14 @@ export function AITasks() {
   const handleCompleteReminder = async (id: string) => {
     await dismissAIReminder(id);
     loadData();
+  };
+
+  const handleTurnOffAllAlarms = async () => {
+    setTurningOff(true);
+    stopRingtoneAlarm(); // Immediately stop any active audio/speech
+    await dismissAllAIReminders(); // Mark all active alarms as COMPLETED
+    await loadData();
+    setTurningOff(false);
   };
 
   return (
@@ -120,10 +131,22 @@ export function AITasks() {
 
       {/* 2. Reminder History & Lifecycle Queue Tabs */}
       <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-6 shadow-sm space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-100 dark:border-zinc-800 pb-3">
+        <div className="flex items-center justify-between border-b border-slate-100 dark:border-zinc-800 pb-3 flex-wrap gap-2">
           <h3 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
             <BellRing className="w-4 h-4 text-violet-600" /> REMINDER QUEUE & HISTORY
           </h3>
+
+          {/* 🔕 TURN OFF ALL ALARMS BUTTON */}
+          <Button
+            type="button"
+            size="sm"
+            onClick={handleTurnOffAllAlarms}
+            disabled={turningOff}
+            className="rounded-full bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md shadow-rose-600/20"
+          >
+            <BellOff className="w-3.5 h-3.5 mr-1.5" /> 
+            {turningOff ? 'Turning Off...' : 'Turn Off All Alarms'}
+          </Button>
         </div>
 
         {/* Filter Navigation Tabs */}

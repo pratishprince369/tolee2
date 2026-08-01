@@ -306,6 +306,29 @@ export async function dismissAIReminder(reminderId: string) {
   }
 }
 
+// Turn OFF / Dismiss ALL Active Alarms & Reminders at once
+export async function dismissAllAIReminders() {
+  try {
+    const userId = await getUserId();
+    const updated = await prisma.aIReminder.updateMany({
+      where: {
+        userId,
+        status: { in: ['PENDING', 'SNOOZED'] },
+        isDismissed: false
+      },
+      data: {
+        status: 'COMPLETED',
+        isDismissed: true,
+        completedAt: new Date()
+      }
+    });
+
+    return { success: true, count: updated.count };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
 // Snooze Alarm for 5 Minutes
 export async function snoozeAIReminder(reminderId: string, snoozeMinutes: number = 5) {
   try {
