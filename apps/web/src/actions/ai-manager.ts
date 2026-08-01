@@ -6,6 +6,7 @@ import { authOptions } from '@/lib/auth';
 import { callNvidiaLLM } from '@/modules/ai-manager/Core/chat-engine';
 import { SYSTEM_PROMPTS } from '@/modules/ai-manager/Core/prompt-manager';
 import { parseNaturalLanguageReminder } from '@/modules/ai-manager/Core/reminder-parser';
+import { getUserDeviceTimeInfo, isTimeOrDateQuery } from '@/modules/ai-manager/Core/time-service';
 
 async function getUserId(): Promise<string> {
   const session = await getServerSession(authOptions);
@@ -503,7 +504,7 @@ export async function getAIDashboardSummary() {
 }
 
 // ------------------------------------
-// 4. REAL-TIME AI PERSONAL ASSISTANT PROCESSOR WITH NATURAL LANGUAGE PARSER
+// 4. REAL-TIME AI PERSONAL ASSISTANT PROCESSOR WITH CENTRALIZED TIME SERVICE
 // ------------------------------------
 
 export async function processAIPersonalMessage(
@@ -516,6 +517,17 @@ export async function processAIPersonalMessage(
     const userId = await getUserId();
     const trimmed = message.trim();
     const lower = trimmed.toLowerCase();
+
+    // 🕒 CENTRAL TIME SERVICE RESOLUTION
+    const timeInfo = getUserDeviceTimeInfo(clientLocalISO, timeZone);
+
+    // ⚡ Direct Time Question Handler (0ms instant accurate device time response)
+    if (isTimeOrDateQuery(trimmed)) {
+      return {
+        success: true,
+        response: `🕒 It's currently **${timeInfo.formattedTime}** on **${timeInfo.formattedDate}** (${timeInfo.dayOfWeek}, ${timeInfo.timeZone}).`
+      };
+    }
 
     // ⚡ Ultra-Fast Local Greeting Handler (<10ms instant response)
     const simpleGreetings = ['hi', 'hello', 'hey', 'hie', 'namaste', 'kaise ho', 'good morning', 'good evening', 'good night', 'hola'];
@@ -530,15 +542,15 @@ export async function processAIPersonalMessage(
     if (lower.includes('remind') || lower.includes('reminder') || lower.includes('alarm') || lower.includes('ring') || lower.includes('wake me') || lower.includes('call ')) {
       const { title, remindAt, formattedTimeStr, isRecurring, recurrence } = parseNaturalLanguageReminder(
         trimmed, 
-        clientLocalISO, 
-        timeZone
+        timeInfo.isoString, 
+        timeInfo.timeZone
       );
 
       // Create or Update deduplicated reminder in database
       const result = await createOrUpdateAIReminder({
         title,
         remindAt,
-        timeZone: timeZone || 'Asia/Kolkata',
+        timeZone: timeInfo.timeZone,
         isRecurring,
         recurrence
       });
@@ -588,9 +600,7 @@ export async function processAIPersonalMessage(
       ? `User Memory Context: ${existingMemories.map(m => `${m.key}: ${m.value}`).join('; ')}`
       : 'No previous memories saved.';
 
-    const userTimeContext = clientLocalISO ? `User Current Device Time: ${new Date(clientLocalISO).toLocaleString()}` : '';
-
-    const systemPromptWithContext = `${SYSTEM_PROMPTS.PERSONAL_EMPLOYEE}\n\n${memoryContext}\n${userTimeContext}\n\nYou are a real human-like Jarvis AI Employee for Tolee. Respond concisely, warmly, and helpfully.`;
+    const systemPromptWithContext = `${SYSTEM_PROMPTS.PERSONAL_EMPLOYEE}\n\n${memoryContext}\n\nCRITICAL REAL-TIME CONTEXT: The user's device clock is currently showing ${timeInfo.formattedFull} (${timeInfo.dayOfWeek}, Timezone: ${timeInfo.timeZone}). You MUST report ${timeInfo.formattedTime} whenever asked about the time!`;
 
     // 5. Call Ultra-Fast NVIDIA NIM LLM
     const nvidiaResponse = await callNvidiaLLM(
