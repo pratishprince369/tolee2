@@ -24,11 +24,12 @@ export function AITasks() {
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [loading, setLoading] = useState(false);
   const [turningOff, setTurningOff] = useState(false);
+  const [taskFilter, setTaskFilter] = useState<'pending' | 'completed' | 'overdue' | 'priority' | 'all'>('pending');
   const [activeTab, setActiveTab] = useState<'pending' | 'completed' | 'recurring' | 'missed' | 'archived'>('pending');
 
   useEffect(() => {
     loadData();
-  }, [activeTab]);
+  }, [activeTab, taskFilter]);
 
   const loadData = async () => {
     const [taskRes, remRes] = await Promise.all([
@@ -70,11 +71,24 @@ export function AITasks() {
 
   const handleTurnOffAllAlarms = async () => {
     setTurningOff(true);
-    stopRingtoneAlarm(); // Immediately stop any active audio/speech
-    await dismissAllAIReminders(); // Mark all active alarms as COMPLETED
+    stopRingtoneAlarm();
+    await dismissAllAIReminders();
     await loadData();
     setTurningOff(false);
   };
+
+  const filteredTasks = tasks.filter(t => {
+    if (taskFilter === 'all') return true;
+    if (taskFilter === 'completed') return t.status === 'completed';
+    if (taskFilter === 'pending') return t.status === 'pending';
+    if (taskFilter === 'overdue') {
+      return t.status === 'pending' && t.dueDate && new Date(t.dueDate) < new Date();
+    }
+    if (taskFilter === 'priority') {
+      return t.category === 'priority' || t.category === 'crm' || t.title.toLowerCase().includes('important');
+    }
+    return true;
+  });
 
   return (
     <div className="max-w-4xl mx-auto p-4 md:p-6 space-y-6">
@@ -95,15 +109,59 @@ export function AITasks() {
             placeholder="Add new task (e.g., Pay electricity bill, Call client Rahul)..."
             className="rounded-full bg-slate-50 dark:bg-zinc-800 border-slate-200 dark:border-zinc-700 text-sm"
           />
-          <Button type="submit" disabled={loading} className="rounded-full bg-violet-600 hover:bg-violet-700 text-white shrink-0">
+          <Button type="submit" disabled={loading} className="rounded-full bg-violet-600 hover:bg-violet-700 text-white shrink-0 font-bold">
             <Plus className="w-4 h-4 mr-1" /> Add Task
           </Button>
         </form>
 
+        {/* Task Category Filter Buttons */}
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-1 text-xs">
+          <Button
+            size="sm"
+            variant={taskFilter === 'pending' ? 'default' : 'ghost'}
+            onClick={() => setTaskFilter('pending')}
+            className={`rounded-full text-xs font-semibold ${taskFilter === 'pending' ? 'bg-violet-600 text-white' : ''}`}
+          >
+            Pending Tasks
+          </Button>
+          <Button
+            size="sm"
+            variant={taskFilter === 'completed' ? 'default' : 'ghost'}
+            onClick={() => setTaskFilter('completed')}
+            className={`rounded-full text-xs font-semibold ${taskFilter === 'completed' ? 'bg-emerald-600 text-white' : ''}`}
+          >
+            Completed Tasks
+          </Button>
+          <Button
+            size="sm"
+            variant={taskFilter === 'overdue' ? 'default' : 'ghost'}
+            onClick={() => setTaskFilter('overdue')}
+            className={`rounded-full text-xs font-semibold ${taskFilter === 'overdue' ? 'bg-amber-600 text-white' : ''}`}
+          >
+            Overdue Tasks
+          </Button>
+          <Button
+            size="sm"
+            variant={taskFilter === 'priority' ? 'default' : 'ghost'}
+            onClick={() => setTaskFilter('priority')}
+            className={`rounded-full text-xs font-semibold ${taskFilter === 'priority' ? 'bg-rose-600 text-white' : ''}`}
+          >
+            Priority Tasks
+          </Button>
+          <Button
+            size="sm"
+            variant={taskFilter === 'all' ? 'default' : 'ghost'}
+            onClick={() => setTaskFilter('all')}
+            className={`rounded-full text-xs font-semibold ${taskFilter === 'all' ? 'bg-slate-700 text-white' : ''}`}
+          >
+            All Tasks ({tasks.length})
+          </Button>
+        </div>
+
         {/* Task List */}
         <div className="space-y-2">
-          {tasks.length > 0 ? (
-            tasks.slice(0, 5).map((task) => (
+          {filteredTasks.length > 0 ? (
+            filteredTasks.map((task) => (
               <div 
                 key={task.id} 
                 className="flex items-center justify-between p-3.5 bg-slate-50 dark:bg-zinc-800/50 border border-slate-100 dark:border-zinc-800 rounded-2xl cursor-pointer hover:border-violet-300 transition-all"
@@ -124,7 +182,12 @@ export function AITasks() {
               </div>
             ))
           ) : (
-            <p className="text-xs text-slate-400 italic text-center py-2">No pending tasks</p>
+            <div className="text-center py-6 space-y-2">
+              <p className="text-xs text-slate-400 italic">No pending tasks yet.</p>
+              <Button size="sm" variant="outline" onClick={() => (document.querySelector('input') as HTMLElement)?.focus()} className="rounded-full text-xs font-bold">
+                <Plus className="w-3.5 h-3.5 mr-1" /> Create Task
+              </Button>
+            </div>
           )}
         </div>
       </div>

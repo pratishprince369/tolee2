@@ -15,6 +15,8 @@ import { AICRM } from '../CRM/AICRM';
 import { AICommunity } from '../Community/AICommunity';
 import { AINews } from '../News/AINews';
 import { AIMemorySettings } from '../Settings/AIMemorySettings';
+import { AIFinance } from '../Finance/AIFinance';
+import { AIBirthdays } from '../Personal/AIBirthdays';
 import { getAIDashboardSummary, processAIPersonalMessage } from '@/actions/ai-manager';
 import { Button } from '@/components/ui/button';
 
@@ -26,7 +28,9 @@ export type AIModuleTab =
   | 'crm'
   | 'community'
   | 'news'
-  | 'settings';
+  | 'settings'
+  | 'finance'
+  | 'birthdays';
 
 interface Message {
   id: string;
@@ -173,7 +177,7 @@ export function AIDashboard() {
       <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-6 max-w-6xl mx-auto w-full">
         {activeTab === 'dashboard' && (
           <>
-            <DailySummaryGrid summary={summaryData} onTabChange={setActiveTab} />
+            <DailySummaryGrid userName={session?.user?.name || 'Friend'} summary={summaryData} onSelectAction={setActiveTab} />
             
             {/* Live Interactive Chat Messages Stream */}
             {messages.length > 0 && (
@@ -229,6 +233,8 @@ export function AIDashboard() {
         {activeTab === 'community' && <AICommunity />}
         {activeTab === 'news' && <AINews />}
         {activeTab === 'settings' && <AIMemorySettings />}
+        {activeTab === 'finance' && <AIFinance />}
+        {activeTab === 'birthdays' && <AIBirthdays />}
       </div>
 
       {/* Sticky Bottom Voice & Text Input Dock */}

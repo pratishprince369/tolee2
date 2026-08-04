@@ -20,7 +20,7 @@ interface SummaryData {
 interface DailySummaryGridProps {
   userName: string;
   summary: SummaryData;
-  onSelectAction: (action: string) => void;
+  onSelectAction: (action: any) => void;
 }
 
 export function DailySummaryGrid({ userName, summary, onSelectAction }: DailySummaryGridProps) {
@@ -91,7 +91,7 @@ export function DailySummaryGrid({ userName, summary, onSelectAction }: DailySum
 
         {/* Birthdays */}
         <div 
-          onClick={() => onSelectAction('family')}
+          onClick={() => onSelectAction('birthdays')}
           className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-4 cursor-pointer hover:border-violet-500 transition-all shadow-sm hover:shadow-md group"
         >
           <div className="flex items-center justify-between mb-2">
