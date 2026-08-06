@@ -3,9 +3,11 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Home, Compass, Film, MessageCircle, Menu, User, Settings, Globe, Store, LogOut, MessageSquare, Map, Briefcase, Award, Newspaper, Tv, Bot, Bell, Megaphone, Zap, HelpCircle } from 'lucide-react';
+import { Home, Compass, Film, MessageCircle, Menu, User, Settings, Globe, Store, LogOut, MessageSquare, Map, Briefcase, Award, Newspaper, Tv, Bot, Bell, Megaphone, Zap, HelpCircle, FileText } from 'lucide-react';
 import { useSession, signOut } from 'next-auth/react';
 import { getSidebarDataCached } from '@/lib/sidebar-data';
+import { getDrafts } from '@/lib/draftManager';
+import { MyDraftsModal } from '@/components/MyDraftsModal';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,6 +26,26 @@ export function BottomNav() {
   const isAuthenticated = status === 'authenticated';
 
   const [clickedPath, setClickedPath] = React.useState<string | null>(null);
+  const [draftsCount, setDraftsCount] = React.useState(0);
+  const [isDraftsModalOpen, setIsDraftsModalOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    if (session?.user) {
+      const uId = (session.user as any).id;
+      setDraftsCount(getDrafts(uId).length);
+    }
+  }, [session]);
+
+  React.useEffect(() => {
+    const handleUpdate = () => {
+      if (session?.user) {
+        const uId = (session.user as any).id;
+        setDraftsCount(getDrafts(uId).length);
+      }
+    };
+    window.addEventListener('tolee_drafts_updated', handleUpdate);
+    return () => window.removeEventListener('tolee_drafts_updated', handleUpdate);
+  }, [session]);
 
   React.useEffect(() => {
     setClickedPath(null);
@@ -82,6 +104,7 @@ export function BottomNav() {
   ];
 
   return (
+    <>
     <div className={`fixed bottom-0 left-0 right-0 w-full h-[calc(4.2rem+env(safe-area-inset-bottom))] flex items-center justify-around z-50 lg:hidden border-t px-3 pb-[env(safe-area-inset-bottom)] transition-all duration-300 backdrop-blur-md ${activePath === '/reels' ? 'bg-black/95 border-zinc-800/50 shadow-black/40' : 'bg-white/95 dark:bg-zinc-950/95 border-zinc-150/80 dark:border-zinc-900 shadow-zinc-200/40 dark:shadow-black/60'}`}>
       {navItems.map((item) => {
         const Icon = item.icon;
@@ -120,6 +143,17 @@ export function BottomNav() {
                 <DropdownMenuItem onClick={() => { setClickedPath('/u/me'); router.push('/u/me'); }} className={getDropdownItemClass('/u/me')}>
                   <User className={getDropdownIconClass('/u/me')} />
                   <span>My Profile</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setIsDraftsModalOpen(true)} className="cursor-pointer flex w-full items-center justify-between py-2 px-3">
+                  <div className="flex items-center">
+                    <FileText className="mr-2 h-4 w-4 text-amber-500" />
+                    <span>My Drafts</span>
+                  </div>
+                  {draftsCount > 0 && (
+                    <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-full bg-amber-500 text-white">
+                      {draftsCount}
+                    </span>
+                  )}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => { setClickedPath('/settings'); router.push('/settings'); }} className={getDropdownItemClass('/settings')}>
                   <Settings className={getDropdownIconClass('/settings')} />
@@ -276,5 +310,7 @@ export function BottomNav() {
         );
       })}
     </div>
+    <MyDraftsModal isOpen={isDraftsModalOpen} onClose={() => setIsDraftsModalOpen(false)} />
+    </>
   );
 }
