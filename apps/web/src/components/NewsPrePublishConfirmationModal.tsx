@@ -6,7 +6,6 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { 
   Newspaper, CheckCircle2, Edit3, Send, Sparkles, Tag, Globe, ArrowRight 
@@ -112,11 +111,11 @@ export function NewsPrePublishConfirmationModal({
 
             <div>
               <label className="font-bold text-gray-700 dark:text-gray-300">Short Summary</label>
-              <Textarea 
+              <textarea 
                 value={summary}
-                onChange={(e) => setSummary(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setSummary(e.target.value)}
                 rows={2}
-                className="mt-1 rounded-xl text-xs"
+                className="mt-1 w-full p-2.5 bg-white dark:bg-[#121212] border border-gray-200 dark:border-gray-800 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-600 font-sans"
               />
             </div>
           </div>
