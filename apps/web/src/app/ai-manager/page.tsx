@@ -1,8 +1,5 @@
-'use me';
-'use client';
-
 import React, { Suspense } from 'react';
-import { AIDashboard } from '@/modules/ai-manager/Dashboard/AIDashboard';
+import { AIDashboard } from '@/modules/tolee-ai-manager';
 import { Bot } from 'lucide-react';
 
 export default function AIManagerPage() {
