@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { DailySummaryGrid } from '../Components/DailySummaryGrid';
 import { VoiceInputDock } from '../Components/VoiceInputDock';
+import { VoiceCompanionDock } from '../VoiceCompanion/VoiceCompanionDock';
 import { DailyPlanner } from '../Personal/DailyPlanner';
 import { AICalendar } from '../Calendar/AICalendar';
 import { AITasks } from '../Tasks/AITasks';
@@ -151,6 +152,7 @@ export function AIDashboard() {
               <Bot className="w-5 h-5" />
             </div>
             <span className="font-extrabold text-sm text-slate-900 dark:text-white hidden sm:inline">Tolee AI Manager</span>
+            <VoiceCompanionDock onSelectTab={(tab) => setActiveTab(tab as any)} />
           </div>
 
           <div className="flex items-center gap-1">
