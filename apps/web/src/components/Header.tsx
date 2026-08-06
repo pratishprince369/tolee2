@@ -297,10 +297,12 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
                   </>
                 )}
                 {task.state === 'processing' && (
-                  <>
-                    <span className="animate-spin text-amber-500">⚙</span>
-                    <span>Processing Media...</span>
-                  </>
+                  <div className="flex items-center gap-1.5 max-w-[200px] sm:max-w-[320px] truncate">
+                    <span className="animate-spin text-amber-500 shrink-0">⚙</span>
+                    <span className="truncate text-[11px] font-semibold text-gray-700 dark:text-zinc-300">
+                      {task.stepMessage || 'Processing Media...'}
+                    </span>
+                  </div>
                 )}
                 {task.state === 'success' && (
                   <>

@@ -134,30 +134,48 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         throw new Error('Internal Error: Temporary image URL detected. Upload failed.');
       }
 
-      // Update to Processing State with Live AI Logs
-      const aiSteps = [
-        { msg: 'Step 1/5: ⚡ Analyzing content & extracting key themes...', progress: 30 },
-        { msg: 'Step 2/5: ✍️ AI generating SEO title, headline & slug...', progress: 50 },
-        { msg: 'Step 3/5: 🏷️ Extracting relevant tags & keywords...', progress: 70 },
-        { msg: 'Step 4/5: 📝 Generating meta description & summarizing...', progress: 90 },
-        { msg: 'Step 5/5: ✨ Formatting news article & finalizing...', progress: 98 },
-      ];
+      // Update to Processing State with Live Background Logs
+      const isMedia = uploadedItems.length > 0 || uploadType === 'reel';
+      const isNews = postData?.postType === 'news';
+
+      const processingSteps = isNews
+        ? [
+            { msg: 'Step 1/5: ⚡ Analyzing content & extracting key themes...', progress: 25 },
+            { msg: 'Step 2/5: ✍️ AI generating SEO title, headline & slug...', progress: 45 },
+            { msg: 'Step 3/5: 🏷️ Extracting relevant tags & keywords...', progress: 65 },
+            { msg: 'Step 4/5: 📝 Generating meta description & summarizing...', progress: 85 },
+            { msg: 'Step 5/5: ✨ Formatting news article & finalizing...', progress: 98 },
+          ]
+        : isMedia
+        ? [
+            { msg: 'Step 1/5: 🖼️ Validating media files & checking resolution...', progress: 25 },
+            { msg: 'Step 2/5: 🎞️ Optimizing image/video compression & CDN cache...', progress: 45 },
+            { msg: 'Step 3/5: 🛡️ Running AI content safety & moderation scan...', progress: 65 },
+            { msg: 'Step 4/5: 📍 Tagging location & mapping to selected Tolees...', progress: 85 },
+            { msg: 'Step 5/5: 🚀 Distributing post to feed & finalizing...', progress: 98 },
+          ]
+        : [
+            { msg: 'Step 1/4: ⚡ Analyzing post text & hashtags...', progress: 30 },
+            { msg: 'Step 2/4: 🛡️ Running moderation & safety checks...', progress: 60 },
+            { msg: 'Step 3/4: 🌐 Mapping to selected Tolee groups...', progress: 85 },
+            { msg: 'Step 4/4: 🚀 Publishing post to feed...', progress: 98 },
+          ];
 
       let currentStepIdx = 0;
       setTask(prev => ({
         ...prev,
         state: 'processing',
         totalProgress: 100,
-        processingProgress: aiSteps[0].progress,
-        stepMessage: aiSteps[0].msg,
+        processingProgress: processingSteps[0].progress,
+        stepMessage: processingSteps[0].msg,
       }));
 
       const stepInterval = setInterval(() => {
-        currentStepIdx = Math.min(currentStepIdx + 1, aiSteps.length - 1);
+        currentStepIdx = Math.min(currentStepIdx + 1, processingSteps.length - 1);
         setTask(prev => ({
           ...prev,
-          processingProgress: aiSteps[currentStepIdx].progress,
-          stepMessage: aiSteps[currentStepIdx].msg,
+          processingProgress: processingSteps[currentStepIdx].progress,
+          stepMessage: processingSteps[currentStepIdx].msg,
         }));
       }, 900);
 
