@@ -18,6 +18,7 @@ import { AIMemorySettings } from '../Settings/AIMemorySettings';
 import { AIFinance } from '../Finance/AIFinance';
 import { AIBirthdays } from '../Personal/AIBirthdays';
 import { getAIDashboardSummary, processAIPersonalMessage } from '@/actions/ai-manager';
+import { createPost } from '@/actions/post';
 import { Button } from '@/components/ui/button';
 
 export type AIModuleTab = 
