@@ -309,6 +309,7 @@ export function AIDashboard() {
         isOpen={isVoiceCompanionActive}
         onClose={() => setIsVoiceCompanionActive(false)}
         onSelectTab={(tab) => setActiveTab(tab as any)}
+        onSendMessage={handleSendMessage}
       />
 
       {/* Sticky Bottom Voice & Text Input Dock with ChatGPT-Style Start Voice Button */}

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Radio, Mic, Volume2, Sparkles, X, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { VoiceCompanionEngine } from './voiceCompanionEngine';
@@ -12,27 +12,35 @@ interface FloatingVoiceHUDProps {
   isOpen: boolean;
   onClose: () => void;
   onSelectTab: (tab: string) => void;
+  onSendMessage: (text: string) => void;
 }
 
-export function FloatingVoiceHUD({ isOpen, onClose, onSelectTab }: FloatingVoiceHUDProps) {
+export function FloatingVoiceHUD({ isOpen, onClose, onSelectTab, onSendMessage }: FloatingVoiceHUDProps) {
   const [engine, setEngine] = useState<VoiceCompanionEngine | null>(null);
   const [mode, setMode] = useState<VoiceCompanionMode>('ALWAYS_LISTENING');
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [wakeWordActive, setWakeWordActive] = useState(false);
   const [speechText, setSpeechText] = useState('Voice Active: Say "Tolee" or speak any command');
+  const hasSpokenOnOpen = useRef(false);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      hasSpokenOnOpen.current = false;
+      return;
+    }
 
     const vEngine = new VoiceCompanionEngine(mode);
     const welcomeText = 'Boliye, How can I help you sir?';
     setSpeechText(welcomeText);
 
-    // Speak immediate greeting aloud on voice companion activation
-    setTimeout(() => {
-      vEngine.speak(welcomeText, 'hi-IN');
-    }, 300);
+    // Speak welcome greeting ONLY ONCE when opened by user click
+    if (!hasSpokenOnOpen.current) {
+      hasSpokenOnOpen.current = true;
+      setTimeout(() => {
+        vEngine.speak(welcomeText, 'hi-IN');
+      }, 300);
+    }
 
     vEngine.onStatusChange((listening, speaking, wakeWord) => {
       setIsListening(listening);
@@ -47,14 +55,20 @@ export function FloatingVoiceHUD({ isOpen, onClose, onSelectTab }: FloatingVoice
     vEngine.onCommand(async (transcript) => {
       const parsed = parseVoiceCommand(transcript);
       setSpeechText(parsed.responseText);
-      vEngine.speak(parsed.responseText, parsed.detectedLang);
 
-      if (parsed.intent === 'READ_NOTIFICATIONS') {
+      if (parsed.intent === 'CREATE_CONTENT') {
+        vEngine.speak(parsed.responseText, parsed.detectedLang);
+        onSendMessage(transcript); // Executes AI post generation in Chat Box!
+      } else if (parsed.intent === 'READ_NOTIFICATIONS') {
         const briefingRes = await getVoiceNotificationBriefing();
         setSpeechText(briefingRes.briefing);
         vEngine.speak(briefingRes.briefing, 'hi-IN');
       } else if (parsed.intent === 'OPEN_MODULE' && parsed.targetModule) {
         onSelectTab(parsed.targetModule);
+        vEngine.speak(parsed.responseText, parsed.detectedLang);
+      } else {
+        vEngine.speak(parsed.responseText, parsed.detectedLang);
+        onSendMessage(transcript);
       }
     });
 

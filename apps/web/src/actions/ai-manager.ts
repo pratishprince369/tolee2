@@ -529,6 +529,48 @@ export async function processAIPersonalMessage(
       };
     }
 
+    // ⚡ Autonomous Post & AI Image Creation Execution Handler (High Priority)
+    const isPostIntent = 
+      lower.includes('post') || 
+      lower.includes('image') || 
+      lower.includes('banner') || 
+      lower.includes('poster') || 
+      lower.includes('generate') ||
+      lower.includes('banao') ||
+      lower.includes('bana do') ||
+      lower.includes('create');
+
+    if (isPostIntent) {
+      try {
+        const isGoodMorning = lower.includes('good morning') || lower.includes('subah') || lower.includes('morning');
+        const promptConcept = isGoodMorning 
+          ? 'Beautiful morning sunrise over mountains with inspiring light' 
+          : trimmed;
+
+        const generatedImageUrl = await generateAIImageWithFallback(promptConcept) || 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800&q=80';
+
+        const caption = isGoodMorning
+          ? `🌅 Good morning! Wishing everyone a peaceful, inspiring, and productive day ahead! ✨\n\n#GoodMorning #Tolee #Inspiration #DailyMotivation #Community`
+          : `✨ ${trimmed}\n\n#Tolee #Community #Updates`;
+        
+        return {
+          success: true,
+          response: `✨ **Tolee AI Employee**: Maine aapka **${isGoodMorning ? 'Good Morning Post' : 'Post'}** AI image ke saath tayar kar diya hai!\n\nNiche post review karein aur **Publish Post Now** button par click karke Feed par post karein.`,
+          interactiveAction: {
+            type: 'PUBLISH_POST',
+            label: '🚀 Publish Post Now',
+            payload: {
+              caption,
+              imageUrl: generatedImageUrl,
+              postType: 'post'
+            }
+          }
+        };
+      } catch (err) {
+        console.error('Autonomous image post creation fallback:', err);
+      }
+    }
+
     // ⚡ Ultra-Fast Local Greeting Handler (<10ms instant response)
     const simpleGreetings = ['hi', 'hello', 'hey', 'hie', 'namaste', 'kaise ho', 'good morning', 'good evening', 'good night', 'hola'];
     if (simpleGreetings.includes(lower)) {
