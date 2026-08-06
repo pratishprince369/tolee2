@@ -17,12 +17,64 @@ export async function generateMetadata({ params }: ReelPageProps): Promise<Metad
   try {
     const post = await prisma.post.findUnique({
       where: { id },
-      select: { caption: true, author: { select: { username: true } } },
+      select: {
+        caption: true,
+        mediaUrls: true,
+        author: { select: { name: true, username: true, isPrivate: true } },
+        tolees: { select: { tolee: { select: { isPrivate: true, privacy: true } } } },
+      },
     });
+
     if (post) {
+      const isPrivateAuthor = post.author?.isPrivate;
+      const isPrivateGroup = post.tolees?.some(t => t.tolee?.isPrivate || t.tolee?.privacy === 'private');
+
+      if (isPrivateAuthor || isPrivateGroup) {
+        return {
+          title: 'Private Reel – Tolee',
+          description: 'This reel is private.',
+          robots: {
+            index: false,
+            follow: false,
+            nocache: true,
+            googleBot: {
+              index: false,
+              follow: false,
+              noimageindex: true,
+            }
+          }
+        };
+      }
+
+      const title = `${post.author?.name || post.author?.username || 'Creator'} Reel – Tolee`;
+      const description = post.caption?.slice(0, 160) || 'Watch this reel on Tolee';
+      const videoUrl = post.mediaUrls ? post.mediaUrls.split(',')[0] : '';
+
       return {
-        title: `${post.author?.username || 'Creator'} Reel – Tolee`,
-        description: post.caption?.slice(0, 160) || 'Watch this reel on Tolee',
+        title,
+        description,
+        openGraph: {
+          title,
+          description,
+          url: `https://www.tolee.in/reel/${id}`,
+          siteName: 'Tolee Reels',
+          type: 'video.other',
+          videos: videoUrl ? [{ url: videoUrl }] : undefined,
+        },
+        twitter: {
+          card: 'player',
+          title,
+          description,
+        },
+        robots: {
+          index: true,
+          follow: true,
+          googleBot: {
+            index: true,
+            follow: true,
+            'max-image-preview': 'large',
+          }
+        }
       };
     }
   } catch {}

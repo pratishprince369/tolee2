@@ -1,20 +1,68 @@
-import React from 'react';
-import { notFound } from 'next/navigation';
-import Link from 'next/link';
-import { getNewsBySlug } from '@/actions/news';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { 
-  Calendar, Clock, User, Share2, Bookmark, ArrowLeft, Globe, 
-  MessageCircle, Sparkles, HelpCircle, Film, Info, Quote, ChevronRight
-} from 'lucide-react';
-import { FollowButton } from '@/components/FollowButton';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
-import { PostCarousel } from '@/components/PostCarousel';
-import { NewsEngagement } from '@/components/NewsEngagement';
+import { Metadata } from 'next';
+
+export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
+  const news = await getNewsBySlug(params.slug);
+  if (!news || !news.post) {
+    return { title: 'News Not Found | Tolee' };
+  }
+
+  const post = news.post;
+  const isPrivateAuthor = post.author?.isPrivate;
+  const isPrivateGroup = post.tolees?.some((t: any) => t.tolee?.isPrivate || t.tolee?.privacy === 'private');
+
+  if (isPrivateAuthor || isPrivateGroup) {
+    return {
+      title: 'Private Article | Tolee News',
+      description: 'This news article is private.',
+      robots: {
+        index: false,
+        follow: false,
+        nocache: true,
+        googleBot: {
+          index: false,
+          follow: false,
+          noimageindex: true,
+        }
+      }
+    };
+  }
+
+  const headline = post.caption || news.headline || 'Tolee News Article';
+  const description = news.summary || news.metaDescription || headline;
+  const mediaUrl = post.mediaUrls ? post.mediaUrls.split(',')[0] : 'https://www.tolee.in/tolee-news-default.png';
+
+  return {
+    title: `${headline} | Tolee News`,
+    description,
+    keywords: news.keywords ? news.keywords.split(',') : undefined,
+    openGraph: {
+      title: headline,
+      description,
+      url: `https://www.tolee.in/news/${params.slug}`,
+      siteName: 'Tolee News',
+      type: 'article',
+      images: [{ url: mediaUrl }],
+      publishedTime: new Date(news.createdAt).toISOString(),
+      authors: [post.author?.name || 'Tolee Creator'],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: headline,
+      description,
+      images: [mediaUrl],
+    },
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: {
+        index: true,
+        follow: true,
+        'max-image-preview': 'large',
+        'max-snippet': -1,
+      }
+    }
+  };
+}
 
 export default async function NewsReaderPage({ params }: { params: { slug: string } }) {
   const news = await getNewsBySlug(params.slug);

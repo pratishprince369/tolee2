@@ -18,14 +18,58 @@ export async function generateMetadata({ params }: PostPageProps): Promise<Metad
     return { title: 'Post not found – Tolee' };
   }
   const post = res.post;
+
+  const isPrivateAuthor = post.authorIsPrivate || post.author?.isPrivate;
+  const isPrivateGroup = post.toleeIsPrivate || post.tolee?.isPrivate || post.tolee?.privacy === 'private';
+
+  if (isPrivateAuthor || isPrivateGroup) {
+    return {
+      title: 'Private Post – Tolee',
+      description: 'This post is private.',
+      robots: {
+        index: false,
+        follow: false,
+        nocache: true,
+        googleBot: {
+          index: false,
+          follow: false,
+          noimageindex: true,
+        }
+      }
+    };
+  }
+
+  const title = `${post.author?.name || post.author || 'Creator'} on Tolee – ${post.caption?.slice(0, 60) || 'View post'}`;
+  const description = post.caption?.slice(0, 160) || 'View this post on Tolee';
+  const mediaUrl = post.image || 'https://www.tolee.in/default-post-preview.png';
+
   return {
-    title: `${post.author} on Tolee – ${post.caption?.slice(0, 60) || 'View post'}`,
-    description: post.caption?.slice(0, 160) || 'View this post on Tolee',
+    title,
+    description,
     openGraph: {
-      title: `${post.author} on Tolee`,
-      description: post.caption?.slice(0, 160) || '',
-      images: post.image ? [{ url: post.image }] : [],
+      title,
+      description,
+      url: `https://www.tolee.in/post/${id}`,
+      siteName: 'Tolee',
+      images: [{ url: mediaUrl }],
+      type: 'article',
     },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: [mediaUrl],
+    },
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: {
+        index: true,
+        follow: true,
+        'max-image-preview': 'large',
+        'max-snippet': -1,
+      }
+    }
   };
 }
 

@@ -29,8 +29,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   let postUrls: MetadataRoute.Sitemap = [];
 
   try {
-    // 2. Fetch Tolee Groups (priority: 0.9)
+    // 2. Fetch Public Tolee Groups (priority: 0.9) - Exclude private groups
     const tolees = await prisma.tolee.findMany({
+      where: {
+        isPrivate: false,
+        privacy: { not: 'private' },
+      },
       select: {
         slug: true,
         createdAt: true,
@@ -100,12 +104,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }
 
   try {
-    // 5. Fetch Public User Profiles (priority: 0.6)
+    // 5. Fetch Public User Profiles (priority: 0.6) - Exclude private accounts
     const users = await prisma.user.findMany({
       where: {
         username: { not: null },
         isBanned: false,
         isSuspended: false,
+        isPrivate: false,
       },
       select: {
         username: true,
@@ -124,8 +129,22 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }
 
   try {
-    // 6. Fetch Public News Posts (priority: 0.9)
+    // 6. Fetch Public News Posts (priority: 0.9) - Exclude private accounts or private groups
     const news = await prisma.newsPost.findMany({
+      where: {
+        post: {
+          status: 'published',
+          isArchived: false,
+          author: { isPrivate: false },
+          tolees: {
+            none: {
+              tolee: {
+                isPrivate: true,
+              }
+            }
+          }
+        }
+      },
       select: {
         slug: true,
         updatedAt: true,
@@ -162,12 +181,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }
 
   try {
-    // 8. Fetch Public Feed Posts & Reels (priority: 0.8)
+    // 8. Fetch Public Feed Posts & Reels (priority: 0.8) - Exclude private accounts or private groups
     const posts = await prisma.post.findMany({
       where: {
         visibility: 'public',
         status: 'published',
-        postType: { not: 'news' }, // News posts are handled via /news/[slug]
+        postType: { not: 'news' },
+        author: { isPrivate: false },
+        tolees: {
+          none: {
+            tolee: {
+              isPrivate: true,
+            }
+          }
+        }
       },
       select: {
         id: true,

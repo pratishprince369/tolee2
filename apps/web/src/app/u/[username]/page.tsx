@@ -409,26 +409,67 @@ export async function generateMetadata({ params }: { params: { username: string 
   try {
     let user = await prisma.user.findUnique({
       where: { username },
-      select: { searchEngineIndexable: true }
+      select: { name: true, username: true, bio: true, image: true, isPrivate: true, searchEngineIndexable: true }
     });
 
     if (!user) {
       user = await prisma.user.findUnique({
         where: { id: username },
-        select: { searchEngineIndexable: true }
+        select: { name: true, username: true, bio: true, image: true, isPrivate: true, searchEngineIndexable: true }
       });
     }
 
-    if (!user || user.searchEngineIndexable === false) {
+    if (!user || user.isPrivate || user.searchEngineIndexable === false) {
       return {
+        title: 'Private Account | Tolee',
+        description: 'This profile is private.',
         robots: {
           index: false,
-          follow: false
+          follow: false,
+          nocache: true,
+          googleBot: {
+            index: false,
+            follow: false,
+            noimageindex: true,
+          }
         }
       };
     }
+
+    const title = `${user.name || user.username} (@${user.username}) | Tolee`;
+    const description = user.bio || `Check out ${user.name}'s profile and posts on Tolee.`;
+    const image = user.image || 'https://www.tolee.in/default-user-avatar.svg';
+
+    return {
+      title,
+      description,
+      openGraph: {
+        title,
+        description,
+        url: `https://www.tolee.in/u/${user.username}`,
+        siteName: 'Tolee',
+        images: [{ url: image }],
+        type: 'profile',
+      },
+      twitter: {
+        card: 'summary_large_image',
+        title,
+        description,
+        images: [image],
+      },
+      robots: {
+        index: true,
+        follow: true,
+        googleBot: {
+          index: true,
+          follow: true,
+          'max-image-preview': 'large',
+          'max-snippet': -1,
+        }
+      }
+    };
   } catch (error) {
-    console.error("Error generating metadata:", error);
+    console.error("Error generating user profile metadata:", error);
   }
 
   return {
