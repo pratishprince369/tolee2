@@ -38,11 +38,28 @@ interface Message {
   text: string;
   isAI: boolean;
   time: string;
+  interactiveAction?: {
+    type: string;
+    label: string;
+    payload: any;
+    executed?: boolean;
+  };
 }
 
 export function AIDashboard() {
   const { data: session } = useSession();
   const [activeTab, setActiveTab] = useState<AIModuleTab>('dashboard');
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: 'init_1',
+      sender: 'Tolee AI Employee',
+      text: 'Good morning! I am your 24×7 Personal AI Employee, inspired by J.A.R.V.I.S. How can I manage your posts, Tolees, CRM leads, or calendar today?',
+      isAI: true,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    }
+  ]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [publishingActionId, setPublishingActionId] = useState<string | null>(null);
   const [summaryData, setSummaryData] = useState({
     pendingTasksCount: 0,
     remindersCount: 0,
