@@ -485,7 +485,7 @@ function GlobalUploadProgress({ task, retryUpload, cancelUpload }: { task: any, 
   if (task.state === 'idle') return null;
 
   const showProgressBar = task.state === 'uploading' || task.state === 'processing';
-  const progressPercent = task.state === 'processing' ? 95 : task.totalProgress;
+  const progressPercent = task.state === 'processing' ? (task.processingProgress || 95) : task.totalProgress;
 
   return (
     <>
@@ -496,6 +496,17 @@ function GlobalUploadProgress({ task, retryUpload, cancelUpload }: { task: any, 
             className="h-full bg-gradient-to-r from-[#0a7c85] via-[#0ea5e9] to-[#10b981] transition-all duration-300 ease-out"
             style={{ width: `${progressPercent}%` }}
           />
+        </div>
+      )}
+
+      {/* 1b. Live AI Processing Step Banner */}
+      {task.state === 'processing' && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 bg-zinc-900/95 dark:bg-zinc-950/95 text-white border border-zinc-700/80 px-4 py-2.5 rounded-full shadow-2xl z-[9999] flex items-center gap-3 text-xs font-semibold animate-in fade-in-0 zoom-in-95 duration-200 backdrop-blur-md max-w-[90vw]">
+          <div className="w-3.5 h-3.5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin shrink-0" />
+          <span className="truncate">{task.stepMessage || '⚡ AI processing & generating metadata...'}</span>
+          <span className="text-[10px] font-mono text-indigo-400 bg-indigo-950/50 px-2 py-0.5 rounded-full border border-indigo-500/20 shrink-0">
+            {progressPercent}%
+          </span>
         </div>
       )}
 

@@ -21,6 +21,8 @@ export interface UploadTask {
   successMessage?: string;
   errorMessage?: string;
   postData?: any;
+  stepMessage?: string;
+  processingProgress?: number;
 }
 
 interface UploadContextType {
@@ -132,12 +134,32 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         throw new Error('Internal Error: Temporary image URL detected. Upload failed.');
       }
 
-      // Update to Processing State
+      // Update to Processing State with Live AI Logs
+      const aiSteps = [
+        { msg: 'Step 1/5: ⚡ Analyzing content & extracting key themes...', progress: 30 },
+        { msg: 'Step 2/5: ✍️ AI generating SEO title, headline & slug...', progress: 50 },
+        { msg: 'Step 3/5: 🏷️ Extracting relevant tags & keywords...', progress: 70 },
+        { msg: 'Step 4/5: 📝 Generating meta description & summarizing...', progress: 90 },
+        { msg: 'Step 5/5: ✨ Formatting news article & finalizing...', progress: 98 },
+      ];
+
+      let currentStepIdx = 0;
       setTask(prev => ({
         ...prev,
         state: 'processing',
         totalProgress: 100,
+        processingProgress: aiSteps[0].progress,
+        stepMessage: aiSteps[0].msg,
       }));
+
+      const stepInterval = setInterval(() => {
+        currentStepIdx = Math.min(currentStepIdx + 1, aiSteps.length - 1);
+        setTask(prev => ({
+          ...prev,
+          processingProgress: aiSteps[currentStepIdx].progress,
+          stepMessage: aiSteps[currentStepIdx].msg,
+        }));
+      }, 900);
 
       // Format media payload
       const combinedUrls = uploadedItems.map(i => i.url).join(',');
@@ -160,6 +182,8 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         keywords: postData.keywords,
         tags: postData.tags,
       });
+
+      clearInterval(stepInterval);
 
       if (!result.success) {
         throw new Error(result.error || `Unable to publish ${uploadType === 'reel' ? 'reel' : 'post'}. Please try again.`);
