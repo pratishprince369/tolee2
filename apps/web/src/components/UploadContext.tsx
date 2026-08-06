@@ -177,7 +177,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
           processingProgress: processingSteps[currentStepIdx].progress,
           stepMessage: processingSteps[currentStepIdx].msg,
         }));
-      }, 900);
+      }, 250);
 
       // Format media payload
       const combinedUrls = uploadedItems.map(i => i.url).join(',');

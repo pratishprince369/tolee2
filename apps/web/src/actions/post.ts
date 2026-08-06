@@ -143,27 +143,32 @@ export async function createPost(data: {
 
     if (data.postType === 'news' && !isDraft) {
       try {
-        const aiResult = await runNewsAIPipeline({
+        const aiPromise = runNewsAIPipeline({
           headline: data.headline || 'Untitled News',
           content: data.content || '',
           mediaUrls: data.media ? data.media.url : null
         });
 
-        newsCategory = aiResult.category;
-        newsSummary = aiResult.summary;
-        newsContent = aiResult.content;
-        newsMetaDesc = aiResult.metaDescription;
-        newsKeywords = aiResult.keywords;
-        newsTags = aiResult.tags;
-        newsReadingTime = aiResult.readingTime;
-        newsScoreAnalysis = aiResult.scoreAnalysis;
+        const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 1000));
+        const aiResult: any = await Promise.race([aiPromise, timeoutPromise]);
 
-        if (!aiResult.clean) {
-          postStatus = 'flagged_ai';
-          aiReport = aiResult.moderationReason;
+        if (aiResult) {
+          newsCategory = aiResult.category || newsCategory;
+          newsSummary = aiResult.summary || newsSummary;
+          newsContent = aiResult.content || newsContent;
+          newsMetaDesc = aiResult.metaDescription || newsMetaDesc;
+          newsKeywords = aiResult.keywords || newsKeywords;
+          newsTags = aiResult.tags || newsTags;
+          newsReadingTime = aiResult.readingTime || newsReadingTime;
+          newsScoreAnalysis = aiResult.scoreAnalysis;
+
+          if (!aiResult.clean) {
+            postStatus = 'flagged_ai';
+            aiReport = aiResult.moderationReason;
+          }
         }
       } catch (aiErr) {
-        console.error("AI news pipeline failed, falling back to manual inputs:", aiErr);
+        console.error("AI news pipeline failed or timed out, using fallback inputs:", aiErr);
       }
     }
 

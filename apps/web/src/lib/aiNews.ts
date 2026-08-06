@@ -25,8 +25,12 @@ export async function runNewsAIPipeline(data: NewsAIPayload) {
 
   const callNIM = async (prompt: string, temperature = 0.2): Promise<string> => {
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 1500);
+
       const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
         method: 'POST',
+        signal: controller.signal,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${NVIDIA_API_KEY}`
@@ -48,6 +52,8 @@ export async function runNewsAIPipeline(data: NewsAIPayload) {
         })
       });
 
+      clearTimeout(timeoutId);
+
       if (!response.ok) {
         throw new Error(`NVIDIA NIM API returned status ${response.status}`);
       }
@@ -55,7 +61,7 @@ export async function runNewsAIPipeline(data: NewsAIPayload) {
       const resData = await response.json();
       return resData?.choices?.[0]?.message?.content || '';
     } catch (err) {
-      console.error('NIM call failed:', err);
+      console.error('NIM call failed or timed out:', err);
       return '';
     }
   };
