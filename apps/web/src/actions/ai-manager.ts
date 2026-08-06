@@ -593,7 +593,41 @@ export async function processAIPersonalMessage(
       });
     }
 
-    // 4. Fetch user memories for context
+    // 4b. Autonomous Post & AI Image Creation Execution
+    const isImageOrPostRequest = 
+      lower.includes('post') || 
+      lower.includes('image') || 
+      lower.includes('good morning') || 
+      lower.includes('banner') || 
+      lower.includes('poster') || 
+      lower.includes('generate');
+
+    if (isImageOrPostRequest && (lower.includes('create') || lower.includes('make') || lower.includes('banao') || lower.includes('publish') || lower.includes('good morning'))) {
+      try {
+        const promptConcept = trimmed.length > 5 ? trimmed : 'Beautiful morning sunrise with inspirational quote for social media post';
+        const generatedImageUrl = await generateAIImageWithFallback(promptConcept) || 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800&q=80';
+
+        const caption = `🌅 Good morning! Wishing everyone a peaceful, inspiring, and productive day ahead! ✨\n\n#GoodMorning #Tolee #Inspiration #DailyMotivation #Community`;
+        
+        return {
+          success: true,
+          response: `✨ **Tolee AI Employee**: I have created a custom **Good Morning Post** with an AI-generated image for you!\n\nReview the generated post below and click **Publish Now** to post it to your Tolees instantly.`,
+          interactiveAction: {
+            type: 'PUBLISH_POST',
+            label: '🚀 Publish Post Now',
+            payload: {
+              caption,
+              imageUrl: generatedImageUrl,
+              postType: 'post'
+            }
+          }
+        };
+      } catch (err) {
+        console.error('Autonomous image post creation fallback:', err);
+      }
+    }
+
+    // 5. Fetch user memories for context
     const existingMemories = await prisma.aIMemory.findMany({
       where: { userId },
       take: 5
@@ -603,9 +637,9 @@ export async function processAIPersonalMessage(
       ? `User Memory Context: ${existingMemories.map(m => `${m.key}: ${m.value}`).join('; ')}`
       : 'No previous memories saved.';
 
-    const systemPromptWithContext = `${SYSTEM_PROMPTS.PERSONAL_EMPLOYEE}\n\n${memoryContext}\n\nCRITICAL REAL-TIME CONTEXT: The user's device clock is currently showing ${timeInfo.formattedFull} (${timeInfo.dayOfWeek}, Timezone: ${timeInfo.timeZone}). You MUST report ${timeInfo.formattedTime} whenever asked about the time!`;
+    const systemPromptWithContext = `${SYSTEM_PROMPTS.PERSONAL_EMPLOYEE}\n\n${memoryContext}\n\nCRITICAL SYSTEM INSTRUCTION: Current date/time reference: ${timeInfo.formattedFull} (${timeInfo.dayOfWeek}, Timezone: ${timeInfo.timeZone}). Use this internal context ONLY when scheduling or directly asked about the clock. DO NOT output timing notes, clock stamps, or "(Current time: ...)" in your message responses unless the user explicitly asks for the time!`;
 
-    // 5. Call Ultra-Fast NVIDIA NIM LLM
+    // 6. Call Ultra-Fast NVIDIA NIM LLM
     const nvidiaResponse = await callNvidiaLLM(
       [...history, { role: 'user', content: trimmed }],
       systemPromptWithContext

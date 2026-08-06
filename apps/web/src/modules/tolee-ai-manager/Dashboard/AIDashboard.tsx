@@ -52,8 +52,6 @@ export function AIDashboard() {
     reminders: [],
     myGroups: []
   });
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -62,12 +60,36 @@ export function AIDashboard() {
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, isLoading]);
 
   const loadSummary = async () => {
     const res = await getAIDashboardSummary();
     if (res.success && res.summary) {
       setSummaryData(res.summary as any);
+    }
+  };
+
+  const handleExecuteAction = async (msgId: string, action: any) => {
+    if (action.type === 'PUBLISH_POST' && action.payload) {
+      setPublishingActionId(msgId);
+      try {
+        const res = await createPost({
+          content: action.payload.caption,
+          postType: 'post',
+          media: action.payload.imageUrl ? { type: 'image', url: action.payload.imageUrl } : null,
+        });
+
+        if (res.success) {
+          setMessages(prev => prev.map(m => m.id === msgId ? {
+            ...m,
+            interactiveAction: { ...m.interactiveAction!, executed: true, label: '✅ Published to Feed!' }
+          } : m));
+        }
+      } catch (err) {
+        console.error('Action execution failed:', err);
+      } finally {
+        setPublishingActionId(null);
+      }
     }
   };
 
@@ -92,7 +114,8 @@ export function AIDashboard() {
       sender: 'Tolee AI Employee',
       text: result.response,
       isAI: true,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      interactiveAction: (result as any).interactiveAction
     };
 
     setMessages((prev) => [...prev, aiMsg]);
@@ -208,6 +231,28 @@ export function AIDashboard() {
                         }`}
                       >
                         <div className="whitespace-pre-wrap">{msg.text}</div>
+                        {msg.interactiveAction && (
+                          <div className="mt-3 p-3 bg-white dark:bg-zinc-900 rounded-2xl border border-violet-200 dark:border-violet-800/80 shadow-sm space-y-2.5">
+                            {msg.interactiveAction.payload?.imageUrl && (
+                              <img 
+                                src={msg.interactiveAction.payload.imageUrl} 
+                                alt="AI Generated Visual" 
+                                className="w-full h-44 object-cover rounded-xl border border-slate-100 dark:border-zinc-800 shadow-inner"
+                              />
+                            )}
+                            <p className="text-xs font-medium text-slate-700 dark:text-zinc-300 line-clamp-3">
+                              {msg.interactiveAction.payload?.caption}
+                            </p>
+                            <Button
+                              size="sm"
+                              disabled={msg.interactiveAction.executed || publishingActionId === msg.id}
+                              onClick={() => handleExecuteAction(msg.id, msg.interactiveAction)}
+                              className="w-full h-9 bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs rounded-xl shadow-md transition-all active:scale-[0.98]"
+                            >
+                              {publishingActionId === msg.id ? '🚀 Publishing to Tolees...' : msg.interactiveAction.label}
+                            </Button>
+                          </div>
+                        )}
                         <span className={`block text-[10px] mt-1.5 text-right ${msg.isAI ? 'text-slate-400' : 'text-violet-200'}`}>
                           {msg.time}
                         </span>
