@@ -26,6 +26,13 @@ export function FloatingVoiceHUD({ isOpen, onClose, onSelectTab }: FloatingVoice
     if (!isOpen) return;
 
     const vEngine = new VoiceCompanionEngine(mode);
+    const welcomeText = 'Boliye, How can I help you sir?';
+    setSpeechText(welcomeText);
+
+    // Speak immediate greeting aloud on voice companion activation
+    setTimeout(() => {
+      vEngine.speak(welcomeText, 'hi-IN');
+    }, 300);
 
     vEngine.onStatusChange((listening, speaking, wakeWord) => {
       setIsListening(listening);
@@ -34,7 +41,7 @@ export function FloatingVoiceHUD({ isOpen, onClose, onSelectTab }: FloatingVoice
     });
 
     vEngine.onWakeWord(() => {
-      setSpeechText('Listening! What can I do for you?');
+      setSpeechText('Listening! What can I do for you sir?');
     });
 
     vEngine.onCommand(async (transcript) => {

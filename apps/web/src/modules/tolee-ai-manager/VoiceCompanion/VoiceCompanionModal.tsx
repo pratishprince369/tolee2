@@ -35,6 +35,12 @@ export function VoiceCompanionModal({ isOpen, onClose, onSelectTab }: VoiceCompa
 
   useEffect(() => {
     const vEngine = new VoiceCompanionEngine(mode);
+    const welcomeText = 'Boliye, How can I help you sir?';
+    setAiSpeechText(welcomeText);
+
+    setTimeout(() => {
+      vEngine.speak(welcomeText, 'hi-IN');
+    }, 300);
 
     vEngine.onStatusChange((listening, speaking, wakeWord) => {
       setIsListening(listening);
@@ -43,7 +49,7 @@ export function VoiceCompanionModal({ isOpen, onClose, onSelectTab }: VoiceCompa
     });
 
     vEngine.onWakeWord(() => {
-      setAiSpeechText('I am listening! What would you like me to do?');
+      setAiSpeechText('Listening! What can I do for you sir?');
     });
 
     vEngine.onCommand(async (transcript) => {
