@@ -16,7 +16,6 @@ import { useUpload } from './UploadContext';
 import { PostCarousel } from '@/components/PostCarousel';
 import { askAIWriter } from '@/actions/ai-helper';
 import { saveDraft } from '@/lib/draftManager';
-import { NewsPrePublishConfirmationModal, NewsConfirmationData } from '@/components/NewsPrePublishConfirmationModal';
 
 export function CreatePostModal({ 
   children, 
@@ -224,60 +223,49 @@ export function CreatePostModal({
     setIsOpen(open);
   };
 
-  const [showNewsConfirmModal, setShowNewsConfirmModal] = useState(false);
-
-  const executePublishWithData = (confirmedData: any) => {
-    isPublishingRef.current = true;
-    const firstSelectedTolee = joinedTolees.find(t => t.id === selectedTolees[0]);
-    
-    const postData = {
-      content: confirmedData.content || content,
-      postType,
-      toleeName: selectedTolees.length === 1 ? firstSelectedTolee?.name : `${selectedTolees.length} Tolees`,
-      toleeSlug: selectedTolees.length === 1 ? firstSelectedTolee?.slug : 'multiple',
-      selectedToleeIds: selectedTolees,
-      // Optional news meta data
-      ...(postType === 'news' ? {
-        headline: confirmedData.headline || headline,
-        summary: confirmedData.summary || summary,
-        category: confirmedData.category || category,
-        metaDescription: confirmedData.metaDescription || seoMetaDesc,
-        keywords: confirmedData.keywords || seoKeywords,
-        tags: confirmedData.tags || seoTags,
-      } : {})
-    };
-
-    // Start global upload & creation task
-    startUpload(
-      mediaList,
-      postData,
-      videoOnly ? 'reel' : 'feed',
-      onPost
-    );
-
-    // Instantly reset modal form and close it
-    setContent('');
-    setHeadline('');
-    setSummary('');
-    setSeoMetaDesc('');
-    setSeoKeywords('');
-    setSeoTags('');
-    setMediaList([]);
-    setSelectedTolees(toleeId ? [toleeId] : []);
-    setIsOpen(false);
-    setShowNewsConfirmModal(false);
-    setTimeout(() => {
-      isPublishingRef.current = false;
-    }, 500);
-  };
-
   const handlePost = async () => {
     if (onPost && isPostReady) {
-      if (postType === 'news' && !showNewsConfirmModal) {
-        setShowNewsConfirmModal(true);
-        return;
-      }
-      executePublishWithData({ content, headline, summary, category, metaDescription: seoMetaDesc, keywords: seoKeywords, tags: seoTags, selectedTolees });
+      isPublishingRef.current = true;
+      const firstSelectedTolee = joinedTolees.find(t => t.id === selectedTolees[0]);
+      
+      const postData = {
+        content,
+        postType,
+        toleeName: selectedTolees.length === 1 ? firstSelectedTolee?.name : `${selectedTolees.length} Tolees`,
+        toleeSlug: selectedTolees.length === 1 ? firstSelectedTolee?.slug : 'multiple',
+        selectedToleeIds: selectedTolees,
+        // Optional news meta data
+        ...(postType === 'news' ? {
+          headline,
+          summary,
+          category,
+          metaDescription: seoMetaDesc,
+          keywords: seoKeywords,
+          tags: seoTags,
+        } : {})
+      };
+
+      // Start global upload & creation task
+      startUpload(
+        mediaList,
+        postData,
+        videoOnly ? 'reel' : 'feed',
+        onPost
+      );
+
+      // Instantly reset modal form and close it
+      setContent('');
+      setHeadline('');
+      setSummary('');
+      setSeoMetaDesc('');
+      setSeoKeywords('');
+      setSeoTags('');
+      setMediaList([]);
+      setSelectedTolees(toleeId ? [toleeId] : []);
+      setIsOpen(false);
+      setTimeout(() => {
+        isPublishingRef.current = false;
+      }, 500);
     }
   };
 
@@ -286,7 +274,6 @@ export function CreatePostModal({
     : (content.trim().length > 0 && selectedTolees.length > 0);
 
   return (
-    <>
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       {children && (
         <DialogTrigger asChild>
@@ -553,26 +540,5 @@ export function CreatePostModal({
         />
       </DialogContent>
     </Dialog>
-
-    {showNewsConfirmModal && (
-      <NewsPrePublishConfirmationModal
-        isOpen={showNewsConfirmModal}
-        onClose={() => setShowNewsConfirmModal(false)}
-        initialData={{
-          headline,
-          content,
-          summary,
-          category,
-          metaDescription: seoMetaDesc,
-          keywords: seoKeywords,
-          tags: seoTags,
-          selectedTolees,
-        }}
-        onConfirmPublish={(confirmedData) => {
-          executePublishWithData(confirmedData);
-        }}
-      />
-    )}
-    </>
   );
 }
