@@ -23,15 +23,17 @@ export function CreatePostModal({
   toleeId, 
   toleeName, 
   toleeSlug,
-  defaultTab = 'regular'
+  defaultTab = 'regular',
+  defaultOpen = false
 }: { 
-  children: React.ReactNode, 
+  children?: React.ReactNode, 
   onPost?: (post: any, postData?: any) => void, 
   videoOnly?: boolean, 
   toleeId?: string, 
   toleeName?: string, 
   toleeSlug?: string,
-  defaultTab?: string
+  defaultTab?: string,
+  defaultOpen?: boolean
 }) {
   const { data: session } = useSession();
   const router = useRouter();
@@ -41,7 +43,7 @@ export function CreatePostModal({
   const [content, setContent] = useState('');
   const [selectedTolees, setSelectedTolees] = useState<string[]>(toleeId ? [toleeId] : []);
   const [mediaList, setMediaList] = useState<{ type: 'image' | 'video'; url: string; file?: File }[]>([]);
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(defaultOpen);
   const [aiModalOpen, setAiModalOpen] = useState(false);
   const [videoModalOpen, setVideoModalOpen] = useState(false);
   const [joinedTolees, setJoinedTolees] = useState<any[]>([]);
@@ -244,9 +246,11 @@ export function CreatePostModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        {children}
-      </DialogTrigger>
+      {children && (
+        <DialogTrigger asChild>
+          {children}
+        </DialogTrigger>
+      )}
       <DialogContent 
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}

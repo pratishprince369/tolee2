@@ -3,14 +3,15 @@ import Link from 'next/link';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
-import { Newspaper, PlusCircle } from 'lucide-react';
+import { Newspaper } from 'lucide-react';
 import { getNewsFeedPosts } from '@/actions/news';
 import { NewsFeedStream } from '@/components/NewsFeedStream';
+import { CreateNewsButton } from '@/components/CreateNewsButton';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-export default async function NewsHubPage({ searchParams }: { searchParams: { cat?: string } }) {
+export default async function NewsHubPage({ searchParams }: { searchParams: { cat?: string; create?: string; openModal?: string } }) {
   const session = await getServerSession(authOptions);
   const currentUserId = session?.user ? (session.user as any).id : null;
   const isSuperAdmin = session?.user?.email === process.env.SUPER_ADMIN_EMAIL;
@@ -46,11 +47,7 @@ export default async function NewsHubPage({ searchParams }: { searchParams: { ca
             </div>
           </div>
 
-          <Link href="/news/create">
-            <Button className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl flex items-center gap-1.5 shadow-sm shadow-indigo-600/10">
-              <PlusCircle className="w-4 h-4" /> Create Article
-            </Button>
-          </Link>
+          <CreateNewsButton defaultOpen={searchParams.create === 'true' || searchParams.openModal === 'news'} />
         </div>
 
         {/* Paginated Category Filtered Stream */}

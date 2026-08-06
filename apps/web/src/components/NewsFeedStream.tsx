@@ -14,6 +14,7 @@ import { NewsEngagement } from '@/components/NewsEngagement';
 import { getNewsFeedPosts } from '@/actions/news';
 import { ViewTracker } from '@/components/ViewTracker';
 import { OptimisticPostCard } from '@/components/OptimisticPostCard';
+import { CreateNewsButton } from '@/components/CreateNewsButton';
 
 interface NewsFeedStreamProps {
   initialNews: any[];
@@ -303,11 +304,7 @@ export function NewsFeedStream({
             <p className="text-xs text-gray-400 max-w-xs mx-auto">
               Be the first to publish a news story or blog in the "{activeCategory}" category!
             </p>
-            <Link href="/news/create">
-              <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold">
-                Create First Post
-              </Button>
-            </Link>
+            <CreateNewsButton />
           </div>
         )}
 
