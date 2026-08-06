@@ -76,6 +76,7 @@ import { ApkPromoManager } from "@/components/ApkPromoManager";
 import { PwaManager } from "@/components/PwaManager";
 import { MediaPickerModal } from "@/components/MediaPickerModal";
 import { GlobalAlarmListener } from "@/components/GlobalAlarmListener";
+import { DraftsReminderBanner } from "@/components/DraftsReminderBanner";
 import AnalyticsTracker from "@/components/AnalyticsTracker";
 import { RoutePrefetcher } from "@/components/RoutePrefetcher";
 import { Suspense } from "react";
@@ -220,6 +221,7 @@ export default async function RootLayout({
           <ApkPromoManager />
           <PwaManager />
           <MediaPickerModal />
+          <DraftsReminderBanner />
           <Suspense fallback={null}>
             <AnalyticsTracker />
           </Suspense>

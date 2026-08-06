@@ -15,6 +15,7 @@ import { AIVideoGeneratorModal } from '@/components/AIVideoGeneratorModal';
 import { useUpload } from './UploadContext';
 import { PostCarousel } from '@/components/PostCarousel';
 import { askAIWriter } from '@/actions/ai-helper';
+import { saveDraft } from '@/lib/draftManager';
 
 export function CreatePostModal({ 
   children, 
@@ -198,8 +199,33 @@ export function CreatePostModal({
     }
   };
 
+  const isPublishingRef = useRef(false);
+
+  const handleOpenChange = (open: boolean) => {
+    if (!open && !isPublishingRef.current) {
+      const hasContent = content.trim().length > 0 || headline.trim().length > 0;
+      if (hasContent && session?.user) {
+        const uId = (session.user as any).id;
+        const res = saveDraft(uId, {
+          postType: (postType as any) || 'regular',
+          headline,
+          content,
+          summary,
+          category,
+          mediaList: mediaList.map(m => ({ type: m.type, url: m.url })),
+          selectedTolees,
+        });
+        if (!res.success && res.error) {
+          alert(res.error);
+        }
+      }
+    }
+    setIsOpen(open);
+  };
+
   const handlePost = async () => {
     if (onPost && isPostReady) {
+      isPublishingRef.current = true;
       const firstSelectedTolee = joinedTolees.find(t => t.id === selectedTolees[0]);
       
       const postData = {
@@ -237,6 +263,9 @@ export function CreatePostModal({
       setMediaList([]);
       setSelectedTolees(toleeId ? [toleeId] : []);
       setIsOpen(false);
+      setTimeout(() => {
+        isPublishingRef.current = false;
+      }, 500);
     }
   };
 
@@ -245,7 +274,7 @@ export function CreatePostModal({
     : (content.trim().length > 0 && selectedTolees.length > 0);
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       {children && (
         <DialogTrigger asChild>
           {children}

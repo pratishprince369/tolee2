@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Search, Bell, MessageCircle, LogOut, User, Settings, Compass, Store, Globe, Heart, Bot, Zap, MessageSquare, Briefcase, Award } from 'lucide-react';
+import { Search, Bell, MessageCircle, LogOut, User, Settings, Compass, Store, Globe, Heart, Bot, Zap, MessageSquare, Briefcase, Award, FileText } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -11,6 +11,8 @@ import { useSession, signOut } from 'next-auth/react';
 import { getSidebarData } from '@/actions/user';
 import { SearchInput } from './SearchInput';
 import { cn } from '@/lib/utils';
+import { getDrafts } from '@/lib/draftManager';
+import { MyDraftsModal } from '@/components/MyDraftsModal';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -67,6 +69,27 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
       });
     }
   }, [session, pathname]);
+
+  const [draftsCount, setDraftsCount] = React.useState(0);
+  const [isDraftsModalOpen, setIsDraftsModalOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    if (session?.user) {
+      const uId = (session.user as any).id;
+      setDraftsCount(getDrafts(uId).length);
+    }
+  }, [session]);
+
+  React.useEffect(() => {
+    const handleUpdate = () => {
+      if (session?.user) {
+        const uId = (session.user as any).id;
+        setDraftsCount(getDrafts(uId).length);
+      }
+    };
+    window.addEventListener('tolee_drafts_updated', handleUpdate);
+    return () => window.removeEventListener('tolee_drafts_updated', handleUpdate);
+  }, [session]);
 
   const { task, retryUpload, cancelUpload } = useUpload();
 
@@ -383,6 +406,17 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
                     <User className="mr-2 h-4 w-4" />
                     <span>Profile</span>
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setIsDraftsModalOpen(true)} className="cursor-pointer flex w-full items-center justify-between">
+                    <div className="flex items-center">
+                      <FileText className="mr-2 h-4 w-4 text-amber-500" />
+                      <span>My Drafts</span>
+                    </div>
+                    {draftsCount > 0 && (
+                      <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-full bg-amber-500 text-white">
+                        {draftsCount}
+                      </span>
+                    )}
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => router.push('/settings')} className="cursor-pointer flex w-full items-center">
                     <Settings className="mr-2 h-4 w-4" />
                     <span>Settings</span>
@@ -496,6 +530,9 @@ function GlobalUploadProgress({ task, retryUpload, cancelUpload }: { task: any, 
           <span>{task.successMessage || '✅ Published successfully'}</span>
         </div>
       )}
+
+      {/* 4. My Drafts Modal */}
+      <MyDraftsModal isOpen={isDraftsModalOpen} onClose={() => setIsDraftsModalOpen(false)} />
     </>
   );
 }
