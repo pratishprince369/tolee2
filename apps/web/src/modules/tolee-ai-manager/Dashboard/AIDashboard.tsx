@@ -9,6 +9,7 @@ import {
 import { DailySummaryGrid } from '../Components/DailySummaryGrid';
 import { VoiceInputDock } from '../Components/VoiceInputDock';
 import { VoiceCompanionDock } from '../VoiceCompanion/VoiceCompanionDock';
+import { FloatingVoiceHUD } from '../VoiceCompanion/FloatingVoiceHUD';
 import { DailyPlanner } from '../Personal/DailyPlanner';
 import { AICalendar } from '../Calendar/AICalendar';
 import { AITasks } from '../Tasks/AITasks';
@@ -62,6 +63,7 @@ export function AIDashboard() {
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const [publishingActionId, setPublishingActionId] = useState<string | null>(null);
+  const [isVoiceCompanionActive, setIsVoiceCompanionActive] = useState(false);
   const [summaryData, setSummaryData] = useState({
     pendingTasksCount: 0,
     remindersCount: 0,
@@ -302,8 +304,19 @@ export function AIDashboard() {
         {activeTab === 'birthdays' && <AIBirthdays />}
       </div>
 
-      {/* Sticky Bottom Voice & Text Input Dock */}
-      <VoiceInputDock onSendMessage={handleSendMessage} isLoading={isLoading} />
+      {/* Non-blocking Floating J.A.R.V.I.S. Voice Widget */}
+      <FloatingVoiceHUD
+        isOpen={isVoiceCompanionActive}
+        onClose={() => setIsVoiceCompanionActive(false)}
+        onSelectTab={(tab) => setActiveTab(tab as any)}
+      />
+
+      {/* Sticky Bottom Voice & Text Input Dock with ChatGPT-Style Start Voice Button */}
+      <VoiceInputDock 
+        onSendMessage={handleSendMessage} 
+        onToggleVoiceCompanion={() => setIsVoiceCompanionActive(!isVoiceCompanionActive)}
+        isLoading={isLoading} 
+      />
     </div>
   );
 }

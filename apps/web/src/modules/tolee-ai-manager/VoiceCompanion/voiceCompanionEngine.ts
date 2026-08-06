@@ -97,7 +97,7 @@ export class VoiceCompanionEngine {
     }
   }
 
-  public speak(text: string, onEnd?: () => void) {
+  public speak(text: string, langCode: string = 'hi-IN', onEnd?: () => void) {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
     if (this.mode === 'SILENT' || this.mode === 'MEETING') return;
 
@@ -106,10 +106,11 @@ export class VoiceCompanionEngine {
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.rate = 1.0;
     utterance.pitch = 1.05;
+    utterance.lang = langCode;
 
-    // Pick warm natural Indian English/Hindi voice if available
+    // Pick warm natural Indian Hindi/Marathi/English voice if available
     const voices = window.speechSynthesis.getVoices();
-    const preferredVoice = voices.find(v => v.lang.includes('en-IN') || v.lang.includes('hi-IN') || v.name.toLowerCase().includes('google') || v.name.toLowerCase().includes('natural'));
+    const preferredVoice = voices.find(v => v.lang.toLowerCase().includes(langCode.toLowerCase()) || v.lang.includes('hi-IN') || v.lang.includes('en-IN'));
     if (preferredVoice) {
       utterance.voice = preferredVoice;
     }
@@ -162,7 +163,7 @@ export class VoiceCompanionEngine {
       if (!this.wakeWordDetected && (spokenText.includes('tolee') || spokenText.includes('hey tolee'))) {
         this.wakeWordDetected = true;
         this.notifyStatus();
-        this.speak('Yes, I am listening.', () => {
+        this.speak('Yes, I am listening.', 'en-IN', () => {
           if (this.onWakeWordCallback) this.onWakeWordCallback();
         });
       } else if (this.wakeWordDetected && finalTranscript.length > 3) {

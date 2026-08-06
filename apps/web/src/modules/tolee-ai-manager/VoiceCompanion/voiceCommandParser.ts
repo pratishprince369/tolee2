@@ -1,7 +1,16 @@
 import { VoiceCommandIntent } from './voiceTypes';
 
-export function parseVoiceCommand(transcript: string): VoiceCommandIntent {
+export interface ParsedVoiceResult extends VoiceCommandIntent {
+  detectedLang: 'hi-IN' | 'mr-IN' | 'en-IN';
+}
+
+export function parseVoiceCommand(transcript: string): ParsedVoiceResult {
   const clean = transcript.trim().toLowerCase();
+
+  // Language Detection heuristic
+  const isHindi = /batao|karo|kholo|padho|aaj|dikhao|banao|kaise|kya|hoga/i.test(clean);
+  const isMarathi = /sang|dakhva|aajche|kasa|kiti|kay|shuru|sangto/i.test(clean);
+  const lang: 'hi-IN' | 'mr-IN' | 'en-IN' = isMarathi ? 'mr-IN' : isHindi ? 'hi-IN' : 'en-IN';
 
   // Strip Wake Words if present
   const wakeWords = ['hey tolee', 'tolee,', 'tolee', 'ok tolee', 'okey tolee'];
@@ -23,7 +32,12 @@ export function parseVoiceCommand(transcript: string): VoiceCommandIntent {
     return {
       intent: 'READ_NOTIFICATIONS',
       confirmationRequired: false,
-      responseText: 'Sure! Let me check your latest notifications.'
+      responseText: lang === 'hi-IN' 
+        ? 'Ji bilkul! Main aapke naye notifications check karke batata hoon.'
+        : lang === 'mr-IN'
+        ? 'Ho nakki! Mi tumche nave notifications तपासून sangto.'
+        : 'Sure! Let me check your latest notifications.',
+      detectedLang: lang
     };
   }
 
@@ -38,7 +52,12 @@ export function parseVoiceCommand(transcript: string): VoiceCommandIntent {
       intent: 'OPEN_MODULE',
       targetModule: 'crm',
       confirmationRequired: false,
-      responseText: 'Opening your CRM dashboard with pending leads and follow-ups.'
+      responseText: lang === 'hi-IN'
+        ? 'Aapka CRM Dashboard khol raha hoon jahan aapke pending leads hain.'
+        : lang === 'mr-IN'
+        ? 'Tumce CRM Dashboard ughadat ahe.'
+        : 'Opening your CRM dashboard with pending leads.',
+      detectedLang: lang
     };
   }
 
@@ -54,7 +73,12 @@ export function parseVoiceCommand(transcript: string): VoiceCommandIntent {
       intent: 'OPEN_MODULE',
       targetModule: commandText.includes('meeting') || commandText.includes('calendar') ? 'calendar' : 'tasks',
       confirmationRequired: false,
-      responseText: 'Opening your scheduled tasks and meetings.'
+      responseText: lang === 'hi-IN'
+        ? 'Aapke scheduled tasks aur meetings ki list open kar raha hoon.'
+        : lang === 'mr-IN'
+        ? 'Tumche scheduled kam ughadat ahe.'
+        : 'Opening your scheduled tasks and meetings.',
+      detectedLang: lang
     };
   }
 
@@ -68,7 +92,12 @@ export function parseVoiceCommand(transcript: string): VoiceCommandIntent {
     return {
       intent: 'SUMMARIZE_ACTIVITY',
       confirmationRequired: false,
-      responseText: 'Preparing your daily activity summary across Tolees, CRM, and analytics.'
+      responseText: lang === 'hi-IN'
+        ? 'Aapka aaj ka Tolee, CRM aur engagement report summary tayar kar raha hoon.'
+        : lang === 'mr-IN'
+        ? 'Aajcha daily report summary tayar karat ahe.'
+        : 'Preparing your daily activity summary across Tolees, CRM, and analytics.',
+      detectedLang: lang
     };
   }
 
@@ -84,7 +113,12 @@ export function parseVoiceCommand(transcript: string): VoiceCommandIntent {
       intent: 'CREATE_CONTENT',
       query: commandText,
       confirmationRequired: true,
-      responseText: 'Drafting your new post with AI-generated visual copy. I will ask for your confirmation before publishing.'
+      responseText: lang === 'hi-IN'
+        ? 'Aapke liye AI image poster aur caption draft kar raha hoon. Publish karne se pehele aapki permission loonga.'
+        : lang === 'mr-IN'
+        ? 'Nave post tayar karat ahe. Publish karnya aadhi tumchi khatri ghein.'
+        : 'Drafting your new post with AI-generated visual copy.',
+      detectedLang: lang
     };
   }
 
@@ -95,7 +129,10 @@ export function parseVoiceCommand(transcript: string): VoiceCommandIntent {
       intent: 'SEARCH_TOLEE',
       query: searchQuery || 'Mumbai Real Estate',
       confirmationRequired: false,
-      responseText: `Searching Tolee network for "${searchQuery || 'trending groups'}".`
+      responseText: lang === 'hi-IN'
+        ? `Tolee network par "${searchQuery || 'trending groups'}" dhoondh raha hoon.`
+        : `Searching Tolee network for "${searchQuery || 'trending groups'}".`,
+      detectedLang: lang
     };
   }
 
@@ -104,6 +141,11 @@ export function parseVoiceCommand(transcript: string): VoiceCommandIntent {
     intent: 'UNKNOWN',
     query: commandText,
     confirmationRequired: false,
-    responseText: `I am processing your command: "${commandText}". How else can I assist you?`
+    responseText: lang === 'hi-IN'
+      ? `Main aapke is instruction par kaam kar raha hoon: "${commandText}". Main aur kya help karoon?`
+      : lang === 'mr-IN'
+      ? `Mi tumcha message samajhlo: "${commandText}".`
+      : `I am processing your command: "${commandText}". How else can I assist you?`,
+    detectedLang: lang
   };
 }

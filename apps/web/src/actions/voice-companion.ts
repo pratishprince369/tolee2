@@ -42,7 +42,7 @@ export async function getVoiceNotificationBriefing() {
 
     if (unreadNotifs.length > 0) {
       summaryParts.push(`You have ${unreadNotifs.length} new notification${unreadNotifs.length > 1 ? 's' : ''}.`);
-      unreadNotifs.forEach((n) => {
+      unreadNotifs.forEach((n: any) => {
         summaryParts.push(`${n.title}. ${n.message}`);
       });
     }

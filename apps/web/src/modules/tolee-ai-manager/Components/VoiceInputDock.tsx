@@ -7,10 +7,11 @@ import { Input } from '@/components/ui/input';
 
 interface VoiceInputDockProps {
   onSendMessage: (text: string) => void;
+  onToggleVoiceCompanion?: () => void;
   isLoading?: boolean;
 }
 
-export function VoiceInputDock({ onSendMessage, isLoading = false }: VoiceInputDockProps) {
+export function VoiceInputDock({ onSendMessage, onToggleVoiceCompanion, isLoading = false }: VoiceInputDockProps) {
   const [input, setInput] = useState('');
   const [isRecording, setIsRecording] = useState(false);
 
@@ -129,6 +130,26 @@ export function VoiceInputDock({ onSendMessage, isLoading = false }: VoiceInputD
               <Mic className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </Button>
           </div>
+
+          {/* ChatGPT-Style Start Voice Soundwave Button */}
+          {onToggleVoiceCompanion && (
+            <Button
+              type="button"
+              onClick={onToggleVoiceCompanion}
+              size="icon"
+              className="rounded-full w-9 h-9 sm:w-11 sm:h-11 bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 shrink-0 shadow-md flex items-center justify-center relative group"
+              title="Start Voice Companion"
+            >
+              <div className="flex items-center gap-0.5">
+                <span className="w-0.5 h-3.5 bg-cyan-400 rounded-full animate-pulse" />
+                <span className="w-0.5 h-5 bg-violet-400 rounded-full animate-pulse delay-75" />
+                <span className="w-0.5 h-3 bg-emerald-400 rounded-full animate-pulse delay-150" />
+              </div>
+              <span className="absolute -top-8 right-0 text-[10px] font-extrabold bg-slate-900 text-white px-2.5 py-0.5 rounded-full shadow border border-slate-700 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
+                Start Voice
+              </span>
+            </Button>
+          )}
 
           {/* Send Button */}
           <Button 
