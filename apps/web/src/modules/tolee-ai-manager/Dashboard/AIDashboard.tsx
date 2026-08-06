@@ -316,6 +316,7 @@ export function AIDashboard() {
       <VoiceInputDock 
         onSendMessage={handleSendMessage} 
         onToggleVoiceCompanion={() => setIsVoiceCompanionActive(!isVoiceCompanionActive)}
+        isVoiceActive={isVoiceCompanionActive}
         isLoading={isLoading} 
       />
     </div>

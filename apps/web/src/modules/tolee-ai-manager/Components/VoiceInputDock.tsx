@@ -1,17 +1,18 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Mic, Send, Camera, FileText, Sparkles, MessageSquare, Paperclip, X } from 'lucide-react';
+import { Mic, Send, Camera, FileText, Sparkles, MessageSquare, Paperclip, X, Radio } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
 interface VoiceInputDockProps {
   onSendMessage: (text: string) => void;
   onToggleVoiceCompanion?: () => void;
+  isVoiceActive?: boolean;
   isLoading?: boolean;
 }
 
-export function VoiceInputDock({ onSendMessage, onToggleVoiceCompanion, isLoading = false }: VoiceInputDockProps) {
+export function VoiceInputDock({ onSendMessage, onToggleVoiceCompanion, isVoiceActive = false, isLoading = false }: VoiceInputDockProps) {
   const [input, setInput] = useState('');
   const [isRecording, setIsRecording] = useState(false);
 
@@ -131,22 +132,25 @@ export function VoiceInputDock({ onSendMessage, onToggleVoiceCompanion, isLoadin
             </Button>
           </div>
 
-          {/* ChatGPT-Style Start Voice Soundwave Button */}
+          {/* Dedicated ChatGPT-Style Soundwave ON/OFF Toggle Button */}
           {onToggleVoiceCompanion && (
             <Button
               type="button"
               onClick={onToggleVoiceCompanion}
-              size="icon"
-              className="rounded-full w-9 h-9 sm:w-11 sm:h-11 bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 shrink-0 shadow-md flex items-center justify-center relative group"
-              title="Start Voice Companion"
+              className={`rounded-full px-3 py-2 h-9 sm:h-11 border text-xs font-bold shrink-0 transition-all flex items-center gap-1.5 shadow-md ${
+                isVoiceActive
+                  ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.6)] animate-pulse'
+                  : 'bg-slate-900 dark:bg-slate-800 text-white border-slate-700 hover:border-cyan-400'
+              }`}
+              title={isVoiceActive ? 'Voice Manager ON (Click to turn OFF)' : 'Voice Manager OFF (Click to turn ON)'}
             >
               <div className="flex items-center gap-0.5">
-                <span className="w-0.5 h-3.5 bg-cyan-400 rounded-full animate-pulse" />
-                <span className="w-0.5 h-5 bg-violet-400 rounded-full animate-pulse delay-75" />
-                <span className="w-0.5 h-3 bg-emerald-400 rounded-full animate-pulse delay-150" />
+                <span className={`w-0.5 h-3.5 rounded-full ${isVoiceActive ? 'bg-slate-950 animate-bounce' : 'bg-cyan-400'}`} />
+                <span className={`w-0.5 h-5 rounded-full ${isVoiceActive ? 'bg-slate-950 animate-bounce delay-75' : 'bg-violet-400'}`} />
+                <span className={`w-0.5 h-3 rounded-full ${isVoiceActive ? 'bg-slate-950 animate-bounce delay-150' : 'bg-emerald-400'}`} />
               </div>
-              <span className="absolute -top-8 right-0 text-[10px] font-extrabold bg-slate-900 text-white px-2.5 py-0.5 rounded-full shadow border border-slate-700 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
-                Start Voice
+              <span className="hidden xs:inline text-[11px] font-extrabold tracking-wide">
+                {isVoiceActive ? 'VOICE ON' : 'START VOICE'}
               </span>
             </Button>
           )}
