@@ -27,7 +27,7 @@ export async function generateMetadata({ params }: ReelPageProps): Promise<Metad
 
     if (post) {
       const isPrivateAuthor = post.author?.isPrivate;
-      const isPrivateGroup = post.tolees?.some(t => t.tolee?.isPrivate || t.tolee?.privacy === 'private');
+      const isPrivateGroup = post.tolees?.some((t: any) => t.tolee?.isPrivate || t.tolee?.privacy === 'private');
 
       if (isPrivateAuthor || isPrivateGroup) {
         return {

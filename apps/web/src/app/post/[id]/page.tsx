@@ -19,10 +19,9 @@ export async function generateMetadata({ params }: PostPageProps): Promise<Metad
   }
   const post = res.post;
 
-  const isPrivateAuthor = post.authorIsPrivate || post.author?.isPrivate;
-  const isPrivateGroup = post.toleeIsPrivate || post.tolee?.isPrivate || post.tolee?.privacy === 'private';
+  const isPrivateAuthor = post.authorIsPrivate || false;
 
-  if (isPrivateAuthor || isPrivateGroup) {
+  if (isPrivateAuthor) {
     return {
       title: 'Private Post – Tolee',
       description: 'This post is private.',

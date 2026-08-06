@@ -1,3 +1,20 @@
+import React from 'react';
+import { notFound } from 'next/navigation';
+import Link from 'next/link';
+import { getNewsBySlug } from '@/actions/news';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { 
+  Calendar, Clock, User, Share2, Bookmark, ArrowLeft, Globe, 
+  MessageCircle, Sparkles, HelpCircle, Film, Info, Quote, ChevronRight
+} from 'lucide-react';
+import { FollowButton } from '@/components/FollowButton';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
+import { PostCarousel } from '@/components/PostCarousel';
+import { NewsEngagement } from '@/components/NewsEngagement';
 import { Metadata } from 'next';
 
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
