@@ -89,7 +89,7 @@ export function AIDashboard() {
 
     const aiMsg: Message = {
       id: `ai_${Date.now()}`,
-      sender: 'Tolee AI Employee',
+      sender: 'Tolee AI Manager',
       text: result.response,
       isAI: true,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -216,7 +216,7 @@ export function AIDashboard() {
                   ))}
                   {isLoading && (
                     <div className="flex gap-3 items-center text-xs text-slate-400 italic">
-                      <Bot className="w-4 h-4 text-violet-600 animate-spin" /> Tolee AI Employee is processing...
+                      <Bot className="w-4 h-4 text-violet-600 animate-spin" /> Tolee AI Manager is processing...
                     </div>
                   )}
                   <div ref={chatEndRef} />

@@ -555,7 +555,7 @@ export async function processAIPersonalMessage(
         
         return {
           success: true,
-          response: `✨ **Tolee AI Employee**: Maine aapka **${isGoodMorning ? 'Good Morning Post' : 'Post'}** AI image ke saath tayar kar diya hai!\n\nNiche post review karein aur **Publish Post Now** button par click karke Feed par post karein.`,
+          response: `✨ **Tolee AI Manager**: Maine aapka **${isGoodMorning ? 'Good Morning Post' : 'Post'}** AI image ke saath tayar kar diya hai!\n\nNiche post review karein aur **Publish Post Now** button par click karke Feed par post karein.`,
           interactiveAction: {
             type: 'PUBLISH_POST',
             label: '🚀 Publish Post Now',
@@ -653,7 +653,7 @@ export async function processAIPersonalMessage(
         
         return {
           success: true,
-          response: `✨ **Tolee AI Employee**: I have created a custom **Good Morning Post** with an AI-generated image for you!\n\nReview the generated post below and click **Publish Now** to post it to your Tolees instantly.`,
+          response: `✨ **Tolee AI Manager**: I have created a custom **Good Morning Post** with an AI-generated image for you!\n\nReview the generated post below and click **Publish Now** to post it to your Tolees instantly.`,
           interactiveAction: {
             type: 'PUBLISH_POST',
             label: '🚀 Publish Post Now',
@@ -697,7 +697,7 @@ export async function processAIPersonalMessage(
     // Fallback response if LLM API is unreachable or timed out
     return {
       success: true,
-      response: `🤖 **Tolee AI Employee**: I have processed your request: "${trimmed}". I have updated your tasks and alarms in your database. What would you like to execute next?`
+      response: `🤖 **Tolee AI Manager**: I have processed your request: "${trimmed}". I have updated your tasks and alarms in your database. What would you like to execute next?`
     };
 
   } catch (error: any) {

@@ -31,7 +31,7 @@ export function DailySummaryGrid({ userName, summary, onSelectAction }: DailySum
         <div className="absolute top-0 right-0 transform translate-x-8 -translate-y-8 w-48 h-48 bg-white/10 rounded-full blur-2xl pointer-events-none" />
         <div className="relative z-10 space-y-2">
           <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-xs font-semibold">
-            <Sparkles className="w-3.5 h-3.5" /> 24×7 Personal AI Employee Active
+            <Sparkles className="w-3.5 h-3.5" /> 24×7 Personal Tolee AI Manager Active
           </div>
           <h1 className="text-2xl md:text-4xl font-extrabold tracking-tight">
             👋 Good Morning, {userName || 'Friend'}!

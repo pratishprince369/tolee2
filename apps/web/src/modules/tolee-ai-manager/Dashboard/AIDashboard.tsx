@@ -55,8 +55,8 @@ export function AIDashboard() {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'init_1',
-      sender: 'Tolee AI Employee',
-      text: 'Good morning! I am your 24×7 Personal AI Employee, inspired by J.A.R.V.I.S. How can I manage your posts, Tolees, CRM leads, or calendar today?',
+      sender: 'Tolee AI Manager',
+      text: 'Good morning! I am your 24×7 Personal Tolee AI Manager, inspired by J.A.R.V.I.S. How can I manage your posts, Tolees, CRM leads, or calendar today?',
       isAI: true,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     }
@@ -132,7 +132,7 @@ export function AIDashboard() {
 
     const aiMsg: Message = {
       id: `ai_${Date.now()}`,
-      sender: 'Tolee AI Employee',
+      sender: 'Tolee AI Manager',
       text: result.response,
       isAI: true,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -283,7 +283,7 @@ export function AIDashboard() {
                   ))}
                   {isLoading && (
                     <div className="flex gap-3 items-center text-xs text-slate-400 italic">
-                      <Bot className="w-4 h-4 text-violet-600 animate-spin" /> Tolee AI Employee is processing...
+                      <Bot className="w-4 h-4 text-violet-600 animate-spin" /> Tolee AI Manager is processing...
                     </div>
                   )}
                   <div ref={chatEndRef} />
