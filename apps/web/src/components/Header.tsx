@@ -476,6 +476,7 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
       </div>
 
     </header>
+    <MyDraftsModal isOpen={isDraftsModalOpen} onClose={() => setIsDraftsModalOpen(false)} />
     </div>
   );
 }
@@ -530,9 +531,6 @@ function GlobalUploadProgress({ task, retryUpload, cancelUpload }: { task: any, 
           <span>{task.successMessage || '✅ Published successfully'}</span>
         </div>
       )}
-
-      {/* 4. My Drafts Modal */}
-      <MyDraftsModal isOpen={isDraftsModalOpen} onClose={() => setIsDraftsModalOpen(false)} />
     </>
   );
 }
