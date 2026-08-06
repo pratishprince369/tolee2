@@ -81,15 +81,16 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
           faviconUrl: d.faviconUrl || null,
           mobileLogoUrl: d.mobileLogoUrl || null,
         });
-        // Dynamically update favicon in browser tab
-        if (d.faviconUrl) {
-          const existing = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
-          if (existing) {
-            existing.href = d.faviconUrl;
+        // Dynamically update favicon in browser tab (faviconUrl -> mobileLogoUrl -> headerLogoUrl -> /logo.png)
+        const activeFav = d.faviconUrl || d.mobileLogoUrl || d.headerLogoUrl || '/logo.png';
+        if (activeFav) {
+          const existingLinks = document.querySelectorAll<HTMLLinkElement>('link[rel*="icon"]');
+          if (existingLinks.length > 0) {
+            existingLinks.forEach(link => { link.href = activeFav; });
           } else {
             const link = document.createElement('link');
             link.rel = 'icon';
-            link.href = d.faviconUrl;
+            link.href = activeFav;
             document.head.appendChild(link);
           }
         }

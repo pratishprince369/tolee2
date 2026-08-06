@@ -180,6 +180,8 @@ export default async function RootLayout({
     ]
   };
 
+  const activeFavicon = settings?.faviconUrl || settings?.mobileLogoUrl || settings?.headerLogoUrl || '/logo.png';
+
   return (
     <html lang="en" className={cn("font-sans", fontSans.variable)}>
       <head>
@@ -189,7 +191,9 @@ export default async function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="Tolee" />
         <meta name="google-site-verification" content="24ZTpDCR3sByCo7jqJUtr78KevMb3PQO7IGSDRl-g4A" />
-        <link rel="apple-touch-icon" href="/logo.png" />
+        <link rel="icon" href={activeFavicon} />
+        <link rel="shortcut icon" href={activeFavicon} />
+        <link rel="apple-touch-icon" href={activeFavicon} />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdOrganization) }}
