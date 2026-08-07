@@ -7,6 +7,7 @@ import { callNvidiaLLM } from '@/modules/ai-manager/Core/chat-engine';
 import { SYSTEM_PROMPTS } from '@/modules/ai-manager/Core/prompt-manager';
 import { parseNaturalLanguageReminder } from '@/modules/ai-manager/Core/reminder-parser';
 import { getUserDeviceTimeInfo, isTimeOrDateQuery } from '@/modules/ai-manager/Core/time-service';
+import { getUserMonthlyRewardStatus, triggerRewardNotifications } from '@/lib/reward-service';
 
 async function getUserId(): Promise<string> {
   const session = await getServerSession(authOptions);
@@ -706,12 +707,38 @@ export async function processAIPersonalMessage(
       }
     }
 
-    // 5. Fetch real-time user account context (Chats, Notifications, Groups, Memories)
-    const [userChatParticipants, existingMemories, notifications, userTolees] = await Promise.all([
+    // ⚡ Direct ₹3,999 Ads Wallet Creator Offer Query Handler
+    const isOfferQuery = 
+      lower.includes('3999') || 
+      lower.includes('3,999') || 
+      lower.includes('ads wallet') || 
+      lower.includes('offer') || 
+      lower.includes('creator reward') || 
+      lower.includes('reward status') ||
+      (lower.includes('post') && (lower.includes('kitne') || lower.includes('baki') || lower.includes('target')));
+
+    if (isOfferQuery) {
+      const rewardStatus = await getUserMonthlyRewardStatus(userId);
+      return {
+        success: true,
+        response: `🎁 **Tolee ₹3,999 Ads Wallet Monthly Creator Offer**:
+
+• **Posts Created This Month**: **${rewardStatus.postsThisMonth}/30** posts
+• **Posts Created Today**: **${rewardStatus.postsToday}** posts
+• **Today's Recommended Target**: **Post ${rewardStatus.recommendedTodayPosts} item(s)** today
+• **Current Ads Wallet Balance**: **₹${rewardStatus.adsWalletBalance.toLocaleString()}**
+
+📢 **Reward Guidance**: ${rewardStatus.notificationMessage}`
+      };
+    }
+
+    // 5. Fetch real-time user account context (Chats, Notifications, Groups, Memories, Reward Progress)
+    const [userChatParticipants, existingMemories, notifications, userTolees, rewardStatus] = await Promise.all([
       prisma.chatParticipant.findMany({ where: { userId }, select: { chatId: true } }).catch(() => []),
       prisma.aIMemory.findMany({ where: { userId }, take: 5 }).catch(() => []),
       prisma.notification.findMany({ where: { userId, isRead: false }, take: 3, orderBy: { createdAt: 'desc' } }).catch(() => []),
-      prisma.toleeMember.findMany({ where: { userId, status: 'approved' }, take: 5, include: { tolee: { select: { name: true } } } }).catch(() => [])
+      prisma.toleeMember.findMany({ where: { userId, status: 'approved' }, take: 5, include: { tolee: { select: { name: true } } } }).catch(() => []),
+      getUserMonthlyRewardStatus(userId).catch(() => null)
     ]);
 
     const userChatIds = userChatParticipants.map(cp => cp.chatId);
@@ -727,11 +754,12 @@ REAL-TIME USER ACCOUNT DATA CONTEXT:
 - Recent Direct Chat Messages: ${recentMessages.length > 0 ? recentMessages.map(m => `${m.sender.name}: "${m.content}"`).join('; ') : 'No recent direct messages'}
 - Unread Notifications: ${notifications.length > 0 ? notifications.map(n => n.title).join('; ') : 'No unread notifications'}
 - Active Joined Tolee Groups: ${userTolees.length > 0 ? userTolees.map(t => t.tolee.name).join(', ') : 'Tolee Public Group'}
+- Monthly ₹3,999 Ads Wallet Reward Progress: ${rewardStatus ? `${rewardStatus.postsThisMonth}/30 posts created this month (Today: ${rewardStatus.postsToday} posts). Guidance: ${rewardStatus.notificationMessage}` : 'Active'}
 - User Saved Memories: ${existingMemories.length > 0 ? existingMemories.map(m => `${m.key}: ${m.value}`).join('; ') : 'None'}
 
 CRITICAL ACCOUNT ACCESS MANDATE:
-You have 100% FULL ACCESS to the user's Tolee account, direct chats, notifications, and group posts!
-NEVER state or claim "I don't have direct access to your chat box" or "you need to check yourself"! You know all their chats and notifications listed above. Answer directly and perform actions on their behalf.`;
+You have 100% FULL ACCESS to the user's Tolee account, direct chats, notifications, group posts, and ₹3,999 Ads Wallet Creator Offer!
+NEVER state or claim "I don't have direct access to your chat box" or "you need to check yourself"! You know all their chats, notifications, and monthly post progress listed above. Answer directly and perform actions on their behalf.`;
 
     const systemPromptWithContext = `${SYSTEM_PROMPTS.PERSONAL_EMPLOYEE}\n\n${accountDataSummary}\n\nCRITICAL SYSTEM INSTRUCTION: Current date/time reference: ${timeInfo.formattedFull} (${timeInfo.dayOfWeek}, Timezone: ${timeInfo.timeZone}). Use this internal context ONLY when scheduling or directly asked about the clock. DO NOT output timing notes, clock stamps, or "(Current time: ...)" in your message responses unless the user explicitly asks for the time!`;
 

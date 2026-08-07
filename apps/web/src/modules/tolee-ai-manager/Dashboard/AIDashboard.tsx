@@ -225,6 +225,27 @@ export function AIDashboard() {
       <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-6 max-w-6xl mx-auto w-full">
         {activeTab === 'dashboard' && (
           <>
+            {/* 🎁 ₹3,999 Ads Wallet Monthly Creator Offer Banner */}
+            <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-700 rounded-3xl p-4 sm:p-5 text-white shadow-lg relative overflow-hidden flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border border-emerald-500/30">
+              <div className="space-y-1.5 z-10">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-xs font-extrabold uppercase tracking-wider text-emerald-100">
+                  🎁 Official Creator Reward Offer
+                </div>
+                <h2 className="text-lg sm:text-2xl font-black tracking-tight">
+                  Tolee gives every User <span className="text-yellow-300">₹3,999/-</span> in Ads Wallet!
+                </h2>
+                <p className="text-xs sm:text-sm text-emerald-100 font-medium max-w-2xl leading-relaxed">
+                  Post 1 or 2 posts daily (Reels, Videos, Images, or Blogs) on Tolee. Maintain your daily streak to receive ₹3,999 automatically credited to your Ads Wallet every month!
+                </p>
+              </div>
+
+              <div className="shrink-0 bg-white/15 backdrop-blur-md p-3.5 rounded-2xl border border-white/20 text-left sm:text-right z-10 w-full sm:w-auto flex sm:flex-col justify-between items-center sm:items-end gap-1">
+                <span className="text-xs font-bold text-emerald-100">Monthly Ads Reward</span>
+                <span className="text-2xl font-black text-yellow-300 drop-shadow-sm">₹3,999/mo</span>
+                <span className="text-[10px] bg-yellow-400 text-slate-950 font-black px-2.5 py-0.5 rounded-full uppercase">Automatic Deposit</span>
+              </div>
+            </div>
+
             <DailySummaryGrid userName={session?.user?.name || 'Friend'} summary={summaryData} onSelectAction={setActiveTab} />
             
             {/* Live Interactive Chat Messages Stream */}
