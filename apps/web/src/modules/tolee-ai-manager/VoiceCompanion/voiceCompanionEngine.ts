@@ -175,18 +175,50 @@ export class VoiceCompanionEngine {
     (window as any)._toleeActiveUtterance = utterance;
 
     const voices = window.speechSynthesis.getVoices();
-    // Prioritize Natural/Google/Microsoft Swara human voices
-    const naturalVoice = voices.find(v => 
-      (v.name.toLowerCase().includes('natural') || v.name.toLowerCase().includes('google') || v.name.toLowerCase().includes('swara') || v.name.toLowerCase().includes('online')) &&
-      (v.lang.toLowerCase().includes(langCode.toLowerCase()) || v.lang.includes('hi') || v.lang.includes('en'))
-    ) || voices.find(v => 
-      v.lang.toLowerCase().includes(langCode.toLowerCase()) || 
-      v.lang.includes('hi-IN') || 
-      v.lang.includes('en-IN')
-    );
 
-    if (naturalVoice) {
-      utterance.voice = naturalVoice;
+    // 🇮🇳 Authentic Indian Voice Selection Engine (Eliminating Western Accents)
+    // 1. Prioritize explicit Hindi Indian voices (hi-IN, hi_IN, Swara, Hemant, Madhur, Google हिन्दी)
+    let indianVoice = voices.find(v => {
+      const lang = v.lang.toLowerCase();
+      const name = v.name.toLowerCase();
+      return (
+        lang.includes('hi-in') || 
+        lang.includes('hi_in') || 
+        name.includes('swara') || 
+        name.includes('hemant') || 
+        name.includes('madhur') || 
+        name.includes('kalpana') || 
+        name.includes('karan') || 
+        name.includes('हिन्दी') || 
+        name.includes('hindi')
+      );
+    });
+
+    // 2. Fallback to Indian English voices (en-IN, Neerja, Prabhat, Google English India)
+    if (!indianVoice) {
+      indianVoice = voices.find(v => {
+        const lang = v.lang.toLowerCase();
+        const name = v.name.toLowerCase();
+        return (
+          lang.includes('en-in') || 
+          lang.includes('en_in') || 
+          name.includes('neerja') || 
+          name.includes('prabhat') || 
+          name.includes('india')
+        );
+      });
+    }
+
+    // 3. Fallback to any voice with 'hi' in language tag
+    if (!indianVoice) {
+      indianVoice = voices.find(v => v.lang.toLowerCase().startsWith('hi'));
+    }
+
+    if (indianVoice) {
+      utterance.voice = indianVoice;
+      utterance.lang = indianVoice.lang || 'hi-IN';
+    } else {
+      utterance.lang = 'hi-IN';
     }
 
     let hasFinished = false;
