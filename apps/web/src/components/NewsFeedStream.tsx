@@ -186,10 +186,11 @@ export function NewsFeedStream({
 
           let rawCoverImg = postMediaUrls ? postMediaUrls.split(/,(?=https?:\/\/)/)[0] : null;
           
-          // Fail-safe YouTube detection
+          // Fail-safe YouTube detection & Video ID extraction
           const isYouTube = Boolean(
             (itemSlug && itemSlug.startsWith('yt-')) || 
             itemSourceUrl.includes('youtube.com') || 
+            itemSourceUrl.includes('youtu.be') || 
             postMediaUrls.includes('youtube.com') ||
             postMediaUrls.includes('ytimg.com')
           );
@@ -200,16 +201,15 @@ export function NewsFeedStream({
           if (isYouTube) {
             if (itemSourceUrl.includes('v=')) {
               ytVideoId = itemSourceUrl.split('v=')[1]?.split('&')[0] || '';
+            } else if (itemSourceUrl.includes('youtu.be/')) {
+              ytVideoId = itemSourceUrl.split('youtu.be/')[1]?.split('?')[0] || '';
+            } else if (itemSourceUrl.includes('embed/')) {
+              ytVideoId = itemSourceUrl.split('embed/')[1]?.split('?')[0] || '';
+            } else if (postMediaUrls.includes('/vi/')) {
+              ytVideoId = postMediaUrls.split('/vi/')[1]?.split('/')[0] || '';
             }
-            if (!ytVideoId && postMediaUrls) {
-              const urls = postMediaUrls.split(',');
-              for (const u of urls) {
-                if (typeof u === 'string' && u.includes('youtube.com/embed/')) {
-                  ytVideoId = u.split('embed/')[1]?.split('?')[0] || '';
-                } else if (typeof u === 'string' && (u.includes('i.ytimg.com') || u.includes('img.youtube.com'))) {
-                  fallbackThumb = u;
-                }
-              }
+            if (postMediaUrls.includes('i.ytimg.com') || postMediaUrls.includes('img.youtube.com')) {
+              fallbackThumb = postMediaUrls.split(/,(?=https?:\/\/)/)[0];
             }
           }
 

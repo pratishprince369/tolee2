@@ -1585,13 +1585,14 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                   const newsReadingTime = news?.readingTime || 1;
                   const newsViewsCount = post.views || news?.viewsCount || 0;
 
-                  // Detect YouTube Video Posts safely
+                  // Detect YouTube Video Posts safely & extract Video ID
                   const sourceUrlStr = typeof news?.sourceUrl === 'string' ? news.sourceUrl : '';
                   const mediaUrlsStr = typeof post.mediaUrls === 'string' ? post.mediaUrls : '';
 
                   const isYouTube = Boolean(
                     (newsSlug && newsSlug.startsWith('yt-')) ||
                     sourceUrlStr.includes('youtube.com') ||
+                    sourceUrlStr.includes('youtu.be') ||
                     mediaUrlsStr.includes('youtube.com') ||
                     mediaUrlsStr.includes('ytimg.com')
                   );
@@ -1600,10 +1601,12 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                   if (isYouTube) {
                     if (sourceUrlStr.includes('v=')) {
                       ytVideoId = sourceUrlStr.split('v=')[1]?.split('&')[0] || '';
-                    } else if (mediaUrlsStr.includes('img.youtube.com/vi/')) {
-                      ytVideoId = mediaUrlsStr.split('img.youtube.com/vi/')[1]?.split('/')[0] || '';
-                    } else if (mediaUrlsStr.includes('i.ytimg.com/vi/')) {
-                      ytVideoId = mediaUrlsStr.split('i.ytimg.com/vi/')[1]?.split('/')[0] || '';
+                    } else if (sourceUrlStr.includes('youtu.be/')) {
+                      ytVideoId = sourceUrlStr.split('youtu.be/')[1]?.split('?')[0] || '';
+                    } else if (sourceUrlStr.includes('embed/')) {
+                      ytVideoId = sourceUrlStr.split('embed/')[1]?.split('?')[0] || '';
+                    } else if (mediaUrlsStr.includes('/vi/')) {
+                      ytVideoId = mediaUrlsStr.split('/vi/')[1]?.split('/')[0] || '';
                     }
                   }
 
