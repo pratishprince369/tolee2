@@ -161,9 +161,12 @@ export async function publishDailyNewsBatch(): Promise<{ success: boolean; count
     const hindiIndex = { val: 0 };
     const marathiIndex = { val: 0 };
     const englishIndex = { val: 0 };
+    const batchProcessedHeadlines = new Set<string>();
 
-    for (let i = 0; i < 15; i++) {
-      const accountConfig = REGISTERED_NEWS_ACCOUNTS[i % REGISTERED_NEWS_ACCOUNTS.length];
+    for (let i = 0; i < 30; i++) { // Loop up to 30 candidates to ensure 15 non-duplicate posts
+      if (publishedCount >= 15) break;
+
+      const accountConfig = REGISTERED_NEWS_ACCOUNTS[publishedCount % REGISTERED_NEWS_ACCOUNTS.length];
       const dbUser = userMap.get(accountConfig.email);
 
       if (!dbUser) {
@@ -190,13 +193,40 @@ export async function publishDailyNewsBatch(): Promise<{ success: boolean; count
       }
 
       const headline = articleItem.headline;
+      const normalizedKey = headline.toLowerCase().replace(/[^\w]/g, '').slice(0, 40);
+
+      // Check 1: In-memory batch duplicate check
+      if (batchProcessedHeadlines.has(normalizedKey)) {
+        logs.push(`Duplicate skipped (in-batch): "${headline.slice(0, 40)}..."`);
+        continue;
+      }
+
+      // Check 2: Database historical duplicate check
       const slugBase = headline
         .toLowerCase()
         .replace(/[^\w\s-]/g, '')
         .replace(/\s+/g, '-')
-        .slice(0, 70);
-      const slug = `${slugBase}-${Date.now().toString().slice(-4)}${i}`;
+        .slice(0, 60);
 
+      const dbDuplicate = await prisma.newsPost.findFirst({
+        where: {
+          OR: [
+            { headline: { contains: headline.slice(0, 30), mode: 'insensitive' } },
+            { slug: { startsWith: slugBase.slice(0, 30) } }
+          ]
+        }
+      });
+
+      if (dbDuplicate) {
+        logs.push(`Duplicate skipped (DB history): "${headline.slice(0, 40)}..." already exists.`);
+        batchProcessedHeadlines.add(normalizedKey);
+        continue;
+      }
+
+      // Mark as processed
+      batchProcessedHeadlines.add(normalizedKey);
+
+      const slug = `${slugBase}-${Date.now().toString().slice(-4)}${publishedCount}`;
       const localized = buildLocalizedNewsContent(headline, accountConfig.category, accountConfig.language);
       const summary = articleItem.description || `Verified news coverage on ${headline}. Read full story on Tolee News.`;
       const metaDescription = `Latest updates on ${headline}. Read verified analysis on Tolee News.`;
