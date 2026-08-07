@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Volume2, VolumeX, Play, Pause, Youtube } from 'lucide-react';
+import { Volume2, VolumeX, Play, Pause, Video } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 interface YouTubeAutoplayVideoProps {
@@ -102,7 +102,7 @@ export function YouTubeAutoplayVideo({
 
       {/* Category Badge */}
       <Badge className="absolute top-3 left-3 bg-red-600/90 text-white font-extrabold text-[10px] uppercase px-2.5 py-1 rounded-lg border-none shadow-md flex items-center gap-1.5 backdrop-blur-md">
-        <Youtube className="w-3.5 h-3.5 fill-current" />
+        <Video className="w-3.5 h-3.5" />
         <span>{category} Video</span>
       </Badge>
     </div>
