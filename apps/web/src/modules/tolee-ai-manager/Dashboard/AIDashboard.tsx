@@ -100,11 +100,9 @@ export function AIDashboard() {
       try {
         const res = await createPost({
           content: action.payload.caption || '',
-          mediaUrls: action.payload.imageUrl ? [action.payload.imageUrl] : [],
-          mediaType: 'IMAGE',
-          postType: 'IMAGE',
-          toleeId: action.payload.toleeId || undefined,
-          visibility: 'PUBLIC'
+          postType: 'post',
+          media: action.payload.imageUrl ? { type: 'image', url: action.payload.imageUrl } : null,
+          toleeIds: action.payload.toleeId ? [action.payload.toleeId] : undefined
         });
 
         if (res.success) {
@@ -122,7 +120,7 @@ export function AIDashboard() {
             )
           );
         } else {
-          alert('Failed to publish post: ' + (res.error || 'Unknown error'));
+          alert('Failed to publish post: ' + ((res as any).error || 'Unknown error'));
         }
       } catch (err: any) {
         alert('Error publishing post: ' + err.message);
@@ -147,19 +145,17 @@ export function AIDashboard() {
     setIsLoading(true);
 
     try {
-      const result = await processAIPersonalMessage(userText);
+      const clientISO = new Date().toISOString();
+      const timeZone = typeof window !== 'undefined' && window.Intl ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'Asia/Kolkata';
+      const result = await processAIPersonalMessage(userText, [], clientISO, timeZone);
       
       const aiMsg: Message = {
         id: `ai_${Date.now()}`,
         sender: 'Tolee AI Manager',
-        text: result.reply,
+        text: (result as any).response || (result as any).reply || '',
         isAI: true,
         time: formatTime(),
-        interactiveAction: result.actionPayload ? {
-          type: result.actionPayload.type,
-          label: result.actionPayload.label || 'Publish Post',
-          payload: result.actionPayload
-        } : undefined
+        interactiveAction: (result as any).interactiveAction || (result as any).actionPayload
       };
 
       setMessages((prev) => [...prev, aiMsg]);
