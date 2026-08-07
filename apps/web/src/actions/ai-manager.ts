@@ -595,7 +595,7 @@ export async function processAIPersonalMessage(
             if (postResult?.success) {
               return {
                 success: true,
-                response: `🚀 **Tolee AI Manager (Autonomous Execution)**: Maine aapke account se **${title}** AI image ke saath aapke Tolee Feed par live publish kar di hai!\n\n![${title}](${generatedImageUrl})\n\n✅ Post is now live on your Tolee profile!`
+                response: `🚀 **Tolee AI Manager (Autonomous Database Execution)**: Maine aapke account se **${title}** AI image ke saath aapke Tolee Feed par live publish kar di hai!\n\n![${title}](${generatedImageUrl})\n\n✅ Post is now live on your Tolee profile!\n\n💬 *Kya main isey aapke Tolee groups par bhi share karoon ya aapke kisi chat message ka reply kardo?*`
               };
             }
           } catch (pubErr) {
@@ -605,7 +605,7 @@ export async function processAIPersonalMessage(
 
         return {
           success: true,
-          response: `✨ **Tolee AI Manager**: Maine aapke liye **${title}** AI image ke saath tayar kar diya hai!\n\n![${title}](${generatedImageUrl})\n\nNiche preview check karein aur **Publish Post Now** button par click karke Feed/Group par post karein.`,
+          response: `✨ **Tolee AI Manager**: Maine aapke liye **${title}** AI image ke saath tayar kar diya hai!\n\n![${title}](${generatedImageUrl})\n\nNiche preview check karein aur **Publish Post Now** button par click karke Feed/Group par post karein.\n\n💬 *Aap bolenge "post kardo" to main ise turant live publish kar dunga. Aage aur kya karna hai?*`,
           interactiveAction: {
             type: 'PUBLISH_POST',
             label: '🚀 Publish Post Now',
