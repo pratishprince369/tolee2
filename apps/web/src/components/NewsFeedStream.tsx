@@ -15,6 +15,7 @@ import { getNewsFeedPosts } from '@/actions/news';
 import { ViewTracker } from '@/components/ViewTracker';
 import { OptimisticPostCard } from '@/components/OptimisticPostCard';
 import { CreateNewsButton } from '@/components/CreateNewsButton';
+import { YouTubeAutoplayVideo } from '@/components/YouTubeAutoplayVideo';
 
 interface NewsFeedStreamProps {
   initialNews: any[];
@@ -177,7 +178,38 @@ export function NewsFeedStream({
         <OptimisticPostCard />
         {newsPosts.map((item) => {
           const post = item.post;
-          const coverImg = post?.mediaUrls ? post.mediaUrls.split(/,(?=https?:\/\/)/)[0] : null;
+          let rawCoverImg = post?.mediaUrls ? post.mediaUrls.split(/,(?=https?:\/\/)/)[0] : null;
+          
+          // YouTube detection
+          const isYouTube = item.slug?.startsWith('yt-') || 
+            (item.sourceUrl && item.sourceUrl.includes('youtube.com')) || 
+            (post?.mediaUrls && post.mediaUrls.includes('youtube.com'));
+          
+          let ytVideoId = '';
+          let fallbackThumb = '';
+
+          if (isYouTube) {
+            if (item.sourceUrl && item.sourceUrl.includes('v=')) {
+              ytVideoId = item.sourceUrl.split('v=')[1]?.split('&')[0] || '';
+            }
+            if (!ytVideoId && post?.mediaUrls) {
+              const urls = post.mediaUrls.split(',');
+              for (const u of urls) {
+                if (u.includes('youtube.com/embed/')) {
+                  ytVideoId = u.split('embed/')[1]?.split('?')[0] || '';
+                } else if (u.includes('i.ytimg.com') || u.includes('img.youtube.com')) {
+                  fallbackThumb = u;
+                }
+              }
+            }
+          }
+
+          // Ensure cover image is not an iframe embed URL
+          let cleanCoverImg = rawCoverImg;
+          if (cleanCoverImg && cleanCoverImg.includes('youtube.com/embed/')) {
+            cleanCoverImg = fallbackThumb || post?.mediaUrls?.split(',').find((u: string) => u.startsWith('http') && !u.includes('youtube.com/embed/')) || null;
+          }
+
           const dateStr = new Date(item.createdAt).toLocaleDateString('en-US', {
             month: 'short',
             day: 'numeric',
@@ -220,23 +252,32 @@ export function NewsFeedStream({
                 )}
               </div>
 
-              {/* Large Cover Image */}
-              <Link href={`/news/${item.slug}`}>
-                <div className="w-full overflow-hidden bg-slate-50 dark:bg-zinc-950 aspect-video relative cursor-pointer">
-                  {coverImg ? (
-                    <img
-                      src={coverImg}
-                      alt={item.headline}
-                      className="w-full h-full object-cover hover:scale-[1.01] transition-transform duration-300"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center text-zinc-300 dark:text-zinc-800">
-                      <Newspaper className="w-16 h-16 stroke-[1.2]" />
-                    </div>
-                  )}
-                </div>
-              </Link>
+              {/* YouTube Autoplay Video or Large Cover Image */}
+              {Boolean(isYouTube && ytVideoId) ? (
+                <YouTubeAutoplayVideo
+                  videoId={ytVideoId}
+                  title={item.headline}
+                  thumbnailUrl={cleanCoverImg || undefined}
+                  category={item.category}
+                />
+              ) : (
+                <Link href={`/news/${item.slug}`}>
+                  <div className="w-full overflow-hidden bg-slate-50 dark:bg-zinc-950 aspect-video relative cursor-pointer">
+                    {cleanCoverImg ? (
+                      <img
+                        src={cleanCoverImg}
+                        alt={item.headline}
+                        className="w-full h-full object-cover hover:scale-[1.01] transition-transform duration-300"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center text-zinc-300 dark:text-zinc-800">
+                        <Newspaper className="w-16 h-16 stroke-[1.2]" />
+                      </div>
+                    )}
+                  </div>
+                </Link>
+              )}
 
               {/* Headline & Summary */}
               <CardContent className="p-5 pt-4 space-y-2 flex-grow">
