@@ -31,6 +31,7 @@ import { getOrCreatePersonalChat } from '@/actions/chat';
 import { ShareModal } from '@/components/ShareModal';
 import { HLSVideo } from '@/components/HLSVideo';
 import { AutoplayVideo } from '@/components/AutoplayVideo';
+import { YouTubeAutoplayVideo } from '@/components/YouTubeAutoplayVideo';
 import { isVideoUrl, getMediaThumbnail, getPosterUrl } from '@/lib/media';
 import { fetchFeedStories } from '@/actions/story';
 import { createTestStory } from '@/actions/highlight';
@@ -1584,6 +1585,19 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                   const newsReadingTime = news?.readingTime || 1;
                   const newsViewsCount = post.views || news?.viewsCount || 0;
 
+                  // Detect YouTube Video Posts
+                  const isYouTube = newsSlug.startsWith('yt-') || (news?.sourceUrl && news.sourceUrl.includes('youtube.com'));
+                  let ytVideoId = '';
+                  if (isYouTube) {
+                    if (news?.sourceUrl && news.sourceUrl.includes('v=')) {
+                      ytVideoId = news.sourceUrl.split('v=')[1]?.split('&')[0] || '';
+                    } else if (post.mediaUrls && post.mediaUrls.includes('img.youtube.com/vi/')) {
+                      ytVideoId = post.mediaUrls.split('img.youtube.com/vi/')[1]?.split('/')[0] || '';
+                    } else if (post.mediaUrls && post.mediaUrls.includes('i.ytimg.com/vi/')) {
+                      ytVideoId = post.mediaUrls.split('i.ytimg.com/vi/')[1]?.split('/')[0] || '';
+                    }
+                  }
+
                   return (
                     <Card key={post.id} id={`post-${post.id}`} className="border-indigo-100 dark:border-indigo-950/20 shadow-[0_4px_24px_rgba(0,0,0,0.02)] bg-white dark:bg-[#121212] overflow-hidden transition-all duration-300 hover:shadow-lg rounded-[24px] mb-6 transition-all duration-500">
                       {/* Shared group context banner */}
@@ -1638,8 +1652,15 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
 
                       {/* News Card body */}
                       <CardContent className="p-0">
-                        {/* Cover Image */}
-                        {post.mediaUrls ? (
+                        {/* YouTube Autoplay Video or Cover Image */}
+                        {isYouTube && ytVideoId ? (
+                          <YouTubeAutoplayVideo
+                            videoId={ytVideoId}
+                            title={newsHeadline}
+                            thumbnailUrl={post.mediaUrls ? post.mediaUrls.split(/,(?=https?:\/\/)/)[0] : undefined}
+                            category={newsCategory}
+                          />
+                        ) : post.mediaUrls ? (
                           <Link href={`/news/${newsSlug}`}>
                             <div className="aspect-video w-full overflow-hidden bg-black relative cursor-pointer">
                               <img src={post.mediaUrls.split(/,(?=https?:\/\/)/)[0]} alt={newsHeadline} className="w-full h-full object-cover hover:scale-[1.01] transition-transform duration-300" />
