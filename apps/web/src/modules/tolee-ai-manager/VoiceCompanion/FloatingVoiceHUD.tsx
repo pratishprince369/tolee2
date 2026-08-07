@@ -15,7 +15,7 @@ interface FloatingVoiceHUDProps {
   onSendMessage: (text: string) => Promise<string | void>;
 }
 
-const NATIVE_ANNOUNCEMENTS: Record<string, { text: string; langCode: string }> = {
+const ON_ANNOUNCEMENTS: Record<string, { text: string; langCode: string }> = {
   'hi-IN': {
     text: 'Aapka Tolee Voice AI Manager ON ho chuka hai. Ab aap mujhe voice mein operate kar sakte hain.',
     langCode: 'hi-IN'
@@ -42,6 +42,25 @@ const NATIVE_ANNOUNCEMENTS: Record<string, { text: string; langCode: string }> =
   }
 };
 
+const OFF_ANNOUNCEMENTS: Record<string, { text: string; langCode: string }> = {
+  'hi-IN': {
+    text: 'Aapka Tolee Voice AI Manager OFF ho chuka hai.',
+    langCode: 'hi-IN'
+  },
+  'en-IN': {
+    text: 'Your Tolee Voice AI Manager is OFF.',
+    langCode: 'en-IN'
+  },
+  'mr-IN': {
+    text: 'Tumcha Tolee Voice AI Manager OFF jala ahe.',
+    langCode: 'mr-IN'
+  },
+  'gu-IN': {
+    text: 'Tamaroo Tolee Voice AI Manager OFF thai gayoo chhe.',
+    langCode: 'gu-IN'
+  }
+};
+
 export function FloatingVoiceHUD({ isOpen, onClose, onSelectTab, onSendMessage }: FloatingVoiceHUDProps) {
   const [engine, setEngine] = useState<VoiceCompanionEngine | null>(null);
   const [mode, setMode] = useState<VoiceCompanionMode>('ALWAYS_LISTENING');
@@ -58,7 +77,7 @@ export function FloatingVoiceHUD({ isOpen, onClose, onSelectTab, onSendMessage }
     }
 
     const savedLang = typeof window !== 'undefined' ? (localStorage.getItem('tolee_native_lang') || 'hi-IN') : 'hi-IN';
-    const activeAnnouncement = NATIVE_ANNOUNCEMENTS[savedLang] || NATIVE_ANNOUNCEMENTS['hi-IN'];
+    const activeAnnouncement = ON_ANNOUNCEMENTS[savedLang] || ON_ANNOUNCEMENTS['hi-IN'];
 
     const vEngine = new VoiceCompanionEngine(mode);
     setSpeechText(activeAnnouncement.text);
@@ -106,7 +125,7 @@ export function FloatingVoiceHUD({ isOpen, onClose, onSelectTab, onSendMessage }
         const aiResult = await onSendMessage(transcript);
         if (typeof aiResult === 'string' && aiResult.trim().length > 0) {
           // Strip Markdown formatting symbols (*, _, #, `, [ ]) for clean natural spoken voice
-          spokenReply = aiResult.replace(/[*_#`[\]]/g, '').trim();
+          spokenReply = aiResult.replace(/[*_#`[\]()]/g, '').trim();
         }
       }
 
@@ -121,6 +140,21 @@ export function FloatingVoiceHUD({ isOpen, onClose, onSelectTab, onSendMessage }
       vEngine.stopListening();
     };
   }, [isOpen]);
+
+  const handleTurnOff = () => {
+    const savedLang = typeof window !== 'undefined' ? (localStorage.getItem('tolee_native_lang') || 'hi-IN') : 'hi-IN';
+    const offAnnouncement = OFF_ANNOUNCEMENTS[savedLang] || OFF_ANNOUNCEMENTS['hi-IN'];
+    if (engine) {
+      engine.stopListening();
+      engine.speak(offAnnouncement.text, offAnnouncement.langCode);
+    } else if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(offAnnouncement.text);
+      u.lang = offAnnouncement.langCode;
+      window.speechSynthesis.speak(u);
+    }
+    onClose();
+  };
 
   if (!isOpen) return null;
 
@@ -154,7 +188,7 @@ export function FloatingVoiceHUD({ isOpen, onClose, onSelectTab, onSendMessage }
       <Button
         variant="ghost"
         size="icon"
-        onClick={onClose}
+        onClick={handleTurnOff}
         className="w-7 h-7 rounded-full text-slate-400 hover:text-white hover:bg-slate-800"
         title="Turn Voice Manager OFF"
       >
