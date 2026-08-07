@@ -113,9 +113,25 @@ export function NewsFeedStream({
           setIsLoading(true);
           const nextPage = page + 1;
 
+          // Helper to append unique posts only
+          const appendUniqueNews = (currentList: any[], incomingList: any[]) => {
+            const seenIds = new Set(currentList.map(p => p.id));
+            const seenHeadlines = new Set(currentList.map(p => p.headline?.toLowerCase().trim().slice(0, 30)));
+            
+            const filtered = incomingList.filter((item: any) => {
+              if (!item || seenIds.has(item.id)) return false;
+              const key = item.headline?.toLowerCase().trim().slice(0, 30);
+              if (key && seenHeadlines.has(key)) return false;
+              seenIds.add(item.id);
+              if (key) seenHeadlines.add(key);
+              return true;
+            });
+            return [...currentList, ...filtered];
+          };
+
           // If we already prefetched this batch, use it instantly!
           if (prefetchedNews && prefetchCategory === activeCategory && prefetchPage === nextPage) {
-            setNewsPosts((prev) => [...prev, ...prefetchedNews]);
+            setNewsPosts((prev) => appendUniqueNews(prev, prefetchedNews));
             setPage(nextPage);
             setHasMore(prefetchedNews.length >= 10);
             setPrefetchedNews(null);
@@ -127,7 +143,7 @@ export function NewsFeedStream({
           try {
             const res = await getNewsFeedPosts({ category: activeCategory, page: nextPage, limit: 10 });
             if (res.success && res.news) {
-              setNewsPosts((prev) => [...prev, ...res.news]);
+              setNewsPosts((prev) => appendUniqueNews(prev, res.news));
               setPage(nextPage);
               setHasMore(res.hasMore || false);
             }
