@@ -14,7 +14,8 @@ export const REGISTERED_NEWS_ACCOUNTS: NewsAccountConfig[] = [
   { email: 'loktimes369@gmail.com', category: 'India & National Affairs', language: 'mr', languageName: 'Marathi', fallbackName: 'Suman Kumar' },
   { email: 'updatesontimes@gmail.com', category: 'Business & Finance', language: 'en', languageName: 'English', fallbackName: 'updateson times' },
   { email: 'vadapavwaledada@gmail.com', category: 'Food, Lifestyle & Culture', language: 'en', languageName: 'English', fallbackName: 'vadapav wale dada' },
-  { email: 'rinkugupta90282@gmail.com', category: 'Sports & Entertainment', language: 'en', languageName: 'English', fallbackName: 'Rinku Sharma' }
+  { email: 'rinkugupta90282@gmail.com', category: 'Sports & Entertainment', language: 'en', languageName: 'English', fallbackName: 'Rinku Sharma' },
+  { email: 'foodpaass@gmail.com', category: 'Stock Market & Trading', language: 'en', languageName: 'English', fallbackName: 'Scroll On' }
 ];
 
 export interface NewsArticleItem {
@@ -36,6 +37,35 @@ function sanitizeNewsText(text: string): string {
     .replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1')
     .replace(/[<>]/g, '')
     .trim();
+}
+
+/**
+ * Fetch dedicated Stock Market & Financial news via Finnhub API Key
+ */
+async function fetchFinnhubStockNews(logs: string[]): Promise<NewsArticleItem[]> {
+  const key = process.env.FINNHUB_API_KEY || "d9r5t99r01qnlhcli2ngd9r5t99r01qnlhcli2o0";
+  try {
+    const url = `https://finnhub.io/api/v1/news?category=general&token=${key}`;
+    const res = await fetch(url, { cache: 'no-store' });
+    const data = await res.json();
+
+    if (Array.isArray(data) && data.length > 0) {
+      const items = data.map((a: any) => ({
+        headline: sanitizeNewsText(a.headline || ''),
+        image: a.image && a.image.startsWith('http') ? a.image : undefined,
+        description: sanitizeNewsText(a.summary || ''),
+        language: 'en' as const
+      })).filter((item: NewsArticleItem) => item.headline && item.headline.length > 10);
+
+      if (items.length > 0) {
+        logs.push(`[STOCK] Fetched ${items.length} market articles via Finnhub API.`);
+        return items;
+      }
+    }
+  } catch (err: any) {
+    logs.push(`[STOCK] Finnhub notice: ${err.message}`);
+  }
+  return [];
 }
 
 /**
@@ -143,10 +173,11 @@ export async function publishDailyNewsBatch(withDelay: boolean = false): Promise
   logs.push("Starting Multi-Lingual Daily News Auto-Publisher batch execution...");
 
   try {
-    // Pre-fetch news pools for hi, mr, en
+    // Pre-fetch news pools for hi, mr, en, and stock market
     const hindiPool = await fetchNewsForLanguage('hi', logs);
     const marathiPool = await fetchNewsForLanguage('mr', logs);
     const englishPool = await fetchNewsForLanguage('en', logs);
+    const stockPool = await fetchFinnhubStockNews(logs);
 
     const userEmails = REGISTERED_NEWS_ACCOUNTS.map(a => a.email);
     const users = await prisma.user.findMany({
@@ -161,9 +192,10 @@ export async function publishDailyNewsBatch(withDelay: boolean = false): Promise
     const hindiIndex = { val: 0 };
     const marathiIndex = { val: 0 };
     const englishIndex = { val: 0 };
+    const stockIndex = { val: 0 };
     const batchProcessedHeadlines = new Set<string>();
 
-    for (let i = 0; i < 30; i++) { // Loop up to 30 candidates to ensure 15 non-duplicate posts
+    for (let i = 0; i < 35; i++) { // Loop up to 35 candidates to ensure 15 non-duplicate posts
       if (publishedCount >= 15) break;
 
       const accountConfig = REGISTERED_NEWS_ACCOUNTS[publishedCount % REGISTERED_NEWS_ACCOUNTS.length];
@@ -174,9 +206,12 @@ export async function publishDailyNewsBatch(withDelay: boolean = false): Promise
         continue;
       }
 
-      // Pick article according to account's targeted language
+      // Pick article according to account's targeted language & niche
       let articleItem: NewsArticleItem | null = null;
-      if (accountConfig.language === 'hi' && hindiPool.length > 0) {
+      if (accountConfig.email === 'foodpaass@gmail.com' && stockPool.length > 0) {
+        articleItem = stockPool[stockIndex.val % stockPool.length];
+        stockIndex.val++;
+      } else if (accountConfig.language === 'hi' && hindiPool.length > 0) {
         articleItem = hindiPool[hindiIndex.val % hindiPool.length];
         hindiIndex.val++;
       } else if (accountConfig.language === 'mr' && marathiPool.length > 0) {
