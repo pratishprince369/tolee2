@@ -542,24 +542,41 @@ export async function processAIPersonalMessage(
       lower.includes('generate') ||
       lower.includes('banao') ||
       lower.includes('bana do') ||
-      lower.includes('create');
+      lower.includes('create') ||
+      lower.includes('evening') ||
+      lower.includes('morning') ||
+      lower.includes('subah') ||
+      lower.includes('sandhya');
 
     if (isPostIntent) {
       try {
-        const isGoodMorning = lower.includes('good morning') || lower.includes('subah') || lower.includes('morning');
-        const promptConcept = isGoodMorning 
-          ? 'Beautiful morning sunrise over mountains with inspiring light' 
-          : trimmed;
+        const isGoodEvening = lower.includes('evening') || lower.includes('sandhya');
+        const isGoodMorning = lower.includes('morning') || lower.includes('subah');
+        
+        let promptConcept = 'Inspiring modern visual poster for social media post';
+        let title = 'AI Social Post';
+        let caption = `✨ ${trimmed}\n\n#Tolee #Community #Updates`;
 
-        const generatedImageUrl = await generateAIImageWithFallback(promptConcept) || 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800&q=80';
+        if (isGoodEvening) {
+          promptConcept = 'Peaceful evening sunset skyline over calm ocean with warm glowing golden hour light';
+          title = 'Good Evening Poster';
+          caption = `🌇 Good evening! Wishing you a peaceful, relaxed, and pleasant evening ahead! ✨\n\n#GoodEvening #Tolee #Relaxation #Community`;
+        } else if (isGoodMorning) {
+          promptConcept = 'Beautiful morning sunrise over majestic mountains with inspiring golden sunlight';
+          title = 'Good Morning Poster';
+          caption = `🌅 Good morning! Wishing everyone a peaceful, inspiring, and productive day ahead! ✨\n\n#GoodMorning #Tolee #Inspiration #Community`;
+        } else {
+          // Clean prompt to English keywords
+          promptConcept = trimmed.replace(/image|banner|poster|banao|bana do|karo|post|create|generate/gi, '').trim();
+          if (promptConcept.length < 3) promptConcept = 'Inspiring modern visual banner poster';
+          title = 'AI Image Poster';
+        }
 
-        const caption = isGoodMorning
-          ? `🌅 Good morning! Wishing everyone a peaceful, inspiring, and productive day ahead! ✨\n\n#GoodMorning #Tolee #Inspiration #DailyMotivation #Community`
-          : `✨ ${trimmed}\n\n#Tolee #Community #Updates`;
+        const generatedImageUrl = await generateAIImageWithFallback(promptConcept);
         
         return {
           success: true,
-          response: `✨ **Tolee AI Manager**: Maine aapka **${isGoodMorning ? 'Good Morning Post' : 'Post'}** AI image ke saath tayar kar diya hai!\n\nNiche post review karein aur **Publish Post Now** button par click karke Feed par post karein.`,
+          response: `✨ **Tolee AI Manager**: Maine aapke liye **${title}** AI image ke saath tayar kar diya hai!\n\n![${title}](${generatedImageUrl})\n\nNiche preview check karein aur **Publish Post Now** button par click karke Feed/Group par post karein.`,
           interactiveAction: {
             type: 'PUBLISH_POST',
             label: '🚀 Publish Post Now',
