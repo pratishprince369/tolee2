@@ -553,12 +553,28 @@ export async function processAIPersonalMessage(
       lower.includes('morning') ||
       lower.includes('subah') ||
       lower.includes('sandhya') ||
-      lower.includes('group');
+      lower.includes('group') ||
+      // 🇮🇳 Devanagari Hindi Script Terms
+      trimmed.includes('इमेज') ||
+      trimmed.includes('जनरेट') ||
+      trimmed.includes('बनाओ') ||
+      trimmed.includes('बना दो') ||
+      trimmed.includes('बना') ||
+      trimmed.includes('फोटो') ||
+      trimmed.includes('पोस्टर') ||
+      trimmed.includes('बैनर') ||
+      trimmed.includes('गुड मॉर्निंग') ||
+      trimmed.includes('गुड इवनिंग') ||
+      trimmed.includes('सुप्रभात') ||
+      trimmed.includes('मॉर्निंग') ||
+      trimmed.includes('इवनिंग') ||
+      trimmed.includes('पोस्ट') ||
+      trimmed.includes('शेयर');
 
     if (isPostIntent) {
       try {
-        const isGoodEvening = lower.includes('evening') || lower.includes('sandhya');
-        const isGoodMorning = lower.includes('morning') || lower.includes('subah');
+        const isGoodEvening = lower.includes('evening') || lower.includes('sandhya') || trimmed.includes('इवनिंग') || trimmed.includes('गुड इवनिंग') || trimmed.includes('संध्या');
+        const isGoodMorning = lower.includes('morning') || lower.includes('subah') || trimmed.includes('मॉर्निंग') || trimmed.includes('गुड मॉर्निंग') || trimmed.includes('सुप्रभात');
         
         let promptConcept = 'Inspiring modern visual poster for social media post';
         let title = 'AI Generated Image';
@@ -575,7 +591,7 @@ export async function processAIPersonalMessage(
         } else {
           // Clean prompt to English keywords
           promptConcept = trimmed
-            .replace(/image|photo|pic|picture|tasveer|banner|poster|banao|bana do|bana|karo|post|create|generate|group|share|me|mein|par|pe/gi, '')
+            .replace(/image|photo|pic|picture|tasveer|banner|poster|banao|bana do|bana|karo|post|create|generate|group|share|me|mein|par|pe|इमेज|जनरेट|बनाओ|बना दो|बना|फोटो|पोस्टर|बैनर|पोस्ट|शेयर|हेलो|मुझे|का|के|दो/gi, '')
             .trim();
           if (promptConcept.length < 3) promptConcept = 'Inspiring modern visual banner poster';
           title = `AI Image: ${promptConcept.slice(0, 30)}`;
