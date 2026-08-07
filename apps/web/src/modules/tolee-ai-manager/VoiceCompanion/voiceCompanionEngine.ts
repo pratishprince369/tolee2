@@ -8,8 +8,8 @@ export class VoiceCompanionEngine {
   private priorityConfig: VoicePriorityConfig;
   private isListening: boolean = false;
   private isSpeaking: boolean = false;
-  private wakeWordDetected: boolean = false;
-  private speechVolume: number = 0;
+  private wakeWordDetected: boolean = true;
+  private lastProcessedTranscript: string = '';
   
   private onWakeWordCallback?: () => void;
   private onCommandCallback?: (transcript: string) => void;
@@ -42,7 +42,7 @@ export class VoiceCompanionEngine {
         this.recognition = new SpeechRecognition();
         this.recognition.continuous = true;
         this.recognition.interimResults = true;
-        this.recognition.lang = 'en-IN'; // Multi-lingual Indian English/Hindi support
+        this.recognition.lang = 'en-IN'; // Multi-lingual Hindi/Marathi/English
 
         this.setupRecognitionListeners();
       }
@@ -54,6 +54,7 @@ export class VoiceCompanionEngine {
     if (newMode === 'OFF' || newMode === 'SILENT' || newMode === 'MEETING') {
       this.stopListening();
     } else if (newMode === 'ALWAYS_LISTENING' || newMode === 'DRIVING') {
+      this.wakeWordDetected = true;
       this.startListening();
     }
   }
@@ -75,25 +76,24 @@ export class VoiceCompanionEngine {
   }
 
   public startListening() {
-    if (!this.recognition || this.isListening) return;
+    if (!this.recognition || this.isListening || this.isSpeaking) return;
     try {
       this.recognition.start();
       this.isListening = true;
       this.notifyStatus();
     } catch (e) {
-      console.warn('Voice Engine listening error:', e);
+      console.warn('Voice Engine listening notice:', e);
     }
   }
 
   public stopListening() {
-    if (!this.recognition || !this.isListening) return;
+    if (!this.recognition) return;
     try {
       this.recognition.stop();
       this.isListening = false;
-      this.wakeWordDetected = false;
       this.notifyStatus();
     } catch (e) {
-      console.warn('Voice Engine stop listening error:', e);
+      console.warn('Voice Engine stop listening notice:', e);
     }
   }
 
@@ -101,14 +101,16 @@ export class VoiceCompanionEngine {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
     if (this.mode === 'SILENT' || this.mode === 'MEETING') return;
 
-    window.speechSynthesis.cancel(); // Stop any active speech
+    // Temporarily pause recognition while AI speaks out loud (prevents self-echo)
+    this.stopListening();
+
+    window.speechSynthesis.cancel(); // Cancel previous queued speech
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.rate = 1.0;
     utterance.pitch = 1.05;
     utterance.lang = langCode;
 
-    // Pick warm natural Indian Hindi/Marathi/English voice if available
     const voices = window.speechSynthesis.getVoices();
     const preferredVoice = voices.find(v => v.lang.toLowerCase().includes(langCode.toLowerCase()) || v.lang.includes('hi-IN') || v.lang.includes('en-IN'));
     if (preferredVoice) {
@@ -120,22 +122,24 @@ export class VoiceCompanionEngine {
       this.notifyStatus();
     };
 
-    utterance.onend = () => {
+    const finishSpeaking = () => {
       this.isSpeaking = false;
       this.notifyStatus();
       if (onEnd) onEnd();
+
+      // Automatically resume active listening as soon as AI finishes speaking!
+      if (this.mode === 'ALWAYS_LISTENING' || this.mode === 'DRIVING') {
+        setTimeout(() => this.startListening(), 400);
+      }
     };
 
-    utterance.onerror = () => {
-      this.isSpeaking = false;
-      this.notifyStatus();
-    };
+    utterance.onend = finishSpeaking;
+    utterance.onerror = finishSpeaking;
 
     window.speechSynthesis.speak(utterance);
   }
 
   public speakNotification(notification: SpokenNotification) {
-    // Check priority permissions
     if (notification.priority === 'low' && !this.priorityConfig.lowPriority.dailyAnalytics) return;
     if (notification.priority === 'medium' && !this.priorityConfig.mediumPriority.messages) return;
 
@@ -146,6 +150,8 @@ export class VoiceCompanionEngine {
     if (!this.recognition) return;
 
     this.recognition.onresult = (event: any) => {
+      if (this.isSpeaking) return; // Ignore audio input while AI is speaking
+
       let interim = '';
       let finalTranscript = '';
 
@@ -157,33 +163,51 @@ export class VoiceCompanionEngine {
         }
       }
 
-      const spokenText = (finalTranscript || interim).trim().toLowerCase();
+      const rawText = (finalTranscript || interim).trim();
+      const spokenText = rawText.toLowerCase();
 
-      // Check Wake Word ("Tolee", "Hey Tolee", "Tolee listen")
-      if (!this.wakeWordDetected && (spokenText.includes('tolee') || spokenText.includes('hey tolee'))) {
+      if (spokenText.includes('tolee') || spokenText.includes('hey tolee')) {
         this.wakeWordDetected = true;
         this.notifyStatus();
-        this.speak('Yes, I am listening.', 'en-IN', () => {
-          if (this.onWakeWordCallback) this.onWakeWordCallback();
-        });
-      } else if (this.wakeWordDetected && finalTranscript.length > 3) {
-        if (this.onCommandCallback) {
-          this.onCommandCallback(finalTranscript);
+        if (this.onWakeWordCallback) this.onWakeWordCallback();
+      }
+
+      // Process ANY spoken command for final transcripts (length > 2)
+      if (finalTranscript.trim().length > 2) {
+        const cleanedTranscript = finalTranscript.trim();
+        
+        // Prevent duplicate processing of identical rapid transcripts
+        if (cleanedTranscript !== this.lastProcessedTranscript) {
+          this.lastProcessedTranscript = cleanedTranscript;
+          
+          if (this.onCommandCallback) {
+            this.onCommandCallback(cleanedTranscript);
+          }
+
+          // Reset last transcript cache after 3 seconds
+          setTimeout(() => {
+            if (this.lastProcessedTranscript === cleanedTranscript) {
+              this.lastProcessedTranscript = '';
+            }
+          }, 3000);
         }
-        // Auto reset wake word after command processing
-        setTimeout(() => {
-          this.wakeWordDetected = false;
-          this.notifyStatus();
-        }, 1500);
       }
     };
 
     this.recognition.onend = () => {
       this.isListening = false;
       this.notifyStatus();
-      // Auto-restart if ALWAYS_LISTENING or DRIVING mode
-      if (this.mode === 'ALWAYS_LISTENING' || this.mode === 'DRIVING') {
-        setTimeout(() => this.startListening(), 500);
+      if ((this.mode === 'ALWAYS_LISTENING' || this.mode === 'DRIVING') && !this.isSpeaking) {
+        setTimeout(() => this.startListening(), 400);
+      }
+    };
+
+    this.recognition.onerror = (err: any) => {
+      console.warn('SpeechRecognition error notice:', err);
+      this.isListening = false;
+      this.notifyStatus();
+      if ((this.mode === 'ALWAYS_LISTENING' || this.mode === 'DRIVING') && !this.isSpeaking) {
+        setTimeout(() => this.startListening(), 800);
       }
     };
   }
