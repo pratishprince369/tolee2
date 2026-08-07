@@ -595,16 +595,21 @@ export async function processAIPersonalMessage(
           title = 'Good Morning Poster';
           caption = `🌅 Good morning! Wishing everyone a peaceful, inspiring, and productive day ahead! ✨\n\n#GoodMorning #Tolee #Inspiration #Community`;
         } else {
-          // Clean prompt to core English art concepts
+          // Clean prompt to core subject English concepts, stripping all Hinglish filler words & typos
           const cleanTopic = normalized
-            .replace(/image|photo|pic|picture|tasveer|banner|poster|banao|bana do|bana|karo|post|create|generate|group|share|me|mein|par|pe|creative|mast|shandar|badhiya|mujhe|ka|ke|ki|ko|do|ek|hai|please|kardo|karke|iamge|इमेज|जनरेट|बनाओ|बना दो|बना|फोटो|पोस्टर|बैनर|पोस्ट|शेयर|हेलो|मुझे|का|के|दो/gi, '')
+            .replace(/\b(image|photo|pic|picture|tasveer|banner|poster|banao|bana|karo|post|create|generate|group|share|me|mein|par|pe|creative|mast|shandar|badhiya|mujhe|ka|ke|ki|ko|do|ek|hai|please|kardo|karke|iamge|hte|hue|lada|chahiye|mangata|plz|dikhana|dikhao|bhejo|fast|lo)\b/gi, '')
+            .replace(/[^\w\s]/gi, '')
+            .replace(/\s+/g, ' ')
             .trim();
           
-          const topicDisplay = cleanTopic.length >= 2 ? (cleanTopic.charAt(0).toUpperCase() + cleanTopic.slice(1)) : 'Creative Poster';
+          const topicDisplay = cleanTopic.length >= 2 ? (cleanTopic.charAt(0).toUpperCase() + cleanTopic.slice(1)) : 'Special Visual';
 
-          promptConcept = cleanTopic.length >= 3 
-            ? `A high resolution professional graphic design poster of ${cleanTopic}, featuring artistic calligraphy typography title '${topicDisplay.toUpperCase()}', vibrant color palette, studio cinematic lighting, 8k HD social media artwork poster` 
-            : 'A professional graphic design social media banner poster with artistic typography heading, vibrant colors, clean aesthetic, 8k HD poster design';
+          const isGraphicPosterIntent = normalized.includes('poster') || normalized.includes('banner') || normalized.includes('greeting') || normalized.includes('card') || normalized.includes('quote');
+
+          promptConcept = isGraphicPosterIntent
+            ? `A high resolution professional graphic design social media poster of ${topicDisplay}, featuring stylish calligraphy typography heading '${topicDisplay.toUpperCase()}', vibrant artistic layout, studio lighting, 8k HD poster design`
+            : `Ultra photorealistic 8k studio photograph of authentic ${topicDisplay}, hyper-realistic details, shallow depth of field, natural professional lighting, award winning DSLR camera photograph`;
+          
           title = `AI Image: ${topicDisplay.slice(0, 30)}`;
 
           caption = `✨ ${topicDisplay}! Designed with love & creativity on Tolee AI Manager. What do you think about this? Drop your thoughts below! 👇\n\n#${topicDisplay.replace(/\s+/g, '')} #Tolee #AIArt #Community #Trending`;
