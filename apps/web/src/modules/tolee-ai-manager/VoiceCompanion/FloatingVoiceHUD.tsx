@@ -89,6 +89,9 @@ export function FloatingVoiceHUD({ isOpen, onClose, onSelectTab, onSendMessage }
     vEngine.onCommand(async (transcript) => {
       if (!transcript || transcript.trim().length === 0) return;
 
+      // Pause recognition while server processes request and generates response
+      vEngine.stopListening();
+
       const parsed = parseVoiceCommand(transcript);
       setSpeechText(`🗣️ Processing: "${transcript}"`);
 
