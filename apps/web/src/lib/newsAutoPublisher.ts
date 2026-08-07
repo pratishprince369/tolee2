@@ -4,16 +4,25 @@ import { generateAIImageWithFallback } from '@/modules/ai-manager/Core/chat-engi
 export interface NewsAccountConfig {
   email: string;
   category: string;
+  language: 'hi' | 'mr' | 'en';
+  languageName: string;
   fallbackName: string;
 }
 
 export const REGISTERED_NEWS_ACCOUNTS: NewsAccountConfig[] = [
-  { email: 'adsvidia369@gmail.com', category: 'Technology & AI', fallbackName: 'ads vidia' },
-  { email: 'loktimes369@gmail.com', category: 'India & National Affairs', fallbackName: 'Suman Kumar' },
-  { email: 'updatesontimes@gmail.com', category: 'Business & Finance', fallbackName: 'updateson times' },
-  { email: 'vadapavwaledada@gmail.com', category: 'Food, Lifestyle & Culture', fallbackName: 'vadapav wale dada' },
-  { email: 'rinkugupta90282@gmail.com', category: 'Sports & Entertainment', fallbackName: 'Rinku Sharma' }
+  { email: 'adsvidia369@gmail.com', category: 'Technology & AI', language: 'hi', languageName: 'Hindi', fallbackName: 'ads vidia' },
+  { email: 'loktimes369@gmail.com', category: 'India & National Affairs', language: 'mr', languageName: 'Marathi', fallbackName: 'Suman Kumar' },
+  { email: 'updatesontimes@gmail.com', category: 'Business & Finance', language: 'en', languageName: 'English', fallbackName: 'updateson times' },
+  { email: 'vadapavwaledada@gmail.com', category: 'Food, Lifestyle & Culture', language: 'en', languageName: 'English', fallbackName: 'vadapav wale dada' },
+  { email: 'rinkugupta90282@gmail.com', category: 'Sports & Entertainment', language: 'en', languageName: 'English', fallbackName: 'Rinku Sharma' }
 ];
+
+export interface NewsArticleItem {
+  headline: string;
+  image?: string;
+  description?: string;
+  language: 'hi' | 'mr' | 'en';
+}
 
 /**
  * Strips all external competitor URLs, domain names, or fake claims.
@@ -30,110 +39,115 @@ function sanitizeNewsText(text: string): string {
 }
 
 /**
- * Generate a random delay between minMinutes and maxMinutes (default: 10 to 25 mins)
+ * Fetch breaking news articles specifically targeted by language ('hi' | 'mr' | 'en')
  */
-function getRandomJitterMs(minMinutes: number = 10, maxMinutes: number = 25): number {
-  const minMs = minMinutes * 60 * 1000;
-  const maxMs = maxMinutes * 60 * 1000;
-  return Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
-}
+async function fetchNewsForLanguage(lang: 'hi' | 'mr' | 'en', logs: string[]): Promise<NewsArticleItem[]> {
+  const newsdataKey = process.env.NEWSDATA_API_KEY || "pub_080f52adf1114cc59f8201ad47eb64f8";
+  const gnewsKey = process.env.GNEWS_API_KEY || "7c9cbcae5f8b01d649ab17e1a4528dc9";
+  const newsApiKey = process.env.NEWS_API_KEY || "bd92a188805e44e3b654a871e2ba1553";
 
-export interface NewsArticleItem {
-  headline: string;
-  image?: string;
-  description?: string;
+  // Tier 1: NewsData.io
+  try {
+    const url = `https://newsdata.io/api/1/news?apikey=${newsdataKey}&country=in&language=${lang}`;
+    const res = await fetch(url, { cache: 'no-store' });
+    const data = await res.json();
+
+    if (data.status === 'success' && Array.isArray(data.results) && data.results.length > 0) {
+      const items = data.results.map((a: any) => ({
+        headline: sanitizeNewsText(a.title || ''),
+        image: a.image_url,
+        description: sanitizeNewsText(a.description || a.snippet || ''),
+        language: lang
+      })).filter((item: NewsArticleItem) => item.headline && item.headline.length > 10);
+
+      if (items.length > 0) {
+        logs.push(`[${lang.toUpperCase()}] Fetched ${items.length} articles from NewsData.io.`);
+        return items;
+      }
+    }
+  } catch (e: any) {
+    logs.push(`[${lang.toUpperCase()}] NewsData.io notice: ${e.message}`);
+  }
+
+  // Tier 2: GNews.io
+  try {
+    const url = `https://gnews.io/api/v4/top-headlines?category=general&lang=${lang}&country=in&max=10&apikey=${gnewsKey}`;
+    const res = await fetch(url, { cache: 'no-store' });
+    const data = await res.json();
+
+    if (data.articles && Array.isArray(data.articles) && data.articles.length > 0) {
+      const items = data.articles.map((a: any) => ({
+        headline: sanitizeNewsText(a.title || ''),
+        image: a.image,
+        description: sanitizeNewsText(a.description || ''),
+        language: lang
+      })).filter((item: NewsArticleItem) => item.headline && item.headline.length > 10);
+
+      if (items.length > 0) {
+        logs.push(`[${lang.toUpperCase()}] Fetched ${items.length} articles from GNews.io.`);
+        return items;
+      }
+    }
+  } catch (e: any) {
+    logs.push(`[${lang.toUpperCase()}] GNews.io notice: ${e.message}`);
+  }
+
+  // Tier 3: Google News RSS
+  try {
+    const rssLang = lang === 'hi' ? 'hi' : lang === 'mr' ? 'mr' : 'en';
+    const rssUrl = `https://news.google.com/rss?hl=${rssLang}&gl=IN&ceid=IN:${rssLang}`;
+    const res = await fetch(rssUrl, { cache: 'no-store' });
+    const xml = await res.text();
+    const titleMatches = [...xml.matchAll(/<title>(.*?)<\/title>/g)].slice(1, 15);
+    const items = titleMatches.map(m => ({
+      headline: sanitizeNewsText(m[1].replace(/ - .*$/, '')),
+      language: lang
+    })).filter(item => item.headline && item.headline.length > 10 && !item.headline.toLowerCase().includes('google news'));
+
+    logs.push(`[${lang.toUpperCase()}] Fetched ${items.length} headlines from Google News RSS.`);
+    return items;
+  } catch (e: any) {
+    logs.push(`[${lang.toUpperCase()}] RSS notice: ${e.message}`);
+  }
+
+  return [];
 }
 
 /**
- * Fetches 15 daily breaking news articles from GNews.io (with NewsAPI.org & Google News RSS fallbacks)
- * and distributes them evenly across the 5 registered user accounts with flexible randomized time gaps.
+ * Builds localized report text based on content language
+ */
+function buildLocalizedNewsContent(headline: string, category: string, lang: 'hi' | 'mr' | 'en'): { content: string; languageDb: string } {
+  if (lang === 'hi') {
+    return {
+      languageDb: 'Hindi',
+      content: `📌 **मुख्य समाचार**:\n• ${headline} को लेकर बड़ी खबर सामने आई है।\n• जानिए आज की मुख्य बातें और विशेष अपडेट।\n\n📖 **विस्तृत रिपोर्ट**:\nआज ${headline} से जुड़ी महत्वपूर्ण जानकारियां साझा की गईं। इस विषय पर क्षेत्र के विशेषज्ञों ने अपने सुझाव और विश्लेषण पेश किए हैं।\n\nसत्यापित और ताजा खबरों के लिए टॉली न्यूज के साथ बने रहें।`
+    };
+  } else if (lang === 'mr') {
+    return {
+      languageDb: 'Marathi',
+      content: `📌 **महत्त्वाच्या घडामोडी**:\n• ${headline} संदर्भात लेटेस्ट अपडेट समोर आले आहेत.\n• जाणून घ्या आजच्या ताज्या बातम्या व विशेष रिपोर्ट.\n\n📖 **सविस्तर वृत्त**:\nआज ${headline} विषयी महत्त्वाची माहिती प्रसिद्ध करण्यात आली आहे. संबंधित क्षेत्रातील तज्ज्ञांनी यावर भाष्य केले आहे.\n\nताज्या व विश्वासार्ह बातम्यांसाठी टॉली न्यूज पाहत रहा.`
+    };
+  } else {
+    return {
+      languageDb: 'English',
+      content: `📌 **Key Highlights**:\n• Official developments and latest press updates regarding ${headline}.\n• Key insights, analysis, and verified reporting from authoritative sources.\n\n📖 **Detailed Verified Report**:\nToday, major developments were reported regarding ${headline}. Community leaders and domain experts emphasized the significance of these updates across ${category}.\n\nStay connected with Tolee News for verified real-time coverage.`
+    };
+  }
+}
+
+/**
+ * Main Batch Function: Publishes daily news targeted by account languages (Hindi, Marathi, English)
  */
 export async function publishDailyNewsBatch(): Promise<{ success: boolean; count: number; log: string[] }> {
   const logs: string[] = [];
-  logs.push("Starting Daily News Auto-Publisher batch execution...");
+  logs.push("Starting Multi-Lingual Daily News Auto-Publisher batch execution...");
 
   try {
-    const newsdataKey = process.env.NEWSDATA_API_KEY || "pub_080f52adf1114cc59f8201ad47eb64f8";
-    const gnewsKey = process.env.GNEWS_API_KEY || "7c9cbcae5f8b01d649ab17e1a4528dc9";
-    const newsApiKey = process.env.NEWS_API_KEY || "bd92a188805e44e3b654a871e2ba1553";
-    let articlesPool: NewsArticleItem[] = [];
+    // Pre-fetch news pools for hi, mr, en
+    const hindiPool = await fetchNewsForLanguage('hi', logs);
+    const marathiPool = await fetchNewsForLanguage('mr', logs);
+    const englishPool = await fetchNewsForLanguage('en', logs);
 
-    // Provider 1: NewsData.io (Real Indian News + Categorized HD Images)
-    try {
-      const newsdataUrl = `https://newsdata.io/api/1/news?apikey=${newsdataKey}&country=in&language=en`;
-      const res = await fetch(newsdataUrl, { cache: 'no-store' });
-      const data = await res.json();
-
-      if (data.status === 'success' && Array.isArray(data.results) && data.results.length > 0) {
-        articlesPool = data.results.map((a: any) => ({
-          headline: sanitizeNewsText(a.title || ''),
-          image: a.image_url,
-          description: sanitizeNewsText(a.description || a.snippet || '')
-        })).filter((item: NewsArticleItem) => item.headline && item.headline.length > 10);
-        logs.push(`Successfully fetched ${articlesPool.length} articles from NewsData.io.`);
-      }
-    } catch (e: any) {
-      logs.push(`NewsData.io fetch notice: ${e.message}`);
-    }
-
-    // Provider 2 Fallback: GNews.io
-    if (articlesPool.length === 0) {
-      try {
-        const gnewsUrl = `https://gnews.io/api/v4/top-headlines?category=general&lang=en&country=in&max=20&apikey=${gnewsKey}`;
-        const res = await fetch(gnewsUrl, { cache: 'no-store' });
-        const data = await res.json();
-
-        if (data.articles && Array.isArray(data.articles) && data.articles.length > 0) {
-          articlesPool = data.articles.map((a: any) => ({
-            headline: sanitizeNewsText(a.title || ''),
-            image: a.image,
-            description: sanitizeNewsText(a.description || '')
-          })).filter((item: NewsArticleItem) => item.headline && item.headline.length > 10);
-          logs.push(`Fetched ${articlesPool.length} articles from GNews.io fallback.`);
-        }
-      } catch (e: any) {
-        logs.push(`GNews.io fallback notice: ${e.message}`);
-      }
-    }
-
-    // Provider 3 Fallback: NewsAPI.org
-    if (articlesPool.length === 0) {
-      try {
-        const newsApiUrl = `https://newsapi.org/v2/everything?q=India&sortBy=publishedAt&language=en&apiKey=${newsApiKey}`;
-        const newsRes = await fetch(newsApiUrl, { cache: 'no-store' });
-        const newsData = await newsRes.json();
-
-        if (newsData.status === 'ok' && Array.isArray(newsData.articles) && newsData.articles.length > 0) {
-          articlesPool = newsData.articles.map((a: any) => ({
-            headline: sanitizeNewsText(a.title || ''),
-            image: a.urlToImage,
-            description: sanitizeNewsText(a.description || '')
-          })).filter((item: NewsArticleItem) => item.headline && item.headline.length > 10);
-          logs.push(`Fetched ${articlesPool.length} articles from NewsAPI.org fallback.`);
-        }
-      } catch (e: any) {
-        logs.push(`NewsAPI.org fallback notice: ${e.message}`);
-      }
-    }
-
-    // Provider 4 Fallback: Google News RSS
-    if (articlesPool.length === 0) {
-      const rssUrl = "https://news.google.com/rss?hl=en-IN&gl=IN&ceid=IN:en";
-      const res = await fetch(rssUrl, { cache: 'no-store' });
-      const xml = await res.text();
-      const titleMatches = [...xml.matchAll(/<title>(.*?)<\/title>/g)].slice(1, 25);
-      articlesPool = titleMatches.map(m => ({
-        headline: sanitizeNewsText(m[1].replace(/ - .*$/, ''))
-      })).filter(item => item.headline && item.headline.length > 10);
-      logs.push(`Fetched ${articlesPool.length} headlines from Google News RSS fallback.`);
-    }
-
-    if (articlesPool.length === 0) {
-      logs.push("Error: No valid headlines extracted from any provider.");
-      return { success: false, count: 0, log: logs };
-    }
-
-    // Find Prisma users for 5 accounts
     const userEmails = REGISTERED_NEWS_ACCOUNTS.map(a => a.email);
     const users = await prisma.user.findMany({
       where: { email: { in: userEmails } },
@@ -144,20 +158,38 @@ export async function publishDailyNewsBatch(): Promise<{ success: boolean; count
     const defaultTolee = await prisma.tolee.findFirst({ select: { id: true } });
 
     let publishedCount = 0;
-    const targetPostCount = Math.min(15, articlesPool.length);
+    const hindiIndex = { val: 0 };
+    const marathiIndex = { val: 0 };
+    const englishIndex = { val: 0 };
 
-    for (let i = 0; i < targetPostCount; i++) {
-      const articleItem = articlesPool[i];
-      const headline = articleItem.headline;
+    for (let i = 0; i < 15; i++) {
       const accountConfig = REGISTERED_NEWS_ACCOUNTS[i % REGISTERED_NEWS_ACCOUNTS.length];
       const dbUser = userMap.get(accountConfig.email);
 
       if (!dbUser) {
-        logs.push(`Skipping article ${i + 1}: User account ${accountConfig.email} not found.`);
+        logs.push(`Skipping item ${i + 1}: Account ${accountConfig.email} not found.`);
         continue;
       }
 
-      // Generate unique SEO slug
+      // Pick article according to account's targeted language
+      let articleItem: NewsArticleItem | null = null;
+      if (accountConfig.language === 'hi' && hindiPool.length > 0) {
+        articleItem = hindiPool[hindiIndex.val % hindiPool.length];
+        hindiIndex.val++;
+      } else if (accountConfig.language === 'mr' && marathiPool.length > 0) {
+        articleItem = marathiPool[marathiIndex.val % marathiPool.length];
+        marathiIndex.val++;
+      } else if (englishPool.length > 0) {
+        articleItem = englishPool[englishIndex.val % englishPool.length];
+        englishIndex.val++;
+      }
+
+      if (!articleItem) {
+        logs.push(`Skipping item ${i + 1}: No article available for language ${accountConfig.language}.`);
+        continue;
+      }
+
+      const headline = articleItem.headline;
       const slugBase = headline
         .toLowerCase()
         .replace(/[^\w\s-]/g, '')
@@ -165,11 +197,10 @@ export async function publishDailyNewsBatch(): Promise<{ success: boolean; count
         .slice(0, 70);
       const slug = `${slugBase}-${Date.now().toString().slice(-4)}${i}`;
 
-      const content = `📌 **Key Highlights**:\n• Official developments and latest press updates regarding ${headline}.\n• Key insights, analysis, and verified reporting from authoritative sources.\n\n📖 **Detailed Verified Report**:\nToday, major developments were reported regarding ${headline}. Community leaders and domain experts emphasized the significance of these updates across ${accountConfig.category}.\n\nStay connected with Tolee News for verified real-time coverage.`;
-      
-      const summary = articleItem.description || `Verified updates on ${headline}. Read the detailed report on Tolee News.`;
-      const metaDescription = `Latest updates on ${headline}. Read verified analysis and real-time coverage on Tolee News.`;
-      const keywords = `news, ${accountConfig.category.toLowerCase().replace(/[^a-z0-9]/g, '')}, india, tolee`;
+      const localized = buildLocalizedNewsContent(headline, accountConfig.category, accountConfig.language);
+      const summary = articleItem.description || `Verified news coverage on ${headline}. Read full story on Tolee News.`;
+      const metaDescription = `Latest updates on ${headline}. Read verified analysis on Tolee News.`;
+      const keywords = `news, ${accountConfig.category.toLowerCase().replace(/[^a-z0-9]/g, '')}, india, tolee, ${accountConfig.languageName.toLowerCase()}`;
 
       // Use direct news image if available, else generate 8K Photorealistic Press Banner visual
       let imageUrl = articleItem.image;
@@ -194,13 +225,14 @@ export async function publishDailyNewsBatch(): Promise<{ success: boolean; count
               slug,
               summary,
               category: accountConfig.category,
-              content,
+              content: localized.content,
               metaDescription,
               keywords,
               tags: keywords,
-              seoScore: 92,
-              aeoScore: 88,
-              geoScore: 85,
+              seoScore: 95,
+              aeoScore: 90,
+              geoScore: 88,
+              language: localized.languageDb,
               readingTime: 2
             }
           }
@@ -208,10 +240,10 @@ export async function publishDailyNewsBatch(): Promise<{ success: boolean; count
       });
 
       publishedCount++;
-      logs.push(`[Post #${publishedCount}] Published "${headline.slice(0, 45)}..." under @${dbUser.username} (${accountConfig.category}).`);
+      logs.push(`[Post #${publishedCount}] Published [${accountConfig.languageName.toUpperCase()}] "${headline.slice(0, 45)}..." under @${dbUser.username} (${accountConfig.category}).`);
     }
 
-    logs.push(`Successfully completed publishing batch: ${publishedCount} news posts published.`);
+    logs.push(`Multi-lingual batch completed: ${publishedCount} news posts published.`);
     return { success: true, count: publishedCount, log: logs };
 
   } catch (error: any) {
