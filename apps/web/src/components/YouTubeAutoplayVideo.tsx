@@ -76,7 +76,7 @@ export function YouTubeAutoplayVideo({
       ref={containerRef}
       className={`relative w-full aspect-video rounded-2xl overflow-hidden bg-black shadow-lg border border-zinc-200 dark:border-zinc-800 ${className}`}
     >
-      {isIntersecting && cleanVideoId ? (
+      {mounted && isIntersecting && cleanVideoId ? (
         <iframe
           ref={iframeRef}
           src={embedSrc}

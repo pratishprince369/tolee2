@@ -1662,7 +1662,7 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                       {/* News Card body */}
                       <CardContent className="p-0">
                         {/* YouTube Autoplay Video or Cover Image */}
-                        {isYouTube && ytVideoId ? (
+                        {Boolean(isYouTube && ytVideoId) ? (
                           <YouTubeAutoplayVideo
                             videoId={ytVideoId}
                             title={newsHeadline}
