@@ -39,28 +39,47 @@ function getRandomJitterMs(minMinutes: number = 10, maxMinutes: number = 25): nu
 }
 
 /**
- * Fetches 15 daily breaking news articles from Google News RSS and distributes them
- * evenly across the 5 registered user accounts with flexible randomized time gaps.
+ * Fetches 15 daily breaking news articles from NewsAPI.org (with Google News RSS fallback)
+ * and distributes them evenly across the 5 registered user accounts with flexible randomized time gaps.
  */
 export async function publishDailyNewsBatch(): Promise<{ success: boolean; count: number; log: string[] }> {
   const logs: string[] = [];
   logs.push("Starting Daily News Auto-Publisher batch execution...");
 
   try {
-    const rssUrl = "https://news.google.com/rss?hl=en-IN&gl=IN&ceid=IN:en";
-    const res = await fetch(rssUrl, { cache: 'no-store' });
-    const xml = await res.text();
+    const apiKey = process.env.NEWS_API_KEY || "bd92a188805e44e3b654a871e2ba1553";
+    let rawHeadlines: string[] = [];
 
-    // Extract item titles
-    const titleMatches = [...xml.matchAll(/<title>(.*?)<\/title>/g)].slice(1, 25);
-    const rawHeadlines = titleMatches
-      .map(m => sanitizeNewsText(m[1].replace(/ - .*$/, '')))
-      .filter(h => h && h.length > 10 && !h.toLowerCase().includes('google news'));
+    // Attempt 1: Fetch via NewsAPI.org
+    try {
+      const newsApiUrl = `https://newsapi.org/v2/everything?q=India&sortBy=publishedAt&language=en&apiKey=${apiKey}`;
+      const newsRes = await fetch(newsApiUrl, { cache: 'no-store' });
+      const newsData = await newsRes.json();
 
-    logs.push(`Fetched ${rawHeadlines.length} raw headlines from Google News RSS.`);
+      if (newsData.status === 'ok' && Array.isArray(newsData.articles) && newsData.articles.length > 0) {
+        rawHeadlines = newsData.articles
+          .map((a: any) => sanitizeNewsText(a.title || ''))
+          .filter((h: string) => h && h.length > 10 && !h.toLowerCase().includes('removed'));
+        logs.push(`Successfully fetched ${rawHeadlines.length} headlines from NewsAPI.org.`);
+      }
+    } catch (e: any) {
+      logs.push(`NewsAPI.org fetch warning: ${e.message}. Falling back to Google News RSS.`);
+    }
+
+    // Fallback: Google News RSS
+    if (rawHeadlines.length === 0) {
+      const rssUrl = "https://news.google.com/rss?hl=en-IN&gl=IN&ceid=IN:en";
+      const res = await fetch(rssUrl, { cache: 'no-store' });
+      const xml = await res.text();
+      const titleMatches = [...xml.matchAll(/<title>(.*?)<\/title>/g)].slice(1, 25);
+      rawHeadlines = titleMatches
+        .map(m => sanitizeNewsText(m[1].replace(/ - .*$/, '')))
+        .filter(h => h && h.length > 10 && !h.toLowerCase().includes('google news'));
+      logs.push(`Fetched ${rawHeadlines.length} headlines from Google News RSS fallback.`);
+    }
 
     if (rawHeadlines.length === 0) {
-      logs.push("Error: No valid headlines extracted.");
+      logs.push("Error: No valid headlines extracted from any provider.");
       return { success: false, count: 0, log: logs };
     }
 
