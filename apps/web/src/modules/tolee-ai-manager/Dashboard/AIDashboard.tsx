@@ -23,6 +23,7 @@ import { createPost } from '@/actions/post';
 import { Button } from '@/components/ui/button';
 
 export type AIModuleTab = 
+  | 'chat'
   | 'dashboard'
   | 'planner'
   | 'calendar'
@@ -54,7 +55,7 @@ function formatTime(d: Date = new Date()) {
 
 export function AIDashboard() {
   const { data: session } = useSession();
-  const [activeTab, setActiveTab] = useState<AIModuleTab>('dashboard');
+  const [activeTab, setActiveTab] = useState<AIModuleTab>('chat');
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'init_1',
@@ -84,7 +85,7 @@ export function AIDashboard() {
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isLoading]);
+  }, [messages, isLoading, activeTab]);
 
   const loadSummary = async () => {
     const res = await getAIDashboardSummary();
@@ -98,30 +99,46 @@ export function AIDashboard() {
       setPublishingActionId(msgId);
       try {
         const res = await createPost({
-          content: action.payload.caption,
-          postType: 'post',
-          media: action.payload.imageUrl ? { type: 'image', url: action.payload.imageUrl } : null,
+          content: action.payload.caption || '',
+          mediaUrls: action.payload.imageUrl ? [action.payload.imageUrl] : [],
+          mediaType: 'IMAGE',
+          postType: 'IMAGE',
+          toleeId: action.payload.toleeId || undefined,
+          visibility: 'PUBLIC'
         });
 
         if (res.success) {
-          setMessages(prev => prev.map(m => m.id === msgId ? {
-            ...m,
-            interactiveAction: { ...m.interactiveAction!, executed: true, label: '✅ Published to Feed!' }
-          } : m));
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === msgId
+                ? {
+                    ...m,
+                    text: `${m.text}\n\n✅ **Live Published!** Your post is now live on Tolee Feed${action.payload.toleeName ? ` & ${action.payload.toleeName}` : ''}.`,
+                    interactiveAction: m.interactiveAction
+                      ? { ...m.interactiveAction, executed: true, label: '✅ Published' }
+                      : undefined
+                  }
+                : m
+            )
+          );
+        } else {
+          alert('Failed to publish post: ' + (res.error || 'Unknown error'));
         }
-      } catch (err) {
-        console.error('Action execution failed:', err);
+      } catch (err: any) {
+        alert('Error publishing post: ' + err.message);
       } finally {
         setPublishingActionId(null);
       }
     }
   };
 
-  const handleSendMessage = async (text: string) => {
+  const handleSendMessage = async (userText: string) => {
+    if (!userText || !userText.trim()) return;
+
     const userMsg: Message = {
-      id: `u_${Date.now()}`,
+      id: `usr_${Date.now()}`,
       sender: session?.user?.name || 'You',
-      text,
+      text: userText,
       isAI: false,
       time: formatTime()
     };
@@ -129,23 +146,37 @@ export function AIDashboard() {
     setMessages((prev) => [...prev, userMsg]);
     setIsLoading(true);
 
-    const clientISO = new Date().toISOString();
-    const timeZone = typeof window !== 'undefined' && window.Intl ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'Asia/Kolkata';
-    const result = await processAIPersonalMessage(text, [], clientISO, timeZone);
+    try {
+      const result = await processAIPersonalMessage(userText);
+      
+      const aiMsg: Message = {
+        id: `ai_${Date.now()}`,
+        sender: 'Tolee AI Manager',
+        text: result.reply,
+        isAI: true,
+        time: formatTime(),
+        interactiveAction: result.actionPayload ? {
+          type: result.actionPayload.type,
+          label: result.actionPayload.label || 'Publish Post',
+          payload: result.actionPayload
+        } : undefined
+      };
 
-    const aiMsg: Message = {
-      id: `ai_${Date.now()}`,
-      sender: 'Tolee AI Manager',
-      text: result.response,
-      isAI: true,
-      time: formatTime(),
-      interactiveAction: (result as any).interactiveAction
-    };
-
-    setMessages((prev) => [...prev, aiMsg]);
-    setIsLoading(false);
-    loadSummary();
-    return result.response;
+      setMessages((prev) => [...prev, aiMsg]);
+    } catch (error: any) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `err_${Date.now()}`,
+          sender: 'Tolee AI Manager',
+          text: 'I encountered an error processing your request. Please try again.',
+          isAI: true,
+          time: formatTime()
+        }
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -161,6 +192,14 @@ export function AIDashboard() {
           </div>
 
           <div className="flex items-center gap-1">
+            <Button
+              variant={activeTab === 'chat' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setActiveTab('chat')}
+              className={`rounded-full text-xs font-semibold ${activeTab === 'chat' ? 'bg-violet-600 text-white' : ''}`}
+            >
+              <MessageSquare className="w-3.5 h-3.5 mr-1" /> Chat
+            </Button>
             <Button
               variant={activeTab === 'dashboard' ? 'default' : 'ghost'}
               size="sm"
@@ -199,7 +238,7 @@ export function AIDashboard() {
               onClick={() => setActiveTab('community')}
               className={`rounded-full text-xs font-semibold ${activeTab === 'community' ? 'bg-violet-600 text-white' : ''}`}
             >
-              <MessageSquare className="w-3.5 h-3.5 mr-1" /> Community
+              <Users className="w-3.5 h-3.5 mr-1" /> Community
             </Button>
             <Button
               variant={activeTab === 'news' ? 'default' : 'ghost'}
@@ -221,33 +260,90 @@ export function AIDashboard() {
         </div>
       </div>
 
-      {/* Main Content Workspace View */}
-      <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-6 max-w-6xl mx-auto w-full">
+      {/* Main Content View */}
+      <div className="flex-1 overflow-y-auto p-3 sm:p-6 max-w-6xl mx-auto w-full">
+        {activeTab === 'chat' && (
+          <div className="flex flex-col h-[calc(100vh-140px)] max-w-4xl mx-auto w-full pb-20">
+            {/* ChatGPT Style Immersive Stream Container */}
+            <div className="flex-1 overflow-y-auto px-2 sm:px-4 py-4 space-y-4 no-scrollbar">
+              {messages.map((msg) => (
+                <div 
+                  key={msg.id} 
+                  className={`flex gap-3 ${msg.isAI ? 'justify-start' : 'justify-end'}`}
+                >
+                  {msg.isAI && (
+                    <div className="p-2.5 bg-violet-600 text-white rounded-2xl h-fit shadow-md shadow-violet-600/20">
+                      <Bot className="w-4 h-4" />
+                    </div>
+                  )}
+                  <div 
+                    className={`max-w-[88%] sm:max-w-[80%] rounded-3xl p-4 text-sm leading-relaxed shadow-sm ${
+                      msg.isAI 
+                        ? 'bg-white dark:bg-zinc-900 text-slate-800 dark:text-zinc-100 border border-slate-200/80 dark:border-zinc-800' 
+                        : 'bg-violet-600 text-white font-medium shadow-md shadow-violet-600/20'
+                    }`}
+                  >
+                    <div className="whitespace-pre-wrap">{msg.text}</div>
+                    {msg.interactiveAction && (
+                      <div className="mt-3 p-3.5 bg-slate-50 dark:bg-zinc-950 rounded-2xl border border-violet-200 dark:border-violet-800/80 shadow-sm space-y-3">
+                        {msg.interactiveAction.payload?.imageUrl && (
+                          <img 
+                            src={msg.interactiveAction.payload.imageUrl} 
+                            alt="AI Generated Visual" 
+                            className="w-full h-64 sm:h-80 object-cover rounded-xl border border-slate-200 dark:border-zinc-800 shadow-md"
+                          />
+                        )}
+                        <p className="text-xs font-medium text-slate-700 dark:text-zinc-300 line-clamp-3">
+                          {msg.interactiveAction.payload?.caption}
+                        </p>
+                        <Button
+                          size="sm"
+                          disabled={msg.interactiveAction.executed || publishingActionId === msg.id}
+                          onClick={() => handleExecuteAction(msg.id, msg.interactiveAction)}
+                          className="w-full h-10 bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs rounded-xl shadow-md transition-all active:scale-[0.98]"
+                        >
+                          {publishingActionId === msg.id ? '🚀 Publishing to Tolees...' : msg.interactiveAction.label}
+                        </Button>
+                      </div>
+                    )}
+                    <span suppressHydrationWarning className={`block text-[10px] mt-1.5 text-right ${msg.isAI ? 'text-slate-400' : 'text-violet-200'}`}>
+                      {msg.time}
+                    </span>
+                  </div>
+                </div>
+              ))}
+              {isLoading && (
+                <div className="flex gap-3 items-center text-xs text-slate-400 italic bg-white dark:bg-zinc-900 p-3 rounded-2xl w-fit border border-slate-200/60 dark:border-zinc-800 shadow-sm">
+                  <Bot className="w-4 h-4 text-violet-600 animate-spin" /> Tolee AI Manager is processing...
+                </div>
+              )}
+              <div ref={chatEndRef} />
+            </div>
+          </div>
+        )}
+
         {activeTab === 'dashboard' && (
-          <>
+          <div className="space-y-6">
             <DailySummaryGrid userName={session?.user?.name || 'Friend'} summary={summaryData} onSelectAction={setActiveTab} />
             
-            {/* Live Interactive Chat Messages Stream */}
+            {/* Workspace Secondary Live Stream View */}
             {messages.length > 0 && (
               <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-4 sm:p-6 space-y-4 shadow-sm">
                 <div className="flex items-center justify-between border-b border-slate-100 dark:border-zinc-800 pb-3">
                   <h3 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-violet-600" /> LIVE AI CONVERSATION STREAM
+                    <Sparkles className="w-4 h-4 text-violet-600" /> RECENT CONVERSATION
                   </h3>
-                  <span className="text-xs text-slate-400 font-medium">Real-Time Execution</span>
+                  <Button size="sm" variant="ghost" onClick={() => setActiveTab('chat')} className="text-xs text-violet-600 font-bold">
+                    Open Full Chat →
+                  </Button>
                 </div>
 
-                <div className="space-y-3 max-h-96 overflow-y-auto pr-2 no-scrollbar">
+                <div className="space-y-3 max-h-80 overflow-y-auto pr-2 no-scrollbar">
                   {messages.map((msg) => (
                     <div 
                       key={msg.id} 
                       className={`flex gap-3 ${msg.isAI ? 'justify-start' : 'justify-end'}`}
                     >
-                      {msg.isAI && (
-                        <div className="p-2 bg-violet-100 dark:bg-violet-950/60 text-violet-700 dark:text-violet-300 rounded-2xl h-fit">
-                          <Bot className="w-4 h-4" />
-                        </div>
-                      )}
                       <div 
                         className={`max-w-[85%] rounded-3xl p-3.5 text-xs sm:text-sm leading-relaxed ${
                           msg.isAI 
@@ -256,44 +352,13 @@ export function AIDashboard() {
                         }`}
                       >
                         <div className="whitespace-pre-wrap">{msg.text}</div>
-                        {msg.interactiveAction && (
-                          <div className="mt-3 p-3 bg-white dark:bg-zinc-900 rounded-2xl border border-violet-200 dark:border-violet-800/80 shadow-sm space-y-2.5">
-                            {msg.interactiveAction.payload?.imageUrl && (
-                              <img 
-                                src={msg.interactiveAction.payload.imageUrl} 
-                                alt="AI Generated Visual" 
-                                className="w-full h-44 object-cover rounded-xl border border-slate-100 dark:border-zinc-800 shadow-inner"
-                              />
-                            )}
-                            <p className="text-xs font-medium text-slate-700 dark:text-zinc-300 line-clamp-3">
-                              {msg.interactiveAction.payload?.caption}
-                            </p>
-                            <Button
-                              size="sm"
-                              disabled={msg.interactiveAction.executed || publishingActionId === msg.id}
-                              onClick={() => handleExecuteAction(msg.id, msg.interactiveAction)}
-                              className="w-full h-9 bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs rounded-xl shadow-md transition-all active:scale-[0.98]"
-                            >
-                              {publishingActionId === msg.id ? '🚀 Publishing to Tolees...' : msg.interactiveAction.label}
-                            </Button>
-                          </div>
-                        )}
-                        <span suppressHydrationWarning className={`block text-[10px] mt-1.5 text-right ${msg.isAI ? 'text-slate-400' : 'text-violet-200'}`}>
-                          {msg.time}
-                        </span>
                       </div>
                     </div>
                   ))}
-                  {isLoading && (
-                    <div className="flex gap-3 items-center text-xs text-slate-400 italic">
-                      <Bot className="w-4 h-4 text-violet-600 animate-spin" /> Tolee AI Manager is processing...
-                    </div>
-                  )}
-                  <div ref={chatEndRef} />
                 </div>
               </div>
             )}
-          </>
+          </div>
         )}
 
         {activeTab === 'planner' && <DailyPlanner />}
