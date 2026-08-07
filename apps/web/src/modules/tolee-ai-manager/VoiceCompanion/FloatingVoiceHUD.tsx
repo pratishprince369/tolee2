@@ -78,14 +78,19 @@ export function FloatingVoiceHUD({ isOpen, onClose, onSelectTab, onSendMessage }
     });
 
     vEngine.onWakeWord(() => {
-      setSpeechText('Listening! What can I do for you sir?');
+      setSpeechText('Listening for your command...');
+    });
+
+    // Real-time live transcript display as user speaks into microphone
+    vEngine.onInterim((liveText) => {
+      setSpeechText(`🎙️ Hearing: "${liveText}"`);
     });
 
     vEngine.onCommand(async (transcript) => {
       if (!transcript || transcript.trim().length === 0) return;
 
       const parsed = parseVoiceCommand(transcript);
-      setSpeechText(`🗣️ "${transcript}"`);
+      setSpeechText(`🗣️ Processing: "${transcript}"`);
 
       if (parsed.intent === 'CREATE_CONTENT') {
         vEngine.speak(parsed.responseText, parsed.detectedLang);

@@ -10,30 +10,20 @@ export class VoiceCompanionEngine {
   private isSpeaking: boolean = false;
   private wakeWordDetected: boolean = true;
   private lastProcessedTranscript: string = '';
+  private silenceTimer: any = null;
+  private currentSpokenText: string = '';
   
   private onWakeWordCallback?: () => void;
   private onCommandCallback?: (transcript: string) => void;
+  private onInterimCallback?: (text: string) => void;
   private onStatusChangeCallback?: (isListening: boolean, isSpeaking: boolean, wakeWord: boolean) => void;
 
   constructor(initialMode: VoiceCompanionMode = 'OFF') {
     this.mode = initialMode;
     this.priorityConfig = {
-      highPriority: {
-        alarms: true,
-        meetings: true,
-        emergencyAlerts: true,
-        crmUrgentFollowups: true
-      },
-      mediumPriority: {
-        messages: true,
-        comments: true,
-        crmLeads: true
-      },
-      lowPriority: {
-        likes: false,
-        followers: false,
-        dailyAnalytics: true
-      }
+      highPriority: { alarms: true, meetings: true, emergencyAlerts: true, crmUrgentFollowups: true },
+      mediumPriority: { messages: true, comments: true, crmLeads: true },
+      lowPriority: { likes: false, followers: false, dailyAnalytics: true }
     };
 
     if (typeof window !== 'undefined') {
@@ -42,7 +32,10 @@ export class VoiceCompanionEngine {
         this.recognition = new SpeechRecognition();
         this.recognition.continuous = true;
         this.recognition.interimResults = true;
-        this.recognition.lang = 'en-IN'; // Multi-lingual Hindi/Marathi/English
+        
+        // Dynamically set STT language from user native language preference
+        const savedLang = localStorage.getItem('tolee_native_lang') || 'hi-IN';
+        this.recognition.lang = savedLang;
 
         this.setupRecognitionListeners();
       }
@@ -71,13 +64,29 @@ export class VoiceCompanionEngine {
     this.onCommandCallback = cb;
   }
 
+  public onInterim(cb: (text: string) => void) {
+    this.onInterimCallback = cb;
+  }
+
   public onStatusChange(cb: (isListening: boolean, isSpeaking: boolean, wakeWord: boolean) => void) {
     this.onStatusChangeCallback = cb;
   }
 
-  public startListening() {
+  public async startListening() {
     if (!this.recognition || this.isListening || this.isSpeaking) return;
+
+    // Explicitly request browser microphone permission
+    if (typeof window !== 'undefined' && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      try {
+        await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (micErr) {
+        console.warn('Microphone permission notice:', micErr);
+      }
+    }
+
     try {
+      const savedLang = typeof window !== 'undefined' ? (localStorage.getItem('tolee_native_lang') || 'hi-IN') : 'hi-IN';
+      this.recognition.lang = savedLang;
       this.recognition.start();
       this.isListening = true;
       this.notifyStatus();
@@ -88,6 +97,7 @@ export class VoiceCompanionEngine {
 
   public stopListening() {
     if (!this.recognition) return;
+    if (this.silenceTimer) clearTimeout(this.silenceTimer);
     try {
       this.recognition.stop();
       this.isListening = false;
@@ -150,7 +160,7 @@ export class VoiceCompanionEngine {
     if (!this.recognition) return;
 
     this.recognition.onresult = (event: any) => {
-      if (this.isSpeaking) return; // Ignore audio input while AI is speaking
+      if (this.isSpeaking) return; // Ignore audio input while AI is speaking out loud
 
       let interim = '';
       let finalTranscript = '';
@@ -163,35 +173,43 @@ export class VoiceCompanionEngine {
         }
       }
 
-      const rawText = (finalTranscript || interim).trim();
-      const spokenText = rawText.toLowerCase();
+      const activeText = (finalTranscript || interim).trim();
+      if (!activeText) return;
 
-      if (spokenText.includes('tolee') || spokenText.includes('hey tolee')) {
+      this.currentSpokenText = activeText;
+
+      // Update HUD in real-time with what the mic is hearing
+      if (this.onInterimCallback) {
+        this.onInterimCallback(activeText);
+      }
+
+      if (activeText.toLowerCase().includes('tolee') || activeText.toLowerCase().includes('hey tolee')) {
         this.wakeWordDetected = true;
         this.notifyStatus();
         if (this.onWakeWordCallback) this.onWakeWordCallback();
       }
 
-      // Process ANY spoken command for final transcripts (length > 2)
-      if (finalTranscript.trim().length > 2) {
-        const cleanedTranscript = finalTranscript.trim();
-        
-        // Prevent duplicate processing of identical rapid transcripts
-        if (cleanedTranscript !== this.lastProcessedTranscript) {
-          this.lastProcessedTranscript = cleanedTranscript;
-          
+      // Debounce user silence (800ms after user finishes speaking phrase)
+      if (this.silenceTimer) clearTimeout(this.silenceTimer);
+
+      this.silenceTimer = setTimeout(() => {
+        const textToProcess = this.currentSpokenText.trim();
+        if (textToProcess.length > 2 && textToProcess !== this.lastProcessedTranscript) {
+          this.lastProcessedTranscript = textToProcess;
+          this.currentSpokenText = '';
+
           if (this.onCommandCallback) {
-            this.onCommandCallback(cleanedTranscript);
+            this.onCommandCallback(textToProcess);
           }
 
-          // Reset last transcript cache after 3 seconds
+          // Reset duplicate prevention cache after 3s
           setTimeout(() => {
-            if (this.lastProcessedTranscript === cleanedTranscript) {
+            if (this.lastProcessedTranscript === textToProcess) {
               this.lastProcessedTranscript = '';
             }
           }, 3000);
         }
-      }
+      }, 800);
     };
 
     this.recognition.onend = () => {
