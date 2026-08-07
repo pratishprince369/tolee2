@@ -80,11 +80,51 @@ export async function callNvidiaLLM(messages: { role: string; content: string }[
   return null;
 }
 
-// High-Speed Photorealistic AI Image Generation Engine (FLUX-Realism + LLM Auto-Enhance)
+// High-Speed Photorealistic AI Image Generation Engine (NVIDIA NIM SD 3.5 Large & FLUX.1 Schnell + Cloud Failover)
 export async function generateAIImageWithFallback(prompt: string): Promise<string> {
   const cleanPrompt = prompt ? prompt.trim() : 'Inspiring social media graphic poster, 8k resolution, photorealistic';
   const encoded = encodeURIComponent(cleanPrompt);
-  
-  // Photorealistic DALL-E 3 Grade FLUX.1 Realism Engine with LLM Auto-Enhancement
+
+  const sdKey = process.env.NVIDIA_SD35_KEY || "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";
+  const fluxKey = process.env.NVIDIA_FLUX_SCHNELL_KEY || "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";
+
+  // Try NVIDIA NIM Stability AI SD 3.5 Large / FLUX.1 Schnell with 3.5s timeout
+  for (const item of [
+    { key: sdKey, endpoint: "https://ai.api.nvidia.com/v1/genai/stabilityai/stable-diffusion-3.5-large" },
+    { key: fluxKey, endpoint: "https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-schnell" }
+  ]) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
+
+      const res = await fetch(item.endpoint, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${item.key}`,
+          "Accept": "application/json",
+          "Content-Type": "application/json"
+        },
+        signal: controller.signal,
+        body: JSON.stringify({
+          prompt: cleanPrompt,
+          mode: "base"
+        })
+      });
+
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        const data = await res.json();
+        const b64 = data.image || data.artifacts?.[0]?.base64 || data.b64_json;
+        if (b64) {
+          return `data:image/png;base64,${b64}`;
+        }
+      }
+    } catch (err: any) {
+      // Failover silently to next model / cloud API
+    }
+  }
+
+  // Photorealistic DALL-E 3 Grade FLUX.1 Realism Cloud Engine Failover
   return `https://image.pollinations.ai/prompt/${encoded}?model=flux-realism&enhance=true&width=1080&height=1080&nologo=true`;
 }
