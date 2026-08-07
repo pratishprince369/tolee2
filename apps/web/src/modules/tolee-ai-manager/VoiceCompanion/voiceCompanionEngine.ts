@@ -2,6 +2,23 @@
 
 import { VoiceCompanionMode, VoicePriorityConfig, SpokenNotification } from './voiceTypes';
 
+export function unlockMobileAudio() {
+  if (typeof window === 'undefined') return;
+  
+  // Unlock SpeechSynthesis audio playback on Mobile Safari & Android Chrome
+  if ('speechSynthesis' in window) {
+    try {
+      window.speechSynthesis.resume();
+      const unlockUtterance = new SpeechSynthesisUtterance(' ');
+      unlockUtterance.volume = 0.01;
+      unlockUtterance.rate = 10;
+      window.speechSynthesis.speak(unlockUtterance);
+    } catch (e) {
+      console.warn('Audio unlock notice:', e);
+    }
+  }
+}
+
 export class VoiceCompanionEngine {
   private recognition: any = null;
   private mode: VoiceCompanionMode = 'OFF';
@@ -26,19 +43,31 @@ export class VoiceCompanionEngine {
       lowPriority: { likes: false, followers: false, dailyAnalytics: true }
     };
 
-    if (typeof window !== 'undefined') {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        this.recognition = new SpeechRecognition();
-        this.recognition.continuous = true;
-        this.recognition.interimResults = true;
-        
-        // Dynamically set STT language from user native language preference
-        const savedLang = localStorage.getItem('tolee_native_lang') || 'hi-IN';
-        this.recognition.lang = savedLang;
+    this.initRecognition();
+  }
 
-        this.setupRecognitionListeners();
+  private initRecognition() {
+    if (typeof window === 'undefined') return;
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+
+    try {
+      if (this.recognition) {
+        this.recognition.onresult = null;
+        this.recognition.onend = null;
+        this.recognition.onerror = null;
       }
+    } catch (e) {}
+
+    try {
+      this.recognition = new SpeechRecognition();
+      this.recognition.continuous = true;
+      this.recognition.interimResults = true;
+      const savedLang = localStorage.getItem('tolee_native_lang') || 'hi-IN';
+      this.recognition.lang = savedLang;
+      this.setupRecognitionListeners();
+    } catch (err) {
+      console.warn('SpeechRecognition init error:', err);
     }
   }
 
@@ -73,7 +102,11 @@ export class VoiceCompanionEngine {
   }
 
   public async startListening() {
-    if (!this.recognition || this.isListening || this.isSpeaking) return;
+    if (this.isListening || this.isSpeaking) return;
+
+    if (!this.recognition) {
+      this.initRecognition();
+    }
 
     // Explicitly request browser microphone permission
     if (typeof window !== 'undefined' && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
@@ -86,18 +119,31 @@ export class VoiceCompanionEngine {
 
     try {
       const savedLang = typeof window !== 'undefined' ? (localStorage.getItem('tolee_native_lang') || 'hi-IN') : 'hi-IN';
-      this.recognition.lang = savedLang;
-      this.recognition.start();
-      this.isListening = true;
-      this.notifyStatus();
-    } catch (e) {
-      console.warn('Voice Engine listening notice:', e);
+      if (this.recognition) {
+        this.recognition.lang = savedLang;
+        this.recognition.start();
+        this.isListening = true;
+        this.notifyStatus();
+      }
+    } catch (e: any) {
+      console.warn('Voice Engine listening notice, retrying with fresh instance:', e);
+      this.isListening = false;
+      this.initRecognition();
+      try {
+        if (this.recognition) {
+          this.recognition.start();
+          this.isListening = true;
+          this.notifyStatus();
+        }
+      } catch (err2) {
+        console.warn('Voice Engine restart failed:', err2);
+      }
     }
   }
 
   public stopListening() {
-    if (!this.recognition) return;
     if (this.silenceTimer) clearTimeout(this.silenceTimer);
+    if (!this.recognition) return;
     try {
       this.recognition.stop();
       this.isListening = false;
@@ -116,6 +162,7 @@ export class VoiceCompanionEngine {
     this.stopListening();
 
     try {
+      window.speechSynthesis.resume();
       window.speechSynthesis.cancel(); // Cancel previous queued speech
     } catch (e) {}
 

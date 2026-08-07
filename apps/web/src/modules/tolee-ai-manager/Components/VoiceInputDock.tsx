@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Mic, Send, Camera, FileText, Sparkles, MessageSquare, Paperclip, X, Radio } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { unlockMobileAudio } from '../VoiceCompanion/voiceCompanionEngine';
 
 interface VoiceInputDockProps {
   onSendMessage: (text: string) => void;
@@ -21,6 +22,13 @@ export function VoiceInputDock({ onSendMessage, onToggleVoiceCompanion, isVoiceA
     if (!input.trim() || isLoading) return;
     onSendMessage(input.trim());
     setInput('');
+  };
+
+  const handleToggleVoice = () => {
+    unlockMobileAudio(); // Unlock audio context directly inside user click handler!
+    if (onToggleVoiceCompanion) {
+      onToggleVoiceCompanion();
+    }
   };
 
   const toggleRecording = () => {
@@ -136,7 +144,7 @@ export function VoiceInputDock({ onSendMessage, onToggleVoiceCompanion, isVoiceA
           {onToggleVoiceCompanion && (
             <Button
               type="button"
-              onClick={onToggleVoiceCompanion}
+              onClick={handleToggleVoice}
               className={`rounded-full px-3 py-2 h-9 sm:h-11 border text-xs font-bold shrink-0 transition-all flex items-center gap-1.5 shadow-md ${
                 isVoiceActive
                   ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.6)] animate-pulse'
