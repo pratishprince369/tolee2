@@ -8,7 +8,7 @@ export function parseVoiceCommand(transcript: string): ParsedVoiceResult {
   const clean = transcript.trim().toLowerCase();
 
   // Language Detection heuristic
-  const isHindi = /batao|karo|kholo|padho|aaj|dikhao|banao|kaise|kya|hoga/i.test(clean);
+  const isHindi = /batao|karo|kholo|padho|aaj|dikhao|banao|kaise|kya|hoga|namaste|meri|aawaz|bolo|suno|kuch|nahi|tumhari|aaj/i.test(clean) || /[\u0900-\u097F]/.test(transcript);
   const isMarathi = /sang|dakhva|aajche|kasa|kiti|kay|shuru|sangto/i.test(clean);
   const lang: 'hi-IN' | 'mr-IN' | 'en-IN' = isMarathi ? 'mr-IN' : isHindi ? 'hi-IN' : 'en-IN';
 

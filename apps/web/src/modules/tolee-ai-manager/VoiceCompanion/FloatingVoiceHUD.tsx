@@ -129,8 +129,13 @@ export function FloatingVoiceHUD({ isOpen, onClose, onSelectTab, onSendMessage }
         }
       }
 
+      let spokenLang = parsed.detectedLang;
+      if (/[\u0900-\u097F]/.test(spokenReply)) {
+        spokenLang = 'hi-IN';
+      }
+
       setSpeechText(spokenReply);
-      vEngine.speak(spokenReply, parsed.detectedLang);
+      vEngine.speak(spokenReply, spokenLang);
     });
 
     setEngine(vEngine);
