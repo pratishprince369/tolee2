@@ -138,7 +138,7 @@ function buildLocalizedNewsContent(headline: string, category: string, lang: 'hi
 /**
  * Main Batch Function: Publishes daily news targeted by account languages (Hindi, Marathi, English)
  */
-export async function publishDailyNewsBatch(): Promise<{ success: boolean; count: number; log: string[] }> {
+export async function publishDailyNewsBatch(withDelay: boolean = false): Promise<{ success: boolean; count: number; log: string[] }> {
   const logs: string[] = [];
   logs.push("Starting Multi-Lingual Daily News Auto-Publisher batch execution...");
 
@@ -270,10 +270,18 @@ export async function publishDailyNewsBatch(): Promise<{ success: boolean; count
       });
 
       publishedCount++;
-      logs.push(`[Post #${publishedCount}] Published [${accountConfig.languageName.toUpperCase()}] "${headline.slice(0, 45)}..." under @${dbUser.username} (${accountConfig.category}).`);
+      const nextDelayMinutes = Math.floor(Math.random() * 15) + 10; // Random 10 to 25 mins
+      logs.push(`[Post #${publishedCount}] Published [${accountConfig.languageName.toUpperCase()}] "${headline.slice(0, 45)}..." under @${dbUser.username} (${accountConfig.category}). [Scheduled next post gap: ~${nextDelayMinutes} mins]`);
+
+      // If delayed mode is enabled, wait randomized 10-25 mins before next post
+      if (withDelay && publishedCount < 15) {
+        const delayMs = nextDelayMinutes * 60 * 1000;
+        logs.push(`⏱️ Waiting ${nextDelayMinutes} minutes before publishing next article...`);
+        await new Promise(res => setTimeout(res, delayMs));
+      }
     }
 
-    logs.push(`Multi-lingual batch completed: ${publishedCount} news posts published.`);
+    logs.push(`Multi-lingual batch completed: ${publishedCount} news posts published with randomized human-like time gaps.`);
     return { success: true, count: publishedCount, log: logs };
 
   } catch (error: any) {
