@@ -65,10 +65,6 @@ export async function createPost(data: {
       return { success: false, error: 'Headline is mandatory for news posts.' };
     }
 
-    if (!isDraft && !safeContent && !safeHeadline) {
-      return { success: false, error: 'Post content cannot be empty.' };
-    }
-
     if (!isDraft && safeContent) {
       // AI Panchayat Content Moderation Check
       const { moderateContent } = require('@/lib/aiPanchayat');
@@ -86,7 +82,25 @@ export async function createPost(data: {
       }
     }
 
-    if (!isDraft && (!data.toleeIds || data.toleeIds.length === 0)) {
+    let targetToleeIds = data.toleeIds;
+    if (!isDraft && (!targetToleeIds || targetToleeIds.length === 0)) {
+      const userMember = await prisma.toleeMember.findFirst({
+        where: { userId, status: 'approved' },
+        select: { toleeId: true }
+      });
+      if (userMember?.toleeId) {
+        targetToleeIds = [userMember.toleeId];
+      } else {
+        const defaultTolee = await prisma.tolee.findFirst({
+          select: { id: true }
+        });
+        if (defaultTolee?.id) {
+          targetToleeIds = [defaultTolee.id];
+        }
+      }
+    }
+
+    if (!isDraft && (!targetToleeIds || targetToleeIds.length === 0)) {
       return { success: false, error: 'Please select at least one Tolee.' };
     }
 
@@ -136,7 +150,7 @@ export async function createPost(data: {
     let newsMetaDesc = data.metaDescription || '';
     let newsKeywords = data.keywords || '';
     let newsTags = data.tags || '';
-    let newsReadingTime = 1;
+    let newsReadingTime = 2;
     let newsScoreAnalysis = null;
     let postStatus = isDraft ? 'draft' : 'published';
     let aiReport = null;
@@ -186,8 +200,8 @@ export async function createPost(data: {
         aiReport,
         authorId: userId,
         isAnonymous: !!data.isAnonymous,
-        tolees: data.toleeIds && data.toleeIds.length > 0 ? {
-          create: data.toleeIds.map(id => ({
+        tolees: targetToleeIds && targetToleeIds.length > 0 ? {
+          create: targetToleeIds.map(id => ({
             toleeId: id
           }))
         } : undefined,
@@ -236,9 +250,9 @@ export async function createPost(data: {
       }
     }
 
-    const tolees = data.toleeIds && data.toleeIds.length > 0
+    const tolees = targetToleeIds && targetToleeIds.length > 0
       ? await prisma.tolee.findMany({
-          where: { id: { in: data.toleeIds } },
+          where: { id: { in: targetToleeIds } },
           select: { slug: true }
         })
       : [];
