@@ -49,6 +49,10 @@ interface Message {
   };
 }
 
+function formatTime(d: Date = new Date()) {
+  return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase();
+}
+
 export function AIDashboard() {
   const { data: session } = useSession();
   const [activeTab, setActiveTab] = useState<AIModuleTab>('dashboard');
@@ -58,7 +62,7 @@ export function AIDashboard() {
       sender: 'Tolee AI Manager',
       text: 'Good morning! I am your 24×7 Personal Tolee AI Manager, inspired by J.A.R.V.I.S. How can I manage your posts, Tolees, CRM leads, or calendar today?',
       isAI: true,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      time: formatTime()
     }
   ]);
   const [isLoading, setIsLoading] = useState(false);
@@ -120,7 +124,7 @@ export function AIDashboard() {
       sender: session?.user?.name || 'You',
       text,
       isAI: false,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      time: formatTime()
     };
 
     setMessages((prev) => [...prev, userMsg]);
@@ -135,7 +139,7 @@ export function AIDashboard() {
       sender: 'Tolee AI Manager',
       text: result.response,
       isAI: true,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      time: formatTime(),
       interactiveAction: (result as any).interactiveAction
     };
 
@@ -276,7 +280,7 @@ export function AIDashboard() {
                             </Button>
                           </div>
                         )}
-                        <span className={`block text-[10px] mt-1.5 text-right ${msg.isAI ? 'text-slate-400' : 'text-violet-200'}`}>
+                        <span suppressHydrationWarning className={`block text-[10px] mt-1.5 text-right ${msg.isAI ? 'text-slate-400' : 'text-violet-200'}`}>
                           {msg.time}
                         </span>
                       </div>

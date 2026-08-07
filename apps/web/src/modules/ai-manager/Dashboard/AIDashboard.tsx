@@ -208,7 +208,7 @@ export function AIDashboard() {
                         }`}
                       >
                         <div className="whitespace-pre-wrap">{msg.text}</div>
-                        <span className={`block text-[10px] mt-1.5 text-right ${msg.isAI ? 'text-slate-400' : 'text-violet-200'}`}>
+                        <span suppressHydrationWarning className={`block text-[10px] mt-1.5 text-right ${msg.isAI ? 'text-slate-400' : 'text-violet-200'}`}>
                           {msg.time}
                         </span>
                       </div>
