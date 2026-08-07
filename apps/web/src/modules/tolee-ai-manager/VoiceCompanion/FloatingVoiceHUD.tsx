@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Radio, Mic, Volume2, Sparkles, X, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { VoiceCompanionEngine } from './voiceCompanionEngine';
+import { VoiceCompanionEngine, unlockMobileAudio } from './voiceCompanionEngine';
 import { VoiceCompanionMode } from './voiceTypes';
 import { parseVoiceCommand } from './voiceCommandParser';
 import { getVoiceNotificationBriefing } from '@/actions/voice-companion';
