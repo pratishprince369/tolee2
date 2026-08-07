@@ -289,9 +289,33 @@ export function AIDashboard() {
                             className="w-full h-64 sm:h-80 object-cover rounded-xl border border-slate-200 dark:border-zinc-800 shadow-md"
                           />
                         )}
-                        <p className="text-xs font-medium text-slate-700 dark:text-zinc-300 line-clamp-3">
-                          {msg.interactiveAction.payload?.caption}
-                        </p>
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-1">
+                            ✏️ Edit Post Caption:
+                          </label>
+                          <textarea
+                            rows={3}
+                            value={msg.interactiveAction.payload?.caption || ''}
+                            onChange={(e) => {
+                              const newCaption = e.target.value;
+                              setMessages((prev) =>
+                                prev.map((m) =>
+                                  m.id === msg.id && m.interactiveAction
+                                    ? {
+                                        ...m,
+                                        interactiveAction: {
+                                          ...m.interactiveAction,
+                                          payload: { ...m.interactiveAction.payload, caption: newCaption }
+                                        }
+                                      }
+                                    : m
+                                )
+                              );
+                            }}
+                            placeholder="Type or customize your post caption here..."
+                            className="w-full text-xs font-medium text-slate-800 dark:text-zinc-100 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl p-2.5 focus:ring-2 focus:ring-violet-500 focus:outline-none resize-y"
+                          />
+                        </div>
                         <Button
                           size="sm"
                           disabled={msg.interactiveAction.executed || publishingActionId === msg.id}

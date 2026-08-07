@@ -597,12 +597,15 @@ export async function processAIPersonalMessage(
         } else {
           // Clean prompt to core English art concepts
           const cleanTopic = normalized
-            .replace(/image|photo|pic|picture|tasveer|banner|poster|banao|bana do|bana|karo|post|create|generate|group|share|me|mein|par|pe|creative|mast|shandar|badhiya|mujhe|ka|ke|ki|ko|do|ek|hai|please|kardo|karke|इमेज|जनरेट|बनाओ|बना दो|बना|फोटो|पोस्टर|बैनर|पोस्ट|शेयर|हेलो|मुझे|का|के|दो/gi, '')
+            .replace(/image|photo|pic|picture|tasveer|banner|poster|banao|bana do|bana|karo|post|create|generate|group|share|me|mein|par|pe|creative|mast|shandar|badhiya|mujhe|ka|ke|ki|ko|do|ek|hai|please|kardo|karke|iamge|इमेज|जनरेट|बनाओ|बना दो|बना|फोटो|पोस्टर|बैनर|पोस्ट|शेयर|हेलो|मुझे|का|के|दो/gi, '')
             .trim();
           promptConcept = cleanTopic.length >= 3 
             ? `High resolution professional 8k HD graphic poster of ${cleanTopic}, vibrant color palette, cinematic lighting, social media artwork` 
             : 'Inspiring modern visual banner poster, vibrant colors, clean aesthetic';
           title = `AI Image: ${cleanTopic.slice(0, 30) || 'Creative Art'}`;
+
+          const topicDisplay = cleanTopic.length >= 2 ? (cleanTopic.charAt(0).toUpperCase() + cleanTopic.slice(1)) : 'Special Visual';
+          caption = `✨ ${topicDisplay}! Designed with love & creativity on Tolee AI Manager. What do you think about this? Drop your thoughts below! 👇\n\n#${topicDisplay.replace(/\s+/g, '')} #Tolee #AIArt #Community #Trending`;
         }
 
         const generatedImageUrl = await generateAIImageWithFallback(promptConcept);
