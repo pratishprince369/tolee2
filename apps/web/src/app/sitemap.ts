@@ -129,27 +129,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }
 
   try {
-    // 6. Fetch Public News Posts (priority: 0.9) - Exclude private accounts or private groups
+    // 6. Fetch Published News Posts (priority: 0.9)
     const news = await prisma.newsPost.findMany({
       where: {
         post: {
           status: 'published',
           isArchived: false,
-          author: { isPrivate: false },
-          tolees: {
-            none: {
-              tolee: {
-                isPrivate: true,
-              }
-            }
-          }
         }
       },
       select: {
         slug: true,
         updatedAt: true,
       },
-      take: 2000,
+      orderBy: { updatedAt: 'desc' },
+      take: 5000,
     });
     newsUrls = news.map((n: any) => ({
       url: `${baseUrl}/news/${n.slug}`,
