@@ -8,6 +8,7 @@ import { SYSTEM_PROMPTS } from '@/modules/ai-manager/Core/prompt-manager';
 import { parseNaturalLanguageReminder } from '@/modules/ai-manager/Core/reminder-parser';
 import { getUserDeviceTimeInfo, isTimeOrDateQuery } from '@/modules/ai-manager/Core/time-service';
 import { getUserMonthlyRewardStatus, triggerRewardNotifications } from '@/lib/reward-service';
+import { createPost } from '@/actions/post';
 
 async function getUserId(): Promise<string> {
   const session = await getServerSession(authOptions);
@@ -574,6 +575,34 @@ export async function processAIPersonalMessage(
 
         const generatedImageUrl = await generateAIImageWithFallback(promptConcept);
         
+        const shouldDirectlyPublish = 
+          lower.includes('post kardo') || 
+          lower.includes('post karo') || 
+          lower.includes('publish kardo') || 
+          lower.includes('group pe') || 
+          lower.includes('feed pe') || 
+          lower.includes('daal do') ||
+          lower.includes('bana do');
+
+        if (shouldDirectlyPublish) {
+          try {
+            const postResult = await createPost({
+              content: caption,
+              postType: 'post',
+              media: { type: 'IMAGE', url: generatedImageUrl }
+            });
+
+            if (postResult?.success) {
+              return {
+                success: true,
+                response: `🚀 **Tolee AI Manager (Autonomous Execution)**: Maine aapke account se **${title}** AI image ke saath aapke Tolee Feed par live publish kar di hai!\n\n![${title}](${generatedImageUrl})\n\n✅ Post is now live on your Tolee profile!`
+              };
+            }
+          } catch (pubErr) {
+            console.error('Direct post creation notice:', pubErr);
+          }
+        }
+
         return {
           success: true,
           response: `✨ **Tolee AI Manager**: Maine aapke liye **${title}** AI image ke saath tayar kar diya hai!\n\n![${title}](${generatedImageUrl})\n\nNiche preview check karein aur **Publish Post Now** button par click karke Feed/Group par post karein.`,
