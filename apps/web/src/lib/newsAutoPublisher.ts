@@ -38,8 +38,14 @@ function getRandomJitterMs(minMinutes: number = 10, maxMinutes: number = 25): nu
   return Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
 }
 
+export interface NewsArticleItem {
+  headline: string;
+  image?: string;
+  description?: string;
+}
+
 /**
- * Fetches 15 daily breaking news articles from NewsAPI.org (with Google News RSS fallback)
+ * Fetches 15 daily breaking news articles from GNews.io (with NewsAPI.org & Google News RSS fallbacks)
  * and distributes them evenly across the 5 registered user accounts with flexible randomized time gaps.
  */
 export async function publishDailyNewsBatch(): Promise<{ success: boolean; count: number; log: string[] }> {
@@ -47,38 +53,61 @@ export async function publishDailyNewsBatch(): Promise<{ success: boolean; count
   logs.push("Starting Daily News Auto-Publisher batch execution...");
 
   try {
-    const apiKey = process.env.NEWS_API_KEY || "bd92a188805e44e3b654a871e2ba1553";
-    let rawHeadlines: string[] = [];
+    const gnewsKey = process.env.GNEWS_API_KEY || "7c9cbcae5f8b01d649ab17e1a4528dc9";
+    const newsApiKey = process.env.NEWS_API_KEY || "bd92a188805e44e3b654a871e2ba1553";
+    let articlesPool: NewsArticleItem[] = [];
 
-    // Attempt 1: Fetch via NewsAPI.org
+    // Provider 1: GNews.io (Direct real news photos + Indian Headlines)
     try {
-      const newsApiUrl = `https://newsapi.org/v2/everything?q=India&sortBy=publishedAt&language=en&apiKey=${apiKey}`;
-      const newsRes = await fetch(newsApiUrl, { cache: 'no-store' });
-      const newsData = await newsRes.json();
+      const gnewsUrl = `https://gnews.io/api/v4/top-headlines?category=general&lang=en&country=in&max=20&apikey=${gnewsKey}`;
+      const res = await fetch(gnewsUrl, { cache: 'no-store' });
+      const data = await res.json();
 
-      if (newsData.status === 'ok' && Array.isArray(newsData.articles) && newsData.articles.length > 0) {
-        rawHeadlines = newsData.articles
-          .map((a: any) => sanitizeNewsText(a.title || ''))
-          .filter((h: string) => h && h.length > 10 && !h.toLowerCase().includes('removed'));
-        logs.push(`Successfully fetched ${rawHeadlines.length} headlines from NewsAPI.org.`);
+      if (data.articles && Array.isArray(data.articles) && data.articles.length > 0) {
+        articlesPool = data.articles.map((a: any) => ({
+          headline: sanitizeNewsText(a.title || ''),
+          image: a.image,
+          description: sanitizeNewsText(a.description || '')
+        })).filter((item: NewsArticleItem) => item.headline && item.headline.length > 10);
+        logs.push(`Successfully fetched ${articlesPool.length} articles from GNews.io.`);
       }
     } catch (e: any) {
-      logs.push(`NewsAPI.org fetch warning: ${e.message}. Falling back to Google News RSS.`);
+      logs.push(`GNews.io fetch notice: ${e.message}`);
     }
 
-    // Fallback: Google News RSS
-    if (rawHeadlines.length === 0) {
+    // Provider 2 Fallback: NewsAPI.org
+    if (articlesPool.length === 0) {
+      try {
+        const newsApiUrl = `https://newsapi.org/v2/everything?q=India&sortBy=publishedAt&language=en&apiKey=${newsApiKey}`;
+        const newsRes = await fetch(newsApiUrl, { cache: 'no-store' });
+        const newsData = await newsRes.json();
+
+        if (newsData.status === 'ok' && Array.isArray(newsData.articles) && newsData.articles.length > 0) {
+          articlesPool = newsData.articles.map((a: any) => ({
+            headline: sanitizeNewsText(a.title || ''),
+            image: a.urlToImage,
+            description: sanitizeNewsText(a.description || '')
+          })).filter((item: NewsArticleItem) => item.headline && item.headline.length > 10);
+          logs.push(`Fetched ${articlesPool.length} articles from NewsAPI.org fallback.`);
+        }
+      } catch (e: any) {
+        logs.push(`NewsAPI.org fallback notice: ${e.message}`);
+      }
+    }
+
+    // Provider 3 Fallback: Google News RSS
+    if (articlesPool.length === 0) {
       const rssUrl = "https://news.google.com/rss?hl=en-IN&gl=IN&ceid=IN:en";
       const res = await fetch(rssUrl, { cache: 'no-store' });
       const xml = await res.text();
       const titleMatches = [...xml.matchAll(/<title>(.*?)<\/title>/g)].slice(1, 25);
-      rawHeadlines = titleMatches
-        .map(m => sanitizeNewsText(m[1].replace(/ - .*$/, '')))
-        .filter(h => h && h.length > 10 && !h.toLowerCase().includes('google news'));
-      logs.push(`Fetched ${rawHeadlines.length} headlines from Google News RSS fallback.`);
+      articlesPool = titleMatches.map(m => ({
+        headline: sanitizeNewsText(m[1].replace(/ - .*$/, ''))
+      })).filter(item => item.headline && item.headline.length > 10);
+      logs.push(`Fetched ${articlesPool.length} headlines from Google News RSS fallback.`);
     }
 
-    if (rawHeadlines.length === 0) {
+    if (articlesPool.length === 0) {
       logs.push("Error: No valid headlines extracted from any provider.");
       return { success: false, count: 0, log: logs };
     }
@@ -94,10 +123,11 @@ export async function publishDailyNewsBatch(): Promise<{ success: boolean; count
     const defaultTolee = await prisma.tolee.findFirst({ select: { id: true } });
 
     let publishedCount = 0;
-    const targetPostCount = Math.min(15, rawHeadlines.length);
+    const targetPostCount = Math.min(15, articlesPool.length);
 
     for (let i = 0; i < targetPostCount; i++) {
-      const headline = rawHeadlines[i];
+      const articleItem = articlesPool[i];
+      const headline = articleItem.headline;
       const accountConfig = REGISTERED_NEWS_ACCOUNTS[i % REGISTERED_NEWS_ACCOUNTS.length];
       const dbUser = userMap.get(accountConfig.email);
 
@@ -116,13 +146,16 @@ export async function publishDailyNewsBatch(): Promise<{ success: boolean; count
 
       const content = `📌 **Key Highlights**:\n• Official developments and latest press updates regarding ${headline}.\n• Key insights, analysis, and verified reporting from authoritative sources.\n\n📖 **Detailed Verified Report**:\nToday, major developments were reported regarding ${headline}. Community leaders and domain experts emphasized the significance of these updates across ${accountConfig.category}.\n\nStay connected with Tolee News for verified real-time coverage.`;
       
-      const summary = `Verified updates on ${headline}. Read the detailed report on Tolee News.`;
+      const summary = articleItem.description || `Verified updates on ${headline}. Read the detailed report on Tolee News.`;
       const metaDescription = `Latest updates on ${headline}. Read verified analysis and real-time coverage on Tolee News.`;
       const keywords = `news, ${accountConfig.category.toLowerCase().replace(/[^a-z0-9]/g, '')}, india, tolee`;
 
-      // Generate 8K Photorealistic Press Banner visual (16:9 Photojournalism DSLR Photo)
-      const bannerPrompt = `Ultra photorealistic 8k studio press news photograph representing ${headline}, professional photojournalism shot, wide angle 16:9 aspect ratio, crisp details, natural lighting, award winning press photography`;
-      const imageUrl = await generateAIImageWithFallback(bannerPrompt);
+      // Use direct news image if available, else generate 8K Photorealistic Press Banner visual
+      let imageUrl = articleItem.image;
+      if (!imageUrl || !imageUrl.startsWith('http')) {
+        const bannerPrompt = `Ultra photorealistic 8k studio press news photograph representing ${headline}, professional photojournalism shot, wide angle 16:9 aspect ratio, crisp details, natural lighting, award winning press photography`;
+        imageUrl = await generateAIImageWithFallback(bannerPrompt);
+      }
 
       // Create Post in DB
       await prisma.post.create({
