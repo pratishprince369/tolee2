@@ -101,8 +101,8 @@ export async function publishDailyNewsBatch(): Promise<{ success: boolean; count
       const metaDescription = `Latest updates on ${headline}. Read verified analysis and real-time coverage on Tolee News.`;
       const keywords = `news, ${accountConfig.category.toLowerCase().replace(/[^a-z0-9]/g, '')}, india, tolee`;
 
-      // Generate 8K Photorealistic Banner visual
-      const bannerPrompt = `Ultra photorealistic 8k studio news banner photograph of ${headline}, crisp details, professional journalism photo, cinematic lighting, 8k HD resolution`;
+      // Generate 8K Photorealistic Press Banner visual (16:9 Photojournalism DSLR Photo)
+      const bannerPrompt = `Ultra photorealistic 8k studio press news photograph representing ${headline}, professional photojournalism shot, wide angle 16:9 aspect ratio, crisp details, natural lighting, award winning press photography`;
       const imageUrl = await generateAIImageWithFallback(bannerPrompt);
 
       // Create Post in DB
