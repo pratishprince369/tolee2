@@ -177,27 +177,36 @@ export function NewsFeedStream({
       <div className="space-y-6">
         <OptimisticPostCard />
         {newsPosts.map((item) => {
+          if (!item) return null;
           const post = item.post;
-          let rawCoverImg = post?.mediaUrls ? post.mediaUrls.split(/,(?=https?:\/\/)/)[0] : null;
           
-          // YouTube detection
-          const isYouTube = item.slug?.startsWith('yt-') || 
-            (item.sourceUrl && item.sourceUrl.includes('youtube.com')) || 
-            (post?.mediaUrls && post.mediaUrls.includes('youtube.com'));
+          const itemSlug = typeof item.slug === 'string' ? item.slug : '';
+          const itemSourceUrl = typeof item.sourceUrl === 'string' ? item.sourceUrl : '';
+          const postMediaUrls = typeof post?.mediaUrls === 'string' ? post.mediaUrls : '';
+
+          let rawCoverImg = postMediaUrls ? postMediaUrls.split(/,(?=https?:\/\/)/)[0] : null;
+          
+          // Fail-safe YouTube detection
+          const isYouTube = Boolean(
+            (itemSlug && itemSlug.startsWith('yt-')) || 
+            itemSourceUrl.includes('youtube.com') || 
+            postMediaUrls.includes('youtube.com') ||
+            postMediaUrls.includes('ytimg.com')
+          );
           
           let ytVideoId = '';
           let fallbackThumb = '';
 
           if (isYouTube) {
-            if (item.sourceUrl && item.sourceUrl.includes('v=')) {
-              ytVideoId = item.sourceUrl.split('v=')[1]?.split('&')[0] || '';
+            if (itemSourceUrl.includes('v=')) {
+              ytVideoId = itemSourceUrl.split('v=')[1]?.split('&')[0] || '';
             }
-            if (!ytVideoId && post?.mediaUrls) {
-              const urls = post.mediaUrls.split(',');
+            if (!ytVideoId && postMediaUrls) {
+              const urls = postMediaUrls.split(',');
               for (const u of urls) {
-                if (u.includes('youtube.com/embed/')) {
+                if (typeof u === 'string' && u.includes('youtube.com/embed/')) {
                   ytVideoId = u.split('embed/')[1]?.split('?')[0] || '';
-                } else if (u.includes('i.ytimg.com') || u.includes('img.youtube.com')) {
+                } else if (typeof u === 'string' && (u.includes('i.ytimg.com') || u.includes('img.youtube.com'))) {
                   fallbackThumb = u;
                 }
               }
@@ -207,7 +216,7 @@ export function NewsFeedStream({
           // Ensure cover image is not an iframe embed URL
           let cleanCoverImg = rawCoverImg;
           if (cleanCoverImg && cleanCoverImg.includes('youtube.com/embed/')) {
-            cleanCoverImg = fallbackThumb || post?.mediaUrls?.split(',').find((u: string) => u.startsWith('http') && !u.includes('youtube.com/embed/')) || null;
+            cleanCoverImg = fallbackThumb || (postMediaUrls ? postMediaUrls.split(',').find((u: string) => typeof u === 'string' && u.startsWith('http') && !u.includes('youtube.com/embed/')) : null) || null;
           }
 
           const dateStr = new Date(item.createdAt).toLocaleDateString('en-US', {

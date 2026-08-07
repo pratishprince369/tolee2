@@ -22,23 +22,31 @@ export function YouTubeAutoplayVideo({
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
+  const [mounted, setMounted] = useState(false);
   const [isIntersecting, setIsIntersecting] = useState(false);
-  const [isMuted, setIsMuted] = useState(true);
-  const [isPlaying, setIsPlaying] = useState(true);
+  const [hasError, setHasError] = useState(false);
 
-  // Extract YouTube ID from full URL or raw ID
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Extract YouTube ID safely
   const cleanVideoId = React.useMemo(() => {
-    if (!videoId) return '';
-    if (videoId.includes('youtube.com/watch?v=')) {
-      return videoId.split('v=')[1]?.split('&')[0] || videoId;
+    try {
+      if (!videoId || typeof videoId !== 'string') return '';
+      if (videoId.includes('youtube.com/watch?v=')) {
+        return videoId.split('v=')[1]?.split('&')[0] || videoId;
+      }
+      if (videoId.includes('youtu.be/')) {
+        return videoId.split('youtu.be/')[1]?.split('?')[0] || videoId;
+      }
+      if (videoId.includes('youtube.com/embed/')) {
+        return videoId.split('embed/')[1]?.split('?')[0] || videoId;
+      }
+      return videoId.trim();
+    } catch {
+      return '';
     }
-    if (videoId.includes('youtu.be/')) {
-      return videoId.split('youtu.be/')[1]?.split('?')[0] || videoId;
-    }
-    if (videoId.includes('youtube.com/embed/')) {
-      return videoId.split('embed/')[1]?.split('?')[0] || videoId;
-    }
-    return videoId;
   }, [videoId]);
 
   // Intersection Observer to trigger autoplay when 40% visible in scroll
@@ -47,29 +55,36 @@ export function YouTubeAutoplayVideo({
     const container = containerRef.current;
     if (!container) return;
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            setIsIntersecting(true);
-            setIsPlaying(true);
-          } else {
-            setIsPlaying(false);
+    try {
+      const observer = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            setIsIntersecting(entry.isIntersecting);
           }
-        }
-      },
-      { threshold: 0.4 }
-    );
+        },
+        { threshold: 0.4 }
+      );
 
-    observer.observe(container);
-    return () => observer.disconnect();
+      observer.observe(container);
+      return () => observer.disconnect();
+    } catch (e) {
+      console.error('IntersectionObserver error:', e);
+    }
   }, []);
 
   const embedSrc = cleanVideoId
-    ? `https://www.youtube-nocookie.com/embed/${cleanVideoId}?autoplay=${isIntersecting && isPlaying ? 1 : 0}&mute=${isMuted ? 1 : 0}&enablejsapi=1&playsinline=1&rel=0&modestbranding=1&controls=1`
+    ? `https://www.youtube-nocookie.com/embed/${cleanVideoId}?autoplay=${isIntersecting ? 1 : 0}&mute=1&enablejsapi=1&playsinline=1&rel=0&modestbranding=1`
     : '';
 
-  const fallbackThumbnail = thumbnailUrl || `https://img.youtube.com/vi/${cleanVideoId}/hqdefault.jpg`;
+  const fallbackThumbnail = thumbnailUrl || (cleanVideoId ? `https://img.youtube.com/vi/${cleanVideoId}/hqdefault.jpg` : '/tolee-news-default.png');
+
+  if (hasError || !cleanVideoId) {
+    return (
+      <div className={`relative w-full aspect-video rounded-2xl overflow-hidden bg-black ${className}`}>
+        <img src={fallbackThumbnail} alt={title || 'News'} className="w-full h-full object-cover" />
+      </div>
+    );
+  }
 
   return (
     <div
@@ -80,16 +95,17 @@ export function YouTubeAutoplayVideo({
         <iframe
           ref={iframeRef}
           src={embedSrc}
-          title={title}
+          title={title || 'YouTube Video'}
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
           allowFullScreen
+          onError={() => setHasError(true)}
           className="w-full h-full border-none"
         />
       ) : (
         <div className="relative w-full h-full cursor-pointer group">
           <img
             src={fallbackThumbnail}
-            alt={title}
+            alt={title || 'YouTube News'}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           />
           <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
