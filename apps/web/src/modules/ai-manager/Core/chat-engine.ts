@@ -1,8 +1,12 @@
 import { SYSTEM_PROMPTS } from './prompt-manager';
 
-// Safe 5-Key Environment Variable Rotation Pool
+// Safe Multi-Key Environment & Built-in Key Rotation Pool
 export function getLLMKeyPool(): string[] {
   const keys = [
+    "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", // OpenAI GPT-OSS-120B Key
+    "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", // Google Gemma-4-31B Key
+    "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", // OpenAI GPT-OSS-20B Key
+    "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", // Nemotron Mini 4B Key
     process.env.NVIDIA_API_KEY,
     process.env.NVIDIA_API_KEY_2,
     process.env.NVIDIA_API_KEY_3,
