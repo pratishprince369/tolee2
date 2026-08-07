@@ -53,29 +53,50 @@ export async function publishDailyNewsBatch(): Promise<{ success: boolean; count
   logs.push("Starting Daily News Auto-Publisher batch execution...");
 
   try {
+    const newsdataKey = process.env.NEWSDATA_API_KEY || "pub_080f52adf1114cc59f8201ad47eb64f8";
     const gnewsKey = process.env.GNEWS_API_KEY || "7c9cbcae5f8b01d649ab17e1a4528dc9";
     const newsApiKey = process.env.NEWS_API_KEY || "bd92a188805e44e3b654a871e2ba1553";
     let articlesPool: NewsArticleItem[] = [];
 
-    // Provider 1: GNews.io (Direct real news photos + Indian Headlines)
+    // Provider 1: NewsData.io (Real Indian News + Categorized HD Images)
     try {
-      const gnewsUrl = `https://gnews.io/api/v4/top-headlines?category=general&lang=en&country=in&max=20&apikey=${gnewsKey}`;
-      const res = await fetch(gnewsUrl, { cache: 'no-store' });
+      const newsdataUrl = `https://newsdata.io/api/1/news?apikey=${newsdataKey}&country=in&language=en`;
+      const res = await fetch(newsdataUrl, { cache: 'no-store' });
       const data = await res.json();
 
-      if (data.articles && Array.isArray(data.articles) && data.articles.length > 0) {
-        articlesPool = data.articles.map((a: any) => ({
+      if (data.status === 'success' && Array.isArray(data.results) && data.results.length > 0) {
+        articlesPool = data.results.map((a: any) => ({
           headline: sanitizeNewsText(a.title || ''),
-          image: a.image,
-          description: sanitizeNewsText(a.description || '')
+          image: a.image_url,
+          description: sanitizeNewsText(a.description || a.snippet || '')
         })).filter((item: NewsArticleItem) => item.headline && item.headline.length > 10);
-        logs.push(`Successfully fetched ${articlesPool.length} articles from GNews.io.`);
+        logs.push(`Successfully fetched ${articlesPool.length} articles from NewsData.io.`);
       }
     } catch (e: any) {
-      logs.push(`GNews.io fetch notice: ${e.message}`);
+      logs.push(`NewsData.io fetch notice: ${e.message}`);
     }
 
-    // Provider 2 Fallback: NewsAPI.org
+    // Provider 2 Fallback: GNews.io
+    if (articlesPool.length === 0) {
+      try {
+        const gnewsUrl = `https://gnews.io/api/v4/top-headlines?category=general&lang=en&country=in&max=20&apikey=${gnewsKey}`;
+        const res = await fetch(gnewsUrl, { cache: 'no-store' });
+        const data = await res.json();
+
+        if (data.articles && Array.isArray(data.articles) && data.articles.length > 0) {
+          articlesPool = data.articles.map((a: any) => ({
+            headline: sanitizeNewsText(a.title || ''),
+            image: a.image,
+            description: sanitizeNewsText(a.description || '')
+          })).filter((item: NewsArticleItem) => item.headline && item.headline.length > 10);
+          logs.push(`Fetched ${articlesPool.length} articles from GNews.io fallback.`);
+        }
+      } catch (e: any) {
+        logs.push(`GNews.io fallback notice: ${e.message}`);
+      }
+    }
+
+    // Provider 3 Fallback: NewsAPI.org
     if (articlesPool.length === 0) {
       try {
         const newsApiUrl = `https://newsapi.org/v2/everything?q=India&sortBy=publishedAt&language=en&apiKey=${newsApiKey}`;
@@ -95,7 +116,7 @@ export async function publishDailyNewsBatch(): Promise<{ success: boolean; count
       }
     }
 
-    // Provider 3 Fallback: Google News RSS
+    // Provider 4 Fallback: Google News RSS
     if (articlesPool.length === 0) {
       const rssUrl = "https://news.google.com/rss?hl=en-IN&gl=IN&ceid=IN:en";
       const res = await fetch(rssUrl, { cache: 'no-store' });
