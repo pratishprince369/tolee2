@@ -3,7 +3,7 @@
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { callNvidiaLLM } from '@/modules/ai-manager/Core/chat-engine';
+import { callNvidiaLLM, generateAIImageWithFallback } from '@/modules/ai-manager/Core/chat-engine';
 import { SYSTEM_PROMPTS } from '@/modules/ai-manager/Core/prompt-manager';
 import { parseNaturalLanguageReminder } from '@/modules/ai-manager/Core/reminder-parser';
 import { getUserDeviceTimeInfo, isTimeOrDateQuery } from '@/modules/ai-manager/Core/time-service';
@@ -538,16 +538,22 @@ export async function processAIPersonalMessage(
     const isPostIntent = 
       lower.includes('post') || 
       lower.includes('image') || 
+      lower.includes('photo') || 
+      lower.includes('pic') || 
+      lower.includes('picture') || 
+      lower.includes('tasveer') || 
       lower.includes('banner') || 
       lower.includes('poster') || 
       lower.includes('generate') ||
       lower.includes('banao') ||
       lower.includes('bana do') ||
+      lower.includes('bana') ||
       lower.includes('create') ||
       lower.includes('evening') ||
       lower.includes('morning') ||
       lower.includes('subah') ||
-      lower.includes('sandhya');
+      lower.includes('sandhya') ||
+      lower.includes('group');
 
     if (isPostIntent) {
       try {
@@ -555,8 +561,8 @@ export async function processAIPersonalMessage(
         const isGoodMorning = lower.includes('morning') || lower.includes('subah');
         
         let promptConcept = 'Inspiring modern visual poster for social media post';
-        let title = 'AI Social Post';
-        let caption = `✨ ${trimmed}\n\n#Tolee #Community #Updates`;
+        let title = 'AI Generated Image';
+        let caption = `✨ ${trimmed}\n\n#Tolee #AIArt #Community #Updates`;
 
         if (isGoodEvening) {
           promptConcept = 'Peaceful evening sunset skyline over calm ocean with warm glowing golden hour light';
@@ -568,34 +574,47 @@ export async function processAIPersonalMessage(
           caption = `🌅 Good morning! Wishing everyone a peaceful, inspiring, and productive day ahead! ✨\n\n#GoodMorning #Tolee #Inspiration #Community`;
         } else {
           // Clean prompt to English keywords
-          promptConcept = trimmed.replace(/image|banner|poster|banao|bana do|karo|post|create|generate/gi, '').trim();
+          promptConcept = trimmed
+            .replace(/image|photo|pic|picture|tasveer|banner|poster|banao|bana do|bana|karo|post|create|generate|group|share|me|mein|par|pe/gi, '')
+            .trim();
           if (promptConcept.length < 3) promptConcept = 'Inspiring modern visual banner poster';
-          title = 'AI Image Poster';
+          title = `AI Image: ${promptConcept.slice(0, 30)}`;
         }
 
         const generatedImageUrl = await generateAIImageWithFallback(promptConcept);
-        
+
+        // Fetch user's joined Tolee Groups to associate post if group share requested
+        const userToleeMemberships = await prisma.toleeMember.findMany({
+          where: { userId, status: 'approved' },
+          select: { toleeId: true },
+          take: 3
+        }).catch(() => []);
+
+        const targetToleeIds = userToleeMemberships.map(m => m.toleeId);
+
+        // Automatically publish to Prisma DB if post/share/group/banao directive is present
         const shouldDirectlyPublish = 
-          lower.includes('post kardo') || 
-          lower.includes('post karo') || 
-          lower.includes('publish kardo') || 
-          lower.includes('group pe') || 
-          lower.includes('feed pe') || 
+          lower.includes('post') || 
+          lower.includes('share') || 
+          lower.includes('group') || 
+          lower.includes('publish') || 
           lower.includes('daal do') ||
-          lower.includes('bana do');
+          lower.includes('bana do') ||
+          lower.includes('banao');
 
         if (shouldDirectlyPublish) {
           try {
             const postResult = await createPost({
               content: caption,
               postType: 'post',
+              toleeIds: targetToleeIds.length > 0 ? targetToleeIds : undefined,
               media: { type: 'IMAGE', url: generatedImageUrl }
             });
 
             if (postResult?.success) {
               return {
                 success: true,
-                response: `🚀 **Tolee AI Manager (Autonomous Database Execution)**: Maine aapke account se **${title}** AI image ke saath aapke Tolee Feed par live publish kar di hai!\n\n![${title}](${generatedImageUrl})\n\n✅ Post is now live on your Tolee profile!\n\n💬 *Kya main isey aapke Tolee groups par bhi share karoon ya aapke kisi chat message ka reply kardo?*`
+                response: `🎨 **Tolee AI Image Generator (ChatGPT DALL-E Grade)**: Maine aapke liye **${title}** AI image generate karke aapke account aur Tolee Group par live publish kar di hai!\n\n![${title}](${generatedImageUrl})\n\n✅ Post is now live on your Tolee Feed and Groups!\n\n💬 *Aage aur kya karna hai? Kya main aapke kisi chat message ka reply kardo?*`
               };
             }
           } catch (pubErr) {
@@ -605,7 +624,7 @@ export async function processAIPersonalMessage(
 
         return {
           success: true,
-          response: `✨ **Tolee AI Manager**: Maine aapke liye **${title}** AI image ke saath tayar kar diya hai!\n\n![${title}](${generatedImageUrl})\n\nNiche preview check karein aur **Publish Post Now** button par click karke Feed/Group par post karein.\n\n💬 *Aap bolenge "post kardo" to main ise turant live publish kar dunga. Aage aur kya karna hai?*`,
+          response: `🎨 **Tolee AI Image Generator**: Maine aapke liye **${title}** AI image ke saath tayar kar diya hai!\n\n![${title}](${generatedImageUrl})\n\nNiche preview check karein aur **Publish Post Now** button par click karke Feed/Group par post karein.\n\n💬 *Aap bolenge "post kardo" to main ise turant live publish kar dunga. Aage aur kya karna hai?*`,
           interactiveAction: {
             type: 'PUBLISH_POST',
             label: '🚀 Publish Post Now',
