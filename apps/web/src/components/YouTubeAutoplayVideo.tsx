@@ -43,6 +43,7 @@ export function YouTubeAutoplayVideo({
 
   // Intersection Observer to trigger autoplay when 40% visible in scroll
   useEffect(() => {
+    if (typeof window === 'undefined' || !('IntersectionObserver' in window)) return;
     const container = containerRef.current;
     if (!container) return;
 

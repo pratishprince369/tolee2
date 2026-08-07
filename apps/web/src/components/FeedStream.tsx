@@ -1578,23 +1578,32 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
 
                 if (post.postType === 'news') {
                   const news = post.newsRelation;
-                  const newsSlug = news?.slug || post.id;
-                  const newsHeadline = news?.headline || post.caption || 'Premium Article';
-                  const newsSummary = news?.summary || '';
-                  const newsCategory = news?.category || 'General';
+                  const newsSlug = String(news?.slug || post.id || '');
+                  const newsHeadline = String(news?.headline || post.caption || 'Premium Article');
+                  const newsSummary = String(news?.summary || '');
+                  const newsCategory = String(news?.category || 'General');
                   const newsReadingTime = news?.readingTime || 1;
                   const newsViewsCount = post.views || news?.viewsCount || 0;
 
-                  // Detect YouTube Video Posts
-                  const isYouTube = newsSlug.startsWith('yt-') || (news?.sourceUrl && news.sourceUrl.includes('youtube.com'));
+                  // Detect YouTube Video Posts safely
+                  const sourceUrlStr = typeof news?.sourceUrl === 'string' ? news.sourceUrl : '';
+                  const mediaUrlsStr = typeof post.mediaUrls === 'string' ? post.mediaUrls : '';
+
+                  const isYouTube = Boolean(
+                    (newsSlug && newsSlug.startsWith('yt-')) ||
+                    sourceUrlStr.includes('youtube.com') ||
+                    mediaUrlsStr.includes('youtube.com') ||
+                    mediaUrlsStr.includes('ytimg.com')
+                  );
+
                   let ytVideoId = '';
                   if (isYouTube) {
-                    if (news?.sourceUrl && news.sourceUrl.includes('v=')) {
-                      ytVideoId = news.sourceUrl.split('v=')[1]?.split('&')[0] || '';
-                    } else if (post.mediaUrls && post.mediaUrls.includes('img.youtube.com/vi/')) {
-                      ytVideoId = post.mediaUrls.split('img.youtube.com/vi/')[1]?.split('/')[0] || '';
-                    } else if (post.mediaUrls && post.mediaUrls.includes('i.ytimg.com/vi/')) {
-                      ytVideoId = post.mediaUrls.split('i.ytimg.com/vi/')[1]?.split('/')[0] || '';
+                    if (sourceUrlStr.includes('v=')) {
+                      ytVideoId = sourceUrlStr.split('v=')[1]?.split('&')[0] || '';
+                    } else if (mediaUrlsStr.includes('img.youtube.com/vi/')) {
+                      ytVideoId = mediaUrlsStr.split('img.youtube.com/vi/')[1]?.split('/')[0] || '';
+                    } else if (mediaUrlsStr.includes('i.ytimg.com/vi/')) {
+                      ytVideoId = mediaUrlsStr.split('i.ytimg.com/vi/')[1]?.split('/')[0] || '';
                     }
                   }
 
