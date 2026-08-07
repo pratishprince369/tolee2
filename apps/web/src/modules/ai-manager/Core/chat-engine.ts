@@ -3,6 +3,9 @@ import { SYSTEM_PROMPTS } from './prompt-manager';
 // Safe Multi-Key Environment & Built-in Key Rotation Pool
 export function getLLMKeyPool(): string[] {
   const keys = [
+    "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", // NEW OpenAI GPT-OSS-120B Key
+    "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", // NEW OpenAI GPT-OSS-20B Key
+    "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", // NEW Google Gemma-4-31B Key
     "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", // OpenAI GPT-OSS-120B Key
     "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", // Google Gemma-4-31B Key
     "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", // OpenAI GPT-OSS-20B Key
