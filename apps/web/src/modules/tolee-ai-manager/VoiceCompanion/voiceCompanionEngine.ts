@@ -167,21 +167,26 @@ export class VoiceCompanionEngine {
     } catch (e) {}
 
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 1.0;
-    utterance.pitch = 1.05;
+    utterance.rate = 0.95; // Smooth, mature human cadence
+    utterance.pitch = 1.0;  // Warm natural human pitch
     utterance.lang = langCode;
 
     // PREVENT GARBAGE COLLECTION: Store reference on window object!
     (window as any)._toleeActiveUtterance = utterance;
 
     const voices = window.speechSynthesis.getVoices();
-    const preferredVoice = voices.find(v => 
+    // Prioritize Natural/Google/Microsoft Swara human voices
+    const naturalVoice = voices.find(v => 
+      (v.name.toLowerCase().includes('natural') || v.name.toLowerCase().includes('google') || v.name.toLowerCase().includes('swara') || v.name.toLowerCase().includes('online')) &&
+      (v.lang.toLowerCase().includes(langCode.toLowerCase()) || v.lang.includes('hi') || v.lang.includes('en'))
+    ) || voices.find(v => 
       v.lang.toLowerCase().includes(langCode.toLowerCase()) || 
       v.lang.includes('hi-IN') || 
       v.lang.includes('en-IN')
     );
-    if (preferredVoice) {
-      utterance.voice = preferredVoice;
+
+    if (naturalVoice) {
+      utterance.voice = naturalVoice;
     }
 
     let hasFinished = false;

@@ -669,17 +669,71 @@ export async function processAIPersonalMessage(
       }
     }
 
-    // 5. Fetch user memories for context
-    const existingMemories = await prisma.aIMemory.findMany({
-      where: { userId },
-      take: 5
-    });
+    // ⚡ Direct Chat Box Inspection Handler (Highest Priority for Voice Access)
+    const isChatCheckIntent = 
+      (lower.includes('chat') || lower.includes('message') || lower.includes('msg') || lower.includes('chhat') || lower.includes('inbox')) &&
+      (lower.includes('kiska') || lower.includes('kya') || lower.includes('dekho') || lower.includes('check') || lower.includes('padho') || lower.includes('read') || lower.includes('aaya'));
 
-    const memoryContext = existingMemories.length > 0
-      ? `User Memory Context: ${existingMemories.map(m => `${m.key}: ${m.value}`).join('; ')}`
-      : 'No previous memories saved.';
+    if (isChatCheckIntent) {
+      const userChatParticipants = await prisma.chatParticipant.findMany({
+        where: { userId },
+        select: { chatId: true }
+      }).catch(() => []);
 
-    const systemPromptWithContext = `${SYSTEM_PROMPTS.PERSONAL_EMPLOYEE}\n\n${memoryContext}\n\nCRITICAL SYSTEM INSTRUCTION: Current date/time reference: ${timeInfo.formattedFull} (${timeInfo.dayOfWeek}, Timezone: ${timeInfo.timeZone}). Use this internal context ONLY when scheduling or directly asked about the clock. DO NOT output timing notes, clock stamps, or "(Current time: ...)" in your message responses unless the user explicitly asks for the time!`;
+      const userChatIds = userChatParticipants.map(cp => cp.chatId);
+
+      const recentMessages = userChatIds.length > 0 ? await prisma.message.findMany({
+        where: {
+          chatId: { in: userChatIds },
+          senderId: { not: userId }
+        },
+        take: 3,
+        orderBy: { createdAt: 'desc' },
+        include: { sender: { select: { name: true, username: true } } }
+      }).catch(() => []) : [];
+
+      if (recentMessages.length > 0) {
+        const msgList = recentMessages.map(m => `• **${m.sender.name || m.sender.username || 'User'}**: "${m.content}"`).join('\n');
+        return {
+          success: true,
+          response: `📩 **Tolee AI Manager**: Maine aapka Tolee chat box check kiya hai! Aapke naye messages yeh hain:\n\n${msgList}\n\nKya aap chahte hain ki main inka reply send karoon?`
+        };
+      } else {
+        return {
+          success: true,
+          response: `📩 **Tolee AI Manager**: Maine aapka Tolee chat box check kiya hai! Abhi aapke inbox mein koi bhi naya unread message nahi aaya hai.`
+        };
+      }
+    }
+
+    // 5. Fetch real-time user account context (Chats, Notifications, Groups, Memories)
+    const [userChatParticipants, existingMemories, notifications, userTolees] = await Promise.all([
+      prisma.chatParticipant.findMany({ where: { userId }, select: { chatId: true } }).catch(() => []),
+      prisma.aIMemory.findMany({ where: { userId }, take: 5 }).catch(() => []),
+      prisma.notification.findMany({ where: { userId, isRead: false }, take: 3, orderBy: { createdAt: 'desc' } }).catch(() => []),
+      prisma.toleeMember.findMany({ where: { userId, status: 'approved' }, take: 5, include: { tolee: { select: { name: true } } } }).catch(() => [])
+    ]);
+
+    const userChatIds = userChatParticipants.map(cp => cp.chatId);
+    const recentMessages = userChatIds.length > 0 ? await prisma.message.findMany({
+      where: { chatId: { in: userChatIds }, senderId: { not: userId } },
+      take: 3,
+      orderBy: { createdAt: 'desc' },
+      include: { sender: { select: { name: true } } }
+    }).catch(() => []) : [];
+
+    const accountDataSummary = `
+REAL-TIME USER ACCOUNT DATA CONTEXT:
+- Recent Direct Chat Messages: ${recentMessages.length > 0 ? recentMessages.map(m => `${m.sender.name}: "${m.content}"`).join('; ') : 'No recent direct messages'}
+- Unread Notifications: ${notifications.length > 0 ? notifications.map(n => n.title).join('; ') : 'No unread notifications'}
+- Active Joined Tolee Groups: ${userTolees.length > 0 ? userTolees.map(t => t.tolee.name).join(', ') : 'Tolee Public Group'}
+- User Saved Memories: ${existingMemories.length > 0 ? existingMemories.map(m => `${m.key}: ${m.value}`).join('; ') : 'None'}
+
+CRITICAL ACCOUNT ACCESS MANDATE:
+You have 100% FULL ACCESS to the user's Tolee account, direct chats, notifications, and group posts!
+NEVER state or claim "I don't have direct access to your chat box" or "you need to check yourself"! You know all their chats and notifications listed above. Answer directly and perform actions on their behalf.`;
+
+    const systemPromptWithContext = `${SYSTEM_PROMPTS.PERSONAL_EMPLOYEE}\n\n${accountDataSummary}\n\nCRITICAL SYSTEM INSTRUCTION: Current date/time reference: ${timeInfo.formattedFull} (${timeInfo.dayOfWeek}, Timezone: ${timeInfo.timeZone}). Use this internal context ONLY when scheduling or directly asked about the clock. DO NOT output timing notes, clock stamps, or "(Current time: ...)" in your message responses unless the user explicitly asks for the time!`;
 
     // 6. Call Ultra-Fast NVIDIA NIM LLM
     const nvidiaResponse = await callNvidiaLLM(
