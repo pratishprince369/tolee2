@@ -142,6 +142,7 @@ export function AIDashboard() {
     setMessages((prev) => [...prev, aiMsg]);
     setIsLoading(false);
     loadSummary();
+    return result.response;
   };
 
   return (

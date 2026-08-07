@@ -110,29 +110,39 @@ export class VoiceCompanionEngine {
   public speak(text: string, langCode: string = 'hi-IN', onEnd?: () => void) {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
     if (this.mode === 'SILENT' || this.mode === 'MEETING') return;
+    if (!text || text.trim().length === 0) return;
 
     // Temporarily pause recognition while AI speaks out loud (prevents self-echo)
     this.stopListening();
 
-    window.speechSynthesis.cancel(); // Cancel previous queued speech
+    try {
+      window.speechSynthesis.cancel(); // Cancel previous queued speech
+    } catch (e) {}
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.rate = 1.0;
     utterance.pitch = 1.05;
     utterance.lang = langCode;
 
+    // PREVENT GARBAGE COLLECTION: Store reference on window object!
+    (window as any)._toleeActiveUtterance = utterance;
+
     const voices = window.speechSynthesis.getVoices();
-    const preferredVoice = voices.find(v => v.lang.toLowerCase().includes(langCode.toLowerCase()) || v.lang.includes('hi-IN') || v.lang.includes('en-IN'));
+    const preferredVoice = voices.find(v => 
+      v.lang.toLowerCase().includes(langCode.toLowerCase()) || 
+      v.lang.includes('hi-IN') || 
+      v.lang.includes('en-IN')
+    );
     if (preferredVoice) {
       utterance.voice = preferredVoice;
     }
 
-    utterance.onstart = () => {
-      this.isSpeaking = true;
-      this.notifyStatus();
-    };
+    let hasFinished = false;
 
     const finishSpeaking = () => {
+      if (hasFinished) return;
+      hasFinished = true;
+      (window as any)._toleeActiveUtterance = null;
       this.isSpeaking = false;
       this.notifyStatus();
       if (onEnd) onEnd();
@@ -143,10 +153,39 @@ export class VoiceCompanionEngine {
       }
     };
 
-    utterance.onend = finishSpeaking;
-    utterance.onerror = finishSpeaking;
+    // Calculate maximum expected speaking duration with safety margin
+    const safetyTimeoutMs = Math.max(3500, Math.min(20000, (text.length / 10) * 1000 + 3000));
+    const safetyTimer = setTimeout(() => {
+      if (!hasFinished) {
+        console.warn('SpeechSynthesis safety timeout triggered, resuming listening...');
+        try { window.speechSynthesis.cancel(); } catch(e) {}
+        finishSpeaking();
+      }
+    }, safetyTimeoutMs);
 
-    window.speechSynthesis.speak(utterance);
+    utterance.onstart = () => {
+      this.isSpeaking = true;
+      this.notifyStatus();
+    };
+
+    utterance.onend = () => {
+      clearTimeout(safetyTimer);
+      finishSpeaking();
+    };
+
+    utterance.onerror = (err) => {
+      console.warn('SpeechSynthesis utterance error:', err);
+      clearTimeout(safetyTimer);
+      finishSpeaking();
+    };
+
+    try {
+      window.speechSynthesis.speak(utterance);
+    } catch (err) {
+      console.warn('Failed to invoke speechSynthesis.speak:', err);
+      clearTimeout(safetyTimer);
+      finishSpeaking();
+    }
   }
 
   public speakNotification(notification: SpokenNotification) {

@@ -12,7 +12,7 @@ interface FloatingVoiceHUDProps {
   isOpen: boolean;
   onClose: () => void;
   onSelectTab: (tab: string) => void;
-  onSendMessage: (text: string) => void;
+  onSendMessage: (text: string) => Promise<string | void>;
 }
 
 const NATIVE_ANNOUNCEMENTS: Record<string, { text: string; langCode: string }> = {
@@ -92,20 +92,23 @@ export function FloatingVoiceHUD({ isOpen, onClose, onSelectTab, onSendMessage }
       const parsed = parseVoiceCommand(transcript);
       setSpeechText(`🗣️ Processing: "${transcript}"`);
 
-      if (parsed.intent === 'CREATE_CONTENT') {
-        vEngine.speak(parsed.responseText, parsed.detectedLang);
-        onSendMessage(transcript);
-      } else if (parsed.intent === 'READ_NOTIFICATIONS') {
+      let spokenReply = parsed.responseText;
+
+      if (parsed.intent === 'READ_NOTIFICATIONS') {
         const briefingRes = await getVoiceNotificationBriefing();
-        setSpeechText(briefingRes.briefing);
-        vEngine.speak(briefingRes.briefing, savedLang);
+        spokenReply = briefingRes.briefing;
       } else if (parsed.intent === 'OPEN_MODULE' && parsed.targetModule) {
         onSelectTab(parsed.targetModule);
-        vEngine.speak(parsed.responseText, parsed.detectedLang);
       } else {
-        vEngine.speak(parsed.responseText, parsed.detectedLang);
-        onSendMessage(transcript);
+        const aiResult = await onSendMessage(transcript);
+        if (typeof aiResult === 'string' && aiResult.trim().length > 0) {
+          // Strip Markdown formatting symbols (*, _, #, `, [ ]) for clean natural spoken voice
+          spokenReply = aiResult.replace(/[*_#`[\]]/g, '').trim();
+        }
       }
+
+      setSpeechText(spokenReply);
+      vEngine.speak(spokenReply, parsed.detectedLang);
     });
 
     setEngine(vEngine);
