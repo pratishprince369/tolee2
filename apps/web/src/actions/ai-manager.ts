@@ -573,28 +573,36 @@ export async function processAIPersonalMessage(
 
     if (isPostIntent) {
       try {
-        const isGoodEvening = lower.includes('evening') || lower.includes('sandhya') || trimmed.includes('इवनिंग') || trimmed.includes('गुड इवनिंग') || trimmed.includes('संध्या');
-        const isGoodMorning = lower.includes('morning') || lower.includes('subah') || trimmed.includes('मॉर्निंग') || trimmed.includes('गुड मॉर्निंग') || trimmed.includes('सुप्रभात');
+        // Normalize user input and fix common typos (e.g. "moring" -> "morning")
+        const normalized = lower
+          .replace(/moring/gi, 'morning')
+          .replace(/evning|evnin/gi, 'evening')
+          .replace(/subha/gi, 'subah');
+
+        const isGoodEvening = normalized.includes('evening') || normalized.includes('sandhya') || trimmed.includes('इवनिंग') || trimmed.includes('गुड इवनिंग') || trimmed.includes('संध्या') || trimmed.includes('शाम');
+        const isGoodMorning = normalized.includes('morning') || normalized.includes('subah') || trimmed.includes('मॉर्निंग') || trimmed.includes('गुड मॉर्निंग') || trimmed.includes('सुप्रभात') || trimmed.includes('सुबह');
         
         let promptConcept = 'Inspiring modern visual poster for social media post';
         let title = 'AI Generated Image';
         let caption = `✨ ${trimmed}\n\n#Tolee #AIArt #Community #Updates`;
 
         if (isGoodEvening) {
-          promptConcept = 'Peaceful evening sunset skyline over calm ocean with warm glowing golden hour light';
+          promptConcept = 'Peaceful good evening sunset skyline over calm ocean with glowing warm golden hour light, high resolution HD 8k graphic poster';
           title = 'Good Evening Poster';
           caption = `🌇 Good evening! Wishing you a peaceful, relaxed, and pleasant evening ahead! ✨\n\n#GoodEvening #Tolee #Relaxation #Community`;
         } else if (isGoodMorning) {
-          promptConcept = 'Beautiful morning sunrise over majestic mountains with inspiring golden sunlight';
+          promptConcept = 'Inspiring good morning sunrise poster with golden sunlight over peaceful mountains, crystal clear HD 8k social media graphic poster';
           title = 'Good Morning Poster';
           caption = `🌅 Good morning! Wishing everyone a peaceful, inspiring, and productive day ahead! ✨\n\n#GoodMorning #Tolee #Inspiration #Community`;
         } else {
-          // Clean prompt to English keywords
-          promptConcept = trimmed
-            .replace(/image|photo|pic|picture|tasveer|banner|poster|banao|bana do|bana|karo|post|create|generate|group|share|me|mein|par|pe|इमेज|जनरेट|बनाओ|बना दो|बना|फोटो|पोस्टर|बैनर|पोस्ट|शेयर|हेलो|मुझे|का|के|दो/gi, '')
+          // Clean prompt to core English art concepts
+          const cleanTopic = normalized
+            .replace(/image|photo|pic|picture|tasveer|banner|poster|banao|bana do|bana|karo|post|create|generate|group|share|me|mein|par|pe|creative|mast|shandar|badhiya|mujhe|ka|ke|ki|ko|do|ek|hai|please|kardo|karke|इमेज|जनरेट|बनाओ|बना दो|बना|फोटो|पोस्टर|बैनर|पोस्ट|शेयर|हेलो|मुझे|का|के|दो/gi, '')
             .trim();
-          if (promptConcept.length < 3) promptConcept = 'Inspiring modern visual banner poster';
-          title = `AI Image: ${promptConcept.slice(0, 30)}`;
+          promptConcept = cleanTopic.length >= 3 
+            ? `High resolution professional 8k HD graphic poster of ${cleanTopic}, vibrant color palette, cinematic lighting, social media artwork` 
+            : 'Inspiring modern visual banner poster, vibrant colors, clean aesthetic';
+          title = `AI Image: ${cleanTopic.slice(0, 30) || 'Creative Art'}`;
         }
 
         const generatedImageUrl = await generateAIImageWithFallback(promptConcept);
