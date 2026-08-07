@@ -174,32 +174,43 @@ export function FloatingVoiceHUD({ isOpen, onClose, onSelectTab, onSendMessage }
     onClose();
   };
 
+  const handleMicTap = () => {
+    unlockMobileAudio();
+    if (engine) {
+      engine.startListening();
+      setSpeechText('🎙️ Listening... Speak your command!');
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed bottom-20 right-4 sm:bottom-24 sm:right-6 z-50 flex items-center gap-3 bg-slate-900/95 backdrop-blur-xl border border-cyan-500/40 text-white rounded-full px-4 py-2.5 shadow-[0_0_30px_rgba(6,182,212,0.4)] transition-all animate-in fade-in slide-in-from-bottom-5">
-      {/* Glowing Orb Animation */}
+    <div className="fixed bottom-20 right-3 sm:bottom-24 sm:right-6 z-[99999] flex items-center gap-2.5 bg-slate-900/95 backdrop-blur-xl border border-cyan-500/40 text-white rounded-full px-3.5 py-2.5 shadow-[0_0_30px_rgba(6,182,212,0.4)] transition-all animate-in fade-in slide-in-from-bottom-5 max-w-[calc(100vw-24px)]">
+      {/* Glowing Orb Animation / Tap to Speak Button */}
       <div 
-        className={`relative flex items-center justify-center w-8 h-8 rounded-full border ${
+        onClick={handleMicTap}
+        onTouchEnd={handleMicTap}
+        className={`relative flex items-center justify-center w-9 h-9 rounded-full border cursor-pointer active:scale-95 transition-all shrink-0 ${
           isSpeaking 
-            ? 'border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.8)]' 
+            ? 'border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.8)] bg-cyan-950/50' 
             : wakeWordActive
-            ? 'border-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.8)]'
+            ? 'border-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.8)] bg-emerald-950/50'
             : isListening
-            ? 'border-violet-400 animate-pulse'
-            : 'border-slate-600'
+            ? 'border-violet-400 animate-pulse bg-violet-950/50'
+            : 'border-slate-600 bg-slate-800'
         }`}
+        title="Tap to Speak (Mobile)"
       >
-        <Radio className={`w-4 h-4 ${isSpeaking ? 'text-cyan-300 animate-bounce' : 'text-violet-300'}`} />
+        <Radio className={`w-4 h-4 ${isSpeaking ? 'text-cyan-300 animate-bounce' : isListening ? 'text-emerald-300' : 'text-violet-300'}`} />
       </div>
 
       {/* Text Info */}
-      <div className="max-w-[180px] sm:max-w-[240px] text-xs">
-        <div className="font-bold flex items-center gap-1 text-cyan-300">
-          Tolee Voice Manager ON
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+      <div className="max-w-[150px] sm:max-w-[240px] text-xs overflow-hidden">
+        <div className="font-bold flex items-center gap-1 text-cyan-300 text-[11px] sm:text-xs">
+          Tolee Voice Manager
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0" />
         </div>
-        <p className="text-[11px] text-slate-300 truncate">{speechText}</p>
+        <p className="text-[10px] sm:text-[11px] text-slate-300 truncate">{speechText}</p>
       </div>
 
       {/* Close/Turn OFF Button */}
@@ -207,7 +218,8 @@ export function FloatingVoiceHUD({ isOpen, onClose, onSelectTab, onSendMessage }
         variant="ghost"
         size="icon"
         onClick={handleTurnOff}
-        className="w-7 h-7 rounded-full text-slate-400 hover:text-white hover:bg-slate-800"
+        onTouchEnd={handleTurnOff}
+        className="w-7 h-7 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 shrink-0"
         title="Turn Voice Manager OFF"
       >
         <X className="w-4 h-4" />
