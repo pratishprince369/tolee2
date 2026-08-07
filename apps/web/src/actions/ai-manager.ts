@@ -587,11 +587,11 @@ export async function processAIPersonalMessage(
         let caption = `✨ ${trimmed}\n\n#Tolee #AIArt #Community #Updates`;
 
         if (isGoodEvening) {
-          promptConcept = 'Peaceful good evening sunset skyline over calm ocean with glowing warm golden hour light, high resolution HD 8k graphic poster';
+          promptConcept = "A professional graphic design social media poster with bold calligraphic typography heading text 'Good Evening!' written at the top, elegant subtitle quote 'Wishing you a peaceful and pleasant evening ahead', serene golden hour sunset skyline over calm ocean, warm ambient lighting, 8k HD graphic poster design";
           title = 'Good Evening Poster';
           caption = `🌇 Good evening! Wishing you a peaceful, relaxed, and pleasant evening ahead! ✨\n\n#GoodEvening #Tolee #Relaxation #Community`;
         } else if (isGoodMorning) {
-          promptConcept = 'Inspiring good morning sunrise poster with golden sunlight over peaceful mountains, crystal clear HD 8k social media graphic poster';
+          promptConcept = "A professional graphic design social media poster with bold calligraphic typography text 'Good Morning!' written at the top, inspirational subtitle quote 'Every morning is a new opportunity to start fresh and be grateful', morning sunrise background over peaceful hills, steaming cup of coffee on wooden table, cinematic lighting, 8k HD graphic poster design";
           title = 'Good Morning Poster';
           caption = `🌅 Good morning! Wishing everyone a peaceful, inspiring, and productive day ahead! ✨\n\n#GoodMorning #Tolee #Inspiration #Community`;
         } else {
@@ -599,12 +599,14 @@ export async function processAIPersonalMessage(
           const cleanTopic = normalized
             .replace(/image|photo|pic|picture|tasveer|banner|poster|banao|bana do|bana|karo|post|create|generate|group|share|me|mein|par|pe|creative|mast|shandar|badhiya|mujhe|ka|ke|ki|ko|do|ek|hai|please|kardo|karke|iamge|इमेज|जनरेट|बनाओ|बना दो|बना|फोटो|पोस्टर|बैनर|पोस्ट|शेयर|हेलो|मुझे|का|के|दो/gi, '')
             .trim();
-          promptConcept = cleanTopic.length >= 3 
-            ? `High resolution professional 8k HD graphic poster of ${cleanTopic}, vibrant color palette, cinematic lighting, social media artwork` 
-            : 'Inspiring modern visual banner poster, vibrant colors, clean aesthetic';
-          title = `AI Image: ${cleanTopic.slice(0, 30) || 'Creative Art'}`;
+          
+          const topicDisplay = cleanTopic.length >= 2 ? (cleanTopic.charAt(0).toUpperCase() + cleanTopic.slice(1)) : 'Creative Poster';
 
-          const topicDisplay = cleanTopic.length >= 2 ? (cleanTopic.charAt(0).toUpperCase() + cleanTopic.slice(1)) : 'Special Visual';
+          promptConcept = cleanTopic.length >= 3 
+            ? `A high resolution professional graphic design poster of ${cleanTopic}, featuring artistic calligraphy typography title '${topicDisplay.toUpperCase()}', vibrant color palette, studio cinematic lighting, 8k HD social media artwork poster` 
+            : 'A professional graphic design social media banner poster with artistic typography heading, vibrant colors, clean aesthetic, 8k HD poster design';
+          title = `AI Image: ${topicDisplay.slice(0, 30)}`;
+
           caption = `✨ ${topicDisplay}! Designed with love & creativity on Tolee AI Manager. What do you think about this? Drop your thoughts below! 👇\n\n#${topicDisplay.replace(/\s+/g, '')} #Tolee #AIArt #Community #Trending`;
         }
 
