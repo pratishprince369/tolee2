@@ -110,7 +110,7 @@ export function VoiceCompanionModal({ isOpen, onClose, onSelectTab }: VoiceCompa
               <h2 className="text-base font-bold flex items-center gap-2 text-transparent bg-clip-text bg-gradient-to-r from-violet-300 via-cyan-200 to-white">
                 Tolee Voice Companion
                 <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
-                  J.A.R.V.I.S. Mode
+                  Voice AI Mode
                 </span>
               </h2>
               <p className="text-xs text-slate-400">Continuous Wake-Word Voice Companion</p>

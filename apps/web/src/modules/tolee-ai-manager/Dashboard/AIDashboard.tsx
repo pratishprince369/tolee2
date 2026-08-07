@@ -59,7 +59,7 @@ export function AIDashboard() {
     {
       id: 'init_1',
       sender: 'Tolee AI Manager',
-      text: 'Good morning! I am your 24×7 Personal Tolee AI Manager, inspired by J.A.R.V.I.S. How can I manage your posts, Tolees, CRM leads, or calendar today?',
+      text: 'Good morning! I am your 24×7 Personal Tolee AI Manager. How can I manage your posts, Tolees, CRM leads, or calendar today?',
       isAI: true,
       time: formatTime()
     }

@@ -22,7 +22,7 @@ export function VoiceCompanionDock({ onSelectTab }: VoiceCompanionDockProps) {
         <Radio className="w-3.5 h-3.5" />
         <span className="hidden sm:inline">Voice Companion</span>
         <span className="text-[9px] bg-white/20 px-1.5 py-0.5 rounded-full uppercase tracking-wider">
-          J.A.R.V.I.S.
+          AI Voice
         </span>
       </Button>
 
