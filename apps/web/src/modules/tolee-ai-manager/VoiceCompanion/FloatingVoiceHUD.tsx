@@ -114,20 +114,33 @@ export function FloatingVoiceHUD({ isOpen, onClose, onSelectTab, onSendMessage }
       const parsed = parseVoiceCommand(transcript);
       setSpeechText(`🗣️ Processing: "${transcript}"`);
 
-      let spokenReply = parsed.responseText;
-
-      if (parsed.intent === 'READ_NOTIFICATIONS') {
-        const briefingRes = await getVoiceNotificationBriefing();
-        spokenReply = briefingRes.briefing;
-      } else if (parsed.intent === 'OPEN_MODULE' && parsed.targetModule) {
-        onSelectTab(parsed.targetModule);
-      } else {
-        const aiResult = await onSendMessage(transcript);
-        if (typeof aiResult === 'string' && aiResult.trim().length > 0) {
-          // Strip Markdown formatting symbols (*, _, #, `, [ ]) for clean natural spoken voice
-          spokenReply = aiResult.replace(/[*_#`[\]()]/g, '').trim();
+      // 1. ALWAYS append message to Chat UI box first!
+      let aiResultText = '';
+      try {
+        const res = await onSendMessage(transcript);
+        if (typeof res === 'string') {
+          aiResultText = res;
         }
+      } catch (err) {
+        console.error('onSendMessage error in voice command handler:', err);
       }
+
+      // 2. Handle module tab switching if requested by intent
+      if (parsed.intent === 'OPEN_MODULE' && parsed.targetModule) {
+        onSelectTab(parsed.targetModule);
+      }
+
+      // 3. Prepare clean spoken text
+      let spokenReply = aiResultText || parsed.responseText;
+      if (parsed.intent === 'READ_NOTIFICATIONS') {
+        try {
+          const briefingRes = await getVoiceNotificationBriefing();
+          if (briefingRes?.briefing) spokenReply = briefingRes.briefing;
+        } catch (e) {}
+      }
+
+      // Strip Markdown formatting symbols (*, _, #, `, [ ]) for clean natural spoken voice
+      spokenReply = spokenReply.replace(/[*_#`[\]()]/g, '').trim();
 
       let spokenLang = parsed.detectedLang;
       if (/[\u0900-\u097F]/.test(spokenReply)) {
