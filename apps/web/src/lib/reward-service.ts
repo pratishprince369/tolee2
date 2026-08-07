@@ -195,8 +195,8 @@ export async function triggerRewardNotifications(userId: string) {
       data: {
         userId,
         type: 'CREATOR_REWARD_REMINDER',
-        title: status.postsToday === 0 ? '📢 Post Daily & Earn ₹3,999 in Ads Wallet!' : '✨ ₹3,999 Ads Wallet Monthly Goal',
-        content: status.notificationMessage
+        title: '🎁 Official Creator Reward Offer: ₹3,999/- in Ads Wallet!',
+        content: `Tolee gives every User ₹3,999/- in Ads Wallet! Post 1 or 2 posts daily (Reels, Videos, Images, or Blogs) on Tolee. Maintain your daily streak to receive ₹3,999 automatically credited to your Ads Wallet every month!\n\nStatus: ${status.notificationMessage}`
       }
     });
 

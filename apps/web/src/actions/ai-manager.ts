@@ -476,6 +476,9 @@ export async function getAIDashboardSummary() {
       })
     ]);
 
+    // Automatically deliver ₹3,999 Creator Offer Notification to user's Bell Icon
+    triggerRewardNotifications(userId).catch(err => console.error('Reward notification trigger notice:', err));
+
     return {
       success: true,
       summary: {
