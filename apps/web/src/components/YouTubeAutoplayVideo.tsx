@@ -105,7 +105,7 @@ export function YouTubeAutoplayVideo({
     }
   };
 
-  // controls=0 & modestbranding=1 COMPLETELY ERASES YouTube logo, title link & bottom bar!
+  // controls=0 & modestbranding=1
   const embedSrc = cleanVideoId
     ? `https://www.youtube-nocookie.com/embed/${cleanVideoId}?autoplay=${isIntersecting ? 1 : 0}&mute=${isMuted ? 1 : 0}&controls=0&enablejsapi=1&playsinline=1&rel=0&modestbranding=1&showinfo=0&iv_load_policy=3&disablekb=1&fs=0`
     : '';
@@ -128,19 +128,23 @@ export function YouTubeAutoplayVideo({
     >
       {mounted && isIntersecting && cleanVideoId ? (
         <div className="relative w-full h-full overflow-hidden select-none">
+          {/* scale-[1.18] physically crops the outer 9% edges of YouTube iframe where logo & controls sit */}
           <iframe
             ref={iframeRef}
             src={embedSrc}
             title={title || 'YouTube Video'}
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
             onError={() => setHasError(true)}
-            className="w-full h-full border-none scale-[1.06] origin-center pointer-events-none"
+            className="w-full h-full border-none scale-[1.18] origin-center pointer-events-none transform"
           />
 
           {/* Transparent Mouse Event Interceptor: Blocks mouse hover events from hitting YouTube iframe */}
           <div className="absolute inset-0 z-10 cursor-pointer" />
 
-          {/* Tolee Custom Control Overlays (Top-Right Audio Toggle & Category) */}
+          {/* Top Edge Clean Mask */}
+          <div className="absolute top-0 left-0 right-0 h-10 bg-gradient-to-b from-black/80 to-transparent pointer-events-none z-15" />
+
+          {/* Tolee Custom Control Overlays (Top-Right Audio Toggle) */}
           <div className="absolute top-3 right-3 flex items-center gap-2 z-20 pointer-events-auto">
             <button
               type="button"
@@ -156,9 +160,9 @@ export function YouTubeAutoplayVideo({
             </button>
           </div>
 
-          {/* Bottom-Right Watermark Mask: 100% Covers YouTube Logo & "More Videos" popup button */}
-          <div className="absolute bottom-0 right-0 h-16 w-80 bg-zinc-950/98 backdrop-blur-xl flex items-center justify-end px-4 rounded-tl-2xl pointer-events-none z-20 shadow-2xl border-t border-l border-zinc-800/90">
-            <span className="text-xs font-black tracking-widest text-teal-400 uppercase flex items-center gap-2">
+          {/* Bottom Edge Clean Mask + TOLEE HD Watermark */}
+          <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-black/90 via-black/40 to-transparent pointer-events-none z-15 flex items-end justify-end px-3 py-2">
+            <span className="text-[11px] font-black tracking-widest text-teal-400 uppercase flex items-center gap-1.5 drop-shadow-md">
               <span className="w-2 h-2 rounded-full bg-teal-400 animate-ping" />
               TOLEE HD
             </span>
