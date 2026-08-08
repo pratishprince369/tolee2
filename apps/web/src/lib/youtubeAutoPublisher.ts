@@ -10,6 +10,7 @@ export interface YouTubeVideoItem {
   watchUrl: string;
   embedUrl: string;
   language: 'hi' | 'mr' | 'en';
+  category: string;
 }
 
 /**
@@ -18,12 +19,172 @@ export interface YouTubeVideoItem {
 function cleanYouTubeTitle(title: string): string {
   if (!title) return '';
   return title
-    .replace(/#\w+/g, '') // Remove hashtags
+    .replace(/#\w+/g, '')
     .replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1')
     .replace(/[<>]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
+
+/**
+ * EXPANDED VIDEO CATEGORIES — Discovery, Animation, NASA, Nat Geo, Short Films, Education, etc.
+ */
+const YOUTUBE_VIDEO_CATEGORIES: Record<string, string[]> = {
+  // === SCIENCE & SPACE ===
+  'NASA & Space': [
+    'NASA space rocket launch 2026 4k official',
+    'NASA James Webb telescope discoveries universe',
+    'SpaceX Starship launch Mars mission 2026',
+    'ISS International Space Station astronaut life',
+    'solar system planets exploration documentary 4k',
+    'black hole universe documentary science 4k',
+    'NASA Artemis Moon mission highlights'
+  ],
+
+  // === DISCOVERY & NATURE ===
+  'Discovery & Wildlife': [
+    'Discovery Channel wildlife documentary 4k hd',
+    'ocean deep sea creatures documentary 4k',
+    'African safari lion tiger wildlife 4k',
+    'Amazon rainforest documentary nature 4k',
+    'animal planet predators wildlife documentary',
+    'coral reef underwater world documentary 4k',
+    'extreme weather nature documentary 4k'
+  ],
+
+  // === NATIONAL GEOGRAPHIC ===
+  'National Geographic': [
+    'National Geographic documentary 4k hd 2026',
+    'National Geographic animals nature world',
+    'Nat Geo wild ancient civilizations history',
+    'National Geographic ocean exploration deep sea',
+    'Nat Geo science technology innovation documentary',
+    'National Geographic survival adventure extreme',
+    'Nat Geo earth planet documentary 4k'
+  ],
+
+  // === ANIMATION & CARTOONS ===
+  'Animation & Cartoons': [
+    '3d animated cartoon kids funny video 2026',
+    'best animated short film award winning',
+    'Pixar style animation short film 4k',
+    'funny cartoon animation comedy kids',
+    'CGI animated short film 3d 4k',
+    'nursery rhymes baby songs cartoon animation',
+    'anime best scenes action adventure'
+  ],
+
+  // === EDUCATION ===
+  'Education': [
+    'educational documentary science technology 4k',
+    'how things work explained documentary',
+    'AI artificial intelligence explained 2026',
+    'history of ancient civilizations documentary',
+    'physics quantum mechanics explained simply',
+    'TED talk best motivational speech 2026',
+    'brain science psychology documentary'
+  ],
+
+  // === SHORT FILMS ===
+  'Short Films': [
+    'best short film award winning 2026',
+    'emotional short film drama story',
+    'inspirational short film motivational',
+    'sci-fi short film futuristic 4k',
+    'comedy short film funny sketch',
+    'animated short film oscar nominated',
+    'thriller suspense short film'
+  ],
+
+  // === NEWS & CURRENT AFFAIRS ===
+  'News & Current Affairs': [
+    'India latest news today breaking 2026',
+    'world news international affairs update today',
+    'technology news AI startup update 2026',
+    'business finance market news today India',
+    'political news India parliament session today',
+    'climate change environment news 2026',
+    'health medical news breakthrough 2026'
+  ],
+
+  // === TECHNOLOGY & GADGETS ===
+  'Technology': [
+    'latest tech unboxing gadgets review AI 2026',
+    'iPhone Samsung new phone unboxing review',
+    'AI robotics future technology 2026 4k',
+    'electric car EV Tesla review 2026',
+    'gaming PC setup build 2026 4k',
+    'smart home IoT automation gadgets 2026',
+    'drone camera 4k aerial footage technology'
+  ],
+
+  // === FOOD & COOKING ===
+  'Food & Recipes': [
+    'indian street food recipe travel vlog 2026',
+    'best cooking recipe kitchen hacks tips',
+    'gordon ramsay style cooking professional chef',
+    'viral food recipes TikTok trending 2026',
+    'healthy eating meal prep nutrition guide',
+    'world best restaurants food documentary',
+    'Mumbai Delhi street food tour 4k vlog'
+  ],
+
+  // === COMEDY & ENTERTAINMENT ===
+  'Comedy & Entertainment': [
+    'standup comedy clips funny humor India 2026',
+    'best funny comedy video meme clips 2026',
+    'prank videos funny reaction compilation',
+    'funny Indian comedy videos skits pranks',
+    'comedy podcast highlights funny moments',
+    'late night show best comedy moments',
+    'improv comedy sketch funny viral'
+  ],
+
+  // === SPORTS ===
+  'Sports': [
+    'cricket match top highlights IPL 2026',
+    'football soccer goals best highlights 2026',
+    'Olympics sports highlights moments 4k',
+    'NBA basketball best dunks plays 2026',
+    'combat sports MMA boxing highlights',
+    'extreme sports adventure skateboarding surfing',
+    'Formula 1 race highlights 2026'
+  ],
+
+  // === FINANCE & STOCK MARKET ===
+  'Finance & Markets': [
+    'stock market trading sensex nifty analysis 2026',
+    'cryptocurrency bitcoin ethereum news today',
+    'personal finance investing tips beginners',
+    'mutual fund SIP investment strategy India',
+    'real estate property market India 2026',
+    'startup funding venture capital India 2026',
+    'forex trading strategy tutorial 2026'
+  ],
+
+  // === MUSIC & ARTS ===
+  'Music & Arts': [
+    'best music video new songs 2026 trending',
+    'classical music orchestra performance live',
+    'bollywood new songs music video 2026',
+    'piano guitar cover songs acoustic live',
+    'art painting timelapse satisfying creative',
+    'dance performance choreography viral 2026',
+    'street music busking performance amazing'
+  ]
+};
+
+/**
+ * Per-account category assignment — each account publishes specific types of video content
+ */
+const ACCOUNT_VIDEO_CATEGORIES: Record<string, string[]> = {
+  'adsvidia369@gmail.com': ['NASA & Space', 'Technology', 'Education'],
+  'loktimes369@gmail.com': ['Discovery & Wildlife', 'National Geographic', 'Animation & Cartoons'],
+  'updatesontimes@gmail.com': ['News & Current Affairs', 'Short Films', 'Education'],
+  'vadapavwaledada@gmail.com': ['Food & Recipes', 'Animation & Cartoons', 'Comedy & Entertainment'],
+  'rinkugupta90282@gmail.com': ['Sports', 'Discovery & Wildlife', 'Music & Arts'],
+  'foodpaass@gmail.com': ['Finance & Markets', 'NASA & Space', 'Short Films']
+};
 
 /**
  * Fetch top YouTube videos for a specific query & language using YouTube Data API v3
@@ -33,9 +194,15 @@ async function fetchYouTubeVideos(query: string, lang: 'hi' | 'mr' | 'en', maxRe
   const regionCode = 'IN';
 
   try {
-    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&regionCode=${regionCode}&maxResults=${maxResults}&key=${apiKey}`;
+    // Use videoDuration=medium to get proper videos (4-20 min), not shorts
+    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&videoDuration=medium&regionCode=${regionCode}&maxResults=${maxResults}&order=date&key=${apiKey}`;
     const res = await fetch(url, { cache: 'no-store' });
     const data = await res.json();
+
+    if (data.error) {
+      console.error(`YouTube API Error:`, data.error.message || JSON.stringify(data.error));
+      return [];
+    }
 
     if (data.items && Array.isArray(data.items) && data.items.length > 0) {
       return data.items.map((item: any) => {
@@ -46,10 +213,11 @@ async function fetchYouTubeVideos(query: string, lang: 'hi' | 'mr' | 'en', maxRe
           title: cleanYouTubeTitle(snippet.title || ''),
           description: snippet.description || '',
           thumbnail: snippet.thumbnails?.high?.url || snippet.thumbnails?.medium?.url || `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
-          channelTitle: snippet.channelTitle || 'YouTube News',
+          channelTitle: snippet.channelTitle || 'YouTube',
           watchUrl: `https://www.youtube.com/watch?v=${videoId}`,
           embedUrl: `https://www.youtube.com/embed/${videoId}`,
-          language: lang
+          language: lang,
+          category: query
         };
       }).filter((v: YouTubeVideoItem) => v.videoId && v.title && v.title.length > 5);
     }
@@ -60,83 +228,47 @@ async function fetchYouTubeVideos(query: string, lang: 'hi' | 'mr' | 'en', maxRe
 }
 
 /**
- * Publishes YouTube Video News Posts across the 5 registered user accounts
+ * FIXED: Publishes YouTube Videos as actual VIDEO posts (not news posts)
+ * with embedded YouTube player URLs in mediaUrls
  */
 export async function publishYouTubeVideosBatch(withDelay: boolean = false): Promise<{ success: boolean; count: number; log: string[] }> {
   const logs: string[] = [];
-  logs.push("Starting YouTube Video News Auto-Publisher batch execution...");
+  logs.push("🎬 Starting YouTube Video Auto-Publisher with EXPANDED categories...");
 
   try {
-    // Expanded Topic Categories: NASA, Discovery, Cartoons, Comedy, Education, Tech, Food, Sports, Finance
-    const topicPools: Record<string, string[]> = {
-      'adsvidia369@gmail.com': [
-        'NASA space universe rocket launch discovery science 4k',
-        'latest tech unboxing gadgets review AI 2026',
-        'science educational experiments documentary 4k'
-      ],
-      'loktimes369@gmail.com': [
-        'Discovery channel wild nature documentary 4k hd',
-        'मराठी बातम्या महाराष्ट्र ट्रेंडिंग ट्रॅव्हल व्लॉग',
-        '3d animated cartoon kids funny video'
-      ],
-      'updatesontimes@gmail.com': [
-        'india business market tech news podcast today',
-        'space documentary universe exploration NASA 4k',
-        'funny Indian comedy videos skits pranks'
-      ],
-      'vadapavwaledada@gmail.com': [
-        'indian street food recipe travel vlog 2026',
-        'cute baby funny videos nursery rhymes cartoon animation',
-        'standup comedy clips funny humor videos'
-      ],
-      'rinkugupta90282@gmail.com': [
-        'cricket match top highlights sports news gaming',
-        '3d cartoon animated kids fun stories',
-        'Discovery channel animal wildlife documentary'
-      ],
-      'foodpaass@gmail.com': [
-        'stock market trading sensex nifty crypto strategy',
-        'NASA space galaxy rocket technology discovery',
-        'best funny comedy video meme clips 2026'
-      ]
-    };
-
-    const accountQueries = REGISTERED_NEWS_ACCOUNTS.map(acc => {
-      const pool = topicPools[acc.email] || ['NASA Discovery science space documentary 4k'];
-      const randomQuery = pool[Math.floor(Math.random() * pool.length)];
-      return {
-        email: acc.email,
-        query: randomQuery,
-        lang: acc.language
-      };
-    });
-
     const userEmails = REGISTERED_NEWS_ACCOUNTS.map(a => a.email);
     const users = await prisma.user.findMany({
       where: { email: { in: userEmails } },
       select: { id: true, email: true, name: true, username: true }
     });
 
-    const userMap = new Map<string, { id: string; email: string; name: string | null; username: string | null }>(users.map((u: any) => [u.email, u]));
-    const defaultTolee = await prisma.tolee.findFirst({ select: { id: true } });
+    const userMap = new Map<string, { id: true; email: string; name: string | null; username: string | null }>(users.map((u: any) => [u.email, u]));
+    const allTolees = await prisma.tolee.findMany({ select: { id: true } });
 
     let publishedCount = 0;
     const batchProcessedVideos = new Set<string>();
 
-    for (const config of accountQueries) {
-      const dbUser = userMap.get(config.email);
-      const accountMeta = REGISTERED_NEWS_ACCOUNTS.find(a => a.email === config.email);
-
-      if (!dbUser || !accountMeta) {
-        logs.push(`Skipping YouTube publishing for ${config.email}: User account not found.`);
+    for (const account of REGISTERED_NEWS_ACCOUNTS) {
+      const dbUser = userMap.get(account.email);
+      if (!dbUser) {
+        logs.push(`⚠️ Skipping ${account.email}: User not found in DB.`);
         continue;
       }
 
-      logs.push(`Fetching YouTube videos for @${dbUser.username} (${accountMeta.languageName})...`);
-      const videoItems = await fetchYouTubeVideos(config.query, config.lang, 5);
+      // Get assigned categories for this account
+      const assignedCategories = ACCOUNT_VIDEO_CATEGORIES[account.email] || ['NASA & Space', 'Discovery & Wildlife'];
+      
+      // Pick a random category from assigned list
+      const selectedCategory = assignedCategories[Math.floor(Math.random() * assignedCategories.length)];
+      const queries = YOUTUBE_VIDEO_CATEGORIES[selectedCategory] || ['documentary 4k hd'];
+      const selectedQuery = queries[Math.floor(Math.random() * queries.length)];
+
+      logs.push(`🔍 Fetching [${selectedCategory}] videos for @${dbUser.username} → "${selectedQuery}"...`);
+
+      const videoItems = await fetchYouTubeVideos(selectedQuery, account.language, 8);
 
       if (videoItems.length === 0) {
-        logs.push(`No YouTube videos returned for @${dbUser.username}.`);
+        logs.push(`❌ No YouTube videos returned for @${dbUser.username} (${selectedCategory}).`);
         continue;
       }
 
@@ -145,12 +277,12 @@ export async function publishYouTubeVideosBatch(withDelay: boolean = false): Pro
       for (const v of videoItems) {
         if (batchProcessedVideos.has(v.videoId)) continue;
 
-        // Check if video or title already posted in DB
+        // Check if video already posted in DB (by videoId in mediaUrls or title match)
         const dbExisting = await prisma.post.findFirst({
           where: {
             OR: [
-              { caption: { contains: v.title.slice(0, 25), mode: 'insensitive' } },
-              { mediaUrls: { contains: v.videoId } }
+              { mediaUrls: { contains: v.videoId } },
+              { caption: { contains: v.title.slice(0, 30), mode: 'insensitive' } }
             ]
           }
         });
@@ -159,35 +291,35 @@ export async function publishYouTubeVideosBatch(withDelay: boolean = false): Pro
           selectedVideo = v;
           break;
         } else {
-          logs.push(`Skipping YouTube Video "${v.title.slice(0, 30)}..." (Already posted in DB).`);
+          logs.push(`  ↳ Skipping duplicate: "${v.title.slice(0, 35)}..."`);
         }
       }
 
       if (!selectedVideo) {
-        logs.push(`All fetched videos for @${dbUser.username} were duplicates.`);
+        logs.push(`⚠️ All fetched [${selectedCategory}] videos for @${dbUser.username} were duplicates.`);
         continue;
       }
 
       batchProcessedVideos.add(selectedVideo.videoId);
 
-      // Create Video News Post
+      // Generate slug
       const slugBase = selectedVideo.title
         .toLowerCase()
         .replace(/[^\w\s-]/g, '')
         .replace(/\s+/g, '-')
         .slice(0, 60);
-      const slug = `yt-${slugBase}-${Date.now().toString().slice(-4)}`;
+      const slug = `yt-${slugBase}-${Date.now().toString().slice(-5)}`;
 
-      const localizedContent = `🎥 **YouTube Video News**:\n📌 Watch full video: ${selectedVideo.title}\n📺 Channel: ${selectedVideo.channelTitle}\n\n📖 **Report & Highlights**:\n${selectedVideo.description.slice(0, 300) || 'Watch live verified coverage and video reporting directly on Tolee News.'}\n\nStay connected with Tolee News for live video updates.`;
+      // Video content description
+      const videoContent = `🎥 **${selectedCategory} Video**\n\n📌 **${selectedVideo.title}**\n📺 Channel: ${selectedVideo.channelTitle}\n\n📖 ${selectedVideo.description.slice(0, 400) || `Watch this ${selectedCategory.toLowerCase()} video on Tolee.`}\n\n🔗 Watch full video: ${selectedVideo.watchUrl}\n\nStay connected with Tolee for daily video updates across NASA, Discovery, Animation, Education, Sports, and more!`;
 
-      const allTolees = await prisma.tolee.findMany({ select: { id: true } });
-
+      // ========== FIXED: Create as VIDEO post with embedded YouTube URL ==========
       await prisma.post.create({
         data: {
-          caption: selectedVideo.title,
-          postType: 'news',
-          mediaUrls: selectedVideo.thumbnail,
-          mediaTypes: 'image',
+          caption: `🎬 ${selectedVideo.title}`,
+          postType: 'video',                          // ← FIXED: was 'news', now 'video'
+          mediaUrls: selectedVideo.embedUrl,           // ← FIXED: YouTube embed URL (not thumbnail)
+          mediaTypes: 'video',                         // ← FIXED: was 'image', now 'video'
           status: 'published',
           authorId: dbUser.id,
           tolees: allTolees.length > 0 ? { create: allTolees.map((t: any) => ({ toleeId: t.id })) } : undefined,
@@ -195,18 +327,19 @@ export async function publishYouTubeVideosBatch(withDelay: boolean = false): Pro
             create: {
               headline: selectedVideo.title,
               slug,
-              summary: selectedVideo.description.slice(0, 200) || `Watch ${selectedVideo.title} on Tolee News.`,
-              category: accountMeta.category,
-              content: localizedContent,
-              metaDescription: `Watch video coverage of ${selectedVideo.title} on Tolee News.`,
-              keywords: `youtube, video, news, ${accountMeta.category.toLowerCase().replace(/[^a-z0-9]/g, '')}, tolee`,
-              tags: `youtube, video, ${accountMeta.languageName.toLowerCase()}`,
+              summary: selectedVideo.description.slice(0, 200) || `Watch ${selectedVideo.title} on Tolee.`,
+              category: selectedCategory,
+              content: videoContent,
+              metaDescription: `Watch ${selectedCategory}: ${selectedVideo.title} on Tolee`,
+              keywords: `${selectedCategory.toLowerCase()}, youtube, video, ${account.languageName.toLowerCase()}, tolee`,
+              tags: `${selectedCategory.toLowerCase()}, youtube, video, ${account.languageName.toLowerCase()}`,
               seoScore: 94,
               aeoScore: 90,
               geoScore: 88,
-              language: accountMeta.languageName,
+              language: account.languageName,
               sourceUrl: selectedVideo.watchUrl,
-              readingTime: 3
+              readingTime: 5,
+              coverCaption: selectedVideo.thumbnail           // Store thumbnail as cover image reference
             }
           }
         }
@@ -214,20 +347,20 @@ export async function publishYouTubeVideosBatch(withDelay: boolean = false): Pro
 
       publishedCount++;
       const delayMins = Math.floor(Math.random() * 15) + 10;
-      logs.push(`[YouTube Post #${publishedCount}] Published [${accountMeta.languageName.toUpperCase()}] "${selectedVideo.title.slice(0, 40)}..." (Channel: ${selectedVideo.channelTitle}) under @${dbUser.username}. [Next gap: ~${delayMins}m]`);
+      logs.push(`✅ [Video #${publishedCount}] Published [${selectedCategory}] "${selectedVideo.title.slice(0, 45)}..." (${selectedVideo.channelTitle}) by @${dbUser.username}`);
 
-      if (withDelay && publishedCount < 5) {
+      if (withDelay && publishedCount < REGISTERED_NEWS_ACCOUNTS.length) {
         const delayMs = delayMins * 60 * 1000;
-        logs.push(`⏱️ Waiting ${delayMins} minutes before posting next YouTube video...`);
+        logs.push(`⏱️ Waiting ${delayMins} min before next video...`);
         await new Promise(res => setTimeout(res, delayMs));
       }
     }
 
-    logs.push(`YouTube Video Auto-Publisher completed: ${publishedCount} video news posts published.`);
+    logs.push(`\n🎬 YouTube Video Auto-Publisher completed: ${publishedCount} video posts published across ${Object.keys(YOUTUBE_VIDEO_CATEGORIES).length} categories.`);
     return { success: true, count: publishedCount, log: logs };
 
   } catch (error: any) {
-    logs.push(`Fatal Error in youtube auto-publisher: ${error.message}`);
+    logs.push(`🔴 Fatal Error: ${error.message}`);
     return { success: false, count: 0, log: logs };
   }
 }
