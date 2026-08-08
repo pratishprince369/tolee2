@@ -2,14 +2,31 @@
 
 import { VoiceCompanionMode, VoicePriorityConfig, SpokenNotification } from './voiceTypes';
 
+// Pre-load Web Speech Synthesis voices globally
+if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+  try {
+    window.speechSynthesis.getVoices();
+    if (window.speechSynthesis.onvoiceschanged !== undefined) {
+      window.speechSynthesis.onvoiceschanged = () => {
+        try { window.speechSynthesis.getVoices(); } catch (e) {}
+      };
+    }
+  } catch (e) {}
+}
+
+/**
+ * Mobile Audio Unlocker:
+ * Bypasses iOS Safari & Android Chrome Web Audio & SpeechSynthesis Autoplay restrictions
+ * by triggering a silent audio buffer on any user touch/click gesture.
+ */
 export function unlockMobileAudio() {
   if (typeof window === 'undefined') return;
   
-  // Unlock SpeechSynthesis audio playback on Mobile Safari & Android Chrome
+  // 1. Unlock Web SpeechSynthesis
   if ('speechSynthesis' in window) {
     try {
       window.speechSynthesis.resume();
-      const unlockUtterance = new SpeechSynthesisUtterance(' ');
+      const unlockUtterance = new SpeechSynthesisUtterance('');
       unlockUtterance.volume = 0.01;
       unlockUtterance.rate = 10;
       window.speechSynthesis.speak(unlockUtterance);
@@ -18,11 +35,14 @@ export function unlockMobileAudio() {
     }
   }
 
-  // Unlock Web Audio API context for Mobile Safari / Android Chrome
+  // 2. Create/Unlock persistent Web Audio Context & Dummy Audio Node
   try {
     const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
     if (AudioCtx) {
-      const ctx = new AudioCtx();
+      if (!(window as any)._toleeAudioCtx) {
+        (window as any)._toleeAudioCtx = new AudioCtx();
+      }
+      const ctx = (window as any)._toleeAudioCtx;
       if (ctx.state === 'suspended') {
         ctx.resume();
       }
@@ -32,6 +52,17 @@ export function unlockMobileAudio() {
       source.connect(ctx.destination);
       source.start(0);
     }
+  } catch (e) {}
+
+  // 3. Create persistent HTML5 Audio element to keep mobile audio channel unlocked
+  try {
+    if (!(window as any)._toleeUnlockedAudioElem) {
+      const audio = new Audio();
+      audio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+      (window as any)._toleeUnlockedAudioElem = audio;
+    }
+    const elem = (window as any)._toleeUnlockedAudioElem;
+    elem.play().catch(() => {});
   } catch (e) {}
 }
 
@@ -78,6 +109,7 @@ export class VoiceCompanionEngine {
     try {
       this.recognition = new SpeechRecognition();
       const isMobile = typeof window !== 'undefined' && (window.innerWidth < 768 || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent));
+      
       // Continuous mode causes silent drops on Mobile Safari/Chrome; setting continuous=false on mobile is 100x more reliable
       this.recognition.continuous = !isMobile;
       this.recognition.interimResults = true;
@@ -147,7 +179,7 @@ export class VoiceCompanionEngine {
         this.notifyStatus();
       }
     } catch (e: any) {
-      console.warn('Voice Engine listening notice, retrying with fresh instance:', e);
+      console.warn('Voice Engine listening notice, retrying fresh instance:', e);
       this.isListening = false;
       this.initRecognition();
       try {
@@ -174,6 +206,9 @@ export class VoiceCompanionEngine {
     }
   }
 
+  /**
+   * Speak out response using Authentic Indian Human Voice Synthesis with Fallback Audio Engine
+   */
   public speak(text: string, langCode: string = 'hi-IN', onEnd?: () => void) {
     if (typeof window === 'undefined') return;
     if (this.mode === 'SILENT' || this.mode === 'MEETING') return;
@@ -183,8 +218,15 @@ export class VoiceCompanionEngine {
     this.stopListening();
     unlockMobileAudio();
 
+    const cleanSpokenText = text
+      .replace(/[*_#`[\]()]/g, '')
+      .replace(/https?:\/\/\S+/gi, '')
+      .trim();
+
+    if (!cleanSpokenText) return;
+
     if (!('speechSynthesis' in window)) {
-      this.fallbackAudioSpeak(text, langCode, onEnd);
+      this.fallbackAudioSpeak(cleanSpokenText, langCode, onEnd);
       return;
     }
 
@@ -193,56 +235,54 @@ export class VoiceCompanionEngine {
       window.speechSynthesis.cancel(); // Cancel previous queued speech
     } catch (e) {}
 
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 0.95; // Smooth, mature human cadence
-    utterance.pitch = 1.0;  // Warm natural human pitch
-    utterance.lang = langCode;
+    const utterance = new SpeechSynthesisUtterance(cleanSpokenText);
+    utterance.rate = 0.92; // Natural, warm Indian conversational speed (not rushed)
+    utterance.pitch = 1.02; // Human warm pitch
 
-    // PREVENT GARBAGE COLLECTION: Store reference on window object!
+    // Prevent garbage collection on browser engines
     (window as any)._toleeActiveUtterance = utterance;
 
     const voices = window.speechSynthesis.getVoices();
 
-    // 🇮🇳 Authentic Indian Voice Selection Engine (Eliminating Western Accents)
-    let indianVoice = voices.find(v => {
-      const lang = v.lang.toLowerCase();
-      const name = v.name.toLowerCase();
-      return (
-        lang.includes('hi-in') || 
-        lang.includes('hi_in') || 
-        name.includes('swara') || 
-        name.includes('hemant') || 
-        name.includes('madhur') || 
-        name.includes('kalpana') || 
-        name.includes('karan') || 
-        name.includes('हिन्दी') || 
-        name.includes('hindi')
-      );
-    });
+    // 🇮🇳 Authentic Indian Human Voice Picker Algorithm
+    let selectedVoice: SpeechSynthesisVoice | undefined = undefined;
 
-    if (!indianVoice) {
-      indianVoice = voices.find(v => {
-        const lang = v.lang.toLowerCase();
-        const name = v.name.toLowerCase();
+    if (voices && voices.length > 0) {
+      // 1. Search for Google Hindi / Swara / Hemant / Natural Indian Hindi voices
+      selectedVoice = voices.find(v => {
+        const lang = (v.lang || '').toLowerCase();
+        const name = (v.name || '').toLowerCase();
         return (
-          lang.includes('en-in') || 
-          lang.includes('en_in') || 
-          name.includes('neerja') || 
-          name.includes('prabhat') || 
-          name.includes('india')
+          (lang.includes('hi') || name.includes('hindi') || name.includes('हिन्दी')) &&
+          (name.includes('google') || name.includes('swara') || name.includes('hemant') || name.includes('madhur') || name.includes('kalpana') || name.includes('karan') || name.includes('india'))
         );
       });
+
+      // 2. Search for any Hindi language voice
+      if (!selectedVoice) {
+        selectedVoice = voices.find(v => {
+          const lang = (v.lang || '').toLowerCase();
+          return lang.includes('hi-in') || lang.includes('hi_in') || lang.startsWith('hi');
+        });
+      }
+
+      // 3. Search for Indian Accent English Voice (Neerja, Prabhat, Google English India)
+      if (!selectedVoice) {
+        selectedVoice = voices.find(v => {
+          const lang = (v.lang || '').toLowerCase();
+          const name = (v.name || '').toLowerCase();
+          return (
+            lang.includes('en-in') || lang.includes('en_in') || name.includes('neerja') || name.includes('prabhat') || name.includes('india')
+          );
+        });
+      }
     }
 
-    if (!indianVoice) {
-      indianVoice = voices.find(v => v.lang.toLowerCase().startsWith('hi'));
-    }
-
-    if (indianVoice) {
-      utterance.voice = indianVoice;
-      utterance.lang = indianVoice.lang || 'hi-IN';
+    if (selectedVoice) {
+      utterance.voice = selectedVoice;
+      utterance.lang = selectedVoice.lang || langCode;
     } else {
-      utterance.lang = 'hi-IN';
+      utterance.lang = langCode || 'hi-IN';
     }
 
     let hasFinished = false;
@@ -255,19 +295,19 @@ export class VoiceCompanionEngine {
       this.notifyStatus();
       if (onEnd) onEnd();
 
-      // Automatically resume active listening as soon as AI finishes speaking!
+      // Automatically resume active listening on mobile/desktop after AI finishes speaking
       if (this.mode === 'ALWAYS_LISTENING' || this.mode === 'DRIVING') {
         setTimeout(() => this.startListening(), 400);
       }
     };
 
-    // Calculate maximum expected speaking duration with safety margin
-    const safetyTimeoutMs = Math.max(3500, Math.min(20000, (text.length / 10) * 1000 + 3000));
+    // Calculate safety timeout based on text length
+    const safetyTimeoutMs = Math.max(4000, Math.min(25000, (cleanSpokenText.length / 8) * 1000 + 4000));
     const safetyTimer = setTimeout(() => {
       if (!hasFinished) {
-        console.warn('SpeechSynthesis safety timeout triggered, attempting fallback audio speech...');
+        console.warn('SpeechSynthesis timeout on mobile, switching to Web Audio TTS fallback...');
         try { window.speechSynthesis.cancel(); } catch(e) {}
-        finishSpeaking();
+        this.fallbackAudioSpeak(cleanSpokenText, langCode, finishSpeaking);
       }
     }, safetyTimeoutMs);
 
@@ -282,26 +322,38 @@ export class VoiceCompanionEngine {
     };
 
     utterance.onerror = (err) => {
-      console.warn('SpeechSynthesis utterance error:', err);
+      console.warn('SpeechSynthesis utterance error, using audio fallback:', err);
       clearTimeout(safetyTimer);
-      this.fallbackAudioSpeak(text, langCode, finishSpeaking);
+      this.fallbackAudioSpeak(cleanSpokenText, langCode, finishSpeaking);
     };
 
     try {
       window.speechSynthesis.speak(utterance);
     } catch (err) {
-      console.warn('Failed to invoke speechSynthesis.speak, trying fallback:', err);
+      console.warn('Failed to invoke speechSynthesis.speak, using audio fallback:', err);
       clearTimeout(safetyTimer);
-      this.fallbackAudioSpeak(text, langCode, finishSpeaking);
+      this.fallbackAudioSpeak(cleanSpokenText, langCode, finishSpeaking);
     }
   }
 
+  /**
+   * High Reliability Mobile Audio Fallback TTS Engine
+   * Plays voice responses using Google Translate TTS HTML5 Audio stream
+   */
   private fallbackAudioSpeak(text: string, langCode: string, onEnd?: () => void) {
     try {
-      const cleanText = encodeURIComponent(text.slice(0, 200));
-      const langParam = langCode.startsWith('hi') ? 'hi' : langCode.startsWith('mr') ? 'mr' : 'en';
-      const audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${cleanText}&tl=${langParam}&client=tw-ob`;
-      const audio = new Audio(audioUrl);
+      const cleanText = text.slice(0, 250);
+      const langParam = langCode.startsWith('hi') ? 'hi' : langCode.startsWith('mr') ? 'mr' : langCode.startsWith('gu') ? 'gu' : langCode.startsWith('ta') ? 'ta' : langCode.startsWith('te') ? 'te' : 'hi';
+      const audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(cleanText)}&tl=${langParam}&client=tw-ob`;
+      
+      let audio: HTMLAudioElement;
+      if (typeof window !== 'undefined' && (window as any)._toleeUnlockedAudioElem) {
+        audio = (window as any)._toleeUnlockedAudioElem;
+        audio.src = audioUrl;
+      } else {
+        audio = new Audio(audioUrl);
+      }
+
       this.isSpeaking = true;
       this.notifyStatus();
 
@@ -318,7 +370,7 @@ export class VoiceCompanionEngine {
       };
 
       audio.play().catch(e => {
-        console.warn('Fallback audio playback error:', e);
+        console.warn('Fallback audio playback error on mobile:', e);
         this.isSpeaking = false;
         this.notifyStatus();
         if (onEnd) onEnd();
@@ -375,7 +427,7 @@ export class VoiceCompanionEngine {
 
       this.silenceTimer = setTimeout(() => {
         const textToProcess = this.currentSpokenText.trim();
-        if (textToProcess.length > 2 && textToProcess !== this.lastProcessedTranscript) {
+        if (textToProcess.length > 1 && textToProcess !== this.lastProcessedTranscript) {
           this.lastProcessedTranscript = textToProcess;
           this.currentSpokenText = '';
 
