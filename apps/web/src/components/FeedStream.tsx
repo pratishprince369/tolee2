@@ -1599,13 +1599,19 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
 
                   let ytVideoId = '';
                   if (isYouTube) {
+                    // Extract from sourceUrl
                     if (sourceUrlStr.includes('v=')) {
                       ytVideoId = sourceUrlStr.split('v=')[1]?.split('&')[0] || '';
                     } else if (sourceUrlStr.includes('youtu.be/')) {
                       ytVideoId = sourceUrlStr.split('youtu.be/')[1]?.split('?')[0] || '';
                     } else if (sourceUrlStr.includes('embed/')) {
                       ytVideoId = sourceUrlStr.split('embed/')[1]?.split('?')[0] || '';
-                    } else if (mediaUrlsStr.includes('/vi/')) {
+                    }
+                    // Extract from mediaUrls (embed URL stored directly)
+                    if (!ytVideoId && mediaUrlsStr.includes('youtube.com/embed/')) {
+                      ytVideoId = mediaUrlsStr.split('embed/')[1]?.split('?')[0]?.split(',')[0] || '';
+                    }
+                    if (!ytVideoId && mediaUrlsStr.includes('/vi/')) {
                       ytVideoId = mediaUrlsStr.split('/vi/')[1]?.split('/')[0] || '';
                     }
                   }

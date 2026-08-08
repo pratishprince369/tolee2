@@ -234,17 +234,27 @@ export function NewsFeedStream({
           let fallbackThumb = '';
 
           if (isYouTube) {
+            // Extract videoId from sourceUrl
             if (itemSourceUrl.includes('v=')) {
               ytVideoId = itemSourceUrl.split('v=')[1]?.split('&')[0] || '';
             } else if (itemSourceUrl.includes('youtu.be/')) {
               ytVideoId = itemSourceUrl.split('youtu.be/')[1]?.split('?')[0] || '';
             } else if (itemSourceUrl.includes('embed/')) {
               ytVideoId = itemSourceUrl.split('embed/')[1]?.split('?')[0] || '';
-            } else if (postMediaUrls.includes('/vi/')) {
+            }
+            // Extract videoId from mediaUrls (embed URL stored directly)
+            if (!ytVideoId && postMediaUrls.includes('youtube.com/embed/')) {
+              ytVideoId = postMediaUrls.split('embed/')[1]?.split('?')[0]?.split(',')[0] || '';
+            }
+            if (!ytVideoId && postMediaUrls.includes('/vi/')) {
               ytVideoId = postMediaUrls.split('/vi/')[1]?.split('/')[0] || '';
             }
+            // Thumbnail fallback: coverCaption may store thumbnail URL for video posts
             if (postMediaUrls.includes('i.ytimg.com') || postMediaUrls.includes('img.youtube.com')) {
               fallbackThumb = postMediaUrls.split(/,(?=https?:\/\/)/)[0];
+            }
+            if (!fallbackThumb && (item as any).coverCaption && (item as any).coverCaption.startsWith('http')) {
+              fallbackThumb = (item as any).coverCaption;
             }
           }
 
