@@ -32,16 +32,19 @@ export function VoiceInputDock({ onSendMessage, onToggleVoiceCompanion, isVoiceA
   };
 
   const toggleRecording = () => {
+    unlockMobileAudio();
     if (!isRecording) {
       setIsRecording(true);
       if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
         const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
         const recognition = new SpeechRecognition();
-        recognition.lang = 'en-US';
+        const savedLang = localStorage.getItem('tolee_native_lang') || 'hi-IN';
+        recognition.lang = savedLang;
         recognition.onresult = (event: any) => {
           const transcript = event.results[0][0].transcript;
           setInput(transcript);
           setIsRecording(false);
+          onSendMessage(transcript);
         };
         recognition.onerror = () => setIsRecording(false);
         recognition.onend = () => setIsRecording(false);

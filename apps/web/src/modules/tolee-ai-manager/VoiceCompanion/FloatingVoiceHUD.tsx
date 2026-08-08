@@ -174,41 +174,58 @@ export function FloatingVoiceHUD({ isOpen, onClose, onSelectTab, onSendMessage }
     onClose();
   };
 
-  const handleMicTap = () => {
+  const handleMicTap = (e?: React.SyntheticEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     unlockMobileAudio();
     if (engine) {
-      engine.startListening();
-      setSpeechText('🎙️ Listening... Speak your command!');
+      if (isListening) {
+        engine.stopListening();
+        setSpeechText('Processing voice input...');
+      } else {
+        engine.startListening();
+        setSpeechText('🎙️ Listening... Speak your command!');
+      }
     }
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed bottom-20 right-3 sm:bottom-24 sm:right-6 z-[99999] flex items-center gap-2.5 bg-slate-900/95 backdrop-blur-xl border border-cyan-500/40 text-white rounded-full px-3.5 py-2.5 shadow-[0_0_30px_rgba(6,182,212,0.4)] transition-all animate-in fade-in slide-in-from-bottom-5 max-w-[calc(100vw-24px)]">
+    <div className="fixed bottom-24 left-3 right-3 sm:left-auto sm:right-6 z-[99999] flex items-center justify-between gap-2.5 bg-slate-900/95 backdrop-blur-xl border border-cyan-500/40 text-white rounded-2xl sm:rounded-full px-3.5 py-2.5 shadow-[0_0_30px_rgba(6,182,212,0.4)] transition-all animate-in fade-in slide-in-from-bottom-5 max-w-[calc(100vw-24px)] mx-auto sm:mx-0">
       {/* Glowing Orb Animation / Tap to Speak Button */}
-      <div 
+      <button 
+        type="button"
         onClick={handleMicTap}
-        onTouchEnd={handleMicTap}
-        className={`relative flex items-center justify-center w-9 h-9 rounded-full border cursor-pointer active:scale-95 transition-all shrink-0 ${
+        className={`relative flex items-center justify-center w-10 h-10 rounded-full border cursor-pointer active:scale-95 transition-all shrink-0 ${
           isSpeaking 
-            ? 'border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.8)] bg-cyan-950/50' 
-            : wakeWordActive
-            ? 'border-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.8)] bg-emerald-950/50'
-            : isListening
-            ? 'border-violet-400 animate-pulse bg-violet-950/50'
-            : 'border-slate-600 bg-slate-800'
+            ? 'border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.8)] bg-cyan-950/80 animate-pulse' 
+            : wakeWordActive || isListening
+            ? 'border-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.8)] bg-emerald-950/80 animate-pulse'
+            : 'border-slate-600 bg-slate-800 hover:border-cyan-400'
         }`}
         title="Tap to Speak (Mobile)"
       >
-        <Radio className={`w-4 h-4 ${isSpeaking ? 'text-cyan-300 animate-bounce' : isListening ? 'text-emerald-300' : 'text-violet-300'}`} />
-      </div>
+        {isSpeaking ? (
+          <Volume2 className="w-5 h-5 text-cyan-300 animate-bounce" />
+        ) : (
+          <Mic className={`w-5 h-5 ${isListening ? 'text-emerald-300 animate-pulse' : 'text-cyan-300'}`} />
+        )}
+      </button>
 
       {/* Text Info */}
-      <div className="max-w-[150px] sm:max-w-[240px] text-xs overflow-hidden">
+      <div 
+        onClick={handleMicTap}
+        className="flex-1 min-w-0 text-xs overflow-hidden cursor-pointer"
+      >
         <div className="font-bold flex items-center gap-1 text-cyan-300 text-[11px] sm:text-xs">
-          Tolee Voice Manager
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0" />
+          <span>Tolee Voice Manager</span>
+          <span className={`w-2 h-2 rounded-full shrink-0 ${isSpeaking ? 'bg-cyan-400 animate-ping' : isListening ? 'bg-emerald-400 animate-ping' : 'bg-slate-500'}`} />
+          {!isListening && !isSpeaking && (
+            <span className="text-[10px] text-amber-400 bg-amber-950/60 px-1.5 py-0.5 rounded-full font-mono ml-auto sm:ml-0">Tap Mic 🎙️</span>
+          )}
         </div>
         <p className="text-[10px] sm:text-[11px] text-slate-300 truncate">{speechText}</p>
       </div>
@@ -218,7 +235,6 @@ export function FloatingVoiceHUD({ isOpen, onClose, onSelectTab, onSendMessage }
         variant="ghost"
         size="icon"
         onClick={handleTurnOff}
-        onTouchEnd={handleTurnOff}
         className="w-7 h-7 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 shrink-0"
         title="Turn Voice Manager OFF"
       >

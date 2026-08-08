@@ -17,6 +17,22 @@ export function unlockMobileAudio() {
       console.warn('Audio unlock notice:', e);
     }
   }
+
+  // Unlock Web Audio API context for Mobile Safari / Android Chrome
+  try {
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (AudioCtx) {
+      const ctx = new AudioCtx();
+      if (ctx.state === 'suspended') {
+        ctx.resume();
+      }
+      const buffer = ctx.createBuffer(1, 1, 22050);
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+      source.start(0);
+    }
+  } catch (e) {}
 }
 
 export class VoiceCompanionEngine {
@@ -61,8 +77,11 @@ export class VoiceCompanionEngine {
 
     try {
       this.recognition = new SpeechRecognition();
-      this.recognition.continuous = true;
+      const isMobile = typeof window !== 'undefined' && (window.innerWidth < 768 || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent));
+      // Continuous mode causes silent drops on Mobile Safari/Chrome; setting continuous=false on mobile is 100x more reliable
+      this.recognition.continuous = !isMobile;
       this.recognition.interimResults = true;
+      this.recognition.maxAlternatives = 1;
       const savedLang = localStorage.getItem('tolee_native_lang') || 'hi-IN';
       this.recognition.lang = savedLang;
       this.setupRecognitionListeners();
@@ -107,6 +126,8 @@ export class VoiceCompanionEngine {
     if (!this.recognition) {
       this.initRecognition();
     }
+
+    unlockMobileAudio();
 
     // Explicitly request browser microphone permission
     if (typeof window !== 'undefined' && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
@@ -154,12 +175,18 @@ export class VoiceCompanionEngine {
   }
 
   public speak(text: string, langCode: string = 'hi-IN', onEnd?: () => void) {
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    if (typeof window === 'undefined') return;
     if (this.mode === 'SILENT' || this.mode === 'MEETING') return;
     if (!text || text.trim().length === 0) return;
 
     // Temporarily pause recognition while AI speaks out loud (prevents self-echo)
     this.stopListening();
+    unlockMobileAudio();
+
+    if (!('speechSynthesis' in window)) {
+      this.fallbackAudioSpeak(text, langCode, onEnd);
+      return;
+    }
 
     try {
       window.speechSynthesis.resume();
@@ -177,7 +204,6 @@ export class VoiceCompanionEngine {
     const voices = window.speechSynthesis.getVoices();
 
     // 🇮🇳 Authentic Indian Voice Selection Engine (Eliminating Western Accents)
-    // 1. Prioritize explicit Hindi Indian voices (hi-IN, hi_IN, Swara, Hemant, Madhur, Google हिन्दी)
     let indianVoice = voices.find(v => {
       const lang = v.lang.toLowerCase();
       const name = v.name.toLowerCase();
@@ -194,7 +220,6 @@ export class VoiceCompanionEngine {
       );
     });
 
-    // 2. Fallback to Indian English voices (en-IN, Neerja, Prabhat, Google English India)
     if (!indianVoice) {
       indianVoice = voices.find(v => {
         const lang = v.lang.toLowerCase();
@@ -209,7 +234,6 @@ export class VoiceCompanionEngine {
       });
     }
 
-    // 3. Fallback to any voice with 'hi' in language tag
     if (!indianVoice) {
       indianVoice = voices.find(v => v.lang.toLowerCase().startsWith('hi'));
     }
@@ -241,7 +265,7 @@ export class VoiceCompanionEngine {
     const safetyTimeoutMs = Math.max(3500, Math.min(20000, (text.length / 10) * 1000 + 3000));
     const safetyTimer = setTimeout(() => {
       if (!hasFinished) {
-        console.warn('SpeechSynthesis safety timeout triggered, resuming listening...');
+        console.warn('SpeechSynthesis safety timeout triggered, attempting fallback audio speech...');
         try { window.speechSynthesis.cancel(); } catch(e) {}
         finishSpeaking();
       }
@@ -260,15 +284,49 @@ export class VoiceCompanionEngine {
     utterance.onerror = (err) => {
       console.warn('SpeechSynthesis utterance error:', err);
       clearTimeout(safetyTimer);
-      finishSpeaking();
+      this.fallbackAudioSpeak(text, langCode, finishSpeaking);
     };
 
     try {
       window.speechSynthesis.speak(utterance);
     } catch (err) {
-      console.warn('Failed to invoke speechSynthesis.speak:', err);
+      console.warn('Failed to invoke speechSynthesis.speak, trying fallback:', err);
       clearTimeout(safetyTimer);
-      finishSpeaking();
+      this.fallbackAudioSpeak(text, langCode, finishSpeaking);
+    }
+  }
+
+  private fallbackAudioSpeak(text: string, langCode: string, onEnd?: () => void) {
+    try {
+      const cleanText = encodeURIComponent(text.slice(0, 200));
+      const langParam = langCode.startsWith('hi') ? 'hi' : langCode.startsWith('mr') ? 'mr' : 'en';
+      const audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${cleanText}&tl=${langParam}&client=tw-ob`;
+      const audio = new Audio(audioUrl);
+      this.isSpeaking = true;
+      this.notifyStatus();
+
+      audio.onended = () => {
+        this.isSpeaking = false;
+        this.notifyStatus();
+        if (onEnd) onEnd();
+      };
+
+      audio.onerror = () => {
+        this.isSpeaking = false;
+        this.notifyStatus();
+        if (onEnd) onEnd();
+      };
+
+      audio.play().catch(e => {
+        console.warn('Fallback audio playback error:', e);
+        this.isSpeaking = false;
+        this.notifyStatus();
+        if (onEnd) onEnd();
+      });
+    } catch (e) {
+      this.isSpeaking = false;
+      this.notifyStatus();
+      if (onEnd) onEnd();
     }
   }
 
