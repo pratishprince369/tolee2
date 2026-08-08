@@ -679,6 +679,15 @@ export async function getNewsFeedPosts(options: {
     const limit = options.limit || 10;
     const category = options.category || 'All';
 
+    // Non-news recreational categories to exclude from general Tolee News feed (/news)
+    const NON_NEWS_RECREATIONAL_CATEGORIES = [
+      'Comedy & Entertainment',
+      'Music & Arts',
+      'Short Films',
+      'Animation & Cartoons',
+      'Food & Recipes'
+    ];
+
     const skip = (page - 1) * limit;
 
     const newsList = await prisma.newsPost.findMany({
@@ -687,7 +696,9 @@ export async function getNewsFeedPosts(options: {
           status: 'published',
           isArchived: false,
         },
-        category: category !== 'All' ? category : undefined,
+        category: category !== 'All' 
+          ? category 
+          : { notIn: NON_NEWS_RECREATIONAL_CATEGORIES },
       },
       include: {
         post: {
