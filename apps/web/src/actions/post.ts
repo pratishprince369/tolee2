@@ -293,13 +293,14 @@ export async function getPosts(options?: { mediaType?: string; limit?: number })
             ? Date.now() - new Date(latestSimPost.createdAt).getTime()
             : Infinity;
           
-          if (timeSinceLast > 15 * 60 * 1000) { // 15 minutes
-            console.log('[Simulation Activity Trigger] Latest post is old. Triggering background simulation activity...');
-            const { runBackgroundSimulationActivity } = require('@/lib/simulation');
-            runBackgroundSimulationActivity();
+          if (timeSinceLast > 3 * 60 * 1000) { // 3 minutes threshold for instant fresh content
+            const { publishYouTubeVideosBatch } = require('@/lib/youtubeAutoPublisher');
+            const { publishDailyNewsBatch } = require('@/lib/newsAutoPublisher');
+            publishYouTubeVideosBatch(false).catch(() => {});
+            publishDailyNewsBatch().catch(() => {});
           }
         } catch (e) {
-          console.error('[Simulation Activity Trigger] Check failed:', e);
+          console.error('[Fresh Content Trigger] Check failed:', e);
         }
       };
       checkAndTrigger();

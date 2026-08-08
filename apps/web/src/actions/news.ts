@@ -677,16 +677,25 @@ export async function getNewsFeedPosts(options: {
     const currentUserId = session?.user ? (session.user as any).id : null;
     const page = options.page || 1;
     const limit = options.limit || 10;
-    const category = options.category || 'All';
-
-    // Non-news recreational categories to exclude from general Tolee News feed (/news)
-    const NON_NEWS_RECREATIONAL_CATEGORIES = [
-      'Comedy & Entertainment',
-      'Music & Arts',
-      'Short Films',
-      'Animation & Cartoons',
-      'Food & Recipes'
-    ];
+    // Background trigger: If latest news post is >3 minutes old, fetch fresh news & YouTube videos
+    if (page === 1) {
+      const checkAndTriggerFreshNews = async () => {
+        try {
+          const latestNews = await prisma.newsPost.findFirst({
+            orderBy: { createdAt: 'desc' },
+            select: { createdAt: true }
+          });
+          const ageMs = latestNews ? Date.now() - new Date(latestNews.createdAt).getTime() : Infinity;
+          if (ageMs > 3 * 60 * 1000) { // >3 mins old
+            const { publishDailyNewsBatch } = require('@/lib/newsAutoPublisher');
+            const { publishYouTubeVideosBatch } = require('@/lib/youtubeAutoPublisher');
+            publishDailyNewsBatch().catch(() => {});
+            publishYouTubeVideosBatch(false).catch(() => {});
+          }
+        } catch (e) {}
+      };
+      checkAndTriggerFreshNews();
+    }
 
     const skip = (page - 1) * limit;
 
