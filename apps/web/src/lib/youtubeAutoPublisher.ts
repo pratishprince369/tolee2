@@ -180,6 +180,8 @@ export async function publishYouTubeVideosBatch(withDelay: boolean = false): Pro
 
       const localizedContent = `🎥 **YouTube Video News**:\n📌 Watch full video: ${selectedVideo.title}\n📺 Channel: ${selectedVideo.channelTitle}\n\n📖 **Report & Highlights**:\n${selectedVideo.description.slice(0, 300) || 'Watch live verified coverage and video reporting directly on Tolee News.'}\n\nStay connected with Tolee News for live video updates.`;
 
+      const allTolees = await prisma.tolee.findMany({ select: { id: true } });
+
       await prisma.post.create({
         data: {
           caption: selectedVideo.title,
@@ -188,7 +190,7 @@ export async function publishYouTubeVideosBatch(withDelay: boolean = false): Pro
           mediaTypes: 'image',
           status: 'published',
           authorId: dbUser.id,
-          tolees: defaultTolee ? { create: [{ toleeId: defaultTolee.id }] } : undefined,
+          tolees: allTolees.length > 0 ? { create: allTolees.map((t: any) => ({ toleeId: t.id })) } : undefined,
           newsRelation: {
             create: {
               headline: selectedVideo.title,

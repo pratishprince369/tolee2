@@ -280,7 +280,9 @@ export async function publishDailyNewsBatch(withDelay: boolean = false): Promise
         imageUrl = await generateAIImageWithFallback(bannerPrompt);
       }
 
-      // Create Post in DB
+      const allTolees = await prisma.tolee.findMany({ select: { id: true } });
+
+      // Create Post in DB linked to all Tolees
       await prisma.post.create({
         data: {
           caption: headline,
@@ -289,7 +291,7 @@ export async function publishDailyNewsBatch(withDelay: boolean = false): Promise
           mediaTypes: 'image',
           status: 'published',
           authorId: dbUser.id,
-          tolees: defaultTolee ? { create: [{ toleeId: defaultTolee.id }] } : undefined,
+          tolees: allTolees.length > 0 ? { create: allTolees.map((t: any) => ({ toleeId: t.id })) } : undefined,
           newsRelation: {
             create: {
               headline,

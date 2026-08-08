@@ -94,6 +94,7 @@ export async function publishCoverrVideosBatch(): Promise<{ success: boolean; co
       const slug = `vid-${slugBase}-${Date.now().toString().slice(-4)}`;
 
       const mediaUrlsCombined = `${selectedVideo.mp4Url},${selectedVideo.posterUrl}`;
+      const allTolees = await prisma.tolee.findMany({ select: { id: true } });
 
       await prisma.post.create({
         data: {
@@ -103,7 +104,7 @@ export async function publishCoverrVideosBatch(): Promise<{ success: boolean; co
           mediaTypes: 'video,image',
           status: 'published',
           authorId: dbUser.id,
-          tolees: defaultTolee ? { create: [{ toleeId: defaultTolee.id }] } : undefined,
+          tolees: allTolees.length > 0 ? { create: allTolees.map((t: any) => ({ toleeId: t.id })) } : undefined,
           newsRelation: {
             create: {
               headline: selectedVideo.title,

@@ -98,10 +98,10 @@ export async function getToleeBySlug(slug: string) {
           }
         },
         posts: {
-          take: 10,
+          take: 30,
           where: {
             post: {
-              ...(!isSimOn ? { isSimulation: false } : {}),
+              isSimulation: false,
               ...(currentUserId ? {
                 OR: [
                   { authorId: currentUserId },
