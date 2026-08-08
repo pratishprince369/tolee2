@@ -50,6 +50,21 @@ export async function checkAndInitializeWallet(referredBy?: string) {
         }
       });
 
+      // 2b. Add Notification to user's Notification Drawer / Bell Icon
+      try {
+        await tx.notification.create({
+          data: {
+            userId,
+            type: 'system',
+            title: '🎉 ₹2,500 Promotional Credits Added!',
+            content: 'Congratulations! Your Tolee Ads Wallet has been credited with ₹2,500 promotional credits to boost posts and promote reels.',
+            link: '/ads-manager'
+          }
+        });
+      } catch (e) {
+        console.warn('Wallet notification notice:', e);
+      }
+
       // 3. Handle referral reward (₹500 for referrer, only if referral doesn't already exist)
       if (referredBy && referredBy !== userId) {
         const referrer = await tx.user.findFirst({

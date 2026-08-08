@@ -36,8 +36,8 @@ export function AdsWalletWelcomeModal() {
         checkAndInitializeWallet(referredBy).then((res) => {
           if (res.success) {
             setBalance(res.balance || 2500);
-            // Trigger popup if it is a new initialization or not yet shown
-            setIsOpen(true);
+            // Mark as shown so it never attempts to popup
+            localStorage.setItem(welcomeShownKey, 'true');
             // Clear referral once applied
             localStorage.removeItem('tolee_referred_by');
             localStorage.removeItem('tolee_referral_code');
@@ -52,15 +52,8 @@ export function AdsWalletWelcomeModal() {
     }
   }, [session]);
 
-  const handleClose = () => {
-    if (session?.user) {
-      const userId = (session.user as any).id;
-      localStorage.setItem(`tolee_ads_welcome_shown_${userId}`, 'true');
-    }
-    setIsOpen(false);
-  };
-
-  if (!isOpen) return null;
+  // NEVER DISPLAY POPUP ON SCREEN AGAIN (User requested notification drawer only)
+  return null;
 
   return (
     <>
