@@ -285,25 +285,26 @@ export function BottomNav() {
             key={item.name} 
             href={item.href} 
             onClick={() => setClickedPath(item.href)}
-            className="relative w-full h-full flex flex-col items-center justify-center"
+            className="relative w-full h-full flex flex-col items-center justify-center tap-feedback select-none"
           >
-            <div className={`flex flex-col items-center justify-center w-full h-full relative pb-1.5 transition-colors duration-200 ${isActive ? activeColor : inactiveColor}`}>
+            <div className={`flex flex-col items-center justify-center w-full h-full relative pb-1 transition-all duration-200 ${isActive ? activeColor : inactiveColor}`}>
               <div className="relative">
                 {Icon && (
                   <Icon 
-                    strokeWidth={1.5}
-                    className={`w-[22px] h-[22px] transition-all duration-300 ${isActive ? 'scale-105' : 'hover:scale-105'}`} 
+                    strokeWidth={isActive ? 2.2 : 1.5}
+                    fill={isActive ? 'currentColor' : 'none'}
+                    className={`w-[22px] h-[22px] transition-all duration-300 ${isActive ? 'scale-110' : 'active:scale-90'}`} 
                   />
                 )}
                 {item.badge && (
-                  <span className="absolute -top-1 -right-2 bg-red-500 text-white text-[10px] w-4 h-4 flex items-center justify-center rounded-full font-bold border border-white dark:border-black">
+                  <span className="absolute -top-1.5 -right-2.5 bg-red-500 text-white text-[9px] min-w-[16px] h-4 flex items-center justify-center rounded-full font-bold border-2 border-white dark:border-black px-0.5">
                     {item.badge}
                   </span>
                 )}
               </div>
-              <span className="text-[10px] mt-[4px] font-semibold leading-none">{item.name}</span>
+              <span className={`text-[10px] mt-[3px] leading-none transition-all duration-200 ${isActive ? 'font-bold' : 'font-medium'}`}>{item.name}</span>
               {isActive && (
-                <span className={`absolute bottom-0 w-1 h-1 rounded-full animate-in fade-in zoom-in duration-300 ${activePath === '/reels' ? 'bg-white' : 'bg-[#0E9F9A] dark:bg-white'}`} />
+                <span className={`absolute bottom-0 w-5 h-[3px] rounded-full transition-all duration-500 ease-out ${activePath === '/reels' ? 'bg-white' : 'bg-[#0E9F9A] dark:bg-white'}`} />
               )}
             </div>
           </Link>
