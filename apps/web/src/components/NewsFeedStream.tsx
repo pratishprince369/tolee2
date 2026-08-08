@@ -33,7 +33,19 @@ export function NewsFeedStream({
   isSuperAdmin,
 }: NewsFeedStreamProps) {
   const router = useRouter();
-  const [newsPosts, setNewsPosts] = useState<any[]>(initialNews);
+  const deduplicateNewsArray = (arr: any[]) => {
+    if (!Array.isArray(arr)) return [];
+    const seenHeadlines = new Set<string>();
+    return arr.filter((item: any) => {
+      if (!item) return false;
+      const key = item.headline?.toLowerCase().trim().replace(/[^\w]/g, '').slice(0, 35);
+      if (key && seenHeadlines.has(key)) return false;
+      if (key) seenHeadlines.add(key);
+      return true;
+    });
+  };
+
+  const [newsPosts, setNewsPosts] = useState<any[]>(deduplicateNewsArray(initialNews));
   const [activeCategory, setActiveCategory] = useState(initialCategory);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(initialNews.length >= 10);
@@ -46,7 +58,7 @@ export function NewsFeedStream({
 
   // Reset when initialNews changes from server
   useEffect(() => {
-    setNewsPosts(initialNews);
+    setNewsPosts(deduplicateNewsArray(initialNews));
     setActiveCategory(initialCategory);
     setPage(1);
     setHasMore(initialNews.length >= 10);

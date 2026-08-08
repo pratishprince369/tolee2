@@ -777,23 +777,22 @@ export async function getNewsFeedPosts(options: {
       };
     });
 
-    // Check if there are more posts in the next batch
-    const nextBatchCount = await prisma.newsPost.count({
-      where: {
-        post: {
-          status: 'published',
-          isArchived: false,
-        },
-        category: category !== 'All' ? category : undefined,
-      },
-      skip: skip + limit,
-      take: 1,
+    // Server-side strict deduplication by headline key
+    const seenHeadlines = new Set<string>();
+    const uniqueMappedNews = mappedNews.filter((item: any) => {
+      const key = item.headline?.toLowerCase().trim().replace(/[^\w]/g, '').slice(0, 35);
+      if (key && seenHeadlines.has(key)) return false;
+      if (key) seenHeadlines.add(key);
+      return true;
     });
+
+    // Check if there are more posts in the next batch
+    const hasMore = newsList.length === limit;
 
     return {
       success: true,
-      news: mappedNews,
-      hasMore: nextBatchCount > 0,
+      news: uniqueMappedNews,
+      hasMore
     };
   } catch (err: any) {
     console.error('Error fetching news feed posts:', err);
