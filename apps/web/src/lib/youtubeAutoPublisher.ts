@@ -67,15 +67,49 @@ export async function publishYouTubeVideosBatch(withDelay: boolean = false): Pro
   logs.push("Starting YouTube Video News Auto-Publisher batch execution...");
 
   try {
-    // Diverse Video Queries per account across Tech, Gaming, Food, Sports, Movies, Business
-    const accountQueries = [
-      { email: 'adsvidia369@gmail.com', query: 'latest tech unboxing gadgets review AI 2026', lang: 'hi' as const },
-      { email: 'loktimes369@gmail.com', query: 'मराठी बातम्या महाराष्ट्र ट्रेंडिंग ट्रॅव्हल व्लॉग', lang: 'mr' as const },
-      { email: 'updatesontimes@gmail.com', query: 'india business market tech news podcast today', lang: 'en' as const },
-      { email: 'vadapavwaledada@gmail.com', query: 'indian street food recipe travel vlog 2026', lang: 'en' as const },
-      { email: 'rinkugupta90282@gmail.com', query: 'cricket match top highlights sports news gaming', lang: 'en' as const },
-      { email: 'foodpaass@gmail.com', query: 'stock market trading sensex nifty crypto strategy', lang: 'en' as const }
-    ];
+    // Expanded Topic Categories: NASA, Discovery, Cartoons, Comedy, Education, Tech, Food, Sports, Finance
+    const topicPools: Record<string, string[]> = {
+      'adsvidia369@gmail.com': [
+        'NASA space universe rocket launch discovery science 4k',
+        'latest tech unboxing gadgets review AI 2026',
+        'science educational experiments documentary 4k'
+      ],
+      'loktimes369@gmail.com': [
+        'Discovery channel wild nature documentary 4k hd',
+        'मराठी बातम्या महाराष्ट्र ट्रेंडिंग ट्रॅव्हल व्लॉग',
+        '3d animated cartoon kids funny video'
+      ],
+      'updatesontimes@gmail.com': [
+        'india business market tech news podcast today',
+        'space documentary universe exploration NASA 4k',
+        'funny Indian comedy videos skits pranks'
+      ],
+      'vadapavwaledada@gmail.com': [
+        'indian street food recipe travel vlog 2026',
+        'cute baby funny videos nursery rhymes cartoon animation',
+        'standup comedy clips funny humor videos'
+      ],
+      'rinkugupta90282@gmail.com': [
+        'cricket match top highlights sports news gaming',
+        '3d cartoon animated kids fun stories',
+        'Discovery channel animal wildlife documentary'
+      ],
+      'foodpaass@gmail.com': [
+        'stock market trading sensex nifty crypto strategy',
+        'NASA space galaxy rocket technology discovery',
+        'best funny comedy video meme clips 2026'
+      ]
+    };
+
+    const accountQueries = REGISTERED_NEWS_ACCOUNTS.map(acc => {
+      const pool = topicPools[acc.email] || ['NASA Discovery science space documentary 4k'];
+      const randomQuery = pool[Math.floor(Math.random() * pool.length)];
+      return {
+        email: acc.email,
+        query: randomQuery,
+        lang: acc.languageCode
+      };
+    });
 
     const userEmails = REGISTERED_NEWS_ACCOUNTS.map(a => a.email);
     const users = await prisma.user.findMany({
