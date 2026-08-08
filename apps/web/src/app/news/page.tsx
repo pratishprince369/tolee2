@@ -32,22 +32,29 @@ export default async function NewsHubPage({ searchParams }: { searchParams: { ca
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] text-gray-900 dark:text-zinc-200 p-4 sm:p-6 lg:px-8 pt-20">
+    <div className="min-h-screen bg-slate-50/50 dark:bg-[#0a0a0a] text-slate-900 dark:text-zinc-200 p-3 sm:p-6 lg:px-8 pt-16 sm:pt-20">
       <div className="max-w-3xl mx-auto space-y-6">
         
-        {/* News Hub Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-[#121212] p-6 rounded-3xl border border-gray-100 dark:border-zinc-900 shadow-xs">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-md shadow-indigo-600/20">
-              <Newspaper className="w-6 h-6" />
+        {/* News Hub Premium Header */}
+        <div className="relative overflow-hidden flex flex-col sm:flex-row sm:items-center justify-between gap-5 bg-white/90 dark:bg-[#121212]/90 backdrop-blur-xl p-5 sm:p-7 rounded-3xl border border-slate-200/80 dark:border-zinc-800/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.3)]">
+          <div className="absolute top-0 right-0 -mt-8 -mr-8 w-32 h-32 bg-gradient-to-br from-teal-500/10 to-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
+          
+          <div className="flex items-start sm:items-center gap-4 relative z-10">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-tr from-[#0E9F9A] via-teal-500 to-emerald-400 flex items-center justify-center text-white shadow-lg shadow-teal-500/25 ring-4 ring-teal-500/10 shrink-0">
+              <Newspaper className="w-6 h-6 sm:w-7 sm:h-7" />
             </div>
             <div>
-              <h1 className="text-2xl font-black text-gray-900 dark:text-white leading-tight">Tolee News Hub</h1>
-              <p className="text-xs text-gray-400">Discover premium blogs, local updates, and stories written by the community</p>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20 mb-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-ping" /> Real-Time News Stream
+              </div>
+              <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">Tolee News Hub</h1>
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 mt-0.5 max-w-md">Discover verified breaking stories, local updates & community insights curated 24/7 by AI Managers</p>
             </div>
           </div>
 
-          <CreateNewsButton defaultOpen={searchParams.create === 'true' || searchParams.openModal === 'news'} />
+          <div className="relative z-10 shrink-0">
+            <CreateNewsButton defaultOpen={searchParams.create === 'true' || searchParams.openModal === 'news'} />
+          </div>
         </div>
 
         {/* Paginated Category Filtered Stream */}

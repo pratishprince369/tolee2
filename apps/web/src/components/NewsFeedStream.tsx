@@ -185,20 +185,27 @@ export function NewsFeedStream({
     <div className="max-w-3xl mx-auto space-y-6">
       
       {/* Category Tabs list */}
-      <div className="flex gap-2 overflow-x-auto pb-2 pr-2 custom-scrollbar sticky top-16 z-20 bg-gray-50/90 dark:bg-[#0a0a0a]/90 backdrop-blur-md py-3 -mx-4 px-4 sm:-mx-6 sm:px-6">
-        {categories.map((cat) => (
-          <button
-            key={cat}
-            onClick={() => handleCategoryChange(cat)}
-            className={`text-xs font-extrabold px-4.5 py-2.5 rounded-2xl select-none transition-all cursor-pointer whitespace-nowrap ${
-              activeCategory === cat
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20 scale-102'
-                : 'bg-white hover:bg-gray-50 dark:bg-[#121212] dark:hover:bg-zinc-900 text-gray-500 dark:text-zinc-400 border border-gray-100 dark:border-zinc-900'
-            }`}
-          >
-            {cat}
-          </button>
-        ))}
+      <div 
+        className="flex gap-2 overflow-x-auto no-scrollbar scroll-smooth sticky top-16 z-20 bg-slate-50/95 dark:bg-[#0a0a0a]/95 backdrop-blur-xl py-3 -mx-3 px-3 sm:-mx-6 sm:px-6"
+        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+      >
+        {categories.map((cat) => {
+          const isActive = activeCategory === cat;
+          return (
+            <button
+              key={cat}
+              onClick={() => handleCategoryChange(cat)}
+              className={`text-xs font-bold px-4 py-2 rounded-full select-none transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
+                isActive
+                  ? 'bg-gradient-to-r from-[#0E9F9A] to-teal-500 text-white shadow-md shadow-teal-500/25 scale-[1.03] ring-2 ring-teal-400/30 font-extrabold'
+                  : 'bg-white/90 hover:bg-slate-100 dark:bg-[#151517]/90 dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-400 border border-slate-200/80 dark:border-zinc-800/80 hover:border-slate-300 dark:hover:border-zinc-700'
+              }`}
+            >
+              {isActive && <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping shrink-0" />}
+              {cat}
+            </button>
+          );
+        })}
       </div>
 
       {/* News Feed Cards List */}

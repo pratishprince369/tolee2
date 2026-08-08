@@ -3,6 +3,13 @@
 @tailwind utilities;
 
 @layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none !important;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none !important;
+    scrollbar-width: none !important;
+  }
   .animate-progress-bar {
     animation: progress-bar 2s ease-in-out infinite;
   }
