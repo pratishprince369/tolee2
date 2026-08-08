@@ -15,6 +15,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { PostCarousel } from '@/components/PostCarousel';
 import { NewsEngagement } from '@/components/NewsEngagement';
+import { YouTubeAutoplayVideo } from '@/components/YouTubeAutoplayVideo';
 import { Metadata } from 'next';
 
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
@@ -187,18 +188,15 @@ export default async function NewsReaderPage({ params }: { params: { slug: strin
         {/* Hero Cover Image & Gallery or YouTube Autoplay Video Player */}
         {news.slug.startsWith('yt-') || (news.sourceUrl && news.sourceUrl.includes('youtube.com')) ? (
           <div className="space-y-2">
-            <div className="w-full aspect-video rounded-3xl overflow-hidden bg-black border border-gray-150 dark:border-zinc-900 shadow-md relative">
-              <iframe
-                src={`https://www.youtube.com/embed/${news.sourceUrl?.split('v=')[1]?.split('&')[0] || post.mediaUrls?.split('vi/')[1]?.split('/')[0]}?autoplay=1&mute=1&enablejsapi=1&playsinline=1`}
-                title={news.headline}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                className="w-full h-full border-none"
-              />
-            </div>
+            <YouTubeAutoplayVideo
+              videoId={news.sourceUrl || post.mediaUrls || ''}
+              title={news.headline}
+              category={news.category}
+              thumbnailUrl={news.coverCaption || ''}
+            />
             {news.sourceUrl && (
               <div className="px-2 flex justify-between text-[11px] text-gray-400 dark:text-zinc-500 italic">
-                <span>Watch full video on YouTube</span>
+                <span>Watch full HD video on Tolee</span>
                 <a href={news.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-500 hover:underline">
                   Source: {news.sourceUrl}
                 </a>
@@ -292,15 +290,11 @@ export default async function NewsReaderPage({ params }: { params: { slug: strin
               if (match) embedId = match[1];
 
               return embedId ? (
-                <div key={idx} className="aspect-video w-full rounded-2xl overflow-hidden bg-black border border-gray-150 shadow-sm">
-                  <iframe 
-                    width="100%" 
-                    height="100%" 
-                    src={`https://www.youtube.com/embed/${embedId}`} 
-                    title="YouTube video player" 
-                    frameBorder="0" 
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                    allowFullScreen
+                <div key={idx} className="w-full">
+                  <YouTubeAutoplayVideo
+                    videoId={embedId}
+                    title="YouTube Video"
+                    category={news.category}
                   />
                 </div>
               ) : null;
