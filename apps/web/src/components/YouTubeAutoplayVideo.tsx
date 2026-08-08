@@ -134,15 +134,18 @@ export function YouTubeAutoplayVideo({
             title={title || 'YouTube Video'}
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
             onError={() => setHasError(true)}
-            className="w-full h-full border-none scale-[1.05] origin-center pointer-events-none"
+            className="w-full h-full border-none scale-[1.06] origin-center pointer-events-none"
           />
 
-          {/* Tolee Custom Control Overlays (Top-Right Audio Toggle & Bottom-Right TOLEE HD Watermark) */}
+          {/* Transparent Mouse Event Interceptor: Blocks mouse hover events from hitting YouTube iframe */}
+          <div className="absolute inset-0 z-10 cursor-pointer" />
+
+          {/* Tolee Custom Control Overlays (Top-Right Audio Toggle & Category) */}
           <div className="absolute top-3 right-3 flex items-center gap-2 z-20 pointer-events-auto">
             <button
               type="button"
               onClick={toggleMute}
-              className="w-9 h-9 rounded-full bg-black/75 hover:bg-black/90 text-white backdrop-blur-md flex items-center justify-center border border-white/20 shadow-lg transition-transform active:scale-95"
+              className="w-9 h-9 rounded-full bg-black/85 hover:bg-black text-white backdrop-blur-md flex items-center justify-center border border-white/20 shadow-xl transition-all active:scale-95"
               title={isMuted ? 'Unmute Audio' : 'Mute Audio'}
             >
               {isMuted ? (
@@ -153,9 +156,9 @@ export function YouTubeAutoplayVideo({
             </button>
           </div>
 
-          {/* Bottom-Right Watermark Mask: Replaces YouTube logo with TOLEE HD badge */}
-          <div className="absolute bottom-0 right-0 h-10 w-32 bg-black/95 backdrop-blur-md flex items-center justify-end px-3 rounded-tl-2xl pointer-events-none z-20 shadow-xl border-t border-l border-zinc-800/90">
-            <span className="text-[11px] font-black tracking-widest text-teal-400 uppercase flex items-center gap-1.5">
+          {/* Bottom-Right Watermark Mask: 100% Covers YouTube Logo & "More Videos" popup button */}
+          <div className="absolute bottom-0 right-0 h-16 w-80 bg-zinc-950/98 backdrop-blur-xl flex items-center justify-end px-4 rounded-tl-2xl pointer-events-none z-20 shadow-2xl border-t border-l border-zinc-800/90">
+            <span className="text-xs font-black tracking-widest text-teal-400 uppercase flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-teal-400 animate-ping" />
               TOLEE HD
             </span>
@@ -163,7 +166,7 @@ export function YouTubeAutoplayVideo({
 
           {/* Play/Pause Overlay Indicator on Tap */}
           {!isPlaying && (
-            <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center z-10">
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center z-15">
               <div className="w-14 h-14 rounded-full bg-teal-500/90 text-white flex items-center justify-center shadow-2xl scale-110">
                 <Play className="w-7 h-7 fill-current translate-x-0.5" />
               </div>
