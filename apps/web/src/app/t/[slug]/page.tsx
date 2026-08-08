@@ -297,7 +297,20 @@ export default async function ToleePage({ params }: { params: { slug: string } }
     (a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
 
-  toleeData.posts = unifiedFeed;
+  // Client/Page level strict headline & ID deduplication
+  const seenIds = new Set<string>();
+  const seenHeadlines = new Set<string>();
+  const uniqueUnifiedFeed = unifiedFeed.filter((item: any) => {
+    if (!item || seenIds.has(item.id)) return false;
+    const headlineText = item.caption || item.content || item.title || '';
+    const key = headlineText.toLowerCase().trim().replace(/[^\w]/g, '').slice(0, 35);
+    if (key && seenHeadlines.has(key)) return false;
+    seenIds.add(item.id);
+    if (key) seenHeadlines.add(key);
+    return true;
+  });
+
+  toleeData.posts = uniqueUnifiedFeed;
 
   return (
     <Suspense fallback={
