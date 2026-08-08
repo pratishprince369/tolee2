@@ -67,13 +67,14 @@ export async function publishYouTubeVideosBatch(withDelay: boolean = false): Pro
   logs.push("Starting YouTube Video News Auto-Publisher batch execution...");
 
   try {
-    // Queries per account/language
+    // Diverse Video Queries per account across Tech, Gaming, Food, Sports, Movies, Business
     const accountQueries = [
-      { email: 'adsvidia369@gmail.com', query: 'हिंदी न्यूज़ लाइव ताज़ा ख़बर', lang: 'hi' as const },
-      { email: 'loktimes369@gmail.com', query: 'मराठी बातम्या लाइव्ह महाराष्ट्रात', lang: 'mr' as const },
-      { email: 'updatesontimes@gmail.com', query: 'india business finance market news today', lang: 'en' as const },
-      { email: 'vadapavwaledada@gmail.com', query: 'indian street food recipe culture travel', lang: 'en' as const },
-      { email: 'rinkugupta90282@gmail.com', query: 'cricket match highlights sports news india', lang: 'en' as const }
+      { email: 'adsvidia369@gmail.com', query: 'latest tech unboxing gadgets review AI 2026', lang: 'hi' as const },
+      { email: 'loktimes369@gmail.com', query: 'मराठी बातम्या महाराष्ट्र ट्रेंडिंग ट्रॅव्हल व्लॉग', lang: 'mr' as const },
+      { email: 'updatesontimes@gmail.com', query: 'india business market tech news podcast today', lang: 'en' as const },
+      { email: 'vadapavwaledada@gmail.com', query: 'indian street food recipe travel vlog 2026', lang: 'en' as const },
+      { email: 'rinkugupta90282@gmail.com', query: 'cricket match top highlights sports news gaming', lang: 'en' as const },
+      { email: 'foodpaass@gmail.com', query: 'stock market trading sensex nifty crypto strategy', lang: 'en' as const }
     ];
 
     const userEmails = REGISTERED_NEWS_ACCOUNTS.map(a => a.email);
