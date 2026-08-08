@@ -73,7 +73,7 @@ export default async function GlobalFeedPage() {
           toleeName: firstTolee?.name || 'Tolee',
           toleeSlug: firstTolee?.slug || 'group',
           role: (firstTolee?.ownerId && post.author?.id && firstTolee.ownerId === post.author.id && !isAnon) ? 'Admin' : 'Member',
-          time: new Date(post.createdAt).toLocaleDateString(),
+          time: `${new Date(post.createdAt).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' })} | ${new Date(post.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase()}`,
           content: post.caption || '',
           image: post.mediaTypes && post.mediaTypes.split(',')[0] === 'image' ? post.mediaUrls?.split(/,(?=https?:\/\/)/)[0] : null,
           video: post.mediaTypes && post.mediaTypes.split(',')[0] === 'video' ? post.mediaUrls?.split(/,(?=https?:\/\/)/)[0] : null,

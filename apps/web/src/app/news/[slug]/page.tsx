@@ -96,11 +96,8 @@ export default async function NewsReaderPage({ params }: { params: { slug: strin
   const authorName = post.author?.name || 'Anonymous Creator';
   const authorUsername = post.author?.username || 'anonymous';
   const authorAvatar = post.author?.image || '/default-user-avatar.svg';
-  const dateFormatted = new Date(news.createdAt).toLocaleDateString('en-US', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric'
-  });
+  const newsDateObj = new Date(news.createdAt);
+  const dateFormatted = `${newsDateObj.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' })} | ${newsDateObj.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase()}`;
 
   // Parse structured Notion blocks
   let contentBlocks: any[] = [];

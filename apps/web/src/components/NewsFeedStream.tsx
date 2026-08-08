@@ -235,11 +235,8 @@ export function NewsFeedStream({
             cleanCoverImg = fallbackThumb || (postMediaUrls ? postMediaUrls.split(',').find((u: string) => typeof u === 'string' && u.startsWith('http') && !u.includes('youtube.com/embed/')) : null) || null;
           }
 
-          const dateStr = new Date(item.createdAt).toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric'
-          });
+          const itemDate = new Date(item.createdAt);
+          const dateStr = `${itemDate.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' })} | ${itemDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase()}`;
 
           return (
             <Card

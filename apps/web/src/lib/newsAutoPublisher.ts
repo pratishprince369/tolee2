@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { generateAIImageWithFallback } from '@/modules/ai-manager/Core/chat-engine';
+import { generateAINewsArticle } from '@/lib/aiNewsGenerator';
 
 export interface NewsAccountConfig {
   email: string;
@@ -195,8 +196,8 @@ export async function publishDailyNewsBatch(withDelay: boolean = false): Promise
     const stockIndex = { val: 0 };
     const batchProcessedHeadlines = new Set<string>();
 
-    for (let i = 0; i < 35; i++) { // Loop up to 35 candidates to ensure 15 non-duplicate posts
-      if (publishedCount >= 15) break;
+    for (let i = 0; i < 50; i++) { // Loop up to 50 candidates to publish 20-25 non-duplicate posts
+      if (publishedCount >= 25) break;
 
       const accountConfig = REGISTERED_NEWS_ACCOUNTS[publishedCount % REGISTERED_NEWS_ACCOUNTS.length];
       const dbUser = userMap.get(accountConfig.email);
@@ -222,8 +223,13 @@ export async function publishDailyNewsBatch(withDelay: boolean = false): Promise
         englishIndex.val++;
       }
 
+      // Fallback: If external API has no article left, generate fresh news via AI Model
       if (!articleItem) {
-        logs.push(`Skipping item ${i + 1}: No article available for language ${accountConfig.language}.`);
+        articleItem = await generateAINewsArticle(accountConfig.category, accountConfig.language, logs);
+      }
+
+      if (!articleItem) {
+        logs.push(`Skipping item ${i + 1}: Could not generate article for ${accountConfig.email}.`);
         continue;
       }
 
