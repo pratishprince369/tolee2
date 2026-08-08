@@ -257,102 +257,104 @@ export async function publishYouTubeVideosBatch(withDelay: boolean = false): Pro
 
       // Get assigned categories for this account
       const assignedCategories = ACCOUNT_VIDEO_CATEGORIES[account.email] || ['NASA & Space', 'Discovery & Wildlife'];
-      
-      // Pick a random category from assigned list
-      const selectedCategory = assignedCategories[Math.floor(Math.random() * assignedCategories.length)];
-      const queries = YOUTUBE_VIDEO_CATEGORIES[selectedCategory] || ['documentary 4k hd'];
-      const selectedQuery = queries[Math.floor(Math.random() * queries.length)];
 
-      logs.push(`🔍 Fetching [${selectedCategory}] videos for @${dbUser.username} → "${selectedQuery}"...`);
+      // Publish up to 3 videos per account to reach 15-18 videos daily
+      for (let itemIdx = 0; itemIdx < 3; itemIdx++) {
+        // Pick a category from assigned list
+        const selectedCategory = assignedCategories[itemIdx % assignedCategories.length];
+        const queries = YOUTUBE_VIDEO_CATEGORIES[selectedCategory] || ['documentary 4k hd'];
+        const selectedQuery = queries[Math.floor(Math.random() * queries.length)];
 
-      const videoItems = await fetchYouTubeVideos(selectedQuery, account.language, 8);
+        logs.push(`🔍 Fetching [${selectedCategory}] videos for @${dbUser.username} → "${selectedQuery}"...`);
 
-      if (videoItems.length === 0) {
-        logs.push(`❌ No YouTube videos returned for @${dbUser.username} (${selectedCategory}).`);
-        continue;
-      }
+        const videoItems = await fetchYouTubeVideos(selectedQuery, account.language, 10);
 
-      // Pick first non-duplicate video
-      let selectedVideo: YouTubeVideoItem | null = null;
-      for (const v of videoItems) {
-        if (batchProcessedVideos.has(v.videoId)) continue;
+        if (videoItems.length === 0) {
+          logs.push(`❌ No YouTube videos returned for @${dbUser.username} (${selectedCategory}).`);
+          continue;
+        }
 
-        // Check if video already posted in DB (by videoId in mediaUrls or title match)
-        const dbExisting = await prisma.post.findFirst({
-          where: {
-            OR: [
-              { mediaUrls: { contains: v.videoId } },
-              { caption: { contains: v.title.slice(0, 30), mode: 'insensitive' } }
-            ]
+        // Pick first non-duplicate video
+        let selectedVideo: YouTubeVideoItem | null = null;
+        for (const v of videoItems) {
+          if (batchProcessedVideos.has(v.videoId)) continue;
+
+          // Check if video already posted in DB (by videoId in mediaUrls or title match)
+          const dbExisting = await prisma.post.findFirst({
+            where: {
+              OR: [
+                { mediaUrls: { contains: v.videoId } },
+                { caption: { contains: v.title.slice(0, 30), mode: 'insensitive' } }
+              ]
+            }
+          });
+
+          if (!dbExisting) {
+            selectedVideo = v;
+            break;
+          } else {
+            logs.push(`  ↳ Skipping duplicate: "${v.title.slice(0, 35)}..."`);
+          }
+        }
+
+        if (!selectedVideo) {
+          logs.push(`⚠️ All fetched [${selectedCategory}] videos for @${dbUser.username} were duplicates.`);
+          continue;
+        }
+
+        batchProcessedVideos.add(selectedVideo.videoId);
+
+        // Generate slug
+        const slugBase = selectedVideo.title
+          .toLowerCase()
+          .replace(/[^\w\s-]/g, '')
+          .replace(/\s+/g, '-')
+          .slice(0, 60);
+        const slug = `yt-${slugBase}-${Date.now().toString().slice(-5)}${publishedCount}`;
+
+        // Video content description
+        const videoContent = `🎥 **${selectedCategory} Video**\n\n📌 **${selectedVideo.title}**\n📺 Channel: ${selectedVideo.channelTitle}\n\n📖 ${selectedVideo.description.slice(0, 400) || `Watch this ${selectedCategory.toLowerCase()} video on Tolee.`}\n\n🔗 Watch full video: ${selectedVideo.watchUrl}\n\nStay connected with Tolee for daily video updates across NASA, Discovery, Animation, Education, Sports, and more!`;
+
+        // Create as VIDEO post with embedded YouTube URL
+        await prisma.post.create({
+          data: {
+            caption: `🎬 ${selectedVideo.title}`,
+            postType: 'video',
+            mediaUrls: selectedVideo.embedUrl,
+            mediaTypes: 'video',
+            status: 'published',
+            authorId: dbUser.id,
+            tolees: allTolees.length > 0 ? { create: allTolees.map((t: any) => ({ toleeId: t.id })) } : undefined,
+            newsRelation: {
+              create: {
+                headline: selectedVideo.title,
+                slug,
+                summary: selectedVideo.description.slice(0, 200) || `Watch ${selectedVideo.title} on Tolee.`,
+                category: selectedCategory,
+                content: videoContent,
+                metaDescription: `Watch ${selectedCategory}: ${selectedVideo.title} on Tolee`,
+                keywords: `${selectedCategory.toLowerCase()}, youtube, video, ${account.languageName.toLowerCase()}, tolee`,
+                tags: `${selectedCategory.toLowerCase()}, youtube, video, ${account.languageName.toLowerCase()}`,
+                seoScore: 94,
+                aeoScore: 90,
+                geoScore: 88,
+                language: account.languageName,
+                sourceUrl: selectedVideo.watchUrl,
+                readingTime: 5,
+                coverCaption: selectedVideo.thumbnail
+              }
+            }
           }
         });
 
-        if (!dbExisting) {
-          selectedVideo = v;
-          break;
-        } else {
-          logs.push(`  ↳ Skipping duplicate: "${v.title.slice(0, 35)}..."`);
+        publishedCount++;
+        logs.push(`✅ [Video #${publishedCount}] Published [${selectedCategory}] "${selectedVideo.title.slice(0, 45)}..." (${selectedVideo.channelTitle}) by @${dbUser.username}`);
+
+        if (withDelay && publishedCount < 15) {
+          const delayMs = 3 * 60 * 1000;
+          logs.push(`⏱️ Waiting 3 min before next video...`);
+          await new Promise(res => setTimeout(res, delayMs));
         }
-      }
-
-      if (!selectedVideo) {
-        logs.push(`⚠️ All fetched [${selectedCategory}] videos for @${dbUser.username} were duplicates.`);
-        continue;
-      }
-
-      batchProcessedVideos.add(selectedVideo.videoId);
-
-      // Generate slug
-      const slugBase = selectedVideo.title
-        .toLowerCase()
-        .replace(/[^\w\s-]/g, '')
-        .replace(/\s+/g, '-')
-        .slice(0, 60);
-      const slug = `yt-${slugBase}-${Date.now().toString().slice(-5)}`;
-
-      // Video content description
-      const videoContent = `🎥 **${selectedCategory} Video**\n\n📌 **${selectedVideo.title}**\n📺 Channel: ${selectedVideo.channelTitle}\n\n📖 ${selectedVideo.description.slice(0, 400) || `Watch this ${selectedCategory.toLowerCase()} video on Tolee.`}\n\n🔗 Watch full video: ${selectedVideo.watchUrl}\n\nStay connected with Tolee for daily video updates across NASA, Discovery, Animation, Education, Sports, and more!`;
-
-      // ========== FIXED: Create as VIDEO post with embedded YouTube URL ==========
-      await prisma.post.create({
-        data: {
-          caption: `🎬 ${selectedVideo.title}`,
-          postType: 'video',                          // ← FIXED: was 'news', now 'video'
-          mediaUrls: selectedVideo.embedUrl,           // ← FIXED: YouTube embed URL (not thumbnail)
-          mediaTypes: 'video',                         // ← FIXED: was 'image', now 'video'
-          status: 'published',
-          authorId: dbUser.id,
-          tolees: allTolees.length > 0 ? { create: allTolees.map((t: any) => ({ toleeId: t.id })) } : undefined,
-          newsRelation: {
-            create: {
-              headline: selectedVideo.title,
-              slug,
-              summary: selectedVideo.description.slice(0, 200) || `Watch ${selectedVideo.title} on Tolee.`,
-              category: selectedCategory,
-              content: videoContent,
-              metaDescription: `Watch ${selectedCategory}: ${selectedVideo.title} on Tolee`,
-              keywords: `${selectedCategory.toLowerCase()}, youtube, video, ${account.languageName.toLowerCase()}, tolee`,
-              tags: `${selectedCategory.toLowerCase()}, youtube, video, ${account.languageName.toLowerCase()}`,
-              seoScore: 94,
-              aeoScore: 90,
-              geoScore: 88,
-              language: account.languageName,
-              sourceUrl: selectedVideo.watchUrl,
-              readingTime: 5,
-              coverCaption: selectedVideo.thumbnail           // Store thumbnail as cover image reference
-            }
-          }
-        }
-      });
-
-      publishedCount++;
-      const delayMins = Math.floor(Math.random() * 15) + 10;
-      logs.push(`✅ [Video #${publishedCount}] Published [${selectedCategory}] "${selectedVideo.title.slice(0, 45)}..." (${selectedVideo.channelTitle}) by @${dbUser.username}`);
-
-      if (withDelay && publishedCount < REGISTERED_NEWS_ACCOUNTS.length) {
-        const delayMs = delayMins * 60 * 1000;
-        logs.push(`⏱️ Waiting ${delayMins} min before next video...`);
-        await new Promise(res => setTimeout(res, delayMs));
       }
     }
 
