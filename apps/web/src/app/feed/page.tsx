@@ -6,6 +6,8 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 
+import { publishDailyNewsBatch } from '@/lib/newsAutoPublisher';
+
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
@@ -17,6 +19,18 @@ export default async function GlobalFeedPage() {
   }
   
   const currentUserId = (session?.user as any)?.id;
+
+  // Background trigger: auto-publish fresh news if latest post is older than 10 mins
+  try {
+    const latestNews = await prisma.newsPost.findFirst({
+      orderBy: { createdAt: 'desc' },
+      select: { createdAt: true }
+    });
+    const timeSince = latestNews ? Date.now() - new Date(latestNews.createdAt).getTime() : Infinity;
+    if (timeSince > 10 * 60 * 1000) {
+      publishDailyNewsBatch(false).catch(() => {});
+    }
+  } catch (e) {}
 
   // Fetch real posts from DB
   let dbPosts: any[] = [];
