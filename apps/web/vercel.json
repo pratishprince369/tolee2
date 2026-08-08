@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/publish-daily-news",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/publish-youtube-videos",
+      "schedule": "0 */2 * * *"
+    }
+  ]
+}
