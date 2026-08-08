@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Play, Video } from 'lucide-react';
+import { Play, Volume2, VolumeX, Video } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 interface YouTubeAutoplayVideoProps {
@@ -24,6 +24,8 @@ export function YouTubeAutoplayVideo({
 
   const [mounted, setMounted] = useState(false);
   const [isIntersecting, setIsIntersecting] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(true);
   const [hasError, setHasError] = useState(false);
 
   useEffect(() => {
@@ -60,6 +62,9 @@ export function YouTubeAutoplayVideo({
         (entries) => {
           for (const entry of entries) {
             setIsIntersecting(entry.isIntersecting);
+            if (entry.isIntersecting) {
+              setIsPlaying(true);
+            }
           }
         },
         { threshold: 0.4 }
@@ -72,9 +77,37 @@ export function YouTubeAutoplayVideo({
     }
   }, []);
 
-  // modestbranding=1, rel=0, iv_load_policy=3 removes YouTube popups
+  const toggleMute = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newMuteState = !isMuted;
+    setIsMuted(newMuteState);
+
+    // Send postMessage to YouTube IFrame API to toggle volume
+    if (iframeRef.current && iframeRef.current.contentWindow) {
+      const command = newMuteState ? 'mute' : 'unMute';
+      iframeRef.current.contentWindow.postMessage(
+        JSON.stringify({ event: 'command', func: command, args: [] }),
+        '*'
+      );
+    }
+  };
+
+  const togglePlay = () => {
+    const nextPlayState = !isPlaying;
+    setIsPlaying(nextPlayState);
+
+    if (iframeRef.current && iframeRef.current.contentWindow) {
+      const command = nextPlayState ? 'playVideo' : 'pauseVideo';
+      iframeRef.current.contentWindow.postMessage(
+        JSON.stringify({ event: 'command', func: command, args: [] }),
+        '*'
+      );
+    }
+  };
+
+  // controls=0 & modestbranding=1 COMPLETELY ERASES YouTube logo, title link & bottom bar!
   const embedSrc = cleanVideoId
-    ? `https://www.youtube-nocookie.com/embed/${cleanVideoId}?autoplay=${isIntersecting ? 1 : 0}&mute=1&enablejsapi=1&playsinline=1&rel=0&modestbranding=1&showinfo=0&iv_load_policy=3`
+    ? `https://www.youtube-nocookie.com/embed/${cleanVideoId}?autoplay=${isIntersecting ? 1 : 0}&mute=${isMuted ? 1 : 0}&controls=0&enablejsapi=1&playsinline=1&rel=0&modestbranding=1&showinfo=0&iv_load_policy=3&disablekb=1&fs=0`
     : '';
 
   const fallbackThumbnail = thumbnailUrl || (cleanVideoId ? `https://img.youtube.com/vi/${cleanVideoId}/hqdefault.jpg` : '/tolee-news-default.png');
@@ -90,26 +123,52 @@ export function YouTubeAutoplayVideo({
   return (
     <div
       ref={containerRef}
-      className={`relative w-full aspect-video rounded-2xl overflow-hidden bg-black shadow-lg border border-zinc-200 dark:border-zinc-800 ${className}`}
+      onClick={togglePlay}
+      className={`relative w-full aspect-video rounded-2xl overflow-hidden bg-black shadow-lg border border-zinc-200 dark:border-zinc-800 cursor-pointer group ${className}`}
     >
       {mounted && isIntersecting && cleanVideoId ? (
-        <div className="relative w-full h-full overflow-hidden">
+        <div className="relative w-full h-full overflow-hidden select-none">
           <iframe
             ref={iframeRef}
             src={embedSrc}
             title={title || 'YouTube Video'}
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            allowFullScreen
             onError={() => setHasError(true)}
-            className="w-full h-full border-none scale-[1.03] origin-center"
+            className="w-full h-full border-none scale-[1.05] origin-center pointer-events-none"
           />
-          {/* Bottom-Right Watermark Mask: Hides YouTube Logo & "More Videos" Button */}
-          <div className="absolute bottom-0 right-0 h-10 w-28 bg-black/95 backdrop-blur-md flex items-center justify-end px-3 rounded-tl-xl pointer-events-none z-10 shadow-lg border-t border-l border-zinc-800/80">
+
+          {/* Tolee Custom Control Overlays (Top-Right Audio Toggle & Bottom-Right TOLEE HD Watermark) */}
+          <div className="absolute top-3 right-3 flex items-center gap-2 z-20 pointer-events-auto">
+            <button
+              type="button"
+              onClick={toggleMute}
+              className="w-9 h-9 rounded-full bg-black/75 hover:bg-black/90 text-white backdrop-blur-md flex items-center justify-center border border-white/20 shadow-lg transition-transform active:scale-95"
+              title={isMuted ? 'Unmute Audio' : 'Mute Audio'}
+            >
+              {isMuted ? (
+                <VolumeX className="w-4 h-4 text-rose-400" />
+              ) : (
+                <Volume2 className="w-4 h-4 text-emerald-400 animate-pulse" />
+              )}
+            </button>
+          </div>
+
+          {/* Bottom-Right Watermark Mask: Replaces YouTube logo with TOLEE HD badge */}
+          <div className="absolute bottom-0 right-0 h-10 w-32 bg-black/95 backdrop-blur-md flex items-center justify-end px-3 rounded-tl-2xl pointer-events-none z-20 shadow-xl border-t border-l border-zinc-800/90">
             <span className="text-[11px] font-black tracking-widest text-teal-400 uppercase flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-ping" />
+              <span className="w-2 h-2 rounded-full bg-teal-400 animate-ping" />
               TOLEE HD
             </span>
           </div>
+
+          {/* Play/Pause Overlay Indicator on Tap */}
+          {!isPlaying && (
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center z-10">
+              <div className="w-14 h-14 rounded-full bg-teal-500/90 text-white flex items-center justify-center shadow-2xl scale-110">
+                <Play className="w-7 h-7 fill-current translate-x-0.5" />
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <div className="relative w-full h-full cursor-pointer group">
