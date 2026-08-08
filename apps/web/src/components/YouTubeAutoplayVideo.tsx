@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Volume2, VolumeX, Play, Pause, Video } from 'lucide-react';
+import { Play, Video } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 interface YouTubeAutoplayVideoProps {
@@ -72,8 +72,9 @@ export function YouTubeAutoplayVideo({
     }
   }, []);
 
+  // modestbranding=1, rel=0, iv_load_policy=3 removes YouTube popups
   const embedSrc = cleanVideoId
-    ? `https://www.youtube-nocookie.com/embed/${cleanVideoId}?autoplay=${isIntersecting ? 1 : 0}&mute=1&enablejsapi=1&playsinline=1&rel=0&modestbranding=1`
+    ? `https://www.youtube-nocookie.com/embed/${cleanVideoId}?autoplay=${isIntersecting ? 1 : 0}&mute=1&enablejsapi=1&playsinline=1&rel=0&modestbranding=1&showinfo=0&iv_load_policy=3`
     : '';
 
   const fallbackThumbnail = thumbnailUrl || (cleanVideoId ? `https://img.youtube.com/vi/${cleanVideoId}/hqdefault.jpg` : '/tolee-news-default.png');
@@ -92,15 +93,24 @@ export function YouTubeAutoplayVideo({
       className={`relative w-full aspect-video rounded-2xl overflow-hidden bg-black shadow-lg border border-zinc-200 dark:border-zinc-800 ${className}`}
     >
       {mounted && isIntersecting && cleanVideoId ? (
-        <iframe
-          ref={iframeRef}
-          src={embedSrc}
-          title={title || 'YouTube Video'}
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-          allowFullScreen
-          onError={() => setHasError(true)}
-          className="w-full h-full border-none"
-        />
+        <div className="relative w-full h-full overflow-hidden">
+          <iframe
+            ref={iframeRef}
+            src={embedSrc}
+            title={title || 'YouTube Video'}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+            onError={() => setHasError(true)}
+            className="w-full h-full border-none scale-[1.03] origin-center"
+          />
+          {/* Bottom-Right Watermark Mask: Hides YouTube Logo & "More Videos" Button */}
+          <div className="absolute bottom-0 right-0 h-10 w-28 bg-black/95 backdrop-blur-md flex items-center justify-end px-3 rounded-tl-xl pointer-events-none z-10 shadow-lg border-t border-l border-zinc-800/80">
+            <span className="text-[11px] font-black tracking-widest text-teal-400 uppercase flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-ping" />
+              TOLEE HD
+            </span>
+          </div>
+        </div>
       ) : (
         <div className="relative w-full h-full cursor-pointer group">
           <img
@@ -117,7 +127,7 @@ export function YouTubeAutoplayVideo({
       )}
 
       {/* Category Badge */}
-      <Badge className="absolute top-3 left-3 bg-red-600/90 text-white font-extrabold text-[10px] uppercase px-2.5 py-1 rounded-lg border-none shadow-md flex items-center gap-1.5 backdrop-blur-md">
+      <Badge className="absolute top-3 left-3 bg-red-600/90 text-white font-extrabold text-[10px] uppercase px-2.5 py-1 rounded-lg border-none shadow-md flex items-center gap-1.5 backdrop-blur-md z-20">
         <Video className="w-3.5 h-3.5" />
         <span>{category} Video</span>
       </Badge>
