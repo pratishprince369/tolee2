@@ -3,7 +3,7 @@ import { prisma } from '../lib/prisma';
 async function linkAllNewsToAllTolees() {
   console.log("Fetching all active Tolees (Groups) in database...");
   const allTolees = await prisma.tolee.findMany({ select: { id: true, name: true, slug: true } });
-  console.log(`Found ${allTolees.length} Tolees:`, allTolees.map(t => `${t.name} (${t.slug})`));
+  console.log(`Found ${allTolees.length} Tolees:`, allTolees.map((t: any) => `${t.name} (${t.slug})`));
 
   if (allTolees.length === 0) {
     console.error("No Tolees found in DB!");

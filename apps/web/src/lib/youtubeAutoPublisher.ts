@@ -107,7 +107,7 @@ export async function publishYouTubeVideosBatch(withDelay: boolean = false): Pro
       return {
         email: acc.email,
         query: randomQuery,
-        lang: acc.languageCode
+        lang: acc.language
       };
     });
 
