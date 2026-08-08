@@ -196,8 +196,8 @@ export async function publishDailyNewsBatch(withDelay: boolean = false): Promise
     const stockIndex = { val: 0 };
     const batchProcessedHeadlines = new Set<string>();
 
-    for (let i = 0; i < 50; i++) { // Loop up to 50 candidates to publish 20-25 non-duplicate posts
-      if (publishedCount >= 25) break;
+    for (let i = 0; i < 50; i++) { // Loop up to 50 candidates to publish 10 non-duplicate news posts
+      if (publishedCount >= 10) break;
 
       const accountConfig = REGISTERED_NEWS_ACCOUNTS[publishedCount % REGISTERED_NEWS_ACCOUNTS.length];
       const dbUser = userMap.get(accountConfig.email);

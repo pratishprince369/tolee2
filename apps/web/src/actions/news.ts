@@ -786,12 +786,40 @@ export async function getNewsFeedPosts(options: {
       return true;
     });
 
+    // Interleave: News Post -> Video Post -> News Post -> Video Post
+    const textNews: any[] = [];
+    const videoNews: any[] = [];
+
+    for (const item of uniqueMappedNews) {
+      const p = item.post;
+      const isVid = p?.postType === 'reel' || 
+                    (p?.mediaTypes && p?.mediaTypes.includes('video')) || 
+                    (p?.mediaUrls && (p?.mediaUrls.includes('youtube') || p?.mediaUrls.includes('.mp4') || p?.mediaUrls.includes('youtu.be')));
+      if (isVid) {
+        videoNews.push(item);
+      } else {
+        textNews.push(item);
+      }
+    }
+
+    let finalNewsStream = uniqueMappedNews;
+    if (textNews.length > 0 && videoNews.length > 0) {
+      const interleaved: any[] = [];
+      let nIdx = 0;
+      let vIdx = 0;
+      while (nIdx < textNews.length || vIdx < videoNews.length) {
+        if (nIdx < textNews.length) interleaved.push(textNews[nIdx++]);
+        if (vIdx < videoNews.length) interleaved.push(videoNews[vIdx++]);
+      }
+      finalNewsStream = interleaved;
+    }
+
     // Check if there are more posts in the next batch
     const hasMore = newsList.length === limit;
 
     return {
       success: true,
-      news: uniqueMappedNews,
+      news: finalNewsStream,
       hasMore
     };
   } catch (err: any) {

@@ -310,7 +310,35 @@ export default async function ToleePage({ params }: { params: { slug: string } }
     return true;
   });
 
-  toleeData.posts = uniqueUnifiedFeed;
+  // Interleave: News Post -> Video Post -> News Post -> Video Post
+  const textGroupPosts: any[] = [];
+  const videoGroupPosts: any[] = [];
+
+  for (const item of uniqueUnifiedFeed) {
+    const isVid = item.postType === 'reel' || 
+                  item.video || 
+                  (item.mediaTypes && item.mediaTypes.includes('video')) || 
+                  (item.mediaUrls && (item.mediaUrls.includes('youtube') || item.mediaUrls.includes('.mp4') || item.mediaUrls.includes('youtu.be')));
+    if (isVid) {
+      videoGroupPosts.push(item);
+    } else {
+      textGroupPosts.push(item);
+    }
+  }
+
+  let interleavedGroupFeed = uniqueUnifiedFeed;
+  if (textGroupPosts.length > 0 && videoGroupPosts.length > 0) {
+    const interleaved: any[] = [];
+    let nIdx = 0;
+    let vIdx = 0;
+    while (nIdx < textGroupPosts.length || vIdx < videoGroupPosts.length) {
+      if (nIdx < textGroupPosts.length) interleaved.push(textGroupPosts[nIdx++]);
+      if (vIdx < videoGroupPosts.length) interleaved.push(videoGroupPosts[vIdx++]);
+    }
+    interleavedGroupFeed = interleaved;
+  }
+
+  toleeData.posts = interleavedGroupFeed;
 
   return (
     <Suspense fallback={
