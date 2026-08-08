@@ -1,11 +1,12 @@
 import { publishDailyNewsBatch } from '@/lib/newsAutoPublisher';
 import { publishYouTubeVideosBatch } from '@/lib/youtubeAutoPublisher';
+import { publishCoverrVideosBatch } from '@/lib/coverrAutoPublisher';
 
 let isDaemonRunning = false;
 
 /**
  * Continuous Background Auto-Publisher Daemon Engine
- * Runs in the background and publishes 20-25 news posts daily with human-like time gaps.
+ * Runs in the background and publishes 20-25 news & video posts daily with human-like time gaps.
  */
 export function startNewsAutoPublisherDaemon() {
   if (isDaemonRunning) {
@@ -14,7 +15,7 @@ export function startNewsAutoPublisherDaemon() {
   }
 
   isDaemonRunning = true;
-  console.log("🚀 Starting Continuous Daily News Auto-Publisher Daemon Loop...");
+  console.log("🚀 Starting Continuous Daily News & Stock Video Auto-Publisher Daemon Loop...");
 
   const runLoop = async () => {
     while (isDaemonRunning) {
@@ -26,6 +27,10 @@ export function startNewsAutoPublisherDaemon() {
         console.log("🎬 [DAEMON LOOP] Executing YouTube video news publication...");
         const ytResult = await publishYouTubeVideosBatch(false);
         console.log(`🎬 [DAEMON LOOP] Published ${ytResult.count} YouTube video news posts.`);
+
+        console.log("🎥 [DAEMON LOOP] Executing Coverr HD stock video publication...");
+        const coverrResult = await publishCoverrVideosBatch();
+        console.log(`🎥 [DAEMON LOOP] Published ${coverrResult.count} Coverr HD stock video posts.`);
 
       } catch (err: any) {
         console.error("❌ [DAEMON LOOP ERROR]:", err.message);
