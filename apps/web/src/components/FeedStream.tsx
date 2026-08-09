@@ -1753,7 +1753,16 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                             </button>
 
                             <button
-                              onClick={(e) => { e.stopPropagation(); setSelectedPostForShare(post); setShareModalOpen(true); }}
+                              onClick={(e) => { 
+                                e.stopPropagation(); 
+                                setSelectedPostForShare({
+                                  ...post,
+                                  postType: 'news',
+                                  contentType: 'news',
+                                  slug: newsSlug
+                                }); 
+                                setShareModalOpen(true); 
+                              }}
                               className="flex items-center gap-1.5 text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 focus:outline-none transition-colors"
                             >
                               <Send strokeWidth={1.5} className="w-[19px] h-[19px]" />
