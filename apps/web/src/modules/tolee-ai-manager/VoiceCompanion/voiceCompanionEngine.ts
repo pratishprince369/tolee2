@@ -152,7 +152,7 @@ export class VoiceCompanionEngine {
     this.onStatusChangeCallback = cb;
   }
 
-  public async startListening() {
+  public startListening() {
     if (this.isListening || this.isSpeaking) return;
 
     if (!this.recognition) {
@@ -160,15 +160,6 @@ export class VoiceCompanionEngine {
     }
 
     unlockMobileAudio();
-
-    // Explicitly request browser microphone permission
-    if (typeof window !== 'undefined' && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      try {
-        await navigator.mediaDevices.getUserMedia({ audio: true });
-      } catch (micErr) {
-        console.warn('Microphone permission notice:', micErr);
-      }
-    }
 
     try {
       const savedLang = typeof window !== 'undefined' ? (localStorage.getItem('tolee_native_lang') || 'hi-IN') : 'hi-IN';
@@ -179,7 +170,7 @@ export class VoiceCompanionEngine {
         this.notifyStatus();
       }
     } catch (e: any) {
-      console.warn('Voice Engine listening notice, retrying fresh instance:', e);
+      console.warn('Voice Engine listening notice, re-initializing:', e);
       this.isListening = false;
       this.initRecognition();
       try {
@@ -189,7 +180,7 @@ export class VoiceCompanionEngine {
           this.notifyStatus();
         }
       } catch (err2) {
-        console.warn('Voice Engine restart failed:', err2);
+        console.warn('Voice Engine start failed:', err2);
       }
     }
   }
@@ -445,10 +436,12 @@ export class VoiceCompanionEngine {
       }, 800);
     };
 
+    const isMobile = typeof window !== 'undefined' && (window.innerWidth < 768 || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent));
+
     this.recognition.onend = () => {
       this.isListening = false;
       this.notifyStatus();
-      if ((this.mode === 'ALWAYS_LISTENING' || this.mode === 'DRIVING') && !this.isSpeaking) {
+      if (!isMobile && (this.mode === 'ALWAYS_LISTENING' || this.mode === 'DRIVING') && !this.isSpeaking) {
         setTimeout(() => this.startListening(), 400);
       }
     };
@@ -457,7 +450,7 @@ export class VoiceCompanionEngine {
       console.warn('SpeechRecognition error notice:', err);
       this.isListening = false;
       this.notifyStatus();
-      if ((this.mode === 'ALWAYS_LISTENING' || this.mode === 'DRIVING') && !this.isSpeaking) {
+      if (!isMobile && (this.mode === 'ALWAYS_LISTENING' || this.mode === 'DRIVING') && !this.isSpeaking) {
         setTimeout(() => this.startListening(), 800);
       }
     };

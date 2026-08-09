@@ -205,7 +205,6 @@ export function FloatingVoiceHUD({ isOpen, onClose, onSelectTab, onSendMessage }
       <button 
         type="button"
         onClick={handleMicTap}
-        onTouchEnd={handleMicTap}
         className={`relative flex items-center justify-center w-11 h-11 rounded-full border cursor-pointer active:scale-95 transition-all shrink-0 ${
           isSpeaking 
             ? 'border-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.9)] bg-cyan-950/90 animate-pulse' 
@@ -225,7 +224,6 @@ export function FloatingVoiceHUD({ isOpen, onClose, onSelectTab, onSendMessage }
       {/* Text Info */}
       <div 
         onClick={handleMicTap}
-        onTouchEnd={handleMicTap}
         className="flex-1 min-w-0 text-xs overflow-hidden cursor-pointer select-none"
       >
         <div className="font-bold flex items-center gap-1.5 text-cyan-300 text-xs sm:text-xs">
