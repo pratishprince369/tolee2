@@ -15,7 +15,14 @@ import {
   Users, Mic, MicOff, MessageCircle, Send, Heart, Flame, 
   Sparkles, Radio, Share2, Volume2, ShieldCheck, Zap
 } from 'lucide-react';
-import { toast } from 'sonner';
+
+const toast = {
+  success: (msg: string) => typeof window !== 'undefined' && console.log('✅ ' + msg),
+  error: (msg: string) => typeof window !== 'undefined' && console.log('❌ ' + msg),
+  info: (msg: string) => typeof window !== 'undefined' && console.log('ℹ️ ' + msg),
+  loading: (msg: string) => typeof window !== 'undefined' && console.log('⏳ ' + msg),
+  dismiss: () => {}
+};
 
 interface ToleeWatchSquadModalProps {
   isOpen: boolean;

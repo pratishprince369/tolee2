@@ -14,7 +14,14 @@ import {
   Sparkles, Mic, Video, Volume2, Radio, Zap, Swords, 
   Smile, Flame, Award, CheckCircle2, Play, RefreshCw 
 } from 'lucide-react';
-import { toast } from 'sonner';
+
+const toast = {
+  success: (msg: string) => typeof window !== 'undefined' && console.log('✅ ' + msg),
+  error: (msg: string) => typeof window !== 'undefined' && console.log('❌ ' + msg),
+  info: (msg: string) => typeof window !== 'undefined' && console.log('ℹ️ ' + msg),
+  loading: (msg: string) => typeof window !== 'undefined' && console.log('⏳ ' + msg),
+  dismiss: () => {}
+};
 
 interface ToleeAIDuetModalProps {
   isOpen: boolean;

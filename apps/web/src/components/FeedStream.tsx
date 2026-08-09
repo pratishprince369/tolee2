@@ -71,10 +71,10 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
   }, []);
 
   useEffect(() => {
-    if (posts && posts.length > 0) {
-      savePostsToOfflinePocket(posts);
+    if (initialPosts && initialPosts.length > 0) {
+      savePostsToOfflinePocket(initialPosts);
     }
-  }, [posts]);
+  }, [initialPosts]);
 
   const loadStories = async () => {
     try {

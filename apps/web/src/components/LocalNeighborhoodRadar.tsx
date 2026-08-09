@@ -8,7 +8,14 @@ import {
   MapPin, Radar, Navigation, ShieldAlert, Utensils, Megaphone, 
   Sparkles, EyeOff, Send, Radio, Plus, CheckCircle2, ChevronRight 
 } from 'lucide-react';
-import { toast } from 'sonner';
+
+const toast = {
+  success: (msg: string) => typeof window !== 'undefined' && console.log('✅ ' + msg),
+  error: (msg: string) => typeof window !== 'undefined' && console.log('❌ ' + msg),
+  info: (msg: string) => typeof window !== 'undefined' && console.log('ℹ️ ' + msg),
+  loading: (msg: string) => typeof window !== 'undefined' && console.log('⏳ ' + msg),
+  dismiss: () => {}
+};
 
 interface LocalRadarPost {
   id: string;
