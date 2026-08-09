@@ -244,45 +244,47 @@ export class VoiceCompanionEngine {
 
     const voices = window.speechSynthesis.getVoices();
 
-    // 🇮🇳 Authentic Indian Human Voice Picker Algorithm
+    // 🌐 Global Language Script Detector & Voice Picker Algorithm
+    let detectedLang = langCode || 'hi-IN';
+    if (/[\u0900-\u097F]/.test(cleanSpokenText)) detectedLang = 'hi-IN';
+    else if (/[\u0B80-\u0BFF]/.test(cleanSpokenText)) detectedLang = 'ta-IN';
+    else if (/[\u0C00-\u0C7F]/.test(cleanSpokenText)) detectedLang = 'te-IN';
+    else if (/[\u0A80-\u0AFF]/.test(cleanSpokenText)) detectedLang = 'gu-IN';
+    else if (/[\u0980-\u09FF]/.test(cleanSpokenText)) detectedLang = 'bn-IN';
+    else if (/[\u0600-\u06FF]/.test(cleanSpokenText)) detectedLang = 'ar-SA';
+    else if (/[\u3040-\u30FF]/.test(cleanSpokenText)) detectedLang = 'ja-JP';
+    else if (/[\u4E00-\u9FFF]/.test(cleanSpokenText)) detectedLang = 'zh-CN';
+    else if (/[\u0400-\u04FF]/.test(cleanSpokenText)) detectedLang = 'ru-RU';
+    else if (/[\uAC00-\uD7AF]/.test(cleanSpokenText)) detectedLang = 'ko-KR';
+
+    const targetLangISO = detectedLang.split('-')[0].toLowerCase();
+
+    const voices = window.speechSynthesis.getVoices();
     let selectedVoice: SpeechSynthesisVoice | undefined = undefined;
 
     if (voices && voices.length > 0) {
-      // 1. Search for Google Hindi / Swara / Hemant / Natural Indian Hindi voices
+      // 1. Search for exact natural Google/Microsoft/Apple voice for the target language
       selectedVoice = voices.find(v => {
-        const lang = (v.lang || '').toLowerCase();
-        const name = (v.name || '').toLowerCase();
-        return (
-          (lang.includes('hi') || name.includes('hindi') || name.includes('हिन्दी')) &&
-          (name.includes('google') || name.includes('swara') || name.includes('hemant') || name.includes('madhur') || name.includes('kalpana') || name.includes('karan') || name.includes('india'))
-        );
+        const vLang = (v.lang || '').toLowerCase();
+        const vName = (v.name || '').toLowerCase();
+        return (vLang.includes(targetLangISO) || vLang.includes(detectedLang.toLowerCase())) &&
+          (vName.includes('google') || vName.includes('natural') || vName.includes('premium') || vName.includes('neural') || vName.includes('swara') || vName.includes('siri'));
       });
 
-      // 2. Search for any Hindi language voice
+      // 2. Search for any voice matching the language code
       if (!selectedVoice) {
         selectedVoice = voices.find(v => {
-          const lang = (v.lang || '').toLowerCase();
-          return lang.includes('hi-in') || lang.includes('hi_in') || lang.startsWith('hi');
-        });
-      }
-
-      // 3. Search for Indian Accent English Voice (Neerja, Prabhat, Google English India)
-      if (!selectedVoice) {
-        selectedVoice = voices.find(v => {
-          const lang = (v.lang || '').toLowerCase();
-          const name = (v.name || '').toLowerCase();
-          return (
-            lang.includes('en-in') || lang.includes('en_in') || name.includes('neerja') || name.includes('prabhat') || name.includes('india')
-          );
+          const vLang = (v.lang || '').toLowerCase();
+          return vLang.includes(targetLangISO) || vLang.startsWith(targetLangISO);
         });
       }
     }
 
     if (selectedVoice) {
       utterance.voice = selectedVoice;
-      utterance.lang = selectedVoice.lang || langCode;
+      utterance.lang = selectedVoice.lang || detectedLang;
     } else {
-      utterance.lang = langCode || 'hi-IN';
+      utterance.lang = detectedLang;
     }
 
     let hasFinished = false;
@@ -307,7 +309,7 @@ export class VoiceCompanionEngine {
       if (!hasFinished) {
         console.warn('SpeechSynthesis timeout on mobile, switching to Web Audio TTS fallback...');
         try { window.speechSynthesis.cancel(); } catch(e) {}
-        this.fallbackAudioSpeak(cleanSpokenText, langCode, finishSpeaking);
+        this.fallbackAudioSpeak(cleanSpokenText, detectedLang, finishSpeaking);
       }
     }, safetyTimeoutMs);
 
@@ -324,7 +326,7 @@ export class VoiceCompanionEngine {
     utterance.onerror = (err) => {
       console.warn('SpeechSynthesis utterance error, using audio fallback:', err);
       clearTimeout(safetyTimer);
-      this.fallbackAudioSpeak(cleanSpokenText, langCode, finishSpeaking);
+      this.fallbackAudioSpeak(cleanSpokenText, detectedLang, finishSpeaking);
     };
 
     try {
@@ -332,18 +334,18 @@ export class VoiceCompanionEngine {
     } catch (err) {
       console.warn('Failed to invoke speechSynthesis.speak, using audio fallback:', err);
       clearTimeout(safetyTimer);
-      this.fallbackAudioSpeak(cleanSpokenText, langCode, finishSpeaking);
+      this.fallbackAudioSpeak(cleanSpokenText, detectedLang, finishSpeaking);
     }
   }
 
   /**
-   * High Reliability Mobile Audio Fallback TTS Engine
+   * High Reliability Global Audio Fallback TTS Engine (Supports All World Languages)
    * Plays voice responses using Google Translate TTS HTML5 Audio stream
    */
   private fallbackAudioSpeak(text: string, langCode: string, onEnd?: () => void) {
     try {
       const cleanText = text.slice(0, 250);
-      const langParam = langCode.startsWith('hi') ? 'hi' : langCode.startsWith('mr') ? 'mr' : langCode.startsWith('gu') ? 'gu' : langCode.startsWith('ta') ? 'ta' : langCode.startsWith('te') ? 'te' : 'hi';
+      const langParam = langCode.split('-')[0].toLowerCase() || 'hi';
       const audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(cleanText)}&tl=${langParam}&client=tw-ob`;
       
       let audio: HTMLAudioElement;
@@ -368,6 +370,16 @@ export class VoiceCompanionEngine {
         this.notifyStatus();
         if (onEnd) onEnd();
       };
+
+      audio.play().catch(e => {
+        console.warn('Fallback audio playback error on mobile:', e);
+        this.isSpeaking = false;
+        this.notifyStatus();
+        if (onEnd) onEnd();
+      });
+    } catch (e) {
+      this.isSpeaking = false;
+      this.notifyStatus();
 
       audio.play().catch(e => {
         console.warn('Fallback audio playback error on mobile:', e);

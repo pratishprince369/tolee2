@@ -194,17 +194,18 @@ export function FloatingVoiceHUD({ isOpen, onClose, onSelectTab, onSendMessage }
   if (!isOpen) return null;
 
   return (
-    <div className="fixed bottom-24 left-3 right-3 sm:left-auto sm:right-6 z-[99999] flex items-center justify-between gap-2.5 bg-slate-900/95 backdrop-blur-xl border border-cyan-500/40 text-white rounded-2xl sm:rounded-full px-3.5 py-2.5 shadow-[0_0_30px_rgba(6,182,212,0.4)] transition-all animate-in fade-in slide-in-from-bottom-5 max-w-[calc(100vw-24px)] mx-auto sm:mx-0">
+    <div className="fixed bottom-20 left-2 right-2 sm:left-auto sm:right-6 z-[9999999] flex items-center justify-between gap-3 bg-slate-900/95 backdrop-blur-2xl border border-cyan-500/50 text-white rounded-2xl sm:rounded-full px-4 py-3 shadow-[0_0_35px_rgba(6,182,212,0.5)] transition-all animate-in fade-in slide-in-from-bottom-5 max-w-[calc(100vw-16px)] mx-auto sm:mx-0">
       {/* Glowing Orb Animation / Tap to Speak Button */}
       <button 
         type="button"
         onClick={handleMicTap}
-        className={`relative flex items-center justify-center w-10 h-10 rounded-full border cursor-pointer active:scale-95 transition-all shrink-0 ${
+        onTouchEnd={handleMicTap}
+        className={`relative flex items-center justify-center w-11 h-11 rounded-full border cursor-pointer active:scale-95 transition-all shrink-0 ${
           isSpeaking 
-            ? 'border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.8)] bg-cyan-950/80 animate-pulse' 
+            ? 'border-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.9)] bg-cyan-950/90 animate-pulse' 
             : wakeWordActive || isListening
-            ? 'border-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.8)] bg-emerald-950/80 animate-pulse'
-            : 'border-slate-600 bg-slate-800 hover:border-cyan-400'
+            ? 'border-emerald-400 shadow-[0_0_20px_rgba(52,211,153,0.9)] bg-emerald-950/90 animate-pulse'
+            : 'border-cyan-500/40 bg-slate-800 hover:border-cyan-400'
         }`}
         title="Tap to Speak (Mobile)"
       >
@@ -218,16 +219,17 @@ export function FloatingVoiceHUD({ isOpen, onClose, onSelectTab, onSendMessage }
       {/* Text Info */}
       <div 
         onClick={handleMicTap}
-        className="flex-1 min-w-0 text-xs overflow-hidden cursor-pointer"
+        onTouchEnd={handleMicTap}
+        className="flex-1 min-w-0 text-xs overflow-hidden cursor-pointer select-none"
       >
-        <div className="font-bold flex items-center gap-1 text-cyan-300 text-[11px] sm:text-xs">
-          <span>Tolee Voice Manager</span>
+        <div className="font-bold flex items-center gap-1.5 text-cyan-300 text-xs sm:text-xs">
+          <span>Tolee Voice AI</span>
           <span className={`w-2 h-2 rounded-full shrink-0 ${isSpeaking ? 'bg-cyan-400 animate-ping' : isListening ? 'bg-emerald-400 animate-ping' : 'bg-slate-500'}`} />
           {!isListening && !isSpeaking && (
-            <span className="text-[10px] text-amber-400 bg-amber-950/60 px-1.5 py-0.5 rounded-full font-mono ml-auto sm:ml-0">Tap Mic 🎙️</span>
+            <span className="text-[10px] text-amber-400 bg-amber-950/70 px-2 py-0.5 rounded-full font-mono ml-auto sm:ml-0 border border-amber-500/30">Tap Mic 🎙️</span>
           )}
         </div>
-        <p className="text-[10px] sm:text-[11px] text-slate-300 truncate">{speechText}</p>
+        <p className="text-[11px] sm:text-xs text-slate-200 truncate mt-0.5">{speechText}</p>
       </div>
 
       {/* Close/Turn OFF Button */}
@@ -235,7 +237,7 @@ export function FloatingVoiceHUD({ isOpen, onClose, onSelectTab, onSendMessage }
         variant="ghost"
         size="icon"
         onClick={handleTurnOff}
-        className="w-7 h-7 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 shrink-0"
+        className="w-8 h-8 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 shrink-0 active:scale-90"
         title="Turn Voice Manager OFF"
       >
         <X className="w-4 h-4" />
