@@ -16,13 +16,11 @@ export function getLLMKeyPool(): string[] {
 export async function callNvidiaLLM(messages: { role: string; content: string }[], systemPrompt?: string) {
   const keyPool = getLLMKeyPool();
   const models = [
-    "meta/llama-3.3-70b-instruct",
-    "meta/llama-3.2-11b-vision-instruct",
+    "nvidia/nemotron-4-340b-instruct",
     "nvidia/nemotron-3-ultra-550b-a55b",
-    "mistralai/mixtral-8x7b-instruct-v0.1",
-    "stepfun-ai/step-3.7-flash",
     "nvidia/nemotron-mini-4b-instruct",
-    "meta/llama-3.1-70b-instruct"
+    "meta/llama-3.3-70b-instruct",
+    "google/gemma-4-31b-it"
   ];
 
   for (const apiKey of keyPool) {
