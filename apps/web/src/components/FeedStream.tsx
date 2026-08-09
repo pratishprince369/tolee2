@@ -1589,13 +1589,13 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                   );
                 }
 
-                if (post.postType === 'news') {
+                if (post.postType === 'news' || post.postType === 'video' || Boolean(post.newsRelation)) {
                   const news = post.newsRelation;
                   const newsSlug = String(news?.slug || post.id || '');
-                  const newsHeadline = String(news?.headline || post.caption || 'Premium Article');
+                  const newsHeadline = String(news?.headline || post.caption?.replace(/^🎬\s*/, '') || 'Featured Video');
                   const newsSummary = String(news?.summary || '');
-                  const newsCategory = String(news?.category || 'General');
-                  const newsReadingTime = news?.readingTime || 1;
+                  const newsCategory = String(news?.category || 'Video');
+                  const newsReadingTime = news?.readingTime || 4;
                   const newsViewsCount = post.views || news?.viewsCount || 0;
 
                   // Detect YouTube Video Posts safely & extract Video ID

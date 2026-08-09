@@ -7,6 +7,7 @@ import { authOptions } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 
 import { publishDailyNewsBatch } from '@/lib/newsAutoPublisher';
+import { publishYouTubeVideosBatch } from '@/lib/youtubeAutoPublisher';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -20,14 +21,16 @@ export default async function GlobalFeedPage() {
   
   const currentUserId = (session?.user as any)?.id;
 
-  // Background trigger: auto-publish fresh news if latest post is older than 10 mins
+  // Background trigger: auto-publish fresh news & videos if latest post is older than 90 seconds
   try {
-    const latestNews = await prisma.newsPost.findFirst({
+    const latestPost = await prisma.post.findFirst({
+      where: { isArchived: false, status: 'published' },
       orderBy: { createdAt: 'desc' },
       select: { createdAt: true }
     });
-    const timeSince = latestNews ? Date.now() - new Date(latestNews.createdAt).getTime() : Infinity;
-    if (timeSince > 10 * 60 * 1000) {
+    const timeSince = latestPost ? Date.now() - new Date(latestPost.createdAt).getTime() : Infinity;
+    if (timeSince > 90 * 1000) {
+      publishYouTubeVideosBatch(false).catch(() => {});
       publishDailyNewsBatch(false).catch(() => {});
     }
   } catch (e) {}
