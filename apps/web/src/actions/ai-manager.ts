@@ -534,6 +534,136 @@ export async function processAIPersonalMessage(
       };
     }
 
+    // 📩 REAL DATABASE CHAT & MESSAGE CHECKING INTENT
+    const isChatCheckIntent =
+      lower.includes('chat') ||
+      lower.includes('message') ||
+      lower.includes('msg') ||
+      lower.includes('kisi ka message') ||
+      lower.includes('unread') ||
+      lower.includes('sandesh') ||
+      trimmed.includes('चैट') ||
+      trimmed.includes('मैसेज') ||
+      trimmed.includes('संदेश');
+
+    if (isChatCheckIntent && (lower.includes('check') || lower.includes('aaya') || lower.includes('batao') || lower.includes('karo') || lower.includes('bata') || lower.includes('show') || lower.includes('padho') || lower.includes('kya'))) {
+      try {
+        const userChats = await prisma.chatParticipant.findMany({
+          where: { userId },
+          select: { chatId: true }
+        });
+
+        const chatIds = userChats.map(c => c.chatId);
+
+        if (chatIds.length === 0) {
+          return {
+            success: true,
+            response: `📩 **Tolee AI Manager**: Maine aapki chats check ki hain. Abhi aapke paas koi active chat conversation nahi hai.`
+          };
+        }
+
+        // Query unread messages in user's chats
+        const unreadMessages = await prisma.message.findMany({
+          where: {
+            chatId: { in: chatIds },
+            senderId: { not: userId },
+            isRead: false
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 5,
+          include: {
+            sender: { select: { name: true, username: true } },
+            chat: { select: { name: true, isGroupChat: true } }
+          }
+        });
+
+        if (unreadMessages.length > 0) {
+          const msgListStr = unreadMessages.map((m, idx) => {
+            const senderName = m.sender?.name || m.sender?.username || 'User';
+            const timeAgo = new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            return `${idx + 1}. 👤 **${senderName}** (${timeAgo}): "${m.content.slice(0, 80)}"`;
+          }).join('\n');
+
+          return {
+            success: true,
+            response: `📩 **Tolee AI Manager**: Maine aapki chats check ki hain! Aapke paas **${unreadMessages.length} naye unread message(s)** aaye hain:\n\n${msgListStr}\n\n💬 *Aap bolenge "chat open kardo" to main aapko Chat section par le chalunga!*`,
+            interactiveAction: {
+              type: 'OPEN_MODULE',
+              label: '💬 Open Chats Now',
+              payload: { targetModule: 'chat' }
+            }
+          };
+        }
+
+        // Query recent messages if no unread
+        const recentMessages = await prisma.message.findMany({
+          where: {
+            chatId: { in: chatIds },
+            senderId: { not: userId }
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 3,
+          include: {
+            sender: { select: { name: true, username: true } }
+          }
+        });
+
+        if (recentMessages.length > 0) {
+          const lastMsg = recentMessages[0];
+          const senderName = lastMsg.sender?.name || lastMsg.sender?.username || 'User';
+          const timeAgo = new Date(lastMsg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+          return {
+            success: true,
+            response: `✅ **Tolee AI Manager**: Maine aapki chats check ki hain. Abhi aapke paas koi **naya unread message nahi aaya hai**.\n\nAapka aakhiri message **${senderName}** ki taraf se tha (${timeAgo}):\n> "${lastMsg.content.slice(0, 100)}"`
+          };
+        }
+
+        return {
+          success: true,
+          response: `✅ **Tolee AI Manager**: Maine aapki chats check ki hain. Abhi aapke chat me koi naya message nahi aaya hai.`
+        };
+      } catch (chatErr) {
+        console.error('Chat check intent error:', chatErr);
+      }
+    }
+
+    // 🔔 REAL DATABASE NOTIFICATION CHECKING INTENT
+    const isNotificationIntent =
+      lower.includes('notification') ||
+      lower.includes('alert') ||
+      lower.includes('notice') ||
+      trimmed.includes('नोटिफिकेशन') ||
+      trimmed.includes('अलर्ट');
+
+    if (isNotificationIntent && (lower.includes('check') || lower.includes('batao') || lower.includes('show') || lower.includes('karo') || lower.includes('kya'))) {
+      try {
+        const notifications = await prisma.notification.findMany({
+          where: { userId, read: false },
+          orderBy: { createdAt: 'desc' },
+          take: 5
+        });
+
+        if (notifications.length > 0) {
+          const notifListStr = notifications.map((n, idx) => {
+            return `${idx + 1}. 🔔 **${n.title || 'Notification'}**: ${n.message || ''}`;
+          }).join('\n');
+
+          return {
+            success: true,
+            response: `🔔 **Tolee AI Manager**: Maine aapke alerts check kiye hain! Aapke paas **${notifications.length} naye unread notification(s)** hain:\n\n${notifListStr}`
+          };
+        }
+
+        return {
+          success: true,
+          response: `✅ **Tolee AI Manager**: Maine aapke notifications check kiye hain. Abhi aapke paas koi naya unread alert nahi hai.`
+        };
+      } catch (notifErr) {
+        console.error('Notification check intent error:', notifErr);
+      }
+    }
+
     // ⚡ Autonomous Post & AI Image Creation Execution Handler (High Priority)
     const isPostIntent = 
       lower.includes('post') || 
