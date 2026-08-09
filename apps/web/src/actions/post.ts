@@ -951,12 +951,14 @@ export async function getPosts(options?: { mediaType?: string; limit?: number })
       finalPosts = combinedPosts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     }
 
-    // Interleave: News Post -> Video Post -> News Post -> Video Post
+    // Interleave: Video News Post FIRST -> News Post -> Video News Post -> News Post
     const newsList: any[] = [];
     const videoList: any[] = [];
 
     for (const p of finalPosts) {
       const isVid = p.postType === 'reel' || 
+                    p.postType === 'video' ||
+                    Boolean(p.newsRelation && p.mediaUrls && (p.mediaUrls.includes('youtube') || p.mediaUrls.includes('youtu.be'))) ||
                     (p.mediaTypes && p.mediaTypes.includes('video')) || 
                     (p.mediaUrls && (p.mediaUrls.includes('youtube') || p.mediaUrls.includes('.mp4') || p.mediaUrls.includes('youtu.be')));
       if (isVid) {
@@ -966,13 +968,20 @@ export async function getPosts(options?: { mediaType?: string; limit?: number })
       }
     }
 
+    // Auto-trigger fresh YouTube batch if low video count in feed
+    if (videoList.length < 15) {
+      const { publishYouTubeVideosBatch } = require('@/lib/youtubeAutoPublisher');
+      publishYouTubeVideosBatch(false).catch(() => {});
+    }
+
     if (newsList.length > 0 && videoList.length > 0) {
       const interleaved: any[] = [];
       let nIdx = 0;
       let vIdx = 0;
+      // Start with Video News Post FIRST at Index 0
       while (nIdx < newsList.length || vIdx < videoList.length) {
-        if (nIdx < newsList.length) interleaved.push(newsList[nIdx++]);
         if (vIdx < videoList.length) interleaved.push(videoList[vIdx++]);
+        if (nIdx < newsList.length) interleaved.push(newsList[nIdx++]);
       }
       finalPosts = interleaved;
     }
