@@ -190,15 +190,30 @@ export function YouTubeAutoplayVideo({
   };
 
   const embedSrc = cleanVideoId
-    ? `https://www.youtube-nocookie.com/embed/${cleanVideoId}?autoplay=${isIntersecting ? 1 : 0}&mute=${isMuted ? 1 : 0}&controls=0&enablejsapi=1&playsinline=1&rel=0&modestbranding=1&showinfo=0&iv_load_policy=3&disablekb=1&fs=0`
+    ? `https://www.youtube.com/embed/${cleanVideoId}?autoplay=${isIntersecting ? 1 : 0}&mute=${isMuted ? 1 : 0}&controls=0&enablejsapi=1&playsinline=1&rel=0&modestbranding=1&showinfo=0&iv_load_policy=3&disablekb=1&fs=0`
     : '';
 
   const fallbackThumbnail = thumbnailUrl || (cleanVideoId ? `https://img.youtube.com/vi/${cleanVideoId}/hqdefault.jpg` : '/tolee-news-default.png');
 
   if (hasError || !cleanVideoId) {
     return (
-      <div className={`relative w-full aspect-video rounded-2xl overflow-hidden bg-black ${className}`}>
-        <img src={fallbackThumbnail} alt={title || 'News'} className="w-full h-full object-cover" />
+      <div 
+        onClick={() => {
+          if (cleanVideoId) {
+            window.open(`https://www.youtube.com/watch?v=${cleanVideoId}`, '_blank');
+          }
+        }}
+        className={`relative w-full aspect-video rounded-2xl overflow-hidden bg-black cursor-pointer group/thumb ${className}`}
+      >
+        <img src={fallbackThumbnail} alt={title || 'News'} className="w-full h-full object-cover group-hover/thumb:scale-105 transition-transform duration-300" />
+        <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+          <div className="w-14 h-14 rounded-full bg-teal-500/90 text-white flex items-center justify-center shadow-2xl scale-100 group-hover/thumb:scale-110 transition-transform">
+            <Play className="w-7 h-7 fill-current translate-x-0.5" />
+          </div>
+        </div>
+        <div className="absolute bottom-2 right-2 bg-black/80 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+          Watch on YouTube
+        </div>
       </div>
     );
   }

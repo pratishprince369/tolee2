@@ -194,7 +194,7 @@ async function fetchYouTubeVideos(query: string, lang: 'hi' | 'mr' | 'en', maxRe
   const regionCode = 'IN';
 
   try {
-    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&videoDuration=medium&regionCode=${regionCode}&maxResults=${maxResults}&order=date&key=${apiKey}`;
+    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&videoEmbeddable=true&videoSyndicated=true&videoDuration=medium&regionCode=${regionCode}&maxResults=${maxResults}&order=date&key=${apiKey}`;
     const res = await fetch(url, { cache: 'no-store' });
     const data = await res.json();
 
