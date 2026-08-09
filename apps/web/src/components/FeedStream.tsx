@@ -40,6 +40,8 @@ import { StoryEditor } from '@/components/StoryEditor';
 import { PostCarousel } from '@/components/PostCarousel';
 import { Camera, Sparkles } from 'lucide-react';
 import { UserHovercard } from '@/components/UserHovercard';
+import { LocalNeighborhoodRadar } from '@/components/LocalNeighborhoodRadar';
+import { savePostsToOfflinePocket } from '@/lib/offlineSmartPocket';
 
 export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
   const { data: session } = useSession();
@@ -67,6 +69,12 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
   useEffect(() => {
     loadStories();
   }, []);
+
+  useEffect(() => {
+    if (posts && posts.length > 0) {
+      savePostsToOfflinePocket(posts);
+    }
+  }, [posts]);
 
   const loadStories = async () => {
     try {
@@ -1069,6 +1077,11 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                 })}
             </div>
             
+            {/* Tolee Neighborhood Radar Widget (Idea #1) */}
+            <div className="mb-6">
+              <LocalNeighborhoodRadar />
+            </div>
+
             {/* Premium Desktop Action Grid (Horizontal Cards) */}
             <div className="hidden sm:grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
               {/* Box 1: Post Your Requirement */}

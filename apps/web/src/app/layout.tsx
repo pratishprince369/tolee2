@@ -77,6 +77,7 @@ import { PwaManager } from "@/components/PwaManager";
 import { MediaPickerModal } from "@/components/MediaPickerModal";
 import { GlobalAlarmListener } from "@/components/GlobalAlarmListener";
 import { DraftsReminderBanner } from "@/components/DraftsReminderBanner";
+import { OfflineSmartPocketBanner } from "@/components/OfflineSmartPocketBanner";
 import AnalyticsTracker from "@/components/AnalyticsTracker";
 import { RoutePrefetcher } from "@/components/RoutePrefetcher";
 import { Suspense } from "react";
@@ -219,6 +220,7 @@ export default async function RootLayout({
       <body className="antialiased min-h-screen bg-background flex flex-col">
         <Providers>
           <RoutePrefetcher />
+          <OfflineSmartPocketBanner />
           <GlobalAlarmListener />
           <OnboardingModal />
           <OnboardingReminder />
