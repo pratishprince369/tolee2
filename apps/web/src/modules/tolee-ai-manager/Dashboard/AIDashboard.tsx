@@ -149,27 +149,32 @@ export function AIDashboard() {
       const timeZone = typeof window !== 'undefined' && window.Intl ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'Asia/Kolkata';
       const result = await processAIPersonalMessage(userText, [], clientISO, timeZone);
       
+      const aiText = (result as any).response || (result as any).reply || 'Command processed successfully.';
+
       const aiMsg: Message = {
         id: `ai_${Date.now()}`,
         sender: 'Tolee AI Manager',
-        text: (result as any).response || (result as any).reply || '',
+        text: aiText,
         isAI: true,
         time: formatTime(),
         interactiveAction: (result as any).interactiveAction || (result as any).actionPayload
       };
 
       setMessages((prev) => [...prev, aiMsg]);
+      return aiText;
     } catch (error: any) {
+      const errText = 'I encountered an error processing your request. Please try again.';
       setMessages((prev) => [
         ...prev,
         {
           id: `err_${Date.now()}`,
           sender: 'Tolee AI Manager',
-          text: 'I encountered an error processing your request. Please try again.',
+          text: errText,
           isAI: true,
           time: formatTime()
         }
       ]);
+      return errText;
     } finally {
       setIsLoading(false);
     }

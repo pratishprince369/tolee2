@@ -108,6 +108,9 @@ export function FloatingVoiceHUD({ isOpen, onClose, onSelectTab, onSendMessage }
     vEngine.onCommand(async (transcript) => {
       if (!transcript || transcript.trim().length === 0) return;
 
+      // Unlock mobile audio channel immediately upon command capture
+      unlockMobileAudio();
+
       // Pause recognition while server processes request and generates response
       vEngine.stopListening();
 
@@ -118,7 +121,7 @@ export function FloatingVoiceHUD({ isOpen, onClose, onSelectTab, onSendMessage }
       let aiResultText = '';
       try {
         const res = await onSendMessage(transcript);
-        if (typeof res === 'string') {
+        if (typeof res === 'string' && res.trim().length > 0) {
           aiResultText = res;
         }
       } catch (err) {
@@ -131,7 +134,7 @@ export function FloatingVoiceHUD({ isOpen, onClose, onSelectTab, onSendMessage }
       }
 
       // 3. Prepare clean spoken text
-      let spokenReply = aiResultText || parsed.responseText;
+      let spokenReply = aiResultText || parsed.responseText || 'Command processed successfully.';
       if (parsed.intent === 'READ_NOTIFICATIONS') {
         try {
           const briefingRes = await getVoiceNotificationBriefing();
@@ -148,6 +151,9 @@ export function FloatingVoiceHUD({ isOpen, onClose, onSelectTab, onSendMessage }
       }
 
       setSpeechText(spokenReply);
+
+      // Re-unlock mobile audio context right before invoking speak()
+      unlockMobileAudio();
       vEngine.speak(spokenReply, spokenLang);
     });
 
