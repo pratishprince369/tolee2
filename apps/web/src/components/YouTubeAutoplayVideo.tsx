@@ -191,10 +191,10 @@ export function YouTubeAutoplayVideo({
   };
 
   const embedSrc = cleanVideoId
-    ? `https://www.youtube.com/embed/${cleanVideoId}?autoplay=${isIntersecting ? 1 : 0}&mute=${isMuted ? 1 : 0}&controls=0&enablejsapi=1&playsinline=1&rel=0&modestbranding=1&showinfo=0&iv_load_policy=3&disablekb=1&fs=0`
+    ? `https://www.youtube-nocookie.com/embed/${cleanVideoId}?autoplay=${isIntersecting ? 1 : 0}&mute=${isMuted ? 1 : 0}&controls=1&enablejsapi=1&playsinline=1&rel=0`
     : '';
 
-  const fallbackThumbnail = thumbnailUrl || (cleanVideoId ? `https://img.youtube.com/vi/${cleanVideoId}/hqdefault.jpg` : '/tolee-news-default.png');
+  const fallbackThumbnail = thumbnailUrl || (cleanVideoId ? `https://i.ytimg.com/vi/${cleanVideoId}/hqdefault.jpg` : '/tolee-news-default.png');
 
   if (hasError || !cleanVideoId) {
     return (
@@ -230,14 +230,13 @@ export function YouTubeAutoplayVideo({
     >
       {mounted && isIntersecting && cleanVideoId ? (
         <div className="relative w-full h-full overflow-hidden select-none bg-black">
-          {/* scale-[1.32] physically crops out outer 16% edges of YouTube iframe where logo & channel overlay sit */}
           <iframe
             ref={iframeRef}
             src={embedSrc}
             title={title || 'YouTube Video'}
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
             onError={() => setHasError(true)}
-            className="w-full h-full border-none scale-[1.32] origin-center pointer-events-none transform"
+            className="w-full h-full border-none pointer-events-auto"
           />
 
           {/* Transparent Mouse Click Area (Click Anywhere to Play/Pause) */}
