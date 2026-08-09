@@ -186,8 +186,7 @@ export async function publishDailyNewsBatch(withDelay: boolean = false): Promise
       select: { id: true, email: true, name: true, username: true }
     });
 
-    const userMap = new Map<string, { id: string; email: string; name: string | null; username: string | null }>(users.map((u: any) => [u.email, u]));
-    const defaultTolee = await prisma.tolee.findFirst({ select: { id: true } });
+    const allTolees = await prisma.tolee.findMany({ select: { id: true } });
 
     let publishedCount = 0;
     const hindiIndex = { val: 0 };
