@@ -677,25 +677,23 @@ export async function getNewsFeedPosts(options: {
     const currentUserId = session?.user ? (session.user as any).id : null;
     const page = options.page || 1;
     const limit = options.limit || 10;
-    // Background trigger: If latest news post is >3 minutes old, fetch fresh news & YouTube videos
-    if (page === 1) {
-      const checkAndTriggerFreshNews = async () => {
-        try {
-          const latestNews = await prisma.newsPost.findFirst({
-            orderBy: { createdAt: 'desc' },
-            select: { createdAt: true }
-          });
-          const ageMs = latestNews ? Date.now() - new Date(latestNews.createdAt).getTime() : Infinity;
-          if (ageMs > 3 * 60 * 1000) { // >3 mins old
-            const { publishDailyNewsBatch } = require('@/lib/newsAutoPublisher');
-            const { publishYouTubeVideosBatch } = require('@/lib/youtubeAutoPublisher');
-            publishDailyNewsBatch().catch(() => {});
-            publishYouTubeVideosBatch(false).catch(() => {});
-          }
-        } catch (e) {}
-      };
-      checkAndTriggerFreshNews();
-    }
+    // Background trigger: If latest news post is >90 seconds old, fetch fresh news & YouTube videos
+    const checkAndTriggerFreshNews = async () => {
+      try {
+        const latestNews = await prisma.newsPost.findFirst({
+          orderBy: { createdAt: 'desc' },
+          select: { createdAt: true }
+        });
+        const ageMs = latestNews ? Date.now() - new Date(latestNews.createdAt).getTime() : Infinity;
+        if (ageMs > 90 * 1000) { // >90 seconds old
+          const { publishDailyNewsBatch } = require('@/lib/newsAutoPublisher');
+          const { publishYouTubeVideosBatch } = require('@/lib/youtubeAutoPublisher');
+          publishDailyNewsBatch().catch(() => {});
+          publishYouTubeVideosBatch(false).catch(() => {});
+        }
+      } catch (e) {}
+    };
+    checkAndTriggerFreshNews();
 
     const skip = (page - 1) * limit;
 

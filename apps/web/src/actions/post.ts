@@ -280,31 +280,29 @@ export async function getPosts(options?: { mediaType?: string; limit?: number })
     const limit = options?.limit || 30;
     const mediaType = options?.mediaType;
 
-    // Trigger dynamic simulation activity in background if simulated latest post is too old
-    if (isSimOn) {
-      const checkAndTrigger = async () => {
-        try {
-          const latestSimPost = await prisma.post.findFirst({
-            where: { isSimulation: true },
-            orderBy: { createdAt: 'desc' },
-            select: { createdAt: true }
-          });
-          const timeSinceLast = latestSimPost 
-            ? Date.now() - new Date(latestSimPost.createdAt).getTime()
-            : Infinity;
-          
-          if (timeSinceLast > 3 * 60 * 1000) { // 3 minutes threshold for instant fresh content
-            const { publishYouTubeVideosBatch } = require('@/lib/youtubeAutoPublisher');
-            const { publishDailyNewsBatch } = require('@/lib/newsAutoPublisher');
-            publishYouTubeVideosBatch(false).catch(() => {});
-            publishDailyNewsBatch().catch(() => {});
-          }
-        } catch (e) {
-          console.error('[Fresh Content Trigger] Check failed:', e);
+    // Trigger instant background YouTube & News auto-publisher if latest post is older than 90 seconds (1.5 mins)
+    const checkAndTriggerFreshPosts = async () => {
+      try {
+        const latestPost = await prisma.post.findFirst({
+          where: { isArchived: false, status: 'published' },
+          orderBy: { createdAt: 'desc' },
+          select: { createdAt: true }
+        });
+        const timeSinceLast = latestPost 
+          ? Date.now() - new Date(latestPost.createdAt).getTime()
+          : Infinity;
+        
+        if (timeSinceLast > 90 * 1000) { // 90 seconds threshold for instant fresh YouTube videos & news
+          const { publishYouTubeVideosBatch } = require('@/lib/youtubeAutoPublisher');
+          const { publishDailyNewsBatch } = require('@/lib/newsAutoPublisher');
+          publishYouTubeVideosBatch(false).catch(() => {});
+          publishDailyNewsBatch().catch(() => {});
         }
-      };
-      checkAndTrigger();
-    }
+      } catch (e) {
+        console.error('[Fresh Content Trigger] Check failed:', e);
+      }
+    };
+    checkAndTriggerFreshPosts();
 
     // Determine viewed post history to support Anti-Repetition
     let viewedPostIds: string[] = [];
