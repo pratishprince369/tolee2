@@ -28,6 +28,17 @@ interface CarouselVideoProps {
 }
 
 function CarouselVideo({ src, isActive, shouldLoad, postId }: CarouselVideoProps) {
+  // Bulletproof Catch: If src is a YouTube URL or embed URL, render YouTubeAutoplayVideo directly
+  if (src && (src.includes('youtube.com') || src.includes('youtu.be') || src.includes('ytimg.com') || src.includes('embed'))) {
+    let ytId = src;
+    if (ytId.includes('embed/')) ytId = ytId.split('embed/')[1]?.split('?')[0]?.split(',')[0] || ytId;
+    else if (ytId.includes('v=')) ytId = ytId.split('v=')[1]?.split('&')[0] || ytId;
+    else if (ytId.includes('youtu.be/')) ytId = ytId.split('youtu.be/')[1]?.split('?')[0] || ytId;
+    else if (ytId.includes('/vi/')) ytId = ytId.split('/vi/')[1]?.split('/')[0] || ytId;
+
+    return <YouTubeAutoplayVideo videoId={ytId} title="Tolee Video" />;
+  }
+
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);

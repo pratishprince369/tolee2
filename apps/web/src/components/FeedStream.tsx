@@ -1640,7 +1640,10 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                     }
                   }
 
-                  const cleanCoverImg = post.mediaUrls ? post.mediaUrls.split(/,(?=https?:\/\/)/)[0] : undefined;
+                  let cleanCoverImg = post.mediaUrls ? post.mediaUrls.split(/,(?=https?:\/\/)/)[0] : undefined;
+                  if (cleanCoverImg && (cleanCoverImg.includes('youtube.com/embed/') || cleanCoverImg.includes('youtu.be/'))) {
+                    cleanCoverImg = ytVideoId ? `https://i.ytimg.com/vi/${ytVideoId}/hqdefault.jpg` : undefined;
+                  }
 
                   return (
                     <Card key={post.id} id={`post-${post.id}`} className="border-gray-100 dark:border-zinc-900/60 bg-white dark:bg-[#121212] rounded-3xl overflow-hidden shadow-xs hover:shadow-md transition-all duration-300 flex flex-col relative mb-6">
