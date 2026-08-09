@@ -27,163 +27,120 @@ function cleanYouTubeTitle(title: string): string {
 }
 
 /**
- * EXPANDED VIDEO CATEGORIES & QUERIES
+ * 11 USER-SPECIFIED VIDEO CATEGORIES & HIGH-IMPACT QUERIES
  */
 const YOUTUBE_VIDEO_CATEGORIES: Record<string, string[]> = {
-  // === SCIENCE & SPACE ===
-  'NASA & Space': [
-    'NASA space rocket launch 2026 4k official',
-    'NASA James Webb telescope discoveries universe',
-    'SpaceX Starship launch Mars mission 2026',
-    'ISS International Space Station astronaut life',
-    'solar system planets exploration documentary 4k',
-    'black hole universe documentary science 4k',
-    'NASA Artemis Moon mission highlights'
+  // 1. NASA
+  'NASA': [
+    'NASA rocket launch 4k official 2026',
+    'NASA James Webb space telescope discoveries',
+    'NASA Artemis Moon mission updates 2026',
+    'NASA Mars Rover Perseverance discovery',
+    'ISS International Space Station live astronaut',
+    'NASA deep space exploration 4k'
   ],
 
-  // === DISCOVERY & NATURE ===
-  'Discovery & Wildlife': [
-    'Discovery Channel wildlife documentary 4k hd',
-    'ocean deep sea creatures documentary 4k',
-    'African safari lion tiger wildlife 4k',
-    'Amazon rainforest documentary nature 4k',
-    'animal planet predators wildlife documentary',
-    'coral reef underwater world documentary 4k',
-    'extreme weather nature documentary 4k'
+  // 2. DISCOVERY
+  'Discovery': [
+    'Discovery Channel documentary 4k 2026',
+    'Discovery Channel deep sea creatures',
+    'Discovery Channel survival wild nature',
+    'Discovery Channel extreme engineering',
+    'Discovery expedition mysteries world 4k'
   ],
 
-  // === NATIONAL GEOGRAPHIC ===
+  // 3. NATIONAL GEOGRAPHIC
   'National Geographic': [
-    'National Geographic documentary 4k hd 2026',
-    'National Geographic animals nature world',
-    'Nat Geo wild ancient civilizations history',
-    'National Geographic ocean exploration deep sea',
-    'Nat Geo science technology innovation documentary',
-    'National Geographic survival adventure extreme',
-    'Nat Geo earth planet documentary 4k'
+    'National Geographic wild 4k documentary',
+    'National Geographic ocean exploration deep',
+    'National Geographic earth planet nature',
+    'National Geographic ancient civilizations',
+    'Nat Geo wild predators wildlife 4k'
   ],
 
-  // === ANIMATION & CARTOONS ===
-  'Animation & Cartoons': [
-    '3d animated cartoon kids funny video 2026',
-    'best animated short film award winning',
-    'Pixar style animation short film 4k',
-    'funny cartoon animation comedy kids',
-    'CGI animated short film 3d 4k',
-    'nursery rhymes baby songs cartoon animation',
-    'anime best scenes action adventure'
+  // 4. SCIENCE
+  'Science': [
+    'latest science breakthroughs 2026 4k',
+    'quantum physics science explained simply',
+    'future of artificial intelligence robotics science',
+    'human body neuroscience brain science',
+    'climate science environment breakthroughs 4k'
   ],
 
-  // === EDUCATION ===
+  // 5. EDUCATION
   'Education': [
-    'educational documentary science technology 4k',
-    'how things work explained documentary',
-    'AI artificial intelligence explained 2026',
-    'history of ancient civilizations documentary',
-    'physics quantum mechanics explained simply',
-    'TED talk best motivational speech 2026',
-    'brain science psychology documentary'
+    'educational documentary 4k full episode',
+    'how things work engineering explained',
+    'TED talk best educational speeches 2026',
+    'history of human evolution documentary',
+    'world geography history education'
   ],
 
-  // === SHORT FILMS ===
-  'Short Films': [
-    'best short film award winning 2026',
-    'emotional short film drama story',
-    'inspirational short film motivational',
-    'sci-fi short film futuristic 4k',
-    'comedy short film funny sketch',
-    'animated short film oscar nominated',
-    'thriller suspense short film'
+  // 6. DOCUMENTARY
+  'Documentary': [
+    'award winning short documentary 4k',
+    'untamed nature documentary full 4k',
+    'universe cosmos mystery documentary',
+    'deep ocean sea life documentary 4k',
+    'historical mystery full documentary'
   ],
 
-  // === NEWS & CURRENT AFFAIRS ===
-  'News & Current Affairs': [
-    'India latest news today breaking 2026',
-    'world news international affairs update today',
-    'technology news AI startup update 2026',
-    'business finance market news today India',
-    'political news India parliament session today',
-    'climate change environment news 2026',
-    'health medical news breakthrough 2026'
+  // 7. HISTORY
+  'History': [
+    'ancient Egypt Pyramids history documentary 4k',
+    'ancient Rome Empire history documentary',
+    'World War history documentary 4k',
+    'Indian ancient history civilisations 4k',
+    'lost cities archaeological discoveries history'
   ],
 
-  // === TECHNOLOGY & GADGETS ===
+  // 8. SPACE
+  'Space': [
+    'SpaceX Starship launch Mars mission 4k',
+    'black hole universe space documentary',
+    'solar system planets 4k space exploration',
+    'milky way galaxy space documentary 4k',
+    'james webb telescope deep space images'
+  ],
+
+  // 9. ANIMALS
+  'Animals': [
+    'wild animals lion tiger elephant 4k safari',
+    'underwater marine animals ocean documentary',
+    'cute animals birds wildlife documentary 4k',
+    'predators vs prey animal planet 4k',
+    'African savanna wildlife animals'
+  ],
+
+  // 10. TECHNOLOGY
   'Technology': [
-    'latest tech unboxing gadgets review AI 2026',
-    'iPhone Samsung new phone unboxing review',
-    'AI robotics future technology 2026 4k',
-    'electric car EV Tesla review 2026',
-    'gaming PC setup build 2026 4k',
-    'smart home IoT automation gadgets 2026',
-    'drone camera 4k aerial footage technology'
+    'latest technology gadgets unboxing 2026 4k',
+    'AI artificial intelligence technology review',
+    'electric vehicles EV Tesla tech 2026',
+    'drone aerial 4k camera technology',
+    'smart robotics future tech 2026'
   ],
 
-  // === FOOD & COOKING ===
-  'Food & Recipes': [
-    'indian street food recipe travel vlog 2026',
-    'best cooking recipe kitchen hacks tips',
-    'gordon ramsay style cooking professional chef',
-    'viral food recipes TikTok trending 2026',
-    'healthy eating meal prep nutrition guide',
-    'world best restaurants food documentary',
-    'Mumbai Delhi street food tour 4k vlog'
-  ],
-
-  // === COMEDY & ENTERTAINMENT ===
-  'Comedy & Entertainment': [
-    'standup comedy clips funny humor India 2026',
-    'best funny comedy video meme clips 2026',
-    'prank videos funny reaction compilation',
-    'funny Indian comedy videos skits pranks',
-    'comedy podcast highlights funny moments',
-    'late night show best comedy moments',
-    'improv comedy sketch funny viral'
-  ],
-
-  // === SPORTS ===
-  'Sports': [
-    'cricket match top highlights IPL 2026',
-    'football soccer goals best highlights 2026',
-    'Olympics sports highlights moments 4k',
-    'NBA basketball best dunks plays 2026',
-    'combat sports MMA boxing highlights',
-    'extreme sports adventure skateboarding surfing',
-    'Formula 1 race highlights 2026'
-  ],
-
-  // === FINANCE & STOCK MARKET ===
-  'Finance & Markets': [
-    'stock market trading sensex nifty analysis 2026',
-    'cryptocurrency bitcoin ethereum news today',
-    'personal finance investing tips beginners',
-    'mutual fund SIP investment strategy India',
-    'real estate property market India 2026',
-    'startup funding venture capital India 2026',
-    'forex trading strategy tutorial 2026'
-  ],
-
-  // === MUSIC & ARTS ===
-  'Music & Arts': [
-    'best music video new songs 2026 trending',
-    'classical music orchestra performance live',
-    'bollywood new songs music video 2026',
-    'piano guitar cover songs acoustic live',
-    'art painting timelapse satisfying creative',
-    'dance performance choreography viral 2026',
-    'street music busking performance amazing'
+  // 11. KIDS EDUCATION
+  'Kids Education': [
+    '3d animated cartoon kids education funny',
+    'science experiments for kids educational',
+    'animals documentary for kids fun learning',
+    'solar system planets animation for kids',
+    'nursery rhymes 3d cartoon educational video'
   ]
 };
 
 /**
- * Account specific categories mapping
+ * Account specific categories mapping (balanced across all 11 categories for 6 accounts)
  */
 const ACCOUNT_VIDEO_CATEGORIES: Record<string, string[]> = {
-  'adsvidia369@gmail.com': ['NASA & Space', 'Technology', 'Education'],
-  'loktimes369@gmail.com': ['Discovery & Wildlife', 'National Geographic', 'Animation & Cartoons'],
-  'updatesontimes@gmail.com': ['News & Current Affairs', 'Short Films', 'Education'],
-  'vadapavwaledada@gmail.com': ['Food & Recipes', 'Animation & Cartoons', 'Comedy & Entertainment'],
-  'rinkugupta90282@gmail.com': ['Sports', 'Discovery & Wildlife', 'Music & Arts'],
-  'foodpaass@gmail.com': ['Finance & Markets', 'NASA & Space', 'Short Films']
+  'adsvidia369@gmail.com': ['NASA', 'Space', 'Technology', 'Science'],
+  'loktimes369@gmail.com': ['Discovery', 'National Geographic', 'Animals', 'Kids Education'],
+  'updatesontimes@gmail.com': ['Education', 'History', 'Documentary', 'Science'],
+  'vadapavwaledada@gmail.com': ['Kids Education', 'Animals', 'Discovery', 'Documentary'],
+  'rinkugupta90282@gmail.com': ['National Geographic', 'Animals', 'History', 'Space'],
+  'foodpaass@gmail.com': ['Technology', 'NASA', 'Education', 'Documentary']
 };
 
 /**
@@ -227,11 +184,11 @@ async function fetchYouTubeVideos(query: string, lang: 'hi' | 'mr' | 'en', maxRe
 }
 
 /**
- * Auto-Publishes YouTube Videos for ALL 6 Accounts (Target 3 videos per account = 18 videos per batch)
+ * Auto-Publishes 50 YouTube Videos Daily across 6 Registered Accounts
  */
 export async function publishYouTubeVideosBatch(withDelay: boolean = false): Promise<{ success: boolean; count: number; log: string[] }> {
   const logs: string[] = [];
-  logs.push("🎬 Starting YouTube Video Auto-Publisher batch execution across ALL 6 ACCOUNTS...");
+  logs.push("🎬 Starting 50 Videos/Day YouTube Auto-Publisher batch execution across 6 ACCOUNTS...");
 
   try {
     const userEmails = REGISTERED_NEWS_ACCOUNTS.map(a => a.email);
@@ -240,25 +197,25 @@ export async function publishYouTubeVideosBatch(withDelay: boolean = false): Pro
       select: { id: true, email: true, name: true, username: true }
     });
 
-    const userMap = new Map<string, { id: true; email: string; name: string | null; username: string | null }>(users.map((u: any) => [u.email, u]));
+    const userMap = new Map<string, { id: string; email: string; name: string | null; username: string | null }>(users.map((u: any) => [u.email, u]));
     const allTolees = await prisma.tolee.findMany({ select: { id: true } });
 
     let publishedCount = 0;
     const batchProcessedVideos = new Set<string>();
+    const TARGET_BATCH_COUNT = 50; // 50 videos per day flow
 
-    for (const account of REGISTERED_NEWS_ACCOUNTS) {
-      const dbUser = userMap.get(account.email);
-      if (!dbUser) {
-        logs.push(`⚠️ Skipping ${account.email}: User not found in DB.`);
-        continue;
-      }
+    // Loop through accounts to reach 50 videos
+    for (let round = 0; round < 9; round++) {
+      if (publishedCount >= TARGET_BATCH_COUNT) break;
 
-      const assignedCategories = ACCOUNT_VIDEO_CATEGORIES[account.email] || ['NASA & Space', 'Discovery & Wildlife', 'Technology'];
-      let accountPostCount = 0;
+      for (const account of REGISTERED_NEWS_ACCOUNTS) {
+        if (publishedCount >= TARGET_BATCH_COUNT) break;
 
-      // Try up to 3 videos for this account
-      for (let itemIdx = 0; itemIdx < 3; itemIdx++) {
-        const selectedCategory = assignedCategories[itemIdx % assignedCategories.length];
+        const dbUser = userMap.get(account.email);
+        if (!dbUser) continue;
+
+        const assignedCategories = ACCOUNT_VIDEO_CATEGORIES[account.email] || ['NASA', 'Discovery', 'Science', 'Technology'];
+        const selectedCategory = assignedCategories[round % assignedCategories.length];
         const queries = YOUTUBE_VIDEO_CATEGORIES[selectedCategory] || ['documentary 4k hd'];
         
         let selectedVideo: YouTubeVideoItem | null = null;
@@ -286,7 +243,6 @@ export async function publishYouTubeVideosBatch(withDelay: boolean = false): Pro
         }
 
         if (!selectedVideo) {
-          logs.push(`⚠️ Could not find non-duplicate video for @${dbUser.username} in ${selectedCategory}.`);
           continue;
         }
 
@@ -299,7 +255,7 @@ export async function publishYouTubeVideosBatch(withDelay: boolean = false): Pro
           .slice(0, 60);
         const slug = `yt-${slugBase}-${Date.now().toString().slice(-5)}${publishedCount}`;
 
-        const videoContent = `🎥 **${selectedVideo.category} Video**\n\n📌 **${selectedVideo.title}**\n📺 Channel: ${selectedVideo.channelTitle}\n\n📖 ${selectedVideo.description.slice(0, 400) || `Watch this video on Tolee.`}\n\n🔗 Watch full video: ${selectedVideo.watchUrl}\n\nStay connected with Tolee for daily video updates across NASA, Discovery, Animation, Education, Sports, and more!`;
+        const videoContent = `🎥 **${selectedVideo.category} Video**\n\n📌 **${selectedVideo.title}**\n📺 Channel: ${selectedVideo.channelTitle}\n\n📖 ${selectedVideo.description.slice(0, 400) || `Watch this video on Tolee.`}\n\n🔗 Watch full video: ${selectedVideo.watchUrl}\n\nStay connected with Tolee for daily video updates across NASA, Discovery, National Geographic, Science, Education, Documentary, History, Space, Animals, Technology, and Kids Education!`;
 
         await prisma.post.create({
           data: {
@@ -333,16 +289,15 @@ export async function publishYouTubeVideosBatch(withDelay: boolean = false): Pro
         });
 
         publishedCount++;
-        accountPostCount++;
-        logs.push(`✅ [@${dbUser.username} #${accountPostCount}] Published [${selectedVideo.category}] "${selectedVideo.title.slice(0, 45)}..."`);
+        logs.push(`✅ [#${publishedCount}/50] Published [@${dbUser.username}] [${selectedVideo.category}] "${selectedVideo.title.slice(0, 40)}..."`);
 
         if (withDelay) {
-          await new Promise(res => setTimeout(res, 2000));
+          await new Promise(res => setTimeout(res, 1000));
         }
       }
     }
 
-    logs.push(`\n🎬 YouTube Auto-Publisher batch complete: ${publishedCount} new video posts created across all 6 accounts.`);
+    logs.push(`\n🎬 YouTube Auto-Publisher batch complete: ${publishedCount} new video posts created across all 11 specified categories.`);
     return { success: true, count: publishedCount, log: logs };
 
   } catch (error: any) {
