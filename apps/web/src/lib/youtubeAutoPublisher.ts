@@ -144,42 +144,77 @@ const ACCOUNT_VIDEO_CATEGORIES: Record<string, string[]> = {
 };
 
 /**
- * Fetch top YouTube videos for a specific query & language using YouTube Data API v3
+ * Fetch top YouTube videos for a specific query & language using YouTube Data API v3 with Invidious Fallback
  */
 async function fetchYouTubeVideos(query: string, lang: 'hi' | 'mr' | 'en', maxResults: number = 15): Promise<YouTubeVideoItem[]> {
-  const apiKey = process.env.YOUTUBE_API_KEY || "AIzaSyAQGEjKb5EkJjZSSh4I4X5x2zhESnhSzH0";
+  const apiKeys = [
+    process.env.YOUTUBE_API_KEY,
+    "AIzaSyAQGEjKb5EkJjZSSh4I4X5x2zhESnhSzH0"
+  ].filter((k): k is string => Boolean(k && k.trim()));
+
   const regionCode = 'IN';
 
-  try {
-    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&videoEmbeddable=true&videoSyndicated=true&videoDuration=medium&regionCode=${regionCode}&maxResults=${maxResults}&order=date&key=${apiKey}`;
-    const res = await fetch(url, { cache: 'no-store' });
-    const data = await res.json();
+  // 1. Try Official YouTube Data API keys
+  for (const apiKey of apiKeys) {
+    try {
+      const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&videoEmbeddable=true&videoSyndicated=true&videoDuration=medium&regionCode=${regionCode}&maxResults=${maxResults}&order=date&key=${apiKey}`;
+      const res = await fetch(url, { cache: 'no-store' });
+      const data = await res.json();
 
-    if (data.error) {
-      console.error(`YouTube API Error:`, data.error.message || JSON.stringify(data.error));
-      return [];
+      if (data.items && Array.isArray(data.items) && data.items.length > 0) {
+        return data.items.map((item: any) => {
+          const videoId = item.id?.videoId;
+          const snippet = item.snippet || {};
+          return {
+            videoId,
+            title: cleanYouTubeTitle(snippet.title || ''),
+            description: snippet.description || '',
+            thumbnail: snippet.thumbnails?.high?.url || snippet.thumbnails?.medium?.url || `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+            channelTitle: snippet.channelTitle || 'YouTube',
+            watchUrl: `https://www.youtube.com/watch?v=${videoId}`,
+            embedUrl: `https://www.youtube.com/embed/${videoId}`,
+            language: lang,
+            category: query
+          };
+        }).filter((v: YouTubeVideoItem) => v.videoId && v.title && v.title.length > 5);
+      }
+    } catch (error: any) {
+      // Failover to next key / Invidious fallback
     }
-
-    if (data.items && Array.isArray(data.items) && data.items.length > 0) {
-      return data.items.map((item: any) => {
-        const videoId = item.id?.videoId;
-        const snippet = item.snippet || {};
-        return {
-          videoId,
-          title: cleanYouTubeTitle(snippet.title || ''),
-          description: snippet.description || '',
-          thumbnail: snippet.thumbnails?.high?.url || snippet.thumbnails?.medium?.url || `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
-          channelTitle: snippet.channelTitle || 'YouTube',
-          watchUrl: `https://www.youtube.com/watch?v=${videoId}`,
-          embedUrl: `https://www.youtube.com/embed/${videoId}`,
-          language: lang,
-          category: query
-        };
-      }).filter((v: YouTubeVideoItem) => v.videoId && v.title && v.title.length > 5);
-    }
-  } catch (error: any) {
-    console.error(`YouTube API fetch error for ${lang} (${query}):`, error.message);
   }
+
+  // 2. High-Availability Fallback: Public Invidious Search API Instances
+  const invidiousInstances = [
+    'https://invidious.drgns.space',
+    'https://vid.puffyan.us',
+    'https://inv.riversip.com'
+  ];
+
+  for (const instance of invidiousInstances) {
+    try {
+      const invUrl = `${instance}/api/v1/search?q=${encodeURIComponent(query)}&type=video`;
+      const res = await fetch(invUrl, { signal: AbortSignal.timeout(3500) });
+      if (res.ok) {
+        const items = await res.json();
+        if (Array.isArray(items) && items.length > 0) {
+          return items.map((item: any) => ({
+            videoId: item.videoId,
+            title: cleanYouTubeTitle(item.title || ''),
+            description: item.description || '',
+            thumbnail: item.videoThumbnails?.[0]?.url || `https://img.youtube.com/vi/${item.videoId}/hqdefault.jpg`,
+            channelTitle: item.author || 'YouTube',
+            watchUrl: `https://www.youtube.com/watch?v=${item.videoId}`,
+            embedUrl: `https://www.youtube.com/embed/${item.videoId}`,
+            language: lang,
+            category: query
+          })).filter((v: YouTubeVideoItem) => v.videoId && v.title && v.title.length > 5);
+        }
+      }
+    } catch {
+      // Continue to next instance
+    }
+  }
+
   return [];
 }
 
