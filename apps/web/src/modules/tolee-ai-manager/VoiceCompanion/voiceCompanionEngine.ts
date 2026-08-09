@@ -242,8 +242,6 @@ export class VoiceCompanionEngine {
     // Prevent garbage collection on browser engines
     (window as any)._toleeActiveUtterance = utterance;
 
-    const voices = window.speechSynthesis.getVoices();
-
     // 🌐 Global Language Script Detector & Voice Picker Algorithm
     let detectedLang = langCode || 'hi-IN';
     if (/[\u0900-\u097F]/.test(cleanSpokenText)) detectedLang = 'hi-IN';
@@ -370,16 +368,6 @@ export class VoiceCompanionEngine {
         this.notifyStatus();
         if (onEnd) onEnd();
       };
-
-      audio.play().catch(e => {
-        console.warn('Fallback audio playback error on mobile:', e);
-        this.isSpeaking = false;
-        this.notifyStatus();
-        if (onEnd) onEnd();
-      });
-    } catch (e) {
-      this.isSpeaking = false;
-      this.notifyStatus();
 
       audio.play().catch(e => {
         console.warn('Fallback audio playback error on mobile:', e);
