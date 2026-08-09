@@ -148,7 +148,6 @@ export function VoiceInputDock({ onSendMessage, onToggleVoiceCompanion, isVoiceA
             <Button
               type="button"
               onClick={handleToggleVoice}
-              onTouchEnd={handleToggleVoice}
               className={`rounded-full px-3 py-2 h-9 sm:h-11 border text-xs font-bold shrink-0 transition-all flex items-center gap-1.5 shadow-md ${
                 isVoiceActive
                   ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.6)] animate-pulse'
