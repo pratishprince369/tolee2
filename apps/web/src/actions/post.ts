@@ -854,13 +854,28 @@ export async function getPosts(options?: { mediaType?: string; limit?: number })
         candidates = combinedPosts;
       }
 
-      // PERSONALIZATION SCORING
+      // PERSONALIZATION & VIDEO FEATURED SCORING
       const scoredCandidates = candidates.map(post => {
         let score = 1.0;
         
         // Freshness boost: newer posts get higher priority
         const ageInHours = (Date.now() - new Date(post.createdAt).getTime()) / (3600 * 1000);
         score += Math.max(0, 5.0 - (ageInHours / 24)); // boost up to +5.0 for very fresh posts
+
+        // 🎬 MASSIVE FEATURED BOOST FOR YOUTUBE CATEGORY VIDEO POSTS (+10.0)
+        const isVideoPost = 
+          post.postType === 'video' || 
+          post.postType === 'news' || 
+          Boolean(post.newsRelation) ||
+          (typeof post.mediaUrls === 'string' && (
+            post.mediaUrls.includes('youtube.com') || 
+            post.mediaUrls.includes('youtu.be') || 
+            post.mediaUrls.includes('ytimg.com')
+          ));
+
+        if (isVideoPost) {
+          score += 10.0; // Ensures YouTube video posts sort to the very top of feed!
+        }
 
         // Follow boost
         const authorId = post.author?.id || post.authorId;
@@ -880,7 +895,7 @@ export async function getPosts(options?: { mediaType?: string; limit?: number })
         }
 
         // Randomize slightly so they don't see the exact same order each refresh
-        score *= (0.5 + Math.random() * 1.0);
+        score *= (0.8 + Math.random() * 0.4);
 
         return { post, score };
       });
@@ -889,25 +904,22 @@ export async function getPosts(options?: { mediaType?: string; limit?: number })
       const realPool = scoredCandidates.filter(c => !c.post.isSimulation).sort((a, b) => b.score - a.score).map(c => c.post);
       const simPool = scoredCandidates.filter(c => c.post.isSimulation).sort((a, b) => b.score - a.score).map(c => c.post);
 
-      // MIXING ALGORITHM: 40-60% real user content, backfilled by simulated content
+      // MIXING ALGORITHM: Real user & YouTube video content FIRST, backfilled by simulated content
       const mixed: any[] = [];
       const targetSize = Math.min(limit, candidates.length);
       
-      // Calculate how many real posts to take. Aim for 50%
-      const targetRealCount = Math.floor(targetSize * 0.5);
+      const targetRealCount = Math.floor(targetSize * 0.7); // 70% real/video posts priority
       const actualRealCount = Math.min(realPool.length, targetRealCount);
       const actualSimCount = targetSize - actualRealCount;
 
       const selectedReal = realPool.slice(0, actualRealCount);
       const selectedSim = simPool.slice(0, actualSimCount);
 
-      // Interleave them to mix naturally
+      // Interleave real/video content FIRST at index 0
       let rIdx = 0;
       let sIdx = 0;
       while (mixed.length < targetSize) {
-        if (sIdx < selectedSim.length && (mixed.length % 2 === 0 || rIdx >= selectedReal.length)) {
-          mixed.push(selectedSim[sIdx++]);
-        } else if (rIdx < selectedReal.length) {
+        if (rIdx < selectedReal.length) {
           mixed.push(selectedReal[rIdx++]);
         } else if (sIdx < selectedSim.length) {
           mixed.push(selectedSim[sIdx++]);
