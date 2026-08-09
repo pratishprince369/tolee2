@@ -12,6 +12,7 @@ import {
 } from '@/components/HLSVideo';
 import { getPosterUrl } from '@/lib/media';
 import { videoMetadataCache } from '@/lib/videoCache';
+import { YouTubeAutoplayVideo } from '@/components/YouTubeAutoplayVideo';
 
 interface PostCarouselProps {
   mediaUrls: string;
@@ -342,25 +343,44 @@ export function PostCarousel({ mediaUrls, mediaTypes, postId }: PostCarouselProp
           transform: `translateX(-${activeIndex * (100 / items.length)}%)`
         }}
       >
-        {items.map((item, idx) => (
-          <div key={idx} className="h-full relative overflow-hidden flex items-center justify-center bg-neutral-900 dark:bg-zinc-950" style={{ width: `${100 / items.length}%` }}>
-            {item.type === 'video' ? (
-              <CarouselVideo 
-                src={item.url} 
-                isActive={idx === activeIndex} 
-                shouldLoad={idx === activeIndex || idx === activeIndex + 1}
-                postId={postId} 
-              />
-            ) : (
-              <img 
-                src={item.url} 
-                alt={`Media ${idx + 1}`} 
-                className="w-full h-full object-contain select-none pointer-events-none"
-                draggable={false}
-              />
-            )}
-          </div>
-        ))}
+        {items.map((item, idx) => {
+          const isYt = Boolean(
+            item.url.includes('youtube.com') ||
+            item.url.includes('youtu.be') ||
+            item.url.includes('ytimg.com')
+          );
+
+          if (isYt) {
+            return (
+              <div key={idx} className="h-full w-full relative overflow-hidden flex items-center justify-center bg-neutral-900 dark:bg-zinc-950" style={{ width: `${100 / items.length}%` }}>
+                <YouTubeAutoplayVideo
+                  videoId={item.url}
+                  title="Tolee Video"
+                />
+              </div>
+            );
+          }
+
+          return (
+            <div key={idx} className="h-full relative overflow-hidden flex items-center justify-center bg-neutral-900 dark:bg-zinc-950" style={{ width: `${100 / items.length}%` }}>
+              {item.type === 'video' ? (
+                <CarouselVideo 
+                  src={item.url} 
+                  isActive={idx === activeIndex} 
+                  shouldLoad={idx === activeIndex || idx === activeIndex + 1}
+                  postId={postId} 
+                />
+              ) : (
+                <img 
+                  src={item.url} 
+                  alt={`Media ${idx + 1}`} 
+                  className="w-full h-full object-contain select-none pointer-events-none"
+                  draggable={false}
+                />
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* Navigation Arrows (Desktop overlay) */}
