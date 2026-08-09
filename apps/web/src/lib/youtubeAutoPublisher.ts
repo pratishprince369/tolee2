@@ -27,7 +27,7 @@ function cleanYouTubeTitle(title: string): string {
 }
 
 /**
- * EXPANDED VIDEO CATEGORIES — Discovery, Animation, NASA, Nat Geo, Short Films, Education, etc.
+ * EXPANDED VIDEO CATEGORIES & QUERIES
  */
 const YOUTUBE_VIDEO_CATEGORIES: Record<string, string[]> = {
   // === SCIENCE & SPACE ===
@@ -175,7 +175,7 @@ const YOUTUBE_VIDEO_CATEGORIES: Record<string, string[]> = {
 };
 
 /**
- * Per-account category assignment — each account publishes specific types of video content
+ * Account specific categories mapping
  */
 const ACCOUNT_VIDEO_CATEGORIES: Record<string, string[]> = {
   'adsvidia369@gmail.com': ['NASA & Space', 'Technology', 'Education'],
@@ -189,12 +189,11 @@ const ACCOUNT_VIDEO_CATEGORIES: Record<string, string[]> = {
 /**
  * Fetch top YouTube videos for a specific query & language using YouTube Data API v3
  */
-async function fetchYouTubeVideos(query: string, lang: 'hi' | 'mr' | 'en', maxResults: number = 10): Promise<YouTubeVideoItem[]> {
+async function fetchYouTubeVideos(query: string, lang: 'hi' | 'mr' | 'en', maxResults: number = 15): Promise<YouTubeVideoItem[]> {
   const apiKey = process.env.YOUTUBE_API_KEY || "AIzaSyAQGEjKb5EkJjZSSh4I4X5x2zhESnhSzH0";
   const regionCode = 'IN';
 
   try {
-    // Use videoDuration=medium to get proper videos (4-20 min), not shorts
     const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&videoDuration=medium&regionCode=${regionCode}&maxResults=${maxResults}&order=date&key=${apiKey}`;
     const res = await fetch(url, { cache: 'no-store' });
     const data = await res.json();
@@ -228,12 +227,11 @@ async function fetchYouTubeVideos(query: string, lang: 'hi' | 'mr' | 'en', maxRe
 }
 
 /**
- * FIXED: Publishes YouTube Videos as actual VIDEO posts (not news posts)
- * with embedded YouTube player URLs in mediaUrls
+ * Auto-Publishes YouTube Videos for ALL 6 Accounts (Target 3 videos per account = 18 videos per batch)
  */
 export async function publishYouTubeVideosBatch(withDelay: boolean = false): Promise<{ success: boolean; count: number; log: string[] }> {
   const logs: string[] = [];
-  logs.push("🎬 Starting YouTube Video Auto-Publisher with EXPANDED categories...");
+  logs.push("🎬 Starting YouTube Video Auto-Publisher batch execution across ALL 6 ACCOUNTS...");
 
   try {
     const userEmails = REGISTERED_NEWS_ACCOUNTS.map(a => a.email);
@@ -255,56 +253,45 @@ export async function publishYouTubeVideosBatch(withDelay: boolean = false): Pro
         continue;
       }
 
-      // Get assigned categories for this account
-      const assignedCategories = ACCOUNT_VIDEO_CATEGORIES[account.email] || ['NASA & Space', 'Discovery & Wildlife'];
+      const assignedCategories = ACCOUNT_VIDEO_CATEGORIES[account.email] || ['NASA & Space', 'Discovery & Wildlife', 'Technology'];
+      let accountPostCount = 0;
 
-      // Publish up to 3 videos per account to reach 15-18 videos daily
+      // Try up to 3 videos for this account
       for (let itemIdx = 0; itemIdx < 3; itemIdx++) {
-        // Pick a category from assigned list
         const selectedCategory = assignedCategories[itemIdx % assignedCategories.length];
         const queries = YOUTUBE_VIDEO_CATEGORIES[selectedCategory] || ['documentary 4k hd'];
-        const selectedQuery = queries[Math.floor(Math.random() * queries.length)];
-
-        logs.push(`🔍 Fetching [${selectedCategory}] videos for @${dbUser.username} → "${selectedQuery}"...`);
-
-        const videoItems = await fetchYouTubeVideos(selectedQuery, account.language, 10);
-
-        if (videoItems.length === 0) {
-          logs.push(`❌ No YouTube videos returned for @${dbUser.username} (${selectedCategory}).`);
-          continue;
-        }
-
-        // Pick first non-duplicate video
+        
         let selectedVideo: YouTubeVideoItem | null = null;
-        for (const v of videoItems) {
-          if (batchProcessedVideos.has(v.videoId)) continue;
 
-          // Check if video already posted in DB (by videoId in mediaUrls or title match)
-          const dbExisting = await prisma.post.findFirst({
-            where: {
-              OR: [
-                { mediaUrls: { contains: v.videoId } },
-                { caption: { contains: v.title.slice(0, 30), mode: 'insensitive' } }
-              ]
+        // Try queries in category
+        for (const query of queries) {
+          const videoItems = await fetchYouTubeVideos(query, account.language, 15);
+          for (const v of videoItems) {
+            if (batchProcessedVideos.has(v.videoId)) continue;
+
+            // Check if exact videoId already exists in DB
+            const dbExisting = await prisma.post.findFirst({
+              where: {
+                mediaUrls: { contains: v.videoId }
+              }
+            });
+
+            if (!dbExisting) {
+              selectedVideo = v;
+              selectedVideo.category = selectedCategory;
+              break;
             }
-          });
-
-          if (!dbExisting) {
-            selectedVideo = v;
-            break;
-          } else {
-            logs.push(`  ↳ Skipping duplicate: "${v.title.slice(0, 35)}..."`);
           }
+          if (selectedVideo) break;
         }
 
         if (!selectedVideo) {
-          logs.push(`⚠️ All fetched [${selectedCategory}] videos for @${dbUser.username} were duplicates.`);
+          logs.push(`⚠️ Could not find non-duplicate video for @${dbUser.username} in ${selectedCategory}.`);
           continue;
         }
 
         batchProcessedVideos.add(selectedVideo.videoId);
 
-        // Generate slug
         const slugBase = selectedVideo.title
           .toLowerCase()
           .replace(/[^\w\s-]/g, '')
@@ -312,10 +299,8 @@ export async function publishYouTubeVideosBatch(withDelay: boolean = false): Pro
           .slice(0, 60);
         const slug = `yt-${slugBase}-${Date.now().toString().slice(-5)}${publishedCount}`;
 
-        // Video content description
-        const videoContent = `🎥 **${selectedCategory} Video**\n\n📌 **${selectedVideo.title}**\n📺 Channel: ${selectedVideo.channelTitle}\n\n📖 ${selectedVideo.description.slice(0, 400) || `Watch this ${selectedCategory.toLowerCase()} video on Tolee.`}\n\n🔗 Watch full video: ${selectedVideo.watchUrl}\n\nStay connected with Tolee for daily video updates across NASA, Discovery, Animation, Education, Sports, and more!`;
+        const videoContent = `🎥 **${selectedVideo.category} Video**\n\n📌 **${selectedVideo.title}**\n📺 Channel: ${selectedVideo.channelTitle}\n\n📖 ${selectedVideo.description.slice(0, 400) || `Watch this video on Tolee.`}\n\n🔗 Watch full video: ${selectedVideo.watchUrl}\n\nStay connected with Tolee for daily video updates across NASA, Discovery, Animation, Education, Sports, and more!`;
 
-        // Create as VIDEO post with embedded YouTube URL
         await prisma.post.create({
           data: {
             caption: `🎬 ${selectedVideo.title}`,
@@ -330,17 +315,17 @@ export async function publishYouTubeVideosBatch(withDelay: boolean = false): Pro
                 headline: selectedVideo.title,
                 slug,
                 summary: selectedVideo.description.slice(0, 200) || `Watch ${selectedVideo.title} on Tolee.`,
-                category: selectedCategory,
+                category: selectedVideo.category,
                 content: videoContent,
-                metaDescription: `Watch ${selectedCategory}: ${selectedVideo.title} on Tolee`,
-                keywords: `${selectedCategory.toLowerCase()}, youtube, video, ${account.languageName.toLowerCase()}, tolee`,
-                tags: `${selectedCategory.toLowerCase()}, youtube, video, ${account.languageName.toLowerCase()}`,
-                seoScore: 94,
-                aeoScore: 90,
-                geoScore: 88,
+                metaDescription: `Watch ${selectedVideo.category}: ${selectedVideo.title} on Tolee`,
+                keywords: `${selectedVideo.category.toLowerCase()}, youtube, video, ${account.languageName.toLowerCase()}, tolee`,
+                tags: `${selectedVideo.category.toLowerCase()}, youtube, video, ${account.languageName.toLowerCase()}`,
+                seoScore: 95,
+                aeoScore: 92,
+                geoScore: 90,
                 language: account.languageName,
                 sourceUrl: selectedVideo.watchUrl,
-                readingTime: 5,
+                readingTime: 4,
                 coverCaption: selectedVideo.thumbnail
               }
             }
@@ -348,21 +333,20 @@ export async function publishYouTubeVideosBatch(withDelay: boolean = false): Pro
         });
 
         publishedCount++;
-        logs.push(`✅ [Video #${publishedCount}] Published [${selectedCategory}] "${selectedVideo.title.slice(0, 45)}..." (${selectedVideo.channelTitle}) by @${dbUser.username}`);
+        accountPostCount++;
+        logs.push(`✅ [@${dbUser.username} #${accountPostCount}] Published [${selectedVideo.category}] "${selectedVideo.title.slice(0, 45)}..."`);
 
-        if (withDelay && publishedCount < 15) {
-          const delayMs = 3 * 60 * 1000;
-          logs.push(`⏱️ Waiting 3 min before next video...`);
-          await new Promise(res => setTimeout(res, delayMs));
+        if (withDelay) {
+          await new Promise(res => setTimeout(res, 2000));
         }
       }
     }
 
-    logs.push(`\n🎬 YouTube Video Auto-Publisher completed: ${publishedCount} video posts published across ${Object.keys(YOUTUBE_VIDEO_CATEGORIES).length} categories.`);
+    logs.push(`\n🎬 YouTube Auto-Publisher batch complete: ${publishedCount} new video posts created across all 6 accounts.`);
     return { success: true, count: publishedCount, log: logs };
 
   } catch (error: any) {
-    logs.push(`🔴 Fatal Error: ${error.message}`);
+    logs.push(`🔴 Fatal Error in YouTube Auto-Publisher: ${error.message}`);
     return { success: false, count: 0, log: logs };
   }
 }
