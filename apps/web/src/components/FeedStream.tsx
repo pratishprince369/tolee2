@@ -1769,8 +1769,6 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                     </Card>
                   );
                 }
-                  );
-                }
 
                 if (post.postType === 'listing') {
                   const listingUrl = `/marketplace/listing/${post.id}`;
