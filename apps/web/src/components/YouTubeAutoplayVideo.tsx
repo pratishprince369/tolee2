@@ -41,16 +41,17 @@ export function YouTubeAutoplayVideo({
   const cleanVideoId = React.useMemo(() => {
     try {
       if (!videoId || typeof videoId !== 'string') return '';
-      if (videoId.includes('youtube.com/watch?v=')) {
-        return videoId.split('v=')[1]?.split('&')[0] || videoId;
+      let id = videoId.trim();
+      if (id.includes('v=')) {
+        id = id.split('v=')[1]?.split('&')[0] || id;
+      } else if (id.includes('youtu.be/')) {
+        id = id.split('youtu.be/')[1]?.split('?')[0] || id;
+      } else if (id.includes('embed/')) {
+        id = id.split('embed/')[1]?.split('?')[0] || id;
+      } else if (id.includes('/vi/')) {
+        id = id.split('/vi/')[1]?.split('/')[0] || id;
       }
-      if (videoId.includes('youtu.be/')) {
-        return videoId.split('youtu.be/')[1]?.split('?')[0] || videoId;
-      }
-      if (videoId.includes('youtube.com/embed/')) {
-        return videoId.split('embed/')[1]?.split('?')[0] || videoId;
-      }
-      return videoId.trim();
+      return id.split(',')[0]?.split('/')[0]?.split('?')[0]?.trim() || '';
     } catch {
       return '';
     }

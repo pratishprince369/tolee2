@@ -351,10 +351,16 @@ export function PostCarousel({ mediaUrls, mediaTypes, postId }: PostCarouselProp
           );
 
           if (isYt) {
+            let ytId = item.url;
+            if (ytId.includes('embed/')) ytId = ytId.split('embed/')[1]?.split('?')[0]?.split(',')[0] || ytId;
+            else if (ytId.includes('v=')) ytId = ytId.split('v=')[1]?.split('&')[0] || ytId;
+            else if (ytId.includes('youtu.be/')) ytId = ytId.split('youtu.be/')[1]?.split('?')[0] || ytId;
+            else if (ytId.includes('/vi/')) ytId = ytId.split('/vi/')[1]?.split('/')[0] || ytId;
+
             return (
               <div key={idx} className="h-full w-full relative overflow-hidden flex items-center justify-center bg-neutral-900 dark:bg-zinc-950" style={{ width: `${100 / items.length}%` }}>
                 <YouTubeAutoplayVideo
-                  videoId={item.url}
+                  videoId={ytId}
                   title="Tolee Video"
                 />
               </div>

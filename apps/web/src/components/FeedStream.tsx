@@ -1589,7 +1589,17 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                   );
                 }
 
-                if (post.postType === 'news' || post.postType === 'video' || Boolean(post.newsRelation)) {
+                const isVideoPost = 
+                  post.postType === 'news' || 
+                  post.postType === 'video' || 
+                  Boolean(post.newsRelation) ||
+                  (typeof post.mediaUrls === 'string' && (
+                    post.mediaUrls.includes('youtube.com') || 
+                    post.mediaUrls.includes('youtu.be') || 
+                    post.mediaUrls.includes('ytimg.com')
+                  ));
+
+                if (isVideoPost) {
                   const news = post.newsRelation;
                   const newsSlug = String(news?.slug || post.id || '');
                   const newsHeadline = String(news?.headline || post.caption?.replace(/^🎬\s*/, '') || 'Featured Video');
