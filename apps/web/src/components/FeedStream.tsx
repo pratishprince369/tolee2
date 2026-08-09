@@ -1622,7 +1622,6 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
 
                   let ytVideoId = '';
                   if (isYouTube) {
-                    // Extract from sourceUrl
                     if (sourceUrlStr.includes('v=')) {
                       ytVideoId = sourceUrlStr.split('v=')[1]?.split('&')[0] || '';
                     } else if (sourceUrlStr.includes('youtu.be/')) {
@@ -1630,123 +1629,110 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                     } else if (sourceUrlStr.includes('embed/')) {
                       ytVideoId = sourceUrlStr.split('embed/')[1]?.split('?')[0] || '';
                     }
-                    // Extract from mediaUrls (embed URL stored directly)
                     if (!ytVideoId && mediaUrlsStr.includes('youtube.com/embed/')) {
                       ytVideoId = mediaUrlsStr.split('embed/')[1]?.split('?')[0]?.split(',')[0] || '';
                     }
                     if (!ytVideoId && mediaUrlsStr.includes('/vi/')) {
                       ytVideoId = mediaUrlsStr.split('/vi/')[1]?.split('/')[0] || '';
                     }
+                    if (!ytVideoId && mediaUrlsStr.includes('youtu.be/')) {
+                      ytVideoId = mediaUrlsStr.split('youtu.be/')[1]?.split('?')[0] || '';
+                    }
                   }
 
+                  const cleanCoverImg = post.mediaUrls ? post.mediaUrls.split(/,(?=https?:\/\/)/)[0] : undefined;
+
                   return (
-                    <Card key={post.id} id={`post-${post.id}`} className="border-indigo-100 dark:border-indigo-950/20 shadow-[0_4px_24px_rgba(0,0,0,0.02)] bg-white dark:bg-[#121212] overflow-hidden transition-all duration-300 hover:shadow-lg rounded-[24px] mb-6 transition-all duration-500">
-                      {/* Shared group context banner */}
-                      {post.toleeName && (
-                        <div className="px-4 py-2 border-b border-indigo-50/50 dark:border-zinc-900 bg-indigo-50/20 dark:bg-zinc-900/10 flex items-center justify-between">
-                          <div className="flex items-center gap-1.5">
-                            <Newspaper className="w-3.5 h-3.5 text-indigo-500" />
-                            <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Tolee News Channel</span>
-                          </div>
-                          <Link href={`/t/${post.toleeSlug}`}>
-                            <span className="text-[10px] font-bold text-gray-400 hover:underline uppercase tracking-wider">In {post.toleeName}</span>
-                          </Link>
+                    <Card key={post.id} id={`post-${post.id}`} className="border-gray-100 dark:border-zinc-900/60 bg-white dark:bg-[#121212] rounded-3xl overflow-hidden shadow-xs hover:shadow-md transition-all duration-300 flex flex-col relative mb-6">
+                      {/* Top Header Row: Category Badge & Group Info & Options Menu */}
+                      <div className="p-5 pb-3 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Badge className="bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full border-none select-none">
+                            {newsCategory}
+                          </Badge>
+                          {post.toleeName && (
+                            <span className="text-[11px] text-gray-400 font-bold">
+                              in <Link href={`/t/${post.toleeSlug}`} className="text-indigo-600 dark:text-indigo-400 hover:underline">t/{post.toleeSlug}</Link>
+                            </span>
+                          )}
                         </div>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setActiveOptionsPost(post); }}
+                          className="h-8 w-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors focus:outline-none"
+                        >
+                          <MoreHorizontal className="w-5 h-5" />
+                        </button>
+                      </div>
+
+                      {/* YouTube Autoplay Video Component or Cover Image */}
+                      {Boolean(isYouTube && ytVideoId) ? (
+                        <YouTubeAutoplayVideo
+                          videoId={ytVideoId}
+                          title={newsHeadline}
+                          thumbnailUrl={cleanCoverImg}
+                          category={newsCategory}
+                        />
+                      ) : cleanCoverImg ? (
+                        <Link href={`/news/${newsSlug}`}>
+                          <div className="w-full overflow-hidden bg-slate-50 dark:bg-zinc-950 aspect-video relative cursor-pointer">
+                            <img src={cleanCoverImg} alt={newsHeadline} className="w-full h-full object-cover hover:scale-[1.01] transition-transform duration-300" loading="lazy" />
+                          </div>
+                        </Link>
+                      ) : (
+                        <Link href={`/news/${newsSlug}`}>
+                          <div className="w-full aspect-video bg-indigo-50/50 dark:bg-indigo-950/10 flex items-center justify-center relative cursor-pointer">
+                            <Newspaper className="w-12 h-12 text-indigo-300 dark:text-indigo-900/60" />
+                          </div>
+                        </Link>
                       )}
 
-                      {/* Header */}
-                      <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between">
-                        <div className="flex items-center gap-2.5">
-                          <UserHovercard username={post.author}>
-                            <Link href={`/u/${post.author}`}>
-                              <Avatar className="w-9 h-9 cursor-pointer border border-gray-100 dark:border-zinc-800">
-                                <AvatarImage src={post.authorAvatar} alt={post.author} />
-                                <AvatarFallback>{post.author?.[0]}</AvatarFallback>
-                              </Avatar>
-                            </Link>
-                          </UserHovercard>
-                          <div className="flex flex-col -space-y-0.5">
-                            <div className="flex items-center gap-1">
+                      {/* Content Body: Headline, Summary, Author Meta */}
+                      <div className="p-5 space-y-3">
+                        <Link href={`/news/${newsSlug}`}>
+                          <h2 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white leading-tight hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer transition-colors line-clamp-2">
+                            {newsHeadline}
+                          </h2>
+                        </Link>
+
+                        {newsSummary && (
+                          <p className="text-sm text-gray-600 dark:text-zinc-400 line-clamp-2 leading-relaxed">
+                            {newsSummary}
+                          </p>
+                        )}
+
+                        {/* Author Info & Timestamp */}
+                        <div className="pt-2 flex items-center justify-between border-t border-gray-100 dark:border-zinc-900/50">
+                          <div className="flex items-center gap-2.5">
+                            <UserHovercard username={post.author}>
+                              <Link href={`/u/${post.author}`}>
+                                <Avatar className="w-8 h-8 cursor-pointer border border-gray-100 dark:border-zinc-800">
+                                  <AvatarImage src={post.authorAvatar} alt={post.author} />
+                                  <AvatarFallback>{post.author?.[0]}</AvatarFallback>
+                                </Avatar>
+                              </Link>
+                            </UserHovercard>
+                            <div className="flex flex-col -space-y-0.5">
                               <UserHovercard username={post.author}>
                                 <Link href={`/u/${post.author}`}>
-                                  <span className="font-extrabold text-[13.5px] cursor-pointer hover:underline">{post.author}</span>
+                                  <span className="font-bold text-xs text-gray-900 dark:text-white cursor-pointer hover:underline">{post.author}</span>
                                 </Link>
                               </UserHovercard>
-                              <Badge className="bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-400 font-extrabold text-[8.5px] px-1.5 py-0.5 border-none rounded">Verified Author</Badge>
+                              <span className="text-[10.5px] text-gray-400">{post.time}</span>
                             </div>
-                            <span className="text-[10.5px] text-gray-400">{post.time}</span>
+                          </div>
+
+                          <div className="flex items-center gap-2 text-[11px] text-gray-400 font-bold uppercase tracking-wider">
+                            <span>⏱ {newsReadingTime} MIN READ</span>
+                            <span>•</span>
+                            <span>👁 {newsViewsCount} VIEWS</span>
                           </div>
                         </div>
-                        
-                        {/* Right side follow button */}
-                        {post.authorId && !isPostAuthorMe && postFollowState && (
-                          <Button 
-                            size="xs" 
-                            variant="ghost" 
-                            className="text-xs font-bold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
-                            onClick={() => handleFollowAuthor(post.authorId)}
-                          >
-                            {postFollowState.isFollowing ? 'Following' : 'Follow'}
-                          </Button>
-                        )}
-                      </CardHeader>
+                      </div>
 
-                      {/* News Card body */}
-                      <CardContent className="p-0">
-                        {/* YouTube Autoplay Video or Cover Image */}
-                        {Boolean(isYouTube && ytVideoId) ? (
-                          <YouTubeAutoplayVideo
-                            videoId={ytVideoId}
-                            title={newsHeadline}
-                            thumbnailUrl={post.mediaUrls ? post.mediaUrls.split(/,(?=https?:\/\/)/)[0] : undefined}
-                            category={newsCategory}
-                          />
-                        ) : post.mediaUrls ? (
-                          <Link href={`/news/${newsSlug}`}>
-                            <div className="aspect-video w-full overflow-hidden bg-black relative cursor-pointer">
-                              <img src={post.mediaUrls.split(/,(?=https?:\/\/)/)[0]} alt={newsHeadline} className="w-full h-full object-cover hover:scale-[1.01] transition-transform duration-300" />
-                              <Badge className="absolute top-3 left-3 bg-black/60 backdrop-blur-md text-[9px] font-bold text-white uppercase px-2 py-0.5 rounded border-none">
-                                {newsCategory}
-                              </Badge>
-                            </div>
-                          </Link>
-                        ) : (
-                          <Link href={`/news/${newsSlug}`}>
-                            <div className="aspect-video w-full bg-indigo-50/50 dark:bg-indigo-950/10 flex items-center justify-center relative cursor-pointer">
-                              <Newspaper className="w-10 h-10 text-indigo-300 dark:text-indigo-900/60" />
-                              <Badge className="absolute top-3 left-3 bg-black/60 backdrop-blur-md text-[9px] font-bold text-white uppercase px-2 py-0.5 rounded border-none">
-                                {newsCategory}
-                              </Badge>
-                            </div>
-                          </Link>
-                        )}
-
-                        <div className="p-4 space-y-2">
-                          <Link href={`/news/${newsSlug}`}>
-                            <h3 className="font-extrabold text-[18px] text-gray-900 dark:text-white leading-snug hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer transition-colors line-clamp-2">
-                              {newsHeadline}
-                            </h3>
-                          </Link>
-                          {newsSummary && (
-                            <p className="text-xs text-gray-500 dark:text-zinc-400 line-clamp-2 leading-relaxed">
-                              {newsSummary}
-                            </p>
-                          )}
-                          <div className="flex items-center gap-3 text-[11px] text-gray-400 pt-1">
-                            <span className="font-bold bg-gray-150 dark:bg-zinc-900 px-2 py-0.5 rounded text-indigo-600 dark:text-indigo-400">{newsCategory}</span>
-                            <span>•</span>
-                            <span>{newsReadingTime} Min Read</span>
-                            <span>•</span>
-                            <span>{newsViewsCount} Views</span>
-                          </div>
-                        </div>
-                      </CardContent>
-
-                      {/* Footer Actions */}
-                      <CardFooter className="px-4 pb-4 pt-2 flex flex-col gap-3">
+                      {/* Footer Actions: Like, Comment, Share, Save */}
+                      <CardFooter className="px-5 pb-4 pt-1 flex flex-col gap-3">
                         <div className="flex items-center justify-between w-full pt-3 border-t border-zinc-150 dark:border-zinc-900/60">
                           <div className="flex items-center gap-5">
-                            {/* Like */}
                             <button
                               onClick={(e) => { e.stopPropagation(); handleLike(post.id); }}
                               className={`flex items-center gap-1.5 transition-all duration-200 active:scale-110 focus:outline-none ${post.likedByMe ? 'text-red-500' : 'text-zinc-600 dark:text-zinc-400 hover:text-red-500'}`}
@@ -1755,7 +1741,6 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                               <span className="text-xs font-semibold">{post.likes}</span>
                             </button>
 
-                            {/* Comment */}
                             <button
                               onClick={(e) => { e.stopPropagation(); openCommentsModal(post.id); }}
                               className="flex items-center gap-1.5 text-zinc-600 dark:text-zinc-400 hover:text-indigo-500 focus:outline-none transition-colors"
@@ -1764,7 +1749,6 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                               <span className="text-xs font-semibold">{post.comments}</span>
                             </button>
 
-                            {/* Share */}
                             <button
                               onClick={(e) => { e.stopPropagation(); setSelectedPostForShare(post); setShareModalOpen(true); }}
                               className="flex items-center gap-1.5 text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 focus:outline-none transition-colors"
@@ -1774,24 +1758,17 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                             </button>
                           </div>
 
-                          <div className="flex items-center gap-2">
-                            {/* Bookmark */}
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleSave(post.id); }}
-                              className={`text-zinc-600 dark:text-zinc-400 transition-all duration-250 ${post.savedByMe ? 'text-indigo-600' : 'hover:text-indigo-600'}`}
-                            >
-                              <Bookmark strokeWidth={1.5} className={`w-[20px] h-[20px] ${post.savedByMe ? 'fill-indigo-600 stroke-indigo-600' : 'fill-transparent'}`} />
-                            </button>
-
-                            <Link href={`/news/${newsSlug}`}>
-                              <Button size="xs" className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold px-3">
-                                Read Article
-                              </Button>
-                            </Link>
-                          </div>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleSave(post.id); }}
+                            className="text-zinc-600 dark:text-zinc-400 hover:text-amber-500 focus:outline-none transition-colors"
+                          >
+                            <Bookmark strokeWidth={1.5} className={`w-[20px] h-[20px] ${post.savedByMe ? 'fill-amber-500 text-amber-500' : 'fill-transparent'}`} />
+                          </button>
                         </div>
                       </CardFooter>
                     </Card>
+                  );
+                }
                   );
                 }
 
