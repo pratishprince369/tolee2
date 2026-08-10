@@ -39,6 +39,7 @@ import { StoryViewer } from '@/components/StoryViewer';
 import { StoryEditor } from '@/components/StoryEditor';
 import { PostCarousel } from '@/components/PostCarousel';
 import { Camera, Sparkles } from 'lucide-react';
+import { UserHovercard } from '@/components/UserHovercard';
 import { savePostsToOfflinePocket } from '@/lib/offlineSmartPocket';
 
 export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
