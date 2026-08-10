@@ -903,11 +903,11 @@ export async function processAIPersonalMessage(
     }
 
     // ⚡ Direct Chat Box Inspection Handler (Highest Priority for Voice Access)
-    const isChatCheckIntent = 
+    const isDirectChatCheckIntent = 
       (lower.includes('chat') || lower.includes('message') || lower.includes('msg') || lower.includes('chhat') || lower.includes('inbox')) &&
       (lower.includes('kiska') || lower.includes('kya') || lower.includes('dekho') || lower.includes('check') || lower.includes('padho') || lower.includes('read') || lower.includes('aaya'));
 
-    if (isChatCheckIntent) {
+    if (isDirectChatCheckIntent) {
       const userChatParticipants = await prisma.chatParticipant.findMany({
         where: { userId },
         select: { chatId: true }
