@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Play, Pause, Volume2, VolumeX, Video, Maximize, Minimize } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Video, Maximize, Minimize, RotateCcw, RotateCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 interface YouTubeAutoplayVideoProps {
@@ -29,7 +29,7 @@ export function YouTubeAutoplayVideo({
   const [hasError, setHasError] = useState(false);
 
   const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
+  const [duration, setDuration] = useState(300); // Default 5 mins to enable instant seeking
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isHoveringControls, setIsHoveringControls] = useState(false);
 
@@ -108,12 +108,27 @@ export function YouTubeAutoplayVideo({
     return () => window.removeEventListener('message', handleMessage);
   }, []);
 
+  // Send handshake message to YouTube Iframe on load
+  const handleIframeLoad = () => {
+    if (iframeRef.current && iframeRef.current.contentWindow) {
+      try {
+        iframeRef.current.contentWindow.postMessage(
+          JSON.stringify({ event: 'listening', id: 1, channel: 'widget' }),
+          '*'
+        );
+      } catch {
+        // ignore iframe error
+      }
+    }
+  };
+
   // Timer ticker to increment currentTime smoothly while playing
   useEffect(() => {
     if (!isPlaying || !isIntersecting) return;
     const interval = setInterval(() => {
       setCurrentTime((prev) => {
-        if (duration > 0 && prev >= duration) return duration;
+        const maxDur = duration > 0 ? duration : 300;
+        if (prev >= maxDur) return maxDur;
         return prev + 1;
       });
     }, 1000);
@@ -170,6 +185,19 @@ export function YouTubeAutoplayVideo({
     }
   };
 
+  const seekRelative = (seconds: number) => {
+    const maxDur = duration > 0 ? duration : 300;
+    const newTime = Math.max(0, Math.min(maxDur, currentTime + seconds));
+    setCurrentTime(newTime);
+
+    if (iframeRef.current && iframeRef.current.contentWindow) {
+      iframeRef.current.contentWindow.postMessage(
+        JSON.stringify({ event: 'command', func: 'seekTo', args: [newTime, true] }),
+        '*'
+      );
+    }
+  };
+
   const toggleFullscreen = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!containerRef.current) return;
@@ -191,7 +219,7 @@ export function YouTubeAutoplayVideo({
   };
 
   const originParam = React.useMemo(() => {
-    if (typeof window !== 'undefined' && window.location.origin) {
+    if (typeof window !== 'undefined' && window.location && window.location.origin) {
       return encodeURIComponent(window.location.origin);
     }
     return 'https%3A%2F%2Fwww.tolee.in';
@@ -226,7 +254,8 @@ export function YouTubeAutoplayVideo({
     );
   }
 
-  const progressPercent = duration > 0 ? Math.min((currentTime / duration) * 100, 100) : 0;
+  const effectiveDuration = duration > 0 ? duration : 300;
+  const progressPercent = Math.min((currentTime / effectiveDuration) * 100, 100);
 
   return (
     <div
@@ -243,6 +272,7 @@ export function YouTubeAutoplayVideo({
             title={title || 'YouTube Video'}
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
             allowFullScreen
+            onLoad={handleIframeLoad}
             onError={() => setHasError(true)}
             className="w-full h-full border-none pointer-events-auto"
           />
@@ -265,24 +295,24 @@ export function YouTubeAutoplayVideo({
           {/* TOLEE FULL CUSTOM HD PLAYER CONTROL BAR (Z-30) */}
           <div
             onClick={(e) => e.stopPropagation()}
-            className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black/95 to-transparent pt-6 pb-2 px-3.5 z-30 transition-opacity duration-300 pointer-events-auto ${
+            className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black/95 to-transparent pt-6 pb-2.5 px-3.5 z-30 transition-opacity duration-300 pointer-events-auto ${
               !isPlaying || isHoveringControls ? 'opacity-100' : 'opacity-90 hover:opacity-100'
             }`}
           >
-            {/* Interactive Progress Line & Point Handle (Seek Bar) */}
-            <div className="relative w-full h-3 flex items-center cursor-pointer group/seek mb-1.5">
+            {/* Interactive Progress Line & Drag Scrubber (Seek Bar) */}
+            <div className="relative w-full h-4 flex items-center cursor-pointer group/seek mb-1.5">
               {/* Background Track */}
-              <div className="w-full h-1.5 bg-white/20 rounded-full overflow-hidden relative">
+              <div className="w-full h-1.5 bg-white/25 rounded-full overflow-hidden relative">
                 {/* Red Active Progress Fill */}
                 <div
-                  className="h-full bg-red-500 rounded-full transition-all duration-150"
+                  className="h-full bg-red-500 rounded-full transition-all duration-75"
                   style={{ width: `${progressPercent}%` }}
                 />
               </div>
 
               {/* Point Handle Dot */}
               <div
-                className="absolute w-3.5 h-3.5 rounded-full bg-red-500 border-2 border-white shadow-md transform -translate-x-1/2 transition-transform scale-100 group-hover/seek:scale-125"
+                className="absolute w-4 h-4 rounded-full bg-red-500 border-2 border-white shadow-lg transform -translate-x-1/2 transition-transform scale-100 group-hover/seek:scale-125 pointer-events-none z-45"
                 style={{ left: `${progressPercent}%` }}
               />
 
@@ -290,8 +320,8 @@ export function YouTubeAutoplayVideo({
               <input
                 type="range"
                 min={0}
-                max={duration || 100}
-                step={0.1}
+                max={effectiveDuration}
+                step={0.5}
                 value={currentTime}
                 onChange={handleSeek}
                 className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-40"
@@ -300,7 +330,7 @@ export function YouTubeAutoplayVideo({
 
             {/* Custom Control Action Buttons & Status Row */}
             <div className="flex items-center justify-between text-white text-xs select-none">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2.5">
                 {/* Play / Pause Toggle */}
                 <button
                   type="button"
@@ -313,6 +343,26 @@ export function YouTubeAutoplayVideo({
                   ) : (
                     <Play className="w-4 h-4 fill-current translate-x-0.5" />
                   )}
+                </button>
+
+                {/* Skip 10 Seconds Backward */}
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); seekRelative(-10); }}
+                  className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-transform active:scale-95"
+                  title="Rewind 10s"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                </button>
+
+                {/* Skip 10 Seconds Forward */}
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); seekRelative(10); }}
+                  className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-transform active:scale-95"
+                  title="Forward 10s"
+                >
+                  <RotateCw className="w-3.5 h-3.5" />
                 </button>
 
                 {/* Mute / Unmute Button */}
@@ -330,13 +380,13 @@ export function YouTubeAutoplayVideo({
                 </button>
 
                 {/* Realtime Playback Counter (01:24 / 08:56) */}
-                <span className="text-[11px] font-medium text-zinc-300 font-mono tracking-tight">
-                  {formatTime(currentTime)} / {formatTime(duration)}
+                <span className="text-[11px] font-medium text-zinc-300 font-mono tracking-tight ml-0.5">
+                  {formatTime(currentTime)} / {formatTime(effectiveDuration)}
                 </span>
               </div>
 
               {/* Right Side Options: Fullscreen & TOLEE HD Watermark */}
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2.5">
                 {/* Fullscreen Button */}
                 <button
                   type="button"
@@ -352,7 +402,7 @@ export function YouTubeAutoplayVideo({
                 </button>
 
                 {/* TOLEE HD Badge */}
-                <span className="text-[11px] font-black tracking-widest text-teal-400 uppercase flex items-center gap-1.5 drop-shadow-md bg-black/40 px-2 py-0.5 rounded-full border border-teal-500/30">
+                <span className="text-[10px] font-black tracking-widest text-teal-400 uppercase flex items-center gap-1.5 drop-shadow-md bg-black/40 px-2 py-0.5 rounded-full border border-teal-500/30">
                   <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-ping" />
                   TOLEE HD
                 </span>
