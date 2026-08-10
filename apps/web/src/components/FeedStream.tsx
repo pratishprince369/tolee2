@@ -39,8 +39,6 @@ import { StoryViewer } from '@/components/StoryViewer';
 import { StoryEditor } from '@/components/StoryEditor';
 import { PostCarousel } from '@/components/PostCarousel';
 import { Camera, Sparkles } from 'lucide-react';
-import { UserHovercard } from '@/components/UserHovercard';
-import { LocalNeighborhoodRadar } from '@/components/LocalNeighborhoodRadar';
 import { savePostsToOfflinePocket } from '@/lib/offlineSmartPocket';
 
 export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
@@ -1075,11 +1073,6 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                     </div>
                   );
                 })}
-            </div>
-            
-            {/* Tolee Neighborhood Radar Widget (Idea #1) */}
-            <div className="mb-6">
-              <LocalNeighborhoodRadar />
             </div>
 
             {/* Premium Desktop Action Grid (Horizontal Cards) */}
