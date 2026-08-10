@@ -115,9 +115,9 @@ export function FloatingVoiceHUD({ isOpen, onClose, onSelectTab, onSendMessage }
       vEngine.stopListening();
 
       const parsed = parseVoiceCommand(transcript);
-      setSpeechText(`🗣️ Processing: "${transcript}"`);
+      setSpeechText(`🗣️ Processing: "${transcript}"...`);
 
-      // 1. ALWAYS append message to Chat UI box first!
+      // 1. Send command to central AI Manager Core via onSendMessage
       let aiResultText = '';
       try {
         const res = await onSendMessage(transcript);
@@ -133,28 +133,33 @@ export function FloatingVoiceHUD({ isOpen, onClose, onSelectTab, onSendMessage }
         onSelectTab(parsed.targetModule);
       }
 
-      // 3. Prepare clean spoken text
-      let spokenReply = aiResultText || parsed.responseText || 'Command processed successfully.';
-      if (parsed.intent === 'READ_NOTIFICATIONS') {
+      // 3. Spoken text MUST be the exact AI Core response
+      let spokenReply = aiResultText || 'माफ़ कीजिए, अभी मैं आपका जवाब तैयार नहीं कर पा रहा हूँ। कृपया थोड़ी देर बाद फिर कोशिश करें।';
+      if (parsed.intent === 'READ_NOTIFICATIONS' && !aiResultText) {
         try {
           const briefingRes = await getVoiceNotificationBriefing();
           if (briefingRes?.briefing) spokenReply = briefingRes.briefing;
         } catch (e) {}
       }
 
-      // Strip Markdown formatting symbols (*, _, #, `, [ ]) for clean natural spoken voice
-      spokenReply = spokenReply.replace(/[*_#`[\]()]/g, '').trim();
+      // Clean markdown syntax for speech synthesis while preserving exact words
+      const cleanSpoken = spokenReply
+        .replace(/✅\s*\*\*Tolee AI Manager\*\*:\s*/gi, '')
+        .replace(/🔔\s*\*\*Tolee AI Manager\*\*:\s*/gi, '')
+        .replace(/[*_#`[\]()]/g, '')
+        .replace(/https?:\/\/\S+/gi, '')
+        .trim();
 
       let spokenLang = parsed.detectedLang;
-      if (/[\u0900-\u097F]/.test(spokenReply)) {
+      if (/[\u0900-\u097F]/.test(cleanSpoken)) {
         spokenLang = 'hi-IN';
       }
 
-      setSpeechText(spokenReply);
+      setSpeechText(cleanSpoken);
 
       // Re-unlock mobile audio context right before invoking speak()
       unlockMobileAudio();
-      vEngine.speak(spokenReply, spokenLang);
+      vEngine.speak(cleanSpoken, spokenLang);
     });
 
     setEngine(vEngine);

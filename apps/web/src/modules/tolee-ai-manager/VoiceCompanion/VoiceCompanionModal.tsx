@@ -10,14 +10,16 @@ import { VoiceCompanionEngine } from './voiceCompanionEngine';
 import { VoiceCompanionMode, VoicePriorityConfig } from './voiceTypes';
 import { parseVoiceCommand } from './voiceCommandParser';
 import { getVoiceNotificationBriefing } from '@/actions/voice-companion';
+import { processAIPersonalMessage } from '@/actions/ai-manager';
 
 interface VoiceCompanionModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSelectTab: (tab: string) => void;
+  onSendMessage?: (text: string) => Promise<string | void>;
 }
 
-export function VoiceCompanionModal({ isOpen, onClose, onSelectTab }: VoiceCompanionModalProps) {
+export function VoiceCompanionModal({ isOpen, onClose, onSelectTab, onSendMessage }: VoiceCompanionModalProps) {
   const [engine, setEngine] = useState<VoiceCompanionEngine | null>(null);
   const [mode, setMode] = useState<VoiceCompanionMode>('ALWAYS_LISTENING');
   const [isListening, setIsListening] = useState(false);
@@ -56,13 +58,32 @@ export function VoiceCompanionModal({ isOpen, onClose, onSelectTab }: VoiceCompa
       setLiveTranscript(transcript);
       const parsed = parseVoiceCommand(transcript);
 
-      setAiSpeechText(parsed.responseText);
-      vEngine.speak(parsed.responseText);
+      let replyText = '';
+      if (onSendMessage) {
+        const res = await onSendMessage(transcript);
+        if (typeof res === 'string' && res.trim().length > 0) replyText = res;
+      }
+      if (!replyText) {
+        try {
+          const clientISO = new Date().toISOString();
+          const timeZone = typeof window !== 'undefined' && window.Intl ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'Asia/Kolkata';
+          const result = await processAIPersonalMessage(transcript, [], clientISO, timeZone);
+          replyText = (result as any).response || (result as any).reply || '';
+        } catch (e) {}
+      }
 
-      if (parsed.intent === 'READ_NOTIFICATIONS') {
+      const finalSpoken = replyText || 'माफ़ कीजिए, अभी मैं आपका जवाब तैयार नहीं कर पा रहा हूँ। कृपया थोड़ी देर बाद फिर कोशिश करें।';
+      const cleanSpoken = finalSpoken.replace(/[*_#`[\]()]/g, '').replace(/https?:\/\/\S+/gi, '').trim();
+
+      setAiSpeechText(cleanSpoken);
+      vEngine.speak(cleanSpoken);
+
+      if (parsed.intent === 'READ_NOTIFICATIONS' && !replyText) {
         const briefingRes = await getVoiceNotificationBriefing();
-        setAiSpeechText(briefingRes.briefing);
-        vEngine.speak(briefingRes.briefing);
+        if (briefingRes?.briefing) {
+          setAiSpeechText(briefingRes.briefing);
+          vEngine.speak(briefingRes.briefing);
+        }
       } else if (parsed.intent === 'OPEN_MODULE' && parsed.targetModule) {
         onSelectTab(parsed.targetModule);
       }

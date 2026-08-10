@@ -163,7 +163,7 @@ export function AIDashboard() {
       setMessages((prev) => [...prev, aiMsg]);
       return aiText;
     } catch (error: any) {
-      const errText = 'I encountered an error processing your request. Please try again.';
+      const errText = 'माफ़ कीजिए, अभी मैं आपका जवाब तैयार नहीं कर पा रहा हूँ। कृपया थोड़ी देर बाद फिर कोशिश करें।';
       setMessages((prev) => [
         ...prev,
         {

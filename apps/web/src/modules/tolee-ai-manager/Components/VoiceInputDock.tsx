@@ -25,7 +25,7 @@ export function VoiceInputDock({ onSendMessage, onToggleVoiceCompanion, isVoiceA
   };
 
   const handleToggleVoice = () => {
-    unlockMobileAudio(); // Unlock audio context directly inside user click handler!
+    unlockMobileAudio();
     if (onToggleVoiceCompanion) {
       onToggleVoiceCompanion();
     }
@@ -33,6 +33,12 @@ export function VoiceInputDock({ onSendMessage, onToggleVoiceCompanion, isVoiceA
 
   const toggleRecording = () => {
     unlockMobileAudio();
+    // If Voice Companion HUD is active, toggle Voice Companion directly to avoid duplicate SpeechRecognition instances
+    if (isVoiceActive && onToggleVoiceCompanion) {
+      onToggleVoiceCompanion();
+      return;
+    }
+
     if (!isRecording) {
       setIsRecording(true);
       if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
@@ -41,19 +47,20 @@ export function VoiceInputDock({ onSendMessage, onToggleVoiceCompanion, isVoiceA
         const savedLang = localStorage.getItem('tolee_native_lang') || 'hi-IN';
         recognition.lang = savedLang;
         recognition.onresult = (event: any) => {
-          const transcript = event.results[0][0].transcript;
-          setInput(transcript);
+          const transcript = event.results[0][0]?.transcript;
           setIsRecording(false);
-          onSendMessage(transcript);
+          if (transcript && transcript.trim()) {
+            setInput('');
+            onSendMessage(transcript.trim());
+          }
         };
         recognition.onerror = () => setIsRecording(false);
         recognition.onend = () => setIsRecording(false);
         recognition.start();
       } else {
         setTimeout(() => {
-          setInput('Schedule doctor appointment for tomorrow at 9 AM');
           setIsRecording(false);
-        }, 2000);
+        }, 1500);
       }
     } else {
       setIsRecording(false);

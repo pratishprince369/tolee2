@@ -27,20 +27,23 @@ export function VoiceInputDock({ onSendMessage, isLoading = false }: VoiceInputD
       if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
         const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
         const recognition = new SpeechRecognition();
-        recognition.lang = 'en-US';
+        const savedLang = localStorage.getItem('tolee_native_lang') || 'hi-IN';
+        recognition.lang = savedLang;
         recognition.onresult = (event: any) => {
-          const transcript = event.results[0][0].transcript;
-          setInput(transcript);
+          const transcript = event.results[0][0]?.transcript;
           setIsRecording(false);
+          if (transcript && transcript.trim()) {
+            setInput('');
+            onSendMessage(transcript.trim());
+          }
         };
         recognition.onerror = () => setIsRecording(false);
         recognition.onend = () => setIsRecording(false);
         recognition.start();
       } else {
         setTimeout(() => {
-          setInput('Schedule doctor appointment for tomorrow at 9 AM');
           setIsRecording(false);
-        }, 2000);
+        }, 1500);
       }
     } else {
       setIsRecording(false);
