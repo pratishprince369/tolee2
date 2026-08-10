@@ -218,15 +218,8 @@ export function YouTubeAutoplayVideo({
     return `${mins < 10 ? '0' : ''}${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
-  const originParam = React.useMemo(() => {
-    if (typeof window !== 'undefined' && window.location && window.location.origin) {
-      return encodeURIComponent(window.location.origin);
-    }
-    return 'https%3A%2F%2Fwww.tolee.in';
-  }, []);
-
   const embedSrc = cleanVideoId
-    ? `https://www.youtube.com/embed/${cleanVideoId}?autoplay=1&mute=${isMuted ? 1 : 0}&controls=1&enablejsapi=1&playsinline=1&rel=0&origin=${originParam}`
+    ? `https://www.youtube.com/embed/${cleanVideoId}?autoplay=1&mute=${isMuted ? 1 : 0}&controls=1&enablejsapi=1&playsinline=1&rel=0`
     : '';
 
   const fallbackThumbnail = thumbnailUrl || (cleanVideoId ? `https://i.ytimg.com/vi/${cleanVideoId}/hqdefault.jpg` : '/tolee-news-default.png');
