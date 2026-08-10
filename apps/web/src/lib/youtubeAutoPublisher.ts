@@ -255,6 +255,19 @@ export async function publishYouTubeVideosBatch(withDelay: boolean = false): Pro
         
         let selectedVideo: YouTubeVideoItem | null = null;
 
+/**
+ * Verify if a YouTube video is 100% public & embeddable on external websites via oEmbed API
+ */
+async function isYouTubeVideoEmbeddable(videoId: string): Promise<boolean> {
+  if (!videoId || videoId.length !== 11) return false;
+  try {
+    const res = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`, { signal: AbortSignal.timeout(3000) });
+    return res.status === 200;
+  } catch {
+    return true; // Fallback allow if network timeout
+  }
+}
+
         // Try queries in category
         for (const query of queries) {
           const videoItems = await fetchYouTubeVideos(query, account.language, 15);
@@ -269,9 +282,12 @@ export async function publishYouTubeVideosBatch(withDelay: boolean = false): Pro
             });
 
             if (!dbExisting) {
-              selectedVideo = v;
-              selectedVideo.category = selectedCategory;
-              break;
+              const isEmbeddable = await isYouTubeVideoEmbeddable(v.videoId);
+              if (isEmbeddable) {
+                selectedVideo = v;
+                selectedVideo.category = selectedCategory;
+                break;
+              }
             }
           }
           if (selectedVideo) break;

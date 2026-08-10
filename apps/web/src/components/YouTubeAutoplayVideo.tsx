@@ -190,8 +190,15 @@ export function YouTubeAutoplayVideo({
     return `${mins < 10 ? '0' : ''}${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
+  const originParam = React.useMemo(() => {
+    if (typeof window !== 'undefined' && window.location.origin) {
+      return encodeURIComponent(window.location.origin);
+    }
+    return 'https%3A%2F%2Fwww.tolee.in';
+  }, []);
+
   const embedSrc = cleanVideoId
-    ? `https://www.youtube-nocookie.com/embed/${cleanVideoId}?autoplay=${isIntersecting ? 1 : 0}&mute=${isMuted ? 1 : 0}&controls=1&enablejsapi=1&playsinline=1&rel=0`
+    ? `https://www.youtube.com/embed/${cleanVideoId}?autoplay=1&mute=${isMuted ? 1 : 0}&controls=1&enablejsapi=1&playsinline=1&rel=0&origin=${originParam}`
     : '';
 
   const fallbackThumbnail = thumbnailUrl || (cleanVideoId ? `https://i.ytimg.com/vi/${cleanVideoId}/hqdefault.jpg` : '/tolee-news-default.png');
@@ -208,12 +215,12 @@ export function YouTubeAutoplayVideo({
       >
         <img src={fallbackThumbnail} alt={title || 'News'} className="w-full h-full object-cover group-hover/thumb:scale-105 transition-transform duration-300" />
         <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
-          <div className="w-14 h-14 rounded-full bg-teal-500/90 text-white flex items-center justify-center shadow-2xl scale-100 group-hover/thumb:scale-110 transition-transform">
+          <div className="w-14 h-14 rounded-full bg-indigo-600 text-white flex items-center justify-center shadow-2xl scale-100 group-hover/thumb:scale-110 transition-transform">
             <Play className="w-7 h-7 fill-current translate-x-0.5" />
           </div>
         </div>
-        <div className="absolute bottom-2 right-2 bg-black/80 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-          Watch on YouTube
+        <div className="absolute bottom-2 right-2 bg-black/80 text-white text-[10px] font-bold px-2.5 py-1 rounded-full">
+          ▶ Watch Video
         </div>
       </div>
     );
@@ -226,7 +233,7 @@ export function YouTubeAutoplayVideo({
       ref={containerRef}
       onMouseEnter={() => setIsHoveringControls(true)}
       onMouseLeave={() => setIsHoveringControls(false)}
-      className={`relative w-full aspect-video rounded-2xl overflow-hidden bg-black shadow-xl border border-zinc-800 cursor-pointer group ${className}`}
+      className={`relative w-full aspect-video rounded-2xl overflow-hidden bg-black shadow-xl border border-zinc-800/80 cursor-pointer group ${className}`}
     >
       {mounted && isIntersecting && cleanVideoId ? (
         <div className="relative w-full h-full overflow-hidden select-none bg-black">
@@ -235,6 +242,7 @@ export function YouTubeAutoplayVideo({
             src={embedSrc}
             title={title || 'YouTube Video'}
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
             onError={() => setHasError(true)}
             className="w-full h-full border-none pointer-events-auto"
           />
