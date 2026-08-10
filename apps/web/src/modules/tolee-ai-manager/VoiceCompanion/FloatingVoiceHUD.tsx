@@ -17,27 +17,27 @@ interface FloatingVoiceHUDProps {
 
 const ON_ANNOUNCEMENTS: Record<string, { text: string; langCode: string }> = {
   'hi-IN': {
-    text: 'Aapka Tolee Voice AI Manager ON ho chuka hai. Ab aap mujhe voice mein operate kar sakte hain.',
+    text: 'Namaste! Main aapka Tolee Voice AI Manager hoon. Main aapki posts help, HD AI creatives and posters banane, Tolee Ads setup karne, CRM leads aur daily tasks manage karne me poori madad kar sakta hoon. Aap bataiye, aaj aapko kis cheez me support chahiye?',
     langCode: 'hi-IN'
   },
   'en-IN': {
-    text: 'Your Tolee Voice AI Manager is now ON. You can now operate me using your voice.',
+    text: 'Hello! I am your Tolee Voice AI Manager. I can help you write social posts, generate HD AI creatives and posters, set up Tolee Ads, and manage your CRM leads and daily tasks. How can I support you today?',
     langCode: 'en-IN'
   },
   'mr-IN': {
-    text: 'Tumcha Tolee Voice AI Manager ON jala ahe. Aata tumhi majhashi aawajane bolu shakta.',
+    text: 'Namaskar! Mi tumcha Tolee Voice AI Manager ahe. Mi tumhi posts, HD AI creatives, Tolee Ads, CRM leads ani daily tasks madhe poorna madat karu shakto. Aaj tumhala kay support hawa ahe sanga?',
     langCode: 'mr-IN'
   },
   'gu-IN': {
-    text: 'Tamaroo Tolee Voice AI Manager ON thai gayoo chhe. Aawaj thi operate kari shako chho.',
+    text: 'Namaste! Tamaroo Tolee Voice AI Manager ON thai gayoo chhe. Hu tamne posts, AI creatives, Tolee Ads ane CRM leads ma madad kari shaku chhu. Tamne shu support joiye chhe?',
     langCode: 'gu-IN'
   },
   'ta-IN': {
-    text: 'Ungal Tolee Voice AI Manager ON aagivittathu.',
+    text: 'Vanakkam! Ungal Tolee Voice AI Manager ON aagivittathu. Naan ungaluku posts, AI creatives, Tolee Ads matrum CRM leedgalil udava mudiyum.',
     langCode: 'ta-IN'
   },
   'te-IN': {
-    text: 'Mee Tolee Voice AI Manager ON ayyindi.',
+    text: 'Namaskaram! Mee Tolee Voice AI Manager ON ayyindi. Nenu meeku posts, AI creatives, Tolee Ads mariyu CRM leads lo sahayam cheyagalanu.',
     langCode: 'te-IN'
   }
 };
