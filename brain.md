@@ -5,6 +5,31 @@
 
 ---
 
+## 🛑 CRITICAL VERCEL DEPLOYMENT & DOMAIN BINDING RULE (PREVENT 404 ERRORS)
+
+### 1. Root Cause of 404 NOT_FOUND Errors
+The Vercel account has 2 projects:
+- **`tolee2` (`prj_Wn6T8m69R3l94pQn75K4d9qZ`)**: Configured with **Root Directory = `apps/web`**. This project builds Next.js App Router dynamic routes correctly.
+- **`tolee` (`prj_vfGvwq5S3ibFqpxmoJXqJhj1dVv1`)**: Configured WITHOUT `Root Directory = apps/web`, causing Vercel Edge `404 NOT_FOUND` on dynamic routes (`/feed`, `/radar`, `/u/[username]`).
+
+### 2. MANDATORY AGENT DEPLOYMENT RULES:
+- **Rule A**: `.vercel/project.json` in workspace root MUST ALWAYS point to project `tolee2`:
+  ```json
+  {
+    "projectId": "prj_Wn6T8m69R3l94pQn75K4d9qZ",
+    "orgId": "team_AJ71A0NLBhadpULnLbdFmBaW",
+    "projectName": "tolee2"
+  }
+  ```
+- **Rule B**: Never run `npx vercel --prod` against project `tolee`. Always deploy to project `tolee2`.
+- **Rule C**: After pushing to GitHub, always enforce domain alias to `tolee2`:
+  ```bash
+  npx vercel alias set https://tolee2.vercel.app tolee.in
+  npx vercel alias set https://tolee2.vercel.app www.tolee.in
+  ```
+
+---
+
 ## 🤖 6 Automated News & Video Publishing Accounts
 All automated news and HD video posts are published under 6 registered user accounts:
 
@@ -88,6 +113,6 @@ All automated news and HD video posts are published under 6 registered user acco
 
 ## 🚀 AI Agent Future Directive
 Whenever starting a new turn or feature update:
-1. Read `brain.md` and `apps/web/MOBILE_BRAIN.md` to preserve all 6 accounts, API keys, news-video interleaving pattern, group linking, and mobile voice manager fixes.
+1. Read `brain.md` and `apps/web/MOBILE_BRAIN.md` to preserve all 6 accounts, API keys, news-video interleaving pattern, group linking, mobile voice manager fixes, and Vercel project `tolee2` domain binding rules.
 2. Ensure no duplicate posts are created.
 3. Test all mobile viewport layouts (`max-w-sm`, touch buttons, audio unlocks).
