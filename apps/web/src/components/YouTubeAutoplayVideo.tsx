@@ -93,8 +93,8 @@ export function YouTubeAutoplayVideo({
     );
   }
 
-  // Clean Native YouTube Embed URL with controls enabled
-  const embedSrc = `https://www.youtube.com/embed/${cleanVideoId}?autoplay=1&mute=1&controls=1&modestbranding=1&rel=0&playsinline=1&enablejsapi=1`;
+  // Clean Native YouTube Embed URL with audio unmuted by default
+  const embedSrc = `https://www.youtube.com/embed/${cleanVideoId}?autoplay=1&mute=0&controls=1&modestbranding=1&rel=0&playsinline=1&enablejsapi=1`;
 
   return (
     <div
