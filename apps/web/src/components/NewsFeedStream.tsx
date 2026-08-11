@@ -305,12 +305,14 @@ export function NewsFeedStream({
 
               {/* YouTube Autoplay Video or Large Cover Image */}
               {Boolean(isYouTube && ytVideoId) ? (
-                <YouTubeAutoplayVideo
-                  videoId={ytVideoId}
-                  title={item.headline}
-                  thumbnailUrl={cleanCoverImg || undefined}
-                  category={item.category}
-                />
+                <div className="-mx-4 sm:mx-0 my-2">
+                  <YouTubeAutoplayVideo
+                    videoId={ytVideoId}
+                    title={item.headline}
+                    thumbnailUrl={cleanCoverImg || undefined}
+                    category={item.category}
+                  />
+                </div>
               ) : (
                 <Link href={`/news/${item.slug}`}>
                   <div className="w-full overflow-hidden bg-slate-50 dark:bg-zinc-950 aspect-video relative cursor-pointer">
