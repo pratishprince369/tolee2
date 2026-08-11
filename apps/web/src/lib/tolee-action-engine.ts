@@ -21,27 +21,27 @@ export interface ActionExecutionResult {
 }
 
 /**
- * 🛡️ Central Audit Logger for AI Actions
+ * ⚡ Ultra-Fast Non-Blocking Audit Logger for AI Actions
+ * Executed asynchronously to eliminate DB latency from user response path.
  */
-async function logAIAction(
+function logAIAction(
   userId: string,
   action: string,
   command: string,
   status: 'SUCCESS' | 'FAILED' | 'REJECTED',
   details: any
 ) {
-  try {
-    await prisma.auditLog.create({
-      data: {
-        action: `AI_ACTION:${action}`,
-        target: userId,
-        targetType: 'user',
-        details: JSON.stringify({ command, status, details, timestamp: new Date().toISOString() })
-      }
-    });
-  } catch (err) {
-    console.warn('AI Action Audit Log save failed (non-critical):', err);
-  }
+  // Fire and forget async log insertion
+  prisma.auditLog.create({
+    data: {
+      action: `AI_ACTION:${action}`,
+      target: userId,
+      targetType: 'user',
+      details: JSON.stringify({ command, status, details, timestamp: new Date().toISOString() })
+    }
+  }).catch((err) => {
+    console.warn('AI Action Audit Log save notice:', err);
+  });
 }
 
 /**
@@ -50,21 +50,21 @@ async function logAIAction(
 async function fetchLiveNewsForToleeAI(categoryQuery?: string): Promise<{ title: string; source: string; summary?: string; url?: string }[]> {
   const results: { title: string; source: string; summary?: string; url?: string }[] = [];
 
-  // 1. Fetch from Tolee Database NewsPost table
+  // 1. Fetch from Tolee Database NewsPost table with pruned select fields
   try {
     const dbNews = await prisma.newsPost.findMany({
       take: 5,
       orderBy: { createdAt: 'desc' },
-      select: { title: true, content: true, category: true, slug: true }
+      select: { headline: true, summary: true, category: true, sourceUrl: true }
     });
 
     for (const item of dbNews) {
-      if (item.title) {
+      if (item.headline) {
         results.push({
-          title: item.title,
+          title: item.headline,
           source: `Tolee News (${item.category || 'General'})`,
-          summary: item.content ? item.content.slice(0, 100) : undefined,
-          url: `/news/${item.slug || ''}`
+          summary: item.summary ? item.summary.slice(0, 120) : undefined,
+          url: item.sourceUrl || '/news'
         });
       }
     }
@@ -168,7 +168,7 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
   const trimmed = command.trim();
   const lower = trimmed.toLowerCase();
 
-  // Fetch current user details for context
+  // Fetch current user details with minimal pruned fields
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { id: true, name: true, username: true, isCreator: true }
@@ -206,7 +206,7 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
     if (liveNews.length > 0) {
       const newsList = liveNews.map((n, i) => `${i + 1}. 📰 **${n.title}**\n   *Source: ${n.source}*${n.summary ? `\n   > "${n.summary}"` : ''}`).join('\n\n');
 
-      await logAIAction(userId, 'GET_LIVE_NEWS', command, 'SUCCESS', { count: liveNews.length });
+      logAIAction(userId, 'GET_LIVE_NEWS', command, 'SUCCESS', { count: liveNews.length });
       return {
         success: true,
         action: 'GET_LIVE_NEWS',
@@ -219,7 +219,7 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
         }
       };
     } else {
-      await logAIAction(userId, 'GET_LIVE_NEWS', command, 'SUCCESS', { count: 0 });
+      logAIAction(userId, 'GET_LIVE_NEWS', command, 'SUCCESS', { count: 0 });
       return {
         success: true,
         action: 'GET_LIVE_NEWS',
@@ -250,7 +250,6 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
     trimmed.includes('इनबॉक्स');
 
   if (isChatIntent) {
-    // A. Check Unread / Recent Messages (Supports English & Devanagari)
     const isCheckReadIntent = 
       lower.includes('check') || 
       lower.includes('aaya') || 
@@ -276,7 +275,7 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
       const chatIds = userChats.map(c => c.chatId);
 
       if (chatIds.length === 0) {
-        await logAIAction(userId, 'CHAT_CHECK', command, 'SUCCESS', { unreadCount: 0 });
+        logAIAction(userId, 'CHAT_CHECK', command, 'SUCCESS', { unreadCount: 0 });
         return {
           success: true,
           action: 'VIEW_CHAT_MESSAGES',
@@ -297,7 +296,9 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
         },
         orderBy: { createdAt: 'desc' },
         take: 5,
-        include: {
+        select: {
+          id: true,
+          content: true,
           sender: { select: { name: true, username: true } }
         }
       });
@@ -308,7 +309,7 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
           return `${i + 1}. 👤 **${senderName}**: "${m.content.slice(0, 80)}"`;
         }).join('\n');
 
-        await logAIAction(userId, 'CHAT_CHECK', command, 'SUCCESS', { unreadCount: unreadMessages.length });
+        logAIAction(userId, 'CHAT_CHECK', command, 'SUCCESS', { unreadCount: unreadMessages.length });
         return {
           success: true,
           action: 'VIEW_CHAT_MESSAGES',
@@ -326,14 +327,17 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
         where: { chatId: { in: chatIds }, senderId: { not: userId } },
         orderBy: { createdAt: 'desc' },
         take: 1,
-        include: { sender: { select: { name: true, username: true } } }
+        select: {
+          content: true,
+          sender: { select: { name: true, username: true } }
+        }
       });
 
       const lastMsg = recentMessages[0];
       const lastSender = lastMsg ? (lastMsg.sender?.name || lastMsg.sender?.username || 'User') : 'no one';
       const lastText = lastMsg ? lastMsg.content.slice(0, 80) : '';
 
-      await logAIAction(userId, 'CHAT_CHECK', command, 'SUCCESS', { unreadCount: 0 });
+      logAIAction(userId, 'CHAT_CHECK', command, 'SUCCESS', { unreadCount: 0 });
       return {
         success: true,
         action: 'VIEW_CHAT_MESSAGES',
@@ -412,7 +416,7 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
             }
           });
 
-          await logAIAction(userId, 'SEND_CHAT_MESSAGE', command, 'SUCCESS', { recipientId: recipient.id, messageId: createdMsg.id });
+          logAIAction(userId, 'SEND_CHAT_MESSAGE', command, 'SUCCESS', { recipientId: recipient.id, messageId: createdMsg.id });
           return {
             success: true,
             action: 'SEND_CHAT_MESSAGE',
@@ -449,7 +453,7 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
     const postTitle = latestPost.caption || 'Tolee Post';
 
     if (latestPost.likes.length > 0) {
-      await logAIAction(userId, 'LIKE_POST', command, 'SUCCESS', { postId: latestPost.id, alreadyLiked: true });
+      logAIAction(userId, 'LIKE_POST', command, 'SUCCESS', { postId: latestPost.id, alreadyLiked: true });
       return {
         success: true,
         action: 'LIKE_POST',
@@ -469,7 +473,7 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
       }
     });
 
-    await logAIAction(userId, 'LIKE_POST', command, 'SUCCESS', { postId: latestPost.id });
+    logAIAction(userId, 'LIKE_POST', command, 'SUCCESS', { postId: latestPost.id });
     return {
       success: true,
       action: 'LIKE_POST',
@@ -487,11 +491,12 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
     if (lower.includes('dekho') || lower.includes('batao') || lower.includes('show') || trimmed.includes('देखो') || trimmed.includes('बताओ') || trimmed.includes('दिखाओ')) {
       const targetPost = await prisma.post.findFirst({
         orderBy: { createdAt: 'desc' },
-        include: {
+        select: {
+          id: true,
           comments: {
             take: 5,
             orderBy: { createdAt: 'desc' },
-            include: { author: { select: { name: true, username: true } } }
+            select: { content: true, author: { select: { name: true, username: true } } }
           }
         }
       });
@@ -542,7 +547,7 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
       }
     });
 
-    await logAIAction(userId, 'COMMENT_POST', command, 'SUCCESS', { postId: latestPost.id, commentId: createdComment.id });
+    logAIAction(userId, 'COMMENT_POST', command, 'SUCCESS', { postId: latestPost.id, commentId: createdComment.id });
     return {
       success: true,
       action: 'COMMENT_POST',
@@ -559,11 +564,12 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
   if (lower.includes('delete') || trimmed.includes('डिलीट')) {
     const userLatestPost = await prisma.post.findFirst({
       where: { authorId: userId },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, caption: true }
     });
 
     if (!userLatestPost) {
-      await logAIAction(userId, 'DELETE_POST', command, 'REJECTED', { reason: 'No owned posts found' });
+      logAIAction(userId, 'DELETE_POST', command, 'REJECTED', { reason: 'No owned posts found' });
       return {
         success: false,
         action: 'DELETE_POST',
@@ -574,7 +580,7 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
     const postTitle = userLatestPost.caption || 'Post';
     await prisma.post.delete({ where: { id: userLatestPost.id } });
 
-    await logAIAction(userId, 'DELETE_POST', command, 'SUCCESS', { postId: userLatestPost.id });
+    logAIAction(userId, 'DELETE_POST', command, 'SUCCESS', { postId: userLatestPost.id });
     return {
       success: true,
       action: 'DELETE_POST',
@@ -599,7 +605,7 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
 
       const groupList = groups.map((g, i) => `${i + 1}. 👥 **${g.name}** (${g._count.members} members)`).join('\n');
 
-      await logAIAction(userId, 'SEARCH_TOLEE_GROUPS', command, 'SUCCESS', { count: groups.length });
+      logAIAction(userId, 'SEARCH_TOLEE_GROUPS', command, 'SUCCESS', { count: groups.length });
       return {
         success: true,
         action: 'SEARCH_TOLEE_GROUPS',
@@ -618,7 +624,7 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
       });
 
       if (firstGroup) {
-        await logAIAction(userId, 'OPEN_TOLEE_GROUP', command, 'SUCCESS', { slug: firstGroup.slug });
+        logAIAction(userId, 'OPEN_TOLEE_GROUP', command, 'SUCCESS', { slug: firstGroup.slug });
         return {
           success: true,
           action: 'OPEN_TOLEE_GROUP',
@@ -664,7 +670,7 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
       }
     });
 
-    await logAIAction(userId, 'GENERATE_IMAGE', command, 'SUCCESS', { imageUrl, postId: newPost.id });
+    logAIAction(userId, 'GENERATE_IMAGE', command, 'SUCCESS', { imageUrl, postId: newPost.id });
     return {
       success: true,
       action: 'GENERATE_IMAGE',
@@ -685,12 +691,13 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
     const notifications = await prisma.notification.findMany({
       where: { userId, isRead: false },
       orderBy: { createdAt: 'desc' },
-      take: 5
+      take: 5,
+      select: { id: true, message: true, createdAt: true }
     });
 
     if (notifications.length > 0) {
       const notifStr = notifications.map((n, i) => `${i + 1}. 🔔 ${n.message}`).join('\n');
-      await logAIAction(userId, 'CHECK_NOTIFICATIONS', command, 'SUCCESS', { count: notifications.length });
+      logAIAction(userId, 'CHECK_NOTIFICATIONS', command, 'SUCCESS', { count: notifications.length });
       return {
         success: true,
         action: 'CHECK_NOTIFICATIONS',
@@ -698,7 +705,7 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
       };
     }
 
-    await logAIAction(userId, 'CHECK_NOTIFICATIONS', command, 'SUCCESS', { count: 0 });
+    logAIAction(userId, 'CHECK_NOTIFICATIONS', command, 'SUCCESS', { count: 0 });
     return {
       success: true,
       action: 'CHECK_NOTIFICATIONS',
@@ -710,7 +717,7 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
   // 7. MARKETPLACE CREATION / DRAFT
   // ==========================================
   if (lower.includes('marketplace') || lower.includes('sell') || lower.includes('listing') || trimmed.includes('मार्केटप्लेस')) {
-    await logAIAction(userId, 'CREATE_MARKETPLACE_LISTING', command, 'SUCCESS', {});
+    logAIAction(userId, 'CREATE_MARKETPLACE_LISTING', command, 'SUCCESS', {});
     return {
       success: true,
       action: 'CREATE_MARKETPLACE_LISTING',
@@ -727,7 +734,7 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
   // 8. ADS MANAGER DRAFT SETUP
   // ==========================================
   if (lower.includes('ad') || lower.includes('campaign') || lower.includes('promot') || trimmed.includes('विज्ञापन') || trimmed.includes('एड')) {
-    await logAIAction(userId, 'CREATE_AD_CAMPAIGN', command, 'SUCCESS', {});
+    logAIAction(userId, 'CREATE_AD_CAMPAIGN', command, 'SUCCESS', {});
     return {
       success: true,
       action: 'CREATE_AD_CAMPAIGN',
@@ -752,7 +759,7 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
       { role: 'user', content: trimmed }
     ]);
 
-    await logAIAction(userId, 'AI_CONVERSATION', command, 'SUCCESS', {});
+    logAIAction(userId, 'AI_CONVERSATION', command, 'SUCCESS', {});
     return {
       success: true,
       action: 'CONVERSATION',

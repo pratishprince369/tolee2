@@ -1,5 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  compress: true, // Enables Gzip & Brotli compression for all JSON & HTTP assets
+  swcMinify: true,
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -7,9 +9,10 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   experimental: {
-    optimizePackageImports: ['lucide-react'],
+    optimizePackageImports: ['lucide-react', 'framer-motion', 'date-fns', 'recharts'],
   },
   images: {
+    formats: ['image/avif', 'image/webp'],
     remotePatterns: [
       { protocol: 'https', hostname: 'i.pravatar.cc' },
       { protocol: 'https', hostname: 'images.unsplash.com' },
@@ -22,16 +25,30 @@ const nextConfig = {
   async headers() {
     return [
       {
+        source: '/_next/static/(.*)',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable'
+          }
+        ]
+      },
+      {
+        source: '/api/(.*)',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=0, s-maxage=10, stale-while-revalidate=60'
+          }
+        ]
+      },
+      {
         source: '/(.*)',
         headers: [
           {
             key: 'X-DNS-Prefetch-Control',
             value: 'on'
           },
-          // NOTE: X-Frame-Options SAMEORIGIN removed — causes Capacitor Android WebView
-          // to redirect to Chrome on some devices. WebView is same-origin by design.
-          // NOTE: Strict-Transport-Security removed — can cause redirect loops inside
-          // Capacitor WebView that loads via http/https server URL bridge.
           {
             key: 'X-Content-Type-Options',
             value: 'nosniff'
