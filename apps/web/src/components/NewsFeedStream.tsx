@@ -297,7 +297,7 @@ export function NewsFeedStream({
                     <NewsCardMenu
                       postId={post.id}
                       slug={item.slug}
-                      canEdit={currentUserId === post.authorId || isSuperAdmin}
+                      canEdit={!!(currentUserId && post.authorId && currentUserId === post.authorId)}
                     />
                   </div>
                 )}

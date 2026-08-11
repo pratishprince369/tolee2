@@ -1580,7 +1580,8 @@ export function InstagramProfileView({
                     {newsArticles.map((newsItem: any) => {
                       const post = newsItem.post;
                       const coverImg = post?.mediaUrls ? post.mediaUrls.split(/,(?=https?:\/\/)/)[0] : null;
-                      const canEditThis = isMe || isSuperAdmin;
+                      const articleAuthorId = post?.authorId || newsItem?.authorId;
+                      const canEditThis = !!(currentUserId && articleAuthorId && currentUserId === articleAuthorId);
                       
                       return (
                         <div key={newsItem.id} className="bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800/80 rounded-2xl overflow-hidden hover:shadow-sm transition-all">
@@ -2061,9 +2062,8 @@ export function InstagramProfileView({
       <Dialog open={!!activeOptionsPost} onOpenChange={(open) => { if (!open) setActiveOptionsPost(null); }}>
         <DialogContent className="sm:max-w-[400px] w-full bg-[#1c1c1e] text-white p-0 gap-0 overflow-hidden border border-gray-800 shadow-2xl rounded-3xl">
           <div className="flex flex-col text-center divide-y divide-gray-800/80">
-            {session?.user && activeOptionsPost && (
-              ((session.user as any).id === (activeOptionsPost.authorId || user.id) ||
-               (session.user as any).username === (activeOptionsPost.author || user.username))
+            {session?.user && activeOptionsPost && activeOptionsPost.authorId && (
+              (session.user as any).id === activeOptionsPost.authorId
             ) ? (
               <>
                 <div className="px-4 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wider bg-white/[0.02]">Post Controls (Owner)</div>

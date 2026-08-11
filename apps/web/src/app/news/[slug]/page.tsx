@@ -93,7 +93,7 @@ export default async function NewsReaderPage({ params }: { params: { slug: strin
   const post = news.post;
   const currentUserId = session?.user ? (session.user as any).id : null;
   const isSuperAdmin = session?.user?.email === process.env.SUPER_ADMIN_EMAIL;
-  const canEdit = currentUserId === post.authorId || isSuperAdmin;
+  const canEdit = !!(currentUserId && post.authorId && currentUserId === post.authorId);
   const authorName = post.author?.name || 'Anonymous Creator';
   const authorUsername = post.author?.username || 'anonymous';
   const authorAvatar = post.author?.image || '/default-user-avatar.svg';
