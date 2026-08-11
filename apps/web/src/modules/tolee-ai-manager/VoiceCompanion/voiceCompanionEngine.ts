@@ -394,6 +394,41 @@ export class VoiceCompanionEngine {
     }
   }
 
+  /**
+   * 🛑 Instant Barge-In / Interruption Handler
+   * Immediately stops AI speech output when user starts speaking or issues interrupt command.
+   */
+  public cancelSpeech() {
+    if (typeof window === 'undefined') return;
+
+    // 1. Cancel Web SpeechSynthesis
+    if ('speechSynthesis' in window) {
+      try {
+        window.speechSynthesis.cancel();
+      } catch (e) {}
+    }
+
+    // 2. Stop native Android bridge speech if active
+    try {
+      const nativeBridge = (window as any).ToleeNative || (window as any).AndroidBridge;
+      if (nativeBridge && typeof nativeBridge.stopSpeech === 'function') {
+        nativeBridge.stopSpeech();
+      }
+    } catch (e) {}
+
+    // 3. Stop HTML5 Audio elements if active
+    try {
+      const elem = (window as any)._toleeUnlockedAudioElem;
+      if (elem) {
+        elem.pause();
+        elem.currentTime = 0;
+      }
+    } catch (e) {}
+
+    this.isSpeaking = false;
+    this.notifyStatus();
+  }
+
   public speakNotification(notification: SpokenNotification) {
     if (notification.priority === 'low' && !this.priorityConfig.lowPriority.dailyAnalytics) return;
     if (notification.priority === 'medium' && !this.priorityConfig.mediumPriority.messages) return;
@@ -405,8 +440,6 @@ export class VoiceCompanionEngine {
     if (!this.recognition) return;
 
     this.recognition.onresult = (event: any) => {
-      if (this.isSpeaking) return; // Ignore audio input while AI is speaking out loud
-
       let interim = '';
       let finalTranscript = '';
 
@@ -419,6 +452,27 @@ export class VoiceCompanionEngine {
       }
 
       const activeText = (finalTranscript || interim).trim();
+      const lowerActive = activeText.toLowerCase();
+
+      // 🛑 Instant Barge-In Detection: Stop AI speech if user interrupts or says "stop/ruk jao"
+      if (this.isSpeaking) {
+        const isInterruptCommand = 
+          lowerActive.includes('stop') || 
+          lowerActive.includes('ruk') || 
+          lowerActive.includes('wait') || 
+          lowerActive.includes('roko') || 
+          lowerActive.includes('chup') || 
+          lowerActive.includes('pause') ||
+          activeText.length > 3;
+
+        if (isInterruptCommand) {
+          console.log('🛑 Instant Barge-In Triggered! Stopping AI speech output...');
+          this.cancelSpeech();
+        } else {
+          return;
+        }
+      }
+
       if (!activeText) return;
 
       this.currentSpokenText = activeText;
