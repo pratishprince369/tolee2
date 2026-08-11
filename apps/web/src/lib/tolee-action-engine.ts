@@ -45,9 +45,43 @@ async function logAIAction(
 }
 
 /**
+ * 🌐 Helper: Translates & cleans Devanagari / Hinglish concepts into vivid English image prompts
+ */
+function cleanAndTranslateImagePrompt(rawCommand: string): string {
+  const lower = rawCommand.toLowerCase();
+  
+  // Direct term mapping for common Hindi/Hinglish terms & STT typos
+  if (lower.includes('गेंगो') || lower.includes('मैंगो') || lower.includes('आम') || lower.includes('mango')) {
+    return 'Juicy vibrant ripe mangoes hanging on tree branch with fresh green leaves, ultra realistic studio lighting, 8k HD product photograph';
+  }
+  if (lower.includes('रियल एस्टेट') || lower.includes('real estate') || lower.includes('makan') || lower.includes('ghar') || lower.includes('property')) {
+    return 'Luxury modern architectural real estate villa house exterior with swimming pool, sunset golden hour lighting, 8k graphic poster design';
+  }
+  if (lower.includes('गुड मॉर्निंग') || lower.includes('morning') || lower.includes('subah') || lower.includes('मॉर्निंग') || lower.includes('सुप्रभात')) {
+    return 'Serene sunrise over peaceful mountains with steaming hot tea cup on wooden desk, typography heading Good Morning, 8k HD graphic poster';
+  }
+  if (lower.includes('गुड इवनिंग') || lower.includes('evening') || lower.includes('sandhya') || lower.includes('इवनिंग') || lower.includes('संध्या')) {
+    return 'Relaxing golden sunset skyline over ocean with warm glowing lights, typography heading Good Evening, 8k HD graphic poster';
+  }
+
+  // Clean prompt by removing action verb filler words in Devanagari & English
+  const cleaned = rawCommand
+    .replace(/generate|image|photo|pic|banao|bana do|creative|poster|banner|इमेज|जनरेट|फोटो|बनाओ|करके|दो|मुझे|कि|मैं|तो|का|की|के|ko|pe|par|ek|hai|please/gi, '')
+    .replace(/[^\w\s\u0900-\u097F]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!cleaned || cleaned.length < 2) {
+    return 'Modern high-tech AI digital poster art, vibrant colors, 8k resolution';
+  }
+
+  return `High resolution studio visual poster of ${cleaned}, realistic lighting, vibrant color palette, 8k resolution`;
+}
+
+/**
  * 🧠 CENTRAL TOLEE AI ACTION ENGINE
- * Analyzes natural language commands, detects intent, checks permissions,
- * executes real platform operations, validates results, and logs audit events.
+ * Analyzes natural language commands in English, Hindi, Devanagari script, & Hinglish,
+ * checks permissions, executes real platform database operations, validates results, and logs audit events.
  */
 export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise<ActionExecutionResult> {
   const { userId, command } = ctx;
@@ -80,13 +114,32 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
     lower.includes('kisi ka message') ||
     lower.includes('unread') ||
     lower.includes('sandesh') ||
+    lower.includes('inbox') ||
     trimmed.includes('चैट') ||
     trimmed.includes('मैसेज') ||
-    trimmed.includes('संदेश');
+    trimmed.includes('संदेश') ||
+    trimmed.includes('इनबॉक्स');
 
   if (isChatIntent) {
-    // A. Check Unread / Recent Messages
-    if (lower.includes('check') || lower.includes('aaya') || lower.includes('batao') || lower.includes('dekho') || lower.includes('show') || lower.includes('read') || lower.includes('kya')) {
+    // A. Check Unread / Recent Messages (Supports English & Devanagari)
+    const isCheckReadIntent = 
+      lower.includes('check') || 
+      lower.includes('aaya') || 
+      lower.includes('aaye') || 
+      lower.includes('batao') || 
+      lower.includes('dekho') || 
+      lower.includes('show') || 
+      lower.includes('read') || 
+      lower.includes('kya') ||
+      trimmed.includes('चेक') ||
+      trimmed.includes('बताओ') ||
+      trimmed.includes('दिखाओ') ||
+      trimmed.includes('आया') ||
+      trimmed.includes('आए') ||
+      trimmed.includes('पढ़ो') ||
+      trimmed.includes('क्या');
+
+    if (isCheckReadIntent) {
       const userChats = await prisma.chatParticipant.findMany({
         where: { userId },
         select: { chatId: true }
@@ -98,7 +151,12 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
         return {
           success: true,
           action: 'VIEW_CHAT_MESSAGES',
-          message: `📩 **Tolee AI Manager**: Maine aapki chats check ki hain! Abhi aapke paas koi active conversation nahi hai.`
+          message: `📩 **Tolee AI Manager**: Maine aapki chats check ki hain! Abhi aapke paas koi active conversation nahi hai.`,
+          interactiveAction: {
+            type: 'OPEN_CHAT',
+            label: '💬 Open Chat Box',
+            payload: { url: '/chat' }
+          }
         };
       }
 
@@ -128,7 +186,7 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
           message: `📩 **Tolee AI Manager**: Aapke paas **${unreadMessages.length} naye unread message(s)** aaye hain:\n\n${msgList}`,
           interactiveAction: {
             type: 'OPEN_CHAT',
-            label: '💬 Open Chats Now',
+            label: '💬 Open Chat Box Now',
             payload: { url: '/chat' }
           }
         };
@@ -152,14 +210,19 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
         action: 'VIEW_CHAT_MESSAGES',
         message: lastMsg 
           ? `✅ **Tolee AI Manager**: Aapke paas koi **naya unread message nahi hai**.\n\nAakhiri message **${lastSender}** se tha: "${lastText}"`
-          : `✅ **Tolee AI Manager**: Aapke chat me koi naya message nahi hai.`
+          : `✅ **Tolee AI Manager**: Aapke chat me koi naya message nahi hai.`,
+        interactiveAction: {
+          type: 'OPEN_CHAT',
+          label: '💬 Go to Messages',
+          payload: { url: '/chat' }
+        }
       };
     }
 
     // B. Send Message Command
-    if (lower.includes('karo') || lower.includes('bhejo') || lower.includes('send')) {
+    if (lower.includes('karo') || lower.includes('bhejo') || lower.includes('send') || trimmed.includes('करो') || trimmed.includes('भेजो')) {
       const words = trimmed.split(' ');
-      const toIndex = words.findIndex(w => w.toLowerCase() === 'ko' || w.toLowerCase() === 'to');
+      const toIndex = words.findIndex(w => w.toLowerCase() === 'ko' || w.toLowerCase() === 'to' || w === 'को');
       let targetName = '';
       if (toIndex > 0) {
         targetName = words[toIndex - 1];
@@ -206,10 +269,10 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
           }
 
           let msgText = 'Hello!';
-          if (lower.includes(' ki ')) {
-            msgText = trimmed.split(/ ki /i)[1] || 'Hello!';
-          } else if (lower.includes(' message ')) {
-            msgText = trimmed.split(/ message /i)[1] || 'Hello!';
+          if (lower.includes(' ki ') || lower.includes(' की ')) {
+            msgText = trimmed.split(/ ki | की /i)[1] || 'Hello!';
+          } else if (lower.includes(' message ') || lower.includes(' मैसेज ')) {
+            msgText = trimmed.split(/ message | मैसेज /i)[1] || 'Hello!';
           }
 
           const createdMsg = await prisma.message.create({
@@ -240,7 +303,7 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
   // 2. FEED & POST OPERATIONS (Like, Unlike, Comment, Reply, Delete)
   // ==========================================
   const isPostLikeIntent = lower.includes('like') || trimmed.includes('लाइक');
-  if (isPostLikeIntent && (lower.includes('post') || lower.includes('reel') || lower.includes('latest') || lower.includes('karo'))) {
+  if (isPostLikeIntent && (lower.includes('post') || lower.includes('reel') || lower.includes('latest') || lower.includes('karo') || trimmed.includes('पोस्ट') || trimmed.includes('करो'))) {
     const latestPost = await prisma.post.findFirst({
       orderBy: { createdAt: 'desc' },
       select: { id: true, caption: true, likes: { where: { userId } } }
@@ -261,7 +324,12 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
       return {
         success: true,
         action: 'LIKE_POST',
-        message: `👍 **Tolee AI Manager**: Aapne pehele se hi iss post ko like kar rakha hai!\n> "${postTitle.slice(0, 60)}..."`
+        message: `👍 **Tolee AI Manager**: Aapne pehele se hi iss post ko like kar rakha hai!\n> "${postTitle.slice(0, 60)}..."`,
+        interactiveAction: {
+          type: 'OPEN_POST',
+          label: '📖 View Post',
+          payload: { url: `/post/${latestPost.id}` }
+        }
       };
     }
 
@@ -272,35 +340,22 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
       }
     });
 
-    const verifyLike = await prisma.like.findUnique({
-      where: { id: createdLike.id }
-    });
-
-    if (verifyLike) {
-      await logAIAction(userId, 'LIKE_POST', command, 'SUCCESS', { postId: latestPost.id });
-      return {
-        success: true,
-        action: 'LIKE_POST',
-        message: `👍 **Done! Maine post like kar diya!**\n> Post: "${postTitle.slice(0, 70)}..."`,
-        interactiveAction: {
-          type: 'OPEN_POST',
-          label: '📖 View Post',
-          payload: { url: `/post/${latestPost.id}` }
-        }
-      };
-    } else {
-      await logAIAction(userId, 'LIKE_POST', command, 'FAILED', { postId: latestPost.id });
-      return {
-        success: false,
-        action: 'LIKE_POST',
-        message: `❌ **Tolee AI Manager**: Main post like nahi kar paaya. System operation reject hua.`
-      };
-    }
+    await logAIAction(userId, 'LIKE_POST', command, 'SUCCESS', { postId: latestPost.id });
+    return {
+      success: true,
+      action: 'LIKE_POST',
+      message: `👍 **Done! Maine post like kar diya!**\n> Post: "${postTitle.slice(0, 70)}..."`,
+      interactiveAction: {
+        type: 'OPEN_POST',
+        label: '📖 View Post',
+        payload: { url: `/post/${latestPost.id}` }
+      }
+    };
   }
 
   // B. Comment on Post Intent
-  if ((lower.includes('comment') || trimmed.includes('कमेंट')) && (lower.includes('karo') || lower.includes('batao') || lower.includes('write') || lower.includes('dekho'))) {
-    if (lower.includes('dekho') || lower.includes('batao') || lower.includes('show')) {
+  if ((lower.includes('comment') || trimmed.includes('कमेंट')) && (lower.includes('karo') || lower.includes('batao') || lower.includes('write') || lower.includes('dekho') || trimmed.includes('करो') || trimmed.includes('बताओ') || trimmed.includes('देखो'))) {
+    if (lower.includes('dekho') || lower.includes('batao') || lower.includes('show') || trimmed.includes('देखो') || trimmed.includes('बताओ') || trimmed.includes('दिखाओ')) {
       const targetPost = await prisma.post.findFirst({
         orderBy: { createdAt: 'desc' },
         include: {
@@ -352,7 +407,7 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
 
     const createdComment = await prisma.comment.create({
       data: {
-        content: commentText.replace(/comment karo/i, '').trim() || 'Nice update!',
+        content: commentText.replace(/comment karo/i, '').replace(/कमेंट करो/i, '').trim() || 'Nice update!',
         postId: latestPost.id,
         authorId: userId
       }
@@ -372,7 +427,7 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
   }
 
   // C. Delete Own Post (With Ownership Permission Safeguard)
-  if (lower.includes('delete') && (lower.includes('post') || lower.includes('my post') || lower.includes('mera post'))) {
+  if (lower.includes('delete') || trimmed.includes('डिलीट')) {
     const userLatestPost = await prisma.post.findFirst({
       where: { authorId: userId },
       orderBy: { createdAt: 'desc' }
@@ -402,7 +457,7 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
   // 3. TOLEE GROUPS & COMMUNITY OPERATIONS
   // ==========================================
   if (lower.includes('group') || lower.includes('tolee') || trimmed.includes('ग्रुप') || trimmed.includes('टोली')) {
-    if (lower.includes('search') || lower.includes('dhundo') || lower.includes('find') || lower.includes('list')) {
+    if (lower.includes('search') || lower.includes('dhundo') || lower.includes('find') || lower.includes('list') || trimmed.includes('सर्च') || trimmed.includes('ढूंढो')) {
       const groups = await prisma.tolee.findMany({
         take: 5,
         select: {
@@ -428,7 +483,7 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
       };
     }
 
-    if (lower.includes('open') || lower.includes('kholo') || lower.includes('jao')) {
+    if (lower.includes('open') || lower.includes('kholo') || lower.includes('jao') || trimmed.includes('खोलो') || trimmed.includes('जाओ')) {
       const firstGroup = await prisma.tolee.findFirst({
         select: { id: true, name: true, slug: true }
       });
@@ -462,18 +517,18 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
     lower.includes('banner') ||
     trimmed.includes('इमेज') ||
     trimmed.includes('जनरेट') ||
-    trimmed.includes('फोटो');
+    trimmed.includes('फोटो') ||
+    trimmed.includes('बनाओ') ||
+    trimmed.includes('पोस्टर');
 
   if (isImageIntent) {
-    const promptConcept = trimmed
-      .replace(/generate|image|photo|pic|banao|bana do|creative|poster|banner|इमेज|जनरेट|फोटो|बनाओ/gi, '')
-      .trim() || 'Modern futuristic AI poster graphic';
+    const promptConcept = cleanAndTranslateImagePrompt(trimmed);
 
     const imageUrl = await generateAIImageWithFallback(promptConcept);
 
     const newPost = await prisma.post.create({
       data: {
-        caption: `✨ AI Generated Creative: ${promptConcept}`,
+        caption: `✨ AI Generated Creative: ${promptConcept.slice(0, 80)}`,
         mediaUrls: JSON.stringify([imageUrl]),
         mediaTypes: JSON.stringify(['image']),
         authorId: userId
@@ -484,7 +539,7 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
     return {
       success: true,
       action: 'GENERATE_IMAGE',
-      message: `🎨 **Done! Maine AI Image generate kar ke post create kar diya hai!**\n\nPrompt: "${promptConcept}"`,
+      message: `🎨 **Done! Maine AI Image generate kar ke post create kar diya hai!**\n\nPrompt: "${promptConcept}"\n\n![AI Image](${imageUrl})`,
       data: { imageUrl, postId: newPost.id },
       interactiveAction: {
         type: 'PREVIEW_IMAGE',
@@ -497,7 +552,7 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
   // ==========================================
   // 5. NOTIFICATIONS & ALERTS CHECK
   // ==========================================
-  if (lower.includes('notification') || lower.includes('who followed') || lower.includes('who liked') || lower.includes('kisne')) {
+  if (lower.includes('notification') || lower.includes('who followed') || lower.includes('who liked') || lower.includes('kisne') || trimmed.includes('नोटिफिकेशन')) {
     const notifications = await prisma.notification.findMany({
       where: { userId, isRead: false },
       orderBy: { createdAt: 'desc' },
@@ -525,7 +580,7 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
   // ==========================================
   // 6. MARKETPLACE CREATION / DRAFT
   // ==========================================
-  if (lower.includes('marketplace') || lower.includes('sell') || lower.includes('listing')) {
+  if (lower.includes('marketplace') || lower.includes('sell') || lower.includes('listing') || trimmed.includes('मार्केटप्लेस')) {
     await logAIAction(userId, 'CREATE_MARKETPLACE_LISTING', command, 'SUCCESS', {});
     return {
       success: true,
@@ -542,7 +597,7 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
   // ==========================================
   // 7. ADS MANAGER DRAFT SETUP
   // ==========================================
-  if (lower.includes('ad') || lower.includes('campaign') || lower.includes('promot')) {
+  if (lower.includes('ad') || lower.includes('campaign') || lower.includes('promot') || trimmed.includes('विज्ञापन') || trimmed.includes('एड')) {
     await logAIAction(userId, 'CREATE_AD_CAMPAIGN', command, 'SUCCESS', {});
     return {
       success: true,

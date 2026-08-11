@@ -95,11 +95,20 @@ export function AIDashboard() {
   };
 
   const handleExecuteAction = async (msgId: string, action: any) => {
-    if (action.type === 'PUBLISH_POST' && action.payload) {
+    if (!action) return;
+
+    if (action.type === 'NAVIGATE' || action.type === 'OPEN_CHAT' || action.type === 'OPEN_POST') {
+      if (action.payload?.url) {
+        window.location.href = action.payload.url;
+      }
+      return;
+    }
+
+    if ((action.type === 'PUBLISH_POST' || action.type === 'PREVIEW_IMAGE') && action.payload) {
       setPublishingActionId(msgId);
       try {
         const res = await createPost({
-          content: action.payload.caption || '',
+          content: action.payload.caption || '✨ AI Generated Post',
           postType: 'post',
           media: action.payload.imageUrl ? { type: 'image', url: action.payload.imageUrl } : null,
           toleeIds: action.payload.toleeId ? [action.payload.toleeId] : undefined
@@ -111,9 +120,9 @@ export function AIDashboard() {
               m.id === msgId
                 ? {
                     ...m,
-                    text: `${m.text}\n\n✅ **Live Published!** Your post is now live on Tolee Feed${action.payload.toleeName ? ` & ${action.payload.toleeName}` : ''}.`,
+                    text: `${m.text}\n\n✅ **Live Published!** Your post is now live on Tolee Feed!`,
                     interactiveAction: m.interactiveAction
-                      ? { ...m.interactiveAction, executed: true, label: '✅ Published' }
+                      ? { ...m.interactiveAction, executed: true, label: '✅ Live Published' }
                       : undefined
                   }
                 : m
