@@ -21,13 +21,13 @@ export async function generateMetadata({ params }: ReelPageProps): Promise<Metad
         caption: true,
         mediaUrls: true,
         author: { select: { name: true, username: true, isPrivate: true } },
-        tolees: { select: { tolee: { select: { isPrivate: true, privacy: true } } } },
+        tolees: { select: { tolee: { select: { isPrivate: true } } } },
       },
     });
 
     if (post) {
       const isPrivateAuthor = post.author?.isPrivate;
-      const isPrivateGroup = post.tolees?.some((t: any) => t.tolee?.isPrivate || t.tolee?.privacy === 'private');
+      const isPrivateGroup = post.tolees?.some((t: any) => t.tolee?.isPrivate);
 
       if (isPrivateAuthor || isPrivateGroup) {
         return {

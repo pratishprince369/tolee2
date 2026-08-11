@@ -33,7 +33,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const tolees = await prisma.tolee.findMany({
       where: {
         isPrivate: false,
-        privacy: { not: 'private' },
       },
       select: {
         slug: true,
