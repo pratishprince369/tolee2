@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Radio, Mic, Volume2, Sparkles, X, Settings } from 'lucide-react';
+import { Mic, Volume2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { VoiceCompanionEngine, unlockMobileAudio } from './voiceCompanionEngine';
 import { VoiceCompanionMode } from './voiceTypes';
@@ -17,46 +17,19 @@ interface FloatingVoiceHUDProps {
 
 const ON_ANNOUNCEMENTS: Record<string, { text: string; langCode: string }> = {
   'hi-IN': {
-    text: 'Namaste! Main aapka Tolee Voice AI Manager hoon. Main aapki posts help, HD AI creatives and posters banane, Tolee Ads setup karne, CRM leads aur daily tasks manage karne me poori madad kar sakta hoon. Aap bataiye, aaj aapko kis cheez me support chahiye?',
+    text: 'Namaste! Tolee Voice AI Manager active hai. Bolen, main aapki kya madad kar sakta hoon?',
     langCode: 'hi-IN'
   },
   'en-IN': {
-    text: 'Hello! I am your Tolee Voice AI Manager. I can help you write social posts, generate HD AI creatives and posters, set up Tolee Ads, and manage your CRM leads and daily tasks. How can I support you today?',
+    text: 'Hello! Tolee Voice AI Manager is active. How can I help you today?',
     langCode: 'en-IN'
   },
   'mr-IN': {
-    text: 'Namaskar! Mi tumcha Tolee Voice AI Manager ahe. Mi tumhi posts, HD AI creatives, Tolee Ads, CRM leads ani daily tasks madhe poorna madat karu shakto. Aaj tumhala kay support hawa ahe sanga?',
+    text: 'Namaskar! Mi tumcha Tolee Voice AI Manager active ahe. Mi tumhala kay madad karu?',
     langCode: 'mr-IN'
   },
   'gu-IN': {
-    text: 'Namaste! Tamaroo Tolee Voice AI Manager ON thai gayoo chhe. Hu tamne posts, AI creatives, Tolee Ads ane CRM leads ma madad kari shaku chhu. Tamne shu support joiye chhe?',
-    langCode: 'gu-IN'
-  },
-  'ta-IN': {
-    text: 'Vanakkam! Ungal Tolee Voice AI Manager ON aagivittathu. Naan ungaluku posts, AI creatives, Tolee Ads matrum CRM leedgalil udava mudiyum.',
-    langCode: 'ta-IN'
-  },
-  'te-IN': {
-    text: 'Namaskaram! Mee Tolee Voice AI Manager ON ayyindi. Nenu meeku posts, AI creatives, Tolee Ads mariyu CRM leads lo sahayam cheyagalanu.',
-    langCode: 'te-IN'
-  }
-};
-
-const OFF_ANNOUNCEMENTS: Record<string, { text: string; langCode: string }> = {
-  'hi-IN': {
-    text: 'Aapka Tolee Voice AI Manager OFF ho chuka hai.',
-    langCode: 'hi-IN'
-  },
-  'en-IN': {
-    text: 'Your Tolee Voice AI Manager is OFF.',
-    langCode: 'en-IN'
-  },
-  'mr-IN': {
-    text: 'Tumcha Tolee Voice AI Manager OFF jala ahe.',
-    langCode: 'mr-IN'
-  },
-  'gu-IN': {
-    text: 'Tamaroo Tolee Voice AI Manager OFF thai gayoo chhe.',
+    text: 'Namaste! Tamaroo Tolee Voice AI Manager active chhe. Hu tamne shu madad kari shaku?',
     langCode: 'gu-IN'
   }
 };
@@ -68,11 +41,31 @@ export function FloatingVoiceHUD({ isOpen, onClose, onSelectTab, onSendMessage }
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [wakeWordActive, setWakeWordActive] = useState(false);
   const [speechText, setSpeechText] = useState('Tolee Voice AI Manager Active');
+  
   const hasSpokenOnOpen = useRef(false);
+  const inactivityTimerRef = useRef<any>(null);
+
+  // ⏰ Reset 2-Minute Inactivity Auto-OFF Timer (120,000ms)
+  const resetInactivityTimer = () => {
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+    }
+    inactivityTimerRef.current = setTimeout(() => {
+      console.log('⏰ Voice AI 2-minute inactivity limit reached. Shutting down Voice AI...');
+      if ('speechSynthesis' in window) {
+        try { window.speechSynthesis.cancel(); } catch (e) {}
+      }
+      onClose();
+    }, 120000); // 2 minutes (120 seconds) inactivity limit
+  };
 
   useEffect(() => {
     if (!isOpen) {
       hasSpokenOnOpen.current = false;
+      if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+      if ('speechSynthesis' in window) {
+        try { window.speechSynthesis.cancel(); } catch (e) {}
+      }
       return;
     }
 
@@ -81,12 +74,15 @@ export function FloatingVoiceHUD({ isOpen, onClose, onSelectTab, onSendMessage }
 
     const vEngine = new VoiceCompanionEngine(mode);
     setSpeechText(activeAnnouncement.text);
+    resetInactivityTimer();
 
-    // Play native language activation announcement on explicit click trigger
+    // Play native language activation announcement on explicit open
     if (!hasSpokenOnOpen.current) {
       hasSpokenOnOpen.current = true;
       setTimeout(() => {
-        vEngine.speak(activeAnnouncement.text, activeAnnouncement.langCode);
+        if (isOpen) {
+          vEngine.speak(activeAnnouncement.text, activeAnnouncement.langCode);
+        }
       }, 300);
     }
 
@@ -97,16 +93,19 @@ export function FloatingVoiceHUD({ isOpen, onClose, onSelectTab, onSendMessage }
     });
 
     vEngine.onWakeWord(() => {
+      resetInactivityTimer();
       setSpeechText('Listening for your command...');
     });
 
     // Real-time live transcript display as user speaks into microphone
     vEngine.onInterim((liveText) => {
+      resetInactivityTimer();
       setSpeechText(`🎙️ Hearing: "${liveText}"`);
     });
 
     vEngine.onCommand(async (transcript) => {
       if (!transcript || transcript.trim().length === 0) return;
+      resetInactivityTimer();
 
       // Unlock mobile audio channel immediately upon command capture
       unlockMobileAudio();
@@ -166,21 +165,24 @@ export function FloatingVoiceHUD({ isOpen, onClose, onSelectTab, onSendMessage }
     vEngine.setMode(mode);
 
     return () => {
+      if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+      vEngine.cancelSpeech();
       vEngine.stopListening();
     };
   }, [isOpen]);
 
   const handleTurnOff = () => {
-    const savedLang = typeof window !== 'undefined' ? (localStorage.getItem('tolee_native_lang') || 'hi-IN') : 'hi-IN';
-    const offAnnouncement = OFF_ANNOUNCEMENTS[savedLang] || OFF_ANNOUNCEMENTS['hi-IN'];
+    if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+    
+    // Strict Immediate Voice Output Cancellation
     if (engine) {
+      engine.cancelSpeech();
       engine.stopListening();
-      engine.speak(offAnnouncement.text, offAnnouncement.langCode);
-    } else if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(offAnnouncement.text);
-      u.lang = offAnnouncement.langCode;
-      window.speechSynthesis.speak(u);
+    }
+    if ('speechSynthesis' in window) {
+      try {
+        window.speechSynthesis.cancel();
+      } catch (e) {}
     }
     onClose();
   };
@@ -190,6 +192,7 @@ export function FloatingVoiceHUD({ isOpen, onClose, onSelectTab, onSendMessage }
       e.preventDefault();
       e.stopPropagation();
     }
+    resetInactivityTimer();
     unlockMobileAudio();
     if (engine) {
       if (isListening) {
