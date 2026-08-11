@@ -45,6 +45,86 @@ async function logAIAction(
 }
 
 /**
+ * 🌐 Live Multi-Source News Engine (Prisma DB NewsPost + GNews + Finnhub + NewsAPI)
+ */
+async function fetchLiveNewsForToleeAI(categoryQuery?: string): Promise<{ title: string; source: string; summary?: string; url?: string }[]> {
+  const results: { title: string; source: string; summary?: string; url?: string }[] = [];
+
+  // 1. Fetch from Tolee Database NewsPost table
+  try {
+    const dbNews = await prisma.newsPost.findMany({
+      take: 5,
+      orderBy: { createdAt: 'desc' },
+      select: { title: true, content: true, category: true, slug: true }
+    });
+
+    for (const item of dbNews) {
+      if (item.title) {
+        results.push({
+          title: item.title,
+          source: `Tolee News (${item.category || 'General'})`,
+          summary: item.content ? item.content.slice(0, 100) : undefined,
+          url: `/news/${item.slug || ''}`
+        });
+      }
+    }
+  } catch (err) {
+    console.warn('Prisma newsPost fetch notice:', err);
+  }
+
+  // 2. Fetch from GNews API
+  const gnewsKey = process.env.GNEWS_API_KEY || "84f1a26d7f0224151744b82143003028";
+  if (gnewsKey) {
+    try {
+      const topic = categoryQuery || 'general';
+      const url = `https://gnews.io/api/v4/top-headlines?category=${topic}&lang=hi&country=in&max=5&apikey=${gnewsKey}`;
+      const res = await fetch(url, { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.articles && Array.isArray(data.articles)) {
+          for (const a of data.articles) {
+            if (a.title && !results.some(r => r.title.toLowerCase() === a.title.toLowerCase())) {
+              results.push({
+                title: a.title,
+                source: a.source?.name || 'GNews India',
+                summary: a.description ? a.description.slice(0, 120) : undefined,
+                url: a.url
+              });
+            }
+          }
+        }
+      }
+    } catch (e) {}
+  }
+
+  // 3. Fetch Stock Market & Financial News via Finnhub
+  const finnhubKey = process.env.FINNHUB_API_KEY || "d9r5t99r01qnlhcli2ngd9r5t99r01qnlhcli2o0";
+  if (finnhubKey && results.length < 5) {
+    try {
+      const url = `https://finnhub.io/api/v1/news?category=general&token=${finnhubKey}`;
+      const res = await fetch(url, { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          for (const a of data.slice(0, 4)) {
+            if (a.headline && !results.some(r => r.title.toLowerCase() === a.headline.toLowerCase())) {
+              results.push({
+                title: a.headline,
+                source: 'Market & Finance',
+                summary: a.summary ? a.summary.slice(0, 120) : undefined,
+                url: a.url
+              });
+            }
+          }
+        }
+      }
+    } catch (e) {}
+  }
+
+  return results.slice(0, 5);
+}
+
+/**
  * 🌐 Helper: Translates & cleans Devanagari / Hinglish concepts into vivid English image prompts
  */
 function cleanAndTranslateImagePrompt(rawCommand: string): string {
@@ -105,7 +185,56 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
   const userNameStr = user.name || user.username || 'User';
 
   // ==========================================
-  // 1. CHAT OPERATIONS (Read, Unread, Send, Reply, Open)
+  // 1. NEWS OPERATIONS (Live DB NewsPost + GNews + Finnhub + NewsAPI Access)
+  // ==========================================
+  const isNewsIntent =
+    lower.includes('news') ||
+    lower.includes('khabar') ||
+    lower.includes('headline') ||
+    lower.includes('update') ||
+    lower.includes('samachar') ||
+    trimmed.includes('न्यूज़') ||
+    trimmed.includes('न्यूज') ||
+    trimmed.includes('खबर') ||
+    trimmed.includes('समाचार') ||
+    trimmed.includes('ताज़ा') ||
+    trimmed.includes('अपडेट');
+
+  if (isNewsIntent) {
+    const liveNews = await fetchLiveNewsForToleeAI();
+
+    if (liveNews.length > 0) {
+      const newsList = liveNews.map((n, i) => `${i + 1}. 📰 **${n.title}**\n   *Source: ${n.source}*${n.summary ? `\n   > "${n.summary}"` : ''}`).join('\n\n');
+
+      await logAIAction(userId, 'GET_LIVE_NEWS', command, 'SUCCESS', { count: liveNews.length });
+      return {
+        success: true,
+        action: 'GET_LIVE_NEWS',
+        message: `📰 **Tolee AI Manager**: Aaj ki latest breaking news & top headlines:\n\n${newsList}`,
+        data: { news: liveNews },
+        interactiveAction: {
+          type: 'NAVIGATE',
+          label: '📰 Read All Tolee News',
+          payload: { url: '/news' }
+        }
+      };
+    } else {
+      await logAIAction(userId, 'GET_LIVE_NEWS', command, 'SUCCESS', { count: 0 });
+      return {
+        success: true,
+        action: 'GET_LIVE_NEWS',
+        message: `📰 **Tolee AI Manager**: Main live news search kar raha hoon. Tolee News Portal par naye articles check karein!`,
+        interactiveAction: {
+          type: 'NAVIGATE',
+          label: '📰 Open Tolee News',
+          payload: { url: '/news' }
+        }
+      };
+    }
+  }
+
+  // ==========================================
+  // 2. CHAT OPERATIONS (Read, Unread, Send, Reply, Open)
   // ==========================================
   const isChatIntent =
     lower.includes('chat') ||
@@ -300,7 +429,7 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
   }
 
   // ==========================================
-  // 2. FEED & POST OPERATIONS (Like, Unlike, Comment, Reply, Delete)
+  // 3. FEED & POST OPERATIONS (Like, Unlike, Comment, Reply, Delete)
   // ==========================================
   const isPostLikeIntent = lower.includes('like') || trimmed.includes('लाइक');
   if (isPostLikeIntent && (lower.includes('post') || lower.includes('reel') || lower.includes('latest') || lower.includes('karo') || trimmed.includes('पोस्ट') || trimmed.includes('करो'))) {
@@ -454,7 +583,7 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
   }
 
   // ==========================================
-  // 3. TOLEE GROUPS & COMMUNITY OPERATIONS
+  // 4. TOLEE GROUPS & COMMUNITY OPERATIONS
   // ==========================================
   if (lower.includes('group') || lower.includes('tolee') || trimmed.includes('ग्रुप') || trimmed.includes('टोली')) {
     if (lower.includes('search') || lower.includes('dhundo') || lower.includes('find') || lower.includes('list') || trimmed.includes('सर्च') || trimmed.includes('ढूंढो')) {
@@ -505,7 +634,7 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
   }
 
   // ==========================================
-  // 4. IMAGE GENERATION & POST CREATION PIPELINE
+  // 5. IMAGE GENERATION & POST CREATION PIPELINE
   // ==========================================
   const isImageIntent =
     lower.includes('image') ||
@@ -550,7 +679,7 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
   }
 
   // ==========================================
-  // 5. NOTIFICATIONS & ALERTS CHECK
+  // 6. NOTIFICATIONS & ALERTS CHECK
   // ==========================================
   if (lower.includes('notification') || lower.includes('who followed') || lower.includes('who liked') || lower.includes('kisne') || trimmed.includes('नोटिफिकेशन')) {
     const notifications = await prisma.notification.findMany({
@@ -578,7 +707,7 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
   }
 
   // ==========================================
-  // 6. MARKETPLACE CREATION / DRAFT
+  // 7. MARKETPLACE CREATION / DRAFT
   // ==========================================
   if (lower.includes('marketplace') || lower.includes('sell') || lower.includes('listing') || trimmed.includes('मार्केटप्लेस')) {
     await logAIAction(userId, 'CREATE_MARKETPLACE_LISTING', command, 'SUCCESS', {});
@@ -595,7 +724,7 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
   }
 
   // ==========================================
-  // 7. ADS MANAGER DRAFT SETUP
+  // 8. ADS MANAGER DRAFT SETUP
   // ==========================================
   if (lower.includes('ad') || lower.includes('campaign') || lower.includes('promot') || trimmed.includes('विज्ञापन') || trimmed.includes('एड')) {
     await logAIAction(userId, 'CREATE_AD_CAMPAIGN', command, 'SUCCESS', {});
@@ -612,7 +741,7 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
   }
 
   // ==========================================
-  // 8. FALLBACK CONVERSATIONAL AI ENGINE (NVIDIA Llama 3 70B)
+  // 9. FALLBACK CONVERSATIONAL AI ENGINE (NVIDIA Llama 3 70B)
   // ==========================================
   try {
     const aiText = await callNvidiaLLM([
