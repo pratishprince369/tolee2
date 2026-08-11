@@ -29,6 +29,9 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.webkit.PermissionRequest;
 
+import android.speech.tts.TextToSpeech;
+import java.util.Locale;
+
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -61,6 +64,7 @@ public class MainActivity extends BridgeActivity {
     // File chooser request code for <input type="file"> in WebView
     private static final int RC_FILE_CHOOSER = 1002;
     private boolean isReady = false;
+    private TextToSpeech textToSpeech;
 
     // Holds the pending file upload callback from WebChromeClient.onShowFileChooser
     private ValueCallback<Uri[]> mFilePathCallback;
@@ -103,6 +107,16 @@ public class MainActivity extends BridgeActivity {
         autoRequestPermissions();
         checkOverlayPermission();
         requestIgnoreBatteryOptimizations();
+
+        try {
+            textToSpeech = new TextToSpeech(this, status -> {
+                if (status != TextToSpeech.ERROR && textToSpeech != null) {
+                    textToSpeech.setLanguage(new Locale("hi", "IN"));
+                }
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "Error initializing TextToSpeech", e);
+        }
 
         final View content = findViewById(android.R.id.content);
         content.getViewTreeObserver().addOnPreDrawListener(
@@ -227,6 +241,7 @@ public class MainActivity extends BridgeActivity {
         settings.setAllowFileAccess(true);
         settings.setAllowContentAccess(true);
         settings.setJavaScriptCanOpenWindowsAutomatically(true);
+        settings.setMediaPlaybackRequiresUserGesture(false);
 
         String customUserAgent = "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Mobile Safari/537.36";
         settings.setUserAgentString(customUserAgent);
@@ -641,6 +656,33 @@ public class MainActivity extends BridgeActivity {
     }
 
     public class ToleeNativeBridge {
+        @android.webkit.JavascriptInterface
+        public void speakText(String text, String langCode) {
+            if (textToSpeech != null && text != null && !text.trim().isEmpty()) {
+                try {
+                    Locale locale = new Locale("hi", "IN");
+                    if (langCode != null && langCode.toLowerCase().startsWith("en")) {
+                        locale = Locale.US;
+                    } else if (langCode != null && langCode.toLowerCase().startsWith("mr")) {
+                        locale = new Locale("mr", "IN");
+                    }
+                    textToSpeech.setLanguage(locale);
+                    textToSpeech.speak(text, TextToSpeech.QUEUE_FLUSH, null, "ToleeTTS");
+                } catch (Exception e) {
+                    Log.e(TAG, "Native TTS speak error", e);
+                }
+            }
+        }
+
+        @android.webkit.JavascriptInterface
+        public void stopSpeech() {
+            if (textToSpeech != null) {
+                try {
+                    textToSpeech.stop();
+                } catch (Exception e) {}
+            }
+        }
+
         @android.webkit.JavascriptInterface
         public void startGoogleSignIn() {
             runOnUiThread(MainActivity.this::triggerNativeGoogleSignIn);

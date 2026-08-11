@@ -216,6 +216,27 @@ export class VoiceCompanionEngine {
 
     if (!cleanSpokenText) return;
 
+    // 📱 Native Android App Bridge Speech Support
+    const nativeBridge = (window as any).ToleeNative || (window as any).AndroidBridge;
+    if (nativeBridge && typeof nativeBridge.speakText === 'function') {
+      try {
+        let detectedLang = langCode || 'hi-IN';
+        if (/[\u0900-\u097F]/.test(cleanSpokenText)) detectedLang = 'hi-IN';
+        this.isSpeaking = true;
+        this.notifyStatus();
+        nativeBridge.speakText(cleanSpokenText, detectedLang);
+        const speechDurationMs = Math.max(3000, cleanSpokenText.length * 120);
+        setTimeout(() => {
+          this.isSpeaking = false;
+          this.notifyStatus();
+          if (onEnd) onEnd();
+        }, speechDurationMs);
+        return;
+      } catch (e) {
+        console.warn('Native bridge speakText failed, falling back to Web SpeechSynthesis:', e);
+      }
+    }
+
     if (!('speechSynthesis' in window)) {
       this.fallbackAudioSpeak(cleanSpokenText, langCode, onEnd);
       return;
