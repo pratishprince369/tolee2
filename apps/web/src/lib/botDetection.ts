@@ -9,7 +9,8 @@ export const isBotName = (str: string): boolean => {
         const code = trimmed.charCodeAt(i);
         if (code >= 65 && code <= 90) midUpperCount++;
       }
-      if (midUpperCount >= 2) return true;
+      const isAllUppercase = trimmed === trimmed.toUpperCase();
+      if (midUpperCount >= 2 && !isAllUppercase) return true;
       
       const vowels = (trimmed.match(/[aeiouy]/gi) || []).length;
       if (vowels / len < 0.23) return true;
@@ -26,8 +27,8 @@ export const checkBotStatus = (email: string, name: string): boolean => {
   const prefix = cleanEmail.split('@')[0] || '';
   
   const botKeywords = process.env.NODE_ENV === 'production'
-    ? ['bot', 'temp', 'fake', 'spam', 'qa-', 'qa_', 'test-', 'test_']
-    : ['bot', 'temp', 'fake', 'spam'];
+    ? ['bot', 'tempmail', 'temp-mail', 'temporary', 'fake', 'spam', 'qa-', 'qa_', 'test-', 'test_']
+    : ['bot', 'tempmail', 'temp-mail', 'temporary', 'fake', 'spam'];
     
   const namePatterns = process.env.NODE_ENV === 'production'
     ? ['blocked user', 'forgot password user', 'e2e otp user', 'otp user']
@@ -36,7 +37,7 @@ export const checkBotStatus = (email: string, name: string): boolean => {
   const dotCount = (prefix.match(/\./g) || []).length;
 
   return (
-    dotCount >= 3 ||
+    dotCount >= 6 ||
     isBotName(name) ||
     botKeywords.some(k => prefix.includes(k) || cleanName.includes(k)) ||
     namePatterns.some(p => cleanName.includes(p))

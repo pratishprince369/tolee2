@@ -11,7 +11,7 @@ function SignupForm() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [website, setWebsite] = useState('');
+  const [honeypotValue, setHoneypotValue] = useState('');
   const [isBot, setIsBot] = useState(false);
   const searchParams = useSearchParams();
   const urlError = searchParams.get('error');
@@ -59,7 +59,7 @@ function SignupForm() {
     e.preventDefault();
     setError('');
 
-    if (website || isBot || checkBotStatus(email, name)) {
+    if (honeypotValue || isBot || checkBotStatus(email, name)) {
       setError('Bot user detected or invalid name formatting. Please use a proper name.');
       return;
     }
@@ -69,7 +69,7 @@ function SignupForm() {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password, website, ref })
+        body: JSON.stringify({ name, email, password, website: honeypotValue, ref })
       });
       const data = await res.json();
       if (!res.ok) {
@@ -98,13 +98,13 @@ function SignupForm() {
         {error && <div className="mb-4 text-red-500 text-sm text-center">{error}</div>}
 
         <form className="space-y-4" onSubmit={handleSubmit}>
-          {/* Honeypot field */}
+          {/* Honeypot field (renamed name to honeypot_field to prevent autofill false positives) */}
           <div className="hidden" aria-hidden="true">
             <input
               type="text"
-              name="website"
-              value={website}
-              onChange={e => setWebsite(e.target.value)}
+              name="honeypot_field"
+              value={honeypotValue}
+              onChange={e => setHoneypotValue(e.target.value)}
               tabIndex={-1}
               autoComplete="off"
             />
