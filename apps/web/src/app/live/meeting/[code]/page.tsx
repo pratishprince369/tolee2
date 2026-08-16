@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'Tolee Interactive Room',
-  description: 'Google Meet style multi-party video conferencing, webinars, and masterclasses.',
+  description: 'Google Meet style multi-party video conferencing, webinars, and T-Meets.',
 };
 
 interface PageProps {

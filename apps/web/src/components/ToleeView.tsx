@@ -111,7 +111,7 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
     }
   };
 
-  // Masterclass Live Stage States
+  // T-Meet Live Stage States
   const [isLive, setIsLive] = useState(tolee?.isLive || false);
   const [liveSessionType, setLiveSessionType] = useState<'public' | 'private' | null>(tolee?.liveSessionType || null);
   const [liveHostId, setLiveHostId] = useState<string | null>(tolee?.liveHostId || null);
@@ -163,7 +163,7 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
 
   const handleStartInstantMeeting = async () => {
     try {
-      const title = window.prompt("Enter Meeting Title:", `${tolee.name} Masterclass`) || `${tolee.name} Masterclass`;
+      const title = window.prompt("Enter Meeting Title:", `${tolee.name} T-Meet`) || `${tolee.name} T-Meet`;
       const visibility = window.confirm("Make this a Public Meeting? (Press OK for Public, Cancel for Private/Waiting Room)") ? 'public' : 'private';
       
       const res = await createMeeting({
@@ -259,7 +259,7 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
       setViewerCount(1);
       
       setLiveChatMessages([
-        { sender: 'System 🤖', avatar: '', message: `🔴 Live Masterclass started as ${type} session!`, time: 'Now', isSystem: true }
+        { sender: 'System 🤖', avatar: '', message: `🔴 T-Meet started as ${type} session!`, time: 'Now', isSystem: true }
       ]);
 
       setTimeout(() => {
@@ -274,7 +274,7 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
       }
     } catch (err) {
       console.error('Failed to start camera:', err);
-      alert('Camera access is required to host the Live Masterclass.');
+      alert('Camera access is required to host the T-Meet session.');
     }
   };
 
@@ -400,7 +400,7 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
     console.log(`[DEBUG] [User Joined Live] User: ${currentUserId} (${session?.user?.name || 'User'}) joined live session for Tolee ID: ${tolee.id}`);
     setIsUserJoined(true);
     setLiveChatMessages([
-      { sender: 'System 🤖', avatar: '', message: '👋 You joined the Live Masterclass. Hello!', time: 'Now', isSystem: true }
+      { sender: 'System 🤖', avatar: '', message: '👋 You joined the T-Meet session. Hello!', time: 'Now', isSystem: true }
     ]);
     if (socketRef.current?.connected) {
       socketRef.current.emit('tolee-participant-joined', {
@@ -1305,7 +1305,7 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                     : 'border-transparent text-gray-500 hover:text-gray-900 dark:hover:text-white'
                 }`}
               >
-                {tab === 'dashboard' ? 'COS Workspace ⚡' : tab === 'live' ? 'Live Masterclass 🎓' : tab}
+                {tab === 'dashboard' ? 'COS Workspace ⚡' : tab === 'live' ? 'T-Meet 🎓' : tab}
               </button>
             ))}
             {(isAdmin || tolee?.ownerId === currentUserId) && (
@@ -1462,7 +1462,7 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                            <p className="mb-4">What you get:</p>
                            <ul className="list-disc pl-5 space-y-2 mb-4">
                              <li>Access to all community discussions and resources</li>
-                             <li>Exclusive masterclasses and video content</li>
+                             <li>Exclusive T-Meets and video content</li>
                              <li>Direct networking with like-minded individuals</li>
                            </ul>
                            <p>Join us to share knowledge, collaborate on projects, and master the future together!</p>
