@@ -39,7 +39,7 @@ function logAIAction(
       targetType: 'user',
       details: JSON.stringify({ command, status, details, timestamp: new Date().toISOString() })
     }
-  }).catch((err) => {
+  }).catch((err: any) => {
     console.warn('AI Action Audit Log save notice:', err);
   });
 }
@@ -131,6 +131,18 @@ function cleanAndTranslateImagePrompt(rawCommand: string): string {
   const lower = rawCommand.toLowerCase();
   
   // Direct term mapping for common Hindi/Hinglish terms & STT typos
+  if (lower.includes('15 अगस्त') || lower.includes('15 august') || lower.includes('independe')) {
+    return 'Indian Independence Day creative banner design with tricolor orange white green theme, Indian national flag, Ashoka Chakra, patriotic celebration poster, realistic lighting, 8k HD resolution';
+  }
+  if (lower.includes('तिरंगा') || lower.includes('tiranga')) {
+    return 'Indian tricolor national flag waving proudly in the sky, cinematic lighting, 8k HD resolution';
+  }
+  if (lower.includes('कृष्ण') || lower.includes('krishna') || lower.includes('janmashtami') || lower.includes('जन्माष्टमी')) {
+    return 'Lord Krishna with divine flute, glowing peacock feather, magical abstract background, digital oil painting style, vibrant colors, 8k resolution';
+  }
+  if (lower.includes('ganesh') || lower.includes('ganpati') || lower.includes('गणेश') || lower.includes('गणपति')) {
+    return 'Lord Ganesha beautiful artistic idol, festival decoration lights, warm golden colors, 8k HD resolution digital art';
+  }
   if (lower.includes('गेंगो') || lower.includes('मैंगो') || lower.includes('आम') || lower.includes('mango')) {
     return 'Juicy vibrant ripe mangoes hanging on tree branch with fresh green leaves, ultra realistic studio lighting, 8k HD product photograph';
   }
@@ -146,7 +158,7 @@ function cleanAndTranslateImagePrompt(rawCommand: string): string {
 
   // Clean prompt by removing action verb filler words in Devanagari & English
   const cleaned = rawCommand
-    .replace(/generate|image|photo|pic|banao|bana do|creative|poster|banner|इमेज|जनरेट|फोटो|बनाओ|करके|दो|मुझे|कि|मैं|तो|का|की|के|ko|pe|par|ek|hai|please/gi, '')
+    .replace(/generate|image|photo|pic|banao|bana do|creative|poster|banner|इमेज|जनरेट|फोटो|बनाओ|करके|दो|मुझे|कि|मैं|तो|का|की|के|ko|pe|par|ek|hai|please|बैनर|बेनर|बना|बनाएं|बनाये|बनाकर|बनाओ/gi, '')
     .replace(/[^\w\s\u0900-\u097F]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
@@ -272,7 +284,7 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
         where: { userId },
         select: { chatId: true }
       });
-      const chatIds = userChats.map(c => c.chatId);
+      const chatIds = userChats.map((c: any) => c.chatId);
 
       if (chatIds.length === 0) {
         logAIAction(userId, 'CHAT_CHECK', command, 'SUCCESS', { unreadCount: 0 });
@@ -304,7 +316,7 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
       });
 
       if (unreadMessages.length > 0) {
-        const msgList = unreadMessages.map((m, i) => {
+        const msgList = unreadMessages.map((m: any, i: number) => {
           const senderName = m.sender?.name || m.sender?.username || 'User';
           return `${i + 1}. 👤 **${senderName}**: "${m.content.slice(0, 80)}"`;
         }).join('\n');
@@ -509,7 +521,7 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
         };
       }
 
-      const commentList = targetPost.comments.map((c, i) => {
+      const commentList = targetPost.comments.map((c: any, i: number) => {
         const authorName = c.author?.name || c.author?.username || 'User';
         return `${i + 1}. 💬 **${authorName}**: "${c.content}"`;
       }).join('\n');
@@ -603,7 +615,7 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
         }
       });
 
-      const groupList = groups.map((g, i) => `${i + 1}. 👥 **${g.name}** (${g._count.members} members)`).join('\n');
+      const groupList = groups.map((g: any, i: number) => `${i + 1}. 👥 **${g.name}** (${g._count.members} members)`).join('\n');
 
       logAIAction(userId, 'SEARCH_TOLEE_GROUPS', command, 'SUCCESS', { count: groups.length });
       return {
@@ -648,13 +660,21 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
     lower.includes('pic') ||
     lower.includes('generate') ||
     lower.includes('banao') ||
+    lower.includes('bana') ||
     lower.includes('poster') ||
     lower.includes('banner') ||
     trimmed.includes('इमेज') ||
     trimmed.includes('जनरेट') ||
     trimmed.includes('फोटो') ||
     trimmed.includes('बनाओ') ||
-    trimmed.includes('पोस्टर');
+    trimmed.includes('बना') ||
+    trimmed.includes('बनाएं') ||
+    trimmed.includes('बनाये') ||
+    trimmed.includes('पोस्टर') ||
+    trimmed.includes('बैनर') ||
+    trimmed.includes('बेनर') ||
+    trimmed.includes('तस्वीर') ||
+    trimmed.includes('चित्र');
 
   if (isImageIntent) {
     const promptConcept = cleanAndTranslateImagePrompt(trimmed);
@@ -696,7 +716,7 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
     });
 
     if (notifications.length > 0) {
-      const notifStr = notifications.map((n, i) => `${i + 1}. 🔔 ${n.message}`).join('\n');
+      const notifStr = notifications.map((n: any, i: number) => `${i + 1}. 🔔 ${n.message}`).join('\n');
       logAIAction(userId, 'CHECK_NOTIFICATIONS', command, 'SUCCESS', { count: notifications.length });
       return {
         success: true,

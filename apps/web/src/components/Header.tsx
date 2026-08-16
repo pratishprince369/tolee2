@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Search, Bell, MessageCircle, LogOut, User, Settings, Compass, Store, Globe, Heart, Bot, Zap, MessageSquare, Briefcase, Award, FileText } from 'lucide-react';
+import { Search, Bell, MessageCircle, LogOut, User, Settings, Compass, Store, Globe, Heart, Bot, Zap, MessageSquare, Briefcase, Award, FileText, Radio } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -199,8 +199,24 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
 
       {/* Middle: Embedded Search Bar (Fully Responsive & Dynamic) */}
       {pathname !== '/discover' && pathname !== '/' && (
-        <div className="flex-1 min-w-[90px] sm:min-w-[180px] max-w-[160px] sm:max-w-sm md:max-w-md mx-1 sm:mx-2">
-          <SearchInput />
+        <div className="flex-1 min-w-[90px] sm:min-w-[180px] max-w-[160px] sm:max-w-sm md:max-w-md mx-1 sm:mx-2 flex items-center gap-1.5">
+          <div className="flex-1">
+            <SearchInput />
+          </div>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => router.push('/radar')}
+            className={cn(
+              "rounded-xl md:hidden flex items-center justify-center h-8 w-8 xs:h-9 xs:w-9 flex-shrink-0 transition-all active:scale-95 border border-zinc-200 dark:border-zinc-800",
+              pathname.startsWith('/radar') 
+                ? 'text-[#0E9F9A] bg-[#0E9F9A]/5 border-[#0E9F9A]/20' 
+                : 'text-gray-500 dark:text-zinc-400 hover:bg-gray-50 dark:hover:bg-zinc-900/50'
+            )}
+            title="Tolee Radar"
+          >
+            <Radio className="w-4 h-4 xs:w-[18px] xs:h-[18px]" />
+          </Button>
         </div>
       )}
 

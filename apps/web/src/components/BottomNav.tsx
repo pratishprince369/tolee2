@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Home, Compass, Film, MessageCircle, Menu, User, Settings, Globe, Store, LogOut, MessageSquare, Map, Briefcase, Award, Newspaper, Tv, Bot, Bell, Megaphone, Zap, HelpCircle, FileText } from 'lucide-react';
+import { Home, Compass, Film, MessageCircle, Menu, User, Settings, Globe, Store, LogOut, MessageSquare, Map, Radio, Briefcase, Award, Newspaper, Tv, Bot, Bell, Megaphone, Zap, HelpCircle, FileText } from 'lucide-react';
 import { useSession, signOut } from 'next-auth/react';
 import { getSidebarDataCached } from '@/lib/sidebar-data';
 import { getDrafts } from '@/lib/draftManager';
@@ -219,6 +219,10 @@ export function BottomNav() {
                 <DropdownMenuItem onClick={() => { setClickedPath('/map'); router.push('/map'); }} className={getDropdownItemClass('/map')}>
                   <Map className={getDropdownIconClass('/map')} />
                   <span>Live Map</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { setClickedPath('/radar'); router.push('/radar'); }} className={getDropdownItemClass('/radar')}>
+                  <Radio className={getDropdownIconClass('/radar')} />
+                  <span>Tolee Radar</span>
                 </DropdownMenuItem>
 
                 <DropdownMenuSeparator />
