@@ -110,8 +110,41 @@ async function fetchNewsForLanguage(lang: 'hi' | 'mr' | 'en', logs: string[]): P
   const gnewsKey = process.env.GNEWS_API_KEY || "7c9cbcae5f8b01d649ab17e1a4528dc9";
   const newsApiKey = process.env.NEWS_API_KEY || "bd92a188805e44e3b654a871e2ba1553";
   const currentsApiKey = process.env.CURRENTS_API_KEY || "ue1WLanfXoMsFJ9MHsL_NLmVBD2v8fRNXAqe-b5-MlfY4oLz";
+  const freeNewsApiKey = process.env.FREENEWS_API_KEY || "763b5eea94f613c9c3826c04220ffdf9f97bc7bd90844327989de58d19e7cbe5";
 
-  // Tier 1: CurrentsAPI.services
+  // Tier 1: FreeNewsAPI.io (5,000 Requests/day)
+  try {
+    const fnLang = lang === 'hi' ? 'hi' : lang === 'mr' ? 'mr' : 'en';
+    const url = `https://api.freenewsapi.io/v1/news?language=${fnLang}&country=in`;
+    const res = await fetch(url, {
+      headers: {
+        'x-api-key': freeNewsApiKey,
+        'Accept': 'application/json'
+      },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(4000)
+    });
+    const data = await res.json();
+
+    const articles = data.articles || data.results || data.news || data.data || [];
+    if (Array.isArray(articles) && articles.length > 0) {
+      const items = articles.map((a: any) => ({
+        headline: sanitizeNewsText(a.title || a.headline || ''),
+        image: (a.image_url || a.image || a.urlToImage || a.thumbnail) && (a.image_url || a.image || a.urlToImage || a.thumbnail).startsWith('http') ? (a.image_url || a.image || a.urlToImage || a.thumbnail) : undefined,
+        description: sanitizeNewsText(a.description || a.summary || a.snippet || ''),
+        language: lang
+      })).filter((item: NewsArticleItem) => item.headline && item.headline.length > 10 && item.image);
+
+      if (items.length > 0) {
+        logs.push(`[${lang.toUpperCase()}] Fetched ${items.length} image-verified articles from FreeNewsAPI.io.`);
+        return items;
+      }
+    }
+  } catch (e: any) {
+    logs.push(`[${lang.toUpperCase()}] FreeNewsAPI notice: ${e.message}`);
+  }
+
+  // Tier 2: CurrentsAPI.services
   try {
     const currentsLang = lang === 'hi' ? 'hi' : lang === 'mr' ? 'mr' : 'en';
     const url = `https://api.currentsapi.services/v1/latest-news?language=${currentsLang}&apiKey=${currentsApiKey}`;
