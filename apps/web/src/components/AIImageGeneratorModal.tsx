@@ -14,7 +14,10 @@ interface AIImageGeneratorModalProps {
 }
 
 const STYLE_PRESETS = [
-  { id: 'realistic', name: 'Realistic', description: 'Photorealistic textures & cinematic lighting', gradient: 'from-amber-500 to-rose-500' },
+  { id: 'fooocus_v2', name: 'Fooocus V2', description: 'Midjourney-grade photorealism & prompt expansion', gradient: 'from-cyan-500 to-blue-600' },
+  { id: 'fooocus_masterpiece', name: 'Masterpiece', description: 'Ultra high-end textures & golden hour light', gradient: 'from-amber-500 to-orange-600' },
+  { id: 'fooocus_photography', name: 'Photography', description: '85mm DSLR portrait with natural soft bokeh', gradient: 'from-emerald-500 to-teal-600' },
+  { id: 'fooocus_cinematic', name: 'Cinematic Movie', description: 'IMAX anamorphic 70mm movie still aesthetic', gradient: 'from-purple-600 to-indigo-700' },
   { id: 'illustration', name: 'Illustration', description: 'Modern 2D character & vector graphic', gradient: 'from-violet-500 to-fuchsia-500' },
   { id: 'marketing', name: 'Marketing Banner', description: 'Sleek banner ads & corporate design', gradient: 'from-blue-500 to-indigo-500' },
   { id: 'social', name: 'Social Media', description: 'Aesthetic, Pinterest/Instagram styling', gradient: 'from-emerald-500 to-teal-500' },
@@ -45,7 +48,7 @@ const LOADING_STEPS = [
 
 export function AIImageGeneratorModal({ onSelectImage, triggerButton, isOpen, setIsOpen }: AIImageGeneratorModalProps) {
   const [prompt, setPrompt] = useState('');
-  const [selectedStyle, setSelectedStyle] = useState('realistic');
+  const [selectedStyle, setSelectedStyle] = useState('fooocus_v2');
   const [selectedRatio, setSelectedRatio] = useState('square');
   const [generateCount, setGenerateCount] = useState(2); // default generate 2 variants
   

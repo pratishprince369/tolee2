@@ -117,10 +117,13 @@ export async function callNvidiaLLM(messages: { role: string; content: string }[
   return null;
 }
 
-// High-Speed Photorealistic AI Image Generation Engine (NVIDIA NIM SD 3.5 Large & FLUX.1 Schnell + Cloud Failover)
+// High-Speed Photorealistic AI Image Generation Engine (Fooocus V2 Prompt Expander + NVIDIA NIM + FLUX.1 Realism)
 export async function generateAIImageWithFallback(prompt: string): Promise<string> {
   const cleanPrompt = prompt ? prompt.trim() : 'Inspiring social media graphic poster, 8k resolution, photorealistic';
-  const encoded = encodeURIComponent(cleanPrompt);
+  
+  // Fooocus V2 Midjourney Prompt Expansion
+  const fooocusExpandedPrompt = `${cleanPrompt}, highly detailed, cinematic lighting, masterpiece, 8k resolution, photorealistic, sharp focus, intricate details, depth of field, award winning photography`;
+  const encoded = encodeURIComponent(fooocusExpandedPrompt);
 
   const sdKey = process.env.NVIDIA_SD35_KEY || "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";
   const fluxKey = process.env.NVIDIA_FLUX_SCHNELL_KEY || "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";
@@ -143,7 +146,7 @@ export async function generateAIImageWithFallback(prompt: string): Promise<strin
         },
         signal: controller.signal,
         body: JSON.stringify({
-          prompt: cleanPrompt,
+          prompt: fooocusExpandedPrompt,
           mode: "base"
         })
       });
