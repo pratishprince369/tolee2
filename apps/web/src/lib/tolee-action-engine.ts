@@ -226,20 +226,106 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
   const userNameStr = user.name || user.username || 'User';
 
   // ==========================================
-  // 1. NEWS OPERATIONS (Live DB NewsPost + GNews + Finnhub + NewsAPI Access)
+  // 1. IMAGE & CREATIVE BANNER GENERATION (Top Priority)
+  // ==========================================
+  const isImageOrCreativeIntent =
+    lower.includes('creative') ||
+    lower.includes('banner') ||
+    lower.includes('poster') ||
+    lower.includes('image') ||
+    lower.includes('photo') ||
+    lower.includes('pic') ||
+    lower.includes('picture') ||
+    lower.includes('generate') ||
+    lower.includes('banao') ||
+    lower.includes('bana do') ||
+    lower.includes('bana de') ||
+    lower.includes('bana ke do') ||
+    lower.includes('design') ||
+    lower.includes('visual') ||
+    lower.includes('graphic') ||
+    lower.includes('flyer') ||
+    lower.includes('thumbnail') ||
+    lower.includes('logo') ||
+    lower.includes('artwork') ||
+    lower.includes('illustration') ||
+    lower.includes('wallpaper') ||
+    trimmed.includes('इमेज') ||
+    trimmed.includes('जनरेट') ||
+    trimmed.includes('फोटो') ||
+    trimmed.includes('बनाओ') ||
+    trimmed.includes('बना') ||
+    trimmed.includes('बनाएं') ||
+    trimmed.includes('बनाये') ||
+    trimmed.includes('पोस्टर') ||
+    trimmed.includes('बैनर') ||
+    trimmed.includes('बेनर') ||
+    trimmed.includes('तस्वीर') ||
+    trimmed.includes('चित्र') ||
+    trimmed.includes('डिज़ाइन') ||
+    trimmed.includes('क्रिएटिव');
+
+  const isVideoIntent =
+    lower.includes('video') ||
+    lower.includes('reel') ||
+    lower.includes('short') ||
+    lower.includes('animation') ||
+    trimmed.includes('वीडियो') ||
+    trimmed.includes('रील');
+
+  if (isImageOrCreativeIntent && !isVideoIntent) {
+    const promptConcept = await cleanAndTranslateImagePrompt(trimmed);
+
+    const imageUrl = await generateAIImageWithFallback(promptConcept);
+
+    const newPost = await prisma.post.create({
+      data: {
+        caption: `✨ AI Generated Creative: ${promptConcept.slice(0, 80)}`,
+        mediaUrls: JSON.stringify([imageUrl]),
+        mediaTypes: JSON.stringify(['image']),
+        authorId: userId
+      }
+    });
+
+    logAIAction(userId, 'GENERATE_IMAGE', command, 'SUCCESS', { imageUrl, postId: newPost.id });
+    return {
+      success: true,
+      action: 'GENERATE_IMAGE',
+      message: `🎨 **Done! Maine aapke liye 8K AI Creative Banner design kar ke post ready kar diya hai!**\n\nPrompt: "${promptConcept}"\n\n![AI Image](${imageUrl})`,
+      data: { imageUrl, postId: newPost.id },
+      interactiveAction: {
+        type: 'PREVIEW_IMAGE',
+        label: '🖼️ Preview & Edit Creative Post',
+        payload: { imageUrl, postUrl: `/post/${newPost.id}`, caption: `✨ ${promptConcept.slice(0, 100)}` }
+      }
+    };
+  }
+
+  // ==========================================
+  // 2. NEWS OPERATIONS (Live DB NewsPost + GNews + Finnhub + NewsAPI Access)
   // ==========================================
   const isNewsIntent =
-    lower.includes('news') ||
-    lower.includes('khabar') ||
-    lower.includes('headline') ||
-    lower.includes('update') ||
-    lower.includes('samachar') ||
-    trimmed.includes('न्यूज़') ||
-    trimmed.includes('न्यूज') ||
-    trimmed.includes('खबर') ||
-    trimmed.includes('समाचार') ||
-    trimmed.includes('ताज़ा') ||
-    trimmed.includes('अपडेट');
+    !isImageOrCreativeIntent &&
+    !isVideoIntent &&
+    (
+      lower.includes('today news') ||
+      lower.includes('aaj ki news') ||
+      lower.includes('breaking news') ||
+      lower.includes('latest news') ||
+      lower.includes('read news') ||
+      lower.includes('show news') ||
+      lower.includes('top news') ||
+      lower.includes('top headlines') ||
+      lower.includes('today headline') ||
+      lower.includes('khabar batao') ||
+      lower.includes('samachar batao') ||
+      lower.includes('market update') ||
+      trimmed.includes('ताज़ा खबर') ||
+      trimmed.includes('समाचार दिखाओ') ||
+      trimmed.includes('न्यूज़ दिखाओ') ||
+      trimmed.includes('आज की खबर') ||
+      (lower.startsWith('news') || lower.endsWith('news') || lower === 'news' || lower === 'khabar' || lower === 'samachar')
+    );
 
   if (isNewsIntent) {
     const liveNews = await fetchLiveNewsForToleeAI();
@@ -678,59 +764,6 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
         };
       }
     }
-  }
-
-  // ==========================================
-  // 5. IMAGE GENERATION & POST CREATION PIPELINE
-  // ==========================================
-  const isImageIntent =
-    lower.includes('image') ||
-    lower.includes('photo') ||
-    lower.includes('pic') ||
-    lower.includes('generate') ||
-    lower.includes('banao') ||
-    lower.includes('bana') ||
-    lower.includes('poster') ||
-    lower.includes('banner') ||
-    trimmed.includes('इमेज') ||
-    trimmed.includes('जनरेट') ||
-    trimmed.includes('फोटो') ||
-    trimmed.includes('बनाओ') ||
-    trimmed.includes('बना') ||
-    trimmed.includes('बनाएं') ||
-    trimmed.includes('बनाये') ||
-    trimmed.includes('पोस्टर') ||
-    trimmed.includes('बैनर') ||
-    trimmed.includes('बेनर') ||
-    trimmed.includes('तस्वीर') ||
-    trimmed.includes('चित्र');
-
-  if (isImageIntent) {
-    const promptConcept = await cleanAndTranslateImagePrompt(trimmed);
-
-    const imageUrl = await generateAIImageWithFallback(promptConcept);
-
-    const newPost = await prisma.post.create({
-      data: {
-        caption: `✨ AI Generated Creative: ${promptConcept.slice(0, 80)}`,
-        mediaUrls: JSON.stringify([imageUrl]),
-        mediaTypes: JSON.stringify(['image']),
-        authorId: userId
-      }
-    });
-
-    logAIAction(userId, 'GENERATE_IMAGE', command, 'SUCCESS', { imageUrl, postId: newPost.id });
-    return {
-      success: true,
-      action: 'GENERATE_IMAGE',
-      message: `🎨 **Done! Maine AI Image generate kar ke post create kar diya hai!**\n\nPrompt: "${promptConcept}"\n\n![AI Image](${imageUrl})`,
-      data: { imageUrl, postId: newPost.id },
-      interactiveAction: {
-        type: 'PREVIEW_IMAGE',
-        label: '🖼️ Preview Generated Image',
-        payload: { imageUrl, postUrl: `/post/${newPost.id}` }
-      }
-    };
   }
 
   // ==========================================
