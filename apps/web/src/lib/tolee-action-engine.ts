@@ -125,23 +125,35 @@ async function fetchLiveNewsForToleeAI(categoryQuery?: string): Promise<{ title:
 }
 
 /**
- * 🌐 Helper: Translates & cleans Devanagari / Hinglish concepts into vivid English image prompts
+ * 🌐 Helper: Translates & cleans Devanagari / Hinglish concepts into vivid English image prompts using LLM & Festivals Knowledge
  */
-function cleanAndTranslateImagePrompt(rawCommand: string): string {
+async function cleanAndTranslateImagePrompt(rawCommand: string): Promise<string> {
   const lower = rawCommand.toLowerCase();
   
-  // Direct term mapping for common Hindi/Hinglish terms & STT typos
-  if (lower.includes('15 अगस्त') || lower.includes('15 august') || lower.includes('independe')) {
-    return 'Indian Independence Day creative banner design with tricolor orange white green theme, Indian national flag, Ashoka Chakra, patriotic celebration poster, realistic lighting, 8k HD resolution';
+  // 1. Direct Term Mapping for Indian Festivals, National Days & Common Typos
+  if (lower.includes('15') && (lower.includes('aug') || lower.includes('अगस्त') || lower.includes('augest') || lower.includes('august') || lower.includes('independe') || lower.includes('azadi') || lower.includes('aazadi'))) {
+    return '15th August Indian Independence Day patriotic celebration commercial banner poster design, vibrant tricolor saffron white green ribbons, Indian national flag fluttering majestically, 3D typography Happy Independence Day, Ashoka Chakra emblem, celebratory patriotic background, 8k resolution graphic design';
   }
-  if (lower.includes('तिरंगा') || lower.includes('tiranga')) {
-    return 'Indian tricolor national flag waving proudly in the sky, cinematic lighting, 8k HD resolution';
+  if (lower.includes('26') && (lower.includes('jan') || lower.includes('जनवरी') || lower.includes('republic') || lower.includes('ganatantra'))) {
+    return '26th January Indian Republic Day celebration creative banner, India Gate backdrop, majestic tricolor flag, patriotic typography, 8k commercial visual design';
   }
-  if (lower.includes('कृष्ण') || lower.includes('krishna') || lower.includes('janmashtami') || lower.includes('जन्माष्टमी')) {
-    return 'Lord Krishna with divine flute, glowing peacock feather, magical abstract background, digital oil painting style, vibrant colors, 8k resolution';
+  if (lower.includes('तिरंगा') || lower.includes('tiranga') || lower.includes('indian flag')) {
+    return 'Indian tricolor national flag waving proudly in bright sunny sky, patriotic background, cinematic lighting, 8k resolution';
   }
-  if (lower.includes('ganesh') || lower.includes('ganpati') || lower.includes('गणेश') || lower.includes('गणपति')) {
-    return 'Lord Ganesha beautiful artistic idol, festival decoration lights, warm golden colors, 8k HD resolution digital art';
+  if (lower.includes('rakhi') || lower.includes('raksha bandhan') || lower.includes('रक्षाबंधन')) {
+    return 'Raksha Bandhan festival celebration creative banner, beautiful golden Rakhi with sweets and flowers on thali, warm festive lighting, 8k digital art poster';
+  }
+  if (lower.includes('diwali') || lower.includes('deepawali') || lower.includes('दिवाली') || lower.includes('दीपावली')) {
+    return 'Happy Diwali grand festive celebration poster banner, glowing golden diyas, fireworks, traditional rangoli, luxury royal festive background, 8k resolution';
+  }
+  if (lower.includes('holi') || lower.includes('होली')) {
+    return 'Happy Holi vibrant colorful celebration poster, explosion of bright organic gulal powders in air, festive water splash, joyful festival banner, 8k resolution';
+  }
+  if (lower.includes('ganesh') || lower.includes('ganpati') || lower.includes('गणेश') || lower.includes('गणपति') || lower.includes('chaturthi')) {
+    return 'Lord Ganesha majestic idol with modak, glowing aura, golden temple festival backdrop, 8k graphic banner design';
+  }
+  if (lower.includes('krishna') || lower.includes('janmashtami') || lower.includes('जन्माष्टमी') || lower.includes('कृष्ण')) {
+    return 'Lord Krishna with divine golden flute and peacock feather, glowing celestial backdrop, makhan matki, 8k spiritual festival banner';
   }
   if (lower.includes('गेंगो') || lower.includes('मैंगो') || lower.includes('आम') || lower.includes('mango')) {
     return 'Juicy vibrant ripe mangoes hanging on tree branch with fresh green leaves, ultra realistic studio lighting, 8k HD product photograph';
@@ -156,18 +168,35 @@ function cleanAndTranslateImagePrompt(rawCommand: string): string {
     return 'Relaxing golden sunset skyline over ocean with warm glowing lights, typography heading Good Evening, 8k HD graphic poster';
   }
 
-  // Clean prompt by removing action verb filler words in Devanagari & English
+  // 2. High-Speed LLM Creative Prompt Translation & Expansion
+  try {
+    const translationPrompt = `You are a World-Class Creative Art Director & Prompt Engineer.
+Convert this user request (which may be in Hindi, Hinglish, Marathi, or English) into an ultra-detailed, professional 8K commercial graphic banner / advertising poster prompt for FLUX.1/Stable Diffusion:
+User request: "${rawCommand}"
+
+Requirements:
+- Identify the exact core subject, festival, business, or product.
+- Describe the visual composition, color scheme, background, lighting, and graphic design style.
+- Output ONLY the final visual prompt in English without conversational commentary or quotes.`;
+
+    const expanded = await callNvidiaLLM([{ role: 'user', content: translationPrompt }]);
+    if (expanded && expanded.length > 15) {
+      return `${expanded.trim().replace(/^["']|["']$/g, '')}, professional graphic design, commercial poster banner, 8k resolution, award-winning lighting, crisp detail`;
+    }
+  } catch (err) {}
+
+  // 3. Fallback clean up
   const cleaned = rawCommand
-    .replace(/generate|image|photo|pic|banao|bana do|creative|poster|banner|इमेज|जनरेट|फोटो|बनाओ|करके|दो|मुझे|कि|मैं|तो|का|की|के|ko|pe|par|ek|hai|please|बैनर|बेनर|बना|बनाएं|बनाये|बनाकर|बनाओ/gi, '')
+    .replace(/generate|image|photo|pic|banao|bana do|creative|poster|banner|इमेज|जनरेट|फोटो|बनाओ|करके|दो|मुझे|कि|मैं|तो|का|की|के|ko|pe|par|ek|hai|please|बैनर|बेनर|बना|बनाएं|बनाये|बनाकर/gi, '')
     .replace(/[^\w\s\u0900-\u097F]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 
   if (!cleaned || cleaned.length < 2) {
-    return 'Modern high-tech AI digital poster art, vibrant colors, 8k resolution';
+    return 'Modern high-tech commercial poster banner design, vibrant colors, 8k resolution';
   }
 
-  return `High resolution studio visual poster of ${cleaned}, realistic lighting, vibrant color palette, 8k resolution`;
+  return `High resolution commercial marketing banner poster of ${cleaned}, professional advertising graphic design, realistic lighting, vibrant color palette, 8k resolution`;
 }
 
 /**
@@ -677,7 +706,7 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
     trimmed.includes('चित्र');
 
   if (isImageIntent) {
-    const promptConcept = cleanAndTranslateImagePrompt(trimmed);
+    const promptConcept = await cleanAndTranslateImagePrompt(trimmed);
 
     const imageUrl = await generateAIImageWithFallback(promptConcept);
 

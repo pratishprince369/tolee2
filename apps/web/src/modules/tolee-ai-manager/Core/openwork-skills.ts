@@ -42,9 +42,30 @@ export const OPENWORK_SKILL_REGISTRY: Record<string, OpenWorkSkill> = {
       { name: 'aspectRatio', type: 'string', description: 'Aspect ratio (e.g. 1:1, 16:9, 9:16, 4:5)' }
     ],
     execute: async (args) => {
-      const prompt = args.prompt || 'Modern professional marketing creative banner';
+      const rawPrompt = args.prompt || 'Modern professional marketing creative banner';
       const style = args.style || 'Modern Minimalist';
-      const enhancedPrompt = `${prompt}, ${style} style, professional commercial visual design, 8k resolution, award-winning lighting, crisp detail`;
+      const lower = rawPrompt.toLowerCase();
+
+      let enhancedPrompt = `${rawPrompt}, ${style} style, professional commercial visual design, 8k resolution, award-winning lighting, crisp detail`;
+
+      // Festival / National Day / Typo Handling
+      if (lower.includes('15') && (lower.includes('aug') || lower.includes('अगस्त') || lower.includes('augest') || lower.includes('august') || lower.includes('independe') || lower.includes('azadi'))) {
+        enhancedPrompt = '15th August Indian Independence Day patriotic celebration commercial banner poster design, vibrant tricolor saffron white green ribbons, Indian national flag fluttering majestically, 3D typography Happy Independence Day, Ashoka Chakra emblem, celebratory patriotic background, 8k resolution graphic design';
+      } else if (lower.includes('26') && (lower.includes('jan') || lower.includes('जनवरी') || lower.includes('republic'))) {
+        enhancedPrompt = '26th January Indian Republic Day celebration creative banner, India Gate backdrop, majestic tricolor flag, patriotic typography, 8k commercial visual design';
+      } else if (lower.includes('diwali') || lower.includes('deepawali') || lower.includes('दिवाली')) {
+        enhancedPrompt = 'Happy Diwali grand festive celebration poster banner, glowing golden diyas, fireworks, traditional rangoli, luxury royal festive background, 8k resolution';
+      } else {
+        try {
+          const trans = await callNvidiaLLM([{ 
+            role: 'user', 
+            content: `Convert this user request into an ultra-detailed, professional 8K commercial graphic banner / advertising poster prompt for FLUX.1 text-to-image:\n"${rawPrompt}"\nOutput ONLY the English prompt.`
+          }]);
+          if (trans && trans.length > 15) {
+            enhancedPrompt = `${trans.trim().replace(/^["']|["']$/g, '')}, professional graphic design, 8k resolution, award-winning lighting, crisp detail`;
+          }
+        } catch (e) {}
+      }
       
       const imageUrl = await generateAIImageWithFallback(enhancedPrompt);
       return {
