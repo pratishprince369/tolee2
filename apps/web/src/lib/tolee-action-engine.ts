@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { callNvidiaLLM, generateAIImageWithFallback } from '@/modules/tolee-ai-manager/Core/chat-engine';
+import { generateAndVerifyAIImage } from '@/modules/tolee-ai-manager/Core/image-verification-engine';
 
 export interface ActionExecutionContext {
   userId: string;
@@ -276,23 +277,37 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
   if (isImageOrCreativeIntent && !isVideoIntent) {
     const promptConcept = await cleanAndTranslateImagePrompt(trimmed);
 
-    const imageUrl = await generateAIImageWithFallback(promptConcept);
+    // 👁️ Autonomous Vision Verification & Self-Correction Pipeline
+    const verificationResult = await generateAndVerifyAIImage({
+      originalPrompt: trimmed,
+      maxRetries: 2,
+      threshold: 78
+    });
+
+    const imageUrl = verificationResult.imageUrl;
+    const finalCaption = `✨ AI Verified Creative: ${promptConcept.slice(0, 80)}`;
 
     const newPost = await prisma.post.create({
       data: {
-        caption: `✨ AI Generated Creative: ${promptConcept.slice(0, 80)}`,
+        caption: finalCaption,
         mediaUrls: JSON.stringify([imageUrl]),
         mediaTypes: JSON.stringify(['image']),
         authorId: userId
       }
     });
 
-    logAIAction(userId, 'GENERATE_IMAGE', command, 'SUCCESS', { imageUrl, postId: newPost.id });
+    logAIAction(userId, 'GENERATE_IMAGE', command, 'SUCCESS', {
+      imageUrl,
+      postId: newPost.id,
+      score: verificationResult.finalScore,
+      attempts: verificationResult.attempts
+    });
+
     return {
       success: true,
       action: 'GENERATE_IMAGE',
-      message: `🎨 **Done! Maine aapke liye 8K AI Creative Banner design kar ke post ready kar diya hai!**\n\nPrompt: "${promptConcept}"\n\n![AI Image](${imageUrl})`,
-      data: { imageUrl, postId: newPost.id },
+      message: `🎨 **Creative Ready! Maine aapke prompt ke mutabiq 8K AI Creative Banner design kiya aur AI Vision se verify bhi kar liya hai.**\n\nPrompt: "${promptConcept}"\n\n![AI Image](${imageUrl})`,
+      data: { imageUrl, postId: newPost.id, verification: verificationResult },
       interactiveAction: {
         type: 'PREVIEW_IMAGE',
         label: '🖼️ Preview & Edit Creative Post',

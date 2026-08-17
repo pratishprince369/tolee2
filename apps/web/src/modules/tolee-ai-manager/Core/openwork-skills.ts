@@ -1,4 +1,4 @@
-import { generateAIImageWithFallback, generateAIVideoWithFallback, callNvidiaLLM } from './chat-engine';
+import { generateAIImageWithFallback, generateAIVideoWithFallback, callNvidiaLLM, generateAndVerifyAIImage } from './chat-engine';
 
 export interface OpenWorkSkillParam {
   name: string;
@@ -95,14 +95,21 @@ export const OPENWORK_SKILL_REGISTRY: Record<string, OpenWorkSkill> = {
         } catch (e) {}
       }
       
-      const imageUrl = await generateAIImageWithFallback(enhancedPrompt);
+      const verifiedResult = await generateAndVerifyAIImage({
+        originalPrompt: enhancedPrompt,
+        maxRetries: 2,
+        threshold: 78
+      });
+
+      const imageUrl = verifiedResult.imageUrl;
       return {
         success: true,
         output: {
           imageUrl,
           prompt: rawPrompt,
           style: preset.name,
-          title: `Creative Design: ${rawPrompt.slice(0, 40)}...`
+          title: `Creative Design: ${rawPrompt.slice(0, 40)}...`,
+          verificationScore: verifiedResult.finalScore
         },
         displayType: 'image',
         interactiveAction: {

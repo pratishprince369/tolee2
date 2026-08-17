@@ -344,3 +344,5 @@ export async function generateAIVideoWithFallback(
 
   return { videoUrl, posterUrl, motionPrompt };
 }
+
+export { generateAndVerifyAIImage, verifyImageWithVisionModel, extractPromptRequirements } from "./image-verification-engine";
