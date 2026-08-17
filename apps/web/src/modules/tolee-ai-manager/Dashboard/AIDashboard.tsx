@@ -18,11 +18,13 @@ import { AINews } from '../News/AINews';
 import { AIMemorySettings } from '../Settings/AIMemorySettings';
 import { AIFinance } from '../Finance/AIFinance';
 import { AIBirthdays } from '../Personal/AIBirthdays';
+import { OpenWorkAgentWorkspace } from '../Components/OpenWorkAgentWorkspace';
 import { getAIDashboardSummary, processAIPersonalMessage } from '@/actions/ai-manager';
 import { createPost } from '@/actions/post';
 import { Button } from '@/components/ui/button';
 
 export type AIModuleTab = 
+  | 'openwork'
   | 'chat'
   | 'dashboard'
   | 'planner'
@@ -201,7 +203,19 @@ export function AIDashboard() {
             <span className="font-extrabold text-sm text-slate-900 dark:text-white hidden sm:inline">Tolee AI Manager</span>
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-1">
+            <Button
+              variant={activeTab === 'openwork' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setActiveTab('openwork')}
+              className={`rounded-full text-xs font-bold transition-all ${
+                activeTab === 'openwork' 
+                  ? 'bg-gradient-to-r from-violet-600 via-indigo-600 to-purple-600 text-white shadow-md shadow-violet-500/25' 
+                  : 'text-violet-700 dark:text-violet-300 hover:bg-violet-50 dark:hover:bg-violet-950/40'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5 mr-1 text-amber-300" /> OpenWork Agent
+            </Button>
             <Button
               variant={activeTab === 'chat' ? 'default' : 'ghost'}
               size="sm"
@@ -395,6 +409,7 @@ export function AIDashboard() {
           </div>
         )}
 
+        {activeTab === 'openwork' && <OpenWorkAgentWorkspace />}
         {activeTab === 'planner' && <DailyPlanner />}
         {activeTab === 'calendar' && <AICalendar />}
         {activeTab === 'tasks' && <AITasks />}

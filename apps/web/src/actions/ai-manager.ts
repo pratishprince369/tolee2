@@ -608,3 +608,61 @@ export async function executeConfirmedAIAction(
     return { success: false, error: error.message || 'Operation failed.' };
   }
 }
+
+// ==========================================
+// 🚀 OPENWORK AUTONOMOUS AGENT ACTIONS
+// ==========================================
+
+import { runOpenWorkAutonomousTask, planOpenWorkTask } from '@/modules/tolee-ai-manager/Core/openwork-engine';
+import { OPENWORK_SKILL_REGISTRY } from '@/modules/tolee-ai-manager/Core/openwork-skills';
+
+export async function runOpenWorkAgentAction(prompt: string) {
+  try {
+    const session = await getServerSession(authOptions);
+    const userId = session?.user ? (session.user as any).id : 'guest';
+
+    const result = await runOpenWorkAutonomousTask(prompt);
+
+    // Save action log if user is logged in
+    if (userId && userId !== 'guest') {
+      await prisma.aIActionLog.create({
+        data: {
+          userId,
+          action: 'OPENWORK_AUTONOMOUS_TASK',
+          command: prompt.slice(0, 100),
+          status: 'SUCCESS',
+          details: JSON.stringify({
+            stepsCount: result.steps.length,
+            hasMedia: Boolean(result.mediaUrl)
+          })
+        }
+      }).catch(() => {});
+    }
+
+    return {
+      success: true,
+      data: JSON.parse(JSON.stringify(result))
+    };
+  } catch (err: any) {
+    console.error('[OpenWorkAction] Error:', err);
+    return {
+      success: false,
+      error: err.message || 'Failed to execute OpenWork autonomous task.'
+    };
+  }
+}
+
+export async function getOpenWorkSkillsList() {
+  const skills = Object.values(OPENWORK_SKILL_REGISTRY).map(s => ({
+    id: s.id,
+    name: s.name,
+    description: s.description,
+    category: s.category,
+    parameters: s.parameters
+  }));
+
+  return {
+    success: true,
+    skills
+  };
+}

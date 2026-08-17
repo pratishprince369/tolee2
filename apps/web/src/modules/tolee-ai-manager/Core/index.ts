@@ -7,3 +7,5 @@ export * from './chat-engine';
 export * from './prompt-manager';
 export * from './reminder-parser';
 export * from './time-service';
+export * from './openwork-skills';
+export * from './openwork-engine';
