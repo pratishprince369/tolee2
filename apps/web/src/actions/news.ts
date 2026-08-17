@@ -6,6 +6,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { createSystemNotification } from '@/lib/notification-service';
 import { runNewsAIPipeline } from '@/lib/aiNews';
+import { findAuthenticNewsImage } from '@/lib/newsAutoPublisher';
 
 // NVIDIA NIM API configuration for Moderation and AI assistant functions
 const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY || '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';
@@ -482,7 +483,24 @@ export async function getNewsBySlug(slug: string) {
       await prisma.newsPost.update({
         where: { id: news.id },
         data: { viewsCount: { increment: 1 } }
-      });
+      }).catch(() => {});
+
+      // If this post doesn't have an image, dynamically backfill from real journalistic APIs
+      if (!news.post.mediaUrls) {
+        try {
+          const foundImage = await findAuthenticNewsImage(news.headline, news.category, news.language || undefined);
+          if (foundImage) {
+            news.post.mediaUrls = foundImage;
+            news.post.mediaTypes = 'image';
+            await prisma.post.update({
+              where: { id: news.postId },
+              data: { mediaUrls: foundImage, mediaTypes: 'image' }
+            }).catch(() => {});
+          }
+        } catch (imgErr) {
+          console.warn('[NewsImageBackfill] Warning:', imgErr);
+        }
+      }
     }
 
     return news;

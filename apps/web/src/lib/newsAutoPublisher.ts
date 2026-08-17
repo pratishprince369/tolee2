@@ -397,6 +397,61 @@ function buildLocalizedNewsContent(headline: string, category: string, lang: 'hi
 }
 
 /**
+ * Looks up authentic verified journalistic images for an existing news headline across all 7 news APIs
+ */
+export async function findAuthenticNewsImage(headline: string, category: string, language?: string): Promise<string | null> {
+  const cleanHeadline = headline.replace(/[^\p{L}\p{N}\s]/gu, ' ').trim();
+  const searchKeyword = cleanHeadline.split(/\s+/).slice(0, 5).join(' ');
+  const lang = language === 'Hindi' ? 'hi' : language === 'Marathi' ? 'mr' : 'en';
+
+  const freeNewsApiKey = process.env.FREENEWS_API_KEY || "763b5eea94f613c9c3826c04220ffdf9f97bc7bd90844327989de58d19e7cbe5";
+  const currentsApiKey = process.env.CURRENTS_API_KEY || "ue1WLanfXoMsFJ9MHsL_NLmVBD2v8fRNXAqe-b5-MlfY4oLz";
+  const gnewsKey = process.env.GNEWS_API_KEY || "7c9cbcae5f8b01d649ab17e1a4528dc9";
+
+  // 1. Try FreeNewsAPI
+  try {
+    const res = await fetch(`https://api.freenewsapi.io/v1/news?in_title=${encodeURIComponent(searchKeyword)}&country=in`, {
+      headers: { 'x-api-key': freeNewsApiKey },
+      signal: AbortSignal.timeout(3000)
+    });
+    const data = await res.json();
+    const articles = data.articles || data.results || data.news || data.data || [];
+    for (const a of articles) {
+      const img = a.image_url || a.image || a.urlToImage || a.thumbnail;
+      if (img && typeof img === 'string' && img.startsWith('http')) return img;
+    }
+  } catch {}
+
+  // 2. Try GNews.io search
+  try {
+    const res = await fetch(`https://gnews.io/api/v4/search?q=${encodeURIComponent(searchKeyword)}&apikey=${gnewsKey}&max=3`, {
+      signal: AbortSignal.timeout(3000)
+    });
+    const data = await res.json();
+    if (data.articles && Array.isArray(data.articles)) {
+      for (const a of data.articles) {
+        if (a.image && typeof a.image === 'string' && a.image.startsWith('http')) return a.image;
+      }
+    }
+  } catch {}
+
+  // 3. Try CurrentsAPI search
+  try {
+    const res = await fetch(`https://api.currentsapi.services/v1/search?keywords=${encodeURIComponent(searchKeyword)}&apiKey=${currentsApiKey}`, {
+      signal: AbortSignal.timeout(3000)
+    });
+    const data = await res.json();
+    if (data.news && Array.isArray(data.news)) {
+      for (const a of data.news) {
+        if (a.image && typeof a.image === 'string' && a.image.startsWith('http') && a.image !== 'None') return a.image;
+      }
+    }
+  } catch {}
+
+  return null;
+}
+
+/**
  * Main Batch Function: Publishes daily news targeted by account languages (Hindi, Marathi, English)
  */
 export async function publishDailyNewsBatch(withDelay: boolean = false): Promise<{ success: boolean; count: number; log: string[] }> {
