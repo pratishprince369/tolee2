@@ -43,24 +43,24 @@ interface OpenWorkResult {
 
 const PRESET_PROMPTS = [
   {
+    icon: '🎬',
+    title: 'LTX-2 Motion Video Reel',
+    prompt: 'Generate a dynamic 50 FPS commercial motion video reel for futuristic tech startup with viral caption'
+  },
+  {
     icon: '🎨',
     title: 'Design Banner & Write Post',
     prompt: 'Create a stunning marketing banner for AI Automation Agency with high-converting social media caption'
   },
   {
+    icon: '🇮🇳',
+    title: '15th August Patriotic Video',
+    prompt: 'Create an Indian Independence Day 15th August patriotic commercial video reel with Tiranga animation'
+  },
+  {
     icon: '📰',
     title: 'Research & Write Tech News',
     prompt: 'Research latest AI and Quantum Computing breakthroughs in India and generate a detailed report'
-  },
-  {
-    icon: '🚀',
-    title: 'Product Launch Campaign',
-    prompt: 'Plan a product launch campaign for our new mobile app with poster design and promotional hashtags'
-  },
-  {
-    icon: '💻',
-    title: 'Build UI Component Code',
-    prompt: 'Write a responsive modern animated Hero section component in React and Tailwind CSS'
   }
 ];
 

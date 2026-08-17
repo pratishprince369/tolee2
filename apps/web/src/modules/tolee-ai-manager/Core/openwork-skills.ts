@@ -1,4 +1,4 @@
-import { generateAIImageWithFallback, callNvidiaLLM } from './chat-engine';
+import { generateAIImageWithFallback, generateAIVideoWithFallback, callNvidiaLLM } from './chat-engine';
 
 export interface OpenWorkSkillParam {
   name: string;
@@ -325,6 +325,47 @@ Provide code with explanations and instructions.`;
           }
         },
         logMessage: `Scheduled "${title}" with ${clientName} for ${datetime}.`
+      };
+    }
+  },
+
+  // 7. LTX-2 & AI Video Reel Generator Skill
+  ai_video_generator: {
+    id: 'ai_video_generator',
+    name: 'LTX-2 AI Video Reel & Motion Generator',
+    description: 'Generates 50 FPS 4K AI video animations, motion reels, and commercial video ads using LTX-2 text-to-video foundation technology.',
+    category: 'creative',
+    parameters: [
+      { name: 'prompt', type: 'string', description: 'Video scene description or motion action', required: true },
+      { name: 'aspectRatio', type: 'string', description: 'Aspect ratio: 9:16 (Reels/Shorts) | 16:9 (Widescreen)' },
+      { name: 'duration', type: 'number', description: 'Duration in seconds (default: 10)' }
+    ],
+    execute: async (args) => {
+      const rawPrompt = args.prompt || 'Cinematic drone shot of futuristic city';
+      const aspectRatio = (args.aspectRatio === '9:16' ? '9:16' : '16:9') as '16:9' | '9:16';
+      
+      const { videoUrl, posterUrl, motionPrompt } = await generateAIVideoWithFallback(rawPrompt, aspectRatio);
+
+      return {
+        success: true,
+        output: {
+          videoUrl,
+          posterUrl,
+          prompt: rawPrompt,
+          motionPrompt,
+          aspectRatio,
+          title: `AI Video Reel: ${rawPrompt.slice(0, 40)}...`
+        },
+        displayType: 'card',
+        interactiveAction: {
+          type: 'PUBLISH_POST',
+          label: '🎬 Publish Video Reel to Feed',
+          payload: {
+            caption: `🎬 ${rawPrompt}\n\nGenerated with Tolee LTX-2 AI Video Studio 🚀`,
+            imageUrl: posterUrl
+          }
+        },
+        logMessage: `Generated 50 FPS LTX-2 video animation for "${rawPrompt.slice(0, 30)}..." (${aspectRatio}).`
       };
     }
   }

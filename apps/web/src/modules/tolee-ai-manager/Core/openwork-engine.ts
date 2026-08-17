@@ -37,6 +37,39 @@ export async function planOpenWorkTask(userPrompt: string): Promise<PlanStep[]> 
   const query = userPrompt.toLowerCase();
   const steps: PlanStep[] = [];
 
+  // Pattern 0: AI Video / Reel / Motion Ad Request (e.g. "video banao", "generate reel", "LTX-2 motion")
+  if (query.includes('video') || query.includes('reel') || query.includes('motion') || query.includes('animation') || query.includes('shorts') || query.includes('वीडियो') || query.includes('रील')) {
+    const isPortrait = query.includes('reel') || query.includes('short') || query.includes('9:16') || query.includes('portrait');
+    steps.push({
+      id: `step_1_${Date.now()}`,
+      stepNumber: 1,
+      title: 'Generate LTX-2 4K Motion Video Reel',
+      skillId: 'ai_video_generator',
+      args: { prompt: userPrompt, aspectRatio: isPortrait ? '9:16' : '16:9' },
+      status: 'pending'
+    });
+
+    steps.push({
+      id: `step_2_${Date.now()}`,
+      stepNumber: 2,
+      title: 'Write High-Converting Video Reel Caption & Tags',
+      skillId: 'content_writer',
+      args: { topic: userPrompt, format: 'video_script' },
+      status: 'pending'
+    });
+
+    steps.push({
+      id: `step_3_${Date.now()}`,
+      stepNumber: 3,
+      title: 'Prepare 1-Click Feed / Reel Publish Action',
+      skillId: 'social_publisher',
+      args: { caption: userPrompt },
+      status: 'pending'
+    });
+
+    return steps;
+  }
+
   // Pattern 1: Creative Banner / Poster Request (e.g. "Create banner for...", "Banner banao")
   if (query.includes('banner') || query.includes('poster') || query.includes('creative') || query.includes('thumbnail') || query.includes('design')) {
     steps.push({
