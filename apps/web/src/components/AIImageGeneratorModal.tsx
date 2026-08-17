@@ -13,6 +13,13 @@ interface AIImageGeneratorModalProps {
   setIsOpen: (isOpen: boolean) => void;
 }
 
+const AI_IMAGE_MODELS = [
+  { id: 'flux_realism', name: 'FLUX Realism', desc: 'Ultra Photorealistic DSLR Photos', badge: 'Ultra HD', icon: '📸' },
+  { id: 'midjourney_v6', name: 'Midjourney V6 Style', desc: 'Artistic & Luxury Aesthetic', badge: 'Artistic', icon: '🎨' },
+  { id: 'ideogram_typography', name: 'Ideogram Typography', desc: 'Text & Logo Graphic Posters', badge: 'Typography', icon: '🔤' },
+  { id: 'sd_35_masterpiece', name: 'SD 3.5 Large', desc: 'Masterpiece Lighting & Fine Textures', badge: 'Masterpiece', icon: '✨' },
+];
+
 const STYLE_PRESETS = [
   { id: 'fooocus_v2', name: 'Fooocus V2', description: 'Midjourney-grade photorealism & prompt expansion', gradient: 'from-cyan-500 to-blue-600' },
   { id: 'fooocus_masterpiece', name: 'Masterpiece', description: 'Ultra high-end textures & golden hour light', gradient: 'from-amber-500 to-orange-600' },
@@ -48,6 +55,7 @@ const LOADING_STEPS = [
 
 export function AIImageGeneratorModal({ onSelectImage, triggerButton, isOpen, setIsOpen }: AIImageGeneratorModalProps) {
   const [prompt, setPrompt] = useState('');
+  const [selectedModel, setSelectedModel] = useState('flux_realism');
   const [selectedStyle, setSelectedStyle] = useState('fooocus_v2');
   const [selectedRatio, setSelectedRatio] = useState('square');
   const [generateCount, setGenerateCount] = useState(2); // default generate 2 variants
@@ -83,6 +91,7 @@ export function AIImageGeneratorModal({ onSelectImage, triggerButton, isOpen, se
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt,
+          model: selectedModel,
           style: selectedStyle,
           aspectRatio: selectedRatio,
           count: generateCount,
@@ -187,6 +196,49 @@ export function AIImageGeneratorModal({ onSelectImage, triggerButton, isOpen, se
                 >
                   {p}
                 </button>
+              ))}
+            </div>
+          </div>
+
+          {/* AI Model Architecture Selector */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-purple-600" />
+                <span>Select AI Image Engine Model</span>
+              </label>
+              <Badge variant="outline" className="text-[10px] font-bold text-purple-600 dark:text-purple-400">
+                Open-Generative-AI Router
+              </Badge>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {AI_IMAGE_MODELS.map((model) => (
+                <div
+                  key={model.id}
+                  onClick={() => !isGenerating && !isSaving && setSelectedModel(model.id)}
+                  className={`p-3 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between ${
+                    selectedModel === model.id
+                      ? 'border-purple-600 bg-purple-50/60 dark:bg-purple-950/40 shadow-sm'
+                      : 'border-zinc-200 dark:border-zinc-850 hover:border-zinc-300 dark:hover:border-zinc-750 bg-white dark:bg-zinc-900/50'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-lg">{model.icon}</span>
+                    <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase ${
+                      selectedModel === model.id ? 'bg-purple-600 text-white' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500'
+                    }`}>
+                      {model.badge}
+                    </span>
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-xs text-zinc-900 dark:text-zinc-100 flex items-center gap-1">
+                      {model.name}
+                      {selectedModel === model.id && <Check className="w-3 h-3 text-purple-600" />}
+                    </h4>
+                    <p className="text-[10px] text-zinc-400 mt-0.5 line-clamp-1">{model.desc}</p>
+                  </div>
+                </div>
               ))}
             </div>
           </div>

@@ -15,7 +15,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Too many requests. Please try again later.' }, { status: 429 });
     }
 
-    const { prompt, style, aspectRatio, count } = await request.json();
+    const { prompt, style, aspectRatio, count, model } = await request.json();
 
     // Basic sanitization: limit length and remove harmful chars if necessary
     const safePrompt = prompt ? prompt.substring(0, 1000).replace(/[<>]/g, '') : '';
@@ -24,20 +24,31 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Prompt is required' });
     }
 
-    // Fooocus V2 Style & Prompt Expansion Engine (Midjourney Grade)
-    const FOOOCUS_EXPANSIONS: Record<string, string> = {
-      fooocus_v2: `${safePrompt}, highly detailed, cinematic lighting, masterpiece, 8k resolution, photorealistic, sharp focus, intricate details, depth of field, award winning photography`,
-      fooocus_masterpiece: `${safePrompt}, stunning visual masterpiece, extremely fine textures, dramatic natural lighting, ultra-detailed 8k, professional color grading, golden hour illumination`,
-      fooocus_photography: `${safePrompt}, professional DSLR portrait, 85mm f/1.4 lens, natural skin texture, soft bokeh, atmospheric studio lighting, photorealistic, National Geographic quality`,
-      fooocus_cinematic: `${safePrompt}, epic cinematic movie still, anamorphic lens, volumetric fog, moody cinematic color palette, dramatic composition, IMAX 70mm aesthetic`,
-      realistic: `${safePrompt}, photorealistic, extremely detailed, 8k resolution, cinematic lighting, professional photographic composition, high-end DSLR portrait camera shot, natural textures, detailed skin and shadows`,
-      illustration: `${safePrompt}, modern digital illustration, highly detailed vector graphic, 2d cartoon aesthetic, vibrant colors, artistic, trending on Behance and Dribbble, clean line art`,
-      marketing: `${safePrompt}, premium commercial banner, product advertisement photography, sleek modern layout, elegant solid background, corporate advertising aesthetic`,
-      social: `${safePrompt}, aesthetic lifestyle social media post, trending on Pinterest, soft editorial color grading, clean minimalist composition, high engagement layout`,
-      minimalist: `${safePrompt}, minimalist artistic design, clean simple lines, soft pastel colors, generous negative space, sophisticated product display, elegant framing`
+    // Open-Generative-AI Multi-Model Prompt Optimization Engine
+    const MODEL_BLUEPRINTS: Record<string, string> = {
+      flux_realism: 'FLUX.1 photorealism, extremely detailed 8k photography, natural skin texture, atmospheric lighting, sharp focus, RAW color grading',
+      midjourney_v6: 'Midjourney v6 aesthetic, hyper-detailed artistic masterpiece, golden hour volumetric light, cinematic composition, award-winning visual art',
+      ideogram_typography: 'Ideogram v2 typography design, 3D commercial graphic poster, crisp bold lettering, advertising layout, vibrant color palette',
+      sd_35_masterpiece: 'Stable Diffusion 3.5 Large, masterpiece artwork, intricate textures, dynamic studio lighting, fine art finish, 8k resolution'
     };
 
-    let enhancedPrompt = FOOOCUS_EXPANSIONS[style] || FOOOCUS_EXPANSIONS.fooocus_v2;
+    // Fooocus V2 Style & Prompt Expansion Engine
+    const FOOOCUS_EXPANSIONS: Record<string, string> = {
+      fooocus_v2: 'cinematic lighting, masterpiece, 8k resolution, photorealistic, sharp focus, intricate details, depth of field',
+      fooocus_masterpiece: 'stunning visual masterpiece, extremely fine textures, dramatic natural lighting, ultra-detailed 8k, golden hour illumination',
+      fooocus_photography: 'professional DSLR portrait, 85mm f/1.4 lens, natural skin texture, soft bokeh, atmospheric studio lighting',
+      fooocus_cinematic: 'epic cinematic movie still, anamorphic lens, volumetric fog, moody color palette, IMAX 70mm aesthetic',
+      realistic: 'photorealistic, extremely detailed, 8k resolution, cinematic lighting, professional photographic composition',
+      illustration: 'modern digital illustration, highly detailed vector graphic, 2d cartoon aesthetic, vibrant colors',
+      marketing: 'premium commercial banner, product advertisement photography, sleek modern layout, corporate advertising',
+      social: 'aesthetic lifestyle social media post, trending on Pinterest, soft editorial color grading',
+      minimalist: 'minimalist artistic design, clean simple lines, soft pastel colors, generous negative space'
+    };
+
+    const modelBlueprint = MODEL_BLUEPRINTS[model] || MODEL_BLUEPRINTS.flux_realism;
+    const styleExpansion = FOOOCUS_EXPANSIONS[style] || FOOOCUS_EXPANSIONS.fooocus_v2;
+
+    let enhancedPrompt = `${safePrompt}, ${modelBlueprint}, ${styleExpansion}`;
 
     // Determine dimensions
     let width = 1024;

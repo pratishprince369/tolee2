@@ -208,12 +208,21 @@ export async function callNvidiaLLM(messages: { role: string; content: string }[
   return null;
 }
 
-// High-Speed Photorealistic AI Image Generation Engine (Fooocus V2 Prompt Expander + NVIDIA NIM + FLUX.1 Realism)
-export async function generateAIImageWithFallback(prompt: string): Promise<string> {
+// High-Speed Photorealistic AI Image Generation Engine (Open-Generative-AI Multi-Model Router: FLUX Realism, Midjourney V6, Ideogram Typography, SD 3.5 Large)
+export async function generateAIImageWithFallback(prompt: string, modelType?: string): Promise<string> {
   const cleanPrompt = prompt ? prompt.trim() : 'Inspiring social media graphic poster, 8k resolution, photorealistic';
   
+  const MODEL_BLUEPRINTS: Record<string, string> = {
+    flux_realism: 'FLUX.1 photorealism, extremely detailed 8k photography, natural skin texture, atmospheric lighting, sharp focus, RAW color grading',
+    midjourney_v6: 'Midjourney v6 aesthetic, hyper-detailed artistic masterpiece, golden hour volumetric light, cinematic composition, award-winning visual art',
+    ideogram_typography: 'Ideogram v2 typography design, 3D commercial graphic poster, crisp bold lettering, advertising layout, vibrant color palette',
+    sd_35_masterpiece: 'Stable Diffusion 3.5 Large, masterpiece artwork, intricate textures, dynamic studio lighting, fine art finish, 8k resolution'
+  };
+
+  const modelBlueprint = (modelType && MODEL_BLUEPRINTS[modelType]) || MODEL_BLUEPRINTS.flux_realism;
+
   // Fooocus V2 Midjourney Prompt Expansion
-  const fooocusExpandedPrompt = `${cleanPrompt}, highly detailed, cinematic lighting, masterpiece, 8k resolution, photorealistic, sharp focus, intricate details, depth of field, award winning photography`;
+  const fooocusExpandedPrompt = `${cleanPrompt}, ${modelBlueprint}, highly detailed, cinematic lighting, masterpiece, 8k resolution, photorealistic, sharp focus, intricate details, depth of field, award winning photography`;
   const encoded = encodeURIComponent(fooocusExpandedPrompt);
 
   const sdKey = process.env.NVIDIA_SD35_KEY || "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";
