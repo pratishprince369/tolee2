@@ -27,8 +27,9 @@ export default async function NewsHubPage({ searchParams }: { searchParams?: { c
   const initialNews = res.success && res.news ? res.news : [];
 
   const categories = [
-    'All', 'Local News', 'Business', 'Technology', 'Real Estate', 
-    'Politics', 'Sports', 'Lifestyle', 'Opinion', 'Press Releases'
+    'All', 'NASA', 'Discovery', 'Science', 'National Geographic', 'Technology', 
+    'Business', 'Education', 'Documentary', 'Space', 'History', 'Animals',
+    'Local News', 'Politics', 'Sports', 'Lifestyle', 'Real Estate', 'Crime & Safety'
   ];
 
   return (

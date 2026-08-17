@@ -258,10 +258,34 @@ export function NewsFeedStream({
             }
           }
 
-          // Ensure cover image is not an iframe embed URL
-          let cleanCoverImg = rawCoverImg;
-          if (cleanCoverImg && cleanCoverImg.includes('youtube.com/embed/')) {
-            cleanCoverImg = fallbackThumb || (postMediaUrls ? postMediaUrls.split(',').find((u: string) => typeof u === 'string' && u.startsWith('http') && !u.includes('youtube.com/embed/')) : null) || null;
+          // Robust Cover Image & YouTube Thumbnail Extraction
+          let cleanCoverImg: string | null = null;
+
+          if (isYouTube && ytVideoId) {
+            cleanCoverImg = `https://i.ytimg.com/vi/${ytVideoId}/hqdefault.jpg`;
+          }
+
+          if (!cleanCoverImg) {
+            let candidate = postMediaUrls || (item as any).coverCaption || (item as any).sourceUrl || '';
+            if (Array.isArray(candidate)) {
+              candidate = candidate[0] || '';
+            } else if (typeof candidate === 'string') {
+              candidate = candidate.trim().replace(/^\[["']?|["']?\]$/g, '').replace(/^"|"$/g, '');
+              candidate = candidate.split(/,(?=https?:\/\/)/)[0];
+            }
+            if (typeof candidate === 'string' && candidate.startsWith('http')) {
+              if (candidate.includes('youtube.com/embed/') || candidate.includes('youtu.be/')) {
+                if (ytVideoId) {
+                  cleanCoverImg = `https://i.ytimg.com/vi/${ytVideoId}/hqdefault.jpg`;
+                }
+              } else {
+                cleanCoverImg = candidate;
+              }
+            }
+          }
+
+          if (!cleanCoverImg && (item as any).coverCaption && typeof (item as any).coverCaption === 'string' && (item as any).coverCaption.startsWith('http')) {
+            cleanCoverImg = (item as any).coverCaption;
           }
 
           const formatDateSafely = (dateInput: any) => {
@@ -332,6 +356,11 @@ export function NewsFeedStream({
                         alt={item.headline}
                         className="w-full h-full object-cover hover:scale-[1.01] transition-transform duration-300"
                         loading="lazy"
+                        onError={(e) => {
+                          const target = e.currentTarget;
+                          target.onerror = null;
+                          target.src = 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=800&q=80';
+                        }}
                       />
                     ) : (
                       <div className="w-full h-full flex flex-col items-center justify-center text-zinc-300 dark:text-zinc-800">

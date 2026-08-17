@@ -678,7 +678,7 @@ export async function getNewsFeedPosts(options: {
     const page = options.page || 1;
     const limit = options.limit || 10;
     const category = options.category || 'All';
-    // Background trigger: If latest news post is >90 seconds old, fetch fresh news & YouTube videos
+    // Background trigger: If latest news post is >60 seconds old, fetch fresh news & YouTube videos immediately without delay
     const checkAndTriggerFreshNews = async () => {
       try {
         const latestNews = await prisma.newsPost.findFirst({
@@ -686,10 +686,10 @@ export async function getNewsFeedPosts(options: {
           select: { createdAt: true }
         });
         const ageMs = latestNews ? Date.now() - new Date(latestNews.createdAt).getTime() : Infinity;
-        if (ageMs > 90 * 1000) { // >90 seconds old
+        if (ageMs > 60 * 1000) { // >60 seconds old
           const { publishDailyNewsBatch } = require('@/lib/newsAutoPublisher');
           const { publishYouTubeVideosBatch } = require('@/lib/youtubeAutoPublisher');
-          publishDailyNewsBatch().catch(() => {});
+          publishDailyNewsBatch(false).catch(() => {});
           publishYouTubeVideosBatch(false).catch(() => {});
         }
       } catch (e) {}
@@ -698,13 +698,24 @@ export async function getNewsFeedPosts(options: {
 
     const skip = (page - 1) * limit;
 
+    const categoryCondition = category && category !== 'All' 
+      ? {
+          OR: [
+            { category: { equals: category, mode: 'insensitive' as const } },
+            { tags: { contains: category, mode: 'insensitive' as const } },
+            { keywords: { contains: category, mode: 'insensitive' as const } },
+            { headline: { contains: category, mode: 'insensitive' as const } }
+          ]
+        }
+      : {};
+
     const newsList = await prisma.newsPost.findMany({
       where: {
         post: {
           status: 'published',
           isArchived: false,
         },
-        ...(category && category !== 'All' ? { category } : {}),
+        ...categoryCondition,
       },
       include: {
         post: {
