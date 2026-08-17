@@ -318,7 +318,42 @@ async function fetchNewsForLanguage(lang: 'hi' | 'mr' | 'en', logs: string[]): P
     }
   }
 
-  // Tier 5: Google News RSS (Fallback)
+  // Tier 5: Google Trends Engine (Real-time Viral Keywords & Stories for IN, US, UK)
+  try {
+    const geo = lang === 'en' ? 'US' : 'IN';
+    const trendsUrl = `https://trends.google.com/trending/rss?geo=${geo}`;
+    const res = await fetch(trendsUrl, { cache: 'no-store', signal: AbortSignal.timeout(4000) });
+    const xml = await res.text();
+    const itemBlocks = xml.split(/<item>/i).slice(1);
+    const trendItems: NewsArticleItem[] = [];
+
+    for (const block of itemBlocks) {
+      const titleMatch = block.match(/<title>(.*?)<\/title>/i);
+      const headline = titleMatch ? sanitizeNewsText(titleMatch[1]) : '';
+      if (!headline || headline.length < 5) continue;
+
+      const imgMatch = block.match(/<ht:picture>(https?:\/\/[^<]+)<\/ht:picture>/i) || block.match(/<ht:picture_source>(https?:\/\/[^<]+)<\/ht:picture_source>/i);
+      const image = imgMatch ? imgMatch[1] : undefined;
+      const descMatch = block.match(/<ht:news_item_snippet>(.*?)<\/ht:news_item_snippet>/i) || block.match(/<description>(.*?)<\/description>/i);
+      const description = descMatch ? sanitizeNewsText(descMatch[1]) : headline;
+
+      trendItems.push({
+        headline,
+        image: image && image.startsWith('http') ? image : undefined,
+        description,
+        language: lang
+      });
+    }
+
+    if (trendItems.length > 0) {
+      logs.push(`[TRENDS] Fetched ${trendItems.length} trending viral stories from Google Trends (${geo}).`);
+      return trendItems;
+    }
+  } catch (e: any) {
+    logs.push(`[TRENDS Notice] ${e.message}`);
+  }
+
+  // Tier 6: Google News RSS (Fallback)
   try {
     const rssLang = lang === 'hi' ? 'hi' : lang === 'mr' ? 'mr' : 'en';
     const rssUrl = `https://news.google.com/rss?hl=${rssLang}&gl=IN&ceid=IN:${rssLang}`;
