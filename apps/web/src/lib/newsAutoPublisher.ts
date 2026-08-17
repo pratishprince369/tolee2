@@ -146,7 +146,87 @@ async function fetchNewsForLanguage(lang: 'hi' | 'mr' | 'en', logs: string[]): P
     logs.push(`[${lang.toUpperCase()}] GNews.io notice: ${e.message}`);
   }
 
-  // Tier 4: Google News RSS (Fallback)
+  // Tier 4: Verified Indian News Feeds with direct Image Enclosures & Media Content
+  const regionalFeeds: Record<string, string[]> = {
+    hi: [
+      'https://feeds.feedburner.com/ndtvkhabar',
+      'https://www.abplive.com/home/feed',
+      'https://hindi.news18.com/rss/khabar/national/national.xml',
+      'https://feeds.bbci.co.uk/hindi/rss.xml'
+    ],
+    mr: [
+      'https://www.loksatta.com/feed/',
+      'https://marathi.abplive.com/home/feed',
+      'https://lokmat.news18.com/rss/maharashtra.xml',
+      'https://feeds.bbci.co.uk/marathi/rss.xml'
+    ],
+    en: [
+      'https://feeds.feedburner.com/ndtvnews-top-stories',
+      'https://www.thehindu.com/news/national/feeder/default.rss',
+      'https://indianexpress.com/section/india/feed/',
+      'https://timesofindia.indiatimes.com/rssfeedstopstories.cms'
+    ]
+  };
+
+  const feeds = regionalFeeds[lang] || regionalFeeds.en;
+  for (const feedUrl of feeds) {
+    try {
+      const res = await fetch(feedUrl, { cache: 'no-store', signal: AbortSignal.timeout(4000) });
+      const xml = await res.text();
+      
+      const itemBlocks = xml.split(/<item[\s>]/i).slice(1);
+      const feedItems: NewsArticleItem[] = [];
+
+      for (const block of itemBlocks) {
+        const titleMatch = block.match(/<title>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/title>/i);
+        const headline = titleMatch ? sanitizeNewsText(titleMatch[1]) : '';
+        if (!headline || headline.length < 10) continue;
+
+        // 1. Check <enclosure url="..." />
+        let image = '';
+        const encMatch = block.match(/<enclosure[^>]+url=["'](https?:\/\/[^"']+)["']/i);
+        if (encMatch) {
+          image = encMatch[1];
+        }
+
+        // 2. Check <media:content url="..." /> or <media:thumbnail url="..." />
+        if (!image) {
+          const mediaMatch = block.match(/<media:(?:content|thumbnail)[^>]+url=["'](https?:\/\/[^"']+)["']/i);
+          if (mediaMatch) {
+            image = mediaMatch[1];
+          }
+        }
+
+        // 3. Check <img> tag inside <description> or <content:encoded>
+        if (!image) {
+          const imgMatch = block.match(/<img[^>]+src=["'](https?:\/\/[^"']+)["']/i);
+          if (imgMatch) {
+            image = imgMatch[1];
+          }
+        }
+
+        const descMatch = block.match(/<description>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/description>/i);
+        const description = descMatch ? sanitizeNewsText(descMatch[1]) : headline;
+
+        feedItems.push({
+          headline,
+          image: image && image.startsWith('http') ? image : undefined,
+          description,
+          language: lang
+        });
+      }
+
+      const withImages = feedItems.filter(f => f.image);
+      if (withImages.length > 0) {
+        logs.push(`[${lang.toUpperCase()}] Fetched ${withImages.length} verified image articles from ${feedUrl.split('/')[2]}.`);
+        return withImages;
+      }
+    } catch (e: any) {
+      // Continue to next feed
+    }
+  }
+
+  // Tier 5: Google News RSS (Fallback)
   try {
     const rssLang = lang === 'hi' ? 'hi' : lang === 'mr' ? 'mr' : 'en';
     const rssUrl = `https://news.google.com/rss?hl=${rssLang}&gl=IN&ceid=IN:${rssLang}`;
