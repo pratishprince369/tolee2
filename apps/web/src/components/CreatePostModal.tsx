@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Image as ImageIcon, Video, Paperclip, CheckCircle2, ShieldCheck, Globe, Trophy, X, Sparkles, Newspaper, ChevronDown, Mic, MicOff } from 'lucide-react';
+import { Image as ImageIcon, Video, Paperclip, CheckCircle2, ShieldCheck, Globe, Trophy, X, Sparkles, Newspaper, ChevronDown, Mic, MicOff, Film } from 'lucide-react';
 
 import { getSidebarData } from '@/actions/user';
 import { useSession } from 'next-auth/react';
@@ -477,6 +477,15 @@ export function CreatePostModal({
                   >
                     <Sparkles className="w-3.5 h-3.5 fill-purple-600/10" />
                     <span>AI Image</span>
+                  </Button>
+                  <Button 
+                    type="button"
+                    onClick={() => setVideoModalOpen(true)} 
+                    variant="ghost" 
+                    className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-xl h-9 px-2.5 font-bold text-xs flex items-center gap-1 border border-blue-200/60 dark:border-blue-800/50 bg-blue-50/30 dark:bg-blue-950/20 mr-1 shadow-sm transition-transform duration-200 hover:scale-[1.02]"
+                  >
+                    <Film className="w-3.5 h-3.5 fill-blue-600/10" />
+                    <span>AI Video</span>
                   </Button>
                 </>
               )}
