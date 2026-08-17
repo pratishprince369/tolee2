@@ -66,6 +66,7 @@ const PRESET_PROMPTS = [
 
 export function OpenWorkAgentWorkspace() {
   const [prompt, setPrompt] = useState('');
+  const [selectedStyle, setSelectedStyle] = useState('stripe_modern');
   const [isExecuting, setIsExecuting] = useState(false);
   const [result, setResult] = useState<OpenWorkResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -187,11 +188,18 @@ export function OpenWorkAgentWorkspace() {
       {/* Interactive Command Center */}
       <Card className="rounded-3xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
         <CardContent className="p-6 space-y-4">
-          <div className="space-y-2">
-            <label className="text-xs font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
-              <Bot className="w-4 h-4 text-violet-600" />
-              What would you like Tolee OpenWork to accomplish today?
-            </label>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
+                <Bot className="w-4 h-4 text-violet-600" />
+                What would you like Tolee OpenWork to accomplish today?
+              </label>
+              <div className="flex items-center gap-1.5 text-[11px] font-bold text-violet-600 dark:text-violet-400">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Awesome Design-MD Enabled</span>
+              </div>
+            </div>
+
             <div className="flex flex-col sm:flex-row gap-3">
               <textarea
                 value={prompt}
@@ -219,6 +227,34 @@ export function OpenWorkAgentWorkspace() {
                   </>
                 )}
               </Button>
+            </div>
+
+            {/* Design-MD Aesthetic Selector Pills */}
+            <div className="pt-1 flex flex-wrap items-center gap-2">
+              <span className="text-[11px] font-extrabold uppercase tracking-wider text-zinc-400 mr-1">
+                Visual Style:
+              </span>
+              {[
+                { id: 'apple_minimal', label: '🍎 Apple Minimal' },
+                { id: 'stripe_modern', label: '💳 Stripe SaaS' },
+                { id: 'linear_dark', label: '⚡ Linear Dark' },
+                { id: 'festive_royal', label: '✨ Festive Luxury' },
+                { id: 'nike_energy', label: '🔥 Nike Commercial' },
+                { id: 'editorial_press', label: '📰 Editorial Press' }
+              ].map((style) => (
+                <button
+                  key={style.id}
+                  type="button"
+                  onClick={() => setSelectedStyle(style.id)}
+                  className={`text-xs px-3 py-1.5 rounded-full font-bold transition-all border ${
+                    selectedStyle === style.id
+                      ? 'bg-violet-600 text-white border-violet-600 shadow-sm shadow-violet-500/30'
+                      : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-700'
+                  }`}
+                >
+                  {style.label}
+                </button>
+              ))}
             </div>
           </div>
         </CardContent>

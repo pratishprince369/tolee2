@@ -26,27 +26,55 @@ export interface OpenWorkSkill {
   }>;
 }
 
+export const AWESOME_DESIGN_PRESETS: Record<string, { name: string; visualBlueprint: string }> = {
+  'apple_minimal': {
+    name: 'Apple Minimalist',
+    visualBlueprint: 'Apple design aesthetic, pristine studio lighting, generous negative space, glassmorphism textures, clean minimalist composition, 8k resolution, elegant commercial product design'
+  },
+  'stripe_modern': {
+    name: 'Stripe SaaS & Modern Tech',
+    visualBlueprint: 'Stripe branding aesthetic, vibrant iridescent mesh gradients, modern isometric 3D geometry, high-contrast crisp graphic design, luxury corporate technology banner, 8k'
+  },
+  'linear_dark': {
+    name: 'Linear Dark Mode',
+    visualBlueprint: 'Linear app aesthetic, sleek obsidian dark theme, subtle glowing cyan and purple neon accents, razor sharp vector details, premium high-tech visual design, 8k'
+  },
+  'festive_royal': {
+    name: 'Festive & Cultural Luxury',
+    visualBlueprint: 'Indian festive luxury design, glowing golden diyas and intricate ornamentation, warm golden hour celebratory lighting, rich vibrant cultural palette, 8k commercial festival poster'
+  },
+  'nike_energy': {
+    name: 'Nike High-Energy Commercial',
+    visualBlueprint: 'Nike dynamic advertising style, high-energy dramatic rim lighting, bold typography, intense cinematic color grading, award-winning commercial poster, 8k'
+  },
+  'editorial_press': {
+    name: 'Editorial Press & Magazine',
+    visualBlueprint: 'Vogue & Time editorial magazine cover style, high-fashion studio lighting, clean journalistic grid layout, crisp typographic framing, 8k photojournalism'
+  }
+};
+
 /**
  * 🌟 OpenWork Skills Registry
  */
 export const OPENWORK_SKILL_REGISTRY: Record<string, OpenWorkSkill> = {
-  // 1. Creative Studio Skill (Fooocus V2 + FLUX + DALL-E)
+  // 1. Creative Studio Skill (Fooocus V2 + FLUX + Awesome Design-MD)
   creative_studio: {
     id: 'creative_studio',
     name: 'Creative Studio & Banner Designer',
-    description: 'Generates ultra-high-resolution marketing banners, product creatives, posters, and thumbnails using Fooocus V2 and FLUX prompt expansion.',
+    description: 'Generates ultra-high-resolution marketing banners, product creatives, posters, and thumbnails using Fooocus V2 and FLUX prompt expansion with Awesome Design-MD brand blueprints.',
     category: 'creative',
     parameters: [
       { name: 'prompt', type: 'string', description: 'Visual design description or banner topic', required: true },
-      { name: 'style', type: 'string', description: 'Visual style preset (e.g. Modern Minimalist, 3D Render, Cinematic, Studio Press, Neon Cyberpunk)' },
+      { name: 'style', type: 'string', description: 'Visual style preset: apple_minimal | stripe_modern | linear_dark | festive_royal | nike_energy | editorial_press' },
       { name: 'aspectRatio', type: 'string', description: 'Aspect ratio (e.g. 1:1, 16:9, 9:16, 4:5)' }
     ],
     execute: async (args) => {
       const rawPrompt = args.prompt || 'Modern professional marketing creative banner';
-      const style = args.style || 'Modern Minimalist';
+      const selectedStyleKey = args.style || 'stripe_modern';
+      const preset = AWESOME_DESIGN_PRESETS[selectedStyleKey] || AWESOME_DESIGN_PRESETS['stripe_modern'];
       const lower = rawPrompt.toLowerCase();
 
-      let enhancedPrompt = `${rawPrompt}, ${style} style, professional commercial visual design, 8k resolution, award-winning lighting, crisp detail`;
+      let enhancedPrompt = `${rawPrompt}, ${preset.visualBlueprint}`;
 
       // Festival / National Day / Typo Handling
       if (lower.includes('15') && (lower.includes('aug') || lower.includes('अगस्त') || lower.includes('augest') || lower.includes('august') || lower.includes('independe') || lower.includes('azadi'))) {
@@ -59,10 +87,10 @@ export const OPENWORK_SKILL_REGISTRY: Record<string, OpenWorkSkill> = {
         try {
           const trans = await callNvidiaLLM([{ 
             role: 'user', 
-            content: `Convert this user request into an ultra-detailed, professional 8K commercial graphic banner / advertising poster prompt for FLUX.1 text-to-image:\n"${rawPrompt}"\nOutput ONLY the English prompt.`
+            content: `You are an Award-Winning Creative Art Director. Convert this user request into an ultra-detailed, professional 8K graphic banner prompt using the "${preset.name}" design aesthetic:\nRequest: "${rawPrompt}"\nOutput ONLY the final prompt in English.`
           }]);
           if (trans && trans.length > 15) {
-            enhancedPrompt = `${trans.trim().replace(/^["']|["']$/g, '')}, professional graphic design, 8k resolution, award-winning lighting, crisp detail`;
+            enhancedPrompt = `${trans.trim().replace(/^["']|["']$/g, '')}, ${preset.visualBlueprint}`;
           }
         } catch (e) {}
       }
@@ -72,20 +100,20 @@ export const OPENWORK_SKILL_REGISTRY: Record<string, OpenWorkSkill> = {
         success: true,
         output: {
           imageUrl,
-          prompt,
-          style,
-          title: `Creative Design: ${prompt.slice(0, 40)}...`
+          prompt: rawPrompt,
+          style: preset.name,
+          title: `Creative Design: ${rawPrompt.slice(0, 40)}...`
         },
         displayType: 'image',
         interactiveAction: {
           type: 'PUBLISH_POST',
           label: '🚀 Publish Banner to Feed',
           payload: {
-            caption: `✨ Creative Design: ${prompt}\n\nDesigned with Tolee OpenWork Creative Studio 🎨`,
+            caption: `✨ Creative Design: ${rawPrompt}\n\nDesigned with Tolee OpenWork Creative Studio (${preset.name}) 🎨`,
             imageUrl
           }
         },
-        logMessage: `Generated high-resolution creative visual for "${prompt.slice(0, 30)}..." in ${style} style.`
+        logMessage: `Generated high-resolution creative visual for "${rawPrompt.slice(0, 30)}..." in ${preset.name} style.`
       };
     }
   },
