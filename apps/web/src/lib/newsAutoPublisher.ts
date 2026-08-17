@@ -44,28 +44,62 @@ function sanitizeNewsText(text: string): string {
  */
 async function fetchFinnhubStockNews(logs: string[]): Promise<NewsArticleItem[]> {
   const key = process.env.FINNHUB_API_KEY || "d9r5t99r01qnlhcli2ngd9r5t99r01qnlhcli2o0";
+  const items: NewsArticleItem[] = [];
+
+  // 1. Finnhub Market News
   try {
     const url = `https://finnhub.io/api/v1/news?category=general&token=${key}`;
-    const res = await fetch(url, { cache: 'no-store' });
+    const res = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(4000) });
     const data = await res.json();
 
     if (Array.isArray(data) && data.length > 0) {
-      const items = data.map((a: any) => ({
+      const finnhubItems = data.map((a: any) => ({
         headline: sanitizeNewsText(a.headline || ''),
         image: a.image && a.image.startsWith('http') ? a.image : undefined,
         description: sanitizeNewsText(a.summary || ''),
         language: 'en' as const
-      })).filter((item: NewsArticleItem) => item.headline && item.headline.length > 10);
+      })).filter((item: NewsArticleItem) => item.headline && item.headline.length > 10 && item.image);
 
-      if (items.length > 0) {
-        logs.push(`[STOCK] Fetched ${items.length} market articles via Finnhub API.`);
-        return items;
+      if (finnhubItems.length > 0) {
+        items.push(...finnhubItems);
+        logs.push(`[STOCK/TECH] Fetched ${finnhubItems.length} market articles via Finnhub API.`);
       }
     }
   } catch (err: any) {
     logs.push(`[STOCK] Finnhub notice: ${err.message}`);
   }
-  return [];
+
+  // 2. HackerNews Official API (https://github.com/HackerNews/API)
+  try {
+    const hnRes = await fetch("https://hacker-news.firebaseio.com/v0/topstories.json?print=pretty", { cache: 'no-store', signal: AbortSignal.timeout(3000) });
+    const topIds: number[] = await hnRes.json();
+    if (Array.isArray(topIds) && topIds.length > 0) {
+      const topSlice = topIds.slice(0, 8);
+      const storyPromises = topSlice.map(async (id) => {
+        try {
+          const itemRes = await fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json?print=pretty`, { signal: AbortSignal.timeout(2500) });
+          return await itemRes.json();
+        } catch {
+          return null;
+        }
+      });
+      const stories = (await Promise.all(storyPromises)).filter(Boolean);
+      for (const s of stories) {
+        if (s.title && s.title.length > 10) {
+          items.push({
+            headline: sanitizeNewsText(s.title),
+            description: `HackerNews Top Tech Discussion: Score ${s.score || 100}+ points by ${s.by || 'tech_community'}. Read full insights on Tolee News.`,
+            language: 'en'
+          });
+        }
+      }
+      logs.push(`[HACKERNEWS] Fetched ${stories.length} tech stories from HackerNews API.`);
+    }
+  } catch (e: any) {
+    logs.push(`[HACKERNEWS] Notice: ${e.message}`);
+  }
+
+  return items;
 }
 
 /**
@@ -75,11 +109,59 @@ async function fetchNewsForLanguage(lang: 'hi' | 'mr' | 'en', logs: string[]): P
   const newsdataKey = process.env.NEWSDATA_API_KEY || "pub_080f52adf1114cc59f8201ad47eb64f8";
   const gnewsKey = process.env.GNEWS_API_KEY || "7c9cbcae5f8b01d649ab17e1a4528dc9";
   const newsApiKey = process.env.NEWS_API_KEY || "bd92a188805e44e3b654a871e2ba1553";
+  const currentsApiKey = process.env.CURRENTS_API_KEY || "ue1WLanfXoMsFJ9MHsL_NLmVBD2v8fRNXAqe-b5-MlfY4oLz";
 
-  // Tier 1: NewsData.io
+  // Tier 1: CurrentsAPI.services
+  try {
+    const currentsLang = lang === 'hi' ? 'hi' : lang === 'mr' ? 'mr' : 'en';
+    const url = `https://api.currentsapi.services/v1/latest-news?language=${currentsLang}&apiKey=${currentsApiKey}`;
+    const res = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(4000) });
+    const data = await res.json();
+
+    if (data.status === 'ok' && Array.isArray(data.news) && data.news.length > 0) {
+      const items = data.news.map((a: any) => ({
+        headline: sanitizeNewsText(a.title || ''),
+        image: a.image && a.image.startsWith('http') && a.image !== 'None' ? a.image : undefined,
+        description: sanitizeNewsText(a.description || ''),
+        language: lang
+      })).filter((item: NewsArticleItem) => item.headline && item.headline.length > 10 && item.image);
+
+      if (items.length > 0) {
+        logs.push(`[${lang.toUpperCase()}] Fetched ${items.length} image-verified articles from CurrentsAPI.`);
+        return items;
+      }
+    }
+  } catch (e: any) {
+    logs.push(`[${lang.toUpperCase()}] CurrentsAPI notice: ${e.message}`);
+  }
+
+  // Tier 2: GNews.io API
+  try {
+    const url = `https://gnews.io/api/v4/top-headlines?category=general&lang=${lang}&country=in&max=10&apikey=${gnewsKey}`;
+    const res = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(4000) });
+    const data = await res.json();
+
+    if (data.articles && Array.isArray(data.articles) && data.articles.length > 0) {
+      const items = data.articles.map((a: any) => ({
+        headline: sanitizeNewsText(a.title || ''),
+        image: a.image && a.image.startsWith('http') ? a.image : undefined,
+        description: sanitizeNewsText(a.description || ''),
+        language: lang
+      })).filter((item: NewsArticleItem) => item.headline && item.headline.length > 10 && item.image);
+
+      if (items.length > 0) {
+        logs.push(`[${lang.toUpperCase()}] Fetched ${items.length} image-verified articles from GNews.io.`);
+        return items;
+      }
+    }
+  } catch (e: any) {
+    logs.push(`[${lang.toUpperCase()}] GNews.io notice: ${e.message}`);
+  }
+
+  // Tier 3: NewsData.io
   try {
     const url = `https://newsdata.io/api/1/news?apikey=${newsdataKey}&country=in&language=${lang}&image=1`;
-    const res = await fetch(url, { cache: 'no-store' });
+    const res = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(4000) });
     const data = await res.json();
 
     if (data.status === 'success' && Array.isArray(data.results) && data.results.length > 0) {
@@ -99,11 +181,11 @@ async function fetchNewsForLanguage(lang: 'hi' | 'mr' | 'en', logs: string[]): P
     logs.push(`[${lang.toUpperCase()}] NewsData.io notice: ${e.message}`);
   }
 
-  // Tier 2: NewsAPI.org
+  // Tier 4: NewsAPI.org
   try {
     const newsApiLang = lang === 'hi' ? 'hi' : 'en';
     const url = `https://newsapi.org/v2/top-headlines?country=in&language=${newsApiLang}&apiKey=${newsApiKey}`;
-    const res = await fetch(url, { cache: 'no-store' });
+    const res = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(4000) });
     const data = await res.json();
 
     if (data.status === 'ok' && Array.isArray(data.articles) && data.articles.length > 0) {
@@ -121,29 +203,6 @@ async function fetchNewsForLanguage(lang: 'hi' | 'mr' | 'en', logs: string[]): P
     }
   } catch (e: any) {
     logs.push(`[${lang.toUpperCase()}] NewsAPI notice: ${e.message}`);
-  }
-
-  // Tier 3: GNews.io
-  try {
-    const url = `https://gnews.io/api/v4/top-headlines?category=general&lang=${lang}&country=in&max=10&apikey=${gnewsKey}`;
-    const res = await fetch(url, { cache: 'no-store' });
-    const data = await res.json();
-
-    if (data.articles && Array.isArray(data.articles) && data.articles.length > 0) {
-      const items = data.articles.map((a: any) => ({
-        headline: sanitizeNewsText(a.title || ''),
-        image: a.image && a.image.startsWith('http') ? a.image : undefined,
-        description: sanitizeNewsText(a.description || ''),
-        language: lang
-      })).filter((item: NewsArticleItem) => item.headline && item.headline.length > 10 && item.image);
-
-      if (items.length > 0) {
-        logs.push(`[${lang.toUpperCase()}] Fetched ${items.length} image-verified articles from GNews.io.`);
-        return items;
-      }
-    }
-  } catch (e: any) {
-    logs.push(`[${lang.toUpperCase()}] GNews.io notice: ${e.message}`);
   }
 
   // Tier 4: Verified Indian News Feeds with direct Image Enclosures & Media Content
