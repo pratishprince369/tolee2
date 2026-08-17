@@ -11,11 +11,11 @@ import { CreateNewsButton } from '@/components/CreateNewsButton';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-export default async function NewsHubPage({ searchParams }: { searchParams: { cat?: string; create?: string; openModal?: string } }) {
+export default async function NewsHubPage({ searchParams }: { searchParams?: { cat?: string; create?: string; openModal?: string } }) {
   const session = await getServerSession(authOptions);
   const currentUserId = session?.user ? (session.user as any).id : null;
   const isSuperAdmin = session?.user?.email === process.env.SUPER_ADMIN_EMAIL;
-  const currentCategory = searchParams.cat || 'All';
+  const currentCategory = searchParams?.cat || 'All';
 
   // Load initial news posts server-side (page 1, limit 10)
   const res = await getNewsFeedPosts({
@@ -53,7 +53,7 @@ export default async function NewsHubPage({ searchParams }: { searchParams: { ca
           </div>
 
           <div className="relative z-10 shrink-0">
-            <CreateNewsButton defaultOpen={searchParams.create === 'true' || searchParams.openModal === 'news'} />
+            <CreateNewsButton defaultOpen={Boolean(searchParams?.create === 'true' || searchParams?.openModal === 'news')} />
           </div>
         </div>
 

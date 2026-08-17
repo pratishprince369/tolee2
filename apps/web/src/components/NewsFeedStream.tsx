@@ -264,8 +264,18 @@ export function NewsFeedStream({
             cleanCoverImg = fallbackThumb || (postMediaUrls ? postMediaUrls.split(',').find((u: string) => typeof u === 'string' && u.startsWith('http') && !u.includes('youtube.com/embed/')) : null) || null;
           }
 
-          const itemDate = new Date(item.createdAt);
-          const dateStr = `${itemDate.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' })} | ${itemDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase()}`;
+          const formatDateSafely = (dateInput: any) => {
+            if (!dateInput) return 'Recently';
+            try {
+              const d = new Date(dateInput);
+              if (isNaN(d.getTime())) return 'Recently';
+              return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            } catch {
+              return 'Recently';
+            }
+          };
+
+          const dateStr = formatDateSafely(item.createdAt);
 
           return (
             <Card
@@ -357,7 +367,7 @@ export function NewsFeedStream({
                     <span className="font-bold text-[12px] leading-tight text-gray-800 dark:text-zinc-200">
                       {post?.author?.name || 'Anonymous Creator'}
                     </span>
-                    <span className="text-[10px] text-gray-400 flex items-center gap-1 mt-0.5 select-none">
+                    <span suppressHydrationWarning className="text-[10px] text-gray-400 flex items-center gap-1 mt-0.5 select-none">
                       <Calendar className="w-3 h-3" /> {dateStr}
                     </span>
                   </div>

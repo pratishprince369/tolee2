@@ -836,7 +836,7 @@ export async function getNewsFeedPosts(options: {
 
     return {
       success: true,
-      news: finalNewsStream,
+      news: JSON.parse(JSON.stringify(finalNewsStream)),
       hasMore
     };
   } catch (err: any) {
