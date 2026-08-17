@@ -208,6 +208,27 @@ export async function callNvidiaLLM(messages: { role: string; content: string }[
   return null;
 }
 
+import cloudinary from "@/lib/cloudinary";
+
+async function uploadToCloudinarySafe(imageSource: string): Promise<string> {
+  try {
+    const uploadRes = await cloudinary.uploader.upload(imageSource, {
+      folder: 'tolee_ai_creatives',
+      resource_type: 'image'
+    });
+    if (uploadRes.secure_url) {
+      let finalUrl = uploadRes.secure_url;
+      if (finalUrl.includes('/upload/')) {
+        finalUrl = finalUrl.replace('/upload/', '/upload/q_auto,f_auto/');
+      }
+      return finalUrl;
+    }
+  } catch (err) {
+    console.warn('[Cloudinary AI Image Upload Notice]', err);
+  }
+  return imageSource;
+}
+
 // High-Speed Photorealistic AI Image Generation Engine (Open-Generative-AI Multi-Model Router: FLUX Realism, Midjourney V6, Ideogram Typography, SD 3.5 Large)
 export async function generateAIImageWithFallback(prompt: string, modelType?: string): Promise<string> {
   const cleanPrompt = prompt ? prompt.trim() : 'Inspiring social media graphic poster, 8k resolution, photorealistic';
@@ -228,14 +249,14 @@ export async function generateAIImageWithFallback(prompt: string, modelType?: st
   const sdKey = process.env.NVIDIA_SD35_KEY || "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";
   const fluxKey = process.env.NVIDIA_FLUX_SCHNELL_KEY || "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";
 
-  // Try NVIDIA NIM Stability AI SD 3.5 Large / FLUX.1 Schnell with 3.5s timeout
+  // Try NVIDIA NIM Stability AI SD 3.5 Large / FLUX.1 Schnell with 5s timeout
   for (const item of [
     { key: sdKey, endpoint: "https://ai.api.nvidia.com/v1/genai/stabilityai/stable-diffusion-3.5-large" },
     { key: fluxKey, endpoint: "https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-schnell" }
   ]) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3500);
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
 
       const res = await fetch(item.endpoint, {
         method: "POST",
@@ -257,7 +278,9 @@ export async function generateAIImageWithFallback(prompt: string, modelType?: st
         const data = await res.json();
         const b64 = data.image || data.artifacts?.[0]?.base64 || data.b64_json;
         if (b64) {
-          return `data:image/png;base64,${b64}`;
+          const dataUri = `data:image/png;base64,${b64}`;
+          const cdnUrl = await uploadToCloudinarySafe(dataUri);
+          return cdnUrl;
         }
       }
     } catch (err: any) {
@@ -265,6 +288,9 @@ export async function generateAIImageWithFallback(prompt: string, modelType?: st
     }
   }
 
-  // Photorealistic DALL-E 3 Grade FLUX.1 Realism Cloud Engine Failover
-  return `https://image.pollinations.ai/prompt/${encoded}?model=flux-realism&enhance=true&width=1080&height=1080&nologo=true`;
+  // Direct Cloudinary Ingestion
+  const seed = Math.floor(Math.random() * 99999);
+  const rawUrl = `https://image.pollinations.ai/prompt/${encoded}?model=flux-realism&enhance=true&width=1080&height=1080&seed=${seed}&nologo=true`;
+  const cdnUrl = await uploadToCloudinarySafe(rawUrl);
+  return cdnUrl;
 }

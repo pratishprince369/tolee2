@@ -248,10 +248,31 @@ export async function generateAIImageWithFallback(prompt: string, modelType?: st
     }
   ];
 
+import cloudinary from "@/lib/cloudinary";
+
+async function uploadToCloudinarySafe(imageSource: string): Promise<string> {
+  try {
+    const uploadRes = await cloudinary.uploader.upload(imageSource, {
+      folder: 'tolee_ai_creatives',
+      resource_type: 'image'
+    });
+    if (uploadRes.secure_url) {
+      let finalUrl = uploadRes.secure_url;
+      if (finalUrl.includes('/upload/')) {
+        finalUrl = finalUrl.replace('/upload/', '/upload/q_auto,f_auto/');
+      }
+      return finalUrl;
+    }
+  } catch (err) {
+    console.warn('[Cloudinary AI Image Upload Notice]', err);
+  }
+  return imageSource;
+}
+
   for (const item of providers) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
 
       const res = await fetch(item.endpoint, {
         method: "POST",
@@ -270,15 +291,20 @@ export async function generateAIImageWithFallback(prompt: string, modelType?: st
         const data = await res.json();
         const b64 = data.image || data.artifacts?.[0]?.base64 || data.b64_json;
         if (b64) {
-          return `data:image/png;base64,${b64}`;
+          const dataUri = `data:image/png;base64,${b64}`;
+          const cdnUrl = await uploadToCloudinarySafe(dataUri);
+          return cdnUrl;
         }
       }
     } catch (err: any) {}
   }
 
-  // 2. High-Fidelity 4K FLUX Realism Cloud Failover
+  // 2. High-Fidelity 4K FLUX Realism Direct Cloudinary Ingestion
   const seed = Math.floor(Math.random() * 99999);
-  return `https://image.pollinations.ai/prompt/${encoded}?model=flux-realism&enhance=true&width=1080&height=1080&seed=${seed}&nologo=true`;
+  const rawUrl = `https://image.pollinations.ai/prompt/${encoded}?model=flux-realism&enhance=true&width=1080&height=1080&seed=${seed}&nologo=true`;
+  
+  const cdnUrl = await uploadToCloudinarySafe(rawUrl);
+  return cdnUrl;
 }
 
 /**
