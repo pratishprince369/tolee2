@@ -677,6 +677,7 @@ export async function getNewsFeedPosts(options: {
     const currentUserId = session?.user ? (session.user as any).id : null;
     const page = options.page || 1;
     const limit = options.limit || 10;
+    const category = options.category || 'All';
     // Background trigger: If latest news post is >90 seconds old, fetch fresh news & YouTube videos
     const checkAndTriggerFreshNews = async () => {
       try {
@@ -703,9 +704,7 @@ export async function getNewsFeedPosts(options: {
           status: 'published',
           isArchived: false,
         },
-        category: category !== 'All' 
-          ? category 
-          : { notIn: NON_NEWS_RECREATIONAL_CATEGORIES },
+        ...(category && category !== 'All' ? { category } : {}),
       },
       include: {
         post: {

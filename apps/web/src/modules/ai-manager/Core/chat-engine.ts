@@ -19,8 +19,52 @@ export function getLLMKeyPool(): string[] {
   return Array.from(new Set(keys.filter((k): k is string => Boolean(k && k.trim()))));
 }
 
-// Multi-Key & Multi-Model High Speed Failover Engine
+const CLOD_API_KEY = process.env.CLOD_API_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJIRnlwdHkxU04wWXZYU3ptdGJ2a0FaVnhycGkyIiwidXNlcklkIjoiSEZ5cHR5MVNOMFl2WFN6bXRidmtBWlZ4cnBpMiIsInRlYW1JZCI6IjVlYjVlMzE1LTM2YzktNDBjOS04OWYwLTY4ZjlkNGJjNDFlYyIsInRlYW1Sb2xlIjoib3duZXIiLCJwcm9qZWN0SWQiOiJiMzg3ZjBiNS1iM2ZmLTRjZGQtODAzOS0yMWIwZTYyMWQ5NzQiLCJqdGkiOiJhcGlrZXktMTc4Njk1MjM2MDk4OSIsImlhdCI6MTc4Njk1MjM2MCwiZXhwIjoxODM2OTUyMzYwfQ.JHpH6Rlcnl23S9QYsw3b4h5e1sCxNHw5WmW1HjgaAkU';
+
+// Multi-Key & Multi-Model High Speed Failover Engine (CLōD API + NVIDIA NIM)
 export async function callNvidiaLLM(messages: { role: string; content: string }[], systemPrompt?: string) {
+  const fullMessages = [
+    { role: "system", content: systemPrompt || SYSTEM_PROMPTS.PERSONAL_EMPLOYEE },
+    ...messages
+  ];
+
+  // 1. First Priority: Try CLōD.io API (High Speed GPT-4o / DeepSeek / Llama)
+  const clodModels = ["deepseek/deepseek-chat", "gpt-4o", "meta-llama/llama-3.1-70b-instruct"];
+  for (const model of clodModels) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+      const res = await fetch("https://api.clod.io/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${CLOD_API_KEY}`
+        },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model,
+          messages: fullMessages,
+          temperature: 0.6,
+          max_tokens: 750
+        })
+      });
+
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        const data = await res.json();
+        const content = data.choices?.[0]?.message?.content;
+        if (content && content.trim()) {
+          return content;
+        }
+      }
+    } catch (e) {
+      // Failover to next CLōD model or NVIDIA
+    }
+  }
+
+  // 2. Second Priority Failover: NVIDIA NIM Key Pool
   const keyPool = getLLMKeyPool();
   const models = [
     "nvidia/nemotron-4-340b-instruct",
@@ -37,11 +81,6 @@ export async function callNvidiaLLM(messages: { role: string; content: string }[
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 3500); // 3.5s timeout for ultra speed
-
-        const fullMessages = [
-          { role: "system", content: systemPrompt || SYSTEM_PROMPTS.PERSONAL_EMPLOYEE },
-          ...messages
-        ];
 
         const res = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
           method: "POST",

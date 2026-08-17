@@ -8,7 +8,7 @@ import { SYSTEM_PROMPTS } from '@/modules/ai-manager/Core/prompt-manager';
 import { parseNaturalLanguageReminder } from '@/modules/ai-manager/Core/reminder-parser';
 import { getUserDeviceTimeInfo, isTimeOrDateQuery } from '@/modules/ai-manager/Core/time-service';
 import { getUserMonthlyRewardStatus, triggerRewardNotifications } from '@/lib/reward-service';
-import { createPost } from '@/actions/post';
+import { createPost, deletePostPermanently } from '@/actions/post';
 import { executeToleeAIAction } from '@/lib/tolee-action-engine';
 
 async function getUserId(): Promise<string> {
@@ -554,5 +554,57 @@ export async function processAIPersonalMessage(
       success: false,
       response: `🤖 **Tolee AI Manager**: Operation error: ${error.message}`
     };
+  }
+}
+
+export async function executeConfirmedAIAction(
+  action: string,
+  targetId?: string,
+  payload?: any
+) {
+  try {
+    const userId = await getUserId();
+
+    if (action === 'DELETE_POST') {
+      if (!targetId) {
+        return { success: false, error: 'Target ID is required for post deletion.' };
+      }
+
+      // Verify ownership before deleting
+      const post = await prisma.post.findUnique({
+        where: { id: targetId },
+        select: { authorId: true }
+      });
+
+      if (!post) {
+        return { success: false, error: 'Post not found.' };
+      }
+
+      if (post.authorId !== userId) {
+        return { success: false, error: 'You are not authorized to delete this post.' };
+      }
+
+      const res = await deletePostPermanently(targetId);
+      if (res.success) {
+        // Log action
+        await prisma.aIActionLog.create({
+          data: {
+            userId,
+            action: 'DELETE_POST',
+            command: `CONFIRMED_DELETE_POST_${targetId}`,
+            status: 'SUCCESS',
+            details: JSON.stringify({ targetId })
+          }
+        });
+        return { success: true, message: 'Post has been permanently deleted.' };
+      } else {
+        return { success: false, error: res.error || 'Failed to delete post.' };
+      }
+    }
+
+    return { success: false, error: `Unsupported AI action type: ${action}` };
+  } catch (error: any) {
+    console.error('Error executing confirmed AI action:', error);
+    return { success: false, error: error.message || 'Operation failed.' };
   }
 }
