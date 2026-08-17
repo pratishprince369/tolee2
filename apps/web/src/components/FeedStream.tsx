@@ -1677,13 +1677,7 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                             <img src={cleanCoverImg} alt={newsHeadline} className="w-full h-full object-cover hover:scale-[1.01] transition-transform duration-300" loading="lazy" />
                           </div>
                         </Link>
-                      ) : (
-                        <Link href={`/news/${newsSlug}`}>
-                          <div className="w-full aspect-video bg-indigo-50/50 dark:bg-indigo-950/10 flex items-center justify-center relative cursor-pointer">
-                            <Newspaper className="w-12 h-12 text-indigo-300 dark:text-indigo-900/60" />
-                          </div>
-                        </Link>
-                      )}
+                      ) : null}
 
                       {/* Content Body: Headline, Summary, Author Meta */}
                       <div className="p-5 space-y-3">

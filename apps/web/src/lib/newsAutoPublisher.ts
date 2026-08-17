@@ -78,20 +78,20 @@ async function fetchNewsForLanguage(lang: 'hi' | 'mr' | 'en', logs: string[]): P
 
   // Tier 1: NewsData.io
   try {
-    const url = `https://newsdata.io/api/1/news?apikey=${newsdataKey}&country=in&language=${lang}`;
+    const url = `https://newsdata.io/api/1/news?apikey=${newsdataKey}&country=in&language=${lang}&image=1`;
     const res = await fetch(url, { cache: 'no-store' });
     const data = await res.json();
 
     if (data.status === 'success' && Array.isArray(data.results) && data.results.length > 0) {
       const items = data.results.map((a: any) => ({
         headline: sanitizeNewsText(a.title || ''),
-        image: a.image_url,
+        image: a.image_url && a.image_url.startsWith('http') ? a.image_url : undefined,
         description: sanitizeNewsText(a.description || a.snippet || ''),
         language: lang
-      })).filter((item: NewsArticleItem) => item.headline && item.headline.length > 10);
+      })).filter((item: NewsArticleItem) => item.headline && item.headline.length > 10 && item.image);
 
       if (items.length > 0) {
-        logs.push(`[${lang.toUpperCase()}] Fetched ${items.length} articles from NewsData.io.`);
+        logs.push(`[${lang.toUpperCase()}] Fetched ${items.length} image-verified articles from NewsData.io.`);
         return items;
       }
     }
@@ -99,7 +99,31 @@ async function fetchNewsForLanguage(lang: 'hi' | 'mr' | 'en', logs: string[]): P
     logs.push(`[${lang.toUpperCase()}] NewsData.io notice: ${e.message}`);
   }
 
-  // Tier 2: GNews.io
+  // Tier 2: NewsAPI.org
+  try {
+    const newsApiLang = lang === 'hi' ? 'hi' : 'en';
+    const url = `https://newsapi.org/v2/top-headlines?country=in&language=${newsApiLang}&apiKey=${newsApiKey}`;
+    const res = await fetch(url, { cache: 'no-store' });
+    const data = await res.json();
+
+    if (data.status === 'ok' && Array.isArray(data.articles) && data.articles.length > 0) {
+      const items = data.articles.map((a: any) => ({
+        headline: sanitizeNewsText(a.title || ''),
+        image: a.urlToImage && a.urlToImage.startsWith('http') ? a.urlToImage : undefined,
+        description: sanitizeNewsText(a.description || ''),
+        language: lang
+      })).filter((item: NewsArticleItem) => item.headline && item.headline.length > 10 && item.image);
+
+      if (items.length > 0) {
+        logs.push(`[${lang.toUpperCase()}] Fetched ${items.length} image-verified articles from NewsAPI.org.`);
+        return items;
+      }
+    }
+  } catch (e: any) {
+    logs.push(`[${lang.toUpperCase()}] NewsAPI notice: ${e.message}`);
+  }
+
+  // Tier 3: GNews.io
   try {
     const url = `https://gnews.io/api/v4/top-headlines?category=general&lang=${lang}&country=in&max=10&apikey=${gnewsKey}`;
     const res = await fetch(url, { cache: 'no-store' });
@@ -108,13 +132,13 @@ async function fetchNewsForLanguage(lang: 'hi' | 'mr' | 'en', logs: string[]): P
     if (data.articles && Array.isArray(data.articles) && data.articles.length > 0) {
       const items = data.articles.map((a: any) => ({
         headline: sanitizeNewsText(a.title || ''),
-        image: a.image,
+        image: a.image && a.image.startsWith('http') ? a.image : undefined,
         description: sanitizeNewsText(a.description || ''),
         language: lang
-      })).filter((item: NewsArticleItem) => item.headline && item.headline.length > 10);
+      })).filter((item: NewsArticleItem) => item.headline && item.headline.length > 10 && item.image);
 
       if (items.length > 0) {
-        logs.push(`[${lang.toUpperCase()}] Fetched ${items.length} articles from GNews.io.`);
+        logs.push(`[${lang.toUpperCase()}] Fetched ${items.length} image-verified articles from GNews.io.`);
         return items;
       }
     }
@@ -122,7 +146,7 @@ async function fetchNewsForLanguage(lang: 'hi' | 'mr' | 'en', logs: string[]): P
     logs.push(`[${lang.toUpperCase()}] GNews.io notice: ${e.message}`);
   }
 
-  // Tier 3: Google News RSS
+  // Tier 4: Google News RSS (Fallback)
   try {
     const rssLang = lang === 'hi' ? 'hi' : lang === 'mr' ? 'mr' : 'en';
     const rssUrl = `https://news.google.com/rss?hl=${rssLang}&gl=IN&ceid=IN:${rssLang}`;
