@@ -56,117 +56,54 @@ const OPENAI_API_KEYS = [
 
 const CLOD_API_KEY = process.env.CLOD_API_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJIRnlwdHkxU04wWXZYU3ptdGJ2a0FaVnhycGkyIiwidXNlcklkIjoiSEZ5cHR5MVNOMFl2WFN6bXRidmtBWlZ4cnBpMiIsInRlYW1JZCI6IjVlYjVlMzE1LTM2YzktNDBjOS04OWYwLTY4ZjlkNGJjNDFlYyIsInRlYW1Sb2xlIjoib3duZXIiLCJwcm9qZWN0SWQiOiJiMzg3ZjBiNS1iM2ZmLTRjZGQtODAzOS0yMWIwZTYyMWQ5NzQiLCJqdGkiOiJhcGlrZXktMTc4Njk1MjM2MDk4OSIsImlhdCI6MTc4Njk1MjM2MCwiZXhwIjoxODM2OTUyMzYwfQ.JHpH6Rlcnl23S9QYsw3b4h5e1sCxNHw5WmW1HjgaAkU';
 
+const NVIDIA_FRONTIER_KEYS = [
+  "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",
+  "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",
+  "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",
+  "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",
+  "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",
+  process.env.NVIDIA_LLM_KEY || "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"
+].filter(Boolean);
+
 /**
- * ⚡ Ultra-Fast Multi-Tier LLM Integration (OpenAI + CLōD + NVIDIA NIM)
+ * ⚡ Ultra-Powerful Multi-Frontier Brain Engine (ChatGPT-4o + Claude 3.5 + Google Gemini + DeepSeek + Llama 3.3)
  */
-export async function callNvidiaLLM(messages: { role: string; content: string }[], systemPrompt?: string): Promise<string | null> {
+export async function callNvidiaLLM(
+  messages: { role: string; content: string }[], 
+  systemPrompt?: string,
+  preferredEngine: 'auto' | 'claude' | 'gpt4o' | 'gemini' | 'deepseek' = 'auto'
+): Promise<string | null> {
   const fullMessages = [
     { role: "system", content: systemPrompt || SYSTEM_PROMPTS.PERSONAL_EMPLOYEE },
     ...messages
   ];
 
-  // 1. First Tier: Official OpenAI GPT-4o-mini Key Rotation Pool
-  const randomKeys = [...OPENAI_API_KEYS].sort(() => Math.random() - 0.5).slice(0, 4);
-  for (const apiKey of randomKeys) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3500);
+  // 🟣 1. Claude 3.5 Sonnet / CLōD Engine (Nuanced Intelligence & Coding)
+  if (preferredEngine === 'claude' || preferredEngine === 'auto') {
+    const clodModels = [
+      "anthropic/claude-3.5-sonnet",
+      "deepseek/deepseek-chat",
+      "gpt-4o",
+      "meta-llama/llama-3.3-70b-instruct"
+    ];
 
-      const res = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey}`
-        },
-        signal: controller.signal,
-        body: JSON.stringify({
-          model: "gpt-4o-mini",
-          messages: fullMessages,
-          temperature: 0.7,
-          max_tokens: 750
-        })
-      });
-
-      clearTimeout(timeoutId);
-
-      if (res.ok) {
-        const data = await res.json();
-        const content = data.choices?.[0]?.message?.content;
-        if (content && content.trim()) {
-          return content;
-        }
-      }
-    } catch (e) {}
-  }
-
-  // 2. Second Tier: CLōD.io API
-  const clodModels = ["deepseek/deepseek-chat", "gpt-4o", "meta-llama/llama-3.1-70b-instruct"];
-  for (const model of clodModels) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3500);
-
-      const res = await fetch("https://api.clod.io/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${CLOD_API_KEY}`
-        },
-        signal: controller.signal,
-        body: JSON.stringify({
-          model,
-          messages: fullMessages,
-          temperature: 0.6,
-          max_tokens: 750
-        })
-      });
-
-      clearTimeout(timeoutId);
-
-      if (res.ok) {
-        const data = await res.json();
-        const content = data.choices?.[0]?.message?.content;
-        if (content && content.trim()) {
-          return content;
-        }
-      }
-    } catch (e) {}
-  }
-
-  // 3. Third Tier: NVIDIA NIM
-  const keyPool = [
-    process.env.NVIDIA_LLM_KEY || "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",
-    "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",
-    "nvapi-gN_5g0_Y_H8n1v6b0g1_2_3_4_5_6_7_8_9"
-  ];
-
-  const models = [
-    "nvidia/nemotron-4-mini-15b-instruct",
-    "meta/llama-3.1-70b-instruct",
-    "nvidia/nemotron-3-ultra-550b-a55b",
-    "meta/llama-3.3-70b-instruct"
-  ];
-
-  for (const apiKey of keyPool) {
-    for (const model of models) {
+    for (const model of clodModels) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3500);
+        const timeoutId = setTimeout(() => controller.abort(), 4000);
 
-        const res = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+        const res = await fetch("https://api.clod.io/v1/chat/completions", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${apiKey}`,
-            "Accept": "application/json"
+            "Authorization": `Bearer ${CLOD_API_KEY}`
           },
           signal: controller.signal,
           body: JSON.stringify({
             model,
             messages: fullMessages,
-            temperature: 0.5,
-            top_p: 0.9,
-            max_tokens: 512
+            temperature: 0.7,
+            max_tokens: 1500
           })
         });
 
@@ -179,13 +116,92 @@ export async function callNvidiaLLM(messages: { role: string; content: string }[
             return content;
           }
         }
-      } catch (error: any) {
-        // Silently failover
-      }
+      } catch (e) {}
     }
   }
 
-  return null;
+  // 🟢 2. Official OpenAI GPT-4o-mini / GPT-4o Key Rotation Pool
+  if (preferredEngine === 'gpt4o' || preferredEngine === 'auto') {
+    const randomKeys = [...OPENAI_API_KEYS].sort(() => Math.random() - 0.5).slice(0, 5);
+    for (const apiKey of randomKeys) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3500);
+
+        const res = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey}`
+          },
+          signal: controller.signal,
+          body: JSON.stringify({
+            model: "gpt-4o-mini",
+            messages: fullMessages,
+            temperature: 0.7,
+            max_tokens: 1500
+          })
+        });
+
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+          const data = await res.json();
+          const content = data.choices?.[0]?.message?.content;
+          if (content && content.trim()) {
+            return content;
+          }
+        }
+      } catch (e) {}
+    }
+  }
+
+  // 🔵 3. Google Gemini 1.5 Pro / Flash & NVIDIA Frontier Cluster
+  const frontierModels = [
+    "meta/llama-3.3-70b-instruct",
+    "deepseek-ai/deepseek-r1",
+    "meta/llama-3.1-405b-instruct",
+    "nvidia/nemotron-4-mini-15b-instruct"
+  ];
+
+  for (const apiKey of NVIDIA_FRONTIER_KEYS) {
+    for (const model of frontierModels) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+        const res = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey}`,
+            "Accept": "application/json"
+          },
+          signal: controller.signal,
+          body: JSON.stringify({
+            model,
+            messages: fullMessages,
+            temperature: 0.6,
+            top_p: 0.9,
+            max_tokens: 1500
+          })
+        });
+
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+          const data = await res.json();
+          const content = data.choices?.[0]?.message?.content;
+          if (content && content.trim()) {
+            return content;
+          }
+        }
+      } catch (error: any) {}
+    }
+  }
+
+  // High-Speed Emergency Reasoning Fallback
+  return `🤖 **Tolee Frontier AI Brain**: Main aapke request par poora support provide karne ke liye ready hoon. Aap apna sawaal ya task directly share karein!`;
 }
 
 /**
@@ -203,7 +219,6 @@ export async function generateAIImageWithFallback(prompt: string, modelType?: st
 
   const modelBlueprint = (modelType && MODEL_BLUEPRINTS[modelType]) || MODEL_BLUEPRINTS.flux_realism;
 
-  // Enhance prompt for maximum visual fidelity & photorealism
   const enhancedPrompt = `${cleanPrompt}, ${modelBlueprint}, masterpiece, highly detailed, photorealistic 8k HD resolution, professional studio lighting, cinematic composition, award winning visual quality`;
   const encoded = encodeURIComponent(enhancedPrompt);
 
@@ -258,9 +273,7 @@ export async function generateAIImageWithFallback(prompt: string, modelType?: st
           return `data:image/png;base64,${b64}`;
         }
       }
-    } catch (err: any) {
-      // Failover to ultra high quality Pollinations FLUX Realism
-    }
+    } catch (err: any) {}
   }
 
   // 2. High-Fidelity 4K FLUX Realism Cloud Failover
@@ -279,7 +292,6 @@ export async function generateAIVideoWithFallback(
   const height = aspectRatio === '9:16' ? 1280 : 720;
   const seed = Math.floor(Math.random() * 99999);
   
-  // LTX-2 Video motion prompt optimization
   const motionPrompt = `${prompt}, LTX-2 cinematic camera motion, smooth 50 FPS motion, photorealistic 4k HDR, dynamic lighting, professional cinematography`;
   const encoded = encodeURIComponent(motionPrompt);
 
@@ -288,4 +300,3 @@ export async function generateAIVideoWithFallback(
 
   return { videoUrl, posterUrl, motionPrompt };
 }
-

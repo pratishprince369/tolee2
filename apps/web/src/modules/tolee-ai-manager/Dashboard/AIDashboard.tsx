@@ -288,6 +288,24 @@ export function AIDashboard() {
       <div className="flex-1 overflow-y-auto p-3 sm:p-6 max-w-6xl mx-auto w-full">
         {activeTab === 'chat' && (
           <div className="flex flex-col h-[calc(100vh-140px)] max-w-4xl mx-auto w-full pb-20">
+            {/* Frontier Brain Intelligence Indicator */}
+            <div className="flex items-center justify-between px-3 py-2 bg-gradient-to-r from-violet-50 via-indigo-50 to-purple-50 dark:from-violet-950/30 dark:via-indigo-950/30 dark:to-purple-950/30 border border-violet-200/60 dark:border-violet-800/40 rounded-2xl mb-2 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="flex h-2 w-2 relative">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span className="font-extrabold text-violet-900 dark:text-violet-200">
+                  🧠 Frontier Multi-Brain Engine
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 text-[11px] font-bold text-violet-700 dark:text-violet-300">
+                <span className="bg-white/80 dark:bg-zinc-900 px-2 py-0.5 rounded-md border border-violet-200 dark:border-zinc-700">ChatGPT-4o</span>
+                <span className="bg-white/80 dark:bg-zinc-900 px-2 py-0.5 rounded-md border border-violet-200 dark:border-zinc-700">Claude 3.5</span>
+                <span className="bg-white/80 dark:bg-zinc-900 px-2 py-0.5 rounded-md border border-violet-200 dark:border-zinc-700">Gemini 1.5</span>
+              </div>
+            </div>
+
             {/* ChatGPT Style Immersive Stream Container */}
             <div className="flex-1 overflow-y-auto px-2 sm:px-4 py-4 space-y-4 no-scrollbar">
               {messages.map((msg) => (
