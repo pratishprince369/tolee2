@@ -1,5 +1,4 @@
 import { prisma } from '@/lib/prisma';
-import { generateAIImageWithFallback } from '@/modules/ai-manager/Core/chat-engine';
 import { generateAINewsArticle } from '@/lib/aiNewsGenerator';
 
 export interface NewsAccountConfig {
@@ -174,6 +173,22 @@ export async function publishDailyNewsBatch(withDelay: boolean = false): Promise
   logs.push("Starting Multi-Lingual Daily News Auto-Publisher batch execution...");
 
   try {
+    // Auto-cleanup: Clean any legacy fake AI generated images from news posts
+    await prisma.post.updateMany({
+      where: {
+        postType: 'news',
+        OR: [
+          { mediaUrls: { contains: 'pollinations.ai' } },
+          { mediaUrls: { contains: 'genai' } },
+          { mediaUrls: { contains: 'ai.api.nvidia.com' } }
+        ]
+      },
+      data: {
+        mediaUrls: null,
+        mediaTypes: null
+      }
+    }).catch(() => {});
+
     // Pre-fetch news pools for hi, mr, en, and stock market
     const hindiPool = await fetchNewsForLanguage('hi', logs);
     const marathiPool = await fetchNewsForLanguage('mr', logs);
@@ -273,12 +288,10 @@ export async function publishDailyNewsBatch(withDelay: boolean = false): Promise
       const metaDescription = `Latest updates on ${headline}. Read verified analysis on Tolee News.`;
       const keywords = `news, ${accountConfig.category.toLowerCase().replace(/[^a-z0-9]/g, '')}, india, tolee, ${accountConfig.languageName.toLowerCase()}`;
 
-      // Use direct news image if available, else generate 8K Photorealistic Press Banner visual
-      let imageUrl = articleItem.image;
-      if (!imageUrl || !imageUrl.startsWith('http')) {
-        const bannerPrompt = `Ultra photorealistic 8k studio press news photograph representing ${headline}, professional photojournalism shot, wide angle 16:9 aspect ratio, crisp details, natural lighting, award winning press photography`;
-        imageUrl = await generateAIImageWithFallback(bannerPrompt);
-      }
+      // Use ONLY the authentic direct image that came from the verified news publisher API
+      const imageUrl = (articleItem.image && typeof articleItem.image === 'string' && articleItem.image.startsWith('http')) 
+        ? articleItem.image 
+        : null;
 
       const allTolees = await prisma.tolee.findMany({ select: { id: true } });
 
@@ -288,7 +301,7 @@ export async function publishDailyNewsBatch(withDelay: boolean = false): Promise
           caption: headline,
           postType: 'news',
           mediaUrls: imageUrl,
-          mediaTypes: 'image',
+          mediaTypes: imageUrl ? 'image' : null,
           status: 'published',
           authorId: dbUser.id,
           tolees: allTolees.length > 0 ? { create: allTolees.map((t: any) => ({ toleeId: t.id })) } : undefined,

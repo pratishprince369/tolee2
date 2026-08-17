@@ -347,29 +347,22 @@ export function NewsFeedStream({
                     category={item.category}
                   />
                 </div>
-              ) : (
+              ) : cleanCoverImg ? (
                 <Link href={`/news/${item.slug}`}>
                   <div className="w-full overflow-hidden bg-slate-50 dark:bg-zinc-950 aspect-video relative cursor-pointer">
-                    {cleanCoverImg ? (
-                      <img
-                        src={cleanCoverImg}
-                        alt={item.headline}
-                        className="w-full h-full object-cover hover:scale-[1.01] transition-transform duration-300"
-                        loading="lazy"
-                        onError={(e) => {
-                          const target = e.currentTarget;
-                          target.onerror = null;
-                          target.src = 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=800&q=80';
-                        }}
-                      />
-                    ) : (
-                      <div className="w-full h-full flex flex-col items-center justify-center text-zinc-300 dark:text-zinc-800">
-                        <Newspaper className="w-16 h-16 stroke-[1.2]" />
-                      </div>
-                    )}
+                    <img
+                      src={cleanCoverImg}
+                      alt={item.headline}
+                      className="w-full h-full object-cover hover:scale-[1.01] transition-transform duration-300"
+                      loading="lazy"
+                      onError={(e) => {
+                        const target = e.currentTarget;
+                        target.style.display = 'none';
+                      }}
+                    />
                   </div>
                 </Link>
-              )}
+              ) : null}
 
               {/* Headline & Summary */}
               <CardContent className="p-5 pt-4 space-y-2 flex-grow">
