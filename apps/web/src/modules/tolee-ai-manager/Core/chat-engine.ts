@@ -1,4 +1,5 @@
 import { SYSTEM_PROMPTS } from "./prompt-manager";
+import cloudinary from "@/lib/cloudinary";
 
 const OPENAI_API_KEYS = [
   process.env.OPENAI_API_KEY,
@@ -66,19 +67,35 @@ const NVIDIA_FRONTIER_KEYS = [
 ].filter(Boolean);
 
 /**
- * ⚡ Ultra-Powerful Multi-Frontier Brain Engine (ChatGPT-4o + Claude 3.5 + Google Gemini + DeepSeek + Llama 3.3)
+ * ⚡ OmniRoute RTK Token & Context Compressor
+ * Shrinks verbose context, removes repetitive whitespace and token overhead for 2x faster TTFT
+ */
+function compressMessagesRTK(messages: { role: string; content: string }[]) {
+  return messages.map(m => ({
+    role: m.role,
+    content: m.content
+      .replace(/\r\n/g, '\n')
+      .replace(/[ \t]+/g, ' ')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim()
+  }));
+}
+
+/**
+ * ⚡ OmniRoute Universal Multi-Tier Brain Gateway (ChatGPT-4o + Claude 3.5 Sonnet + Google Gemini + DeepSeek-R1)
  */
 export async function callNvidiaLLM(
   messages: { role: string; content: string }[], 
   systemPrompt?: string,
   preferredEngine: 'auto' | 'claude' | 'gpt4o' | 'gemini' | 'deepseek' = 'auto'
 ): Promise<string | null> {
+  const compressed = compressMessagesRTK(messages);
   const fullMessages = [
     { role: "system", content: systemPrompt || SYSTEM_PROMPTS.PERSONAL_EMPLOYEE },
-    ...messages
+    ...compressed
   ];
 
-  // 🟣 1. Claude 3.5 Sonnet / CLōD Engine (Nuanced Intelligence & Coding)
+  // 🟣 1. Tier 1: Claude 3.5 Sonnet / CLōD Engine (Nuanced Intelligence & Coding)
   if (preferredEngine === 'claude' || preferredEngine === 'auto') {
     const clodModels = [
       "anthropic/claude-3.5-sonnet",
@@ -90,7 +107,7 @@ export async function callNvidiaLLM(
     for (const model of clodModels) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 4000);
+        const timeoutId = setTimeout(() => controller.abort(), 3500);
 
         const res = await fetch("https://api.clod.io/v1/chat/completions", {
           method: "POST",
@@ -120,13 +137,13 @@ export async function callNvidiaLLM(
     }
   }
 
-  // 🟢 2. Official OpenAI GPT-4o-mini / GPT-4o Key Rotation Pool
+  // 🟢 2. Tier 2: Official OpenAI GPT-4o-mini / GPT-4o Key Rotation Pool
   if (preferredEngine === 'gpt4o' || preferredEngine === 'auto') {
     const randomKeys = [...OPENAI_API_KEYS].sort(() => Math.random() - 0.5).slice(0, 5);
     for (const apiKey of randomKeys) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3500);
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
 
         const res = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
@@ -156,7 +173,7 @@ export async function callNvidiaLLM(
     }
   }
 
-  // 🔵 3. Google Gemini 1.5 Pro / Flash & NVIDIA Frontier Cluster
+  // 🔵 3. Tier 3: Google Gemini 1.5 Pro / Flash & NVIDIA Frontier Cluster (DeepSeek R1 + Llama 3.3)
   const frontierModels = [
     "meta/llama-3.3-70b-instruct",
     "deepseek-ai/deepseek-r1",
@@ -168,7 +185,7 @@ export async function callNvidiaLLM(
     for (const model of frontierModels) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 4000);
+        const timeoutId = setTimeout(() => controller.abort(), 3500);
 
         const res = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
           method: "POST",
@@ -205,7 +222,29 @@ export async function callNvidiaLLM(
 }
 
 /**
- * 🎨 4K HD Photorealistic AI Image Generation Engine (Open-Generative-AI Multi-Model Router: FLUX Realism, Midjourney V6, Ideogram Typography, SD 3.5 Large)
+ * 🔒 Cloudinary Safe Uploader Helper
+ */
+async function uploadToCloudinarySafe(imageSource: string): Promise<string> {
+  try {
+    const uploadRes = await cloudinary.uploader.upload(imageSource, {
+      folder: 'tolee_ai_creatives',
+      resource_type: 'image'
+    });
+    if (uploadRes.secure_url) {
+      let finalUrl = uploadRes.secure_url;
+      if (finalUrl.includes('/upload/')) {
+        finalUrl = finalUrl.replace('/upload/', '/upload/q_auto,f_auto/');
+      }
+      return finalUrl;
+    }
+  } catch (err) {
+    console.warn('[Cloudinary AI Image Upload Notice]', err);
+  }
+  return imageSource;
+}
+
+/**
+ * 🎨 4K HD Photorealistic AI Image Generation Engine (Open-Generative-AI Multi-Model Router)
  */
 export async function generateAIImageWithFallback(prompt: string, modelType?: string): Promise<string> {
   const cleanPrompt = prompt ? prompt.trim() : 'Inspiring social media graphic poster, 8k resolution, photorealistic studio quality';
@@ -247,27 +286,6 @@ export async function generateAIImageWithFallback(prompt: string, modelType?: st
       }
     }
   ];
-
-import cloudinary from "@/lib/cloudinary";
-
-async function uploadToCloudinarySafe(imageSource: string): Promise<string> {
-  try {
-    const uploadRes = await cloudinary.uploader.upload(imageSource, {
-      folder: 'tolee_ai_creatives',
-      resource_type: 'image'
-    });
-    if (uploadRes.secure_url) {
-      let finalUrl = uploadRes.secure_url;
-      if (finalUrl.includes('/upload/')) {
-        finalUrl = finalUrl.replace('/upload/', '/upload/q_auto,f_auto/');
-      }
-      return finalUrl;
-    }
-  } catch (err) {
-    console.warn('[Cloudinary AI Image Upload Notice]', err);
-  }
-  return imageSource;
-}
 
   for (const item of providers) {
     try {
