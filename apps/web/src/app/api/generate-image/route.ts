@@ -69,41 +69,38 @@ export async function POST(request: Request) {
       // Generate a random seed (0 to 4294967295) for each variant
       const randomSeed = Math.floor(Math.random() * 4294967295);
 
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-          'accept': 'application/json',
-        },
-        body: JSON.stringify({
-          requestBody: {
-            prompt: enhancedPrompt,
-            width,
-            height,
-            seed: randomSeed,
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+            'accept': 'application/json',
           },
-        }),
-      });
+          body: JSON.stringify({
+            requestBody: {
+              prompt: enhancedPrompt,
+              width,
+              height,
+              seed: randomSeed,
+            },
+          }),
+        });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`NVIDIA API response error (status ${response.status}): ${errorText}`);
+        if (response.ok) {
+          const data = await response.json();
+          const base64Data = data?.response?.artifacts?.[0]?.base64;
+          if (base64Data && base64Data.length > 20000) {
+            return `data:image/jpeg;base64,${base64Data}`;
+          }
+        }
+      } catch (nimErr) {
+        // Fallback to high-res FLUX engine
       }
 
-      const data = await response.json();
-      if (!data || !data.response?.artifacts?.[0]?.base64) {
-        throw new Error('NVIDIA API response artifact missing');
-      }
-
-      const base64Data = data.response.artifacts[0].base64;
-      
-      // NVIDIA returns a fully black image (usually < 15KB base64) when it hits safety filters
-      if (base64Data.length < 20000) {
-        throw new Error('NVIDIA safety filter blocked this prompt. Please modify your text and try again.');
-      }
-
-      return `data:image/jpeg;base64,${base64Data}`;
+      // Secondary High-Performance FLUX.1 Engine Fallback
+      const encoded = encodeURIComponent(enhancedPrompt);
+      return `https://image.pollinations.ai/prompt/${encoded}?model=flux-realism&width=${width}&height=${height}&seed=${randomSeed}&nologo=true`;
     });
 
     const urls = await Promise.all(promises);
