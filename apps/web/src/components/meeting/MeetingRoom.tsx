@@ -15,13 +15,14 @@ import { Track, Room } from 'livekit-client';
 import { 
   Mic, MicOff, Video, VideoOff, Monitor, PhoneOff, 
   MessageSquare, Users, BarChart3, HelpCircle, Hand, 
-  Sparkles, ShieldAlert, Lock, Unlock, Settings, Loader2
+  Sparkles, ShieldAlert, Lock, Unlock, Settings, Loader2, Captions
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import MeetingSidebar from './MeetingSidebar';
 import { sendMeetingInvitationToAllMembers, updateMeetingStatus } from '@/actions/meeting';
 import { io, Socket } from 'socket.io-client';
+import { useSpeechToText } from '@/hooks/useSpeechToText';
 
 const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 
   (typeof window !== 'undefined' 
@@ -156,6 +157,28 @@ function MeetingRoomInner({ meeting, meetingCode, currentUser, onLeave }: {
   const [invitesSent, setInvitesSent] = useState(false);
   const [isRecording, setIsRecording] = useState(meeting?.isRecording ?? false);
   const [hasStartedConnecting, setHasStartedConnecting] = useState(false);
+  const [liveCaptionsEnabled, setLiveCaptionsEnabled] = useState(false);
+  const [liveSubtitle, setLiveSubtitle] = useState('');
+
+  const { isListening, startListening, stopListening } = useSpeechToText({
+    language: 'hi-IN',
+    continuous: true,
+    interimResults: true,
+    onResult: (spokenText) => {
+      setLiveSubtitle(spokenText);
+    }
+  });
+
+  const toggleLiveCaptions = () => {
+    if (liveCaptionsEnabled) {
+      stopListening();
+      setLiveCaptionsEnabled(false);
+      setLiveSubtitle('');
+    } else {
+      startListening();
+      setLiveCaptionsEnabled(true);
+    }
+  };
 
   useEffect(() => {
     if (connectionState === 'connecting' || connectionState === 'connected') {
@@ -538,6 +561,19 @@ function MeetingRoomInner({ meeting, meetingCode, currentUser, onLeave }: {
                   ))}
                 </div>
               )}
+
+              {/* Live Captions Subtitle Overlay */}
+              {liveCaptionsEnabled && (
+                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 max-w-2xl w-[90%] bg-black/80 backdrop-blur-md text-white text-center py-2.5 px-5 rounded-2xl border border-white/10 shadow-2xl z-40 animate-in fade-in">
+                  <div className="flex items-center justify-center gap-2 mb-1">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                    <span className="text-[10px] font-bold tracking-wider uppercase text-emerald-400">Live Transcription (STT)</span>
+                  </div>
+                  <p className="text-sm sm:text-base font-medium text-zinc-100">
+                    {liveSubtitle || '🎙️ Listening to speaker...'}
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -610,8 +646,23 @@ function MeetingRoomInner({ meeting, meetingCode, currentUser, onLeave }: {
                 ? 'bg-amber-500/20 border-amber-500/30 text-amber-400 hover:bg-amber-500/30' 
                 : 'bg-zinc-800 border-zinc-700 hover:bg-zinc-700 text-white'
             }`}
+            title="Raise Hand"
           >
             <Hand className="w-5 h-5" />
+          </Button>
+
+          {/* Live Captions / Transcription Button */}
+          <Button
+            size="icon"
+            onClick={toggleLiveCaptions}
+            className={`w-12 h-12 rounded-full border transition-all ${
+              liveCaptionsEnabled 
+                ? 'bg-emerald-600 border-emerald-500 text-white shadow-lg shadow-emerald-600/30 animate-pulse' 
+                : 'bg-zinc-800 border-zinc-700 hover:bg-zinc-700 text-zinc-300'
+            }`}
+            title={liveCaptionsEnabled ? "Disable Live Captions" : "Enable Live Captions (Speech to Text)"}
+          >
+            <Captions className="w-5 h-5" />
           </Button>
 
           {/* Quick Reaction Bar */}

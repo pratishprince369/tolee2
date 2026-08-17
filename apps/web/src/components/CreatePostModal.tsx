@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Image as ImageIcon, Video, Paperclip, CheckCircle2, ShieldCheck, Globe, Trophy, X, Sparkles, Newspaper, ChevronDown } from 'lucide-react';
+import { Image as ImageIcon, Video, Paperclip, CheckCircle2, ShieldCheck, Globe, Trophy, X, Sparkles, Newspaper, ChevronDown, Mic, MicOff } from 'lucide-react';
 
 import { getSidebarData } from '@/actions/user';
 import { useSession } from 'next-auth/react';
@@ -16,6 +16,7 @@ import { useUpload } from './UploadContext';
 import { PostCarousel } from '@/components/PostCarousel';
 import { askAIWriter } from '@/actions/ai-helper';
 import { saveDraft } from '@/lib/draftManager';
+import { useSpeechToText } from '@/hooks/useSpeechToText';
 
 export function CreatePostModal({ 
   children, 
@@ -60,6 +61,23 @@ export function CreatePostModal({
   const [seoTags, setSeoTags] = useState('');
   const [showSeoSettings, setShowSeoSettings] = useState(false);
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+
+  // Voice Dictation Hook
+  const { isListening, isSupported, startListening, stopListening } = useSpeechToText({
+    language: 'hi-IN',
+    continuous: true,
+    onResult: (spokenText) => {
+      setContent(spokenText);
+    }
+  });
+
+  const toggleVoiceDictation = () => {
+    if (isListening) {
+      stopListening();
+    } else {
+      startListening();
+    }
+  };
 
   // Drag & drop state
   const [isDragging, setIsDragging] = useState(false);
@@ -431,6 +449,24 @@ export function CreatePostModal({
                 className="hidden" 
                 multiple
               />
+              {/* Voice Dictation Button */}
+              {isSupported && (
+                <Button
+                  type="button"
+                  onClick={toggleVoiceDictation}
+                  variant="ghost"
+                  className={`rounded-xl h-9 px-2.5 font-bold text-xs flex items-center gap-1.5 border shadow-sm transition-all duration-200 ${
+                    isListening
+                      ? 'bg-red-500 hover:bg-red-600 text-white border-red-400 animate-pulse shadow-md shadow-red-500/30'
+                      : 'text-teal-600 hover:text-teal-700 hover:bg-teal-50 dark:hover:bg-teal-950/40 border-teal-200/60 dark:border-teal-800/50 bg-teal-50/30 dark:bg-teal-950/20'
+                  }`}
+                  title={isListening ? "Stop Voice Recording" : "Voice Dictate (बोलकर लिखें)"}
+                >
+                  <Mic className={`w-3.5 h-3.5 ${isListening ? 'animate-bounce' : ''}`} />
+                  <span>{isListening ? 'Listening...' : 'Voice Type'}</span>
+                </Button>
+              )}
+
               {!videoOnly && (
                 <>
                   <Button 

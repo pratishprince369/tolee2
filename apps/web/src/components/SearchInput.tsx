@@ -2,10 +2,11 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, X, Clock, TrendingUp, User, Users, Tag, ShoppingBag, ArrowRight } from 'lucide-react';
+import { Search, X, Clock, TrendingUp, User, Users, Tag, ShoppingBag, ArrowRight, Mic, MicOff } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useSpeechToText } from '@/hooks/useSpeechToText';
 import {
   getSearchSuggestions,
   getSearchHistory,
@@ -25,6 +26,30 @@ export function SearchInput() {
   const [placeholder, setPlaceholder] = useState('Search...');
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const { isListening, isSupported, startListening, stopListening } = useSpeechToText({
+    language: 'hi-IN',
+    onResult: (spokenText) => {
+      setQuery(spokenText);
+      setIsOpen(true);
+    },
+    onEnd: () => {
+      // Auto search if text spoken
+      if (query.trim().length > 0) {
+        handleSubmit(query);
+      }
+    }
+  });
+
+  const toggleVoiceSearch = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isListening) {
+      stopListening();
+    } else {
+      startListening();
+      setIsOpen(true);
+    }
+  };
 
   useEffect(() => {
     const handleResize = () => {
@@ -194,21 +219,41 @@ export function SearchInput() {
             loadHistory();
           }}
           onKeyDown={handleKeyDown}
-          placeholder={placeholder}
-          className="w-full pl-10 pr-9 bg-gray-50/80 dark:bg-zinc-900/40 border border-gray-100 dark:border-zinc-900 rounded-full h-10 text-sm transition-all duration-300 focus-visible:ring-2 focus-visible:ring-[#0a7c85]/20 focus-visible:border-[#0a7c85] focus-visible:bg-white dark:focus-visible:bg-zinc-950 focus:shadow-sm"
+          placeholder={isListening ? '🎙️ Listening... (बोलिए)' : placeholder}
+          className={`w-full pl-10 pr-16 bg-gray-50/80 dark:bg-zinc-900/40 border rounded-full h-10 text-sm transition-all duration-300 focus-visible:ring-2 focus-visible:ring-[#0a7c85]/20 focus-visible:border-[#0a7c85] focus-visible:bg-white dark:focus-visible:bg-zinc-950 focus:shadow-sm ${
+            isListening ? 'border-teal-500 ring-2 ring-teal-500/20 bg-teal-50/30' : 'border-gray-100 dark:border-zinc-900'
+          }`}
         />
-        {query && (
-          <button
-            onClick={() => {
-              setQuery('');
-              setSuggestions([]);
-              inputRef.current?.focus();
-            }}
-            className="absolute right-3.5 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-gray-200 dark:hover:bg-zinc-800 transition-colors"
-          >
-            <X className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300" />
-          </button>
-        )}
+        <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+          {query && (
+            <button
+              onClick={() => {
+                setQuery('');
+                setSuggestions([]);
+                inputRef.current?.focus();
+              }}
+              className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-zinc-800 transition-colors"
+            >
+              <X className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300" />
+            </button>
+          )}
+
+          {/* Voice Search Mic Button */}
+          {isSupported && (
+            <button
+              type="button"
+              onClick={toggleVoiceSearch}
+              title={isListening ? "Stop listening" : "Voice Search (बोलकर खोजें)"}
+              className={`p-1.5 rounded-full transition-all duration-200 ${
+                isListening
+                  ? 'bg-red-500 text-white animate-pulse shadow-md shadow-red-500/30'
+                  : 'text-gray-400 hover:text-[#0a7c85] hover:bg-gray-100 dark:hover:bg-zinc-800'
+              }`}
+            >
+              <Mic className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Floating Suggestions Overlay Dropdown */}

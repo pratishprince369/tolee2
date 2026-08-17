@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Mic, Send, Camera, FileText, Sparkles, MessageSquare, Paperclip, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useSpeechToText } from '@/hooks/useSpeechToText';
 
 interface VoiceInputDockProps {
   onSendMessage: (text: string) => void;
@@ -12,7 +13,16 @@ interface VoiceInputDockProps {
 
 export function VoiceInputDock({ onSendMessage, isLoading = false }: VoiceInputDockProps) {
   const [input, setInput] = useState('');
-  const [isRecording, setIsRecording] = useState(false);
+
+  const { isListening, startListening, stopListening, isSupported } = useSpeechToText({
+    language: typeof window !== 'undefined' ? (localStorage.getItem('tolee_native_lang') || 'hi-IN') : 'hi-IN',
+    onResult: (spokenText) => {
+      if (spokenText && spokenText.trim()) {
+        setInput('');
+        onSendMessage(spokenText.trim());
+      }
+    }
+  });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,31 +32,10 @@ export function VoiceInputDock({ onSendMessage, isLoading = false }: VoiceInputD
   };
 
   const toggleRecording = () => {
-    if (!isRecording) {
-      setIsRecording(true);
-      if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-        const recognition = new SpeechRecognition();
-        const savedLang = localStorage.getItem('tolee_native_lang') || 'hi-IN';
-        recognition.lang = savedLang;
-        recognition.onresult = (event: any) => {
-          const transcript = event.results[0][0]?.transcript;
-          setIsRecording(false);
-          if (transcript && transcript.trim()) {
-            setInput('');
-            onSendMessage(transcript.trim());
-          }
-        };
-        recognition.onerror = () => setIsRecording(false);
-        recognition.onend = () => setIsRecording(false);
-        recognition.start();
-      } else {
-        setTimeout(() => {
-          setIsRecording(false);
-        }, 1500);
-      }
+    if (isListening) {
+      stopListening();
     } else {
-      setIsRecording(false);
+      startListening();
     }
   };
 
@@ -114,9 +103,9 @@ export function VoiceInputDock({ onSendMessage, isLoading = false }: VoiceInputD
             <Input 
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder={isRecording ? 'Listening... Speak now...' : 'Ask your AI Personal Employee...'}
+              placeholder={isListening ? '🎙️ Listening... (बोलिए)...' : 'Ask your AI Personal Employee...'}
               className={`w-full rounded-full pl-3.5 pr-9 py-4 sm:py-5 border-slate-200 dark:border-zinc-800 text-xs sm:text-sm focus-visible:ring-violet-500 ${
-                isRecording ? 'bg-rose-50 dark:bg-rose-950/30 border-rose-400 animate-pulse' : 'bg-slate-50 dark:bg-zinc-900'
+                isListening ? 'bg-rose-50 dark:bg-rose-950/30 border-rose-400 animate-pulse ring-2 ring-rose-500/20' : 'bg-slate-50 dark:bg-zinc-900'
               }`}
             />
             <Button 
@@ -125,9 +114,9 @@ export function VoiceInputDock({ onSendMessage, isLoading = false }: VoiceInputD
               size="icon"
               variant="ghost"
               className={`absolute right-1 top-1/2 -translate-y-1/2 rounded-full w-7 h-7 sm:w-8 sm:h-8 ${
-                isRecording ? 'text-rose-600 animate-bounce' : 'text-slate-400 hover:text-violet-600'
+                isListening ? 'text-rose-600 animate-bounce bg-rose-100 dark:bg-rose-900/50' : 'text-slate-400 hover:text-violet-600'
               }`}
-              title="Voice Assistant"
+              title="Voice Assistant (बोलकर पूछें)"
             >
               <Mic className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </Button>
