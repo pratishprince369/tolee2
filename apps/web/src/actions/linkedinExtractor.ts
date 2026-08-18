@@ -47,7 +47,9 @@ export async function searchAndExtractLinkedInLeads(params: {
   company?: string;
   location?: string;
   count?: number;
-}): Promise<{ success: boolean; leads?: ExtractedLeadItem[]; error?: string }> {
+  page?: number;
+  totalPages?: number;
+}): Promise<{ success: boolean; leads?: ExtractedLeadItem[]; error?: string; totalFound?: number }> {
   try {
     const session = await getServerSession(authOptions);
     const userId = (session?.user as any)?.id || null;
@@ -56,7 +58,9 @@ export async function searchAndExtractLinkedInLeads(params: {
     let targetCompany = params.company?.trim() || '';
     let targetLocation = params.location?.trim() || '';
     let rawContent = params.rawText?.trim() || '';
-    const requestCount = Math.min(Math.max(params.count || 9, 1), 25);
+    let requestedPage = params.page || 1;
+    let totalPagesToScan = params.totalPages || 1;
+    const requestCount = Math.min(Math.max(params.count || (totalPagesToScan * 10), 10), 100);
 
     // If input was provided in URL box, normalize and parse
     if (params.linkedinUrl?.trim()) {
