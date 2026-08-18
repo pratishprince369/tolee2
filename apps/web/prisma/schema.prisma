@@ -1794,3 +1794,28 @@ model AIReminder {
   completedAt   DateTime?
   lastSnoozedAt DateTime?
 }
+
+// ---------------------------------------------------------
+// TOLEE WORLD APP: LINKEDIN EXTRACTOR (SCOUT OSINT ENGINE)
+// Stored in tolee-1 database (DATABASE_URL_AI / prismaAI)
+// ---------------------------------------------------------
+model LinkedInLead {
+  id          String   @id @default(cuid())
+  userId      String?
+  fullName    String
+  role        String
+  company     String
+  domain      String?
+  phone       String?
+  email       String?
+  isVerified  Boolean  @default(true)
+  location    String?
+  linkedinUrl String?
+  score       Int      @default(100)
+  searchQuery String?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([searchQuery])
+}
+
