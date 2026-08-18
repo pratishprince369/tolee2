@@ -22,12 +22,9 @@ const globalForPrismaAI = globalThis as unknown as {
 };
 
 if (!globalForPrismaAI.prismaAI) {
+  const dbUrl = process.env.DATABASE_URL_AI || process.env.DATABASE_URL;
   globalForPrismaAI.prismaAI = new PrismaClient({
-    datasources: {
-      db: {
-        url: process.env.DATABASE_URL_AI,
-      },
-    },
+    ...(dbUrl ? { datasources: { db: { url: dbUrl } } } : {}),
     log: [
       { emit: 'stdout', level: 'error' },
       { emit: 'stdout', level: 'warn' },
