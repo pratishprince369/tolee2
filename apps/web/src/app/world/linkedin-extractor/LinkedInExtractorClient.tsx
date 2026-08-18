@@ -1,7 +1,9 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import { 
   Search, 
   Download, 
@@ -31,6 +33,9 @@ import {
 } from '@/actions/linkedinExtractor';
 
 export default function LinkedInExtractorClient() {
+  const { status } = useSession();
+  const router = useRouter();
+
   const [linkedinUrl, setLinkedinUrl] = useState('');
   const [searchFilter, setSearchFilter] = useState('');
   const [pagesToScan, setPagesToScan] = useState<number>(1);
@@ -43,6 +48,23 @@ export default function LinkedInExtractorClient() {
   // Table pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/auth/signin?callbackUrl=' + encodeURIComponent('/world/linkedin-extractor'));
+    }
+  }, [status, router]);
+
+  if (status === 'loading' || status === 'unauthenticated') {
+    return (
+      <div className="min-h-screen bg-[#070b13] text-gray-200 p-6 flex flex-col justify-center items-center">
+        <div className="w-12 h-12 border-4 border-t-cyan-500 border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin"></div>
+        <p className="mt-4 text-gray-400 text-sm font-medium animate-pulse">
+          {status === 'unauthenticated' ? 'Authentication required. Redirecting to login...' : 'Loading LinkedIn Lead Extractor...'}
+        </p>
+      </div>
+    );
+  }
 
   const showToast = (msg: string) => {
     setNotification(msg);

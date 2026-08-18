@@ -52,6 +52,9 @@ export async function searchAndExtractLinkedInLeads(params: {
 }): Promise<{ success: boolean; leads?: ExtractedLeadItem[]; error?: string; totalFound?: number }> {
   try {
     const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return { success: false, error: 'Authentication required. Please sign in or create an account to use Tolee World tools.' };
+    }
     const userId = (session?.user as any)?.id || null;
 
     let targetRole = params.role?.trim() || '';

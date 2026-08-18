@@ -123,6 +123,11 @@ export async function extractAndRebuildResumeFromText(rawText: string): Promise<
   error?: string;
 }> {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return { success: false, error: 'Authentication required. Please sign in to use Tolee AI Resume Builder.' };
+    }
+
     if (!rawText || rawText.trim().length < 20) {
       return { success: false, error: 'Uploaded file contains insufficient text. Please try another file or enter details manually.' };
     }

@@ -29,13 +29,15 @@ export default function WorldDashboardPage() {
 
   useEffect(() => {
     if (status === 'unauthenticated') {
-      router.push('/auth/signin');
+      router.push('/auth/signin?callbackUrl=' + encodeURIComponent('/world'));
     }
   }, [status, router]);
 
   useEffect(() => {
-    loadTools();
-  }, []);
+    if (status === 'authenticated') {
+      loadTools();
+    }
+  }, [status]);
 
   const loadTools = async () => {
     setLoading(true);
@@ -53,11 +55,13 @@ export default function WorldDashboardPage() {
     return t.category === selectedCategory;
   });
 
-  if (status === 'loading') {
+  if (status === 'loading' || status === 'unauthenticated') {
     return (
       <div className="min-h-screen bg-[#070b13] text-gray-200 p-6 flex flex-col justify-center items-center">
         <div className="w-12 h-12 border-4 border-t-cyan-500 border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin"></div>
-        <p className="mt-4 text-gray-400 text-sm font-medium animate-pulse">Loading Tolee World...</p>
+        <p className="mt-4 text-gray-400 text-sm font-medium animate-pulse">
+          {status === 'unauthenticated' ? 'Authentication required. Redirecting to login...' : 'Loading Tolee World...'}
+        </p>
       </div>
     );
   }

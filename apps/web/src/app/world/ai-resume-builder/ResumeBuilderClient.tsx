@@ -1,7 +1,7 @@
-'use client';
-
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import { 
   FileText, 
   Sparkles, 
@@ -70,10 +70,30 @@ const DEFAULT_BLANK_RESUME: ResumeData = {
 };
 
 export default function ResumeBuilderClient() {
+  const { status } = useSession();
+  const router = useRouter();
+
   // Navigation & Mode States
   const [viewMode, setViewMode] = useState<'START' | 'UPLOAD' | 'STUDIO'>('START');
   const [studioStep, setStudioStep] = useState<number>(1);
   const [mobileTab, setMobileTab] = useState<'editor' | 'preview'>('editor');
+
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/auth/signin?callbackUrl=' + encodeURIComponent('/world/ai-resume-builder'));
+    }
+  }, [status, router]);
+
+  if (status === 'loading' || status === 'unauthenticated') {
+    return (
+      <div className="min-h-screen bg-[#070b13] text-gray-200 p-6 flex flex-col justify-center items-center">
+        <div className="w-12 h-12 border-4 border-t-cyan-500 border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin"></div>
+        <p className="mt-4 text-gray-400 text-sm font-medium animate-pulse">
+          {status === 'unauthenticated' ? 'Authentication required. Redirecting to login...' : 'Loading AI Resume Studio...'}
+        </p>
+      </div>
+    );
+  }
 
   // Resume Data State
   const [resume, setResume] = useState<ResumeData>(DEFAULT_BLANK_RESUME);
