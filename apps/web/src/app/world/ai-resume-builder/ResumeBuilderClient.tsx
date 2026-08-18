@@ -874,6 +874,30 @@ export default function ResumeBuilderClient() {
           {/* STEP 2: PROFESSIONAL SUMMARY */}
           {studioStep === 2 && (
             <div className="space-y-3 text-xs animate-in fade-in">
+              <div className="grid grid-cols-2 gap-3 mb-2">
+                <div>
+                  <label className="block text-gray-300 font-semibold mb-1">Career Seniority Level</label>
+                  <select
+                    className="w-full bg-[#060c16] border border-[#182842] rounded-xl px-3 py-2 text-white focus:outline-none focus:border-cyan-500/60 font-semibold"
+                  >
+                    <option value="Fresher">Fresher / Graduate</option>
+                    <option value="Entry Level">Entry Level (1-2 yrs)</option>
+                    <option value="Mid Level" selected>Mid Level (3-5 yrs)</option>
+                    <option value="Senior">Senior (5-8 yrs)</option>
+                    <option value="Manager / Lead">Manager / Tech Lead (8+ yrs)</option>
+                    <option value="Director / Executive">Director / VP / Executive</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-gray-300 font-semibold mb-1">Target Industry / Domain</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Fintech, SaaS, Healthcare"
+                    className="w-full bg-[#060c16] border border-[#182842] rounded-xl px-3 py-2 text-white focus:outline-none focus:border-cyan-500/60"
+                  />
+                </div>
+              </div>
+
               <div className="flex items-center justify-between">
                 <label className="text-gray-300 font-semibold">Professional Summary (3-4 Sentences)</label>
                 <button
@@ -1294,13 +1318,39 @@ export default function ResumeBuilderClient() {
                       <span className="text-[11px] font-bold text-amber-400 block mb-1">
                         ⚠️ Recommended Missing Keywords:
                       </span>
-                      <div className="flex flex-wrap gap-1.5">
+                      <div className="flex flex-wrap gap-1.5 mb-2.5">
                         {atsResult.missingKeywords.map((kw, i) => (
                           <span key={i} className="px-2 py-0.5 rounded bg-amber-950/70 border border-amber-800/50 text-amber-300 font-mono text-[10px]">
                             +{kw}
                           </span>
                         ))}
                       </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const existingTech = resume.skills.find(s => s.category.toLowerCase().includes('tech') || s.category.toLowerCase().includes('skill'));
+                          if (existingTech) {
+                            setResume(prev => ({
+                              ...prev,
+                              skills: prev.skills.map(s => s.category === existingTech.category ? {
+                                ...s,
+                                items: Array.from(new Set([...s.items, ...atsResult.missingKeywords]))
+                              } : s)
+                            }));
+                          } else {
+                            setResume(prev => ({
+                              ...prev,
+                              skills: [...prev.skills, { category: 'Target Job Keywords', items: atsResult.missingKeywords }]
+                            }));
+                          }
+                          showToast('🚀 Missing ATS keywords incorporated into Skills section!');
+                        }}
+                        className="w-full bg-[#112338] hover:bg-[#183252] border border-cyan-700/50 text-cyan-300 font-bold py-1.5 rounded-lg flex items-center justify-center gap-1.5 text-xs transition-all"
+                      >
+                        <Wand2 className="w-3.5 h-3.5" />
+                        <span>⚡ Optimize Resume for This Job (Add Missing Keywords)</span>
+                      </button>
                     </div>
                   )}
 
