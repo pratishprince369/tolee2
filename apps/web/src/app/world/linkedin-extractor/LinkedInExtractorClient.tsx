@@ -98,6 +98,84 @@ export default function LinkedInExtractorClient() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const exportToExcel = () => {
+    if (leads.length === 0) {
+      alert('No leads available to export. Please extract leads first.');
+      return;
+    }
+
+    const tableHtml = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+      <head>
+        <meta charset="utf-8" />
+        <!--[if gte mso 9]>
+        <xml>
+          <x:ExcelWorkbook>
+            <x:ExcelWorksheets>
+              <x:ExcelWorksheet>
+                <x:Name>LinkedIn Leads</x:Name>
+                <x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>
+              </x:ExcelWorksheet>
+            </x:ExcelWorksheets>
+          </x:ExcelWorkbook>
+        </xml>
+        <![endif]-->
+        <style>
+          th { background-color: #0b1220; color: #38bdf8; font-weight: bold; border: 1px solid #ccc; padding: 10px; font-size: 12px; }
+          td { border: 1px solid #ccc; padding: 8px; font-size: 11px; }
+        </style>
+      </head>
+      <body>
+        <table>
+          <thead>
+            <tr>
+              <th>Sr No</th>
+              <th>Score</th>
+              <th>Full Name</th>
+              <th>Designation / Role</th>
+              <th>Company</th>
+              <th>Domain</th>
+              <th>Mobile / Phone</th>
+              <th>Email ID</th>
+              <th>Email Verified</th>
+              <th>Location</th>
+              <th>LinkedIn URL</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${leads.map((l, idx) => `
+              <tr>
+                <td>${idx + 1}</td>
+                <td>${l.score || 100}%</td>
+                <td>${l.fullName || ''}</td>
+                <td>${l.role || ''}</td>
+                <td>${l.company || ''}</td>
+                <td>${l.domain || ''}</td>
+                <td>${l.phone || ''}</td>
+                <td>${l.email || ''}</td>
+                <td>${l.isVerified ? 'VERIFIED' : 'UNVERIFIED'}</td>
+                <td>${l.location || ''}</td>
+                <td>${l.linkedinUrl || ''}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </body>
+      </html>
+    `;
+
+    const blob = new Blob([tableHtml], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `linkedin_leads_${new Date().toISOString().slice(0, 10)}_${leads.length}_contacts.xls`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    showToast(`📊 Downloaded Excel file with ${leads.length} leads!`);
+  };
+
   const exportToCSV = () => {
     if (leads.length === 0) {
       alert('No leads available to export. Please extract leads first.');
@@ -192,22 +270,33 @@ export default function LinkedInExtractorClient() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             {leads.length > 0 && (
               <button
                 onClick={handleClearAll}
-                className="px-3.5 py-2 rounded-xl bg-[#1e131d] border border-red-900/40 hover:bg-red-950/60 text-red-400 font-semibold text-xs transition-all"
+                className="px-3 py-2 rounded-xl bg-[#1e131d] border border-red-900/40 hover:bg-red-950/60 text-red-400 font-semibold text-xs transition-all"
               >
                 Clear Leads
               </button>
             )}
 
             <button
+              onClick={exportToExcel}
+              disabled={leads.length === 0}
+              className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-emerald-950/40 transition-all active:scale-95"
+              title="Download formatted Microsoft Excel (.xls) file"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              <span>Download Excel</span>
+            </button>
+
+            <button
               onClick={exportToCSV}
               disabled={leads.length === 0}
-              className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs sm:text-sm flex items-center gap-2 shadow-lg shadow-emerald-950/40 transition-all active:scale-95"
+              className="px-3.5 py-2 rounded-xl bg-[#112036] hover:bg-[#1a2f4d] border border-cyan-700/50 disabled:opacity-40 disabled:cursor-not-allowed text-cyan-200 font-bold text-xs flex items-center gap-1.5 shadow-lg transition-all active:scale-95"
+              title="Download standard CSV (.csv) file"
             >
-              <Download className="w-4 h-4" />
+              <Download className="w-3.5 h-3.5" />
               <span>Download CSV</span>
             </button>
           </div>
@@ -565,14 +654,26 @@ export default function LinkedInExtractorClient() {
                   </button>
                 </div>
 
-                {/* CSV Download Button */}
-                <button
-                  onClick={exportToCSV}
-                  className="text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-1 ml-2"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Export CSV</span>
-                </button>
+                {/* Excel & CSV Download Buttons */}
+                <div className="flex items-center gap-2 ml-2">
+                  <button
+                    onClick={exportToExcel}
+                    className="text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-1 text-xs"
+                    title="Export formatted Microsoft Excel file"
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5" />
+                    <span>Export Excel</span>
+                  </button>
+                  <span className="text-gray-600">|</span>
+                  <button
+                    onClick={exportToCSV}
+                    className="text-cyan-400 hover:text-cyan-300 font-semibold flex items-center gap-1 text-xs"
+                    title="Export standard CSV file"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Export CSV</span>
+                  </button>
+                </div>
 
               </div>
 
