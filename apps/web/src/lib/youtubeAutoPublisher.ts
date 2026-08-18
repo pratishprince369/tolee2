@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/prisma';
+import { prismaAI as prisma } from '@/lib/prisma-ai'; // 🛡️ AI content goes to tolee-1 DB
 import { REGISTERED_NEWS_ACCOUNTS } from '@/lib/newsAutoPublisher';
 
 export interface YouTubeVideoItem {

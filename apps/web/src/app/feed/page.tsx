@@ -1,6 +1,7 @@
 import { FeedStream } from '@/components/FeedStream';
 import { getPosts } from '@/actions/post';
 import { prisma } from '@/lib/prisma';
+import { prismaAI } from '@/lib/prisma-ai'; // 🛡️ AI content from tolee-1 DB
 
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
@@ -21,21 +22,21 @@ export default async function GlobalFeedPage() {
   
   const currentUserId = (session?.user as any)?.id;
 
-  // 🛡️ Bandwidth Safeguard: Auto-publish fresh news & videos only if latest post is older than 6 hours (Max 10/day)
+  // 🛡️ Bandwidth Safeguard: Auto-publish fresh news & videos only if latest AI post is older than 6 hours (Max 10/day)
   try {
-    const latestPost = await prisma.post.findFirst({
+    const latestAIPost = await prismaAI.post.findFirst({
       where: { isArchived: false, status: 'published' },
       orderBy: { createdAt: 'desc' },
       select: { createdAt: true }
     });
-    const timeSince = latestPost ? Date.now() - new Date(latestPost.createdAt).getTime() : Infinity;
+    const timeSince = latestAIPost ? Date.now() - new Date(latestAIPost.createdAt).getTime() : Infinity;
     if (timeSince > 6 * 60 * 60 * 1000) { // 6 hours interval
       publishDailyNewsBatch(false).catch(() => {});
       publishYouTubeVideosBatch(false).catch(() => {});
     }
   } catch (e) {}
 
-  // Fetch real posts from DB
+  // Fetch real posts from Main DB
   let dbPosts: any[] = [];
   try {
     const res = await getPosts();
@@ -124,6 +125,79 @@ export default async function GlobalFeedPage() {
     }
   } catch (err) {
     console.error("Failed to load DB posts", err);
+  }
+
+  // 🛡️ Fetch AI news/video posts from tolee-1 AI Database and merge into feed
+  try {
+    const aiPosts = await prismaAI.post.findMany({
+      where: { isArchived: false, status: 'published' },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+      select: {
+        id: true, caption: true, postType: true, mediaUrls: true, mediaTypes: true,
+        visibility: true, createdAt: true, isAnonymous: true, location: true, subLocation: true,
+        title: true, price: true, currency: true, category: true, condition: true, locationText: true,
+        newsRelation: { select: { id: true, headline: true, slug: true, summary: true, category: true, readingTime: true, language: true, sourceUrl: true, viewsCount: true } },
+        author: { select: { id: true, name: true, username: true, avatar: true } },
+        tolees: { select: { tolee: { select: { name: true, slug: true, ownerId: true } } } },
+        _count: { select: { likes: true, comments: true, views: true } },
+      }
+    });
+
+    const aiPostsMapped = aiPosts.map((post: any) => {
+      const firstTolee = post.tolees?.[0]?.tolee;
+      return {
+        id: post.id,
+        authorId: post.author?.id,
+        authorIsPrivate: false,
+        isFollowing: false,
+        followStatus: null,
+        visibility: post.visibility || 'public',
+        author: post.author?.username || post.author?.name || 'Tolee News',
+        authorAvatar: post.author?.avatar || '/default-user-avatar.svg',
+        toleeName: firstTolee?.name || 'Tolee',
+        toleeSlug: firstTolee?.slug || 'group',
+        role: 'Admin',
+        time: `${new Date(post.createdAt).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' })} | ${new Date(post.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase()}`,
+        content: post.caption || '',
+        image: post.mediaTypes && post.mediaTypes.split(',')[0] === 'image' ? post.mediaUrls?.split(/,(?=https?:\/\/)/)[0] : null,
+        video: post.mediaTypes && post.mediaTypes.split(',')[0] === 'video' ? post.mediaUrls?.split(/,(?=https?:\/\/)/)[0] : null,
+        mediaUrls: post.mediaUrls,
+        mediaTypes: post.mediaTypes,
+        likes: post._count?.likes || 0,
+        comments: post._count?.comments || 0,
+        views: post._count?.views || 0,
+        reposts: 0,
+        isWin: false,
+        postType: post.postType,
+        location: post.location,
+        subLocation: post.subLocation,
+        likedByMe: false,
+        savedByMe: false,
+        repostedByMe: false,
+        commentsList: [],
+        resharedByUser: null,
+        title: post.title || null,
+        price: post.price || null,
+        currency: post.currency || null,
+        category: post.category || null,
+        condition: post.condition || null,
+        locationText: post.locationText || null,
+        worldProjectId: null,
+        worldProject: null,
+        newsRelation: post.newsRelation || null,
+        _isAIPost: true, // Flag to identify AI posts in feed
+      };
+    });
+
+    // Merge and sort by time (interleave AI posts with real posts)
+    dbPosts = [...dbPosts, ...aiPostsMapped].sort((a, b) => {
+      const dateA = new Date(a.time?.split(' | ')[0] || 0).getTime();
+      const dateB = new Date(b.time?.split(' | ')[0] || 0).getTime();
+      return dateB - dateA;
+    });
+  } catch (err) {
+    console.error("Failed to load AI posts from tolee-1", err);
   }
 
   return <FeedStream initialPosts={dbPosts} />;

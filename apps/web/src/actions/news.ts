@@ -1,6 +1,7 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
+import { prismaAI } from '@/lib/prisma-ai'; // 🛡️ AI news posts are on tolee-1 DB
 import { revalidatePath } from 'next/cache';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
@@ -380,7 +381,7 @@ export async function deleteNews(postId: string) {
 // 4. Retrieve single News Post by Slug
 export async function getNewsBySlug(slug: string) {
   try {
-    let news = await prisma.newsPost.findUnique({
+    let news = await prismaAI.newsPost.findUnique({ // 🛡️ AI news on tolee-1 DB
       where: { slug },
       include: {
         post: {
@@ -712,7 +713,7 @@ export async function getNewsFeedPosts(options: {
         }
       : {};
 
-    const newsList = await prisma.newsPost.findMany({
+    const newsList = await prismaAI.newsPost.findMany({ // 🛡️ AI news on tolee-1 DB
       where: {
         post: {
           status: 'published',

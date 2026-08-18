@@ -830,12 +830,13 @@ export default function SuperAdminOverview() {
           </div>
         </div>
 
-        {/* Metric Cards Row */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 14 }}>
-          <StatCard icon="📊" label="Transfer This Month" value={`${m.infraUsage?.databaseTransferGB?.toFixed(3) || '0.000'} GB`} sub={`${m.infraUsage?.transferPercentage?.toFixed(1) || 0}% of 1 GB target`} color={m.infraUsage?.transferStatus === 'CRITICAL' ? '#ef4444' : m.infraUsage?.transferStatus === 'WARNING' ? '#f59e0b' : '#22c55e'} />
+        {/* Metric Cards Row — Dual Database */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 14 }}>
+          <StatCard icon="🗄️" label="Main DB (Real Users)" value={`${m.infraUsage?.databaseTransferGB?.toFixed(3) || '0.000'} GB`} sub={`${m.infraUsage?.transferPercentage?.toFixed(1) || 0}% of 1 GB target`} color={m.infraUsage?.transferStatus === 'CRITICAL' ? '#ef4444' : m.infraUsage?.transferStatus === 'WARNING' ? '#f59e0b' : '#22c55e'} />
+          <StatCard icon="🤖" label="AI DB (tolee-1)" value={`${m.infraUsage?.aiDatabaseTransferGB?.toFixed(3) || '0.000'} GB`} sub={`${m.infraUsage?.aiDbPostCount || 0} AI posts stored`} color="#3b82f6" />
           <StatCard icon="📰" label="AI News Today" value={`${m.infraUsage?.todayNewsCount || 0} / ${m.infraUsage?.dailyNewsLimit || 10}`} sub="Daily auto-publish limit" color={(m.infraUsage?.todayNewsCount || 0) >= 10 ? '#ef4444' : '#3b82f6'} />
           <StatCard icon="📅" label="News This Month" value={m.infraUsage?.monthlyNewsCount || 0} sub="Total AI news posts" color="#a78bfa" />
-          <StatCard icon="🎯" label="Max Monthly Limit" value={`${m.infraUsage?.maxMonthlyLimitGB || 5} GB`} sub="Neon Free Tier ceiling" color="#71717a" />
+          <StatCard icon="✅" label="Dual-DB Active" value={m.infraUsage?.dualDbActive ? 'YES' : 'NO'} sub="AI split to tolee-1" color="#22c55e" />
         </div>
       </div>
 
