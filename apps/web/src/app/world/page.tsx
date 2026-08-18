@@ -86,19 +86,11 @@ export default function WorldDashboardPage() {
             </div>
 
             <div>
-              <div className="flex items-center gap-2 mb-1.5">
-                <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-800/50">
-                  OFFICIAL AI APPS STUDIO
-                </span>
-                <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800/50 flex items-center gap-1">
-                  <Database className="w-2.5 h-2.5" /> tolee-1 Isolated DB
-                </span>
-              </div>
               <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
                 Tolee World
               </h1>
               <p className="text-xs sm:text-sm text-gray-400 mt-1 max-w-xl">
-                Explore curated AI apps and OSINT tools published by Tolee. Each application runs with dedicated storage on the secondary database.
+                Explore curated AI apps and productivity tools published by Tolee.
               </p>
             </div>
           </div>
@@ -223,8 +215,8 @@ export default function WorldDashboardPage() {
 
                   {/* Bottom Action Footer */}
                   <div className="pt-4 border-t border-[#142036] flex items-center justify-between">
-                    <div className="text-[11px] text-gray-500 font-mono">
-                      Isolated tolee-1
+                    <div className="text-[11px] text-gray-500 font-medium">
+                      {tool.category}
                     </div>
 
                     <Link
