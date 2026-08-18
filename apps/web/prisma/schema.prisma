@@ -1797,6 +1797,9 @@ model AIReminder {
 
 // ---------------------------------------------------------
 // TOLEE WORLD APP: LINKEDIN EXTRACTOR (SCOUT OSINT ENGINE)
+// ---------------------------------------------------------
+// Tolee World AI Tool Governance & Monetization Model
+// Controlled exclusively by Super Admin / Platform Owner
 // Stored in tolee-1 database (DATABASE_URL_AI / prismaAI)
 // ---------------------------------------------------------
 model LinkedInLead {
@@ -1818,4 +1821,34 @@ model LinkedInLead {
   @@index([userId])
   @@index([searchQuery])
 }
+
+// ---------------------------------------------------------
+// Tolee World AI Tool Governance & Monetization Model
+// Controlled exclusively by Super Admin / Platform Owner
+// Stored in tolee-1 database (DATABASE_URL_AI / prismaAI)
+// ---------------------------------------------------------
+model WorldTool {
+  id            String    @id @default(cuid())
+  name          String
+  slug          String    @unique
+  description   String
+  routeUrl      String
+  icon          String    @default("Zap")
+  category      String    @default("Lead Generation")
+  badge         String?   @default("NEW")
+  isVisible     Boolean   @default(true)
+  accessType    String    @default("FREE") // "FREE", "PAID", "TIMED_FREE"
+  priceMonthly  Float     @default(0)
+  freeTrialDays Int?      @default(7)
+  freeUntil     DateTime?
+  order         Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([slug])
+  @@index([isVisible])
+  @@index([accessType])
+}
+
+
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
+import WorldToolsManager from '@/components/super-admin/WorldToolsManager';
 
 interface Metrics {
   users: { 
@@ -1029,6 +1030,9 @@ export default function SuperAdminOverview() {
           </div>
         </div>
       </div>
+
+      {/* 🌍 Tolee World AI Tools Governance & Monetization Manager */}
+      <WorldToolsManager />
 
       {/* Realtime Presence Explorer */}
       <div style={{ background: '#0d0d0f', border: '1px solid #1c1c1e', borderRadius: 16, padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
