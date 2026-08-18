@@ -789,54 +789,137 @@ export default function SuperAdminOverview() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
           <div>
             <h3 style={{ color: '#fff', fontSize: 16, fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-              🛡️ Network Transfer & AI News Safeguard
+              🛡️ Database Health & Network Transfer Monitor
               <span style={{
                 fontSize: 10, fontWeight: 700,
+                color: m.infraUsage?.dualDbActive ? '#4ade80' : '#fbbf24',
+                background: m.infraUsage?.dualDbActive ? '#052e16' : '#451a03',
+                border: `1px solid ${m.infraUsage?.dualDbActive ? '#14532d' : '#92400e'}`,
+                padding: '2px 8px', borderRadius: 12
+              }}>
+                {m.infraUsage?.dualDbActive ? '2 DATABASES ACTIVE' : 'SINGLE DB'}
+              </span>
+            </h3>
+            <p style={{ color: '#71717a', fontSize: 12, margin: '4px 0 0' }}>Real-time storage & bandwidth tracker for both databases. AI content is isolated on tolee-1.</p>
+          </div>
+        </div>
+
+        {/* Dual Database Progress Bars */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 20 }}>
+
+          {/* Main DB Card */}
+          <div style={{ background: '#111113', border: '1px solid #1c1c1e', borderRadius: 16, padding: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 22 }}>🗄️</span>
+                <div>
+                  <div style={{ color: '#fff', fontSize: 14, fontWeight: 700 }}>Main Database</div>
+                  <div style={{ color: '#71717a', fontSize: 11 }}>Real Users Only — Login, Chat, Posts</div>
+                </div>
+              </div>
+              <span style={{
+                fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
                 color: m.infraUsage?.transferStatus === 'CRITICAL' ? '#fca5a5' : m.infraUsage?.transferStatus === 'WARNING' ? '#fbbf24' : '#4ade80',
                 background: m.infraUsage?.transferStatus === 'CRITICAL' ? '#450a0a' : m.infraUsage?.transferStatus === 'WARNING' ? '#451a03' : '#052e16',
-                border: `1px solid ${m.infraUsage?.transferStatus === 'CRITICAL' ? '#991b1b' : m.infraUsage?.transferStatus === 'WARNING' ? '#92400e' : '#14532d'}`,
-                padding: '2px 8px', borderRadius: 12
+                border: `1px solid ${m.infraUsage?.transferStatus === 'CRITICAL' ? '#991b1b' : m.infraUsage?.transferStatus === 'WARNING' ? '#92400e' : '#14532d'}`
               }}>
                 {m.infraUsage?.transferStatus || 'OPTIMAL'}
               </span>
-            </h3>
-            <p style={{ color: '#71717a', fontSize: 12, margin: '4px 0 0' }}>Monthly database bandwidth usage tracker. Target: keep below 1 GB/month. Neon Free Tier limit: 5 GB/month.</p>
-          </div>
-        </div>
+            </div>
 
-        {/* Transfer Progress Bar */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-            <span style={{ color: '#e4e4e7', fontSize: 13, fontWeight: 700 }}>Database Network Transfer This Month</span>
-            <span style={{ color: '#a1a1aa', fontSize: 12, fontWeight: 600 }}>
-              {m.infraUsage?.databaseTransferGB?.toFixed(3) || '0.000'} GB / {m.infraUsage?.targetMonthlyLimitGB || 1} GB target
-            </span>
-          </div>
-          <div style={{ width: '100%', height: 10, background: '#1c1c1e', borderRadius: 10, overflow: 'hidden', position: 'relative' }}>
-            <div style={{
-              width: `${Math.min(m.infraUsage?.transferPercentage || 0, 100)}%`,
-              height: '100%',
-              background: (m.infraUsage?.transferPercentage || 0) > 100 ? '#ef4444' : (m.infraUsage?.transferPercentage || 0) > 80 ? '#f59e0b' : '#22c55e',
-              borderRadius: 10,
-              transition: 'width 0.6s ease'
-            }} />
-            {/* 1 GB target marker */}
-            <div style={{ position: 'absolute', top: 0, bottom: 0, left: '20%', width: 2, background: '#3b82f6', opacity: 0.5 }} />
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#52525b' }}>
-            <span>0 GB</span>
-            <span style={{ color: '#3b82f6' }}>1 GB Target</span>
-            <span>5 GB Neon Limit</span>
-          </div>
-        </div>
+            {/* Main DB Progress */}
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 6 }}>
+                <span style={{ color: '#a1a1aa', fontWeight: 600 }}>Network Transfer</span>
+                <span style={{ color: '#e4e4e7', fontWeight: 700 }}>{m.infraUsage?.databaseTransferGB?.toFixed(3) || '0.000'} GB / 5 GB</span>
+              </div>
+              <div style={{ width: '100%', height: 12, background: '#1c1c1e', borderRadius: 8, overflow: 'hidden' }}>
+                <div style={{
+                  width: `${Math.min((m.infraUsage?.databaseTransferGB || 0) / 5 * 100, 100)}%`,
+                  height: '100%',
+                  background: (m.infraUsage?.transferPercentage || 0) > 100 ? '#ef4444' : (m.infraUsage?.transferPercentage || 0) > 80 ? '#f59e0b' : '#22c55e',
+                  borderRadius: 8,
+                  transition: 'width 0.6s ease'
+                }} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#52525b', marginTop: 4 }}>
+                <span>0 GB</span>
+                <span style={{ color: (m.infraUsage?.databaseTransferGB || 0) > 1 ? '#ef4444' : '#3b82f6' }}>{((m.infraUsage?.databaseTransferGB || 0) / 5 * 100).toFixed(1)}% full</span>
+                <span>5 GB limit</span>
+              </div>
+            </div>
 
-        {/* Metric Cards Row — Dual Database */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 14 }}>
-          <StatCard icon="🗄️" label="Main DB (Real Users)" value={`${m.infraUsage?.databaseTransferGB?.toFixed(3) || '0.000'} GB`} sub={`${m.infraUsage?.transferPercentage?.toFixed(1) || 0}% of 1 GB target`} color={m.infraUsage?.transferStatus === 'CRITICAL' ? '#ef4444' : m.infraUsage?.transferStatus === 'WARNING' ? '#f59e0b' : '#22c55e'} />
-          <StatCard icon="🤖" label="AI DB (tolee-1)" value={`${m.infraUsage?.aiDatabaseTransferGB?.toFixed(3) || '0.000'} GB`} sub={`${m.infraUsage?.aiDbPostCount || 0} AI posts stored`} color="#3b82f6" />
-          <StatCard icon="📰" label="AI News Today" value={`${m.infraUsage?.todayNewsCount || 0} / ${m.infraUsage?.dailyNewsLimit || 10}`} sub="Daily auto-publish limit" color={(m.infraUsage?.todayNewsCount || 0) >= 10 ? '#ef4444' : '#3b82f6'} />
-          <StatCard icon="📅" label="News This Month" value={m.infraUsage?.monthlyNewsCount || 0} sub="Total AI news posts" color="#a78bfa" />
-          <StatCard icon="✅" label="Dual-DB Active" value={m.infraUsage?.dualDbActive ? 'YES' : 'NO'} sub="AI split to tolee-1" color="#22c55e" />
+            <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
+              <div style={{ flex: 1, background: '#0d0d0f', borderRadius: 10, padding: '10px 12px', textAlign: 'center' }}>
+                <div style={{ color: '#22c55e', fontSize: 18, fontWeight: 800 }}>{m.users?.totalUsers || 0}</div>
+                <div style={{ color: '#71717a', fontSize: 10 }}>Real Users</div>
+              </div>
+              <div style={{ flex: 1, background: '#0d0d0f', borderRadius: 10, padding: '10px 12px', textAlign: 'center' }}>
+                <div style={{ color: '#3b82f6', fontSize: 18, fontWeight: 800 }}>{m.content?.totalPosts || 0}</div>
+                <div style={{ color: '#71717a', fontSize: 10 }}>Real Posts</div>
+              </div>
+              <div style={{ flex: 1, background: '#0d0d0f', borderRadius: 10, padding: '10px 12px', textAlign: 'center' }}>
+                <div style={{ color: '#a78bfa', fontSize: 18, fontWeight: 800 }}>{m.content?.totalMessages || 0}</div>
+                <div style={{ color: '#71717a', fontSize: 10 }}>Messages</div>
+              </div>
+            </div>
+          </div>
+
+          {/* AI DB (tolee-1) Card */}
+          <div style={{ background: '#111113', border: '1px solid #1e3a5f', borderRadius: 16, padding: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 22 }}>🤖</span>
+                <div>
+                  <div style={{ color: '#fff', fontSize: 14, fontWeight: 700 }}>AI Database <span style={{ color: '#3b82f6', fontSize: 11 }}>(tolee-1)</span></div>
+                  <div style={{ color: '#71717a', fontSize: 11 }}>AI News, YouTube Videos, Coverr Posts</div>
+                </div>
+              </div>
+              <span style={{
+                fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
+                color: '#93c5fd', background: '#172554', border: '1px solid #1e3a5f'
+              }}>
+                LAUNCH PLAN
+              </span>
+            </div>
+
+            {/* AI DB Progress */}
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 6 }}>
+                <span style={{ color: '#a1a1aa', fontWeight: 600 }}>Network Transfer</span>
+                <span style={{ color: '#e4e4e7', fontWeight: 700 }}>{m.infraUsage?.aiDatabaseTransferGB?.toFixed(3) || '0.000'} GB / 50 GB</span>
+              </div>
+              <div style={{ width: '100%', height: 12, background: '#1c1c1e', borderRadius: 8, overflow: 'hidden' }}>
+                <div style={{
+                  width: `${Math.min((m.infraUsage?.aiDatabaseTransferGB || 0) / 50 * 100, 100)}%`,
+                  height: '100%',
+                  background: '#3b82f6',
+                  borderRadius: 8,
+                  transition: 'width 0.6s ease'
+                }} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#52525b', marginTop: 4 }}>
+                <span>0 GB</span>
+                <span style={{ color: '#3b82f6' }}>{((m.infraUsage?.aiDatabaseTransferGB || 0) / 50 * 100).toFixed(1)}% full</span>
+                <span>50 GB limit (Launch)</span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
+              <div style={{ flex: 1, background: '#0d0d0f', borderRadius: 10, padding: '10px 12px', textAlign: 'center' }}>
+                <div style={{ color: '#3b82f6', fontSize: 18, fontWeight: 800 }}>{m.infraUsage?.aiDbPostCount || 0}</div>
+                <div style={{ color: '#71717a', fontSize: 10 }}>AI Posts</div>
+              </div>
+              <div style={{ flex: 1, background: '#0d0d0f', borderRadius: 10, padding: '10px 12px', textAlign: 'center' }}>
+                <div style={{ color: '#f59e0b', fontSize: 18, fontWeight: 800 }}>{`${m.infraUsage?.todayNewsCount || 0}/${m.infraUsage?.dailyNewsLimit || 10}`}</div>
+                <div style={{ color: '#71717a', fontSize: 10 }}>News Today</div>
+              </div>
+              <div style={{ flex: 1, background: '#0d0d0f', borderRadius: 10, padding: '10px 12px', textAlign: 'center' }}>
+                <div style={{ color: '#a78bfa', fontSize: 18, fontWeight: 800 }}>{m.infraUsage?.monthlyNewsCount || 0}</div>
+                <div style={{ color: '#71717a', fontSize: 10 }}>This Month</div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
