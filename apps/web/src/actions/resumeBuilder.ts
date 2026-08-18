@@ -65,12 +65,19 @@ export interface ResumeData {
     description: string;
     link?: string;
   }>;
+  certifications?: Array<{
+    id: string;
+    name: string;
+    issuer: string;
+    date: string;
+    url?: string;
+  }>;
   atsScore?: number;
   jobDescription?: string;
 }
 
 /**
- * Helper to call NVIDIA NIM AI models with automatic failover
+ * Robust Multi-Model AI caller with round-robin key and model failover
  */
 async function callAI(systemPrompt: string, userPrompt: string): Promise<string> {
   for (const key of NVIDIA_KEYS) {
@@ -88,8 +95,8 @@ async function callAI(systemPrompt: string, userPrompt: string): Promise<string>
               { role: 'system', content: systemPrompt },
               { role: 'user', content: userPrompt }
             ],
-            temperature: 0.3,
-            max_tokens: 2048,
+            temperature: 0.2,
+            max_tokens: 3500,
           }),
         });
 
@@ -99,7 +106,7 @@ async function callAI(systemPrompt: string, userPrompt: string): Promise<string>
           if (content) return content;
         }
       } catch {
-        // Continue failover
+        // Fallover to next key/model
       }
     }
   }
@@ -107,30 +114,168 @@ async function callAI(systemPrompt: string, userPrompt: string): Promise<string>
 }
 
 /**
- * AI Professional Summary Generator & Enhancer
+ * 1. AI Parse & Rebuild from Uploaded Resume Text / PDF
+ * Strictly preserves real user facts (dates, companies, education) and upgrades formatting + action verbs.
+ */
+export async function extractAndRebuildResumeFromText(rawText: string): Promise<{
+  success: boolean;
+  resume?: ResumeData;
+  error?: string;
+}> {
+  try {
+    if (!rawText || rawText.trim().length < 20) {
+      return { success: false, error: 'Uploaded file contains insufficient text. Please try another file or enter details manually.' };
+    }
+
+    const systemPrompt = `You are the Master Tolee AI Resume Parser & ATS Rebuilder.
+Your task is to take raw, unformatted text extracted from an old user resume and transform it into a clean, modern, ATS-optimized JSON structure.
+
+CRITICAL RULES:
+1. PRESERVE ALL FACTS: Preserve the user's actual names, companies, job titles, dates, universities, degrees, and real skills. DO NOT invent fake companies, fake dates, or fake percentage metrics if the user didn't mention them.
+2. REWRITE & PROFESSIONAL IMPACT: Upgrade raw bullet points using strong action verbs (e.g., "Led", "Architected", "Optimized", "Spearheaded") and clean STAR structure.
+3. OUTPUT FORMAT: Return ONLY a valid JSON object matching this schema (NO markdown ticks, pure JSON):
+{
+  "title": "Professional Resume",
+  "targetRole": "Extracted or inferred target job title",
+  "template": "modern",
+  "personalInfo": {
+    "fullName": "Full Name",
+    "email": "Email or blank",
+    "phone": "Phone or blank",
+    "location": "City, Country or blank",
+    "linkedinUrl": "LinkedIn URL or blank",
+    "portfolioUrl": "Portfolio/Website or blank",
+    "githubUrl": "GitHub or blank"
+  },
+  "summary": "3-4 sentence professional summary highlighting the candidate's core strengths and experience.",
+  "experiences": [
+    {
+      "id": "exp-1",
+      "company": "Company Name",
+      "role": "Job Title",
+      "location": "Location",
+      "startDate": "Start Date (e.g. 2022-01)",
+      "endDate": "End Date (or Present)",
+      "isCurrent": false,
+      "description": "• Upgraded professional bullet point\\n• Impactful responsibility statement"
+    }
+  ],
+  "education": [
+    {
+      "id": "edu-1",
+      "institution": "University / College Name",
+      "degree": "Degree",
+      "fieldOfStudy": "Major / Field",
+      "startDate": "Start Year",
+      "endDate": "End Year",
+      "grade": "Grade/GPA or blank"
+    }
+  ],
+  "skills": [
+    {
+      "category": "Technical Skills",
+      "items": ["Skill 1", "Skill 2"]
+    },
+    {
+      "category": "Tools & Frameworks",
+      "items": ["Tool 1", "Tool 2"]
+    }
+  ],
+  "projects": [
+    {
+      "id": "proj-1",
+      "name": "Project Name",
+      "technologies": "Tech stack used",
+      "description": "Project summary and key deliverables",
+      "link": "URL or blank"
+    }
+  ],
+  "certifications": [],
+  "atsScore": 88
+}`;
+
+    const userPrompt = `RAW EXTRACTED RESUME TEXT:
+"""
+${rawText.slice(0, 5000)}
+"""`;
+
+    const aiResponse = await callAI(systemPrompt, userPrompt);
+    if (aiResponse) {
+      try {
+        const cleaned = aiResponse.replace(/```json/gi, '').replace(/```/g, '').trim();
+        const parsed: ResumeData = JSON.parse(cleaned);
+        if (parsed.personalInfo && parsed.personalInfo.fullName) {
+          // Ensure IDs on arrays
+          if (Array.isArray(parsed.experiences)) {
+            parsed.experiences = parsed.experiences.map((e, idx) => ({
+              id: e.id || `exp-${Date.now()}-${idx}`,
+              company: e.company || 'Company',
+              role: e.role || 'Professional Role',
+              location: e.location || '',
+              startDate: e.startDate || '',
+              endDate: e.endDate || 'Present',
+              isCurrent: Boolean(e.isCurrent),
+              description: e.description || ''
+            }));
+          }
+          if (Array.isArray(parsed.education)) {
+            parsed.education = parsed.education.map((ed, idx) => ({
+              id: ed.id || `edu-${Date.now()}-${idx}`,
+              institution: ed.institution || 'University',
+              degree: ed.degree || 'Degree',
+              fieldOfStudy: ed.fieldOfStudy || '',
+              startDate: ed.startDate || '',
+              endDate: ed.endDate || '',
+              grade: ed.grade || ''
+            }));
+          }
+          if (Array.isArray(parsed.projects)) {
+            parsed.projects = parsed.projects.map((p, idx) => ({
+              id: p.id || `proj-${Date.now()}-${idx}`,
+              name: p.name || 'Project',
+              technologies: p.technologies || '',
+              description: p.description || '',
+              link: p.link || ''
+            }));
+          }
+          return { success: true, resume: parsed };
+        }
+      } catch (jsonErr) {
+        console.warn('[ResumeBuilder] AI JSON parse error:', jsonErr);
+      }
+    }
+
+    return { success: false, error: 'Could not structure resume automatically. Please edit manually.' };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * 2. Professional Summary Generator & Tailoring
  */
 export async function generateAISummary(params: {
   targetRole: string;
   yearsOfExperience?: string;
+  careerLevel?: string;
   skills?: string[];
   currentSummary?: string;
 }): Promise<{ success: boolean; summary?: string; error?: string }> {
   try {
-    const systemPrompt = 'You are an elite executive resume writer and ATS specialist. Write powerful, concise, ATS-friendly professional summaries (3-4 sentences) highlighting impact, leadership, and technical prowess. Return ONLY the summary text without quotes or markdown headers.';
+    const systemPrompt = 'You are an executive career coach and resume writer. Write a powerful, concise 3-4 sentence professional summary that is ATS optimized, focused on leadership, domain mastery, and measurable value. Return ONLY the summary text.';
     const userPrompt = `Target Role: "${params.targetRole}"
-Experience Level: "${params.yearsOfExperience || 'Mid-Senior Level'}"
-Key Skills: "${(params.skills || []).join(', ')}"
-${params.currentSummary ? `Existing Draft to rewrite/improve: "${params.currentSummary}"` : 'Write a fresh, high-impact summary.'}`;
+Experience / Career Level: "${params.careerLevel || params.yearsOfExperience || 'Mid-Senior Level'}"
+Core Skills: "${(params.skills || []).join(', ')}"
+${params.currentSummary ? `Existing draft to refine: "${params.currentSummary}"` : 'Write a fresh, high-impact summary.'}`;
 
     const text = await callAI(systemPrompt, userPrompt);
     if (text) {
       return { success: true, summary: text.replace(/^["']|["']$/g, '') };
     }
 
-    // High quality deterministic fallback
     return {
       success: true,
-      summary: `Accomplished ${params.targetRole} with a proven track record of driving impactful projects, optimizing workflows, and delivering high-performance solutions. Adept at cross-functional collaboration and implementing modern industry standards to achieve strategic business objectives.`
+      summary: `Dynamic ${params.targetRole} with a strong foundation in designing, developing, and executing high-impact solutions. Proven ability to optimize core processes, lead cross-functional initiatives, and deliver scalable results aligned with enterprise standards.`
     };
   } catch (err: any) {
     return { success: false, error: err.message };
@@ -138,7 +283,7 @@ ${params.currentSummary ? `Existing Draft to rewrite/improve: "${params.currentS
 }
 
 /**
- * AI Experience Bullet Point Optimizer (Adds Action Verbs + Metrics)
+ * 3. AI Experience Bullet Point Improver (STAR Method)
  */
 export async function enhanceBulletPoint(params: {
   rawPoint: string;
@@ -146,9 +291,9 @@ export async function enhanceBulletPoint(params: {
   company?: string;
 }): Promise<{ success: boolean; enhanced?: string; error?: string }> {
   try {
-    const systemPrompt = 'You are a career consultant specializing in the STAR method (Situation, Task, Action, Result). Transform raw job duty descriptions into 1-2 compelling bullet points with strong action verbs (e.g. Architected, Spearheaded, Accelerated) and quantifiable achievements. Return ONLY the rewritten bullet point.';
+    const systemPrompt = 'You are an elite career consultant. Rewrite the provided job description into 1-2 powerful bullet points starting with strong action verbs (e.g. Spearheaded, Engineered, Streamlined, Orchestrated). DO NOT invent fake numbers if not provided. Return ONLY the formatted bullet point(s).';
     const userPrompt = `Role: "${params.role}" at "${params.company || 'Company'}"
-Raw statement: "${params.rawPoint}"`;
+Raw points: "${params.rawPoint}"`;
 
     const text = await callAI(systemPrompt, userPrompt);
     if (text) {
@@ -157,7 +302,7 @@ Raw statement: "${params.rawPoint}"`;
 
     return {
       success: true,
-      enhanced: `Spearheaded key initiatives for ${params.role}, improving operational efficiency by 25% and delivering critical milestones on schedule.`
+      enhanced: `• Spearheaded key functional deliverables for ${params.role}, ensuring operational excellence and on-time project completion.`
     };
   } catch (err: any) {
     return { success: false, error: err.message };
@@ -165,7 +310,34 @@ Raw statement: "${params.rawPoint}"`;
 }
 
 /**
- * AI ATS Scanner & Job Description Matcher
+ * 4. AI Skills Suggester
+ */
+export async function suggestSkillsForRole(params: {
+  targetRole: string;
+  existingSkills?: string[];
+}): Promise<{ success: boolean; suggestedSkills: string[] }> {
+  try {
+    const systemPrompt = 'You are a technical recruiter. Given a target job title, suggest 8-12 top industry-standard technical and soft skills in high demand. Return ONLY a comma-separated list of skill names.';
+    const userPrompt = `Target Job Title: "${params.targetRole}"
+Existing Skills: "${(params.existingSkills || []).join(', ')}"`;
+
+    const text = await callAI(systemPrompt, userPrompt);
+    if (text) {
+      const list = text.split(/,|\n/).map(s => s.replace(/^[-•*0-9.]+\s*/, '').trim()).filter(Boolean);
+      return { success: true, suggestedSkills: list.slice(0, 12) };
+    }
+
+    return {
+      success: true,
+      suggestedSkills: ['Problem Solving', 'Strategic Planning', 'Agile Methodologies', 'Performance Optimization', 'Team Leadership']
+    };
+  } catch {
+    return { success: true, suggestedSkills: ['Strategic Planning', 'Cross-functional Collaboration', 'Process Optimization'] };
+  }
+}
+
+/**
+ * 5. Job Description Matcher & ATS Scanner
  */
 export async function analyzeJobDescriptionMatch(params: {
   resumeContent: string;
@@ -174,26 +346,31 @@ export async function analyzeJobDescriptionMatch(params: {
   success: boolean;
   score: number;
   missingKeywords: string[];
+  matchedKeywords: string[];
   recommendations: string[];
   summaryFeedback: string;
 }> {
   try {
-    const systemPrompt = `You are an enterprise Applicant Tracking System (ATS) algorithm analyzer (like Workday, Taleo, Greenhouse).
-Compare the candidate's resume content against the target Job Description.
-Return a valid JSON object without markdown formatting with this schema:
+    const systemPrompt = `You are an enterprise ATS match analyzer.
+Compare the resume against the target Job Description.
+Return ONLY valid JSON (no markdown ticks) in this exact format:
 {
-  "score": 85,
+  "score": 86,
+  "matchedKeywords": ["Next.js", "TypeScript", "Microservices", "REST APIs"],
   "missingKeywords": ["Kubernetes", "GraphQL", "Agile Leadership"],
-  "recommendations": ["Highlight cloud deployment experience in experience section", "Incorporate performance metrics in project descriptions"],
-  "summaryFeedback": "Strong alignment on core technical capabilities with high keyword density for senior positions."
+  "recommendations": [
+    "Highlight specific cloud orchestration experience in your most recent role",
+    "Add missing framework keywords into your Technical Skills section"
+  ],
+  "summaryFeedback": "Solid alignment on full-stack architecture with strong competency match for the senior level."
 }`;
 
-    const userPrompt = `Job Description:
+    const userPrompt = `JOB DESCRIPTION:
 """
 ${params.jobDescription.slice(0, 3000)}
 """
 
-Resume Content:
+RESUME:
 """
 ${params.resumeContent.slice(0, 3000)}
 """`;
@@ -205,28 +382,31 @@ ${params.resumeContent.slice(0, 3000)}
         const parsed = JSON.parse(cleaned);
         return {
           success: true,
-          score: Math.min(Math.max(parsed.score || 85, 40), 98),
-          missingKeywords: parsed.missingKeywords || ['System Architecture', 'CI/CD Pipelines'],
-          recommendations: parsed.recommendations || ['Add specific metrics to recent roles', 'Align skill terminology with job description'],
-          summaryFeedback: parsed.summaryFeedback || 'Good candidate-job alignment across core required competencies.'
+          score: Math.min(Math.max(parsed.score || 85, 45), 98),
+          matchedKeywords: parsed.matchedKeywords || ['Core Competencies', 'System Design'],
+          missingKeywords: parsed.missingKeywords || ['Scalability', 'CI/CD Pipelines'],
+          recommendations: parsed.recommendations || ['Align skill keywords with the job posting requirements.'],
+          summaryFeedback: parsed.summaryFeedback || 'High compatibility with the role requirements.'
         };
       } catch {}
     }
 
     return {
       success: true,
-      score: 88,
-      missingKeywords: ['Scalability', 'Cross-functional Collaboration', 'Performance Optimization'],
+      score: 85,
+      matchedKeywords: ['Full Stack Development', 'Project Management', 'Database Optimization'],
+      missingKeywords: ['Cloud Architecture', 'Agile Sprints', 'Test Automation'],
       recommendations: [
-        'Ensure exact keywords from the job description appear in the Skills section',
-        'Add quantifiable metrics (%) to recent experience achievements'
+        'Ensure exact keywords from the job description are explicitly stated in Skills and Experience',
+        'Emphasize your impact and leadership on key deliverables'
       ],
-      summaryFeedback: 'Resume displays high ATS compatibility with relevant qualifications.'
+      summaryFeedback: 'Strong overall qualification alignment.'
     };
   } catch (err: any) {
     return {
       success: false,
       score: 80,
+      matchedKeywords: [],
       missingKeywords: [],
       recommendations: [],
       summaryFeedback: 'Error scanning match.'
@@ -235,7 +415,32 @@ ${params.resumeContent.slice(0, 3000)}
 }
 
 /**
- * Save User Resume to tolee-1 isolated database
+ * 6. AI Resume Assistant Chat Drawer
+ */
+export async function askAIAssistant(params: {
+  userMessage: string;
+  currentResume: ResumeData;
+}): Promise<{ success: boolean; reply: string; suggestedDiff?: Partial<ResumeData> }> {
+  try {
+    const systemPrompt = `You are Tolee AI Resume Assistant. The user wants help refining, shortening, checking grammar, or restructuring their resume.
+Provide a clear, helpful response and provide any suggested replacements directly.`;
+
+    const userPrompt = `User Request: "${params.userMessage}"
+Resume Summary: "${params.currentResume.summary}"
+Target Role: "${params.currentResume.targetRole}"`;
+
+    const reply = await callAI(systemPrompt, userPrompt);
+    return {
+      success: true,
+      reply: reply || "I've reviewed your request. You can refine your experience bullet points with action verbs and align your skills with your target job."
+    };
+  } catch (err: any) {
+    return { success: false, reply: 'Unable to process AI assistant request.' };
+  }
+}
+
+/**
+ * 7. Save / Load / Delete User Resumes in tolee-1 database
  */
 export async function saveUserResume(data: ResumeData): Promise<{ success: boolean; id?: string; error?: string }> {
   try {
@@ -285,14 +490,10 @@ export async function saveUserResume(data: ResumeData): Promise<{ success: boole
   }
 }
 
-/**
- * Get Saved Resumes for logged in user or sample template
- */
 export async function getUserResumes(): Promise<{ success: boolean; resumes: ResumeData[] }> {
   try {
     const session = await getServerSession(authOptions);
     const userId = (session?.user as any)?.id || null;
-
     if (!userId) return { success: true, resumes: [] };
 
     const dbResumes = await (prismaAI as any).userResume.findMany({
