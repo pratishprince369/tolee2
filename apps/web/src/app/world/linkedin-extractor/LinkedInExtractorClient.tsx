@@ -104,30 +104,35 @@ export default function LinkedInExtractorClient() {
       return;
     }
 
-    const headers = ['#', 'Score', 'Full Name', 'Designation / Role', 'Company', 'Domain', 'Mobile / Phone', 'Email ID', 'Email Verified', 'Location', 'LinkedIn URL'];
+    const headers = ['Sr No', 'Score', 'Full Name', 'Designation / Role', 'Company', 'Domain', 'Mobile / Phone', 'Email ID', 'Email Verified', 'Location', 'LinkedIn URL'];
     const rows = leads.map((l, idx) => [
       idx + 1,
-      `${l.score || 100}%`,
+      `"${l.score || 100}%"`,
       `"${(l.fullName || '').replace(/"/g, '""')}"`,
       `"${(l.role || '').replace(/"/g, '""')}"`,
       `"${(l.company || '').replace(/"/g, '""')}"`,
-      l.domain || '',
-      `"${l.phone || ''}"`,
-      l.email || '',
-      l.isVerified ? 'VERIFIED' : 'UNVERIFIED',
+      `"${(l.domain || '').replace(/"/g, '""')}"`,
+      `"${(l.phone || '').replace(/"/g, '""')}"`,
+      `"${(l.email || '').replace(/"/g, '""')}"`,
+      l.isVerified ? '"VERIFIED"' : '"UNVERIFIED"',
       `"${(l.location || '').replace(/"/g, '""')}"`,
-      l.linkedinUrl || ''
+      `"${(l.linkedinUrl || '').replace(/"/g, '""')}"`
     ]);
 
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+    
+    // Use Blob with UTF-8 BOM (\uFEFF) for perfect Excel / Google Sheets compatibility
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `linkedin_extracted_leads_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.href = url;
+    link.setAttribute('download', `linkedin_leads_${new Date().toISOString().slice(0, 10)}_${leads.length}_contacts.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    showToast('📥 Downloaded CSV with extracted contact numbers & emails!');
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    
+    showToast(`📥 Exported ${leads.length} leads with emails & phone numbers to CSV!`);
   };
 
   // Filtered leads based on search input
