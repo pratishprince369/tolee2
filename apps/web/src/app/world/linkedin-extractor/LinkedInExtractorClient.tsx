@@ -54,126 +54,7 @@ export default function LinkedInExtractorClient() {
     if (res.success && res.leads && res.leads.length > 0) {
       setLeads(res.leads);
     } else {
-      // Default 9 leads dataset matching the user's screenshot
-      setLeads([
-        {
-          id: '1',
-          score: 100,
-          fullName: 'Amit Kulkarni',
-          role: 'Head of Human Resources & Talent Strategy',
-          company: 'Larsen & Toubro',
-          domain: 'larsentoubro.com',
-          phone: '+91 98210 33491',
-          email: 'amit.kulkarni@larsentoubro.com',
-          isVerified: true,
-          location: 'Delhi NCR, India',
-          linkedinUrl: 'https://www.linkedin.com/in/amit-kulkarni-hr',
-        },
-        {
-          id: '2',
-          score: 100,
-          fullName: 'Pooja Deshmukh',
-          role: 'Lead HR Manager & Corporate Hiring',
-          company: 'HDFC Bank',
-          domain: 'hdfcbank.com',
-          phone: '+91 98701 92834',
-          email: 'pooja.deshmukh@hdfcbank.com',
-          isVerified: true,
-          location: 'Delhi NCR, India',
-          linkedinUrl: 'https://www.linkedin.com/in/pooja-deshmukh-recruiting',
-        },
-        {
-          id: '3',
-          score: 100,
-          fullName: 'Trupti Mhetre',
-          role: 'Senior HR Executive & Talent Partner',
-          company: 'Reliance Industries Ltd',
-          domain: 'ril.com',
-          phone: '+91 98335 12908',
-          email: 'trupti.mhetre@ril.com',
-          isVerified: true,
-          location: 'Delhi NCR, India',
-          linkedinUrl: 'https://www.linkedin.com/in/trupti-mhetre-hr',
-        },
-        {
-          id: '4',
-          score: 100,
-          fullName: 'Sreeju Panicker',
-          role: 'Human Resources (HR) at Marathon Realty Ltd',
-          company: 'Marathon Realty',
-          domain: 'marathonrealty.com',
-          phone: '+91 99204 55190',
-          email: 'sreeju.panicker@marathonrealty.com',
-          isVerified: true,
-          location: 'Delhi NCR, India',
-          linkedinUrl: 'https://www.linkedin.com/in/sreeju-panicker-hr',
-        },
-        {
-          id: '5',
-          score: 100,
-          fullName: 'Sanjay Rathore',
-          role: 'HR Recruiter | Talent Acquisition',
-          company: 'Tata Consultancy Services',
-          domain: 'tcs.com',
-          phone: '+91 97693 88123',
-          email: 'sanjay.rathore@tcs.com',
-          isVerified: true,
-          location: 'Delhi NCR, India',
-          linkedinUrl: 'https://www.linkedin.com/in/sanjay-rathore-recruiter',
-        },
-        {
-          id: '6',
-          score: 100,
-          fullName: 'Neha Sharma',
-          role: 'Talent Acquisition Partner & HR Operations',
-          company: 'Infosys Limited',
-          domain: 'infosys.com',
-          phone: '+91 98450 72109',
-          email: 'neha.sharma@infosys.com',
-          isVerified: true,
-          location: 'Bengaluru, India',
-          linkedinUrl: 'https://www.linkedin.com/in/neha-sharma-talent',
-        },
-        {
-          id: '7',
-          score: 100,
-          fullName: 'Vikram Mehta',
-          role: 'Chief Human Resources Officer (CHRO)',
-          company: 'Adani Enterprises',
-          domain: 'adani.com',
-          phone: '+91 99301 44521',
-          email: 'vikram.mehta@adani.com',
-          isVerified: true,
-          location: 'Mumbai, India',
-          linkedinUrl: 'https://www.linkedin.com/in/vikram-mehta-chro',
-        },
-        {
-          id: '8',
-          score: 100,
-          fullName: 'Ananya Roy',
-          role: 'Lead Technical Recruiter & HR Business Partner',
-          company: 'Wipro Technologies',
-          domain: 'wipro.com',
-          phone: '+91 98112 63904',
-          email: 'ananya.roy@wipro.com',
-          isVerified: true,
-          location: 'Delhi NCR, India',
-          linkedinUrl: 'https://www.linkedin.com/in/ananya-roy-wipro',
-        },
-        {
-          id: '9',
-          score: 100,
-          fullName: 'Rohan Gupta',
-          role: 'Director of People Operations & Culture',
-          company: 'ICICI Bank',
-          domain: 'icicibank.com',
-          phone: '+91 98205 18742',
-          email: 'rohan.gupta@icicibank.com',
-          isVerified: true,
-          location: 'Mumbai, India',
-          linkedinUrl: 'https://www.linkedin.com/in/rohan-gupta-people',
-        }
-      ]);
+      setLeads([]);
     }
     setLoading(false);
   };
@@ -451,8 +332,18 @@ export default function LinkedInExtractorClient() {
               <tbody className="divide-y divide-[#101a2d]">
                 {filteredLeads.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="py-12 text-center text-gray-500">
-                      No leads match your search criteria. Paste a URL above to extract more leads.
+                    <td colSpan={10} className="py-16 text-center">
+                      <div className="flex flex-col items-center justify-center max-w-md mx-auto">
+                        <div className="w-12 h-12 rounded-2xl bg-[#0e1728] border border-[#1b2b48] flex items-center justify-center mb-3 text-cyan-400">
+                          <Search className="w-6 h-6" />
+                        </div>
+                        <h3 className="text-sm font-bold text-white mb-1">
+                          No Leads Extracted Yet
+                        </h3>
+                        <p className="text-xs text-gray-400 leading-relaxed">
+                          Paste your target LinkedIn search URL (or enter keywords like <code className="text-cyan-300">delhi hr</code>) above and click <strong className="text-cyan-400">"Extract &amp; Save Leads Now"</strong> to see live leads here.
+                        </p>
+                      </div>
                     </td>
                   </tr>
                 ) : (
