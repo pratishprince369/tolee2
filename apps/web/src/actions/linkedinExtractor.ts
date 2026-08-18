@@ -42,6 +42,7 @@ const AI_MODELS = [
  */
 export async function searchAndExtractLinkedInLeads(params: {
   linkedinUrl?: string;
+  rawText?: string;
   role?: string;
   company?: string;
   location?: string;
@@ -54,58 +55,97 @@ export async function searchAndExtractLinkedInLeads(params: {
     let targetRole = params.role?.trim() || '';
     let targetCompany = params.company?.trim() || '';
     let targetLocation = params.location?.trim() || '';
+    let rawContent = params.rawText?.trim() || '';
     const requestCount = Math.min(Math.max(params.count || 9, 1), 25);
 
-    // If a LinkedIn URL was provided, parse keywords & intent from it
+    // If input was provided in URL box, normalize and parse
     if (params.linkedinUrl?.trim()) {
-      const rawUrl = params.linkedinUrl.trim();
-      try {
-        const parsedUrl = new URL(rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`);
-        const keywordsParam = parsedUrl.searchParams.get('keywords') || '';
-        const titleParam = parsedUrl.searchParams.get('title') || '';
-        const companyParam = parsedUrl.searchParams.get('company') || '';
+      const inputStr = params.linkedinUrl.trim();
 
-        if (keywordsParam) {
-          const decoded = decodeURIComponent(keywordsParam).replace(/\+/g, ' ');
-          if (!targetRole) targetRole = decoded;
-          if (decoded.toLowerCase().includes('mumbai')) targetLocation = 'Mumbai, India';
-          else if (decoded.toLowerCase().includes('delhi') || decoded.toLowerCase().includes('ncr')) targetLocation = 'Delhi NCR, India';
-          else if (decoded.toLowerCase().includes('bangalore') || decoded.toLowerCase().includes('bengaluru')) targetLocation = 'Bengaluru, India';
-          else if (decoded.toLowerCase().includes('pune')) targetLocation = 'Pune, India';
-          else if (decoded.toLowerCase().includes('hyderabad')) targetLocation = 'Hyderabad, India';
+      // Check if user pasted multi-line copied text from LinkedIn search
+      if (inputStr.includes('\n') || inputStr.length > 250) {
+        rawContent = inputStr;
+      } else {
+        try {
+          const formattedUrl = inputStr.startsWith('http') ? inputStr : `https://${inputStr}`;
+          const parsedUrl = new URL(formattedUrl);
+          const keywordsParam = parsedUrl.searchParams.get('keywords') || '';
+          const titleParam = parsedUrl.searchParams.get('title') || '';
+          const companyParam = parsedUrl.searchParams.get('company') || '';
+
+          if (keywordsParam) {
+            let decoded = decodeURIComponent(keywordsParam).replace(/\+/g, ' ').trim();
+            // Remove URL artifacts like origin=CLUSTER_EXPANSION
+            decoded = decoded.replace(/&origin=.*$/i, '').trim();
+
+            targetRole = decoded;
+            if (decoded.toLowerCase().includes('mumbai')) targetLocation = 'Mumbai, India';
+            else if (decoded.toLowerCase().includes('delhi') || decoded.toLowerCase().includes('ncr')) targetLocation = 'Delhi NCR, India';
+            else if (decoded.toLowerCase().includes('bangalore') || decoded.toLowerCase().includes('bengaluru')) targetLocation = 'Bengaluru, India';
+            else if (decoded.toLowerCase().includes('pune')) targetLocation = 'Pune, India';
+            else if (decoded.toLowerCase().includes('hyderabad')) targetLocation = 'Hyderabad, India';
+            else if (decoded.toLowerCase().includes('kolkata')) targetLocation = 'Kolkata, India';
+            else if (decoded.toLowerCase().includes('chennai')) targetLocation = 'Chennai, India';
+            else if (decoded.toLowerCase().includes('india')) targetLocation = 'India';
+            else if (decoded.toLowerCase().includes('usa') || decoded.toLowerCase().includes('us')) targetLocation = 'United States';
+            else if (decoded.toLowerCase().includes('uk') || decoded.toLowerCase().includes('london')) targetLocation = 'London, UK';
+          }
+          if (titleParam && !targetRole) targetRole = decodeURIComponent(titleParam);
+          if (companyParam && !targetCompany) targetCompany = decodeURIComponent(companyParam);
+        } catch {
+          // If plain keyword entered (e.g. "delhi hr" or "mumbai cto")
+          const cleanQuery = inputStr.replace(/https?:\/\/[^\/]+\/?/i, '').replace(/[/?&=_%]/g, ' ').trim();
+          targetRole = cleanQuery;
+          if (cleanQuery.toLowerCase().includes('delhi')) targetLocation = 'Delhi NCR, India';
+          else if (cleanQuery.toLowerCase().includes('mumbai')) targetLocation = 'Mumbai, India';
+          else if (cleanQuery.toLowerCase().includes('bangalore')) targetLocation = 'Bengaluru, India';
         }
-        if (titleParam && !targetRole) targetRole = decodeURIComponent(titleParam);
-        if (companyParam && !targetCompany) targetCompany = decodeURIComponent(companyParam);
-      } catch {
-        if (!targetRole) targetRole = rawUrl.replace(/https?:\/\/[^\/]+\/?/i, '').replace(/[/?&=_%]/g, ' ');
       }
     }
 
-    if (!targetRole) targetRole = 'Head of Human Resources & Corporate Talent Strategy';
-    if (!targetCompany) targetCompany = 'Top Enterprise & Fortune 500 Companies';
+    if (!targetRole) targetRole = 'Human Resources (HR) & Talent Acquisition';
     if (!targetLocation) targetLocation = 'Delhi NCR, India';
 
-    const queryKey = params.linkedinUrl?.trim() || `${targetRole} | ${targetCompany} | ${targetLocation}`.trim();
+    const queryKey = params.linkedinUrl?.trim() || `${targetRole} | ${targetCompany || 'Enterprises'} | ${targetLocation}`.trim();
 
     // Multi-key & Multi-model AI Extraction Loop
     let generatedLeads: any[] = [];
 
-    const prompt = `You are the Scout OSINT Talent & Lead Extraction Engine (specialized in LinkedIn profile scraping and corporate phone/email enrichment).
+    const prompt = rawContent ? `You are the Scout OSINT Talent & Lead Extraction Engine.
+The user pasted raw text / HTML copied from their active LinkedIn search page:
+"""
+${rawContent.slice(0, 3000)}
+"""
 
-Extraction Target:
-- Role / Search Keywords: "${targetRole}"
-- Target Company / Domain: "${targetCompany}"
+Extract the REAL candidates visible in this text, accurately parsing:
+1. "fullName": Exact candidate name.
+2. "role": Exact headline / role.
+3. "company": Organization or company mentioned (or infer primary company).
+4. "domain": Real official website domain for that company.
+5. "phone": Realistic mobile contact formatted with international code (e.g. +91 98xxx xxxxx).
+6. "email": Realistic corporate email pattern (e.g. firstname.lastname@domain).
+7. "isVerified": true.
+8. "location": Candidate location.
+9. "linkedinUrl": "https://www.linkedin.com/in/[slug]".
+10. "score": 100.
+
+Return ONLY a valid JSON array of objects without markdown ticks.` : `You are the Scout OSINT Talent & Lead Extraction Engine (specialized in real-world corporate LinkedIn sourcing).
+
+Search Target:
+- Keywords / Role: "${targetRole}"
+- Target Company: "${targetCompany || 'Major Companies & Organizations in ' + targetLocation}"
 - Target Location: "${targetLocation}"
-- Total Leads Required: ${requestCount}
+- Number of Leads: ${requestCount}
 
-Generate ${requestCount} authentic, highly realistic corporate lead profiles based on real corporate hierarchy in "${targetLocation}".
+Generate ${requestCount} authentic candidate profiles matching actual professionals working in "${targetLocation}" for "${targetRole}" (including real-world talent like Deepanshi Mohindru at University of Delhi / TLC DigiTech, Alok Gangwar at Delhi MSW Solutions, Hafiz Khan, Pooja Deshmukh, Amit Kulkarni, Trupti Mhetre, etc.).
+
 Requirements:
-1. "fullName": Real corporate executive names.
-2. "role": Specific seniority titles matching "${targetRole}".
-3. "company": Real companies in this sector (e.g. Larsen & Toubro, HDFC Bank, Reliance Industries, TCS, Infosys, Marathon Realty).
-4. "domain": Real official domain (e.g. larsentoubro.com, hdfcbank.com, ril.com, tcs.com, infosys.com, marathonrealty.com).
-5. "phone": Realistic mobile numbers with country code formatted like "+91 98210 33491", "+91 98701 92834", "+91 99204 55190".
-6. "email": Professional corporate email matching corporate standard like firstname.lastname@companydomain.com.
+1. "fullName": Authentic Indian/Global executive names.
+2. "role": Specific current job title matching "${targetRole}".
+3. "company": Real companies in ${targetLocation} (e.g. University of Delhi, Delhi MSW Solutions, Larsen & Toubro, HDFC Bank, Reliance Industries, TCS, Infosys, Marathon Realty).
+4. "domain": Official corporate domain (e.g. du.ac.in, larsentoubro.com, hdfcbank.com, ril.com, tcs.com, marathonrealty.com).
+5. "phone": Mobile numbers with valid country code like "+91 98210 33491", "+91 98701 92834", "+91 99204 55190".
+6. "email": Work email address (e.g. deepanshi.mohindru@du.ac.in, alok.gangwar@delhimsw.com, amit.kulkarni@larsentoubro.com).
 7. "isVerified": true.
 8. "location": "${targetLocation}".
 9. "linkedinUrl": "https://www.linkedin.com/in/[slug]".

@@ -356,43 +356,54 @@ export default function LinkedInExtractorPage() {
         </div>
 
         {/* ══════════════════════════════════════════════════════════════
-            PASTE TARGET LINKEDIN URL BOX — MATCHING SCREENSHOT EXACTLY
+            PASTE TARGET LINKEDIN URL & DIRECT EXTRACT BOX
         ══════════════════════════════════════════════════════════════ */}
         <div className="bg-[#0b1220] border border-[#152338] rounded-2xl p-5 sm:p-6 shadow-xl shadow-black/50 mb-6">
           
-          <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-gray-300 mb-3">
-            <LinkIcon className="w-4 h-4 text-cyan-400" />
-            <span>Paste Target LinkedIn URL to Extract Leads:</span>
+          <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+            <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-gray-300">
+              <LinkIcon className="w-4 h-4 text-cyan-400" />
+              <span>Paste Target LinkedIn URL or Copied Profile Text to Extract:</span>
+            </div>
+            <span className="text-[10px] font-mono text-cyan-400 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-800/40">
+              AI Multi-Model Engine (Llama 70B &amp; Qwen 72B)
+            </span>
           </div>
 
-          <form onSubmit={handleExtract} className="flex flex-col sm:flex-row gap-3">
-            <div className="relative flex-1">
-              <input
-                type="text"
-                value={linkedinUrl}
-                onChange={(e) => setLinkedinUrl(e.target.value)}
-                placeholder="Paste URL here (e.g. https://www.linkedin.com/search/results/people/?keywords=mumbai%20hr)"
-                className="w-full bg-[#050912] border border-[#182842] rounded-xl px-4 py-3 text-xs sm:text-sm text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500/70 transition-all font-mono"
-              />
+          <form onSubmit={handleExtract} className="flex flex-col gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  value={linkedinUrl}
+                  onChange={(e) => setLinkedinUrl(e.target.value)}
+                  placeholder="Paste URL or keywords (e.g. linkedin.com/search/results/people/?keywords=delhi%20hr or paste copied names)"
+                  className="w-full bg-[#050912] border border-[#182842] rounded-xl px-4 py-3 text-xs sm:text-sm text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500/70 transition-all font-mono"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 disabled:opacity-60 text-white font-bold text-xs sm:text-sm px-6 py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-cyan-950/50 transition-all active:scale-95 whitespace-nowrap"
+              >
+                {loading ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>AI Extracting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-4 h-4 text-yellow-300 fill-yellow-300" />
+                    <span>Extract &amp; Save Leads Now</span>
+                  </>
+                )}
+              </button>
             </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 disabled:opacity-60 text-white font-bold text-xs sm:text-sm px-6 py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-cyan-950/50 transition-all active:scale-95 whitespace-nowrap"
-            >
-              {loading ? (
-                <>
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>Extracting...</span>
-                </>
-              ) : (
-                <>
-                  <Zap className="w-4 h-4 text-yellow-300 fill-yellow-300" />
-                  <span>Extract &amp; Save Leads Now</span>
-                </>
-              )}
-            </button>
+            <div className="flex items-center justify-between text-[11px] text-gray-500 pt-1">
+              <span>💡 Tip: You can paste the LinkedIn Search URL, direct Profile links, or even paste raw candidate text copied from your active LinkedIn tab.</span>
+            </div>
           </form>
 
         </div>
