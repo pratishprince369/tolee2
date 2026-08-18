@@ -696,23 +696,8 @@ export async function getNewsFeedPosts(options: {
     const page = options.page || 1;
     const limit = options.limit || 10;
     const category = options.category || 'All';
-    // Background trigger: If latest news post is >60 seconds old, fetch fresh news & YouTube videos immediately without delay
-    const checkAndTriggerFreshNews = async () => {
-      try {
-        const latestNews = await prisma.newsPost.findFirst({
-          orderBy: { createdAt: 'desc' },
-          select: { createdAt: true }
-        });
-        const ageMs = latestNews ? Date.now() - new Date(latestNews.createdAt).getTime() : Infinity;
-        if (ageMs > 60 * 1000) { // >60 seconds old
-          const { publishDailyNewsBatch } = require('@/lib/newsAutoPublisher');
-          const { publishYouTubeVideosBatch } = require('@/lib/youtubeAutoPublisher');
-          publishDailyNewsBatch(false).catch(() => {});
-          publishYouTubeVideosBatch(false).catch(() => {});
-        }
-      } catch (e) {}
-    };
-    checkAndTriggerFreshNews();
+    // 🛡️ Bandwidth Safeguard: Removed aggressive 60s auto-publish trigger.
+    // News publishing is now handled ONLY via cron API route with 10/day cap.
 
     const skip = (page - 1) * limit;
 

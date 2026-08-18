@@ -280,29 +280,8 @@ export async function getPosts(options?: { mediaType?: string; limit?: number })
     const limit = options?.limit || 30;
     const mediaType = options?.mediaType;
 
-    // Trigger instant background YouTube & News auto-publisher if latest post is older than 90 seconds (1.5 mins)
-    const checkAndTriggerFreshPosts = async () => {
-      try {
-        const latestPost = await prisma.post.findFirst({
-          where: { isArchived: false, status: 'published' },
-          orderBy: { createdAt: 'desc' },
-          select: { createdAt: true }
-        });
-        const timeSinceLast = latestPost 
-          ? Date.now() - new Date(latestPost.createdAt).getTime()
-          : Infinity;
-        
-        if (timeSinceLast > 90 * 1000) { // 90 seconds threshold for instant fresh YouTube videos & news
-          const { publishYouTubeVideosBatch } = require('@/lib/youtubeAutoPublisher');
-          const { publishDailyNewsBatch } = require('@/lib/newsAutoPublisher');
-          publishYouTubeVideosBatch(false).catch(() => {});
-          publishDailyNewsBatch().catch(() => {});
-        }
-      } catch (e) {
-        console.error('[Fresh Content Trigger] Check failed:', e);
-      }
-    };
-    checkAndTriggerFreshPosts();
+    // 🛡️ Bandwidth Safeguard: Removed aggressive 90s auto-publish trigger from getPosts().
+    // Publishing is now handled ONLY via feed/page.tsx (6hr interval) and cron route with 10/day cap.
 
     // Determine viewed post history to support Anti-Repetition
     let viewedPostIds: string[] = [];
@@ -968,11 +947,8 @@ export async function getPosts(options?: { mediaType?: string; limit?: number })
       }
     }
 
-    // Auto-trigger fresh YouTube batch if low video count in feed
-    if (videoList.length < 15) {
-      const { publishYouTubeVideosBatch } = require('@/lib/youtubeAutoPublisher');
-      publishYouTubeVideosBatch(false).catch(() => {});
-    }
+    // 🛡️ Bandwidth Safeguard: Removed auto-trigger YouTube batch on low video count.
+    // YouTube publishing is now handled ONLY via cron route with daily cap.
 
     if (newsList.length > 0 && videoList.length > 0) {
       const interleaved: any[] = [];

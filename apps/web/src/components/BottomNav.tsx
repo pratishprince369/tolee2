@@ -70,7 +70,7 @@ export function BottomNav() {
             setFranchiseStatus((res as any).franchiseStatus || null);
           }
         });
-      }, 5000);
+      }, 30000); // 🛡️ Bandwidth Safeguard: 30s instead of 5s
       return () => clearInterval(interval);
     }
   }, [session, pathname]);

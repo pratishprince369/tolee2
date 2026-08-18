@@ -537,7 +537,7 @@ export default function SuperAdminOverview() {
       }
     };
     poll(); // immediate first fetch
-    const t = setInterval(poll, 5000);
+    const t = setInterval(poll, 15000); // 🛡️ Bandwidth Safeguard: 15s instead of 5s
     return () => clearInterval(t);
   }, []);
 
@@ -583,7 +583,7 @@ export default function SuperAdminOverview() {
     if (pollingActive) {
       pollingTimerRef.current = setInterval(() => {
         fetchMetrics(dataType);
-      }, 30000); // refresh every 30 seconds
+      }, 60000); // 🛡️ Bandwidth Safeguard: 60s instead of 30s
     } else {
       if (pollingTimerRef.current) {
         clearInterval(pollingTimerRef.current);

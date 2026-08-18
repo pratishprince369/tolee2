@@ -107,7 +107,7 @@ export default function SuperAdminAnalyticsPage() {
   // Run realtime stats fetch on mount, and set a polling interval of 20 seconds
   useEffect(() => {
     fetchRealtime();
-    const interval = setInterval(fetchRealtime, 20000);
+    const interval = setInterval(fetchRealtime, 60000); // 🛡️ Bandwidth Safeguard: 60s instead of 20s
     return () => clearInterval(interval);
   }, []);
 
