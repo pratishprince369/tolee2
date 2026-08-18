@@ -641,6 +641,11 @@ export default function SuperAdminOverview() {
           70% { opacity: 1; box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
           100% { opacity: 0.5; box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
         }
+        @keyframes bandwidth-pulse {
+          0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.5); }
+          50% { box-shadow: 0 0 16px 4px rgba(220, 38, 38, 0.3); }
+          100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.5); }
+        }
       `}</style>
 
       {/* Dynamic Header */}
@@ -723,6 +728,59 @@ export default function SuperAdminOverview() {
             <span style={{ color: '#f87171', fontSize: 13 }}> — Suspicious IPs, spam activities, or potential hacking attempts detected.</span>
           </div>
           <a href="/super-admin/security" style={{ background: '#7f1d1d', color: '#fff', fontSize: 12, fontWeight: 700, textDecoration: 'none', padding: '6px 14px', borderRadius: 8, border: '1px solid #991b1b' }}>Review Events</a>
+        </div>
+      )}
+
+      {/* 🚨 BANDWIDTH CRITICAL ALERT — Shows when Network Transfer approaches or exceeds 1 GB target */}
+      {(m.infraUsage?.transferStatus === 'WARNING' || m.infraUsage?.transferStatus === 'CRITICAL') && (
+        <div style={{
+          background: m.infraUsage?.transferStatus === 'CRITICAL' ? '#450a0a' : '#451a03',
+          border: `2px solid ${m.infraUsage?.transferStatus === 'CRITICAL' ? '#dc2626' : '#d97706'}`,
+          borderRadius: 14,
+          padding: '16px 22px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 14,
+          animation: m.infraUsage?.transferStatus === 'CRITICAL' ? 'bandwidth-pulse 1.5s infinite' : 'none'
+        }}>
+          <span style={{ fontSize: 28, flexShrink: 0 }}>
+            {m.infraUsage?.transferStatus === 'CRITICAL' ? '🔴' : '🟡'}
+          </span>
+          <div style={{ flex: 1 }}>
+            <div style={{
+              color: m.infraUsage?.transferStatus === 'CRITICAL' ? '#fca5a5' : '#fde68a',
+              fontWeight: 800,
+              fontSize: 15,
+              marginBottom: 3
+            }}>
+              {m.infraUsage?.transferStatus === 'CRITICAL'
+                ? '⚠️ CRITICAL: Database Network Transfer has EXCEEDED 1 GB monthly target!'
+                : '⚠️ WARNING: Database Network Transfer approaching 1 GB monthly target!'}
+            </div>
+            <div style={{
+              color: m.infraUsage?.transferStatus === 'CRITICAL' ? '#f87171' : '#fbbf24',
+              fontSize: 12,
+              lineHeight: 1.5
+            }}>
+              Current usage: <strong>{m.infraUsage?.databaseTransferGB?.toFixed(3) || '0.000'} GB</strong> ({m.infraUsage?.transferPercentage?.toFixed(1) || 0}% of 1 GB target).
+              {m.infraUsage?.transferStatus === 'CRITICAL'
+                ? ' AI news auto-publishing should be paused. Neon free tier limit is 5 GB — exceeding it will lock your database!'
+                : ' Consider reducing API calls and monitoring closely. AI news is capped at 10/day.'}
+            </div>
+          </div>
+          <div style={{
+            background: m.infraUsage?.transferStatus === 'CRITICAL' ? '#7f1d1d' : '#78350f',
+            color: '#fff',
+            fontSize: 11,
+            fontWeight: 700,
+            padding: '8px 16px',
+            borderRadius: 10,
+            border: `1px solid ${m.infraUsage?.transferStatus === 'CRITICAL' ? '#991b1b' : '#92400e'}`,
+            textAlign: 'center',
+            whiteSpace: 'nowrap'
+          }}>
+            {m.infraUsage?.databaseTransferGB?.toFixed(3)} GB<br/>/ 1 GB
+          </div>
         </div>
       )}
 
