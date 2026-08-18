@@ -296,6 +296,7 @@ export default function LinkedInExtractorClient() {
                   <option value={2} className="bg-[#0b1220] text-white">2 Pages (~20 Leads)</option>
                   <option value={3} className="bg-[#0b1220] text-white">3 Pages (~30 Leads)</option>
                   <option value={5} className="bg-[#0b1220] text-white">5 Pages (~50 Leads)</option>
+                  <option value={10} className="bg-[#0b1220] text-white">10 Pages (~100 Leads)</option>
                 </select>
               </div>
 
