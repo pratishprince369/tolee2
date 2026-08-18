@@ -26,6 +26,7 @@ const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY || 'nvapi-f9_tipP_IMYxjaHLjard
  * Extracts LinkedIn profiles, enriches emails with pattern verification, formats phone numbers, and stores directly in tolee-1 database.
  */
 export async function searchAndExtractLinkedInLeads(params: {
+  linkedinUrl?: string;
   role?: string;
   company?: string;
   location?: string;
@@ -35,12 +36,42 @@ export async function searchAndExtractLinkedInLeads(params: {
     const session = await getServerSession(authOptions);
     const userId = (session?.user as any)?.id || null;
 
-    const targetRole = params.role?.trim() || 'Human Resources & Talent Acquisition';
-    const targetCompany = params.company?.trim() || 'Top Enterprise Companies';
-    const targetLocation = params.location?.trim() || 'India';
+    let targetRole = params.role?.trim() || '';
+    let targetCompany = params.company?.trim() || '';
+    let targetLocation = params.location?.trim() || '';
     const requestCount = Math.min(Math.max(params.count || 5, 1), 25);
 
-    const queryKey = `${targetRole} | ${targetCompany} | ${targetLocation}`.trim();
+    // If a LinkedIn URL was provided, parse keywords & intent from it
+    if (params.linkedinUrl?.trim()) {
+      const rawUrl = params.linkedinUrl.trim();
+      try {
+        const parsedUrl = new URL(rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`);
+        const keywordsParam = parsedUrl.searchParams.get('keywords') || '';
+        const titleParam = parsedUrl.searchParams.get('title') || '';
+        const companyParam = parsedUrl.searchParams.get('company') || '';
+        const geoParam = parsedUrl.searchParams.get('geoUrn') || '';
+
+        if (keywordsParam) {
+          const decoded = decodeURIComponent(keywordsParam).replace(/\+/g, ' ');
+          if (!targetRole) targetRole = decoded;
+          if (decoded.toLowerCase().includes('mumbai')) targetLocation = 'Mumbai, India';
+          else if (decoded.toLowerCase().includes('delhi')) targetLocation = 'Delhi NCR, India';
+          else if (decoded.toLowerCase().includes('bangalore') || decoded.toLowerCase().includes('bengaluru')) targetLocation = 'Bengaluru, India';
+          else if (decoded.toLowerCase().includes('pune')) targetLocation = 'Pune, India';
+        }
+        if (titleParam && !targetRole) targetRole = decodeURIComponent(titleParam);
+        if (companyParam && !targetCompany) targetCompany = decodeURIComponent(companyParam);
+      } catch {
+        // Fallback: extract terms from raw text if not standard URL
+        if (!targetRole) targetRole = rawUrl.replace(/https?:\/\/[^\/]+\/?/i, '').replace(/[/?&=_%]/g, ' ');
+      }
+    }
+
+    if (!targetRole) targetRole = 'Human Resources & Talent Acquisition';
+    if (!targetCompany) targetCompany = 'Top Enterprise Companies';
+    if (!targetLocation) targetLocation = 'Delhi NCR, India';
+
+    const queryKey = params.linkedinUrl?.trim() || `${targetRole} | ${targetCompany} | ${targetLocation}`.trim();
 
     // Call NVIDIA NIM Llama-3 70B / Scout OSINT Model to generate enriched leads
     let generatedLeads: any[] = [];
