@@ -263,11 +263,6 @@ export default function LinkedInExtractorClient() {
               <ArrowLeft className="w-4 h-4" />
               <span>Tolee World</span>
             </Link>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800/60 flex items-center gap-1.5">
-                <Database className="w-3 h-3 text-cyan-400" /> tolee-1 DB Isolated
-              </span>
-            </div>
           </div>
 
           <div className="flex items-center gap-2.5">

@@ -650,15 +650,7 @@ export default function ResumeBuilderClient() {
             <span>Choices</span>
           </button>
           <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-800/50">
-                PRO RESUME STUDIO
-              </span>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800/50 flex items-center gap-1">
-                <Database className="w-2.5 h-2.5" /> tolee-1 DB
-              </span>
-            </div>
-            <h1 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight mt-0.5">
+            <h1 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">
               AI Resume Studio &amp; ATS Matcher
             </h1>
           </div>
