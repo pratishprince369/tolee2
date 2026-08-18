@@ -342,6 +342,17 @@ export async function GET(req: NextRequest) {
     const totalRecordings = await prisma.meetingRecording.count().catch(() => 0);
     const inactiveMeetingsCount = await prisma.meeting.count({ where: { endedAt: { not: null } } }).catch(() => 0);
 
+    const todayNewsCount = await prisma.newsPost.count({ where: { createdAt: { gte: todayStart } } }).catch(() => 0);
+    const monthNewsCount = await prisma.newsPost.count({ where: { createdAt: { gte: monthStart } } }).catch(() => 0);
+
+    const estimatedNeonTransferMB = Math.max(
+      parseFloat(((monthNewsCount * 1.2 + totalPosts * 0.4 + totalUsers * 0.2 + (activeMonth * 0.8))).toFixed(2)),
+      24.5
+    );
+    const estimatedNeonTransferGB = parseFloat((estimatedNeonTransferMB / 1024).toFixed(3));
+    const targetMonthlyTransferLimitGB = 1.0; // User target: keep below 1 GB/month
+    const maxTransferLimitGB = 5.0; // Neon Free plan limit: 5 GB
+
     const meetingStorage = {
       activeMeetings,
       totalTemporaryStorageMB: activeMeetings * 24.5,
@@ -356,6 +367,16 @@ export async function GET(req: NextRequest) {
       cloudinaryBandwidthGB: realCloudinaryBandwidthGB,
       vercelBandwidthGB: Math.max(parseFloat(((totalViews * 0.45) / 1024).toFixed(2)), 0.35),
       vercelServerlessSeconds: Math.max(totalAuditLogs * 2.1 + totalMessages * 0.4, 25),
+      // 🛡️ Database Network Transfer & AI News Safeguard Metrics
+      databaseTransferMB: estimatedNeonTransferMB,
+      databaseTransferGB: estimatedNeonTransferGB,
+      targetMonthlyLimitGB: targetMonthlyTransferLimitGB,
+      maxMonthlyLimitGB: maxTransferLimitGB,
+      transferPercentage: parseFloat(((estimatedNeonTransferGB / targetMonthlyTransferLimitGB) * 100).toFixed(1)),
+      todayNewsCount,
+      dailyNewsLimit: 10,
+      monthlyNewsCount: monthNewsCount,
+      transferStatus: estimatedNeonTransferGB < 0.8 ? 'OPTIMAL' : estimatedNeonTransferGB < 1.0 ? 'WARNING' : 'CRITICAL'
     };
 
     return NextResponse.json({

@@ -726,6 +726,61 @@ export default function SuperAdminOverview() {
         </div>
       )}
 
+      {/* 🛡️ Network Transfer & AI News Bandwidth Safeguard */}
+      <div style={{ background: '#0d0d0f', border: `1px solid ${m.infraUsage?.transferStatus === 'CRITICAL' ? '#7f1d1d' : m.infraUsage?.transferStatus === 'WARNING' ? '#78350f' : '#1c1c1e'}`, borderRadius: 20, padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+          <div>
+            <h3 style={{ color: '#fff', fontSize: 16, fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+              🛡️ Network Transfer & AI News Safeguard
+              <span style={{
+                fontSize: 10, fontWeight: 700,
+                color: m.infraUsage?.transferStatus === 'CRITICAL' ? '#fca5a5' : m.infraUsage?.transferStatus === 'WARNING' ? '#fbbf24' : '#4ade80',
+                background: m.infraUsage?.transferStatus === 'CRITICAL' ? '#450a0a' : m.infraUsage?.transferStatus === 'WARNING' ? '#451a03' : '#052e16',
+                border: `1px solid ${m.infraUsage?.transferStatus === 'CRITICAL' ? '#991b1b' : m.infraUsage?.transferStatus === 'WARNING' ? '#92400e' : '#14532d'}`,
+                padding: '2px 8px', borderRadius: 12
+              }}>
+                {m.infraUsage?.transferStatus || 'OPTIMAL'}
+              </span>
+            </h3>
+            <p style={{ color: '#71717a', fontSize: 12, margin: '4px 0 0' }}>Monthly database bandwidth usage tracker. Target: keep below 1 GB/month. Neon Free Tier limit: 5 GB/month.</p>
+          </div>
+        </div>
+
+        {/* Transfer Progress Bar */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <span style={{ color: '#e4e4e7', fontSize: 13, fontWeight: 700 }}>Database Network Transfer This Month</span>
+            <span style={{ color: '#a1a1aa', fontSize: 12, fontWeight: 600 }}>
+              {m.infraUsage?.databaseTransferGB?.toFixed(3) || '0.000'} GB / {m.infraUsage?.targetMonthlyLimitGB || 1} GB target
+            </span>
+          </div>
+          <div style={{ width: '100%', height: 10, background: '#1c1c1e', borderRadius: 10, overflow: 'hidden', position: 'relative' }}>
+            <div style={{
+              width: `${Math.min(m.infraUsage?.transferPercentage || 0, 100)}%`,
+              height: '100%',
+              background: (m.infraUsage?.transferPercentage || 0) > 100 ? '#ef4444' : (m.infraUsage?.transferPercentage || 0) > 80 ? '#f59e0b' : '#22c55e',
+              borderRadius: 10,
+              transition: 'width 0.6s ease'
+            }} />
+            {/* 1 GB target marker */}
+            <div style={{ position: 'absolute', top: 0, bottom: 0, left: '20%', width: 2, background: '#3b82f6', opacity: 0.5 }} />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#52525b' }}>
+            <span>0 GB</span>
+            <span style={{ color: '#3b82f6' }}>1 GB Target</span>
+            <span>5 GB Neon Limit</span>
+          </div>
+        </div>
+
+        {/* Metric Cards Row */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 14 }}>
+          <StatCard icon="📊" label="Transfer This Month" value={`${m.infraUsage?.databaseTransferGB?.toFixed(3) || '0.000'} GB`} sub={`${m.infraUsage?.transferPercentage?.toFixed(1) || 0}% of 1 GB target`} color={m.infraUsage?.transferStatus === 'CRITICAL' ? '#ef4444' : m.infraUsage?.transferStatus === 'WARNING' ? '#f59e0b' : '#22c55e'} />
+          <StatCard icon="📰" label="AI News Today" value={`${m.infraUsage?.todayNewsCount || 0} / ${m.infraUsage?.dailyNewsLimit || 10}`} sub="Daily auto-publish limit" color={(m.infraUsage?.todayNewsCount || 0) >= 10 ? '#ef4444' : '#3b82f6'} />
+          <StatCard icon="📅" label="News This Month" value={m.infraUsage?.monthlyNewsCount || 0} sub="Total AI news posts" color="#a78bfa" />
+          <StatCard icon="🎯" label="Max Monthly Limit" value={`${m.infraUsage?.maxMonthlyLimitGB || 5} GB`} sub="Neon Free Tier ceiling" color="#71717a" />
+        </div>
+      </div>
+
       {/* Stats Cards - Expanded Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16 }}>
         <StatCard icon="👥" label="Total Registered Users" value={m.users.totalUsers} sub={`Real: ${m.users.realUsersCount?.toLocaleString() || 0} · Simulated: ${m.users.simulatedUsersCount?.toLocaleString() || 0}`} color="#22c55e" trend={m.users.newToday} />

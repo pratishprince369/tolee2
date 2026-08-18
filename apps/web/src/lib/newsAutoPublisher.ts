@@ -459,6 +459,23 @@ export async function publishDailyNewsBatch(withDelay: boolean = false): Promise
   logs.push("Starting Multi-Lingual Daily News Auto-Publisher batch execution...");
 
   try {
+    // 🛡️ Bandwidth Safeguard: Check how many AI news posts have already been published today
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const todayNewsCount = await prisma.newsPost.count({
+      where: { createdAt: { gte: todayStart } }
+    }).catch(() => 0);
+
+    const DAILY_NEWS_LIMIT = 10;
+    if (todayNewsCount >= DAILY_NEWS_LIMIT) {
+      logs.push(`🛡️ Bandwidth Safeguard: Daily news quota reached (${todayNewsCount}/${DAILY_NEWS_LIMIT} published today). Skipping generation to keep data transfer well below 1 GB/mo.`);
+      return { success: true, count: 0, log: logs };
+    }
+
+    const maxToPublish = Math.min(10, DAILY_NEWS_LIMIT - todayNewsCount);
+    logs.push(`Daily News Cap Active: ${todayNewsCount}/${DAILY_NEWS_LIMIT} already published today. Publishing up to ${maxToPublish} posts.`);
+
     // Auto-cleanup: Clean any legacy fake AI generated images from news posts
     await prisma.post.updateMany({
       where: {
@@ -497,8 +514,8 @@ export async function publishDailyNewsBatch(withDelay: boolean = false): Promise
     const stockIndex = { val: 0 };
     const batchProcessedHeadlines = new Set<string>();
 
-    for (let i = 0; i < 50; i++) { // Loop up to 50 candidates to publish 10 non-duplicate news posts
-      if (publishedCount >= 10) break;
+    for (let i = 0; i < 50; i++) { // Loop up to 50 candidates to publish up to remaining daily quota
+      if (publishedCount >= maxToPublish) break;
 
       const accountConfig = REGISTERED_NEWS_ACCOUNTS[publishedCount % REGISTERED_NEWS_ACCOUNTS.length];
       const dbUser = userMap.get(accountConfig.email);

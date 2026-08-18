@@ -21,7 +21,7 @@ export default async function GlobalFeedPage() {
   
   const currentUserId = (session?.user as any)?.id;
 
-  // Background trigger: auto-publish fresh news & videos if latest post is older than 90 seconds
+  // 🛡️ Bandwidth Safeguard: Auto-publish fresh news & videos only if latest post is older than 6 hours (Max 10/day)
   try {
     const latestPost = await prisma.post.findFirst({
       where: { isArchived: false, status: 'published' },
@@ -29,9 +29,9 @@ export default async function GlobalFeedPage() {
       select: { createdAt: true }
     });
     const timeSince = latestPost ? Date.now() - new Date(latestPost.createdAt).getTime() : Infinity;
-    if (timeSince > 90 * 1000) {
-      publishYouTubeVideosBatch(false).catch(() => {});
+    if (timeSince > 6 * 60 * 60 * 1000) { // 6 hours interval
       publishDailyNewsBatch(false).catch(() => {});
+      publishYouTubeVideosBatch(false).catch(() => {});
     }
   } catch (e) {}
 
