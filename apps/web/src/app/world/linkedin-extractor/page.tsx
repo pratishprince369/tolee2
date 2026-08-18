@@ -31,6 +31,9 @@ import {
   ExtractedLeadItem 
 } from '@/actions/linkedinExtractor';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export default function LinkedInExtractorPage() {
   const [linkedinUrl, setLinkedinUrl] = useState('');
   const [searchFilter, setSearchFilter] = useState('');
