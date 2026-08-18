@@ -1850,5 +1850,30 @@ model WorldTool {
   @@index([accessType])
 }
 
+// ---------------------------------------------------------
+// TOLEE WORLD APP: AI RESUME BUILDER & ATS OPTIMIZER
+// Stored in tolee-1 database (DATABASE_URL_AI / prismaAI)
+// ---------------------------------------------------------
+model UserResume {
+  id             String   @id @default(cuid())
+  userId         String?
+  title          String   @default("My Professional Resume")
+  targetRole     String?
+  template       String   @default("modern")
+  personalInfo   Json
+  summary        String?  @db.Text
+  experiences    Json     @default("[]")
+  education      Json     @default("[]")
+  skills         Json     @default("[]")
+  projects       Json     @default("[]")
+  atsScore       Int?     @default(85)
+  jobDescription String?  @db.Text
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([userId])
+}
+
+
 
 

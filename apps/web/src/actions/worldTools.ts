@@ -40,6 +40,20 @@ const DEFAULT_TOOLS: Omit<WorldToolItem, 'id'>[] = [
     priceMonthly: 19.99,
     freeTrialDays: 7,
     order: 1,
+  },
+  {
+    name: 'AI Resume Builder & ATS Optimizer',
+    slug: 'ai-resume-builder',
+    description: 'Build ATS-optimized resumes with AI summary writer, action-verb enhancer, Job Description matcher, and 1-click PDF download.',
+    routeUrl: '/world/ai-resume-builder',
+    icon: 'FileText',
+    category: 'Career & Productivity',
+    badge: 'PRO AI',
+    isVisible: true,
+    accessType: 'TIMED_FREE',
+    priceMonthly: 14.99,
+    freeTrialDays: 7,
+    order: 2,
   }
 ];
 
