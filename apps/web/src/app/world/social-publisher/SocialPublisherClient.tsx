@@ -46,6 +46,7 @@ const PROMPT_SUGGESTIONS = [
 export default function SocialPublisherClient() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
 
   // Composer States
   const [topic, setTopic] = useState('');
@@ -76,12 +77,16 @@ export default function SocialPublisherClient() {
     whatsapp: '',
   });
 
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Strict Authentication Guard
   useEffect(() => {
-    if (status === 'unauthenticated') {
+    if (mounted && status === 'unauthenticated') {
       router.push('/auth/signin?callbackUrl=' + encodeURIComponent('/world/social-publisher'));
     }
-  }, [status, router]);
+  }, [mounted, status, router]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -211,7 +216,7 @@ export default function SocialPublisherClient() {
     }
   };
 
-  if (status === 'loading' || status === 'unauthenticated') {
+  if (!mounted || status === 'loading' || status === 'unauthenticated') {
     return (
       <div className="min-h-screen bg-[#070b13] text-gray-200 p-6 flex flex-col justify-center items-center">
         <div className="w-12 h-12 border-4 border-t-cyan-500 border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin"></div>
@@ -222,10 +227,11 @@ export default function SocialPublisherClient() {
     );
   }
 
-  const currentPostContent = editablePosts[selectedPlatform];
+  const currentPostContent = editablePosts[selectedPlatform] || '';
   const charCount = currentPostContent.length;
   const userName = (session?.user as any)?.name || 'Creator';
-  const userHandle = (session?.user as any)?.username || 'tolee_creator';
+  const userHandle = (session?.user as any)?.username || (session?.user as any)?.name || 'tolee_creator';
+  const avatarInitial = (userName && typeof userName === 'string' && userName.length > 0) ? userName.charAt(0).toUpperCase() : 'C';
 
   return (
     <div className="min-h-screen bg-[#070b13] text-[#e2e8f0] font-sans pb-28 pt-20 px-3 sm:px-6 lg:px-10 selection:bg-cyan-500/30 selection:text-cyan-200">
@@ -547,7 +553,7 @@ export default function SocialPublisherClient() {
                 <div className="bg-[#0f172a] border border-gray-700/60 rounded-xl p-4 text-gray-100 shadow-inner">
                   <div className="flex items-center gap-3 mb-3">
                     <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm">
-                      {userName.charAt(0)}
+                      {avatarInitial}
                     </div>
                     <div>
                       <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
@@ -576,7 +582,7 @@ export default function SocialPublisherClient() {
                     <div className="flex items-center gap-2.5">
                       <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-pink-500 to-amber-500 p-[2px]">
                         <div className="w-full h-full rounded-full bg-[#0f172a] flex items-center justify-center text-white font-bold text-xs">
-                          {userName.charAt(0)}
+                          {avatarInitial}
                         </div>
                       </div>
                       <span className="text-xs font-bold text-white">{userHandle}</span>
@@ -602,7 +608,7 @@ export default function SocialPublisherClient() {
                 <div className="bg-[#0f172a] border border-gray-700/60 rounded-xl p-4 text-gray-100">
                   <div className="flex items-start gap-3">
                     <div className="w-9 h-9 rounded-full bg-cyan-600 flex items-center justify-center text-white font-bold text-xs shrink-0">
-                      {userName.charAt(0)}
+                      {avatarInitial}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 mb-1">
@@ -643,7 +649,7 @@ export default function SocialPublisherClient() {
                 <div className="bg-[#0f172a] border border-gray-700/60 rounded-xl p-4 text-gray-100">
                   <div className="flex items-center gap-3 mb-3">
                     <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm">
-                      {userName.charAt(0)}
+                      {avatarInitial}
                     </div>
                     <div>
                       <h4 className="text-xs font-bold text-white">{userName}</h4>
