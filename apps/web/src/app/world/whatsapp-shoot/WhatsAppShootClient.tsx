@@ -67,12 +67,13 @@ export default function WhatsAppShootClient() {
   // Tab View
   const [viewTab, setViewTab] = useState<'BUILDER' | 'CAMPAIGNS'>('BUILDER');
 
-  // WhatsApp Web Device Connection States (OpenWA / WhatsApp Web Pair)
+  // Real Baileys / OpenWA WebSocket Session States
   const [isDeviceConnected, setIsDeviceConnected] = useState(false);
   const [connectedPhone, setConnectedPhone] = useState<string | null>(null);
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
+  const [sessionStatus, setSessionStatus] = useState<'DISCONNECTED' | 'SCAN_QR' | 'CONNECTING' | 'CONNECTED'>('DISCONNECTED');
   const [showQRModal, setShowQRModal] = useState(false);
   const [qrTimer, setQrTimer] = useState(25);
-  const [isScanning, setIsScanning] = useState(false);
   const [pairingTab, setPairingTab] = useState<'QR' | 'CODE'>('QR');
   const [pairingPhoneInput, setPairingPhoneInput] = useState('');
   const [generatedPairingCode, setGeneratedPairingCode] = useState<string | null>(null);
@@ -121,15 +122,45 @@ export default function WhatsAppShootClient() {
 
   useEffect(() => {
     setMounted(true);
-    // Check if session was already saved
+  }, []);
+
+  // Poll Real Baileys Session Status
+  const pollSessionStatus = async () => {
     try {
-      const savedDevice = localStorage.getItem('tolee_wa_device');
-      if (savedDevice) {
-        setIsDeviceConnected(true);
-        setConnectedPhone(savedDevice);
+      const res = await fetch('/api/whatsapp-shoot');
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.success) {
+        setSessionStatus(data.status);
+        if (data.qrCodeDataUrl) {
+          setQrCodeDataUrl(data.qrCodeDataUrl);
+        }
+        if (data.status === 'CONNECTED') {
+          setIsDeviceConnected(true);
+          setConnectedPhone(data.phoneNumber || 'Linked WhatsApp');
+          if (showQRModal) {
+            setShowQRModal(false);
+            showToast('🎉 Real WhatsApp Device Connected Successfully!');
+          }
+        } else if (data.status === 'DISCONNECTED') {
+          setIsDeviceConnected(false);
+          setConnectedPhone(null);
+        }
       }
     } catch {}
-  }, []);
+  };
+
+  // Session Polling Interval
+  useEffect(() => {
+    if (!mounted || status !== 'authenticated') return;
+    pollSessionStatus();
+
+    const interval = setInterval(() => {
+      pollSessionStatus();
+    }, showQRModal ? 2500 : 8000);
+
+    return () => clearInterval(interval);
+  }, [mounted, status, showQRModal]);
 
   // QR Code Timer Countdown
   useEffect(() => {
@@ -173,22 +204,21 @@ export default function WhatsAppShootClient() {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // Device Connection Actions
-  const handleSimulateQRScan = () => {
-    setIsScanning(true);
-    showToast('🔄 Pairing with WhatsApp Web Client...');
-
-    setTimeout(() => {
-      const mockNumber = defaultCountryCode + ' ' + (Math.floor(8000000000 + Math.random() * 1999999999));
-      setIsDeviceConnected(true);
-      setConnectedPhone(mockNumber);
-      setIsScanning(false);
-      setShowQRModal(false);
-      try {
-        localStorage.setItem('tolee_wa_device', mockNumber);
-      } catch {}
-      showToast(`🟢 WhatsApp Device Linked Successfully: ${mockNumber}!`);
-    }, 1800);
+  // Initialize Real Session Trigger
+  const handleOpenLinkModal = async () => {
+    setShowQRModal(true);
+    showToast('🔄 Initializing Real Baileys WhatsApp WebSocket Engine...');
+    try {
+      const res = await fetch('/api/whatsapp-shoot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'INIT_SESSION' }),
+      });
+      const data = await res.json();
+      if (data.success && data.qrCodeDataUrl) {
+        setQrCodeDataUrl(data.qrCodeDataUrl);
+      }
+    } catch {}
   };
 
   const handleGeneratePairingCode = () => {
@@ -201,13 +231,20 @@ export default function WhatsAppShootClient() {
     showToast('🔑 8-digit Pairing Code Generated!');
   };
 
-  const handleDisconnectDevice = () => {
-    setIsDeviceConnected(false);
-    setConnectedPhone(null);
+  const handleDisconnectDevice = async () => {
+    showToast('🔴 Disconnecting WhatsApp session...');
     try {
-      localStorage.removeItem('tolee_wa_device');
+      await fetch('/api/whatsapp-shoot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'LOGOUT' }),
+      });
+      setIsDeviceConnected(false);
+      setConnectedPhone(null);
+      setQrCodeDataUrl(null);
+      setSessionStatus('DISCONNECTED');
+      showToast('🔴 WhatsApp Device disconnected.');
     } catch {}
-    showToast('🔴 WhatsApp Device disconnected.');
   };
 
   // Contact Parsing & Sanitizing
@@ -405,36 +442,66 @@ export default function WhatsAppShootClient() {
     return formatMessageForContact(contact);
   };
 
-  // 1-Click Shoot Single Contact (Checks WhatsApp Connection First)
-  const handleShootContact = (contact: WhatsAppContact, idx: number) => {
+  // Real Direct Backend Dispatch (Baileys WebSocket / OpenWA Engine)
+  const handleShootContact = async (contact: WhatsAppContact, idx: number) => {
     if (!isDeviceConnected) {
-      setShowQRModal(true);
-      showToast('⚠️ Please scan WhatsApp QR code to link your sender number first.');
+      handleOpenLinkModal();
+      showToast('⚠️ Please scan real WhatsApp QR code to link your sender device first.');
       return;
     }
 
     const textToSend = getMessageToSendForContact(contact);
-    const sanitizedDigits = contact.phone.replace(/[^\d]/g, '');
-    const waUrl = `https://api.whatsapp.com/send?phone=${sanitizedDigits}&text=${encodeURIComponent(textToSend)}`;
 
-    // Mark as SENT
-    setParsedContacts((prev) =>
-      prev.map((c, i) => (i === idx ? { ...c, status: 'SENT' } : c))
-    );
+    showToast(`⚡ Dispatching to ${contact.name || contact.phone}...`);
 
-    // Open WhatsApp Web in new tab
-    if (typeof window !== 'undefined') {
-      window.open(waUrl, '_blank');
+    try {
+      const res = await fetch('/api/whatsapp-shoot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'SEND_MESSAGE',
+          toPhone: contact.phone,
+          messageText: textToSend,
+          mediaUrl: mediaFile?.url || null,
+          mediaType: mediaFile?.type || null,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setParsedContacts((prev) =>
+          prev.map((c, i) => (i === idx ? { ...c, status: 'SENT' } : c))
+        );
+        showToast(`🚀 Dispatched directly to ${contact.name || contact.phone}!`);
+      } else {
+        // Fallback to Web intent if socket temporarily busy
+        const sanitizedDigits = contact.phone.replace(/[^\d]/g, '');
+        const waUrl = `https://api.whatsapp.com/send?phone=${sanitizedDigits}&text=${encodeURIComponent(textToSend)}`;
+        if (typeof window !== 'undefined') {
+          window.open(waUrl, '_blank');
+        }
+        setParsedContacts((prev) =>
+          prev.map((c, i) => (i === idx ? { ...c, status: 'SENT' } : c))
+        );
+      }
+    } catch {
+      // Fallback
+      const sanitizedDigits = contact.phone.replace(/[^\d]/g, '');
+      const waUrl = `https://api.whatsapp.com/send?phone=${sanitizedDigits}&text=${encodeURIComponent(textToSend)}`;
+      if (typeof window !== 'undefined') {
+        window.open(waUrl, '_blank');
+      }
+      setParsedContacts((prev) =>
+        prev.map((c, i) => (i === idx ? { ...c, status: 'SENT' } : c))
+      );
     }
-
-    showToast(`🚀 Dispatched WhatsApp to ${contact.name || contact.phone}!`);
   };
 
   // Auto-Sequence Shooter
   const handleStartAutoShoot = () => {
     if (!isDeviceConnected) {
-      setShowQRModal(true);
-      showToast('⚠️ Please scan WhatsApp QR code to link your sender number first.');
+      handleOpenLinkModal();
+      showToast('⚠️ Please scan real WhatsApp QR code to link your sender device first.');
       return;
     }
 
@@ -549,7 +616,7 @@ export default function WhatsAppShootClient() {
       )}
 
       {/* ═════════════════════════════════════════════════════════════
-          WHATSAPP WEB QR CODE / LINK DEVICE MODAL (OPENWA STYLE)
+          REAL BAILEYS WHATSAPP WEB QR CODE DEVICE PAIRING MODAL
       ══════════════════════════════════════════════════════════════ */}
       {showQRModal && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
@@ -563,10 +630,10 @@ export default function WhatsAppShootClient() {
                 </div>
                 <div>
                   <h3 className="text-base sm:text-lg font-extrabold text-white">
-                    Link WhatsApp Device
+                    Link Real WhatsApp Device
                   </h3>
                   <p className="text-xs text-gray-400">
-                    Connect your WhatsApp number to start high-speed auto-shooting.
+                    Real Baileys Multi-Device Engine • Scan with WhatsApp to pair.
                   </p>
                 </div>
               </div>
@@ -579,7 +646,7 @@ export default function WhatsAppShootClient() {
               </button>
             </div>
 
-            {/* Connection Tabs (QR Code vs Phone Number Code) */}
+            {/* Connection Tabs */}
             <div className="flex items-center gap-2 p-1 bg-[#070b13] border border-[#182842] rounded-xl">
               <button
                 onClick={() => setPairingTab('QR')}
@@ -588,7 +655,7 @@ export default function WhatsAppShootClient() {
                 }`}
               >
                 <QrCode className="w-3.5 h-3.5" />
-                <span>Scan QR Code</span>
+                <span>Scan Real QR Code</span>
               </button>
               <button
                 onClick={() => setPairingTab('CODE')}
@@ -597,11 +664,11 @@ export default function WhatsAppShootClient() {
                 }`}
               >
                 <Smartphone className="w-3.5 h-3.5" />
-                <span>Link with Phone Number</span>
+                <span>Pairing Code (Phone)</span>
               </button>
             </div>
 
-            {/* TAB A: QR CODE SCANNER */}
+            {/* TAB A: REAL DYNAMIC BAILEYS QR CODE SCANNER */}
             {pairingTab === 'QR' && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-center">
                 {/* Instructions */}
@@ -634,85 +701,32 @@ export default function WhatsAppShootClient() {
                   </div>
                 </div>
 
-                {/* QR Code Container with Live Laser Scan Effect */}
+                {/* Real Baileys QR Code Container */}
                 <div className="flex flex-col items-center justify-center p-4 rounded-2xl bg-[#070b13] border border-emerald-900/60 relative group">
-                  <div className="relative p-3 bg-white rounded-xl shadow-2xl overflow-hidden">
-                    {/* QR Code SVG */}
-                    <svg className="w-44 h-44" viewBox="0 0 200 200" fill="none">
-                      {/* Outer Positioning Squares */}
-                      <rect x="10" y="10" width="50" height="50" rx="6" fill="#111" />
-                      <rect x="20" y="20" width="30" height="30" rx="3" fill="#fff" />
-                      <rect x="26" y="26" width="18" height="18" rx="2" fill="#005c4b" />
-
-                      <rect x="140" y="10" width="50" height="50" rx="6" fill="#111" />
-                      <rect x="150" y="20" width="30" height="30" rx="3" fill="#fff" />
-                      <rect x="156" y="26" width="18" height="18" rx="2" fill="#005c4b" />
-
-                      <rect x="10" y="140" width="50" height="50" rx="6" fill="#111" />
-                      <rect x="20" y="150" width="30" height="30" rx="3" fill="#fff" />
-                      <rect x="26" y="156" width="18" height="18" rx="2" fill="#005c4b" />
-
-                      {/* Random Matrix Pattern */}
-                      <rect x="70" y="20" width="12" height="12" fill="#222" />
-                      <rect x="90" y="15" width="16" height="12" fill="#222" />
-                      <rect x="115" y="20" width="12" height="12" fill="#222" />
-                      <rect x="70" y="45" width="20" height="14" fill="#005c4b" />
-                      <rect x="100" y="45" width="25" height="14" fill="#222" />
-
-                      <rect x="20" y="70" width="14" height="20" fill="#222" />
-                      <rect x="45" y="75" width="15" height="12" fill="#222" />
-                      <rect x="75" y="75" width="50" height="50" rx="8" fill="#128c7e" />
-                      {/* WhatsApp Icon in Center */}
-                      <circle cx="100" cy="100" r="18" fill="#fff" />
-                      <path d="M100 89c-6.1 0-11 4.9-11 11 0 1.9.5 3.8 1.4 5.4L89 111l5.8-1.5c1.6.9 3.4 1.4 5.2 1.4 6.1 0 11-4.9 11-11s-4.9-10.9-11-10.9z" fill="#005c4b" />
-
-                      <rect x="140" y="70" width="20" height="15" fill="#222" />
-                      <rect x="170" y="75" width="15" height="18" fill="#222" />
-                      <rect x="140" y="100" width="15" height="20" fill="#222" />
-                      <rect x="165" y="105" width="20" height="15" fill="#005c4b" />
-
-                      <rect x="70" y="145" width="15" height="15" fill="#222" />
-                      <rect x="95" y="140" width="20" height="15" fill="#222" />
-                      <rect x="125" y="145" width="18" height="18" fill="#222" />
-                      <rect x="155" y="140" width="20" height="20" fill="#222" />
-                      <rect x="75" y="170" width="25" height="15" fill="#005c4b" />
-                      <rect x="110" y="170" width="30" height="15" fill="#222" />
-                      <rect x="150" y="170" width="25" height="15" fill="#222" />
-                    </svg>
+                  <div className="relative p-2 bg-white rounded-xl shadow-2xl overflow-hidden flex items-center justify-center min-w-[180px] min-h-[180px]">
+                    {qrCodeDataUrl ? (
+                      <img src={qrCodeDataUrl} alt="Real WhatsApp QR Code" className="w-44 h-44 object-contain" />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center p-6 text-center space-y-2">
+                        <div className="w-8 h-8 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+                        <span className="text-[11px] text-gray-700 font-semibold">Generating Real WhatsApp QR...</span>
+                      </div>
+                    )}
 
                     {/* Animated Scanning Laser Line */}
-                    <div className="absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-emerald-400 to-transparent animate-bounce opacity-80" />
+                    <div className="absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-emerald-400 to-transparent animate-bounce opacity-80 pointer-events-none" />
                   </div>
 
                   {/* Auto-Refresh Timer */}
                   <div className="mt-3 flex items-center gap-1.5 text-[11px] text-gray-400">
                     <RefreshCw className="w-3 h-3 text-emerald-400 animate-spin" />
-                    <span>QR refreshes in <strong className="text-emerald-300">{qrTimer}s</strong></span>
+                    <span>Real-time WebSocket active • Auto-syncs on scan</span>
                   </div>
-
-                  {/* 1-Click Connect Button */}
-                  <button
-                    onClick={handleSimulateQRScan}
-                    disabled={isScanning}
-                    className="mt-3 w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/25 transition-all"
-                  >
-                    {isScanning ? (
-                      <>
-                        <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        <span>Connecting WhatsApp...</span>
-                      </>
-                    ) : (
-                      <>
-                        <CheckCheck className="w-4 h-4" />
-                        <span>Pair & Link Device Now</span>
-                      </>
-                    )}
-                  </button>
                 </div>
               </div>
             )}
 
-            {/* TAB B: PAIRING WITH PHONE NUMBER (OTP CODE) */}
+            {/* TAB B: PAIRING WITH PHONE NUMBER */}
             {pairingTab === 'CODE' && (
               <div className="space-y-4 p-4 rounded-2xl bg-[#070b13] border border-emerald-900/40">
                 <div className="space-y-1">
@@ -742,12 +756,6 @@ export default function WhatsAppShootClient() {
                     <div className="font-mono text-2xl font-black text-white tracking-widest bg-black/40 py-2 rounded-lg border border-emerald-800">
                       {generatedPairingCode}
                     </div>
-                    <button
-                      onClick={handleSimulateQRScan}
-                      className="text-xs text-emerald-400 font-bold underline hover:text-white mt-1"
-                    >
-                      Confirm Pairing Completed
-                    </button>
                   </div>
                 )}
               </div>
@@ -779,11 +787,11 @@ export default function WhatsAppShootClient() {
                   WhatsApp Shoot
                 </h1>
                 <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-700/50 uppercase tracking-wider">
-                  OPEN-WA ENGINE 🚀
+                  BAILEYS WEBSOCKET ENGINE 🚀
                 </span>
               </div>
               <p className="text-xs text-gray-400 mt-1">
-                AI personalized bulk WhatsApp marketing & campaign runner with zero-ban sequence shooter.
+                Real WhatsApp Web broadcaster with AI personalization and anti-spam sequence shooter.
               </p>
             </div>
           </div>
@@ -800,7 +808,7 @@ export default function WhatsAppShootClient() {
                     <span>🟢 {connectedPhone}</span>
                     <span className="text-[9px] bg-emerald-900 px-1.5 py-0.2 rounded text-emerald-300">ONLINE</span>
                   </div>
-                  <div className="text-[9px] text-emerald-400">WhatsApp Web Linked</div>
+                  <div className="text-[9px] text-emerald-400">Real Baileys Linked</div>
                 </div>
                 <button
                   onClick={handleDisconnectDevice}
@@ -812,11 +820,11 @@ export default function WhatsAppShootClient() {
               </div>
             ) : (
               <button
-                onClick={() => setShowQRModal(true)}
+                onClick={handleOpenLinkModal}
                 className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-[#0e1b30] border border-amber-500/60 hover:border-emerald-500 text-amber-300 hover:text-emerald-300 text-xs font-bold transition-all shadow-md group"
               >
                 <QrCode className="w-4 h-4 text-amber-400 group-hover:text-emerald-400 animate-pulse" />
-                <span>Link WhatsApp via QR Code</span>
+                <span>Link WhatsApp via Real QR Code</span>
               </button>
             )}
 
@@ -1212,7 +1220,7 @@ export default function WhatsAppShootClient() {
                       Sequence Shooter ({sentCount}/{totalCount} Dispatched)
                     </h3>
                     <p className="text-[11px] text-gray-400 mt-0.5">
-                      1-Click direct dispatch with unique AI message per recipient.
+                      Direct Baileys WebSocket dispatch with unique AI message per recipient.
                     </p>
                   </div>
 
@@ -1355,7 +1363,7 @@ export default function WhatsAppShootClient() {
                   <div className="flex items-center gap-2">
                     <span className="text-[11px] text-gray-500 flex items-center gap-1">
                       <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                      Zero-Ban Multi-Variation Protocol
+                      Baileys Multi-Device Protocol
                     </span>
                   </div>
                 </div>
