@@ -37,6 +37,7 @@ import {
   CheckCheck,
   KeyRound,
   Radio,
+  AppWindow,
   Image as ImageIcon
 } from 'lucide-react';
 import { 
@@ -63,18 +64,14 @@ export default function WhatsAppShootClient() {
   const [mounted, setMounted] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const csvInputRef = useRef<HTMLInputElement | null>(null);
+  const popupWindowRef = useRef<Window | null>(null);
 
   // Tab View
   const [viewTab, setViewTab] = useState<'BUILDER' | 'CAMPAIGNS'>('BUILDER');
 
   // WhatsApp Web Device Connection States
-  const [isDeviceConnected, setIsDeviceConnected] = useState(true);
   const [connectedPhone, setConnectedPhone] = useState<string>('+91 98765 43210');
   const [showQRModal, setShowQRModal] = useState(false);
-  const [pairingTab, setPairingTab] = useState<'DIRECT' | 'CODE' | 'QR'>('DIRECT');
-  const [pairingPhoneInput, setPairingPhoneInput] = useState('+91');
-  const [generatedPairingCode, setGeneratedPairingCode] = useState<string | null>(null);
-  const [loadingPairingCode, setLoadingPairingCode] = useState(false);
 
   // Campaign States
   const [campaignId, setCampaignId] = useState<string | null>(null);
@@ -124,7 +121,6 @@ export default function WhatsAppShootClient() {
       const savedPhone = localStorage.getItem('tolee_wa_sender_phone');
       if (savedPhone) {
         setConnectedPhone(savedPhone);
-        setPairingPhoneInput(savedPhone);
       }
     } catch {}
   }, []);
@@ -160,33 +156,28 @@ export default function WhatsAppShootClient() {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // Generate 8-digit Pairing Code via Phone Number
-  const handleGeneratePairingCode = () => {
-    if (!pairingPhoneInput.trim() || pairingPhoneInput.length < 8) {
-      showToast('⚠️ Please enter a valid phone number with country code.');
-      return;
-    }
+  // Dedicated Chrome Popup Window Manager (Single Window Re-used)
+  const openWhatsAppPopupWindow = (targetUrl?: string) => {
+    if (typeof window === 'undefined') return;
 
-    setLoadingPairingCode(true);
-    setTimeout(() => {
-      const clean = pairingPhoneInput.replace(/[^\d]/g, '');
-      const code = `${clean.slice(-4)}-${Math.floor(1000 + Math.random() * 9000)}`;
-      setGeneratedPairingCode(code);
-      setLoadingPairingCode(false);
-      showToast('🎉 8-digit Pairing Code Ready!');
-    }, 600);
-  };
+    const url = targetUrl || 'https://web.whatsapp.com';
+    const width = 960;
+    const height = 720;
+    const left = Math.max(0, Math.round(window.screen.width / 2 - width / 2));
+    const top = Math.max(0, Math.round(window.screen.height / 2 - height / 2));
 
-  // Confirm Sender Number / Device Connected
-  const handleConfirmConnected = (phone?: string) => {
-    const verifiedPhone = phone || pairingPhoneInput || defaultCountryCode + ' 98765 43210';
-    setIsDeviceConnected(true);
-    setConnectedPhone(verifiedPhone);
-    setShowQRModal(false);
+    const features = `width=${width},height=${height},top=${top},left=${left},status=no,menubar=no,toolbar=no,location=yes,resizable=yes,scrollbars=yes`;
+
     try {
-      localStorage.setItem('tolee_wa_sender_phone', verifiedPhone);
-    } catch {}
-    showToast(`🟢 WhatsApp Sender Active: ${verifiedPhone}`);
+      if (!popupWindowRef.current || popupWindowRef.current.closed) {
+        popupWindowRef.current = window.open(url, 'ToleeWhatsAppWebPopup', features);
+      } else {
+        popupWindowRef.current.location.href = url;
+        popupWindowRef.current.focus();
+      }
+    } catch {
+      window.open(url, '_blank');
+    }
   };
 
   // Contact Parsing & Sanitizing
@@ -384,23 +375,21 @@ export default function WhatsAppShootClient() {
     return formatMessageForContact(contact);
   };
 
-  // 1-Click Shoot Single Contact (Direct 100% Reliable WhatsApp Engine)
+  // 1-Click Shoot Single Contact (Opens Dedicated Chrome Popup Window)
   const handleShootContact = (contact: WhatsAppContact, idx: number) => {
     const textToSend = getMessageToSendForContact(contact);
     const sanitizedDigits = contact.phone.replace(/[^\d]/g, '');
-    const waUrl = `https://api.whatsapp.com/send?phone=${sanitizedDigits}&text=${encodeURIComponent(textToSend)}`;
+    const waUrl = `https://web.whatsapp.com/send?phone=${sanitizedDigits}&text=${encodeURIComponent(textToSend)}`;
+
+    // Dispatch directly in the dedicated Chrome popup window
+    openWhatsAppPopupWindow(waUrl);
 
     // Mark as SENT
     setParsedContacts((prev) =>
       prev.map((c, i) => (i === idx ? { ...c, status: 'SENT' } : c))
     );
 
-    // Open WhatsApp Web in new tab
-    if (typeof window !== 'undefined') {
-      window.open(waUrl, '_blank');
-    }
-
-    showToast(`🚀 Dispatched WhatsApp to ${contact.name || contact.phone}!`);
+    showToast(`🚀 Dispatched to ${contact.name || contact.phone} in WhatsApp Popup!`);
   };
 
   // Auto-Sequence Shooter
@@ -413,11 +402,11 @@ export default function WhatsAppShootClient() {
 
     setAutoShootRunning(true);
     setCurrentShootingIdx(pendingIdx);
-    showToast(`▶️ Auto-Shooter started! Sending Contact #${pendingIdx + 1}...`);
+    showToast(`▶️ Auto-Shooter started! Sending Contact #${pendingIdx + 1} in Chrome Popup...`);
     handleShootContact(parsedContacts[pendingIdx], pendingIdx);
   };
 
-  // Auto-advancement effect
+  // Auto-advancement effect in Popup Window
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (autoShootRunning) {
@@ -516,24 +505,24 @@ export default function WhatsAppShootClient() {
       )}
 
       {/* ═════════════════════════════════════════════════════════════
-          WHATSAPP SENDER CONNECTION & CONFIGURATION MODAL
+          CHROME POPUP WHATSAPP WEB SCANNER & LOGIN MODAL
       ══════════════════════════════════════════════════════════════ */}
       {showQRModal && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-[#0b1220] border border-[#1a2e4a] rounded-3xl p-6 sm:p-8 max-w-xl w-full shadow-2xl space-y-6 animate-in fade-in zoom-in duration-200 relative overflow-hidden">
+          <div className="bg-[#0b1220] border border-[#1a2e4a] rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-6 animate-in fade-in zoom-in duration-200 relative overflow-hidden">
             
             {/* Modal Header */}
             <div className="flex items-center justify-between pb-4 border-b border-[#141e33]">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-emerald-950/80 border border-emerald-700/50 flex items-center justify-center text-emerald-400">
-                  <WhatsAppIcon className="w-6 h-6" />
+                  <AppWindow className="w-6 h-6" />
                 </div>
                 <div>
                   <h3 className="text-base sm:text-lg font-extrabold text-white">
-                    WhatsApp Connection Manager
+                    Chrome WhatsApp Web Popup
                   </h3>
                   <p className="text-xs text-gray-400">
-                    OpenWA Direct Engine • Instant 1-Click Broadcast Ready.
+                    Dedicated standalone window for WhatsApp Web scanning & shooting.
                   </p>
                 </div>
               </div>
@@ -546,131 +535,48 @@ export default function WhatsAppShootClient() {
               </button>
             </div>
 
-            {/* Connection Tabs */}
-            <div className="flex items-center gap-2 p-1 bg-[#070b13] border border-[#182842] rounded-xl">
+            {/* Explainer Box */}
+            <div className="space-y-4 p-5 rounded-2xl bg-[#070b13] border border-emerald-900/60 text-left">
+              <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
+                <CheckCheck className="w-5 h-5 text-emerald-400" />
+                <span>Zero-Barrier Chrome Popup Integration</span>
+              </div>
+              
+              <div className="space-y-2 text-xs text-gray-300">
+                <div className="flex items-start gap-2">
+                  <span className="w-5 h-5 rounded-full bg-emerald-950 border border-emerald-700 text-emerald-300 flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">1</span>
+                  <p>Click the button below to open a <strong className="text-white">Dedicated Chrome Popup Window</strong> for WhatsApp Web.</p>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="w-5 h-5 rounded-full bg-emerald-950 border border-emerald-700 text-emerald-300 flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">2</span>
+                  <p>If not already logged in, scan the official QR code in that popup window with your phone.</p>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="w-5 h-5 rounded-full bg-emerald-950 border border-emerald-700 text-emerald-300 flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">3</span>
+                  <p>Once logged in, return here and click <strong className="text-white">"Start Auto-Shoot Sequence"</strong> to start sending AI messages!</p>
+                </div>
+              </div>
+
               <button
-                onClick={() => setPairingTab('DIRECT')}
-                className={`flex-1 py-2 rounded-lg text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all ${
-                  pairingTab === 'DIRECT' ? 'bg-emerald-600 text-white shadow' : 'text-gray-400 hover:text-white'
-                }`}
+                onClick={() => {
+                  openWhatsAppPopupWindow('https://web.whatsapp.com');
+                  showToast('🪟 Opened dedicated WhatsApp Web window in Chrome!');
+                }}
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/25 transition-all"
               >
-                <Zap className="w-3.5 h-3.5" />
-                <span>Direct WhatsApp Web (Recommended)</span>
-              </button>
-              <button
-                onClick={() => setPairingTab('CODE')}
-                className={`flex-1 py-2 rounded-lg text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all ${
-                  pairingTab === 'CODE' ? 'bg-emerald-600 text-white shadow' : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                <Smartphone className="w-3.5 h-3.5" />
-                <span>Pairing Code</span>
+                <AppWindow className="w-4 h-4" />
+                <span>Open Dedicated Chrome Popup Window Now</span>
               </button>
             </div>
 
-            {/* TAB A: DIRECT BROWSER WHATSAPP WEB MODE (100% WORKING) */}
-            {pairingTab === 'DIRECT' && (
-              <div className="space-y-4 p-5 rounded-2xl bg-[#070b13] border border-emerald-900/60 text-left">
-                <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
-                  <CheckCheck className="w-5 h-5 text-emerald-400" />
-                  <span>100% Zero-Block WhatsApp Web Engine Active</span>
-                </div>
-                
-                <p className="text-xs text-gray-300 leading-relaxed">
-                  Tolee World uses your active logged-in browser WhatsApp Web session. You do not need to wait for serverless QR codes or worry about connection drops.
-                </p>
-
-                <div className="p-3 bg-[#0e1b30] border border-emerald-800/40 rounded-xl space-y-2">
-                  <label className="text-xs font-bold text-white">Your Sender Phone Number:</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="tel"
-                      value={pairingPhoneInput}
-                      onChange={(e) => setPairingPhoneInput(e.target.value)}
-                      placeholder="+91 98765 43210"
-                      className="flex-1 bg-[#070b13] border border-[#1a2e4a] focus:border-emerald-500 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none font-mono"
-                    />
-                    <button
-                      onClick={() => handleConfirmConnected(pairingPhoneInput)}
-                      className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow"
-                    >
-                      Save & Activate
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between pt-2">
-                  <span className="text-[11px] text-gray-400">Status: <strong className="text-emerald-400">Ready to Shoot</strong></span>
-                  <button
-                    onClick={() => {
-                      setShowQRModal(false);
-                      showToast('🚀 Ready! Click Start Auto-Shoot Sequence to begin.');
-                    }}
-                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 text-white text-xs font-bold shadow"
-                  >
-                    Start Campaign Now
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* TAB B: PAIRING WITH PHONE NUMBER (OTP CODE) */}
-            {pairingTab === 'CODE' && (
-              <div className="space-y-4 p-4 rounded-2xl bg-[#070b13] border border-emerald-900/40">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-white">Enter WhatsApp Phone Number:</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="tel"
-                      value={pairingPhoneInput}
-                      onChange={(e) => setPairingPhoneInput(e.target.value)}
-                      placeholder="+91 98765 43210"
-                      className="flex-1 bg-[#0b1424] border border-[#1a2e4a] focus:border-emerald-500 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-gray-500 focus:outline-none font-mono"
-                    />
-                    <button
-                      onClick={handleGeneratePairingCode}
-                      disabled={loadingPairingCode}
-                      className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow transition-all disabled:opacity-50 flex items-center gap-1"
-                    >
-                      {loadingPairingCode ? (
-                        <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      ) : (
-                        <span>Generate Code</span>
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                {generatedPairingCode && (
-                  <div className="p-4 rounded-xl bg-emerald-950/70 border border-emerald-700/60 text-center space-y-3">
-                    <p className="text-xs text-emerald-200">
-                      Your WhatsApp Pairing Code:
-                    </p>
-                    <div className="font-mono text-3xl font-black text-emerald-300 tracking-widest bg-black/60 py-3 rounded-xl border border-emerald-800 flex items-center justify-center gap-3">
-                      <span>{generatedPairingCode}</span>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(generatedPairingCode);
-                          showToast('📋 Copied Pairing Code to clipboard!');
-                        }}
-                        className="text-gray-400 hover:text-white p-1"
-                        title="Copy Code"
-                      >
-                        <Copy className="w-4 h-4" />
-                      </button>
-                    </div>
-
-                    <button
-                      onClick={() => handleConfirmConnected(pairingPhoneInput)}
-                      className="w-full py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow"
-                    >
-                      <CheckCheck className="w-4 h-4" />
-                      <span>Confirm & Connect Device</span>
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
+            <div className="flex items-center justify-end">
+              <button
+                onClick={() => setShowQRModal(false)}
+                className="px-4 py-2 rounded-xl bg-[#0e1b30] border border-gray-800 text-gray-300 text-xs font-bold hover:text-white"
+              >
+                Done / Close
+              </button>
+            </div>
 
           </div>
         </div>
@@ -698,7 +604,7 @@ export default function WhatsAppShootClient() {
                   WhatsApp Shoot
                 </h1>
                 <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-700/50 uppercase tracking-wider">
-                  OPEN-WA ACTIVE 🚀
+                  CHROME POPUP DISPATCHER 🚀
                 </span>
               </div>
               <p className="text-xs text-gray-400 mt-1">
@@ -707,21 +613,23 @@ export default function WhatsAppShootClient() {
             </div>
           </div>
 
-          {/* Right Area: Device Status Badge & View Tab Toggle */}
+          {/* Right Area: Popup Opener & View Tab Toggle */}
           <div className="flex flex-wrap items-center gap-3">
             
-            {/* WHATSAPP SENDER STATUS BADGE */}
+            {/* OPEN POPUP WINDOW BUTTON */}
             <button
-              onClick={() => setShowQRModal(true)}
-              className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-emerald-950/70 border border-emerald-600/60 text-emerald-200 shadow-md hover:border-emerald-400 transition-all"
+              onClick={() => {
+                openWhatsAppPopupWindow('https://web.whatsapp.com');
+                showToast('🪟 Opened WhatsApp Web Popup Window!');
+              }}
+              className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-emerald-950/70 border border-emerald-600/60 text-emerald-200 shadow-md hover:border-emerald-400 transition-all group"
             >
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+              <AppWindow className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
               <div className="text-left">
                 <div className="text-[11px] font-extrabold text-white flex items-center gap-1">
-                  <span>🟢 {connectedPhone}</span>
-                  <span className="text-[9px] bg-emerald-900 px-1.5 py-0.2 rounded text-emerald-300 font-mono">ACTIVE</span>
+                  <span>Open WhatsApp Web Window</span>
                 </div>
-                <div className="text-[9px] text-emerald-400">WhatsApp Web Ready</div>
+                <div className="text-[9px] text-emerald-400">Scan QR or Check Session</div>
               </div>
             </button>
 
@@ -1106,7 +1014,7 @@ export default function WhatsAppShootClient() {
                 </div>
               </div>
 
-              {/* CARD 4: ZERO-BAN SEQUENCE SHOOTER */}
+              {/* CARD 4: ZERO-BAN SEQUENCE SHOOTER (CHROME POPUP DISPATCHER) */}
               <div className="bg-[#0b1220] border border-[#182842] rounded-2xl p-5 shadow-xl space-y-4">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-[#141e33]">
                   <div>
@@ -1115,7 +1023,7 @@ export default function WhatsAppShootClient() {
                       Sequence Shooter ({sentCount}/{totalCount} Dispatched)
                     </h3>
                     <p className="text-[11px] text-gray-400 mt-0.5">
-                      1-Click direct dispatch with unique AI message per recipient.
+                      Dispatches in dedicated Chrome Popup Window with custom delay.
                     </p>
                   </div>
 
@@ -1234,7 +1142,7 @@ export default function WhatsAppShootClient() {
                                   }`}
                                 >
                                   <Send className="w-3 h-3" />
-                                  <span>{isSent ? 'Re-Shoot' : 'Shoot'}</span>
+                                  <span>{isSent ? 'Re-Shoot' : 'Shoot (Popup)'}</span>
                                 </button>
                               </td>
                             </tr>
@@ -1258,7 +1166,7 @@ export default function WhatsAppShootClient() {
                   <div className="flex items-center gap-2">
                     <span className="text-[11px] text-gray-500 flex items-center gap-1">
                       <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                      OpenWA Direct Engine Active
+                      Chrome Popup Auto-Sequence Active
                     </span>
                   </div>
                 </div>
