@@ -1928,6 +1928,27 @@ model ScheduledSocialPost {
   @@index([status])
 }
 
+model WhatsAppCampaign {
+  id              String    @id @default(cuid())
+  userId          String
+  userName        String?
+  title           String
+  messageTemplate String
+  mediaUrl        String?
+  mediaType       String?   // "image" or "video" or "document"
+  contactsData    Json      // Array of { id: string, phone: string, name?: string, customVar?: string, status: 'PENDING'|'SENT'|'SKIPPED' }
+  totalContacts   Int       @default(0)
+  sentCount       Int       @default(0)
+  status          String    @default("DRAFT") // "DRAFT", "IN_PROGRESS", "COMPLETED"
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+
 
 
 

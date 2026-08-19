@@ -68,7 +68,21 @@ const DEFAULT_TOOLS: Omit<WorldToolItem, 'id'>[] = [
     priceMonthly: 14.99,
     freeTrialDays: 7,
     order: 3,
-  }
+  },
+  {
+    name: 'WhatsApp Shoot & Bulk Broadcaster',
+    slug: 'whatsapp-shoot',
+    description: 'AI-powered bulk WhatsApp marketing & broadcast shooter. Send personalized campaigns with {{name}} tags, media attachments & zero-ban sequence automation.',
+    routeUrl: '/world/whatsapp-shoot',
+    icon: 'MessageCircle',
+    category: 'Marketing & Sales Automation',
+    badge: 'HOT 🚀',
+    isVisible: true,
+    accessType: 'TIMED_FREE',
+    priceMonthly: 19.99,
+    freeTrialDays: 7,
+    order: 4,
+  },
 ];
 
 /**

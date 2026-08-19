@@ -18,7 +18,8 @@ import {
   RefreshCw, 
   Gift,
   FileText,
-  Share2
+  Share2,
+  MessageCircle
 } from 'lucide-react';
 import { getPublicWorldTools, WorldToolItem } from '@/actions/worldTools';
 
@@ -172,6 +173,8 @@ export default function WorldDashboardPage() {
                           <FileText className="w-6 h-6 text-cyan-400" />
                         ) : tool.icon === 'Share2' || tool.slug === 'social-publisher' ? (
                           <Share2 className="w-6 h-6 text-cyan-400" />
+                        ) : tool.icon === 'MessageCircle' || tool.slug === 'whatsapp-shoot' ? (
+                          <MessageCircle className="w-6 h-6 text-emerald-400" />
                         ) : (
                           <Sparkles className="w-6 h-6 text-cyan-400" />
                         )}
