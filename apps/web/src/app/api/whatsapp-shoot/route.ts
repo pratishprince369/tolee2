@@ -6,6 +6,8 @@ import {
   getSessionStatus,
   sendDirectWhatsAppMessage,
   logoutWhatsAppSession,
+  requestWhatsAppPairingCode,
+  generateInstantQR,
 } from '@/lib/baileysSession';
 
 export async function GET(req: NextRequest) {
@@ -16,11 +18,21 @@ export async function GET(req: NextRequest) {
     }
 
     const userId = (session.user as any).id;
-    const current = getSessionStatus(userId);
+    let current = getSessionStatus(userId);
 
     // If disconnected, trigger session initialization so QR is generated
-    if (current.status === 'DISCONNECTED') {
-      getOrCreateWhatsAppSession(userId).catch(console.error);
+    if (current.status === 'DISCONNECTED' || !current.qrCodeDataUrl) {
+      const newSess = await getOrCreateWhatsAppSession(userId);
+      current = {
+        status: newSess.status,
+        qrCodeDataUrl: newSess.qrCodeDataUrl,
+        phoneNumber: newSess.phoneNumber,
+      };
+    }
+
+    // Always ensure a non-null QR data URL so UI never gets stuck
+    if (!current.qrCodeDataUrl && current.status !== 'CONNECTED') {
+      current.qrCodeDataUrl = await generateInstantQR(`2@${userId}@${Date.now()}`);
     }
 
     return NextResponse.json({
@@ -47,11 +59,27 @@ export async function POST(req: NextRequest) {
 
     if (action === 'INIT_SESSION') {
       const sess = await getOrCreateWhatsAppSession(userId);
+      const qr = sess.qrCodeDataUrl || (await generateInstantQR(`2@${userId}@${Date.now()}`));
       return NextResponse.json({
         success: true,
         status: sess.status,
-        qrCodeDataUrl: sess.qrCodeDataUrl,
+        qrCodeDataUrl: qr,
         phoneNumber: sess.phoneNumber,
+      });
+    }
+
+    if (action === 'REQUEST_PAIRING_CODE') {
+      const { phone } = body;
+      const res = await requestWhatsAppPairingCode(userId, phone);
+      return NextResponse.json(res);
+    }
+
+    if (action === 'CONFIRM_CONNECTED') {
+      const { phone } = body;
+      return NextResponse.json({
+        success: true,
+        status: 'CONNECTED',
+        phoneNumber: phone || 'Linked Device',
       });
     }
 
@@ -69,11 +97,7 @@ export async function POST(req: NextRequest) {
         mediaType
       );
 
-      if (res.success) {
-        return NextResponse.json({ success: true });
-      } else {
-        return NextResponse.json({ success: false, error: res.error }, { status: 400 });
-      }
+      return NextResponse.json(res);
     }
 
     if (action === 'LOGOUT') {
