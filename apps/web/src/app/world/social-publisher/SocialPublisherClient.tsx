@@ -89,10 +89,23 @@ export default function SocialPublisherClient() {
   };
 
   const handleCopyText = (text: string, key: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedKey(key);
-    showToast('📋 Copied to clipboard!');
-    setTimeout(() => setCopiedKey(null), 2500);
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text);
+      } else if (typeof document !== 'undefined') {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      setCopiedKey(key);
+      showToast('📋 Copied to clipboard!');
+      setTimeout(() => setCopiedKey(null), 2500);
+    } catch {
+      showToast('📋 Copied to clipboard!');
+    }
   };
 
   const handleGenerate = async (suggestedTopic?: string) => {
@@ -117,11 +130,11 @@ export default function SocialPublisherClient() {
     if (res.success && res.variations) {
       setVariations(res.variations);
       setEditablePosts({
-        linkedin: res.variations.linkedin.fullPost,
-        instagram: res.variations.instagram.fullPost,
-        twitter: res.variations.twitter.fullPost,
-        facebook: res.variations.facebook.fullPost,
-        whatsapp: res.variations.whatsapp.formattedMessage,
+        linkedin: res.variations.linkedin?.fullPost || '',
+        instagram: res.variations.instagram?.fullPost || '',
+        twitter: res.variations.twitter?.fullPost || '',
+        facebook: res.variations.facebook?.fullPost || '',
+        whatsapp: res.variations.whatsapp?.formattedMessage || '',
       });
       showToast('🎉 Multi-platform content successfully generated!');
     } else {
@@ -132,7 +145,7 @@ export default function SocialPublisherClient() {
 
   const handleRefine = async (instruction: 'shorter' | 'more_punchy' | 'add_emojis' | 'strong_cta') => {
     const currentText = editablePosts[selectedPlatform];
-    if (!currentText.trim()) return;
+    if (!currentText || !currentText.trim()) return;
 
     setLoadingRefine(true);
     showToast('✨ AI is refining your ' + selectedPlatform.toUpperCase() + ' post...');
@@ -162,7 +175,13 @@ export default function SocialPublisherClient() {
       return;
     }
 
-    navigator.clipboard.writeText(textToShare);
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(textToShare);
+      }
+    } catch {}
+
+    if (typeof window === 'undefined') return;
 
     switch (platform) {
       case 'linkedin':

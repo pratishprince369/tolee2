@@ -1,13 +1,17 @@
+import React from 'react';
 import dynamic from 'next/dynamic';
-
-export const metadata = {
-  title: 'AI Multi-Platform Social Publisher | Tolee World',
-  description: 'Write once, optimize with AI, and 1-click publish across LinkedIn, Instagram, Twitter/X, Facebook & WhatsApp.',
-};
 
 const SocialPublisherClient = dynamic(
   () => import('./SocialPublisherClient'),
-  { ssr: false }
+  { 
+    ssr: false,
+    loading: () => (
+      <div className="min-h-screen bg-[#070b13] text-[#e2e8f0] font-sans pb-28 pt-20 px-3 sm:px-6 lg:px-10 flex flex-col items-center justify-center">
+        <div className="w-10 h-10 border-2 border-t-cyan-500 border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin mb-3"></div>
+        <p className="text-xs text-gray-400 font-medium animate-pulse">Launching AI Social Publisher...</p>
+      </div>
+    )
+  }
 );
 
 export default function SocialPublisherPage() {
