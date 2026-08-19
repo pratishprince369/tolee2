@@ -1,5 +1,4 @@
-'use client';
-
+import React from 'react';
 import dynamic from 'next/dynamic';
 
 const LinkedInExtractorClient = dynamic(
@@ -17,3 +16,4 @@ const LinkedInExtractorClient = dynamic(
 export default function LinkedInExtractorPage() {
   return <LinkedInExtractorClient />;
 }
+

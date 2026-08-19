@@ -1,5 +1,4 @@
-'use client';
-
+import React from 'react';
 import dynamic from 'next/dynamic';
 
 const ResumeBuilderClient = dynamic(
@@ -18,3 +17,4 @@ const ResumeBuilderClient = dynamic(
 export default function ResumeBuilderPage() {
   return <ResumeBuilderClient />;
 }
+
