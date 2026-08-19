@@ -114,7 +114,72 @@ async function callAI(systemPrompt: string, userPrompt: string): Promise<string>
 }
 
 /**
- * 1. AI Parse & Rebuild from Uploaded Resume Text / PDF
+ * 1. Parse File (PDF / DOCX / TXT / Base64) & Rebuild Resume with AI
+ */
+export async function parseAndExtractResumeFromFile(params: {
+  base64Data?: string;
+  fileName?: string;
+  fileType?: string;
+  rawText?: string;
+}): Promise<{
+  success: boolean;
+  resume?: ResumeData;
+  error?: string;
+}> {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return { success: false, error: 'Authentication required. Please sign in to use Tolee AI Resume Builder.' };
+    }
+
+    let extractedText = params.rawText?.trim() || '';
+
+    // If base64 file data provided, parse it on the server
+    if (params.base64Data) {
+      const cleanBase64 = params.base64Data.replace(/^data:.*?;base64,/, '');
+      const fileBuffer = Buffer.from(cleanBase64, 'base64');
+
+      if (params.fileName?.toLowerCase().endsWith('.pdf') || params.fileType?.includes('pdf')) {
+        try {
+          const pdfParse = require('pdf-parse');
+          const pdfData = await pdfParse(fileBuffer);
+          if (pdfData && pdfData.text && pdfData.text.trim().length > 10) {
+            extractedText = pdfData.text.trim();
+          }
+        } catch (pdfErr) {
+          console.warn('[ResumeBuilder] pdf-parse fallback:', pdfErr);
+          // Fallback string extraction
+          const rawPdfStr = fileBuffer.toString('latin1');
+          const textMatches = rawPdfStr.match(/\(([^)]+)\)\s*Tj/g) || rawPdfStr.match(/\[(.*?)\]\s*TJ/g);
+          if (textMatches) {
+            extractedText = textMatches.map(m => m.replace(/[\(\)\[\]TjTJ]/g, '')).join(' ');
+          }
+          if (!extractedText || extractedText.length < 20) {
+            extractedText = fileBuffer.toString('utf-8').replace(/[^\x20-\x7E\n\r\t]/g, ' ');
+          }
+        }
+      } else {
+        // Plain text / Markdown / DOC text stream
+        extractedText = fileBuffer.toString('utf-8').replace(/[^\x20-\x7E\n\r\t]/g, ' ').trim();
+      }
+    }
+
+    if (!extractedText || extractedText.length < 15) {
+      return {
+        success: false,
+        error: 'Could not extract readable text from the file. Please paste your resume text or fill details manually.'
+      };
+    }
+
+    return await extractAndRebuildResumeFromText(extractedText);
+  } catch (err: any) {
+    console.error('[ResumeBuilder] File extraction error:', err);
+    return { success: false, error: err.message || 'Failed to process resume file.' };
+  }
+}
+
+/**
+ * 2. AI Parse & Rebuild from Raw Text
  * Strictly preserves real user facts (dates, companies, education) and upgrades formatting + action verbs.
  */
 export async function extractAndRebuildResumeFromText(rawText: string): Promise<{

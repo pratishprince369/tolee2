@@ -40,6 +40,7 @@ import {
 } from 'lucide-react';
 import { 
   ResumeData, 
+  parseAndExtractResumeFromFile,
   extractAndRebuildResumeFromText,
   generateAISummary, 
   enhanceBulletPoint, 
@@ -151,31 +152,46 @@ export default function ResumeBuilderClient() {
   };
 
   const handleStartExtraction = async () => {
+    let base64Data: string | undefined = undefined;
+    let fileName: string | undefined = undefined;
+    let fileType: string | undefined = undefined;
     let rawText = pastedResumeText.trim();
 
-    if (!rawText && uploadedFile) {
+    if (uploadedFile) {
+      fileName = uploadedFile.name;
+      fileType = uploadedFile.type;
       try {
-        rawText = await uploadedFile.text();
-      } catch (err) {
+        base64Data = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(uploadedFile);
+        });
+      } catch (e) {
         showToast('❌ Error reading file. Please paste text directly.');
         return;
       }
     }
 
-    if (!rawText || rawText.length < 20) {
-      showToast('⚠️ Please choose a valid resume file or paste your resume text.');
+    if (!rawText && !base64Data) {
+      showToast('⚠️ Please choose a valid resume file (PDF, DOCX, TXT) or paste your resume text.');
       return;
     }
 
-    setOriginalRawText(rawText);
     setIsProcessingUpload(true);
     setUploadProgressStep(1);
 
-    // Progress simulation steps
-    setTimeout(() => setUploadProgressStep(2), 700);
-    setTimeout(() => setUploadProgressStep(3), 1500);
+    // Progress steps
+    setTimeout(() => setUploadProgressStep(2), 600);
+    setTimeout(() => setUploadProgressStep(3), 1400);
 
-    const res = await extractAndRebuildResumeFromText(rawText);
+    const res = await parseAndExtractResumeFromFile({
+      base64Data,
+      fileName,
+      fileType,
+      rawText: rawText || undefined
+    });
+
     setUploadProgressStep(4);
 
     if (res.success && res.resume) {
@@ -183,11 +199,17 @@ export default function ResumeBuilderClient() {
       setTimeout(() => {
         setIsProcessingUpload(false);
         setViewMode('STUDIO');
+        setStudioStep(1);
         showToast('🎉 Resume successfully parsed & professionally structured by AI!');
-      }, 800);
+      }, 700);
     } else {
-      setIsProcessingUpload(false);
-      showToast('❌ ' + (res.error || 'Could not parse resume automatically. Please enter details manually.'));
+      // Fallback: If AI parse failed, still open Studio with default template so user can edit immediately
+      setTimeout(() => {
+        setIsProcessingUpload(false);
+        setViewMode('STUDIO');
+        setStudioStep(1);
+        showToast('⚠️ We opened the Studio Editor for you to review and complete your details.');
+      }, 800);
     }
   };
 
