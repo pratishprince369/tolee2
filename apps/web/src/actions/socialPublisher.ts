@@ -246,6 +246,8 @@ export interface ScheduledPostItem {
   topic: string;
   tone: string;
   platforms: string[];
+  mediaUrl?: string | null;
+  mediaType?: 'image' | 'video' | null;
   postsData: {
     linkedin?: string;
     instagram?: string;
@@ -265,6 +267,8 @@ export async function scheduleSocialPost(params: {
   topic: string;
   tone: string;
   platforms: string[];
+  mediaUrl?: string | null;
+  mediaType?: 'image' | 'video' | null;
   postsData: {
     linkedin?: string;
     instagram?: string;
@@ -300,6 +304,8 @@ export async function scheduleSocialPost(params: {
         userAvatar,
         topic: params.topic,
         tone: params.tone,
+        mediaUrl: params.mediaUrl || null,
+        mediaType: params.mediaType || null,
         platforms: params.platforms,
         postsData: params.postsData,
         scheduledAt: scheduledDate,
@@ -314,6 +320,8 @@ export async function scheduleSocialPost(params: {
         topic: record.topic,
         tone: record.tone,
         platforms: record.platforms,
+        mediaUrl: record.mediaUrl,
+        mediaType: record.mediaType,
         postsData: record.postsData,
         scheduledAt: record.scheduledAt.toISOString(),
         status: record.status,
@@ -353,6 +361,8 @@ export async function getUserScheduledPosts(): Promise<{
         topic: p.topic,
         tone: p.tone,
         platforms: p.platforms,
+        mediaUrl: p.mediaUrl,
+        mediaType: p.mediaType,
         postsData: p.postsData,
         scheduledAt: p.scheduledAt.toISOString(),
         status: p.status,

@@ -1912,6 +1912,8 @@ model ScheduledSocialPost {
   userAvatar   String?
   topic        String
   tone         String    @default("viral")
+  mediaUrl     String?
+  mediaType    String?   // "image" or "video"
   platforms    String[]  @default(["linkedin", "twitter"])
   postsData    Json      // { linkedin: "...", instagram: "...", twitter: "...", facebook: "...", whatsapp: "..." }
   scheduledAt  DateTime

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
@@ -28,6 +28,10 @@ import {
   ListOrdered,
   PlusCircle,
   AlertCircle,
+  Paperclip,
+  UploadCloud,
+  Film,
+  X,
   Image as ImageIcon
 } from 'lucide-react';
 import { 
@@ -86,6 +90,7 @@ export default function SocialPublisherClient() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // View Navigation
   const [viewTab, setViewTab] = useState<'COMPOSER' | 'QUEUE'>('COMPOSER');
@@ -97,6 +102,14 @@ export default function SocialPublisherClient() {
   const [includeLink, setIncludeLink] = useState('');
   const [selectedPlatform, setSelectedPlatform] = useState<'linkedin' | 'instagram' | 'twitter' | 'facebook' | 'whatsapp'>('linkedin');
   
+  // Media Attachment State
+  const [mediaFile, setMediaFile] = useState<{
+    url: string;
+    type: 'image' | 'video';
+    name?: string;
+  } | null>(null);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
+
   // Results & AI States
   const [variations, setVariations] = useState<PlatformPostVariations | null>(null);
   const [loadingAI, setLoadingAI] = useState(false);
@@ -154,6 +167,55 @@ export default function SocialPublisherClient() {
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const isVideo = file.type.startsWith('video/');
+    const isImage = file.type.startsWith('image/');
+
+    if (!isImage && !isVideo) {
+      showToast('⚠️ Please upload an image (JPG, PNG, WebP) or video (MP4).');
+      return;
+    }
+
+    const maxSize = isVideo ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      showToast(`⚠️ File size exceeds ${isVideo ? '50MB' : '10MB'} limit.`);
+      return;
+    }
+
+    setUploadingMedia(true);
+    showToast(`📤 Uploading ${isVideo ? 'video' : 'image'} to media cloud...`);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (data.success && data.url) {
+        setMediaFile({
+          url: data.url,
+          type: isVideo ? 'video' : 'image',
+          name: file.name,
+        });
+        showToast(`🎉 ${isVideo ? 'Video' : 'Image'} attached successfully!`);
+      } else {
+        showToast('❌ ' + (data.error || 'Failed to upload media.'));
+      }
+    } catch (err: any) {
+      showToast('❌ Upload failed: ' + err.message);
+    } finally {
+      setUploadingMedia(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   const handleCopyText = (text: string, key: string) => {
@@ -237,8 +299,8 @@ export default function SocialPublisherClient() {
   // SCHEDULING LOGIC
   // ══════════════════════════════════════════════════════════════
   const handleConfirmSchedule = async () => {
-    if (!editablePosts.linkedin && !editablePosts.twitter && !editablePosts.instagram) {
-      showToast('⚠️ Please generate content before scheduling.');
+    if (!editablePosts.linkedin && !editablePosts.twitter && !editablePosts.instagram && !mediaFile) {
+      showToast('⚠️ Please generate content or attach media before scheduling.');
       return;
     }
 
@@ -272,9 +334,11 @@ export default function SocialPublisherClient() {
     showToast('⏰ Scheduling multi-platform campaign...');
 
     const res = await scheduleSocialPost({
-      topic: topic || 'Social Campaign',
+      topic: topic || (mediaFile ? `Media Campaign: ${mediaFile.name || 'Visual Post'}` : 'Social Campaign'),
       tone,
       platforms: selectedChannelsForSchedule,
+      mediaUrl: mediaFile?.url || null,
+      mediaType: mediaFile?.type || null,
       postsData: editablePosts,
       scheduledAt: targetDate.toISOString(),
     });
@@ -305,8 +369,8 @@ export default function SocialPublisherClient() {
   // ══════════════════════════════════════════════════════════════
   const handleLaunchPublish = (platform: 'linkedin' | 'instagram' | 'twitter' | 'facebook' | 'whatsapp') => {
     const textToShare = editablePosts[platform];
-    if (!textToShare) {
-      showToast('⚠️ No content to share. Please generate content first.');
+    if (!textToShare && !mediaFile) {
+      showToast('⚠️ No content to share. Please generate content or attach media first.');
       return;
     }
 
@@ -336,11 +400,11 @@ export default function SocialPublisherClient() {
 
       case 'facebook':
         showToast('📘 Opening Facebook...');
-        window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(includeLink || 'https://tolee.in')}&quote=${encodeURIComponent(textToShare)}`, '_blank');
+        window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(includeLink || mediaFile?.url || 'https://tolee.in')}&quote=${encodeURIComponent(textToShare)}`, '_blank');
         break;
 
       case 'instagram':
-        showToast('📸 Caption & hashtags copied! Opening Instagram in a new tab...');
+        showToast('📸 Caption copied! Opening Instagram in a new tab...');
         window.open('https://www.instagram.com/', '_blank');
         break;
     }
@@ -366,6 +430,15 @@ export default function SocialPublisherClient() {
   return (
     <div className="min-h-screen bg-[#070b13] text-[#e2e8f0] font-sans pb-28 pt-20 px-3 sm:px-6 lg:px-10 selection:bg-cyan-500/30 selection:text-cyan-200">
       
+      {/* Hidden File Input for Image/Video Attachments */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleMediaUpload}
+        accept="image/*,video/*"
+        className="hidden"
+      />
+
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 bg-[#0e1e38] text-cyan-200 border border-cyan-500/40 px-5 py-3 rounded-xl shadow-2xl backdrop-blur-md animate-bounce text-sm font-semibold flex items-center gap-2">
@@ -431,6 +504,17 @@ export default function SocialPublisherClient() {
                   onChange={(e) => setCustomDateTime(e.target.value)}
                   className="w-full bg-[#0e1828] border border-[#1a2b47] focus:border-cyan-500 rounded-lg p-2.5 text-xs text-white focus:outline-none"
                 />
+              </div>
+            )}
+
+            {/* Attached Media Summary */}
+            {mediaFile && (
+              <div className="p-3 rounded-xl bg-cyan-950/40 border border-cyan-800/40 flex items-center justify-between text-xs text-cyan-200">
+                <div className="flex items-center gap-2">
+                  {mediaFile.type === 'video' ? <Film className="w-4 h-4 text-pink-400" /> : <ImageIcon className="w-4 h-4 text-cyan-400" />}
+                  <span className="font-semibold">Attached {mediaFile.type === 'video' ? 'Video' : 'Image'} included</span>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-900 text-cyan-100 font-bold">READY</span>
               </div>
             )}
 
@@ -522,11 +606,11 @@ export default function SocialPublisherClient() {
                   AI Social Media Publisher
                 </h1>
                 <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-700/50 uppercase tracking-wider">
-                  HYBRID & SCHEDULER 🔥
+                  MEDIA & SCHEDULER 🔥
                 </span>
               </div>
               <p className="text-xs text-gray-400 mt-1">
-                Write once, optimize with Llama 70B & Qwen 72B, and schedule or 1-click publish across all channels.
+                Attach images & videos, write with Llama 70B & Qwen 72B, and schedule or 1-click publish across all channels.
               </p>
             </div>
           </div>
@@ -569,7 +653,7 @@ export default function SocialPublisherClient() {
             ══════════════════════════════════════════════════════════ */}
             <div className="lg:col-span-5 space-y-6">
 
-              {/* Prompt Card */}
+              {/* Prompt & Media Card */}
               <div className="bg-[#0b1220] border border-[#182842] rounded-2xl p-5 shadow-xl shadow-black/40 space-y-5">
                 <div className="flex items-center justify-between">
                   <label className="text-sm font-bold text-white flex items-center gap-2">
@@ -589,6 +673,82 @@ export default function SocialPublisherClient() {
                   rows={4}
                   className="w-full bg-[#070b13] border border-[#1a2b47] focus:border-cyan-500/80 rounded-xl p-3.5 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-cyan-500/50 resize-none transition-all leading-relaxed"
                 />
+
+                {/* ═══════════════════════════════════════════════════════
+                    IMAGE & VIDEO ATTACHMENT SECTION (MIXPOST STYLE)
+                ════════════════════════════════════════════════════════ */}
+                <div className="space-y-2 pt-2 border-t border-[#141e33]">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-gray-300 flex items-center gap-1.5">
+                      <Paperclip className="w-3.5 h-3.5 text-cyan-400" />
+                      Attach Media (Image / Video):
+                    </label>
+                    <span className="text-[10px] text-gray-500">Max 50MB (Video) / 10MB (Image)</span>
+                  </div>
+
+                  {!mediaFile ? (
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploadingMedia}
+                      className="w-full border-2 border-dashed border-[#1e3354] hover:border-cyan-500/70 bg-[#070e1b] rounded-xl p-3.5 flex items-center justify-center gap-3 text-gray-400 hover:text-cyan-300 transition-all cursor-pointer group"
+                    >
+                      {uploadingMedia ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin"></div>
+                          <span className="text-xs font-semibold text-cyan-300">Uploading Media to Cloud...</span>
+                        </>
+                      ) : (
+                        <>
+                          <div className="w-7 h-7 rounded-lg bg-cyan-950 flex items-center justify-center text-cyan-400 group-hover:scale-110 transition-transform">
+                            <UploadCloud className="w-4 h-4" />
+                          </div>
+                          <div className="text-left">
+                            <div className="text-xs font-bold text-gray-200 group-hover:text-cyan-300">
+                              Upload Image or Video
+                            </div>
+                            <div className="text-[10px] text-gray-500">
+                              Supports JPG, PNG, WEBP, MP4
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </button>
+                  ) : (
+                    <div className="bg-[#070e1b] border border-cyan-800/40 rounded-xl p-3 flex items-center justify-between gap-3 shadow-md">
+                      <div className="flex items-center gap-3 min-w-0">
+                        {mediaFile.type === 'video' ? (
+                          <div className="w-12 h-12 rounded-lg bg-pink-950/60 border border-pink-700/50 flex items-center justify-center text-pink-400 shrink-0">
+                            <Film className="w-6 h-6" />
+                          </div>
+                        ) : (
+                          <img
+                            src={mediaFile.url}
+                            alt="Preview"
+                            className="w-12 h-12 rounded-lg object-cover border border-cyan-700/50 shrink-0"
+                          />
+                        )}
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold text-white truncate">
+                            {mediaFile.name || 'Attached Media'}
+                          </div>
+                          <div className="text-[10px] text-cyan-400 font-semibold uppercase tracking-wider">
+                            {mediaFile.type === 'video' ? '🎥 Video Attached' : '🖼️ Image Attached'}
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setMediaFile(null)}
+                        className="p-1.5 rounded-lg bg-rose-950/60 hover:bg-rose-900 border border-rose-800/40 text-rose-300 transition-all shrink-0"
+                        title="Remove Media"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
 
                 {/* Tone Selection */}
                 <div className="space-y-2">
@@ -831,7 +991,7 @@ export default function SocialPublisherClient() {
               </div>
 
               {/* ═══════════════════════════════════════════════════════
-                  LIVE SOCIAL MEDIA CARD MOCKUP PREVIEW
+                  LIVE SOCIAL MEDIA CARD MOCKUP PREVIEW (WITH MEDIA)
               ════════════════════════════════════════════════════════ */}
               <div className="bg-[#0b1220] border border-[#182842] rounded-2xl p-5 shadow-xl space-y-3">
                 <div className="flex items-center justify-between mb-2">
@@ -862,9 +1022,21 @@ export default function SocialPublisherClient() {
                         <p className="text-[10px] text-gray-400">Founder & Creator • Just now • 🌐</p>
                       </div>
                     </div>
-                    <div className="text-xs text-gray-200 whitespace-pre-line leading-relaxed mb-4">
+                    <div className="text-xs text-gray-200 whitespace-pre-line leading-relaxed mb-3">
                       {editablePosts.linkedin || "Your LinkedIn post preview will appear here..."}
                     </div>
+
+                    {/* Attached Media Display */}
+                    {mediaFile && (
+                      <div className="mb-3 rounded-lg overflow-hidden border border-gray-700/70 bg-black">
+                        {mediaFile.type === 'video' ? (
+                          <video src={mediaFile.url} controls className="w-full max-h-72 object-contain" />
+                        ) : (
+                          <img src={mediaFile.url} alt="Post Attachment" className="w-full max-h-72 object-cover" />
+                        )}
+                      </div>
+                    )}
+
                     <div className="pt-3 border-t border-gray-800 flex items-center justify-between text-[11px] text-gray-400 font-semibold">
                       <span>👍 Like</span>
                       <span>💬 Comment</span>
@@ -889,10 +1061,21 @@ export default function SocialPublisherClient() {
                       <span className="text-gray-400 text-xs">•••</span>
                     </div>
                     
-                    {/* Square media placeholder */}
-                    <div className="w-full h-48 rounded-lg bg-gradient-to-tr from-purple-900/40 via-pink-900/30 to-slate-900 border border-pink-900/40 flex flex-col items-center justify-center text-pink-300/80 mb-3">
-                      <ImageIcon className="w-8 h-8 mb-1" />
-                      <span className="text-[11px] font-semibold">Square 1:1 Post Canvas</span>
+                    {/* Media container */}
+                    <div className="w-full aspect-square rounded-lg bg-[#070b13] border border-pink-900/40 flex flex-col items-center justify-center text-pink-300/80 mb-3 overflow-hidden">
+                      {mediaFile ? (
+                        mediaFile.type === 'video' ? (
+                          <video src={mediaFile.url} controls className="w-full h-full object-cover" />
+                        ) : (
+                          <img src={mediaFile.url} alt="Instagram Post" className="w-full h-full object-cover" />
+                        )
+                      ) : (
+                        <div className="flex flex-col items-center justify-center">
+                          <ImageIcon className="w-8 h-8 mb-1 opacity-70" />
+                          <span className="text-[11px] font-semibold">Square 1:1 Post Canvas</span>
+                          <span className="text-[9px] text-gray-500 mt-0.5">Attach image or video in composer</span>
+                        </div>
+                      )}
                     </div>
 
                     <div className="text-xs text-gray-200 whitespace-pre-line leading-relaxed mb-3">
@@ -917,6 +1100,18 @@ export default function SocialPublisherClient() {
                         <div className="text-xs text-gray-200 whitespace-pre-line leading-relaxed mb-3">
                           {editablePosts.twitter || "Your X / Tweet text will appear here..."}
                         </div>
+
+                        {/* Media in tweet */}
+                        {mediaFile && (
+                          <div className="mb-3 rounded-xl overflow-hidden border border-gray-700 bg-black">
+                            {mediaFile.type === 'video' ? (
+                              <video src={mediaFile.url} controls className="w-full max-h-64 object-cover" />
+                            ) : (
+                              <img src={mediaFile.url} alt="Tweet Media" className="w-full max-h-64 object-cover" />
+                            )}
+                          </div>
+                        )}
+
                         <div className="flex items-center justify-between text-[11px] text-gray-400 font-semibold max-w-sm pt-2 border-t border-gray-800">
                           <span>💬 12</span>
                           <span>🔄 48</span>
@@ -931,11 +1126,20 @@ export default function SocialPublisherClient() {
                 {/* WHATSAPP MOCKUP */}
                 {selectedPlatform === 'whatsapp' && (
                   <div className="bg-[#0b141a] border border-emerald-900/50 rounded-xl p-4 text-gray-100">
-                    <div className="max-w-md ml-auto bg-[#005c4b] text-emerald-50 rounded-2xl rounded-tr-none p-3.5 shadow-md">
+                    <div className="max-w-md ml-auto bg-[#005c4b] text-emerald-50 rounded-2xl rounded-tr-none p-3.5 shadow-md space-y-2">
+                      {mediaFile && (
+                        <div className="rounded-lg overflow-hidden border border-emerald-800/60 bg-black">
+                          {mediaFile.type === 'video' ? (
+                            <video src={mediaFile.url} controls className="w-full max-h-48 object-cover" />
+                          ) : (
+                            <img src={mediaFile.url} alt="WhatsApp Media" className="w-full max-h-48 object-cover" />
+                          )}
+                        </div>
+                      )}
                       <div className="text-xs whitespace-pre-line leading-relaxed font-sans">
                         {editablePosts.whatsapp || "*Your WhatsApp broadcast message will appear here...*"}
                       </div>
-                      <div className="text-[9px] text-emerald-300/80 text-right mt-1.5 flex items-center justify-end gap-1">
+                      <div className="text-[9px] text-emerald-300/80 text-right mt-1 flex items-center justify-end gap-1">
                         <span>10:45 AM</span>
                         <span>✓✓</span>
                       </div>
@@ -955,9 +1159,19 @@ export default function SocialPublisherClient() {
                         <p className="text-[10px] text-gray-400">Just now • 👥 Public</p>
                       </div>
                     </div>
-                    <div className="text-xs text-gray-200 whitespace-pre-line leading-relaxed mb-4">
+                    <div className="text-xs text-gray-200 whitespace-pre-line leading-relaxed mb-3">
                       {editablePosts.facebook || "Your Facebook post preview will appear here..."}
                     </div>
+
+                    {mediaFile && (
+                      <div className="mb-3 rounded-lg overflow-hidden border border-gray-700 bg-black">
+                        {mediaFile.type === 'video' ? (
+                          <video src={mediaFile.url} controls className="w-full max-h-72 object-cover" />
+                        ) : (
+                          <img src={mediaFile.url} alt="Facebook Attachment" className="w-full max-h-72 object-cover" />
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1001,7 +1215,7 @@ export default function SocialPublisherClient() {
                 <div>
                   <h4 className="text-base font-bold text-white">No Scheduled Posts Yet</h4>
                   <p className="text-xs text-gray-400 mt-1 max-w-xs mx-auto">
-                    Generate a viral post in the composer and schedule it for the best peak engagement hours.
+                    Generate a viral post, attach an image or video, and schedule it for peak engagement hours.
                   </p>
                 </div>
                 <button
@@ -1037,6 +1251,20 @@ export default function SocialPublisherClient() {
                             {post.tone.toUpperCase()}
                           </span>
                         </div>
+
+                        {/* Media Preview in card if exists */}
+                        {post.mediaUrl && (
+                          <div className="mb-3 rounded-lg overflow-hidden border border-gray-800 bg-black h-32 relative">
+                            {post.mediaType === 'video' ? (
+                              <div className="w-full h-full flex items-center justify-center bg-gray-900 text-pink-400">
+                                <Film className="w-8 h-8" />
+                                <span className="absolute bottom-2 right-2 text-[9px] bg-black/80 px-1.5 py-0.5 rounded text-white font-bold">VIDEO</span>
+                              </div>
+                            ) : (
+                              <img src={post.mediaUrl} alt="Post media" className="w-full h-full object-cover" />
+                            )}
+                          </div>
+                        )}
 
                         {/* Topic */}
                         <h4 className="text-sm font-bold text-white line-clamp-2 mb-2 group-hover:text-cyan-300 transition-colors">
