@@ -5,13 +5,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Image as ImageIcon, Video, Paperclip, CheckCircle2, ShieldCheck, Globe, Trophy, X, Sparkles, Newspaper, ChevronDown, Mic, MicOff, Film } from 'lucide-react';
+import { Image as ImageIcon, Video, Paperclip, CheckCircle2, ShieldCheck, Globe, Trophy, X, Sparkles, Newspaper, ChevronDown, Mic, MicOff, Film, Radio } from 'lucide-react';
 
 import { getSidebarData } from '@/actions/user';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { AIImageGeneratorModal } from '@/components/AIImageGeneratorModal';
 import { AIVideoGeneratorModal } from '@/components/AIVideoGeneratorModal';
+import { LiveBroadcastStudioModal } from '@/components/LiveBroadcastStudioModal';
 import { useUpload } from './UploadContext';
 import { PostCarousel } from '@/components/PostCarousel';
 import { askAIWriter } from '@/actions/ai-helper';
@@ -48,6 +49,7 @@ export function CreatePostModal({
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const [aiModalOpen, setAiModalOpen] = useState(false);
   const [videoModalOpen, setVideoModalOpen] = useState(false);
+  const [liveModalOpen, setLiveModalOpen] = useState(false);
   const [joinedTolees, setJoinedTolees] = useState<any[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { startUpload, task } = useUpload();
@@ -340,6 +342,16 @@ export function CreatePostModal({
               >
                 <Newspaper className="w-3.5 h-3.5" /> News
               </button>
+              <button 
+                type="button"
+                onClick={() => {
+                  setIsOpen(false);
+                  setLiveModalOpen(true);
+                }}
+                className="flex-1 sm:flex-none text-center px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40"
+              >
+                <Radio className="w-3.5 h-3.5 animate-pulse" /> Live
+              </button>
             </div>
           )}
         </DialogHeader>
@@ -572,7 +584,7 @@ export function CreatePostModal({
           </Button>
         </div>
 
-        {/* AI Modals */}
+        {/* AI & Live Modals */}
         <AIImageGeneratorModal
           isOpen={aiModalOpen}
           setIsOpen={setAiModalOpen}
@@ -584,6 +596,13 @@ export function CreatePostModal({
           onSelectVideo={handleAIVideoSelected}
         />
       </DialogContent>
+
+      <LiveBroadcastStudioModal
+        isOpen={liveModalOpen}
+        onClose={() => setLiveModalOpen(false)}
+        toleeId={toleeId}
+        toleeName={toleeName}
+      />
     </Dialog>
   );
 }

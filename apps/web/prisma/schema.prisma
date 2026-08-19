@@ -1874,6 +1874,38 @@ model UserResume {
   @@index([userId])
 }
 
+// ---------------------------------------------------------
+// TOLEE LIVE STREAMING & NEWS MEDIA WEBINAR ENGINE
+// ---------------------------------------------------------
+model LiveBroadcast {
+  id              String    @id @default(cuid())
+  roomCode        String    @unique
+  title           String
+  description     String?
+  postId          String?   @unique
+  hostId          String
+  hostName        String
+  hostAvatar      String?
+  toleeId         String?   // If stream is hosted in a specific community
+  toleeName       String?
+  isLive          Boolean   @default(true)
+  viewerCount     Int       @default(1)
+  peakViewers     Int       @default(1)
+  coHosts         Json      @default("[]") // Array of { id, name, avatar, role, joinedAt }
+  inviteToken     String?   @unique
+  status          String    @default("live") // "live", "ended", "archived"
+  startedAt       DateTime  @default(now())
+  endedAt         DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([roomCode])
+  @@index([isLive])
+  @@index([hostId])
+  @@index([toleeId])
+}
+
+
 
 
 

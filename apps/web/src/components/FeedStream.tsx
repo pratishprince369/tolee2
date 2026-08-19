@@ -41,6 +41,7 @@ import { PostCarousel } from '@/components/PostCarousel';
 import { Camera, Sparkles } from 'lucide-react';
 import { UserHovercard } from '@/components/UserHovercard';
 import { savePostsToOfflinePocket } from '@/lib/offlineSmartPocket';
+import { LiveStreamPostCard } from '@/components/LiveStreamPostCard';
 
 export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
   const { data: session } = useSession();
@@ -1769,6 +1770,16 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                         </div>
                       </CardFooter>
                     </Card>
+                  );
+                }
+
+                if (post.postType === 'live') {
+                  return (
+                    <LiveStreamPostCard
+                      key={post.id}
+                      post={post}
+                      currentUserId={currentUserId}
+                    />
                   );
                 }
 
