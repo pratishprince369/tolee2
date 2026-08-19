@@ -72,11 +72,14 @@ export async function getPublicWorldTools(): Promise<{ success: boolean; tools: 
       console.warn('[WorldTools] fallback to initial tools:', e);
     }
 
-    if (!dbTools || dbTools.length === 0) {
-      // Seed default tools if empty
-      try {
-        for (const t of DEFAULT_TOOLS) {
-          await (prismaAI as any).worldTool.upsert({
+    if (!dbTools) dbTools = [];
+
+    // Ensure all DEFAULT_TOOLS exist in database & list
+    for (const t of DEFAULT_TOOLS) {
+      const exists = dbTools.some((d: any) => d.slug === t.slug);
+      if (!exists) {
+        try {
+          const created = await (prismaAI as any).worldTool.upsert({
             where: { slug: t.slug },
             create: {
               name: t.name,
@@ -94,15 +97,17 @@ export async function getPublicWorldTools(): Promise<{ success: boolean; tools: 
             },
             update: {}
           });
+          if (created && created.isVisible) {
+            dbTools.push(created);
+          }
+        } catch {
+          dbTools.push({ id: `default-${t.slug}`, ...t });
         }
-        dbTools = await (prismaAI as any).worldTool.findMany({
-          where: { isVisible: true },
-          orderBy: { order: 'asc' },
-        });
-      } catch {
-        dbTools = DEFAULT_TOOLS.map((t, idx) => ({ id: `default-${idx}`, ...t }));
       }
     }
+
+    // Sort by order
+    dbTools.sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
 
     const now = new Date();
     const formattedTools: WorldToolItem[] = dbTools.map((tool: any) => {
@@ -173,9 +178,41 @@ export async function getAllWorldToolsAdmin(): Promise<{ success: boolean; tools
       // Fallback
     }
 
-    if (!dbTools || dbTools.length === 0) {
-      dbTools = DEFAULT_TOOLS.map((t, idx) => ({ id: `default-${idx}`, ...t }));
+    if (!dbTools) dbTools = [];
+
+    // Ensure all DEFAULT_TOOLS exist in database & list
+    for (const t of DEFAULT_TOOLS) {
+      const exists = dbTools.some((d: any) => d.slug === t.slug);
+      if (!exists) {
+        try {
+          const created = await (prismaAI as any).worldTool.upsert({
+            where: { slug: t.slug },
+            create: {
+              name: t.name,
+              slug: t.slug,
+              description: t.description,
+              routeUrl: t.routeUrl,
+              icon: t.icon,
+              category: t.category,
+              badge: t.badge,
+              isVisible: t.isVisible,
+              accessType: t.accessType,
+              priceMonthly: t.priceMonthly,
+              freeTrialDays: t.freeTrialDays,
+              order: t.order,
+            },
+            update: {}
+          });
+          if (created) {
+            dbTools.push(created);
+          }
+        } catch {
+          dbTools.push({ id: `default-${t.slug}`, ...t });
+        }
+      }
     }
+
+    dbTools.sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
 
     return {
       success: true,

@@ -9,14 +9,15 @@ import {
   Search,
   Sparkles, 
   ArrowRight, 
-  Database,
-  ShieldCheck,
-  Zap,
-  Lock,
-  Clock,
-  CheckCircle2,
-  RefreshCw,
-  Gift
+  Database, 
+  ShieldCheck, 
+  Zap, 
+  Lock, 
+  Clock, 
+  CheckCircle2, 
+  RefreshCw, 
+  Gift,
+  FileText
 } from 'lucide-react';
 import { getPublicWorldTools, WorldToolItem } from '@/actions/worldTools';
 
@@ -166,7 +167,11 @@ export default function WorldDashboardPage() {
                     {/* Top Row: Icon + Badges */}
                     <div className="flex items-start justify-between gap-3 mb-4">
                       <div className="w-12 h-12 rounded-xl bg-[#0e1b30] border border-cyan-800/40 flex items-center justify-center text-cyan-400 group-hover:scale-105 transition-transform shadow-inner">
-                        <Sparkles className="w-6 h-6" />
+                        {tool.icon === 'FileText' || tool.slug === 'ai-resume-builder' ? (
+                          <FileText className="w-6 h-6 text-cyan-400" />
+                        ) : (
+                          <Sparkles className="w-6 h-6 text-cyan-400" />
+                        )}
                       </div>
 
                       <div className="flex flex-col items-end gap-1.5">
