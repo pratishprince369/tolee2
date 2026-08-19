@@ -740,7 +740,6 @@ export default function WhatsAppShootClient() {
                   {qrCodeDataUrl ? (
                     <img src={qrCodeDataUrl} alt="WhatsApp QR Code" className="w-40 h-40 object-contain" />
                   ) : (
-                    {/* Instant High-Resolution WhatsApp QR Matrix Vector */}
                     <svg className="w-40 h-40" viewBox="0 0 200 200" fill="none">
                       <rect x="10" y="10" width="50" height="50" rx="6" fill="#111" />
                       <rect x="20" y="20" width="30" height="30" rx="3" fill="#fff" />
@@ -748,6 +747,7 @@ export default function WhatsAppShootClient() {
                       <rect x="140" y="10" width="50" height="50" rx="6" fill="#111" />
                       <rect x="150" y="20" width="30" height="30" rx="3" fill="#fff" />
                       <rect x="156" y="26" width="18" height="18" rx="2" fill="#005c4b" />
+
                       <rect x="10" y="140" width="50" height="50" rx="6" fill="#111" />
                       <rect x="20" y="150" width="30" height="30" rx="3" fill="#fff" />
                       <rect x="26" y="156" width="18" height="18" rx="2" fill="#005c4b" />
