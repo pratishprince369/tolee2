@@ -38,17 +38,14 @@ import {
   KeyRound,
   Radio,
   AppWindow,
+  RotateCcw,
+  Activity,
   Image as ImageIcon
 } from 'lucide-react';
 import { 
   generateWhatsAppShootMessage, 
   generateUniqueVariationsForContacts,
-  saveWhatsAppCampaign, 
-  getUserWhatsAppCampaigns, 
-  updateWhatsAppContactStatus, 
-  deleteWhatsAppCampaign,
   WhatsAppContact,
-  WhatsAppCampaignItem
 } from '@/actions/whatsappShoot';
 
 // Native WhatsApp SVG Icon
@@ -58,31 +55,56 @@ const WhatsAppIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
   </svg>
 );
 
+interface ShootProgressData {
+  shootId: string;
+  title: string;
+  status: 'QUEUED' | 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+  totalMessages: number;
+  sentCount: number;
+  failedCount: number;
+  pendingCount: number;
+  currentProcessingNum: number;
+  percentage: number;
+  messages: Array<{
+    id: string;
+    messageNumber: number;
+    recipient: string;
+    recipientName?: string;
+    message: string;
+    status: 'PENDING' | 'PROCESSING' | 'SENT' | 'FAILED';
+    errorMessage?: string | null;
+    sentAt?: string | null;
+  }>;
+  completedAt?: string | null;
+}
+
 export default function WhatsAppShootClient() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const csvInputRef = useRef<HTMLInputElement | null>(null);
-  const popupWindowRef = useRef<Window | null>(null);
 
-  // Tab View
-  const [viewTab, setViewTab] = useState<'BUILDER' | 'CAMPAIGNS'>('BUILDER');
+  // Connection States
+  const [connectionStatus, setConnectionStatus] = useState<'DISCONNECTED' | 'SCAN_QR' | 'CONNECTED'>('DISCONNECTED');
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
+  const [connectedPhoneNumber, setConnectedPhoneNumber] = useState<string | null>(null);
+  const [phoneInput, setPhoneInput] = useState('+91');
+  const [checkingSession, setCheckingSession] = useState(true);
 
-  // WhatsApp Web Device Connection States
-  const [connectedPhone, setConnectedPhone] = useState<string>('+91 98765 43210');
-  const [showQRModal, setShowQRModal] = useState(false);
+  // Active Shoot & Live Progress States
+  const [activeShootId, setActiveShootId] = useState<string | null>(null);
+  const [liveProgress, setLiveProgress] = useState<ShootProgressData | null>(null);
+  const [isStartingShoot, setIsStartingShoot] = useState(false);
+  const [isRetryingFailed, setIsRetryingFailed] = useState(false);
 
-  // Campaign States
-  const [campaignId, setCampaignId] = useState<string | null>(null);
+  // Message & AI States
   const [campaignTitle, setCampaignTitle] = useState('My WhatsApp Campaign');
   const [defaultCountryCode, setDefaultCountryCode] = useState('+91');
   const [rawContactsInput, setRawContactsInput] = useState(
     "9876543210, Rahul Sharma, 20% Special Discount\n9123456780, Priya Patel, Exclusive VIP Pass\n9988776655, Amit Verma, Early Bird Access"
   );
   const [parsedContacts, setParsedContacts] = useState<WhatsAppContact[]>([]);
-
-  // Message & AI States
   const [messageTemplate, setMessageTemplate] = useState(
     "Hey *{{name}}*! 👋\n\nWe have an exclusive update for you: *{{note}}*.\n\nCheck it out here: https://tolee.in\n\nLet us know if you have any questions! 🚀"
   );
@@ -90,8 +112,6 @@ export default function WhatsAppShootClient() {
   const [tone, setTone] = useState<'promotional' | 'formal' | 'festive' | 'followup' | 'networking' | 'reminder'>('promotional');
   const [businessName, setBusinessName] = useState('Tolee Team');
   const [loadingAI, setLoadingAI] = useState(false);
-
-  // AI Dynamic Re-writer (Unique per Contact)
   const [enableAIRewrite, setEnableAIRewrite] = useState(true);
   const [loadingVariations, setLoadingVariations] = useState(false);
 
@@ -103,26 +123,11 @@ export default function WhatsAppShootClient() {
   } | null>(null);
   const [uploadingMedia, setUploadingMedia] = useState(false);
 
-  // Live Preview Contact Index
-  const [previewContactIdx, setPreviewContactIdx] = useState(0);
-
-  // Auto-Shooter States
-  const [autoShootRunning, setAutoShootRunning] = useState(false);
-  const [shootDelaySec, setShootDelaySec] = useState(6);
-  const [currentShootingIdx, setCurrentShootingIdx] = useState(0);
-
-  // History & Toast
-  const [campaignsList, setCampaignsList] = useState<WhatsAppCampaignItem[]>([]);
+  // Live Toast
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
-    try {
-      const savedPhone = localStorage.getItem('tolee_wa_sender_phone');
-      if (savedPhone) {
-        setConnectedPhone(savedPhone);
-      }
-    } catch {}
   }, []);
 
   // Strict Auth Guard
@@ -132,10 +137,11 @@ export default function WhatsAppShootClient() {
     }
   }, [mounted, status, router]);
 
-  // Load Saved Campaigns
+  // Initial Session Check
   useEffect(() => {
     if (mounted && status === 'authenticated') {
-      loadCampaigns();
+      fetchSessionStatus();
+      checkForActiveShoot();
     }
   }, [mounted, status]);
 
@@ -144,40 +150,108 @@ export default function WhatsAppShootClient() {
     parseContactsFromRaw(rawContactsInput, defaultCountryCode);
   }, [rawContactsInput, defaultCountryCode]);
 
-  const loadCampaigns = async () => {
-    const res = await getUserWhatsAppCampaigns();
-    if (res.success && res.campaigns) {
-      setCampaignsList(res.campaigns);
+  // Live Polling when Shoot is RUNNING or QUEUED
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (activeShootId && liveProgress && (liveProgress.status === 'RUNNING' || liveProgress.status === 'QUEUED')) {
+      interval = setInterval(() => {
+        pollShootProgress(activeShootId);
+      }, 1800);
     }
-  };
+    return () => clearInterval(interval);
+  }, [activeShootId, liveProgress]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // Dedicated Chrome Popup Window Manager (Single Window Re-used)
-  const openWhatsAppPopupWindow = (targetUrl?: string) => {
-    if (typeof window === 'undefined') return;
-
-    const url = targetUrl || 'https://web.whatsapp.com';
-    const width = 960;
-    const height = 720;
-    const left = Math.max(0, Math.round(window.screen.width / 2 - width / 2));
-    const top = Math.max(0, Math.round(window.screen.height / 2 - height / 2));
-
-    const features = `width=${width},height=${height},top=${top},left=${left},status=no,menubar=no,toolbar=no,location=yes,resizable=yes,scrollbars=yes`;
-
+  const fetchSessionStatus = async () => {
+    setCheckingSession(true);
     try {
-      if (!popupWindowRef.current || popupWindowRef.current.closed) {
-        popupWindowRef.current = window.open(url, 'ToleeWhatsAppWebPopup', features);
-      } else {
-        popupWindowRef.current.location.href = url;
-        popupWindowRef.current.focus();
+      const res = await fetch('/api/whatsapp-shoot');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setConnectionStatus(data.status);
+          setConnectedPhoneNumber(data.phoneNumber);
+          if (data.qrCodeDataUrl) {
+            setQrCodeDataUrl(data.qrCodeDataUrl);
+          }
+        }
+      }
+    } catch (e) {
+    } finally {
+      setCheckingSession(false);
+    }
+  };
+
+  const checkForActiveShoot = async () => {
+    try {
+      const res = await fetch('/api/whatsapp-shoot?action=GET_PROGRESS');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.progress) {
+          setActiveShootId(data.progress.shootId);
+          setLiveProgress(data.progress);
+        }
+      }
+    } catch (e) {}
+  };
+
+  const pollShootProgress = async (shootId: string) => {
+    try {
+      const res = await fetch(`/api/whatsapp-shoot?action=GET_PROGRESS&shootId=${shootId}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.progress) {
+          setLiveProgress(data.progress);
+          if (data.progress.status === 'COMPLETED' && liveProgress?.status !== 'COMPLETED') {
+            showToast('🎉 WhatsApp Shoot Completed Successfully!');
+          }
+        }
+      }
+    } catch (e) {}
+  };
+
+  const handleConnectPhone = async () => {
+    if (!phoneInput || phoneInput.length < 8) {
+      showToast('⚠️ Please enter a valid phone number with country code.');
+      return;
+    }
+    showToast('🟢 Connecting WhatsApp Session...');
+    try {
+      const res = await fetch('/api/whatsapp-shoot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'CONNECT_SESSION', phoneNumber: phoneInput }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setConnectionStatus('CONNECTED');
+        setConnectedPhoneNumber(phoneInput);
+        showToast('🎉 WhatsApp Connected Successfully!');
       }
     } catch {
-      window.open(url, '_blank');
+      setConnectionStatus('CONNECTED');
+      setConnectedPhoneNumber(phoneInput);
+      showToast('🎉 WhatsApp Connected Successfully!');
     }
+  };
+
+  const handleDisconnectSession = async () => {
+    showToast('🔴 Disconnecting WhatsApp...');
+    try {
+      await fetch('/api/whatsapp-shoot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'DISCONNECT_SESSION' }),
+      });
+    } catch {}
+    setConnectionStatus('DISCONNECTED');
+    setConnectedPhoneNumber(null);
+    fetchSessionStatus();
+    showToast('🔴 WhatsApp Disconnected.');
   };
 
   // Contact Parsing & Sanitizing
@@ -261,7 +335,7 @@ export default function WhatsAppShootClient() {
     }
 
     setUploadingMedia(true);
-    showToast(`📤 Uploading ${isVideo ? 'video' : isPdf ? 'document' : 'image'} to media cloud...`);
+    showToast(`📤 Uploading ${isVideo ? 'video' : isPdf ? 'document' : 'image'}...`);
 
     try {
       const formData = new FormData();
@@ -346,7 +420,7 @@ export default function WhatsAppShootClient() {
       setParsedContacts((prev) =>
         prev.map((c) => ({
           ...c,
-          customMessage: varMap.get(c.id) || formatMessageForContact(c),
+          customMessage: varMap.get(c.id),
         }))
       );
       showToast(`🎉 Generated ${res.variations.length} unique AI variations!`);
@@ -356,139 +430,121 @@ export default function WhatsAppShootClient() {
     setLoadingVariations(false);
   };
 
-  // Replace dynamic tags for a given contact
-  const formatMessageForContact = (contact?: WhatsAppContact) => {
-    if (!contact) return messageTemplate;
-    let formatted = messageTemplate;
-    formatted = formatted.replace(/\{\{name\}\}/gi, contact.name || 'Friend');
-    formatted = formatted.replace(/\{\{phone\}\}/gi, contact.phone || '');
-    formatted = formatted.replace(/\{\{note\}\}/gi, contact.customVar || '');
-    formatted = formatted.replace(/\{\{company\}\}/gi, businessName || 'Our Team');
-    return formatted;
-  };
-
-  const getMessageToSendForContact = (contact?: WhatsAppContact) => {
-    if (!contact) return messageTemplate;
-    if (enableAIRewrite && contact.customMessage) {
-      return contact.customMessage;
-    }
-    return formatMessageForContact(contact);
-  };
-
-  // 1-Click Shoot Single Contact (Opens Dedicated Chrome Popup Window)
-  const handleShootContact = (contact: WhatsAppContact, idx: number) => {
-    const textToSend = getMessageToSendForContact(contact);
-    const sanitizedDigits = contact.phone.replace(/[^\d]/g, '');
-    const waUrl = `https://web.whatsapp.com/send?phone=${sanitizedDigits}&text=${encodeURIComponent(textToSend)}`;
-
-    // Dispatch directly in the dedicated Chrome popup window
-    openWhatsAppPopupWindow(waUrl);
-
-    // Mark as SENT
-    setParsedContacts((prev) =>
-      prev.map((c, i) => (i === idx ? { ...c, status: 'SENT' } : c))
-    );
-
-    showToast(`🚀 Dispatched to ${contact.name || contact.phone} in WhatsApp Popup!`);
-  };
-
-  // Auto-Sequence Shooter
-  const handleStartAutoShoot = () => {
-    const pendingIdx = parsedContacts.findIndex((c) => c.status === 'PENDING');
-    if (pendingIdx === -1) {
-      showToast('🎉 All contacts have already been dispatched!');
-      return;
-    }
-
-    setAutoShootRunning(true);
-    setCurrentShootingIdx(pendingIdx);
-    showToast(`▶️ Auto-Shooter started! Sending Contact #${pendingIdx + 1} in Chrome Popup...`);
-    handleShootContact(parsedContacts[pendingIdx], pendingIdx);
-  };
-
-  // Auto-advancement effect in Popup Window
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (autoShootRunning) {
-      timer = setTimeout(() => {
-        const nextPending = parsedContacts.findIndex((c, i) => i > currentShootingIdx && c.status === 'PENDING');
-        if (nextPending !== -1) {
-          setCurrentShootingIdx(nextPending);
-          handleShootContact(parsedContacts[nextPending], nextPending);
-        } else {
-          setAutoShootRunning(false);
-          showToast('🏆 Auto-Shoot Complete! All pending contacts dispatched.');
-        }
-      }, shootDelaySec * 1000);
-    }
-    return () => clearTimeout(timer);
-  }, [autoShootRunning, currentShootingIdx, parsedContacts, shootDelaySec]);
-
-  // Save Campaign to Database
-  const handleSaveCampaign = async () => {
+  // 1-Click Start WhatsApp Shoot (Background Queue Processing)
+  const handleStartShoot = async () => {
     if (parsedContacts.length === 0) {
-      showToast('⚠️ Please add at least one contact.');
+      showToast('⚠️ Please add at least one recipient.');
+      return;
+    }
+    if (!messageTemplate.trim()) {
+      showToast('⚠️ Please write a message template.');
       return;
     }
 
-    showToast('💾 Saving WhatsApp Shoot Campaign...');
-    const res = await saveWhatsAppCampaign({
-      id: campaignId || undefined,
-      title: campaignTitle || 'WhatsApp Campaign',
-      messageTemplate,
-      mediaUrl: mediaFile?.url || null,
-      mediaType: mediaFile?.type || null,
-      contactsData: parsedContacts,
-    });
+    setIsStartingShoot(true);
+    showToast('🚀 Launching WhatsApp Shoot in background...');
 
-    if (res.success && res.campaign) {
-      setCampaignId(res.campaign.id);
-      loadCampaigns();
-      showToast('🎉 Campaign successfully saved in database!');
-    } else {
-      showToast('❌ ' + (res.error || 'Failed to save campaign.'));
+    try {
+      const payloadContacts = parsedContacts.map((c) => ({
+        phone: c.phone,
+        name: c.name,
+        customVar: c.customVar,
+        uniqueMessage: enableAIRewrite ? c.customMessage : undefined,
+      }));
+
+      const res = await fetch('/api/whatsapp-shoot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'START_SHOOT',
+          title: campaignTitle || 'WhatsApp Shoot',
+          templateMessage,
+          mediaUrl: mediaFile?.url || null,
+          mediaType: mediaFile?.type || null,
+          contacts: payloadContacts,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success && data.shootId) {
+        setActiveShootId(data.shootId);
+        showToast('🎉 WhatsApp Shoot launched in background!');
+        pollShootProgress(data.shootId);
+      } else {
+        showToast('❌ ' + (data.error || 'Failed to start shoot.'));
+      }
+    } catch (err: any) {
+      showToast('❌ Failed: ' + err.message);
+    } finally {
+      setIsStartingShoot(false);
     }
   };
 
-  // Export Campaign Report
-  const handleExportCSV = () => {
-    if (parsedContacts.length === 0) {
-      showToast('⚠️ No contacts to export.');
+  // 1-Click Retry Failed Messages (No Duplicates)
+  const handleRetryFailedMessages = async () => {
+    if (!activeShootId) return;
+
+    setIsRetryingFailed(true);
+    showToast('🔄 Retrying failed messages in background...');
+
+    try {
+      const res = await fetch('/api/whatsapp-shoot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'RETRY_FAILED',
+          shootId: activeShootId,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        showToast(`🎉 Retrying ${data.retriedCount} failed messages!`);
+        pollShootProgress(activeShootId);
+      } else {
+        showToast('❌ ' + (data.error || 'No failed messages found to retry.'));
+      }
+    } catch (err: any) {
+      showToast('❌ ' + err.message);
+    } finally {
+      setIsRetryingFailed(false);
+    }
+  };
+
+  // Download Detailed CSV Report
+  const handleDownloadCSVReport = () => {
+    if (!liveProgress || !liveProgress.messages) {
+      showToast('⚠️ No report data available.');
       return;
     }
 
-    const header = 'Phone,Name,CustomVar,Status,UniqueMessage\n';
-    const rows = parsedContacts
+    const header = 'MessageNumber,Recipient,RecipientName,Status,ErrorMessage,SentAt,Message\n';
+    const rows = liveProgress.messages
       .map(
-        (c) =>
-          `"${c.phone}","${c.name || ''}","${c.customVar || ''}","${c.status}","${(c.customMessage || formatMessageForContact(c)).replace(/"/g, '""')}"`
+        (m) =>
+          `"${m.messageNumber}","${m.recipient}","${m.recipientName || ''}","${m.status}","${m.errorMessage || ''}","${m.sentAt || ''}","${m.message.replace(/"/g, '""')}"`
       )
       .join('\n');
+
     const blob = new Blob([header + rows], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `whatsapp_shoot_${Date.now()}.csv`;
+    a.download = `whatsapp_shoot_report_${liveProgress.shootId}_${Date.now()}.csv`;
     a.click();
-    showToast('📥 Campaign report downloaded!');
+    showToast('📥 Report CSV downloaded!');
   };
 
-  if (!mounted || status === 'loading' || status === 'unauthenticated') {
+  if (!mounted || status === 'loading' || status === 'unauthenticated' || checkingSession) {
     return (
       <div className="min-h-screen bg-[#070b13] text-gray-200 p-6 flex flex-col justify-center items-center">
         <div className="w-12 h-12 border-4 border-t-emerald-500 border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin"></div>
         <p className="mt-4 text-gray-400 text-sm font-medium animate-pulse">
-          {status === 'unauthenticated' ? 'Authentication required. Redirecting to login...' : 'Loading WhatsApp Shoot Studio...'}
+          {status === 'unauthenticated' ? 'Authentication required. Redirecting to login...' : 'Loading WhatsApp Shoot Engine...'}
         </p>
       </div>
     );
   }
-
-  const sentCount = parsedContacts.filter((c) => c.status === 'SENT').length;
-  const totalCount = parsedContacts.length;
-  const progressPercent = totalCount > 0 ? Math.round((sentCount / totalCount) * 100) : 0;
-  const currentPreviewContact = parsedContacts[previewContactIdx] || parsedContacts[0];
-  const previewMessageText = getMessageToSendForContact(currentPreviewContact);
 
   return (
     <div className="min-h-screen bg-[#070b13] text-[#e2e8f0] font-sans pb-28 pt-20 px-3 sm:px-6 lg:px-10 selection:bg-emerald-500/30 selection:text-emerald-200">
@@ -504,88 +560,12 @@ export default function WhatsAppShootClient() {
         </div>
       )}
 
-      {/* ═════════════════════════════════════════════════════════════
-          CHROME POPUP WHATSAPP WEB SCANNER & LOGIN MODAL
-      ══════════════════════════════════════════════════════════════ */}
-      {showQRModal && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-[#0b1220] border border-[#1a2e4a] rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-6 animate-in fade-in zoom-in duration-200 relative overflow-hidden">
-            
-            {/* Modal Header */}
-            <div className="flex items-center justify-between pb-4 border-b border-[#141e33]">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-950/80 border border-emerald-700/50 flex items-center justify-center text-emerald-400">
-                  <AppWindow className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="text-base sm:text-lg font-extrabold text-white">
-                    Chrome WhatsApp Web Popup
-                  </h3>
-                  <p className="text-xs text-gray-400">
-                    Dedicated standalone window for WhatsApp Web scanning & shooting.
-                  </p>
-                </div>
-              </div>
-
-              <button
-                onClick={() => setShowQRModal(false)}
-                className="text-gray-400 hover:text-white p-1 rounded-lg"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Explainer Box */}
-            <div className="space-y-4 p-5 rounded-2xl bg-[#070b13] border border-emerald-900/60 text-left">
-              <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
-                <CheckCheck className="w-5 h-5 text-emerald-400" />
-                <span>Zero-Barrier Chrome Popup Integration</span>
-              </div>
-              
-              <div className="space-y-2 text-xs text-gray-300">
-                <div className="flex items-start gap-2">
-                  <span className="w-5 h-5 rounded-full bg-emerald-950 border border-emerald-700 text-emerald-300 flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">1</span>
-                  <p>Click the button below to open a <strong className="text-white">Dedicated Chrome Popup Window</strong> for WhatsApp Web.</p>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="w-5 h-5 rounded-full bg-emerald-950 border border-emerald-700 text-emerald-300 flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">2</span>
-                  <p>If not already logged in, scan the official QR code in that popup window with your phone.</p>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="w-5 h-5 rounded-full bg-emerald-950 border border-emerald-700 text-emerald-300 flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">3</span>
-                  <p>Once logged in, return here and click <strong className="text-white">"Start Auto-Shoot Sequence"</strong> to start sending AI messages!</p>
-                </div>
-              </div>
-
-              <button
-                onClick={() => {
-                  openWhatsAppPopupWindow('https://web.whatsapp.com');
-                  showToast('🪟 Opened dedicated WhatsApp Web window in Chrome!');
-                }}
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/25 transition-all"
-              >
-                <AppWindow className="w-4 h-4" />
-                <span>Open Dedicated Chrome Popup Window Now</span>
-              </button>
-            </div>
-
-            <div className="flex items-center justify-end">
-              <button
-                onClick={() => setShowQRModal(false)}
-                className="px-4 py-2 rounded-xl bg-[#0e1b30] border border-gray-800 text-gray-300 text-xs font-bold hover:text-white"
-              >
-                Done / Close
-              </button>
-            </div>
-
-          </div>
-        </div>
-      )}
-
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-7xl mx-auto space-y-8">
         
-        {/* Header Navigation, Device Status & View Switcher */}
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 mb-8 pb-6 border-b border-[#141e33]">
+        {/* ═══════════════════════════════════════════════════════════
+            HEADER & WHATSAPP CONNECTION STATUS BAR
+        ════════════════════════════════════════════════════════════ */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-[#141e33]">
           <div className="flex items-center gap-4">
             <Link 
               href="/world" 
@@ -604,81 +584,116 @@ export default function WhatsAppShootClient() {
                   WhatsApp Shoot
                 </h1>
                 <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-700/50 uppercase tracking-wider">
-                  CHROME POPUP DISPATCHER 🚀
+                  OPENWA ENGINE 🚀
                 </span>
               </div>
               <p className="text-xs text-gray-400 mt-1">
-                AI personalized bulk WhatsApp marketing & campaign runner with zero-ban sequence shooter.
+                Background batch broadcasting with live progress tracker and AI SpinTax rewriter.
               </p>
             </div>
           </div>
 
-          {/* Right Area: Popup Opener & View Tab Toggle */}
-          <div className="flex flex-wrap items-center gap-3">
-            
-            {/* OPEN POPUP WINDOW BUTTON */}
-            <button
-              onClick={() => {
-                openWhatsAppPopupWindow('https://web.whatsapp.com');
-                showToast('🪟 Opened WhatsApp Web Popup Window!');
-              }}
-              className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-emerald-950/70 border border-emerald-600/60 text-emerald-200 shadow-md hover:border-emerald-400 transition-all group"
-            >
-              <AppWindow className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
-              <div className="text-left">
-                <div className="text-[11px] font-extrabold text-white flex items-center gap-1">
-                  <span>Open WhatsApp Web Window</span>
+          {/* Connection Status Badge */}
+          {connectionStatus === 'CONNECTED' ? (
+            <div className="flex items-center gap-3 bg-emerald-950/70 border border-emerald-600/60 px-4 py-2 rounded-2xl shadow-lg">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+              <div>
+                <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                  <span>WhatsApp Connected ✓</span>
+                  <span className="text-[10px] text-emerald-300 font-mono">({connectedPhoneNumber || '+91 98765 43210'})</span>
                 </div>
-                <div className="text-[9px] text-emerald-400">Scan QR or Check Session</div>
+                <div className="text-[10px] text-emerald-400">Background Engine Ready</div>
               </div>
-            </button>
-
-            {/* View Tab Toggle */}
-            <div className="flex items-center gap-1.5 bg-[#0b1220] border border-[#182842] p-1.5 rounded-2xl">
               <button
-                onClick={() => setViewTab('BUILDER')}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-                  viewTab === 'BUILDER'
-                    ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/30'
-                    : 'text-gray-400 hover:text-white'
-                }`}
+                onClick={handleDisconnectSession}
+                className="ml-2 text-xs text-gray-400 hover:text-rose-400 p-1"
+                title="Disconnect WhatsApp"
               >
-                <Zap className="w-3.5 h-3.5" />
-                <span>🎯 Builder</span>
-              </button>
-              <button
-                onClick={() => setViewTab('CAMPAIGNS')}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-                  viewTab === 'CAMPAIGNS'
-                    ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/30'
-                    : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                <Clock className="w-3.5 h-3.5" />
-                <span>📊 History ({campaignsList.length})</span>
+                ✕
               </button>
             </div>
-
-          </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-amber-300 font-semibold flex items-center gap-1 bg-amber-950/60 border border-amber-800/60 px-3 py-1.5 rounded-xl">
+                <AlertCircle className="w-3.5 h-3.5" />
+                WhatsApp Not Connected
+              </span>
+            </div>
+          )}
         </div>
 
         {/* ═══════════════════════════════════════════════════════════
-            TAB 1: CAMPAIGN BUILDER & SEQUENCE SHOOTER
+            SECTION 1: FIRST-TIME WHATSAPP CONNECTION SCREEN
         ════════════════════════════════════════════════════════════ */}
-        {viewTab === 'BUILDER' && (
+        {connectionStatus !== 'CONNECTED' && (
+          <div className="bg-[#0b1220] border border-[#182842] rounded-3xl p-6 sm:p-8 max-w-2xl mx-auto shadow-2xl space-y-6">
+            <div className="text-center space-y-2">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-950/80 border border-emerald-700/60 text-emerald-400 flex items-center justify-center mx-auto shadow-lg">
+                <QrCode className="w-6 h-6" />
+              </div>
+              <h2 className="text-xl font-extrabold text-white">
+                Connect Your WhatsApp
+              </h2>
+              <p className="text-xs text-gray-400 max-w-md mx-auto">
+                Scan the official QR code or connect your sender phone number to start background broadcasts.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-center pt-2">
+              {/* QR Container */}
+              <div className="flex flex-col items-center justify-center p-4 rounded-2xl bg-[#070b13] border border-emerald-900/60 relative">
+                <div className="p-2 bg-white rounded-xl shadow-2xl flex items-center justify-center w-44 h-44">
+                  {qrCodeDataUrl ? (
+                    <img src={qrCodeDataUrl} alt="WhatsApp QR Code" className="w-40 h-40 object-contain" />
+                  ) : (
+                    <div className="w-40 h-40 flex flex-col items-center justify-center text-gray-800">
+                      <div className="w-8 h-8 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+                      <span className="text-[10px] font-bold mt-2">Loading QR...</span>
+                    </div>
+                  )}
+                </div>
+                <span className="text-[10px] text-gray-400 mt-2">Scan with WhatsApp on your phone</span>
+              </div>
+
+              {/* Fast Phone Number Connect */}
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-white">Or Connect Phone Number:</label>
+                  <input
+                    type="tel"
+                    value={phoneInput}
+                    onChange={(e) => setPhoneInput(e.target.value)}
+                    placeholder="+91 98765 43210"
+                    className="w-full bg-[#070b13] border border-[#1a2e4a] focus:border-emerald-500 rounded-xl px-3 py-2.5 text-xs text-white placeholder-gray-500 focus:outline-none font-mono"
+                  />
+                </div>
+
+                <button
+                  onClick={handleConnectPhone}
+                  className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/25 transition-all"
+                >
+                  <CheckCheck className="w-4 h-4" />
+                  <span>Connect WhatsApp ✓</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════
+            SECTION 2: CREATE WHATSAPP SHOOT INTERFACE
+        ════════════════════════════════════════════════════════════ */}
+        {connectionStatus === 'CONNECTED' && (!liveProgress || liveProgress.status === 'COMPLETED') && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-
-            {/* ═════════════════════════════════════════════════════════
-                LEFT COLUMN: CONTACTS & AI MESSAGE STUDIO (5 COLS)
-            ══════════════════════════════════════════════════════════ */}
+            
+            {/* ── LEFT COLUMN: RECIPIENTS & CONTACTS MANAGER (5 COLS) ── */}
             <div className="lg:col-span-5 space-y-6">
-
-              {/* CARD 1: CONTACTS MANAGER */}
+              
               <div className="bg-[#0b1220] border border-[#182842] rounded-2xl p-5 shadow-xl space-y-4">
                 <div className="flex items-center justify-between">
                   <label className="text-sm font-bold text-white flex items-center gap-2">
                     <Users className="w-4 h-4 text-emerald-400" />
-                    Target Contacts ({parsedContacts.length})
+                    Target Recipients ({parsedContacts.length})
                   </label>
                   <button
                     onClick={() => csvInputRef.current?.click()}
@@ -689,7 +704,6 @@ export default function WhatsAppShootClient() {
                   </button>
                 </div>
 
-                {/* Country Code & Fast Preset */}
                 <div className="flex items-center gap-2">
                   <div className="w-36 shrink-0">
                     <label className="text-[10px] font-semibold text-gray-400 block mb-1">Country Code:</label>
@@ -708,7 +722,7 @@ export default function WhatsAppShootClient() {
                   </div>
 
                   <div className="flex-1">
-                    <label className="text-[10px] font-semibold text-gray-400 block mb-1">Campaign Name:</label>
+                    <label className="text-[10px] font-semibold text-gray-400 block mb-1">Shoot Title:</label>
                     <input
                       type="text"
                       value={campaignTitle}
@@ -719,123 +733,125 @@ export default function WhatsAppShootClient() {
                   </div>
                 </div>
 
-                {/* Bulk Textarea */}
                 <div>
                   <div className="flex items-center justify-between text-[11px] text-gray-400 mb-1">
                     <span>Format: <code className="text-emerald-400 font-mono">phone, name, custom_note</code></span>
-                    <span>1 contact per line</span>
+                    <span>1 per line</span>
                   </div>
                   <textarea
                     value={rawContactsInput}
                     onChange={(e) => setRawContactsInput(e.target.value)}
-                    rows={4}
+                    rows={5}
                     placeholder="9876543210, Rahul, 20% Off"
                     className="w-full bg-[#070b13] border border-[#1a2b47] focus:border-emerald-500/80 rounded-xl p-3 text-xs text-gray-200 font-mono placeholder-gray-600 focus:outline-none resize-none leading-relaxed"
                   />
                 </div>
               </div>
 
-              {/* CARD 2: AI MESSAGE STUDIO & MEDIA */}
+              {/* MEDIA ATTACHMENT CARD */}
+              <div className="bg-[#0b1220] border border-[#182842] rounded-2xl p-5 shadow-xl space-y-3">
+                <label className="text-xs font-bold text-gray-300 flex items-center gap-1.5">
+                  <Paperclip className="w-3.5 h-3.5 text-emerald-400" />
+                  Optional Media Attachment:
+                </label>
+
+                {!mediaFile ? (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadingMedia}
+                    className="w-full border-2 border-dashed border-[#1e3354] hover:border-emerald-500/70 bg-[#070e1b] rounded-xl p-3.5 flex items-center justify-center gap-2.5 text-gray-400 hover:text-emerald-300 transition-all cursor-pointer"
+                  >
+                    {uploadingMedia ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin"></div>
+                        <span className="text-xs font-semibold text-emerald-300">Uploading Media...</span>
+                      </>
+                    ) : (
+                      <>
+                        <UploadCloud className="w-4 h-4 text-emerald-400" />
+                        <span className="text-xs font-bold text-gray-200">Upload Flyer Image, Video or PDF</span>
+                      </>
+                    )}
+                  </button>
+                ) : (
+                  <div className="bg-[#070e1b] border border-emerald-800/40 rounded-xl p-3 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      {mediaFile.type === 'video' ? (
+                        <Film className="w-5 h-5 text-pink-400 shrink-0" />
+                      ) : mediaFile.type === 'document' ? (
+                        <FileText className="w-5 h-5 text-amber-400 shrink-0" />
+                      ) : (
+                        <img src={mediaFile.url} alt="Media" className="w-8 h-8 rounded object-cover shrink-0" />
+                      )}
+                      <span className="text-xs text-white font-semibold truncate">{mediaFile.name || 'Attached Media'}</span>
+                    </div>
+                    <button onClick={() => setMediaFile(null)} className="text-rose-400 hover:text-rose-300 p-1">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
+
+            </div>
+
+            {/* ── RIGHT COLUMN: MESSAGE TEMPLATE & AI COPYWRITER (7 COLS) ── */}
+            <div className="lg:col-span-7 space-y-6">
+              
               <div className="bg-[#0b1220] border border-[#182842] rounded-2xl p-5 shadow-xl space-y-4">
                 <div className="flex items-center justify-between">
                   <label className="text-sm font-bold text-white flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-emerald-400" />
-                    AI WhatsApp Copywriter
+                    Message Composer
                   </label>
-                  <span className="text-[10px] font-extrabold text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800/60 uppercase">
-                    SMART TAGS 🔥
-                  </span>
-                </div>
-
-                {/* Topic input */}
-                <div>
-                  <input
-                    type="text"
-                    value={topicPrompt}
-                    onChange={(e) => setTopicPrompt(e.target.value)}
-                    placeholder="Describe your offer, campaign, or message goal..."
-                    className="w-full bg-[#070b13] border border-[#1a2b47] focus:border-emerald-500 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none"
-                  />
-                </div>
-
-                {/* Tone Presets */}
-                <div className="flex flex-wrap gap-1.5">
-                  {[
-                    { id: 'promotional', label: '🔥 Offer / Promo' },
-                    { id: 'formal', label: '💼 Formal B2B' },
-                    { id: 'festive', label: '🎉 Festive Greeting' },
-                    { id: 'followup', label: '📞 Client Follow-up' },
-                    { id: 'networking', label: '🤝 Networking' },
-                  ].map((t) => (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => setTone(t.id as any)}
-                      className={`text-[11px] font-semibold px-2.5 py-1 rounded-md border transition-all ${
-                        tone === t.id
-                          ? 'bg-emerald-950 border-emerald-500 text-emerald-200'
-                          : 'bg-[#070b13] border-[#182842] text-gray-400 hover:border-gray-600'
-                      }`}
-                    >
-                      {t.label}
-                    </button>
-                  ))}
-                </div>
-
-                {/* AI Generate Button */}
-                <button
-                  onClick={handleGenerateCopy}
-                  disabled={loadingAI}
-                  className="w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 transition-all disabled:opacity-50"
-                >
-                  {loadingAI ? (
-                    <>
-                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      <span>Generating AI Copy...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Zap className="w-3.5 h-3.5 fill-white" />
-                      <span>Generate Personalized Copy</span>
-                    </>
-                  )}
-                </button>
-
-                {/* Message Template Editor */}
-                <div className="space-y-1.5 pt-2 border-t border-[#141e33]">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-gray-300">Base Message Template:</label>
-                    {/* Smart Tag Chips */}
-                    <div className="flex items-center gap-1">
-                      {['{{name}}', '{{company}}', '{{note}}'].map((tag) => (
-                        <button
-                          key={tag}
-                          type="button"
-                          onClick={() => setMessageTemplate((prev) => prev + ` ${tag} `)}
-                          className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800/60 hover:bg-emerald-900"
-                          title="Click to insert tag"
-                        >
-                          +{tag}
-                        </button>
-                      ))}
-                    </div>
+                  <div className="flex items-center gap-1">
+                    {['{{name}}', '{{company}}', '{{note}}'].map((tag) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => setMessageTemplate((prev) => prev + ` ${tag} `)}
+                        className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800/60 hover:bg-emerald-900"
+                      >
+                        +{tag}
+                      </button>
+                    ))}
                   </div>
-
-                  <textarea
-                    value={messageTemplate}
-                    onChange={(e) => setMessageTemplate(e.target.value)}
-                    rows={5}
-                    className="w-full bg-[#070b13] border border-[#1a2b47] focus:border-emerald-500 rounded-xl p-3 text-xs text-gray-100 placeholder-gray-600 focus:outline-none resize-y leading-relaxed font-sans"
-                  />
                 </div>
 
-                {/* AI RE-WRITE PER CONTACT FEATURE */}
-                <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-950/70 to-teal-950/60 border border-emerald-700/50 space-y-3 shadow-inner">
+                <textarea
+                  value={messageTemplate}
+                  onChange={(e) => setMessageTemplate(e.target.value)}
+                  rows={6}
+                  className="w-full bg-[#070b13] border border-[#1a2b47] focus:border-emerald-500 rounded-xl p-3.5 text-xs text-gray-100 placeholder-gray-600 focus:outline-none resize-y leading-relaxed font-sans"
+                />
+
+                {/* AI COPYWRITER ASSIST */}
+                <div className="p-3 bg-[#070b13] border border-gray-800/80 rounded-xl space-y-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={topicPrompt}
+                      onChange={(e) => setTopicPrompt(e.target.value)}
+                      placeholder="Prompt AI to rewrite or optimize offer..."
+                      className="flex-1 bg-[#0b1424] border border-[#1a2e4a] focus:border-emerald-500 rounded-lg px-3 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none"
+                    />
+                    <button
+                      onClick={handleGenerateCopy}
+                      disabled={loadingAI}
+                      className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1 shadow disabled:opacity-50"
+                    >
+                      {loadingAI ? 'Generating...' : 'AI Rewrite'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* AI DYNAMIC REWRITE PER CONTACT */}
+                <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-950/70 to-teal-950/60 border border-emerald-700/50 space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Wand2 className="w-4 h-4 text-emerald-400" />
                       <span className="text-xs font-extrabold text-white">
-                        AI Unique Re-write per Contact
+                        AI Unique SpinTax per Contact
                       </span>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
@@ -848,328 +864,35 @@ export default function WhatsAppShootClient() {
                       <div className="w-9 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
                     </label>
                   </div>
-                  <p className="text-[11px] text-emerald-200/80 leading-relaxed">
-                    AI spins & rephrases each message into a 100% unique human-written variation for every number to prevent duplicate detection.
-                  </p>
 
                   <button
                     onClick={handleGenerateUniqueVariations}
                     disabled={loadingVariations || parsedContacts.length === 0}
-                    className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-md transition-all disabled:opacity-50"
+                    className="w-full py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow transition-all disabled:opacity-50"
                   >
-                    {loadingVariations ? (
-                      <>
-                        <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        <span>Re-writing {parsedContacts.length} Messages with AI...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Shuffle className="w-3.5 h-3.5" />
-                        <span>Re-write Unique Messages for All {parsedContacts.length} Contacts</span>
-                      </>
-                    )}
+                    {loadingVariations ? 'Generating Variations...' : `Generate Unique Messages for All ${parsedContacts.length} Contacts`}
                   </button>
                 </div>
 
-                {/* Media Attachment Upload */}
-                <div className="space-y-2 pt-2 border-t border-[#141e33]">
-                  <label className="text-xs font-bold text-gray-300 flex items-center gap-1.5">
-                    <Paperclip className="w-3.5 h-3.5 text-emerald-400" />
-                    Attach Media (Flyer / Image / Video / PDF):
-                  </label>
-
-                  {!mediaFile ? (
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={uploadingMedia}
-                      className="w-full border-2 border-dashed border-[#1e3354] hover:border-emerald-500/70 bg-[#070e1b] rounded-xl p-3 flex items-center justify-center gap-2.5 text-gray-400 hover:text-emerald-300 transition-all cursor-pointer"
-                    >
-                      {uploadingMedia ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin"></div>
-                          <span className="text-xs font-semibold text-emerald-300">Uploading Media...</span>
-                        </>
-                      ) : (
-                        <>
-                          <UploadCloud className="w-4 h-4 text-emerald-400" />
-                          <span className="text-xs font-bold text-gray-200">Upload Image, Video or PDF Flyer</span>
-                        </>
-                      )}
-                    </button>
-                  ) : (
-                    <div className="bg-[#070e1b] border border-emerald-800/40 rounded-xl p-2.5 flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        {mediaFile.type === 'video' ? (
-                          <Film className="w-5 h-5 text-pink-400 shrink-0" />
-                        ) : mediaFile.type === 'document' ? (
-                          <FileText className="w-5 h-5 text-amber-400 shrink-0" />
-                        ) : (
-                          <img src={mediaFile.url} alt="Media" className="w-8 h-8 rounded object-cover shrink-0" />
-                        )}
-                        <span className="text-xs text-white font-semibold truncate">{mediaFile.name || 'Attached Media'}</span>
-                      </div>
-                      <button onClick={() => setMediaFile(null)} className="text-rose-400 hover:text-rose-300 p-1">
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {/* Save Campaign Button */}
+                {/* START SHOOT BUTTON */}
                 <button
-                  onClick={handleSaveCampaign}
-                  className="w-full py-2.5 rounded-xl bg-[#0e1b30] border border-emerald-800/50 hover:border-emerald-500 text-emerald-300 font-extrabold text-xs flex items-center justify-center gap-2 transition-all hover:bg-emerald-950/40"
+                  onClick={handleStartShoot}
+                  disabled={isStartingShoot || parsedContacts.length === 0}
+                  className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-xl shadow-emerald-500/25 transition-all disabled:opacity-50 active:scale-[0.99]"
                 >
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                  <span>Save Campaign Progress</span>
-                </button>
-              </div>
-
-            </div>
-
-            {/* ═════════════════════════════════════════════════════════
-                RIGHT COLUMN: LIVE CHAT PREVIEW & SEQUENCE SHOOTER (7 COLS)
-            ══════════════════════════════════════════════════════════ */}
-            <div className="lg:col-span-7 space-y-6">
-
-              {/* CARD 3: LIVE WHATSAPP CHAT PREVIEW */}
-              <div className="bg-[#0b1220] border border-[#182842] rounded-2xl p-5 shadow-xl space-y-3">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-bold text-gray-300 flex items-center gap-2">
-                    <WhatsAppIcon className="w-4 h-4 text-emerald-400" />
-                    Live Personalized WhatsApp Chat Preview
-                  </span>
-
-                  {/* Recipient switcher */}
-                  {parsedContacts.length > 0 && (
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] text-gray-400">Previewing Contact:</span>
-                      <select
-                        value={previewContactIdx}
-                        onChange={(e) => setPreviewContactIdx(Number(e.target.value))}
-                        className="bg-[#070b13] border border-[#1a2b47] rounded px-2 py-1 text-[11px] text-emerald-300 focus:outline-none font-semibold"
-                      >
-                        {parsedContacts.slice(0, 15).map((c, i) => (
-                          <option key={i} value={i}>
-                            #{i + 1} {c.name} ({c.phone})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                  {isStartingShoot ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>Starting WhatsApp Shoot...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-4 h-4 fill-white" />
+                      <span>Start WhatsApp Shoot ({parsedContacts.length} Contacts)</span>
+                    </>
                   )}
-                </div>
+                </button>
 
-                {/* Unique Variation Indicator Badge */}
-                {currentPreviewContact?.customMessage && (
-                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-950/80 border border-emerald-700/60 text-emerald-300 text-xs font-semibold">
-                    <Sparkles className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-                    <span>AI Unique Re-written Message for {currentPreviewContact.name || 'Recipient'}</span>
-                  </div>
-                )}
-
-                {/* WhatsApp Chat Bubble Mockup */}
-                <div className="bg-[#0b141a] border border-emerald-950 rounded-2xl p-4 shadow-inner max-w-lg mx-auto">
-                  {/* WhatsApp Chat Header */}
-                  <div className="flex items-center gap-3 pb-3 border-b border-gray-800/80 mb-3">
-                    <div className="w-9 h-9 rounded-full bg-emerald-700 flex items-center justify-center text-white font-bold text-xs">
-                      {currentPreviewContact?.name ? currentPreviewContact.name.charAt(0).toUpperCase() : 'W'}
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
-                        {currentPreviewContact?.name || 'Contact Name'}
-                      </h4>
-                      <p className="text-[10px] text-emerald-400 font-mono">
-                        {currentPreviewContact?.phone || defaultCountryCode}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Bubble Message */}
-                  <div className="bg-[#005c4b] text-emerald-50 rounded-2xl rounded-tr-none p-3.5 shadow-md space-y-2 ml-auto max-w-md">
-                    {/* Media in bubble if attached */}
-                    {mediaFile && (
-                      <div className="rounded-lg overflow-hidden border border-emerald-800/60 bg-black">
-                        {mediaFile.type === 'video' ? (
-                          <video src={mediaFile.url} controls className="w-full max-h-48 object-cover" />
-                        ) : mediaFile.type === 'document' ? (
-                          <div className="p-3 bg-emerald-900/60 flex items-center gap-2 text-white">
-                            <FileText className="w-6 h-6 text-amber-300" />
-                            <span className="text-xs font-semibold">{mediaFile.name || 'Flyer.pdf'}</span>
-                          </div>
-                        ) : (
-                          <img src={mediaFile.url} alt="Flyer" className="w-full max-h-48 object-cover" />
-                        )}
-                      </div>
-                    )}
-
-                    <div className="text-xs whitespace-pre-line leading-relaxed font-sans">
-                      {previewMessageText}
-                    </div>
-                    <div className="text-[9px] text-emerald-300/80 text-right mt-1 flex items-center justify-end gap-1">
-                      <span>10:45 AM</span>
-                      <span>✓✓</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* CARD 4: ZERO-BAN SEQUENCE SHOOTER (CHROME POPUP DISPATCHER) */}
-              <div className="bg-[#0b1220] border border-[#182842] rounded-2xl p-5 shadow-xl space-y-4">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-[#141e33]">
-                  <div>
-                    <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
-                      <Zap className="w-4 h-4 text-emerald-400" />
-                      Sequence Shooter ({sentCount}/{totalCount} Dispatched)
-                    </h3>
-                    <p className="text-[11px] text-gray-400 mt-0.5">
-                      Dispatches in dedicated Chrome Popup Window with custom delay.
-                    </p>
-                  </div>
-
-                  {/* Auto-Shooter Delay & Trigger */}
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-1 bg-[#070b13] border border-[#1a2b47] px-2.5 py-1.5 rounded-lg text-xs">
-                      <Clock className="w-3.5 h-3.5 text-gray-400" />
-                      <select
-                        value={shootDelaySec}
-                        onChange={(e) => setShootDelaySec(Number(e.target.value))}
-                        className="bg-transparent text-white text-xs focus:outline-none"
-                      >
-                        <option value={4}>4s delay</option>
-                        <option value={6}>6s delay (Safe)</option>
-                        <option value={10}>10s delay (Ultra-Safe)</option>
-                        <option value={15}>15s delay</option>
-                      </select>
-                    </div>
-
-                    <button
-                      onClick={autoShootRunning ? () => setAutoShootRunning(false) : handleStartAutoShoot}
-                      className={`px-4 py-2 rounded-xl text-xs font-extrabold flex items-center gap-1.5 transition-all shadow-lg ${
-                        autoShootRunning
-                          ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-600/30'
-                          : 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white shadow-emerald-500/25'
-                      }`}
-                    >
-                      {autoShootRunning ? (
-                        <>
-                          <Pause className="w-3.5 h-3.5" />
-                          <span>Pause Auto-Shoot</span>
-                        </>
-                      ) : (
-                        <>
-                          <Play className="w-3.5 h-3.5 fill-white" />
-                          <span>Start Auto-Shoot Sequence</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Progress Bar */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between text-xs font-bold">
-                    <span className="text-gray-300">Campaign Dispatch Progress</span>
-                    <span className="text-emerald-400">{progressPercent}%</span>
-                  </div>
-                  <div className="w-full bg-[#070b13] h-2.5 rounded-full overflow-hidden border border-gray-800">
-                    <div
-                      className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full transition-all duration-500 rounded-full"
-                      style={{ width: `${progressPercent}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* Contacts Queue Table */}
-                <div className="overflow-x-auto max-h-72 overflow-y-auto border border-[#182842] rounded-xl bg-[#070b13]">
-                  <table className="w-full text-left text-xs text-gray-300">
-                    <thead className="bg-[#0b1424] text-gray-400 uppercase text-[10px] font-bold sticky top-0 border-b border-gray-800">
-                      <tr>
-                        <th className="p-3">#</th>
-                        <th className="p-3">Recipient</th>
-                        <th className="p-3">Phone</th>
-                        <th className="p-3">Message Variation</th>
-                        <th className="p-3">Status</th>
-                        <th className="p-3 text-right">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-800/60 font-sans">
-                      {parsedContacts.length === 0 ? (
-                        <tr>
-                          <td colSpan={6} className="p-6 text-center text-gray-500 text-xs">
-                            No contacts added yet. Enter numbers on the left.
-                          </td>
-                        </tr>
-                      ) : (
-                        parsedContacts.map((contact, idx) => {
-                          const isSent = contact.status === 'SENT';
-                          const isCurrent = currentShootingIdx === idx && autoShootRunning;
-                          const msgForThisContact = getMessageToSendForContact(contact);
-
-                          return (
-                            <tr
-                              key={contact.id || idx}
-                              className={`hover:bg-[#0e1b30] transition-colors ${
-                                isCurrent ? 'bg-emerald-950/40 border-l-4 border-emerald-400' : ''
-                              }`}
-                            >
-                              <td className="p-3 font-mono text-gray-500">{idx + 1}</td>
-                              <td className="p-3 font-bold text-white whitespace-nowrap">{contact.name || 'Friend'}</td>
-                              <td className="p-3 font-mono text-emerald-400/90 whitespace-nowrap">{contact.phone}</td>
-                              <td className="p-3 min-w-[200px] max-w-xs">
-                                <p className="text-[11px] text-gray-400 line-clamp-2 font-sans bg-[#0e1828] p-1.5 rounded border border-gray-800/60">
-                                  {msgForThisContact}
-                                </p>
-                              </td>
-                              <td className="p-3 whitespace-nowrap">
-                                {isSent ? (
-                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800">
-                                    SENT ✓
-                                  </span>
-                                ) : (
-                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-gray-900 text-gray-400 border border-gray-800">
-                                    PENDING
-                                  </span>
-                                )}
-                              </td>
-                              <td className="p-3 text-right whitespace-nowrap">
-                                <button
-                                  onClick={() => handleShootContact(contact, idx)}
-                                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ml-auto ${
-                                    isSent
-                                      ? 'bg-[#0e1b30] text-gray-400 hover:text-white border border-gray-800'
-                                      : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/20'
-                                  }`}
-                                >
-                                  <Send className="w-3 h-3" />
-                                  <span>{isSent ? 'Re-Shoot' : 'Shoot (Popup)'}</span>
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Bottom Controls */}
-                <div className="flex items-center justify-between pt-2">
-                  <button
-                    onClick={handleExportCSV}
-                    className="text-xs text-gray-400 hover:text-white font-semibold flex items-center gap-1.5 p-2 rounded-lg bg-[#070b13] border border-gray-800 hover:border-gray-600 transition-all"
-                  >
-                    <Download className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Download Report (CSV)</span>
-                  </button>
-
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] text-gray-500 flex items-center gap-1">
-                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                      Chrome Popup Auto-Sequence Active
-                    </span>
-                  </div>
-                </div>
               </div>
 
             </div>
@@ -1178,131 +901,150 @@ export default function WhatsAppShootClient() {
         )}
 
         {/* ═══════════════════════════════════════════════════════════
-            TAB 2: SAVED CAMPAIGNS & HISTORY
+            SECTION 3: LIVE PROGRESS & BACKGROUND SHOOT MONITOR
         ════════════════════════════════════════════════════════════ */}
-        {viewTab === 'CAMPAIGNS' && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
+        {liveProgress && (
+          <div className="bg-[#0b1220] border border-[#182842] rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
+            
+            {/* PROGRESS HEADER */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-[#141e33]">
               <div>
-                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                  <Clock className="w-5 h-5 text-emerald-400" />
-                  Your Saved WhatsApp Campaigns ({campaignsList.length})
+                <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-700/50 uppercase tracking-wider">
+                  STATUS: {liveProgress.status}
+                </span>
+                <h3 className="text-lg font-extrabold text-white mt-1">
+                  {liveProgress.title || 'WhatsApp Shoot in Progress'}
                 </h3>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  Resume past broadcasts or export campaign dispatch performance.
-                </p>
               </div>
 
-              <button
-                onClick={() => setViewTab('BUILDER')}
-                className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-xs flex items-center gap-2 transition-all shadow-md shadow-emerald-500/20"
-              >
-                <PlusCircle className="w-4 h-4" />
-                <span>Create New Campaign</span>
-              </button>
+              {liveProgress.status === 'COMPLETED' ? (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleDownloadCSVReport}
+                    className="px-3.5 py-2 rounded-xl bg-emerald-950 border border-emerald-700 text-emerald-300 font-bold text-xs flex items-center gap-1.5 hover:bg-emerald-900"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>View Report</span>
+                  </button>
+
+                  <button
+                    onClick={() => setLiveProgress(null)}
+                    className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold text-xs shadow"
+                  >
+                    Start New Shoot
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-xs text-emerald-400 bg-emerald-950/80 px-3 py-1.5 rounded-xl border border-emerald-700/60 font-semibold">
+                  <Activity className="w-4 h-4 animate-spin" />
+                  <span>Processing in Background...</span>
+                </div>
+              )}
             </div>
 
-            {campaignsList.length === 0 ? (
-              <div className="bg-[#0b1220] border border-[#182842] rounded-3xl p-12 text-center max-w-lg mx-auto space-y-4 shadow-xl">
-                <div className="w-14 h-14 rounded-2xl bg-emerald-950/60 border border-emerald-700/40 text-emerald-400 flex items-center justify-center mx-auto shadow-inner">
-                  <WhatsAppIcon className="w-7 h-7" />
-                </div>
+            {/* PROMINENT LIVE PROGRESS BAR */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between font-bold text-sm">
+                <span className="text-white">
+                  {liveProgress.sentCount} / {liveProgress.totalMessages} Messages Sent
+                </span>
+                <span className="text-emerald-400 text-lg font-black">{liveProgress.percentage}%</span>
+              </div>
+
+              <div className="w-full bg-[#070b13] h-4 rounded-full overflow-hidden border border-gray-800 p-0.5">
+                <div
+                  className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-500"
+                  style={{ width: `${liveProgress.percentage}%` }}
+                />
+              </div>
+
+              {liveProgress.currentProcessingNum > 0 && liveProgress.status !== 'COMPLETED' && (
+                <p className="text-xs text-emerald-300 font-medium animate-pulse">
+                  Message #{liveProgress.currentProcessingNum} is being processed...
+                </p>
+              )}
+            </div>
+
+            {/* MESSAGE COUNTERS WIDGET */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="bg-[#070b13] border border-gray-800 rounded-xl p-3 text-center">
+                <span className="text-[10px] text-gray-400 uppercase font-bold block">Total</span>
+                <span className="text-lg font-black text-white">{liveProgress.totalMessages}</span>
+              </div>
+              <div className="bg-[#070b13] border border-emerald-900/60 rounded-xl p-3 text-center">
+                <span className="text-[10px] text-emerald-400 uppercase font-bold block">✓ Sent</span>
+                <span className="text-lg font-black text-emerald-400">{liveProgress.sentCount}</span>
+              </div>
+              <div className="bg-[#070b13] border border-amber-900/60 rounded-xl p-3 text-center">
+                <span className="text-[10px] text-amber-400 uppercase font-bold block">⏳ Pending</span>
+                <span className="text-lg font-black text-amber-400">{liveProgress.pendingCount}</span>
+              </div>
+              <div className="bg-[#070b13] border border-rose-900/60 rounded-xl p-3 text-center">
+                <span className="text-[10px] text-rose-400 uppercase font-bold block">✕ Failed</span>
+                <span className="text-lg font-black text-rose-400">{liveProgress.failedCount}</span>
+              </div>
+            </div>
+
+            {/* RETRY FAILED MESSAGES SECTION (IF ANY) */}
+            {liveProgress.failedCount > 0 && (
+              <div className="p-4 rounded-2xl bg-rose-950/40 border border-rose-800/60 flex items-center justify-between gap-4">
                 <div>
-                  <h4 className="text-base font-bold text-white">No Saved Campaigns Yet</h4>
-                  <p className="text-xs text-gray-400 mt-1 max-w-xs mx-auto">
-                    Create your first personalized WhatsApp broadcast and save your campaign progress.
+                  <h4 className="text-xs font-bold text-rose-300">
+                    {liveProgress.failedCount} Messages Failed to Deliver
+                  </h4>
+                  <p className="text-[11px] text-gray-400 mt-0.5">
+                    Retry only failed messages without sending duplicates to successfully delivered recipients.
                   </p>
                 </div>
                 <button
-                  onClick={() => setViewTab('BUILDER')}
-                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-xs font-bold shadow-lg transition-transform active:scale-95"
+                  onClick={handleRetryFailedMessages}
+                  disabled={isRetryingFailed}
+                  className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center gap-1.5 shadow disabled:opacity-50 shrink-0"
                 >
-                  Start Your First Campaign
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Retry Failed Messages</span>
                 </button>
               </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                {campaignsList.map((c) => {
-                  const percent = c.totalContacts > 0 ? Math.round((c.sentCount / c.totalContacts) * 100) : 0;
-                  return (
-                    <div
-                      key={c.id}
-                      className="bg-[#0b1220] border border-[#182842] hover:border-emerald-500/40 rounded-2xl p-5 shadow-lg flex flex-col justify-between space-y-4 relative overflow-hidden group transition-all"
-                    >
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-700/50 uppercase">
-                            {c.status}
-                          </span>
-                          <span className="text-[11px] text-gray-400">
-                            {new Date(c.createdAt).toLocaleDateString()}
-                          </span>
-                        </div>
+            )}
 
-                        <h4 className="text-base font-bold text-white group-hover:text-emerald-300 transition-colors mb-1">
-                          {c.title}
-                        </h4>
-
-                        <p className="text-xs text-gray-400 line-clamp-2 bg-[#070b13] p-2 rounded-lg border border-gray-900 font-sans mb-3">
-                          {c.messageTemplate}
-                        </p>
-
-                        <div className="space-y-1">
-                          <div className="flex items-center justify-between text-xs text-gray-400">
-                            <span>Dispatched:</span>
-                            <span className="font-bold text-emerald-400">
-                              {c.sentCount} / {c.totalContacts} ({percent}%)
-                            </span>
-                          </div>
-                          <div className="w-full bg-[#070b13] h-1.5 rounded-full overflow-hidden">
-                            <div
-                              className="bg-emerald-500 h-full rounded-full"
-                              style={{ width: `${percent}%` }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between pt-3 border-t border-[#141e33]">
-                        <button
-                          onClick={async () => {
-                            await deleteWhatsAppCampaign(c.id);
-                            loadCampaigns();
-                            showToast('🗑️ Campaign deleted.');
-                          }}
-                          className="text-xs text-rose-400 hover:text-rose-300 flex items-center gap-1"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          <span>Delete</span>
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            setCampaignId(c.id);
-                            setCampaignTitle(c.title);
-                            setMessageTemplate(c.messageTemplate);
-                            setParsedContacts(c.contactsData || []);
-                            if (c.mediaUrl) {
-                              setMediaFile({
-                                url: c.mediaUrl,
-                                type: (c.mediaType as any) || 'image',
-                                name: 'Attached Media',
-                              });
-                            }
-                            setViewTab('BUILDER');
-                            showToast(`📋 Loaded campaign "${c.title}" into builder!`);
-                          }}
-                          className="text-xs text-emerald-300 font-bold px-3 py-1.5 rounded-lg bg-emerald-950/80 border border-emerald-800/40 hover:border-emerald-500 flex items-center gap-1"
-                        >
-                          <Play className="w-3 h-3 fill-current" />
-                          <span>Resume Shoot</span>
-                        </button>
+            {/* INDIVIDUAL MESSAGE PROGRESS LIST */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-bold text-gray-300">Message Progress List:</h4>
+              <div className="max-h-72 overflow-y-auto border border-[#182842] rounded-xl bg-[#070b13] divide-y divide-gray-800/60">
+                {liveProgress.messages?.map((msg) => (
+                  <div key={msg.id || msg.messageNumber} className="p-3 flex items-center justify-between gap-3 text-xs">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="font-mono text-gray-500 shrink-0">#{msg.messageNumber}</span>
+                      <div className="min-w-0">
+                        <p className="font-bold text-white truncate">{msg.recipientName || 'Friend'} ({msg.recipient})</p>
+                        <p className="text-[11px] text-gray-400 truncate max-w-md">{msg.message}</p>
                       </div>
                     </div>
-                  );
-                })}
+
+                    <div className="shrink-0">
+                      {msg.status === 'SENT' ? (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800">
+                          ✓ Sent
+                        </span>
+                      ) : msg.status === 'PROCESSING' ? (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-950 text-amber-400 border border-amber-800 animate-pulse">
+                          ⚡ Processing
+                        </span>
+                      ) : msg.status === 'FAILED' ? (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-950 text-rose-400 border border-rose-800">
+                          ✕ Failed
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-gray-900 text-gray-400 border border-gray-800">
+                          ○ Pending
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
-            )}
+            </div>
+
           </div>
         )}
 

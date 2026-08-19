@@ -2,13 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import {
-  getOrCreateWhatsAppSession,
-  getSessionStatus,
-  sendDirectWhatsAppMessage,
-  logoutWhatsAppSession,
-  requestWhatsAppPairingCode,
-  generateInstantQR,
-} from '@/lib/baileysSession';
+  WhatsAppSessionService,
+  WhatsAppShootService,
+  WhatsAppProgressService,
+  WhatsAppReportService,
+} from '@/lib/whatsappShootService';
+import { generateInstantQR } from '@/lib/baileysSession';
 
 export async function GET(req: NextRequest) {
   try {
@@ -18,28 +17,33 @@ export async function GET(req: NextRequest) {
     }
 
     const userId = (session.user as any).id;
-    let current = getSessionStatus(userId);
+    const { searchParams } = new URL(req.url);
+    const action = searchParams.get('action') || 'SESSION_STATUS';
+    const shootId = searchParams.get('shootId');
 
-    // If disconnected, trigger session initialization so QR is generated
-    if (current.status === 'DISCONNECTED' || !current.qrCodeDataUrl) {
-      const newSess = await getOrCreateWhatsAppSession(userId);
-      current = {
-        status: newSess.status,
-        qrCodeDataUrl: newSess.qrCodeDataUrl,
-        phoneNumber: newSess.phoneNumber,
-      };
+    if (action === 'GET_PROGRESS') {
+      if (shootId) {
+        const progress = await WhatsAppProgressService.getShootProgress(shootId);
+        return NextResponse.json({ success: true, progress });
+      } else {
+        const latest = await WhatsAppProgressService.getUserLatestShoot(userId);
+        return NextResponse.json({ success: true, progress: latest });
+      }
     }
 
-    // Always ensure a non-null QR data URL so UI never gets stuck
-    if (!current.qrCodeDataUrl && current.status !== 'CONNECTED') {
-      current.qrCodeDataUrl = await generateInstantQR(`2@${userId}@${Date.now()}`);
+    // Default: Return Session Status & QR
+    const sess = await WhatsAppSessionService.getOrCreateSession(userId);
+    let qr = sess.qrCodeDataUrl;
+    if (!qr && sess.status !== 'CONNECTED') {
+      qr = await generateInstantQR(`openwa_${userId}_${Date.now()}`);
     }
 
     return NextResponse.json({
       success: true,
-      status: current.status,
-      qrCodeDataUrl: current.qrCodeDataUrl,
-      phoneNumber: current.phoneNumber,
+      status: sess.status,
+      phoneNumber: sess.phoneNumber,
+      qrCodeDataUrl: qr,
+      openwaSessionId: sess.openwaSessionId,
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
@@ -57,51 +61,50 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { action } = body;
 
-    if (action === 'INIT_SESSION') {
-      const sess = await getOrCreateWhatsAppSession(userId);
-      const qr = sess.qrCodeDataUrl || (await generateInstantQR(`2@${userId}@${Date.now()}`));
-      return NextResponse.json({
-        success: true,
-        status: sess.status,
-        qrCodeDataUrl: qr,
-        phoneNumber: sess.phoneNumber,
-      });
-    }
-
-    if (action === 'REQUEST_PAIRING_CODE') {
-      const { phone } = body;
-      const res = await requestWhatsAppPairingCode(userId, phone);
-      return NextResponse.json(res);
-    }
-
-    if (action === 'CONFIRM_CONNECTED') {
-      const { phone } = body;
-      return NextResponse.json({
-        success: true,
-        status: 'CONNECTED',
-        phoneNumber: phone || 'Linked Device',
-      });
-    }
-
-    if (action === 'SEND_MESSAGE') {
-      const { toPhone, messageText, mediaUrl, mediaType } = body;
-      if (!toPhone || !messageText) {
-        return NextResponse.json({ error: 'Missing phone or message text' }, { status: 400 });
+    // 1. Start WhatsApp Shoot
+    if (action === 'START_SHOOT') {
+      const { title, templateMessage, mediaUrl, mediaType, contacts, delaySec } = body;
+      if (!contacts || !Array.isArray(contacts) || contacts.length === 0) {
+        return NextResponse.json({ error: 'At least one contact is required.' }, { status: 400 });
       }
 
-      const res = await sendDirectWhatsAppMessage(
+      const shoot = await WhatsAppShootService.createShoot({
         userId,
-        toPhone,
-        messageText,
-        mediaUrl,
-        mediaType
-      );
+        title: title || 'WhatsApp Campaign',
+        templateMessage: templateMessage || '',
+        mediaUrl: mediaUrl || null,
+        mediaType: mediaType || null,
+        contacts,
+      });
 
+      return NextResponse.json({
+        success: true,
+        shootId: shoot.id,
+        status: shoot.status,
+        totalMessages: shoot.totalMessages,
+      });
+    }
+
+    // 2. Retry Failed Messages
+    if (action === 'RETRY_FAILED') {
+      const { shootId } = body;
+      if (!shootId) {
+        return NextResponse.json({ error: 'Shoot ID required' }, { status: 400 });
+      }
+      const res = await WhatsAppReportService.retryFailedMessages(shootId, userId);
       return NextResponse.json(res);
     }
 
-    if (action === 'LOGOUT') {
-      await logoutWhatsAppSession(userId);
+    // 3. Mark Session Connected
+    if (action === 'CONNECT_SESSION') {
+      const { phoneNumber } = body;
+      const res = await WhatsAppSessionService.markConnected(userId, phoneNumber);
+      return NextResponse.json({ success: true, session: res });
+    }
+
+    // 4. Disconnect Session
+    if (action === 'DISCONNECT_SESSION') {
+      await WhatsAppSessionService.disconnect(userId);
       return NextResponse.json({ success: true });
     }
 

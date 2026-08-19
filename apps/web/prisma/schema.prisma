@@ -1948,6 +1948,68 @@ model WhatsAppCampaign {
   @@index([createdAt])
 }
 
+model WhatsAppSession {
+  id               String    @id @default(cuid())
+  userId           String    @unique
+  openwaSessionId  String    @unique
+  phoneNumber      String?
+  status           String    @default("DISCONNECTED") // "DISCONNECTED", "SCAN_QR", "CONNECTED", "EXPIRED"
+  lastConnectedAt  DateTime?
+  lastActivityAt   DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([openwaSessionId])
+  @@index([status])
+}
+
+model WhatsAppShoot {
+  id                   String                 @id @default(cuid())
+  userId               String
+  sessionId            String?
+  title                String                 @default("WhatsApp Shoot")
+  templateMessage      String
+  mediaUrl             String?
+  mediaType            String?
+  totalMessages        Int                    @default(0)
+  sentCount            Int                    @default(0)
+  failedCount          Int                    @default(0)
+  pendingCount         Int                    @default(0)
+  currentProcessingNum Int                    @default(0)
+  status               String                 @default("QUEUED") // "QUEUED", "RUNNING", "PAUSED", "COMPLETED", "FAILED", "CANCELLED"
+  startedAt            DateTime?
+  completedAt          DateTime?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  messages             WhatsAppShootMessage[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model WhatsAppShootMessage {
+  id               String        @id @default(cuid())
+  shootId          String
+  messageNumber    Int
+  recipient        String
+  recipientName    String?
+  customVar        String?
+  message          String
+  status           String        @default("PENDING") // "PENDING", "PROCESSING", "SENT", "FAILED"
+  openwaMessageId  String?
+  errorMessage     String?
+  sentAt           DateTime?
+  createdAt        DateTime      @default(now())
+  shoot            WhatsAppShoot @relation(fields: [shootId], references: [id], onDelete: Cascade)
+
+  @@index([shootId])
+  @@index([status])
+  @@index([recipient])
+}
+
+
 
 
 
