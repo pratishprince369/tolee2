@@ -2,7 +2,7 @@
 
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { prismaAI } from '@/lib/prismaAI';
+import { prismaAI } from '@/lib/prisma-ai';
 
 // Multi-Key NVIDIA Engine for Failover Resilience
 const NVIDIA_KEYS = [
