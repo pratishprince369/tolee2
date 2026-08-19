@@ -240,3 +240,151 @@ export async function generateViralHashtags(params: {
     return { success: false, error: err.message || 'Failed to generate hashtags.' };
   }
 }
+
+export interface ScheduledPostItem {
+  id: string;
+  topic: string;
+  tone: string;
+  platforms: string[];
+  postsData: {
+    linkedin?: string;
+    instagram?: string;
+    twitter?: string;
+    facebook?: string;
+    whatsapp?: string;
+  };
+  scheduledAt: string;
+  status: 'SCHEDULED' | 'PUBLISHED' | 'CANCELLED' | 'FAILED';
+  createdAt: string;
+}
+
+/**
+ * 4. Schedule a Social Post Campaign
+ */
+export async function scheduleSocialPost(params: {
+  topic: string;
+  tone: string;
+  platforms: string[];
+  postsData: {
+    linkedin?: string;
+    instagram?: string;
+    twitter?: string;
+    facebook?: string;
+    whatsapp?: string;
+  };
+  scheduledAt: string; // ISO string
+}): Promise<{
+  success: boolean;
+  scheduledPost?: ScheduledPostItem;
+  error?: string;
+}> {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return { success: false, error: 'Authentication required. Please sign in to schedule posts.' };
+    }
+
+    const userId = (session.user as any).id;
+    const userName = (session.user as any).name || 'Creator';
+    const userAvatar = (session.user as any).image;
+
+    const scheduledDate = new Date(params.scheduledAt);
+    if (isNaN(scheduledDate.getTime())) {
+      return { success: false, error: 'Invalid schedule date and time.' };
+    }
+
+    const record = await (prismaAI as any).scheduledSocialPost.create({
+      data: {
+        userId,
+        userName,
+        userAvatar,
+        topic: params.topic,
+        tone: params.tone,
+        platforms: params.platforms,
+        postsData: params.postsData,
+        scheduledAt: scheduledDate,
+        status: 'SCHEDULED',
+      },
+    });
+
+    return {
+      success: true,
+      scheduledPost: {
+        id: record.id,
+        topic: record.topic,
+        tone: record.tone,
+        platforms: record.platforms,
+        postsData: record.postsData,
+        scheduledAt: record.scheduledAt.toISOString(),
+        status: record.status,
+        createdAt: record.createdAt.toISOString(),
+      },
+    };
+  } catch (err: any) {
+    console.error('[SocialPublisher] Schedule error:', err);
+    return { success: false, error: err.message || 'Failed to schedule post.' };
+  }
+}
+
+/**
+ * 5. Get User's Scheduled Queue
+ */
+export async function getUserScheduledPosts(): Promise<{
+  success: boolean;
+  posts: ScheduledPostItem[];
+  error?: string;
+}> {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return { success: false, posts: [] };
+    }
+
+    const userId = (session.user as any).id;
+    const posts = await (prismaAI as any).scheduledSocialPost.findMany({
+      where: { userId },
+      orderBy: { scheduledAt: 'asc' },
+    });
+
+    return {
+      success: true,
+      posts: posts.map((p: any) => ({
+        id: p.id,
+        topic: p.topic,
+        tone: p.tone,
+        platforms: p.platforms,
+        postsData: p.postsData,
+        scheduledAt: p.scheduledAt.toISOString(),
+        status: p.status,
+        createdAt: p.createdAt.toISOString(),
+      })),
+    };
+  } catch (err: any) {
+    return { success: false, posts: [], error: err.message };
+  }
+}
+
+/**
+ * 6. Cancel or Delete a Scheduled Post
+ */
+export async function cancelScheduledPost(postId: string): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return { success: false, error: 'Authentication required.' };
+    }
+
+    const userId = (session.user as any).id;
+    await (prismaAI as any).scheduledSocialPost.deleteMany({
+      where: { id: postId, userId },
+    });
+
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+

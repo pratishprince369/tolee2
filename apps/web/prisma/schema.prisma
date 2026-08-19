@@ -1905,6 +1905,28 @@ model LiveBroadcast {
   @@index([toleeId])
 }
 
+model ScheduledSocialPost {
+  id           String    @id @default(cuid())
+  userId       String
+  userName     String?
+  userAvatar   String?
+  topic        String
+  tone         String    @default("viral")
+  platforms    String[]  @default(["linkedin", "twitter"])
+  postsData    Json      // { linkedin: "...", instagram: "...", twitter: "...", facebook: "...", whatsapp: "..." }
+  scheduledAt  DateTime
+  status       String    @default("SCHEDULED") // "SCHEDULED", "PUBLISHED", "CANCELLED", "FAILED"
+  publishedAt  DateTime?
+  errorMessage String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([scheduledAt])
+  @@index([status])
+}
+
+
 
 
 
