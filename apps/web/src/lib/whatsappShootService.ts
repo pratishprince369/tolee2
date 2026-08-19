@@ -2,8 +2,9 @@ import { prismaAI } from '@/lib/prisma-ai';
 import { getOrCreateWhatsAppSession, getSessionStatus, sendDirectWhatsAppMessage, logoutWhatsAppSession, generateInstantQR } from '@/lib/baileysSession';
 
 // OpenWA Environment Configurations
-const OPENWA_API_URL = process.env.OPENWA_API_URL || '';
-const OPENWA_API_KEY = process.env.OPENWA_API_KEY || '';
+const OPENWA_API_URL = process.env.OPENWA_API_URL || 'https://whatsapp-yi7i.onrender.com';
+const OPENWA_API_KEY = process.env.OPENWA_API_KEY || 'tolee_openwa_secret_key_2026';
+
 
 /**
  * Helper to call OpenWA API endpoints with various common route formats
