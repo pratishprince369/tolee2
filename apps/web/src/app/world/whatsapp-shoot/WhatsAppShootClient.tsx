@@ -30,10 +30,13 @@ import {
   ExternalLink,
   ShieldCheck,
   AlertCircle,
+  Wand2,
+  Shuffle,
   Image as ImageIcon
 } from 'lucide-react';
 import { 
   generateWhatsAppShootMessage, 
+  generateUniqueVariationsForContacts,
   saveWhatsAppCampaign, 
   getUserWhatsAppCampaigns, 
   updateWhatsAppContactStatus, 
@@ -76,6 +79,10 @@ export default function WhatsAppShootClient() {
   const [tone, setTone] = useState<'promotional' | 'formal' | 'festive' | 'followup' | 'networking' | 'reminder'>('promotional');
   const [businessName, setBusinessName] = useState('Tolee Team');
   const [loadingAI, setLoadingAI] = useState(false);
+
+  // AI Dynamic Re-writer (Unique per Contact)
+  const [enableAIRewrite, setEnableAIRewrite] = useState(true);
+  const [loadingVariations, setLoadingVariations] = useState(false);
 
   // Media Attachment State
   const [mediaFile, setMediaFile] = useState<{
@@ -271,6 +278,46 @@ export default function WhatsAppShootClient() {
     setLoadingAI(false);
   };
 
+  // AI Unique Re-writer for All Contacts (SpinTax Engine)
+  const handleGenerateUniqueVariations = async () => {
+    if (!messageTemplate.trim()) {
+      showToast('⚠️ Please enter a message template first.');
+      return;
+    }
+    if (parsedContacts.length === 0) {
+      showToast('⚠️ Please add contacts first.');
+      return;
+    }
+
+    setLoadingVariations(true);
+    showToast(`🤖 AI is generating unique variations for ${parsedContacts.length} contacts...`);
+
+    const res = await generateUniqueVariationsForContacts({
+      baseTemplate: messageTemplate,
+      contacts: parsedContacts.map((c) => ({
+        id: c.id,
+        name: c.name,
+        phone: c.phone,
+        customVar: c.customVar,
+      })),
+      tone,
+    });
+
+    if (res.success && res.variations) {
+      const varMap = new Map(res.variations.map((v) => [v.id, v.uniqueMessage]));
+      setParsedContacts((prev) =>
+        prev.map((c) => ({
+          ...c,
+          customMessage: varMap.get(c.id) || formatMessageForContact(c),
+        }))
+      );
+      showToast(`🎉 Generated ${res.variations.length} unique AI variations!`);
+    } else {
+      showToast('❌ ' + (res.error || 'Failed to generate unique variations.'));
+    }
+    setLoadingVariations(false);
+  };
+
   // Replace dynamic tags for a given contact
   const formatMessageForContact = (contact?: WhatsAppContact) => {
     if (!contact) return messageTemplate;
@@ -282,9 +329,17 @@ export default function WhatsAppShootClient() {
     return formatted;
   };
 
+  const getMessageToSendForContact = (contact?: WhatsAppContact) => {
+    if (!contact) return messageTemplate;
+    if (enableAIRewrite && contact.customMessage) {
+      return contact.customMessage;
+    }
+    return formatMessageForContact(contact);
+  };
+
   // 1-Click Shoot Single Contact (Opens WhatsApp Web / App)
   const handleShootContact = (contact: WhatsAppContact, idx: number) => {
-    const textToSend = formatMessageForContact(contact);
+    const textToSend = getMessageToSendForContact(contact);
     const sanitizedDigits = contact.phone.replace(/[^\d]/g, '');
     const waUrl = `https://api.whatsapp.com/send?phone=${sanitizedDigits}&text=${encodeURIComponent(textToSend)}`;
 
@@ -366,8 +421,13 @@ export default function WhatsAppShootClient() {
       return;
     }
 
-    const header = 'Phone,Name,CustomVar,Status\n';
-    const rows = parsedContacts.map((c) => `"${c.phone}","${c.name || ''}","${c.customVar || ''}","${c.status}"`).join('\n');
+    const header = 'Phone,Name,CustomVar,Status,UniqueMessage\n';
+    const rows = parsedContacts
+      .map(
+        (c) =>
+          `"${c.phone}","${c.name || ''}","${c.customVar || ''}","${c.status}","${(c.customMessage || formatMessageForContact(c)).replace(/"/g, '""')}"`
+      )
+      .join('\n');
     const blob = new Blob([header + rows], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -392,6 +452,7 @@ export default function WhatsAppShootClient() {
   const totalCount = parsedContacts.length;
   const progressPercent = totalCount > 0 ? Math.round((sentCount / totalCount) * 100) : 0;
   const currentPreviewContact = parsedContacts[previewContactIdx] || parsedContacts[0];
+  const previewMessageText = getMessageToSendForContact(currentPreviewContact);
 
   return (
     <div className="min-h-screen bg-[#070b13] text-[#e2e8f0] font-sans pb-28 pt-20 px-3 sm:px-6 lg:px-10 selection:bg-emerald-500/30 selection:text-emerald-200">
@@ -429,7 +490,7 @@ export default function WhatsAppShootClient() {
                   WhatsApp Shoot
                 </h1>
                 <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-700/50 uppercase tracking-wider">
-                  OPEN-WA ENGINE 🚀
+                  AI RE-WRITER ACTIVE 🔥
                 </span>
               </div>
               <p className="text-xs text-gray-400 mt-1">
@@ -607,7 +668,7 @@ export default function WhatsAppShootClient() {
                 {/* Message Template Editor */}
                 <div className="space-y-1.5 pt-2 border-t border-[#141e33]">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-gray-300">Message Template:</label>
+                    <label className="text-xs font-bold text-gray-300">Base Message Template:</label>
                     {/* Smart Tag Chips */}
                     <div className="flex items-center gap-1">
                       {['{{name}}', '{{company}}', '{{note}}'].map((tag) => (
@@ -627,9 +688,53 @@ export default function WhatsAppShootClient() {
                   <textarea
                     value={messageTemplate}
                     onChange={(e) => setMessageTemplate(e.target.value)}
-                    rows={6}
+                    rows={5}
                     className="w-full bg-[#070b13] border border-[#1a2b47] focus:border-emerald-500 rounded-xl p-3 text-xs text-gray-100 placeholder-gray-600 focus:outline-none resize-y leading-relaxed font-sans"
                   />
+                </div>
+
+                {/* ═══════════════════════════════════════════════════════
+                    AI RE-WRITE PER CONTACT FEATURE (SPINTAX)
+                ════════════════════════════════════════════════════════ */}
+                <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-950/70 to-teal-950/60 border border-emerald-700/50 space-y-3 shadow-inner">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Wand2 className="w-4 h-4 text-emerald-400" />
+                      <span className="text-xs font-extrabold text-white">
+                        AI Unique Re-write per Contact
+                      </span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={enableAIRewrite}
+                        onChange={(e) => setEnableAIRewrite(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
+                    </label>
+                  </div>
+                  <p className="text-[11px] text-emerald-200/80 leading-relaxed">
+                    AI spins & rephrases each message into a 100% unique human-written variation for every number to prevent duplicate detection.
+                  </p>
+
+                  <button
+                    onClick={handleGenerateUniqueVariations}
+                    disabled={loadingVariations || parsedContacts.length === 0}
+                    className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-md transition-all disabled:opacity-50"
+                  >
+                    {loadingVariations ? (
+                      <>
+                        <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span>Re-writing {parsedContacts.length} Messages with AI...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Shuffle className="w-3.5 h-3.5" />
+                        <span>Re-write Unique Messages for All {parsedContacts.length} Contacts</span>
+                      </>
+                    )}
+                  </button>
                 </div>
 
                 {/* Media Attachment Upload */}
@@ -709,9 +814,9 @@ export default function WhatsAppShootClient() {
                       <select
                         value={previewContactIdx}
                         onChange={(e) => setPreviewContactIdx(Number(e.target.value))}
-                        className="bg-[#070b13] border border-[#1a2b47] rounded px-2 py-1 text-[11px] text-emerald-300 focus:outline-none"
+                        className="bg-[#070b13] border border-[#1a2b47] rounded px-2 py-1 text-[11px] text-emerald-300 focus:outline-none font-semibold"
                       >
-                        {parsedContacts.slice(0, 10).map((c, i) => (
+                        {parsedContacts.slice(0, 15).map((c, i) => (
                           <option key={i} value={i}>
                             #{i + 1} {c.name} ({c.phone})
                           </option>
@@ -720,6 +825,14 @@ export default function WhatsAppShootClient() {
                     </div>
                   )}
                 </div>
+
+                {/* Unique Variation Indicator Badge */}
+                {currentPreviewContact?.customMessage && (
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-950/80 border border-emerald-700/60 text-emerald-300 text-xs font-semibold">
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+                    <span>AI Unique Re-written Message for {currentPreviewContact.name || 'Recipient'}</span>
+                  </div>
+                )}
 
                 {/* WhatsApp Chat Bubble Mockup */}
                 <div className="bg-[#0b141a] border border-emerald-950 rounded-2xl p-4 shadow-inner max-w-lg mx-auto">
@@ -757,7 +870,7 @@ export default function WhatsAppShootClient() {
                     )}
 
                     <div className="text-xs whitespace-pre-line leading-relaxed font-sans">
-                      {formatMessageForContact(currentPreviewContact)}
+                      {previewMessageText}
                     </div>
                     <div className="text-[9px] text-emerald-300/80 text-right mt-1 flex items-center justify-end gap-1">
                       <span>10:45 AM</span>
@@ -776,7 +889,7 @@ export default function WhatsAppShootClient() {
                       Sequence Shooter ({sentCount}/{totalCount} Dispatched)
                     </h3>
                     <p className="text-[11px] text-gray-400 mt-0.5">
-                      1-Click direct dispatch via WhatsApp Web with anti-spam safe delay.
+                      1-Click direct dispatch with unique AI message per recipient.
                     </p>
                   </div>
 
@@ -841,6 +954,7 @@ export default function WhatsAppShootClient() {
                         <th className="p-3">#</th>
                         <th className="p-3">Recipient</th>
                         <th className="p-3">Phone</th>
+                        <th className="p-3">Message Variation</th>
                         <th className="p-3">Status</th>
                         <th className="p-3 text-right">Action</th>
                       </tr>
@@ -848,7 +962,7 @@ export default function WhatsAppShootClient() {
                     <tbody className="divide-y divide-gray-800/60 font-sans">
                       {parsedContacts.length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="p-6 text-center text-gray-500 text-xs">
+                          <td colSpan={6} className="p-6 text-center text-gray-500 text-xs">
                             No contacts added yet. Enter numbers on the left.
                           </td>
                         </tr>
@@ -856,6 +970,7 @@ export default function WhatsAppShootClient() {
                         parsedContacts.map((contact, idx) => {
                           const isSent = contact.status === 'SENT';
                           const isCurrent = currentShootingIdx === idx && autoShootRunning;
+                          const msgForThisContact = getMessageToSendForContact(contact);
 
                           return (
                             <tr
@@ -865,9 +980,14 @@ export default function WhatsAppShootClient() {
                               }`}
                             >
                               <td className="p-3 font-mono text-gray-500">{idx + 1}</td>
-                              <td className="p-3 font-bold text-white">{contact.name || 'Friend'}</td>
-                              <td className="p-3 font-mono text-emerald-400/90">{contact.phone}</td>
-                              <td className="p-3">
+                              <td className="p-3 font-bold text-white whitespace-nowrap">{contact.name || 'Friend'}</td>
+                              <td className="p-3 font-mono text-emerald-400/90 whitespace-nowrap">{contact.phone}</td>
+                              <td className="p-3 min-w-[200px] max-w-xs">
+                                <p className="text-[11px] text-gray-400 line-clamp-2 font-sans bg-[#0e1828] p-1.5 rounded border border-gray-800/60">
+                                  {msgForThisContact}
+                                </p>
+                              </td>
+                              <td className="p-3 whitespace-nowrap">
                                 {isSent ? (
                                   <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800">
                                     SENT ✓
@@ -878,7 +998,7 @@ export default function WhatsAppShootClient() {
                                   </span>
                                 )}
                               </td>
-                              <td className="p-3 text-right">
+                              <td className="p-3 text-right whitespace-nowrap">
                                 <button
                                   onClick={() => handleShootContact(contact, idx)}
                                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ml-auto ${
@@ -912,7 +1032,7 @@ export default function WhatsAppShootClient() {
                   <div className="flex items-center gap-2">
                     <span className="text-[11px] text-gray-500 flex items-center gap-1">
                       <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                      Zero-Ban 1-Click Protocol
+                      Zero-Ban Multi-Variation Protocol
                     </span>
                   </div>
                 </div>

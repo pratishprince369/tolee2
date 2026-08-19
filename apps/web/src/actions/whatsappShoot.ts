@@ -111,7 +111,64 @@ export interface WhatsAppContact {
   phone: string;
   name?: string;
   customVar?: string;
+  customMessage?: string; // AI unique rewritten message for this specific contact
   status: 'PENDING' | 'SENT' | 'SKIPPED';
+}
+
+/**
+ * 2. Generate Unique AI Rewritten Messages for All Contacts (Anti-Spam SpinTax Engine)
+ */
+export async function generateUniqueVariationsForContacts(params: {
+  baseTemplate: string;
+  contacts: { id: string; name?: string; phone: string; customVar?: string }[];
+  tone?: string;
+}): Promise<{
+  success: boolean;
+  variations?: { id: string; uniqueMessage: string }[];
+  error?: string;
+}> {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return { success: false, error: 'Authentication required.' };
+    }
+
+    if (!params.contacts || params.contacts.length === 0) {
+      return { success: true, variations: [] };
+    }
+
+    const systemPrompt = `You are a WhatsApp AI Personalization & Anti-Spam Re-Writer.
+Your goal is to take a base message template and generate a 100% UNIQUE, natural, human-written variation for each recipient.
+
+ANTI-SPAM REWRITING RULES:
+- Every recipient MUST receive a differently phrased message (alternate greetings, varied sentence structures, different introductory hooks).
+- The core meaning, key offer, discounts, links, phone numbers, and call-to-actions must stay 100% accurate and functional.
+- Use WhatsApp markdown (*bold*, _italic_).
+- Return ONLY a valid JSON array of objects: [{"id": "contact_id", "uniqueMessage": "formatted message"}]
+- Do not output any markdown formatting around JSON like \`\`\`json.`;
+
+    const userPrompt = `Base Message Template:
+${params.baseTemplate}
+
+Tone: ${params.tone || 'promotional'}
+
+Recipients List:
+${JSON.stringify(params.contacts.map((c) => ({ id: c.id, name: c.name || 'Friend', customNote: c.customVar || '' })))}
+
+Generate unique rewritten variation for every recipient now (return ONLY raw JSON array):`;
+
+    const raw = await callAI(systemPrompt, userPrompt);
+    const cleaned = raw.replace(/```json/gi, '').replace(/```/g, '').trim();
+    const variations = JSON.parse(cleaned);
+
+    return {
+      success: true,
+      variations: Array.isArray(variations) ? variations : [],
+    };
+  } catch (err: any) {
+    console.error('[WhatsAppShoot] Batch Variations Error:', err);
+    return { success: false, error: err.message || 'Failed to generate unique variations.' };
+  }
 }
 
 export interface WhatsAppCampaignItem {
