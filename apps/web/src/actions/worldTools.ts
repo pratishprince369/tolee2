@@ -54,6 +54,20 @@ const DEFAULT_TOOLS: Omit<WorldToolItem, 'id'>[] = [
     priceMonthly: 14.99,
     freeTrialDays: 7,
     order: 2,
+  },
+  {
+    name: 'AI Multi-Platform Social Publisher',
+    slug: 'social-publisher',
+    description: 'Create, optimize & 1-click publish viral posts across Instagram, LinkedIn, Twitter/X, Facebook & WhatsApp with AI caption & hashtag generator.',
+    routeUrl: '/world/social-publisher',
+    icon: 'Share2',
+    category: 'Marketing & Creator Suite',
+    badge: 'NEW 🔥',
+    isVisible: true,
+    accessType: 'TIMED_FREE',
+    priceMonthly: 14.99,
+    freeTrialDays: 7,
+    order: 3,
   }
 ];
 
