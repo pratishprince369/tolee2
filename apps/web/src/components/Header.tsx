@@ -47,7 +47,9 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
   });
 
   React.useEffect(() => {
-    if (session?.user) {
+    if (!session?.user) return;
+
+    const fetchCounts = () => {
       getSidebarData().then(res => {
         if (res.success) {
           setCounts({ 
@@ -67,7 +69,16 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
           }
         }
       });
-    }
+    };
+
+    fetchCounts();
+    const interval = setInterval(fetchCounts, 5000); // 5s realtime notification polling
+    window.addEventListener('tolee_notification_refresh', fetchCounts);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('tolee_notification_refresh', fetchCounts);
+    };
   }, [session, pathname]);
 
   const [draftsCount, setDraftsCount] = React.useState(0);

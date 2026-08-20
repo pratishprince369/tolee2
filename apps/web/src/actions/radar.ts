@@ -213,27 +213,41 @@ async function dispatchRadarNotifications(params: {
   // 1. Calculate bounding box for high-speed indexed SQL filtering
   const bbox = getBoundingBox(latitude, longitude, radiusKm);
 
-  // 2. Location Freshness Window: Users with location updated in past 14 days (or valid coordinates)
-  const freshnessThreshold = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+  // 2. Extract city/locality keywords from location name (e.g. "Kalyan" from "Kalyan West, Mumbai")
+  const locationTokens = (locationName || '')
+    .split(/[,–\-\/]/)
+    .map(s => s.trim())
+    .filter(s => s.length >= 3);
+  const primaryCity = locationTokens[0] || 'Local';
 
-  // 3. Find candidate users inside bounding box with radar notifications enabled
+  // 3. Find candidate users (via GPS bounding box OR city location string fallback)
   const candidates = await prisma.user.findMany({
     where: {
       id: { not: creatorId },
       isSuspended: false,
       isBanned: false,
-      latitude: { gte: bbox.minLat, lte: bbox.maxLat },
-      longitude: { gte: bbox.minLng, lte: bbox.maxLng },
       radarNotifications: true,
       OR: [
-        { locationUpdatedAt: { gte: freshnessThreshold } },
-        { locationUpdatedAt: null } // Include users whose location was set during onboarding
+        // A. Precise GPS Coordinates inside bounding box
+        {
+          latitude: { gte: bbox.minLat, lte: bbox.maxLat },
+          longitude: { gte: bbox.minLng, lte: bbox.maxLng }
+        },
+        // B. City name fallback if user's GPS coords not yet recorded
+        {
+          location: { contains: primaryCity, mode: 'insensitive' }
+        },
+        {
+          subLocation: { contains: primaryCity, mode: 'insensitive' }
+        }
       ]
     },
     select: {
       id: true,
       latitude: true,
       longitude: true,
+      location: true,
+      subLocation: true,
       radarRadius: true,
       radarAlerts: true,
       radarFood: true,
@@ -246,7 +260,7 @@ async function dispatchRadarNotifications(params: {
   });
 
   if (!candidates.length) {
-    console.log(`[Radar] No nearby candidate users found within ${radiusKm}km bounding box for post ${postId}`);
+    console.log(`[Radar] No nearby candidate users found for post ${postId} in ${locationName}`);
     return;
   }
 
@@ -254,8 +268,6 @@ async function dispatchRadarNotifications(params: {
 
   // 4. Exact Haversine distance & category preference verification
   for (const user of candidates) {
-    if (user.latitude === null || user.longitude === null) continue;
-
     // Check category preferences
     if (category === 'alert' && !user.radarAlerts) continue;
     if (category === 'food' && !user.radarFood) continue;
@@ -264,11 +276,18 @@ async function dispatchRadarNotifications(params: {
     if (category === 'event' && !user.radarEvents) continue;
     if (isAnonymous && !user.radarGuptKhabar) continue;
 
-    const dist = calculateDistanceKm(latitude, longitude, user.latitude, user.longitude);
-    const userMaxRadius = user.radarRadius || 5.0;
-    const effectiveRadius = Math.max(radiusKm, userMaxRadius);
+    let dist: number;
+    if (typeof user.latitude === 'number' && typeof user.longitude === 'number') {
+      dist = calculateDistanceKm(latitude, longitude, user.latitude, user.longitude);
+      const userMaxRadius = user.radarRadius || 5.0;
+      const effectiveRadius = Math.max(radiusKm, userMaxRadius);
 
-    if (dist <= effectiveRadius) {
+      if (dist <= effectiveRadius) {
+        eligibleRecipients.push({ userId: user.id, distanceKm: dist });
+      }
+    } else {
+      // User matched via City / locality string fallback
+      dist = 0.8;
       eligibleRecipients.push({ userId: user.id, distanceKm: dist });
     }
   }

@@ -138,8 +138,10 @@ export function Sidebar() {
   });
 
   React.useEffect(() => {
-    if (isAuthenticated) {
-      getSidebarDataCached().then((res: any) => {
+    if (!isAuthenticated) return;
+
+    const fetchSidebar = () => {
+      getSidebarDataCached(true).then((res: any) => {
         if (res.success) {
           setData({
             managedTolees: res.managedTolees || [],
@@ -150,7 +152,16 @@ export function Sidebar() {
           });
         }
       });
-    }
+    };
+
+    fetchSidebar();
+    const interval = setInterval(fetchSidebar, 5000);
+    window.addEventListener('tolee_notification_refresh', fetchSidebar);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('tolee_notification_refresh', fetchSidebar);
+    };
   }, [isAuthenticated, pathname]);
 
   const mainNav = React.useMemo(() => isAuthenticated ? [

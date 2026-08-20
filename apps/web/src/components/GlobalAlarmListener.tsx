@@ -88,11 +88,15 @@ export function GlobalAlarmListener() {
     checkMissed();
   }, [session]);
 
-  // 3. Active Alarm Poller (Runs every 4 seconds for due reminders)
+  const [liveRadarToast, setLiveRadarToast] = useState<{ id: string; title: string; message: string; link: string; type: string } | null>(null);
+  const seenNotificationIdsRef = useRef<Set<string>>(new Set());
+
+  // 3. Active Alarm & Live Radar Notification Poller (Runs every 4 seconds)
   useEffect(() => {
     if (!session?.user) return;
 
-    const checkAlarms = async () => {
+    const checkAlarmsAndNotifications = async () => {
+      // A. Check Due Reminders
       try {
         const res = await getDueAIReminders();
         if (res.success && res.dueReminders && res.dueReminders.length > 0) {
@@ -106,10 +110,23 @@ export function GlobalAlarmListener() {
           }
         }
       } catch (err) {}
+
+      // B. Check for new unread Radar notifications in real-time
+      try {
+        const notifRes = await fetch('/api/user/unread-notifications-count', { cache: 'no-store' });
+        if (notifRes.ok) {
+          const data = await notifRes.json();
+          if (data.latestRadar && !seenNotificationIdsRef.current.has(data.latestRadar.id)) {
+            seenNotificationIdsRef.current.add(data.latestRadar.id);
+            setLiveRadarToast(data.latestRadar);
+            window.dispatchEvent(new CustomEvent('tolee_notification_refresh'));
+          }
+        }
+      } catch (_) {}
     };
 
-    checkAlarms();
-    const interval = setInterval(checkAlarms, 4000);
+    checkAlarmsAndNotifications();
+    const interval = setInterval(checkAlarmsAndNotifications, 4000);
     return () => clearInterval(interval);
   }, [session, activeAlarm]);
 
@@ -207,6 +224,44 @@ export function GlobalAlarmListener() {
           <p className="text-[10px] text-slate-400 dark:text-zinc-500 mt-2">
             These reminders passed while you were offline.
           </p>
+        </div>
+      )}
+
+      {/* 📡 LIVE TOLEE RADAR FLOATING TOAST BANNER */}
+      {liveRadarToast && (
+        <div className="fixed top-20 right-4 sm:top-20 sm:right-6 z-[9995] max-w-sm w-full bg-white dark:bg-zinc-950 border border-teal-500/40 rounded-3xl p-4 shadow-2xl animate-in slide-in-from-top duration-300 ring-2 ring-teal-500/20">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <span className="w-8 h-8 rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center text-base font-extrabold flex-shrink-0">
+                {liveRadarToast.type === 'radar_food' ? '🍔' : liveRadarToast.type === 'radar_news' ? '📢' : liveRadarToast.type === 'radar_deal' ? '🎉' : liveRadarToast.type === 'radar_gupt' ? '🕵️' : '🚨'}
+              </span>
+              <div>
+                <span className="text-[10px] font-black uppercase text-teal-600 dark:text-teal-400 tracking-wider">
+                  {liveRadarToast.title || 'Tolee Radar Alert'}
+                </span>
+                <p className="text-xs font-bold text-slate-900 dark:text-white line-clamp-2 mt-0.5">
+                  {liveRadarToast.message}
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setLiveRadarToast(null)}
+              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="mt-3 flex items-center justify-end gap-2 pt-2 border-t border-gray-100 dark:border-zinc-900">
+            <a
+              href={liveRadarToast.link || '/radar'}
+              onClick={() => setLiveRadarToast(null)}
+              className="px-3.5 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs shadow-md transition-all flex items-center gap-1"
+            >
+              View on Radar →
+            </a>
+          </div>
         </div>
       )}
     </>
