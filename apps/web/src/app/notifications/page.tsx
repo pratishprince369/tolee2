@@ -185,6 +185,68 @@ export default async function NotificationsPage() {
               );
             }
 
+            if (notification.type.startsWith('radar')) {
+              let emoji = '📡';
+              let badgeColor = 'bg-teal-500/10 text-teal-600 border-teal-500/20';
+              let title = 'Tolee Radar Update';
+
+              if (notification.type === 'radar_alert') {
+                emoji = '🚨';
+                badgeColor = 'bg-rose-500/10 text-rose-600 border-rose-500/20';
+                title = '🚨 Radar Alert';
+              } else if (notification.type === 'radar_food') {
+                emoji = '🍔';
+                badgeColor = 'bg-amber-500/10 text-amber-600 border-amber-500/20';
+                title = '🍔 Secret Food Spot';
+              } else if (notification.type === 'radar_news') {
+                emoji = '📢';
+                badgeColor = 'bg-blue-500/10 text-blue-600 border-blue-500/20';
+                title = '📢 Local News';
+              } else if (notification.type === 'radar_deal') {
+                emoji = '🎉';
+                badgeColor = 'bg-indigo-500/10 text-indigo-600 border-indigo-500/20';
+                title = '🎉 Flash Deal';
+              } else if (notification.type === 'radar_gupt') {
+                emoji = '🕵️';
+                badgeColor = 'bg-purple-500/10 text-purple-600 border-purple-500/20';
+                title = '🕵️ Gupt Khabar';
+              }
+
+              return (
+                <Link key={notification.id} href={notification.link || '/radar'}>
+                  <Card className="border-teal-500/20 dark:border-teal-500/10 bg-gradient-to-br from-teal-50/40 via-white to-white dark:from-teal-950/20 dark:via-zinc-950 dark:to-zinc-950 hover:from-teal-50/60 dark:hover:from-teal-950/30 transition-all rounded-2xl mb-4 shadow-sm relative overflow-hidden group">
+                    <CardContent className="p-5 flex items-start gap-4">
+                      <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 bg-teal-100/80 dark:bg-teal-950 text-2xl shadow-xs">
+                        {emoji}
+                      </div>
+                      <div className="flex-1 space-y-1.5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full border ${badgeColor}`}>
+                            {title}
+                          </span>
+                          <span className="text-xs text-gray-400">
+                            {new Date(notification.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        <p className={`text-sm ${!notification.isRead ? 'font-bold text-gray-900 dark:text-white' : 'text-gray-700 dark:text-zinc-300'} leading-relaxed`}>
+                          {notification.message}
+                        </p>
+                        <div className="pt-1 flex items-center text-xs font-bold text-teal-600 dark:text-teal-400 group-hover:underline gap-1">
+                          <span>View on Neighborhood Radar</span>
+                          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <path d="M5 12h14M12 5l7 7-7 7" />
+                          </svg>
+                        </div>
+                      </div>
+                      {!notification.isRead && (
+                        <div className="w-2.5 h-2.5 bg-teal-500 rounded-full flex-shrink-0 mt-2 animate-pulse"></div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </Link>
+              );
+            }
+
             return (
               <Link key={notification.id} href={notification.link || '#'}>
                 <Card className={`border-gray-200 dark:border-gray-800 bg-white dark:bg-[#121212] hover:bg-gray-50 dark:hover:bg-[#1a1a1a] transition-colors rounded-xl mb-4 ${!notification.isRead ? 'border-l-4 border-l-blue-500' : ''}`}>

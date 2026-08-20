@@ -128,6 +128,21 @@ model User {
   shootNotifications    Boolean           @default(true)
   emailNotifications    Boolean           @default(true)
 
+  // Radar Location & Notification Preferences
+  latitude              Float?
+  longitude             Float?
+  locationUpdatedAt     DateTime?
+  radarNotifications    Boolean           @default(true)
+  radarAlerts           Boolean           @default(true)
+  radarFood             Boolean           @default(true)
+  radarNews             Boolean           @default(true)
+  radarDeals            Boolean           @default(true)
+  radarEvents           Boolean           @default(true)
+  radarGuptKhabar       Boolean           @default(true)
+  radarRadius           Float             @default(5.0)
+  radarPosts            RadarPost[]       @relation("UserRadarPosts")
+  radarLikes            RadarPostLike[]
+
   wallet        Wallet?
   franchise     Franchise?
   referralsMade Referral[] @relation("Referrer")
@@ -2008,6 +2023,44 @@ model WhatsAppShootMessage {
   @@index([status])
   @@index([recipient])
 }
+
+model RadarPost {
+  id              String          @id @default(cuid())
+  category        String          // "alert" | "food" | "news" | "deal" | "event"
+  title           String
+  description     String?
+  latitude        Float
+  longitude       Float
+  locationName    String
+  radiusKm        Float           @default(5.0)
+  isAnonymous     Boolean         @default(false)
+  authorId        String
+  author          User            @relation("UserRadarPosts", fields: [authorId], references: [id], onDelete: Cascade)
+  likesCount      Int             @default(0)
+  viewsCount      Int             @default(0)
+  isDeleted       Boolean         @default(false)
+  expiresAt       DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  likes           RadarPostLike[]
+
+  @@index([latitude, longitude])
+  @@index([createdAt])
+  @@index([category])
+}
+
+model RadarPostLike {
+  id          String    @id @default(cuid())
+  radarPostId String
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  radarPost   RadarPost @relation(fields: [radarPostId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+
+  @@unique([radarPostId, userId])
+}
+
 
 
 

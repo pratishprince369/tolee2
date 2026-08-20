@@ -881,6 +881,14 @@ export async function getUserSettings() {
         marketplaceNotifications: true,
         shootNotifications: true,
         emailNotifications: true,
+        radarNotifications: true,
+        radarAlerts: true,
+        radarFood: true,
+        radarNews: true,
+        radarDeals: true,
+        radarEvents: true,
+        radarGuptKhabar: true,
+        radarRadius: true,
         lastLoginIp: true,
         lastLoginAt: true,
         lastLoginDevice: true,
@@ -922,12 +930,20 @@ export async function updateAccountSettings(data: { preferredLanguage: string })
 }
 
 export async function updateNotificationSettings(data: {
-  pushNotifications: boolean;
-  chatNotifications: boolean;
-  groupNotifications: boolean;
-  marketplaceNotifications: boolean;
-  shootNotifications: boolean;
-  emailNotifications: boolean;
+  pushNotifications?: boolean;
+  chatNotifications?: boolean;
+  groupNotifications?: boolean;
+  marketplaceNotifications?: boolean;
+  shootNotifications?: boolean;
+  emailNotifications?: boolean;
+  radarNotifications?: boolean;
+  radarAlerts?: boolean;
+  radarFood?: boolean;
+  radarNews?: boolean;
+  radarDeals?: boolean;
+  radarEvents?: boolean;
+  radarGuptKhabar?: boolean;
+  radarRadius?: number;
 }) {
   try {
     const session = await getServerSession(authOptions);
@@ -936,16 +952,25 @@ export async function updateNotificationSettings(data: {
     }
     const userId = (session.user as any).id;
 
+    const updatePayload: any = {};
+    if (typeof data.pushNotifications === 'boolean') updatePayload.pushNotifications = data.pushNotifications;
+    if (typeof data.chatNotifications === 'boolean') updatePayload.chatNotifications = data.chatNotifications;
+    if (typeof data.groupNotifications === 'boolean') updatePayload.groupNotifications = data.groupNotifications;
+    if (typeof data.marketplaceNotifications === 'boolean') updatePayload.marketplaceNotifications = data.marketplaceNotifications;
+    if (typeof data.shootNotifications === 'boolean') updatePayload.shootNotifications = data.shootNotifications;
+    if (typeof data.emailNotifications === 'boolean') updatePayload.emailNotifications = data.emailNotifications;
+    if (typeof data.radarNotifications === 'boolean') updatePayload.radarNotifications = data.radarNotifications;
+    if (typeof data.radarAlerts === 'boolean') updatePayload.radarAlerts = data.radarAlerts;
+    if (typeof data.radarFood === 'boolean') updatePayload.radarFood = data.radarFood;
+    if (typeof data.radarNews === 'boolean') updatePayload.radarNews = data.radarNews;
+    if (typeof data.radarDeals === 'boolean') updatePayload.radarDeals = data.radarDeals;
+    if (typeof data.radarEvents === 'boolean') updatePayload.radarEvents = data.radarEvents;
+    if (typeof data.radarGuptKhabar === 'boolean') updatePayload.radarGuptKhabar = data.radarGuptKhabar;
+    if (typeof data.radarRadius === 'number') updatePayload.radarRadius = data.radarRadius;
+
     const updated = await prisma.user.update({
       where: { id: userId },
-      data: {
-        pushNotifications: data.pushNotifications,
-        chatNotifications: data.chatNotifications,
-        groupNotifications: data.groupNotifications,
-        marketplaceNotifications: data.marketplaceNotifications,
-        shootNotifications: data.shootNotifications,
-        emailNotifications: data.emailNotifications,
-      }
+      data: updatePayload
     });
 
     safeRevalidatePath('/settings');

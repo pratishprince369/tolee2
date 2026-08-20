@@ -79,6 +79,15 @@ export default function SettingsPage() {
   const [notifShoot, setNotifShoot] = useState(true);
   const [notifEmail, setNotifEmail] = useState(true);
   
+  // Tolee Radar Notification Preferences
+  const [notifRadar, setNotifRadar] = useState(true);
+  const [notifRadarAlerts, setNotifRadarAlerts] = useState(true);
+  const [notifRadarFood, setNotifRadarFood] = useState(true);
+  const [notifRadarNews, setNotifRadarNews] = useState(true);
+  const [notifRadarDeals, setNotifRadarDeals] = useState(true);
+  const [notifRadarGupt, setNotifRadarGupt] = useState(true);
+  const [notifRadarRadius, setNotifRadarRadius] = useState(5.0);
+  
   // Privacy states
   const [isPrivate, setIsPrivate] = useState(false);
   const [showActivity, setShowActivity] = useState(true);
@@ -120,12 +129,21 @@ export default function SettingsPage() {
           setAvatar(s.avatar || s.image || '');
           
           // Notifications
-          setNotifPush(s.pushNotifications);
-          setNotifChat(s.chatNotifications);
-          setNotifGroup(s.groupNotifications);
-          setNotifMarket(s.marketplaceNotifications);
-          setNotifShoot(s.shootNotifications);
-          setNotifEmail(s.emailNotifications);
+          setNotifPush(s.pushNotifications ?? true);
+          setNotifChat(s.chatNotifications ?? true);
+          setNotifGroup(s.groupNotifications ?? true);
+          setNotifMarket(s.marketplaceNotifications ?? true);
+          setNotifShoot(s.shootNotifications ?? true);
+          setNotifEmail(s.emailNotifications ?? true);
+          
+          // Radar Notifications
+          setNotifRadar(s.radarNotifications ?? true);
+          setNotifRadarAlerts(s.radarAlerts ?? true);
+          setNotifRadarFood(s.radarFood ?? true);
+          setNotifRadarNews(s.radarNews ?? true);
+          setNotifRadarDeals(s.radarDeals ?? true);
+          setNotifRadarGupt(s.radarGuptKhabar ?? true);
+          setNotifRadarRadius(s.radarRadius ?? 5.0);
           
           // Privacy
           setIsPrivate(s.isPrivate);
@@ -268,13 +286,19 @@ export default function SettingsPage() {
     const updatedVal = !currentVal;
     
     // Optimistic UI updates
-    const payload = {
+    const payload: any = {
       pushNotifications: field === 'push' ? updatedVal : notifPush,
       chatNotifications: field === 'chat' ? updatedVal : notifChat,
       groupNotifications: field === 'group' ? updatedVal : notifGroup,
       marketplaceNotifications: field === 'market' ? updatedVal : notifMarket,
       shootNotifications: field === 'shoot' ? updatedVal : notifShoot,
       emailNotifications: field === 'email' ? updatedVal : notifEmail,
+      radarNotifications: field === 'radar' ? updatedVal : notifRadar,
+      radarAlerts: field === 'radar_alert' ? updatedVal : notifRadarAlerts,
+      radarFood: field === 'radar_food' ? updatedVal : notifRadarFood,
+      radarNews: field === 'radar_news' ? updatedVal : notifRadarNews,
+      radarDeals: field === 'radar_deal' ? updatedVal : notifRadarDeals,
+      radarGuptKhabar: field === 'radar_gupt' ? updatedVal : notifRadarGupt,
     };
 
     // Apply local state change
@@ -284,6 +308,12 @@ export default function SettingsPage() {
     if (field === 'market') setNotifMarket(updatedVal);
     if (field === 'shoot') setNotifShoot(updatedVal);
     if (field === 'email') setNotifEmail(updatedVal);
+    if (field === 'radar') setNotifRadar(updatedVal);
+    if (field === 'radar_alert') setNotifRadarAlerts(updatedVal);
+    if (field === 'radar_food') setNotifRadarFood(updatedVal);
+    if (field === 'radar_news') setNotifRadarNews(updatedVal);
+    if (field === 'radar_deal') setNotifRadarDeals(updatedVal);
+    if (field === 'radar_gupt') setNotifRadarGupt(updatedVal);
 
     const res = await updateNotificationSettings(payload);
     if (res.success) {
@@ -297,6 +327,22 @@ export default function SettingsPage() {
       if (field === 'market') setNotifMarket(currentVal);
       if (field === 'shoot') setNotifShoot(currentVal);
       if (field === 'email') setNotifEmail(currentVal);
+      if (field === 'radar') setNotifRadar(currentVal);
+      if (field === 'radar_alert') setNotifRadarAlerts(currentVal);
+      if (field === 'radar_food') setNotifRadarFood(currentVal);
+      if (field === 'radar_news') setNotifRadarNews(currentVal);
+      if (field === 'radar_deal') setNotifRadarDeals(currentVal);
+      if (field === 'radar_gupt') setNotifRadarGupt(currentVal);
+    }
+  };
+
+  const handleUpdateRadarRadius = async (newRadius: number) => {
+    setNotifRadarRadius(newRadius);
+    const res = await updateNotificationSettings({ radarRadius: newRadius });
+    if (res.success) {
+      showToast(`Radar notification radius set to ${newRadius} km`, 'success');
+    } else {
+      showToast('Failed to update radius preference.', 'error');
     }
   };
 
@@ -896,6 +942,141 @@ export default function SettingsPage() {
                         onCheckedChange={() => toggleNotification('email', notifEmail)} 
                       />
                     </div>
+                  </div>
+
+                  {/* 📡 TOLEE RADAR HYPER-LOCAL NOTIFICATIONS SECTION */}
+                  <div className="pt-6 space-y-4 border-t border-zinc-100 dark:border-zinc-800/50">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-base font-black text-teal-600 dark:text-teal-400 flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full bg-teal-500 animate-ping" />
+                            📡 Tolee Radar (Location-Based Alerts)
+                          </h4>
+                          <span className="px-2 py-0.5 rounded-md bg-teal-500/10 text-teal-600 text-[10px] font-black uppercase">
+                            Radius Powered
+                          </span>
+                        </div>
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                          Receive automatic real-time alerts when neighbors report news, food stalls, roadblocks, or deals inside your radius.
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider transition-all duration-300 shadow-sm ${
+                          notifRadar 
+                            ? 'bg-teal-500 text-white shadow-teal-500/20' 
+                            : 'bg-rose-500 text-white shadow-rose-500/20'
+                        }`}>
+                          {notifRadar ? 'ON' : 'OFF'}
+                        </span>
+                        <Switch 
+                          checked={notifRadar} 
+                          onCheckedChange={() => toggleNotification('radar', notifRadar)} 
+                        />
+                      </div>
+                    </div>
+
+                    {/* Sub-toggles if Radar Master is ON */}
+                    {notifRadar && (
+                      <div className="bg-slate-50 dark:bg-zinc-900/60 p-4 rounded-2xl border border-slate-100 dark:border-zinc-850 space-y-4 animate-in fade-in duration-200">
+                        
+                        {/* Preferred Notification Radius */}
+                        <div className="space-y-2 pb-3 border-b border-slate-200/60 dark:border-zinc-800">
+                          <div className="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-zinc-300">
+                            <span>Max Notification Radius:</span>
+                            <span className="text-teal-600 dark:text-teal-400 font-extrabold">{notifRadarRadius} km</span>
+                          </div>
+                          <div className="flex gap-2 flex-wrap">
+                            {[1, 3, 5, 10, 25].map((km) => (
+                              <button
+                                key={km}
+                                type="button"
+                                onClick={() => handleUpdateRadarRadius(km)}
+                                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all ${
+                                  notifRadarRadius === km
+                                    ? 'bg-teal-600 text-white shadow-sm'
+                                    : 'bg-white dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 hover:bg-slate-200 border border-slate-200 dark:border-zinc-700'
+                                }`}
+                              >
+                                {km} km
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* 1. Roadblock & Weather Emergency Alerts */}
+                        <div className="flex items-center justify-between">
+                          <div className="space-y-0.5 pr-4">
+                            <Label className="text-xs font-bold text-slate-850 dark:text-zinc-200 flex items-center gap-1.5">
+                              <span>🚨</span> Emergency & Weather Alerts
+                            </Label>
+                            <p className="text-[11px] text-zinc-500">Heavy rain, water-logging, road blockage, fire or power outages near you.</p>
+                          </div>
+                          <Switch 
+                            checked={notifRadarAlerts} 
+                            onCheckedChange={() => toggleNotification('radar_alert', notifRadarAlerts)} 
+                          />
+                        </div>
+
+                        {/* 2. Secret Food Spots */}
+                        <div className="flex items-center justify-between">
+                          <div className="space-y-0.5 pr-4">
+                            <Label className="text-xs font-bold text-slate-850 dark:text-zinc-200 flex items-center gap-1.5">
+                              <span>🍔</span> Secret Food Spots
+                            </Label>
+                            <p className="text-[11px] text-zinc-500">Late-night food stalls, hidden street food gems, and pop-ups.</p>
+                          </div>
+                          <Switch 
+                            checked={notifRadarFood} 
+                            onCheckedChange={() => toggleNotification('radar_food', notifRadarFood)} 
+                          />
+                        </div>
+
+                        {/* 3. Local News & Events */}
+                        <div className="flex items-center justify-between">
+                          <div className="space-y-0.5 pr-4">
+                            <Label className="text-xs font-bold text-slate-850 dark:text-zinc-200 flex items-center gap-1.5">
+                              <span>📢</span> Local News & Events
+                            </Label>
+                            <p className="text-[11px] text-zinc-500">Neighborhood meetups, sports, community festivals, and civic updates.</p>
+                          </div>
+                          <Switch 
+                            checked={notifRadarNews} 
+                            onCheckedChange={() => toggleNotification('radar_news', notifRadarNews)} 
+                          />
+                        </div>
+
+                        {/* 4. Flash Deals */}
+                        <div className="flex items-center justify-between">
+                          <div className="space-y-0.5 pr-4">
+                            <Label className="text-xs font-bold text-slate-850 dark:text-zinc-200 flex items-center gap-1.5">
+                              <span>🎉</span> Flash Deals & Shop Discounts
+                            </Label>
+                            <p className="text-[11px] text-zinc-500">Flash sales and exclusive neighborhood shop discounts.</p>
+                          </div>
+                          <Switch 
+                            checked={notifRadarDeals} 
+                            onCheckedChange={() => toggleNotification('radar_deal', notifRadarDeals)} 
+                          />
+                        </div>
+
+                        {/* 5. Gupt Khabar (Anonymous Alerts) */}
+                        <div className="flex items-center justify-between">
+                          <div className="space-y-0.5 pr-4">
+                            <Label className="text-xs font-bold text-slate-850 dark:text-zinc-200 flex items-center gap-1.5">
+                              <span>🕵️</span> Gupt Khabar (Anonymous Neighborhood Alerts)
+                            </Label>
+                            <p className="text-[11px] text-zinc-500">Anonymous tips and neighborhood safety notices.</p>
+                          </div>
+                          <Switch 
+                            checked={notifRadarGupt} 
+                            onCheckedChange={() => toggleNotification('radar_gupt', notifRadarGupt)} 
+                          />
+                        </div>
+
+                      </div>
+                    )}
                   </div>
 
                   {/* Native Mobile App Notification Settings */}

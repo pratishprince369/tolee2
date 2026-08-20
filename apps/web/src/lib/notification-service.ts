@@ -41,6 +41,17 @@ function getChannelAndTitle(type: string, groupName?: string): { channelId: stri
       return { channelId: 'social', title: '📍 Complete Your Profile' };
     case 'phone_reminder':
       return { channelId: 'social', title: '📱 Verify Your Mobile Number' };
+    case 'radar':
+    case 'radar_alert':
+      return { channelId: 'default', title: '🚨 Tolee Radar Alert' };
+    case 'radar_food':
+      return { channelId: 'promotions', title: '🍔 Tolee Food Spot' };
+    case 'radar_news':
+      return { channelId: 'groups', title: '📢 Tolee Local News' };
+    case 'radar_deal':
+      return { channelId: 'marketplace', title: '🎉 Tolee Flash Deal' };
+    case 'radar_gupt':
+      return { channelId: 'default', title: '🕵️ Gupt Khabar' };
     default:
       return { channelId: 'default', title: 'Tolee Alert' };
   }
