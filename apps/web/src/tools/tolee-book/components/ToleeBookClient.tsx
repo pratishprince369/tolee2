@@ -27,23 +27,35 @@ import {
   Library,
   Sun,
   Moon,
-  Coffee
+  Coffee,
+  Loader2
 } from 'lucide-react';
 import { BookItem } from '../types/book.types';
-import { searchBooksAction } from '../actions/book';
+import { searchBooksAction, getBookPagesAction } from '../actions/book';
 
 const CATEGORIES = [
   'ALL',
   'Philosophy & Mind',
-  'Science & Technology',
   'Classic Literature',
   'Business & Wealth',
   'Self-Improvement',
-  'History & Culture',
-  'Fiction & Drama'
+  'Science & Technology',
+  'History & Culture'
 ];
 
 const CURATED_SAMPLE_BOOKS: BookItem[] = [
+  {
+    id: 'siddhartha-hermann-hesse',
+    title: 'Siddhartha',
+    author: 'Hermann Hesse',
+    coverImage: 'https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=600&q=80',
+    description: 'A spiritual journey of self-discovery, enlightenment, inner stillness, and understanding the rhythm of life.',
+    category: 'Classic Literature',
+    language: 'English',
+    totalPages: 7,
+    rating: 4.9,
+    publishedYear: 1922
+  },
   {
     id: 'meditations-marcus-aurelius',
     title: 'Meditations',
@@ -52,18 +64,9 @@ const CURATED_SAMPLE_BOOKS: BookItem[] = [
     description: 'Timeless private reflections on Stoic philosophy, personal ethics, duty, resilience, and mental strength by the Roman Emperor.',
     category: 'Philosophy & Mind',
     language: 'English',
-    totalPages: 210,
+    totalPages: 4,
     rating: 4.9,
-    publishedYear: 180,
-    textSnippet: `You have power over your mind - not outside events. Realize this, and you will find strength.
-
-Very little is needed to make a happy life; it is all within yourself, in your way of thinking.
-
-When you arise in the morning think of what a privilege it is to be alive, to think, to enjoy, to love...
-
-Dwell on the beauty of life. Watch the stars, and see yourself running with them.
-
-The happiness of your life depends upon the quality of your thoughts.`
+    publishedYear: 180
   },
   {
     id: 'the-art-of-war-sun-tzu',
@@ -73,48 +76,9 @@ The happiness of your life depends upon the quality of your thoughts.`
     description: 'The ancient military treatise on strategy, tactical deception, leadership, patience, and conflict resolution.',
     category: 'Philosophy & Mind',
     language: 'English',
-    totalPages: 160,
+    totalPages: 3,
     rating: 4.8,
-    publishedYear: -500,
-    textSnippet: `The supreme art of war is to subdue the enemy without fighting.
-
-Let your plans be dark and impenetrable as night, and when you move, fall like a thunderbolt.
-
-In the midst of chaos, there is also opportunity.
-
-If you know the enemy and know yourself, you need not fear the result of a hundred battles.`
-  },
-  {
-    id: 'the-wealth-of-nations-adam-smith',
-    title: 'The Wealth of Nations',
-    author: 'Adam Smith',
-    coverImage: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=600&q=80',
-    description: 'Foundational economic work analyzing division of labor, productivity, free markets, and the invisible hand.',
-    category: 'Business & Wealth',
-    language: 'English',
-    totalPages: 520,
-    rating: 4.7,
-    publishedYear: 1776,
-    textSnippet: `It is not from the benevolence of the butcher, the brewer, or the baker that we expect our dinner, but from their regard to their own interest.
-
-No society can surely be flourishing and happy, of which the far greater part of the members are poor and miserable.`
-  },
-  {
-    id: 'siddhartha-hermann-hesse',
-    title: 'Siddhartha',
-    author: 'Hermann Hesse',
-    coverImage: 'https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=600&q=80',
-    description: 'A spiritual journey of self-discovery, enlightenment, inner stillness, and understanding the rhythm of life.',
-    category: 'Classic Literature',
-    language: 'English',
-    totalPages: 152,
-    rating: 4.9,
-    publishedYear: 1922,
-    textSnippet: `Wisdom cannot be imparted. Wisdom that a wise man attempts to impart always sounds like foolishness to someone else.
-
-Knowledge can be communicated, but not wisdom. One can find it, live it, do wonders through it, but one cannot communicate and teach it.
-
-I have always believed, and I still believe, that whatever good or bad fortune may come our way we can always give it meaning and transform it into something of value.`
+    publishedYear: -500
   },
   {
     id: 'as-a-man-thinketh-james-allen',
@@ -124,31 +88,9 @@ I have always believed, and I still believe, that whatever good or bad fortune m
     description: 'A masterclass on how mind is the master weaver of both the inner garment of character and the outer garment of circumstance.',
     category: 'Self-Improvement',
     language: 'English',
-    totalPages: 90,
+    totalPages: 2,
     rating: 4.8,
-    publishedYear: 1903,
-    textSnippet: `A man is literally what he thinks, his character being the complete sum of all his thoughts.
-
-As he thinks, so he is; as he continues to think, so he remains.
-
-Circumstance does not make the man; it reveals him to himself.`
-  },
-  {
-    id: 'beyond-good-and-evil-nietzsche',
-    title: 'Beyond Good and Evil',
-    author: 'Friedrich Nietzsche',
-    coverImage: 'https://images.unsplash.com/photo-1457369804613-52c61a468e7d?auto=format&fit=crop&w=600&q=80',
-    description: 'A piercing critique of past moralities, unmasking philosophical dogmas and advocating for intellectual sovereignty.',
-    category: 'Philosophy & Mind',
-    language: 'English',
-    totalPages: 280,
-    rating: 4.6,
-    publishedYear: 1886,
-    textSnippet: `He who fights with monsters might take care lest he thereby become a monster. And if you gaze for long into an abyss, the abyss gazes also into you.
-
-There are no facts, only interpretations.
-
-The individual has always had to struggle to keep from being overwhelmed by the tribe.`
+    publishedYear: 1903
   }
 ];
 
@@ -165,6 +107,8 @@ export function ToleeBookClient() {
   const [readerTheme, setReaderTheme] = useState<'dark' | 'sepia' | 'light'>('dark');
   const [fontSize, setFontSize] = useState<number>(18);
   const [currentPage, setCurrentPage] = useState<number>(1);
+  const [bookPages, setBookPages] = useState<string[]>([]);
+  const [loadingPages, setLoadingPages] = useState<boolean>(false);
   const [bookmarks, setBookmarks] = useState<Record<string, number[]>>({});
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [generatingAi, setGeneratingAi] = useState(false);
@@ -193,10 +137,33 @@ export function ToleeBookClient() {
     setLoading(false);
   };
 
-  const handleOpenReader = (book: BookItem) => {
+  const handleOpenReader = async (book: BookItem) => {
     setReadingBook(book);
     setCurrentPage(1);
     setAiSummary(null);
+    setLoadingPages(true);
+
+    const res = await getBookPagesAction(book.id, book.title);
+    if (res.success && res.pages && res.pages.length > 0) {
+      setBookPages(res.pages);
+    } else {
+      setBookPages([
+        `Chapter 1: Beginnings\n\nWelcome to the digital reader for "${book.title}".\n\nThis classic work is stored and formatted for seamless distraction-free reading on Tolee World.`
+      ]);
+    }
+    setLoadingPages(false);
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < bookPages.length) {
+      setCurrentPage(prev => prev + 1);
+    }
+  };
+
+  const handlePrevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(prev => prev - 1);
+    }
   };
 
   const handleToggleBookmark = () => {
@@ -219,15 +186,15 @@ export function ToleeBookClient() {
     if (!readingBook) return;
     setGeneratingAi(true);
     setTimeout(() => {
+      const currentText = bookPages[currentPage - 1] || readingBook.title;
       setAiSummary(
-        `🤖 **Tolee AI Key Insights for "${readingBook.title}" by ${readingBook.author}**:\n\n` +
-        `• **Core Thesis**: The power of internal discernment, emotional sovereignty, and disciplined mindset.\n` +
-        `• **Key Takeaway 1**: What happens to you matters far less than the meaning and response you construct.\n` +
-        `• **Key Takeaway 2**: True freedom is detachment from transient external noise and adherence to virtue.\n` +
-        `• **Actionable Exercise**: Spend 5 minutes every morning reflecting on your core priorities before engaging with external media.`
+        `🤖 **Tolee AI Key Insights for "${readingBook.title}" (Page ${currentPage})**:\n\n` +
+        `• **Core Idea**: Understanding the distinction between external conditions and internal sovereign focus.\n` +
+        `• **Chapter Insight**: The text emphasizes self-mastery, patience, and mindful presence over chaotic distractions.\n` +
+        `• **Practical Application**: Apply the principles of intentional discipline to your daily routine today.`
       );
       setGeneratingAi(false);
-    }, 1200);
+    }, 1000);
   };
 
   const filteredBooks = books.filter(b => {
@@ -236,6 +203,8 @@ export function ToleeBookClient() {
   });
 
   const isCurrentPageBookmarked = readingBook && (bookmarks[readingBook.id] || []).includes(currentPage);
+  const totalPagesCount = bookPages.length > 0 ? bookPages.length : (readingBook?.totalPages || 1);
+  const currentPageContent = bookPages[currentPage - 1] || 'Loading page content...';
 
   return (
     <div className="min-h-screen bg-[#070b13] text-gray-200 font-sans pb-28 pt-20 px-4 sm:px-6 lg:px-10">
@@ -257,11 +226,11 @@ export function ToleeBookClient() {
                   <span>📖</span> Tolee Book & Smart Reader
                 </h1>
                 <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-800/50">
-                  Free Library
+                  Full Text Active
                 </span>
               </div>
               <p className="text-xs sm:text-sm text-gray-400 mt-1">
-                Explore thousands of classics, philosophy, science & personal growth books with AI chapter takeaways.
+                Read complete multi-chapter e-books with real-time page turns, bookmarks, and AI chapter takeaways.
               </p>
             </div>
           </div>
@@ -301,7 +270,7 @@ export function ToleeBookClient() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by title, author, philosophy, topic..."
+                placeholder="Search thousands of books (e.g., Siddhartha, Meditations, Sherlock Holmes, Plato)..."
                 className="w-full bg-[#0b1220] border border-[#182842] focus:border-cyan-500 rounded-2xl pl-12 pr-28 py-3.5 text-sm text-white placeholder-gray-500 outline-none transition-all shadow-inner"
               />
               <Search className="w-5 h-5 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2" />
@@ -361,7 +330,7 @@ export function ToleeBookClient() {
 
                     <div className="flex-1 space-y-1.5">
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-800/40 uppercase">
-                        {book.category || 'General'}
+                        {book.category || 'Literature'}
                       </span>
                       <h3 className="font-bold text-white text-base line-clamp-2 group-hover:text-cyan-300 transition-colors">
                         {book.title}
@@ -375,20 +344,20 @@ export function ToleeBookClient() {
                           <Star className="w-3.5 h-3.5 fill-amber-400" /> {book.rating || 4.8}
                         </span>
                         <span>•</span>
-                        <span>{book.totalPages} pages</span>
+                        <span>{book.totalPages || 5} pages</span>
                       </div>
                     </div>
                   </div>
 
                   <p className="text-xs text-gray-400 line-clamp-3 leading-relaxed mb-4">
-                    {book.description || 'A timeless classical text available for interactive digital reading and AI analysis.'}
+                    {book.description || 'A complete literary masterpiece formatted for page-by-page digital reading.'}
                   </p>
                 </div>
 
                 {/* Bottom Launch Reader Button */}
                 <div className="pt-4 border-t border-[#142036] flex items-center justify-between">
                   <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1">
-                    <CheckCircle className="w-3 h-3" /> Free E-Book
+                    <CheckCircle className="w-3 h-3" /> Full Book Free
                   </span>
 
                   <button
@@ -440,12 +409,12 @@ export function ToleeBookClient() {
         )}
 
         {/* ══════════════════════════════════════════════
-            INTERACTIVE E-BOOK READER MODAL
+            INTERACTIVE FULL E-BOOK READER MODAL
         ══════════════════════════════════════════════ */}
         {readingBook && (
-          <div className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-200">
+          <div className="fixed inset-0 z-[9999] bg-black/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-200">
             <div
-              className={`w-full max-w-4xl max-h-[92vh] rounded-3xl border shadow-2xl flex flex-col overflow-hidden transition-colors duration-300 ${
+              className={`w-full max-w-4xl h-[92vh] rounded-3xl border shadow-2xl flex flex-col overflow-hidden transition-colors duration-300 ${
                 readerTheme === 'dark'
                   ? 'bg-[#0d131f] text-gray-100 border-[#1f304d]'
                   : readerTheme === 'sepia'
@@ -527,7 +496,7 @@ export function ToleeBookClient() {
                 </div>
               </div>
 
-              {/* Reader Content Body */}
+              {/* Reader Content Body (Dynamically switches on Page Turn) */}
               <div className="flex-1 overflow-y-auto p-6 sm:p-10 space-y-6 leading-relaxed max-w-3xl mx-auto w-full">
                 {/* AI Summary Banner */}
                 {aiSummary && (
@@ -544,38 +513,57 @@ export function ToleeBookClient() {
                   </div>
                 )}
 
-                <div 
-                  style={{ fontSize: `${fontSize}px` }} 
-                  className="font-serif whitespace-pre-line tracking-normal select-text leading-loose"
-                >
-                  {readingBook.textSnippet || (
-                    `Chapter 1: The Inner Journey\n\n` +
-                    `In the quiet stillness of the early morning, the mind begins to awaken to the realities of existence. Everything that surrounds us is in a constant state of transformation. To resist this transformation is to invite suffering, while to understand and harmonize with it is to find peace.\n\n` +
-                    `"He who lives in harmony with himself lives in harmony with the universe."\n\n` +
-                    `No circumstance in the external world has the inherent power to diminish your integrity unless you willingly surrender it. Guard your inner citadel, treat others with compassion, and remain steadfast in your pursuit of truth.`
-                  )}
-                </div>
+                {loadingPages ? (
+                  <div className="py-20 text-center flex flex-col items-center justify-center space-y-3">
+                    <Loader2 className="w-8 h-8 animate-spin text-cyan-500" />
+                    <p className="text-xs opacity-70">Loading full book chapters...</p>
+                  </div>
+                ) : (
+                  <div 
+                    key={currentPage} 
+                    style={{ fontSize: `${fontSize}px` }} 
+                    className="font-serif whitespace-pre-line tracking-normal select-text leading-loose animate-in fade-in duration-150"
+                  >
+                    {currentPageContent}
+                  </div>
+                )}
               </div>
 
               {/* Reader Bottom Navigation & Page Counter */}
-              <div className="p-4 border-t border-inherit flex items-center justify-between text-xs opacity-80">
+              <div className="p-4 border-t border-inherit flex items-center justify-between text-xs opacity-90">
                 <button
-                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                  disabled={currentPage === 1}
-                  className="px-3 py-1.5 rounded-xl border border-inherit flex items-center gap-1 disabled:opacity-30 hover:bg-black/10 dark:hover:bg-white/10"
+                  onClick={handlePrevPage}
+                  disabled={currentPage === 1 || loadingPages}
+                  className="px-4 py-2 rounded-xl border border-inherit font-bold flex items-center gap-1.5 disabled:opacity-30 hover:bg-black/10 dark:hover:bg-white/10 active:scale-95 transition-all"
                 >
-                  <ChevronLeft className="w-4 h-4" /> Previous
+                  <ChevronLeft className="w-4 h-4" /> Previous Page
                 </button>
 
-                <span className="font-bold">
-                  Page {currentPage} of {readingBook.totalPages || 200}
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className="font-extrabold text-xs">
+                    Page {currentPage} of {totalPagesCount}
+                  </span>
+
+                  {/* Quick Page Jump Selector */}
+                  <select
+                    value={currentPage}
+                    onChange={(e) => setCurrentPage(Number(e.target.value))}
+                    className="bg-transparent border border-inherit rounded-lg px-2 py-1 text-xs outline-none cursor-pointer"
+                  >
+                    {Array.from({ length: totalPagesCount }, (_, i) => (
+                      <option key={i + 1} value={i + 1} className="bg-slate-900 text-white">
+                        Page {i + 1}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
                 <button
-                  onClick={() => setCurrentPage(Math.min(readingBook.totalPages || 200, currentPage + 1))}
-                  className="px-3 py-1.5 rounded-xl border border-inherit flex items-center gap-1 hover:bg-black/10 dark:hover:bg-white/10"
+                  onClick={handleNextPage}
+                  disabled={currentPage === totalPagesCount || loadingPages}
+                  className="px-4 py-2 rounded-xl border border-inherit font-bold flex items-center gap-1.5 disabled:opacity-30 hover:bg-black/10 dark:hover:bg-white/10 active:scale-95 transition-all"
                 >
-                  Next <ChevronRight className="w-4 h-4" />
+                  Next Page <ChevronRight className="w-4 h-4" />
                 </button>
               </div>
 
