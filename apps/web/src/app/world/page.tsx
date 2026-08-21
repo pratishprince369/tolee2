@@ -19,7 +19,8 @@ import {
   Gift,
   FileText,
   Share2,
-  MessageCircle
+  MessageCircle,
+  BookOpen
 } from 'lucide-react';
 import { getPublicWorldTools, WorldToolItem } from '@/actions/worldTools';
 
@@ -175,6 +176,8 @@ export default function WorldDashboardPage() {
                           <Share2 className="w-6 h-6 text-cyan-400" />
                         ) : tool.icon === 'MessageCircle' || tool.slug === 'whatsapp-shoot' ? (
                           <MessageCircle className="w-6 h-6 text-emerald-400" />
+                        ) : tool.icon === 'BookOpen' || tool.slug === 'book' ? (
+                          <BookOpen className="w-6 h-6 text-amber-400" />
                         ) : (
                           <Sparkles className="w-6 h-6 text-cyan-400" />
                         )}

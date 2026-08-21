@@ -83,6 +83,20 @@ const DEFAULT_TOOLS: Omit<WorldToolItem, 'id'>[] = [
     freeTrialDays: 7,
     order: 4,
   },
+  {
+    name: 'Tolee Book & Smart Reader',
+    slug: 'book',
+    description: 'Digital library & smart e-book reader. Search thousands of free books, track reading progress, take notes, and get AI chapter summaries.',
+    routeUrl: '/world/book',
+    icon: 'BookOpen',
+    category: 'Education & Knowledge',
+    badge: 'NEW 📖',
+    isVisible: true,
+    accessType: 'FREE',
+    priceMonthly: 0,
+    freeTrialDays: null,
+    order: 5,
+  },
 ];
 
 /**

@@ -5,3 +5,4 @@
 export * from './types/book.types';
 export * from './services/bookService';
 export * from './actions/book';
+export { ToleeBookClient } from './components/ToleeBookClient';
