@@ -5,11 +5,12 @@
 
 export interface ShareableItem {
   id: string;
-  postType?: string;
-  contentType?: string;
-  slug?: string;
-  author?: string;
-  toleeSlug?: string;
+  postType?: string | null;
+  contentType?: string | null;
+  slug?: string | null;
+  author?: string | null;
+  toleeSlug?: string | null;
+  [key: string]: any;
 }
 
 /**

@@ -47,6 +47,15 @@ export function ShareModal({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
 
+  // Compute permanent share URL with origin fallback
+  const finalShareUrl = React.useMemo(() => {
+    if (shareUrl && shareUrl.trim() !== '') return shareUrl;
+    if (typeof window !== 'undefined' && window.location.origin) {
+      return `${window.location.origin}/post/${postId}`;
+    }
+    return `https://tolee.in/post/${postId}`;
+  }, [shareUrl, postId]);
+
   // Story sharing states
   const [isStoryEditorOpen, setIsStoryEditorOpen] = useState(false);
   const [storyMediaUrl, setStoryMediaUrl] = useState('');
@@ -107,16 +116,46 @@ export function ShareModal({
     setIsStoryEditorOpen(true);
   };
 
+  const copyTextToClipboard = async (text: string): Promise<boolean> => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch (err) {
+        console.warn('navigator.clipboard failed, attempting fallback...', err);
+      }
+    }
+
+    // Fallback: document.execCommand
+    try {
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      textArea.style.position = 'fixed';
+      textArea.style.top = '-999999px';
+      textArea.style.left = '-999999px';
+      textArea.setAttribute('readonly', '');
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      const success = document.execCommand('copy');
+      document.body.removeChild(textArea);
+      return success;
+    } catch (err) {
+      console.error('Fallback clipboard copy failed:', err);
+      return false;
+    }
+  };
+
   const handleCopyLink = async () => {
     try {
-      await navigator.clipboard.writeText(finalShareUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      const success = await copyTextToClipboard(finalShareUrl);
+      if (success) {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2500);
 
-      // Increment share count in DB
-      const res = await incrementShareCount(postId);
-      if (res.success && res.shareCount !== undefined) {
-        if (onShareSuccess) {
+        // Increment share count in DB
+        const res = await incrementShareCount(postId);
+        if (res.success && res.shareCount !== undefined && onShareSuccess) {
           onShareSuccess(res.shareCount);
         }
       }
@@ -126,25 +165,47 @@ export function ShareModal({
   };
 
   const handleWebShare = async () => {
-    if (typeof navigator === 'undefined' || !navigator.share) return;
-    try {
-      await navigator.share({
-        title: 'Tolee Content',
-        text: previewText || 'Check out this awesome content on Tolee!',
-        url: finalShareUrl,
-      });
+    const shareTitle = 'Tolee Content';
+    const shareText = previewText || 'Check out this post on Tolee!';
 
-      // Increment share count in DB
-      const res = await incrementShareCount(postId);
-      if (res.success && res.shareCount !== undefined) {
-        if (onShareSuccess) {
+    if (typeof navigator !== 'undefined' && typeof (navigator as any).share === 'function') {
+      try {
+        await (navigator as any).share({
+          title: shareTitle,
+          text: shareText,
+          url: finalShareUrl,
+        });
+
+        // Increment share count in DB
+        const res = await incrementShareCount(postId);
+        if (res.success && res.shareCount !== undefined && onShareSuccess) {
           onShareSuccess(res.shareCount);
         }
+        onClose();
+        return;
+      } catch (err: any) {
+        if (err?.name === 'AbortError') {
+          return; // User cancelled share dialog
+        }
+        console.log('Web share failed, falling back to direct options:', err);
       }
-      onClose();
-    } catch (err) {
-      console.log('Web share cancelled or failed:', err);
     }
+
+    // Fallback for browsers without navigator.share (e.g. desktop):
+    // Open WhatsApp Web or copy link
+    const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText + '\n' + finalShareUrl)}`;
+    window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+
+    // Also copy link to clipboard for convenience
+    await copyTextToClipboard(finalShareUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+
+    const res = await incrementShareCount(postId);
+    if (res.success && res.shareCount !== undefined && onShareSuccess) {
+      onShareSuccess(res.shareCount);
+    }
+    onClose();
   };
 
   const handleToggleSelectFriend = (id: string) => {
@@ -261,22 +322,20 @@ export function ShareModal({
               </div>
             </button>
 
-            {typeof window !== 'undefined' && typeof navigator !== 'undefined' && typeof navigator.share === 'function' && (
-              <button
-                onClick={handleWebShare}
-                className="flex-1 flex items-center justify-between p-3.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 border border-indigo-500/20 hover:from-blue-700 hover:to-indigo-700 text-white transition-all duration-200 shadow-md group active:scale-[0.98]"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-white/10 rounded-xl transition-colors">
-                    <Send className="w-5 h-5 text-white" />
-                  </div>
-                  <div className="text-left">
-                    <p className="text-sm font-bold">Share Externally</p>
-                    <p className="text-xs text-blue-100">WhatsApp, SMS, etc.</p>
-                  </div>
+            <button
+              onClick={handleWebShare}
+              className="flex-1 flex items-center justify-between p-3.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 border border-indigo-500/20 hover:from-blue-700 hover:to-indigo-700 text-white transition-all duration-200 shadow-md group active:scale-[0.98]"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-white/10 rounded-xl transition-colors">
+                  <Send className="w-5 h-5 text-white" />
                 </div>
-              </button>
-            )}
+                <div className="text-left">
+                  <p className="text-sm font-bold">Share Externally</p>
+                  <p className="text-xs text-blue-100">WhatsApp, SMS, etc.</p>
+                </div>
+              </div>
+            </button>
           </div>
         </div>
 
