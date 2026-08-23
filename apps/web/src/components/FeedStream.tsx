@@ -898,36 +898,61 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
   const handleNewPost = (post: any, postData?: any) => {
     try {
       console.log("handleNewPost called with:", post, postData);
-      const isAnon = !!post.isAnonymous;
+      const isAnon = !!(post.isAnonymous || postData?.isAnonymous);
+      const currentUserName = session?.user?.name || (session?.user as any)?.username || 'You';
+      const currentUserAvatar = session?.user?.image || (session?.user as any)?.avatar || '/default-user-avatar.svg';
+      const currentUid = (session?.user as any)?.id;
+
       const newLocalPost = {
-        id: post.id,
-        author: isAnon ? 'Anonymous' : (post.author?.username || post.author?.name || 'Anonymous'),
-        authorAvatar: isAnon ? '/default-user-avatar.svg' : (post.author?.avatar || post.author?.image || '/default-user-avatar.svg'),
-        authorId: isAnon ? null : post.author?.id,
-        isAnonymous: isAnon,
-        toleeName: postData?.toleeName || 'Tolee',
-        toleeSlug: postData?.toleeSlug || 'group',
+        id: post.id || `post_${Date.now()}`,
+        author: isAnon ? 'Anonymous' : (post.author?.username || post.author?.name || currentUserName),
+        authorAvatar: isAnon ? '/default-user-avatar.svg' : (post.author?.avatar || post.author?.image || currentUserAvatar),
+        authorId: isAnon ? null : (post.author?.id || currentUid),
+        authorIsPrivate: false,
+        isFollowing: false,
+        followStatus: null,
+        visibility: post.visibility || 'public',
+        toleeName: postData?.toleeName || (post.tolees?.[0]?.tolee?.name) || 'Tolee',
+        toleeSlug: postData?.toleeSlug || (post.tolees?.[0]?.tolee?.slug) || 'group',
         role: 'Member',
         time: 'Just now',
-        content: post.caption || '',
-        image: (post.mediaTypes && post.mediaUrls) ? (post.mediaTypes.split(',')[0] === 'image' ? post.mediaUrls.split(/,(?=https?:\/\/)/)[0] : null) : null,
-        video: (post.mediaTypes && post.mediaUrls) ? (post.mediaTypes.split(',')[0] === 'video' ? post.mediaUrls.split(/,(?=https?:\/\/)/)[0] : null) : null,
-        mediaUrls: post.mediaUrls || null,
-        mediaTypes: post.mediaTypes || null,
+        createdAt: new Date(),
+        content: post.caption || post.content || postData?.content || '',
+        image: (post.mediaTypes && post.mediaUrls) 
+          ? (post.mediaTypes.split(',')[0] === 'image' ? post.mediaUrls.split(/,(?=https?:\/\/)/)[0] : null) 
+          : (postData?.mediaList?.[0]?.type === 'image' ? postData.mediaList[0].url : null),
+        video: (post.mediaTypes && post.mediaUrls) 
+          ? (post.mediaTypes.split(',')[0] === 'video' ? post.mediaUrls.split(/,(?=https?:\/\/)/)[0] : null) 
+          : (postData?.mediaList?.[0]?.type === 'video' ? postData.mediaList[0].url : null),
+        mediaUrls: post.mediaUrls || (postData?.mediaList?.map((m: any) => m.url).join(',')) || null,
+        mediaTypes: post.mediaTypes || (postData?.mediaList?.map((m: any) => m.type).join(',')) || null,
         likes: 0,
         comments: 0,
-        isWin: post.postType === 'win',
-        postType: post.postType || 'regular',
-        location: post.location || null,
-        subLocation: post.subLocation || null,
+        views: 0,
+        reposts: 0,
+        isWin: post.postType === 'win' || postData?.postType === 'win',
+        postType: post.postType || postData?.postType || 'regular',
+        location: post.location || postData?.location || null,
+        subLocation: post.subLocation || postData?.subLocation || null,
         likedByMe: false,
         savedByMe: false,
         repostedByMe: false,
         commentsList: [],
-        resharedByUser: null
+        resharedByUser: null,
+        newsRelation: post.newsRelation || (postData?.postType === 'news' ? {
+          headline: postData.headline,
+          summary: postData.summary,
+          category: postData.category
+        } : null)
       };
+
       console.log("Constructed newLocalPost:", newLocalPost);
-      setFeedPosts(prev => [newLocalPost, ...prev]);
+      setFeedPosts(prev => [newLocalPost, ...prev.filter(p => p.id !== newLocalPost.id)]);
+
+      // Instantly scroll smoothly to the very top so the user sees their post immediately
+      if (typeof window !== 'undefined') {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
     } catch (err) {
       console.error("Error inside handleNewPost:", err);
     }

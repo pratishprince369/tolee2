@@ -839,9 +839,16 @@ export async function getPosts(options?: { mediaType?: string; limit?: number })
         
         // Freshness boost: newer posts get higher priority
         const ageInHours = (Date.now() - new Date(post.createdAt).getTime()) / (3600 * 1000);
-        score += Math.max(0, 5.0 - (ageInHours / 24)); // boost up to +5.0 for very fresh posts
+        score += Math.max(0, 8.0 - (ageInHours / 12)); // boost up to +8.0 for very fresh posts
 
-        // 🎬 MASSIVE FEATURED BOOST FOR YOUTUBE CATEGORY VIDEO POSTS (+10.0)
+        const authorId = post.author?.id || post.authorId;
+
+        // 🌟 HIGHEST PRIORITY: If post belongs to the current logged in user, prioritize at top (+50.0)
+        if (currentUserId && authorId === currentUserId) {
+          score += 50.0;
+        }
+
+        // 🎬 FEATURED BOOST FOR YOUTUBE CATEGORY VIDEO POSTS (+5.0)
         const isVideoPost = 
           post.postType === 'video' || 
           post.postType === 'news' || 
@@ -853,11 +860,10 @@ export async function getPosts(options?: { mediaType?: string; limit?: number })
           ));
 
         if (isVideoPost) {
-          score += 10.0; // Ensures YouTube video posts sort to the very top of feed!
+          score += 5.0;
         }
 
         // Follow boost
-        const authorId = post.author?.id || post.authorId;
         if (authorId && followedAuthorIds.includes(authorId)) {
           score += 3.0;
         }

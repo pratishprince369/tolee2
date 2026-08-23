@@ -120,6 +120,7 @@ export default async function GlobalFeedPage() {
           worldProjectId: post.worldProjectId || null,
           worldProject: post.worldProject || null,
           newsRelation: post.newsRelation || null,
+          createdAt: post.createdAt,
         };
       });
     }
@@ -186,15 +187,21 @@ export default async function GlobalFeedPage() {
         worldProjectId: null,
         worldProject: null,
         newsRelation: post.newsRelation || null,
+        createdAt: post.createdAt,
         _isAIPost: true, // Flag to identify AI posts in feed
       };
     });
 
-    // Merge and sort by time (interleave AI posts with real posts)
+    // Merge and sort: User's own created posts ALWAYS at the top, then strict chronological timestamp
     dbPosts = [...dbPosts, ...aiPostsMapped].sort((a, b) => {
-      const dateA = new Date(a.time?.split(' | ')[0] || 0).getTime();
-      const dateB = new Date(b.time?.split(' | ')[0] || 0).getTime();
-      return dateB - dateA;
+      const isMineA = Boolean(currentUserId && a.authorId === currentUserId);
+      const isMineB = Boolean(currentUserId && b.authorId === currentUserId);
+      if (isMineA && !isMineB) return -1;
+      if (!isMineA && isMineB) return 1;
+
+      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return timeB - timeA;
     });
   } catch (err) {
     console.error("Failed to load AI posts from tolee-1", err);
