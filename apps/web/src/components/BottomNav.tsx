@@ -243,22 +243,10 @@ export function BottomNav() {
                     )}
                   </div>
                 </DropdownMenuItem>
-                {franchiseStatus === 'active' || franchiseStatus === 'suspended' ? (
+                {(franchiseStatus === 'active' || franchiseStatus === 'suspended') && (
                   <DropdownMenuItem onClick={() => { setClickedPath('/franchise/dashboard'); router.push('/franchise/dashboard'); }} className={getDropdownItemClass('/franchise/dashboard')}>
                     <Briefcase className={getDropdownIconClass('/franchise/dashboard')} />
                     <span>My Franchise</span>
-                  </DropdownMenuItem>
-                ) : (
-                  <DropdownMenuItem onClick={() => { setClickedPath('/franchise'); router.push('/franchise'); }} className={getDropdownItemClass('/franchise')}>
-                    <div className="flex items-center justify-between w-full">
-                      <div className="flex items-center">
-                        <Store className={getDropdownIconClass('/franchise')} />
-                        <span>Get Franchise</span>
-                      </div>
-                      {franchiseStatus === 'pending' && (
-                        <span className="text-[8px] font-black uppercase text-amber-600 bg-amber-500/10 border border-amber-500/15 px-1.5 py-0.5 rounded">Pending</span>
-                      )}
-                    </div>
                   </DropdownMenuItem>
                 )}
 

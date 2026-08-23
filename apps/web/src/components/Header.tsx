@@ -458,20 +458,10 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
                     <Globe className="mr-2 h-4 w-4" />
                     <span>My Tolees</span>
                   </DropdownMenuItem>
-                  {franchiseStatus === 'active' || franchiseStatus === 'suspended' ? (
+                  {(franchiseStatus === 'active' || franchiseStatus === 'suspended') && (
                     <DropdownMenuItem onClick={() => router.push('/franchise/dashboard')} className="cursor-pointer flex w-full items-center">
                       <Briefcase className="mr-2 h-4 w-4 text-zinc-700 dark:text-zinc-300" />
                       <span>My Franchise</span>
-                    </DropdownMenuItem>
-                  ) : (
-                    <DropdownMenuItem onClick={() => router.push('/franchise')} className="cursor-pointer flex w-full items-center justify-between">
-                      <div className="flex items-center">
-                        <Store className="mr-2 h-4 w-4" />
-                        <span>Get Franchise</span>
-                      </div>
-                      {franchiseStatus === 'pending' && (
-                        <span className="text-[8px] font-black uppercase text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded">Pending</span>
-                      )}
                     </DropdownMenuItem>
                   )}
                   <DropdownMenuSeparator />
