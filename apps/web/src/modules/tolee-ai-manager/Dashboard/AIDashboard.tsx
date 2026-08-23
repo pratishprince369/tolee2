@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { 
   Bot, Sparkles, Calendar, CheckSquare, Users, MessageSquare, 
-  Brain, Newspaper, LayoutDashboard
+  Brain, Newspaper, LayoutDashboard, Download
 } from 'lucide-react';
 import { DailySummaryGrid } from '../Components/DailySummaryGrid';
 import { VoiceInputDock } from '../Components/VoiceInputDock';
@@ -362,14 +362,28 @@ export function AIDashboard() {
                             className="w-full text-xs font-medium text-slate-800 dark:text-zinc-100 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl p-2.5 focus:ring-2 focus:ring-violet-500 focus:outline-none resize-y"
                           />
                         </div>
-                        <Button
-                          size="sm"
-                          disabled={msg.interactiveAction.executed || publishingActionId === msg.id}
-                          onClick={() => handleExecuteAction(msg.id, msg.interactiveAction)}
-                          className="w-full h-10 bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs rounded-xl shadow-md transition-all active:scale-[0.98]"
-                        >
-                          {publishingActionId === msg.id ? '🚀 Publishing to Tolees...' : msg.interactiveAction.label}
-                        </Button>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          {msg.interactiveAction.payload?.imageUrl && (
+                            <a
+                              href={msg.interactiveAction.payload.imageUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              download="tolee-ai-creative.jpg"
+                              className="flex-1 h-10 bg-slate-200 dark:bg-zinc-800 hover:bg-slate-300 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-1.5 transition-all"
+                            >
+                              <Download className="w-3.5 h-3.5" /> Save Image
+                            </a>
+                          )}
+                          <Button
+                            size="sm"
+                            disabled={msg.interactiveAction.executed || publishingActionId === msg.id}
+                            onClick={() => handleExecuteAction(msg.id, msg.interactiveAction)}
+                            className="flex-1 h-10 bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs rounded-xl shadow-md transition-all active:scale-[0.98] flex items-center justify-center gap-1.5"
+                          >
+                            <Sparkles className="w-3.5 h-3.5" />
+                            {publishingActionId === msg.id ? '🚀 Publishing to Tolees...' : msg.interactiveAction.label}
+                          </Button>
+                        </div>
                       </div>
                     )}
                     <span suppressHydrationWarning className={`block text-[10px] mt-1.5 text-right ${msg.isAI ? 'text-slate-400' : 'text-violet-200'}`}>

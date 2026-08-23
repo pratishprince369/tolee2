@@ -285,20 +285,10 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
     });
 
     const imageUrl = verificationResult.imageUrl;
-    const finalCaption = `✨ AI Verified Creative: ${promptConcept.slice(0, 80)}`;
-
-    const newPost = await prisma.post.create({
-      data: {
-        caption: finalCaption,
-        mediaUrls: JSON.stringify([imageUrl]),
-        mediaTypes: JSON.stringify(['image']),
-        authorId: userId
-      }
-    });
+    const finalCaption = `✨ AI Creative: ${promptConcept.slice(0, 100)}`;
 
     logAIAction(userId, 'GENERATE_IMAGE', command, 'SUCCESS', {
       imageUrl,
-      postId: newPost.id,
       score: verificationResult.finalScore,
       attempts: verificationResult.attempts
     });
@@ -306,12 +296,12 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
     return {
       success: true,
       action: 'GENERATE_IMAGE',
-      message: `🎨 **Creative Ready! Maine aapke prompt ke mutabiq 8K AI Creative Banner design kiya aur AI Vision se verify bhi kar liya hai.**\n\nPrompt: "${promptConcept}"\n\n![AI Image](${imageUrl})`,
-      data: { imageUrl, postId: newPost.id, verification: verificationResult },
+      message: `🎨 **Creative Ready! Maine aapke prompt ke mutabiq 8K AI Creative Banner design kiya aur AI Vision se verify kar liya hai.**\n\nPrompt: "${promptConcept}"\n\nNeeche preview dekhein, caption customize karein aur **"Publish Creative to Feed"** dabakar feed par share karein.\n\n![AI Image](${imageUrl})`,
+      data: { imageUrl, verification: verificationResult },
       interactiveAction: {
-        type: 'PREVIEW_IMAGE',
-        label: '🖼️ Preview & Edit Creative Post',
-        payload: { imageUrl, postUrl: `/post/${newPost.id}`, caption: `✨ ${promptConcept.slice(0, 100)}` }
+        type: 'PUBLISH_POST',
+        label: '🚀 Publish Creative to Feed',
+        payload: { imageUrl, caption: finalCaption }
       }
     };
   }
