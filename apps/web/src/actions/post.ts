@@ -1944,9 +1944,8 @@ export async function deletePostPermanently(postId: string) {
 
 export async function incrementShareCount(postId: string) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user || !(session.user as any).id) {
-      return { success: false, error: 'Unauthorized' };
+    if (!postId) {
+      return { success: false, error: 'Post ID is required' };
     }
 
     const updatedPost = await prisma.post.update({
@@ -1962,14 +1961,18 @@ export async function incrementShareCount(postId: string) {
       }
     });
 
-    revalidatePath('/feed');
-    const postTolees = await prisma.postTolee.findMany({
-      where: { postId },
-      include: { tolee: { select: { slug: true } } }
-    });
-    postTolees.forEach(pt => {
-      revalidatePath(`/t/${pt.tolee.slug}`);
-    });
+    try {
+      revalidatePath('/feed');
+      const postTolees = await prisma.postTolee.findMany({
+        where: { postId },
+        include: { tolee: { select: { slug: true } } }
+      });
+      postTolees.forEach(pt => {
+        if (pt.tolee?.slug) {
+          revalidatePath(`/t/${pt.tolee.slug}`);
+        }
+      });
+    } catch (_) {}
 
     return { success: true, shareCount: updatedPost.shareCount };
   } catch (error) {
