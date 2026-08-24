@@ -139,9 +139,9 @@ export const CURATED_FULL_BOOKS: Record<string, { title: string; author: string;
 };
 
 /**
- * Searches across Gutendex (Project Gutenberg), OpenLibrary, and curated library.
+ * Searches across Gutendex (Project Gutenberg), OpenLibrary, and curated library with optional language filter.
  */
-export async function searchFreeBooksMultiApi(query: string): Promise<BookItem[]> {
+export async function searchFreeBooksMultiApi(query: string, language: string = 'en'): Promise<BookItem[]> {
   try {
     const cleanQuery = query.trim();
     const encoded = encodeURIComponent(cleanQuery);
@@ -164,14 +164,15 @@ export async function searchFreeBooksMultiApi(query: string): Promise<BookItem[]
         description: b.description,
         totalPages: b.pages.length,
         rating: 4.9,
-        language: 'en'
+        language: language || 'en'
       }));
 
     results.push(...curatedMatches);
 
     // 2. Fetch from Gutendex (70,000+ free Public Domain books)
     try {
-      const gRes = await fetch(`https://gutendex.com/books/?search=${encoded}&languages=en`, {
+      const langParam = language && language !== 'all' ? `&languages=${language}` : '&languages=en';
+      const gRes = await fetch(`https://gutendex.com/books/?search=${encoded}${langParam}`, {
         next: { revalidate: 3600 }
       });
       if (gRes.ok) {
@@ -188,7 +189,7 @@ export async function searchFreeBooksMultiApi(query: string): Promise<BookItem[]
               author,
               coverImage: cover,
               category: item.subjects?.[0] ? item.subjects[0].split('--')[0].trim() : 'Classic Literature',
-              language: item.languages?.[0] || 'en',
+              language: item.languages?.[0] || language || 'en',
               totalPages: Math.max(50, Math.min(500, Math.round((item.download_count || 100) / 15))),
               rating: 4.8,
               textSnippet: textUrl ? `https://gutendex.com/books/${item.id}` : undefined,
@@ -220,7 +221,7 @@ export async function searchFreeBooksMultiApi(query: string): Promise<BookItem[]
               author: doc.author_name ? doc.author_name.join(', ') : 'Unknown Author',
               coverImage,
               category: doc.subject ? doc.subject[0] : 'General Literature',
-              language: doc.language ? doc.language[0] : 'en',
+              language: doc.language ? doc.language[0] : language || 'en',
               totalPages: doc.number_of_pages_median || 150,
               publishedYear: doc.first_publish_year,
               rating: doc.ratings_average ? Math.round(doc.ratings_average * 10) / 10 : 4.5
@@ -252,7 +253,7 @@ export async function searchFreeBooksMultiApi(query: string): Promise<BookItem[]
 /**
  * Gets all curated and top popular free books for initial feed.
  */
-export async function getPopularBooksMultiApi(): Promise<BookItem[]> {
+export async function getPopularBooksMultiApi(language: string = 'en'): Promise<BookItem[]> {
   const curatedList: BookItem[] = Object.entries(CURATED_FULL_BOOKS).map(([id, b]) => ({
     id,
     title: b.title,
@@ -262,11 +263,12 @@ export async function getPopularBooksMultiApi(): Promise<BookItem[]> {
     description: b.description,
     totalPages: b.pages.length,
     rating: 4.9,
-    language: 'en'
+    language: language || 'en'
   }));
 
   try {
-    const res = await fetch(`https://gutendex.com/books/?sort=popular&languages=en`, {
+    const langParam = language && language !== 'all' ? `&languages=${language}` : '&languages=en';
+    const res = await fetch(`https://gutendex.com/books/?sort=popular${langParam}`, {
       next: { revalidate: 3600 }
     });
     if (res.ok) {
@@ -281,7 +283,7 @@ export async function getPopularBooksMultiApi(): Promise<BookItem[]> {
             author,
             coverImage: cover,
             category: item.subjects?.[0] ? item.subjects[0].split('--')[0].trim() : 'Classic Masterpiece',
-            language: item.languages?.[0] || 'en',
+            language: item.languages?.[0] || language || 'en',
             totalPages: Math.max(50, Math.min(500, Math.round((item.download_count || 100) / 15))),
             rating: 4.9,
             epubUrl: item.formats?.['application/epub+zip']
@@ -304,6 +306,49 @@ export async function getPopularBooksMultiApi(): Promise<BookItem[]> {
   }
 
   return curatedList;
+}
+
+/**
+ * Translates book text paragraph by paragraph into user's preferred language.
+ */
+export async function translateBookText(text: string, targetLang: string): Promise<string> {
+  if (!text || !targetLang || targetLang === 'en') {
+    return text;
+  }
+
+  try {
+    const paragraphs = text.split('\n\n');
+    const translatedParagraphs: string[] = [];
+
+    for (const p of paragraphs) {
+      if (!p.trim()) continue;
+      // Truncate to safe length for free translation endpoint
+      const cleanP = p.trim().slice(0, 480);
+      try {
+        const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(cleanP)}&langpair=en|${targetLang}`, {
+          next: { revalidate: 86400 }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const translated = data.responseData?.translatedText;
+          if (translated && !translated.includes('MYMEMORY WARNING')) {
+            translatedParagraphs.push(translated);
+          } else {
+            translatedParagraphs.push(p);
+          }
+        } else {
+          translatedParagraphs.push(p);
+        }
+      } catch (err) {
+        translatedParagraphs.push(p);
+      }
+    }
+
+    return translatedParagraphs.join('\n\n');
+  } catch (error) {
+    console.error('[Tolee Book] Translation error:', error);
+    return text;
+  }
 }
 
 /**

@@ -1,15 +1,15 @@
 'use server';
 
-import { searchFreeBooksMultiApi, getPopularBooksMultiApi, getBookPages } from '../services/bookService';
+import { searchFreeBooksMultiApi, getPopularBooksMultiApi, getBookPages, translateBookText } from '../services/bookService';
 import { BookItem } from '../types/book.types';
 
-export async function searchBooksAction(query: string): Promise<{ success: boolean; books: BookItem[]; error?: string }> {
+export async function searchBooksAction(query: string, language: string = 'en'): Promise<{ success: boolean; books: BookItem[]; error?: string }> {
   try {
     if (!query || query.trim().length === 0) {
-      const popular = await getPopularBooksMultiApi();
+      const popular = await getPopularBooksMultiApi(language);
       return { success: true, books: popular };
     }
-    const books = await searchFreeBooksMultiApi(query);
+    const books = await searchFreeBooksMultiApi(query, language);
     return { success: true, books };
   } catch (error) {
     console.error('[Tolee Book Action] Error searching books:', error);
@@ -17,9 +17,9 @@ export async function searchBooksAction(query: string): Promise<{ success: boole
   }
 }
 
-export async function getPopularBooksAction(): Promise<{ success: boolean; books: BookItem[]; error?: string }> {
+export async function getPopularBooksAction(language: string = 'en'): Promise<{ success: boolean; books: BookItem[]; error?: string }> {
   try {
-    const books = await getPopularBooksMultiApi();
+    const books = await getPopularBooksMultiApi(language);
     return { success: true, books };
   } catch (error) {
     console.error('[Tolee Book Action] Error fetching popular books:', error);
@@ -41,6 +41,22 @@ export async function getBookPagesAction(bookId: string, title?: string): Promis
       success: false,
       pages: ['Chapter 1\n\nContent could not be loaded at this time. Please try again.'],
       totalPages: 1
+    };
+  }
+}
+
+export async function translateBookPageAction(text: string, targetLang: string): Promise<{ success: boolean; translatedText: string }> {
+  try {
+    const translatedText = await translateBookText(text, targetLang);
+    return {
+      success: true,
+      translatedText
+    };
+  } catch (error) {
+    console.error('[Tolee Book Action] Error translating page:', error);
+    return {
+      success: false,
+      translatedText: text
     };
   }
 }
