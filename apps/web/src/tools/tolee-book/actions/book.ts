@@ -1,19 +1,29 @@
 'use server';
 
-import { searchOpenLibraryBooks, getBookPages } from '../services/bookService';
+import { searchFreeBooksMultiApi, getPopularBooksMultiApi, getBookPages } from '../services/bookService';
 import { BookItem } from '../types/book.types';
 
 export async function searchBooksAction(query: string): Promise<{ success: boolean; books: BookItem[]; error?: string }> {
   try {
     if (!query || query.trim().length === 0) {
-      const defaultBooks = await searchOpenLibraryBooks('philosophy literature science technology');
-      return { success: true, books: defaultBooks };
+      const popular = await getPopularBooksMultiApi();
+      return { success: true, books: popular };
     }
-    const books = await searchOpenLibraryBooks(query);
+    const books = await searchFreeBooksMultiApi(query);
     return { success: true, books };
   } catch (error) {
     console.error('[Tolee Book Action] Error searching books:', error);
     return { success: false, books: [], error: 'Failed to search books' };
+  }
+}
+
+export async function getPopularBooksAction(): Promise<{ success: boolean; books: BookItem[]; error?: string }> {
+  try {
+    const books = await getPopularBooksMultiApi();
+    return { success: true, books };
+  } catch (error) {
+    console.error('[Tolee Book Action] Error fetching popular books:', error);
+    return { success: false, books: [], error: 'Failed to load popular books' };
   }
 }
 
