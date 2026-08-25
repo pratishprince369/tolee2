@@ -27,9 +27,29 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const post = res.post;
   const author = post.isAnonymous ? 'Gupt Khabar' : post.author;
+  const title = `${post.title} | Tolee Radar (${post.locationName})`;
+  const description = post.description || `${post.title} reported near ${post.locationName} by ${author}.`;
+
   return {
-    title: `${post.title} | Tolee Radar (${post.locationName})`,
-    description: post.description || `${post.title} reported near ${post.locationName} by ${author}.`
+    title,
+    description,
+    alternates: {
+      canonical: `https://tolee.in/radar/${params.id}`,
+    },
+    openGraph: {
+      title,
+      description,
+      url: `https://tolee.in/radar/${params.id}`,
+      siteName: 'Tolee Radar',
+      type: 'article',
+      images: [{ url: 'https://tolee.in/logo.png', width: 1200, height: 630, alt: title }],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: ['https://tolee.in/logo.png'],
+    },
   };
 }
 

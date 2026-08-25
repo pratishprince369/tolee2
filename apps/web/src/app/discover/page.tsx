@@ -3,6 +3,40 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getSimulationSettings, getGroupMemberCount } from '@/lib/simulation';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'Tolee Discover – Explore Verified Local Communities, Groups & Clubs',
+  description: 'Find, explore, and join local interest groups, tech clubs, fitness squads, creative circles, and verified neighborhood Tolee communities near you.',
+  keywords: ['Tolee Discover', 'local communities', 'interest groups', 'join groups India', 'online clubs', 'find groups'],
+  alternates: {
+    canonical: 'https://tolee.in/discover',
+  },
+  openGraph: {
+    title: 'Tolee Discover – Explore Verified Local Communities, Groups & Clubs',
+    description: 'Find, explore, and join local interest groups, tech clubs, and neighborhood Tolee communities.',
+    url: 'https://tolee.in/discover',
+    siteName: 'Tolee Discover',
+    images: [{ url: 'https://tolee.in/logo.png', width: 1200, height: 630, alt: 'Tolee Discover' }],
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Tolee Discover – Explore Verified Local Communities, Groups & Clubs',
+    description: 'Find, explore, and join local interest groups and neighborhood Tolee communities.',
+    images: ['https://tolee.in/logo.png'],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
+};
 
 export default async function DiscoverPage() {
   const session = await getServerSession(authOptions);

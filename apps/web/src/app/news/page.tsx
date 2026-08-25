@@ -7,9 +7,43 @@ import { Newspaper } from 'lucide-react';
 import { getNewsFeedPosts } from '@/actions/news';
 import { NewsFeedStream } from '@/components/NewsFeedStream';
 import { CreateNewsButton } from '@/components/CreateNewsButton';
+import type { Metadata } from 'next';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+
+export const metadata: Metadata = {
+  title: 'Tolee News – Latest Breaking Local News, Stories & Daily Updates',
+  description: 'Stay informed with verified breaking news, local updates, technology, science, business, entertainment, and community journalism on Tolee News.',
+  keywords: ['Tolee News', 'breaking news', 'local news India', 'community journalism', 'science news', 'business updates', 'daily headlines'],
+  alternates: {
+    canonical: 'https://tolee.in/news',
+  },
+  openGraph: {
+    title: 'Tolee News – Latest Breaking Local News, Stories & Daily Updates',
+    description: 'Stay informed with verified breaking news, local updates, technology, science, and community journalism on Tolee News.',
+    url: 'https://tolee.in/news',
+    siteName: 'Tolee News',
+    images: [{ url: 'https://tolee.in/logo.png', width: 1200, height: 630, alt: 'Tolee News' }],
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Tolee News – Latest Breaking Local News, Stories & Daily Updates',
+    description: 'Stay informed with verified breaking news and local updates on Tolee News.',
+    images: ['https://tolee.in/logo.png'],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
+};
 
 export default async function NewsHubPage({ searchParams }: { searchParams?: { cat?: string; create?: string; openModal?: string } }) {
   const session = await getServerSession(authOptions);

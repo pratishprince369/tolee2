@@ -1,4 +1,21 @@
 import React from 'react';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'About Tolee – India’s Group & Community Social Network',
+  description: 'Learn about Tolee, our mission, vision, and how we empower local creators, communities, and micro-businesses across India.',
+  alternates: {
+    canonical: 'https://tolee.in/about',
+  },
+  openGraph: {
+    title: 'About Tolee – India’s Group & Community Social Network',
+    description: 'Learn about Tolee, our mission, vision, and how we empower local creators, communities, and micro-businesses.',
+    url: 'https://tolee.in/about',
+    siteName: 'Tolee',
+    images: [{ url: 'https://tolee.in/logo.png', width: 1200, height: 630, alt: 'About Tolee' }],
+    type: 'website',
+  },
+};
 
 export default function AboutUs() {
   return (

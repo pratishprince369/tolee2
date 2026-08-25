@@ -8,12 +8,12 @@ import { Header } from "@/components/Header";
 const fontSans = Plus_Jakarta_Sans({ subsets: ['latin'], variable: '--font-sans' });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://www.tolee.in"),
+  metadataBase: new URL("https://tolee.in"),
   title: {
     default: "Tolee | Discover Local Communities, Reels & Marketplace",
     template: "%s | Tolee"
   },
-  description: "Tolee is India's leading group social network and community platform. Connect with local Tolee groups, watch vertical video reels, shop on Tolee Marketplace, stream Tolee Screen videos, and build micro-websites.",
+  description: "Tolee is India's leading community social network. Connect with local Tolee groups, watch vertical video reels, discover breaking local news, shop on Tolee Marketplace, stream videos, and explore AI tools.",
   keywords: [
     "Tolee",
     "Tolee App",
@@ -21,14 +21,19 @@ export const metadata: Metadata = {
     "Tolee Communities",
     "Tolee Marketplace",
     "Tolee Reels",
+    "Tolee News",
     "Tolee Screen",
     "Tolee AI",
     "Tolee Groups",
-    "Tolee World"
+    "Tolee World",
+    "Tolee Radar"
   ],
-  authors: [{ name: "Tolee" }],
+  authors: [{ name: "Tolee", url: "https://tolee.in" }],
   creator: "Tolee",
   publisher: "Tolee",
+  alternates: {
+    canonical: "https://tolee.in"
+  },
   robots: {
     index: true,
     follow: true,
@@ -43,24 +48,24 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "https://www.tolee.in",
+    url: "https://tolee.in",
     siteName: "Tolee",
     title: "Tolee | Discover Local Communities, Reels & Marketplace",
-    description: "Connect with local Tolee groups, watch vertical video reels, shop on Tolee Marketplace, stream Tolee Screen videos, and build micro-websites.",
+    description: "Connect with local Tolee groups, watch vertical video reels, discover breaking local news, shop on Tolee Marketplace, stream videos, and explore AI tools.",
     images: [
       {
-        url: "https://www.tolee.in/logo.png",
+        url: "https://tolee.in/logo.png",
         width: 1200,
         height: 630,
-        alt: "Tolee Group Social Network"
+        alt: "Tolee Community Social Network"
       }
     ]
   },
   twitter: {
     card: "summary_large_image",
     title: "Tolee | Discover Local Communities, Reels & Marketplace",
-    description: "Connect with local Tolee groups, watch vertical video reels, shop on Tolee Marketplace, stream Tolee Screen videos, and build micro-websites.",
-    images: ["https://www.tolee.in/logo.png"]
+    description: "Connect with local Tolee groups, watch vertical video reels, discover breaking local news, shop on Tolee Marketplace, stream videos, and explore AI tools.",
+    images: ["https://tolee.in/logo.png"]
   }
 };
 
@@ -106,9 +111,9 @@ export default async function RootLayout({
     "@context": "https://schema.org",
     "@type": "Organization",
     "name": "Tolee",
-    "alternateName": ["Tolee Social Network", "Tolee App", "Tolee India"],
-    "url": "https://www.tolee.in",
-    "logo": "https://www.tolee.in/logo.png",
+    "alternateName": ["Tolee Social Network", "Tolee App", "Tolee India", "Tolee Communities"],
+    "url": "https://tolee.in",
+    "logo": "https://tolee.in/logo.png",
     "sameAs": [
       "https://play.google.com/store/apps/details?id=in.tolee.app"
     ]
@@ -118,10 +123,13 @@ export default async function RootLayout({
     "@context": "https://schema.org",
     "@type": "WebSite",
     "name": "Tolee",
-    "url": "https://www.tolee.in",
+    "url": "https://tolee.in",
     "potentialAction": {
       "@type": "SearchAction",
-      "target": "https://www.tolee.in/discover?q={search_term_string}",
+      "target": {
+        "@type": "EntryPoint",
+        "urlTemplate": "https://tolee.in/discover?q={search_term_string}"
+      },
       "query-input": "required name=search_term_string"
     }
   };
@@ -135,49 +143,63 @@ export default async function RootLayout({
         "position": 1,
         "name": "Tolee Home",
         "description": "Discover & connect with local interest communities and groups on Tolee.",
-        "url": "https://www.tolee.in"
+        "url": "https://tolee.in"
       },
       {
         "@type": "SiteNavigationElement",
         "position": 2,
         "name": "Tolee Reels",
         "description": "Watch trending short vertical video reels and viral content on Tolee Reels.",
-        "url": "https://www.tolee.in/reels"
+        "url": "https://tolee.in/reels"
       },
       {
         "@type": "SiteNavigationElement",
         "position": 3,
-        "name": "Tolee Marketplace",
-        "description": "Buy and sell local products, services, and real estate with 0% commission on Tolee Marketplace.",
-        "url": "https://www.tolee.in/marketplace"
+        "name": "Tolee News",
+        "description": "Read verified breaking local news, science, world affairs and stories on Tolee News.",
+        "url": "https://tolee.in/news"
       },
       {
         "@type": "SiteNavigationElement",
         "position": 4,
-        "name": "Tolee Screen",
-        "description": "Stream high-quality long form videos, live stages, and masterclasses on Tolee Screen.",
-        "url": "https://www.tolee.in/screen"
+        "name": "Tolee Marketplace",
+        "description": "Buy and sell local products, services, vehicles, and real estate with 0% commission on Tolee Marketplace.",
+        "url": "https://tolee.in/marketplace"
       },
       {
         "@type": "SiteNavigationElement",
         "position": 5,
-        "name": "Tolee Discover Groups",
-        "description": "Find and join verified local community groups and private interest Tolees.",
-        "url": "https://www.tolee.in/discover"
+        "name": "Tolee Screen",
+        "description": "Stream high-quality long form videos, live stages, and masterclasses on Tolee Screen.",
+        "url": "https://tolee.in/screen"
       },
       {
         "@type": "SiteNavigationElement",
         "position": 6,
-        "name": "Tolee World",
-        "description": "Create AI micro-websites, online stores, blogs, and restaurants on Tolee World.",
-        "url": "https://www.tolee.in/world"
+        "name": "Tolee Discover Groups",
+        "description": "Find and join verified local community groups and private interest Tolees.",
+        "url": "https://tolee.in/discover"
       },
       {
         "@type": "SiteNavigationElement",
         "position": 7,
+        "name": "Tolee World",
+        "description": "Explore digital books, AI micro-websites, online stores, blogs, and tools on Tolee World.",
+        "url": "https://tolee.in/world"
+      },
+      {
+        "@type": "SiteNavigationElement",
+        "position": 8,
+        "name": "Tolee Radar",
+        "description": "Discover real-time neighborhood local alerts, food spots and deals around your area.",
+        "url": "https://tolee.in/radar"
+      },
+      {
+        "@type": "SiteNavigationElement",
+        "position": 9,
         "name": "Tolee Creator Program",
         "description": "Monetize your content, build subscription groups, and earn with Tolee Creator Program.",
-        "url": "https://www.tolee.in/creator-program"
+        "url": "https://tolee.in/creator-program"
       }
     ]
   };

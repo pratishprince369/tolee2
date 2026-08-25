@@ -1,4 +1,17 @@
 import React from 'react';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'Terms and Conditions | Tolee',
+  description: 'Review the terms and conditions for accessing and using the Tolee social platform, community features, and digital tools.',
+  alternates: {
+    canonical: 'https://tolee.in/terms',
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+};
 
 export default function TermsAndConditions() {
   return (

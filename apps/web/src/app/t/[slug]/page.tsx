@@ -7,6 +7,7 @@ import { authOptions } from '@/lib/auth';
 import { notFound, redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { Suspense } from 'react';
+import type { Metadata } from 'next';
 
 const getValidAvatarUrl = (url: string | null | undefined): string => {
   if (!url || url === 'null' || url === 'undefined' || url.trim() === '') {
@@ -15,11 +16,95 @@ const getValidAvatarUrl = (url: string | null | undefined): string => {
   return url;
 };
 
-export default async function ToleePage({ params }: { params: { slug: string } }) {
+interface ToleePageProps {
+  params: Promise<{ slug: string }> | { slug: string };
+}
+
+export async function generateMetadata({ params }: ToleePageProps): Promise<Metadata> {
+  const { slug } = params instanceof Promise ? await params : params;
+  const res = await getToleeBySlug(slug);
+  const tolee = res?.tolee;
+
+  if (!tolee) {
+    if (['tech-titans', 'music-soul', 'artist-hub', 'qa-test-tolee'].includes(slug)) {
+      const demoName = slug.split('-').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+      return {
+        title: `${demoName} Community | Tolee`,
+        description: `Join the ${demoName} group community on Tolee to connect, discuss, and share updates.`,
+        alternates: { canonical: `https://tolee.in/t/${slug}` },
+      };
+    }
+    return { title: 'Community Not Found | Tolee' };
+  }
+
+  if (tolee.isPrivate || tolee.isPublicVisible === false) {
+    return {
+      title: `${tolee.name} (Private Group) | Tolee`,
+      description: 'This is a private Tolee community.',
+      robots: {
+        index: false,
+        follow: false,
+        nocache: true,
+        googleBot: {
+          index: false,
+          follow: false,
+          noimageindex: true,
+        },
+      },
+    };
+  }
+
+  const title = `${tolee.name} Community | Tolee`;
+  const description = tolee.description || `Join ${tolee.name} on Tolee to connect with local members, discover discussions, events, and community updates.`;
+  const bannerImage = tolee.coverImage || tolee.avatar || 'https://tolee.in/logo.png';
+
+  return {
+    title,
+    description,
+    keywords: [tolee.name, `${tolee.name} group`, `${tolee.name} community`, tolee.category || 'community', 'Tolee India', 'Tolee groups'],
+    alternates: {
+      canonical: `https://tolee.in/t/${slug}`,
+    },
+    openGraph: {
+      title,
+      description,
+      url: `https://tolee.in/t/${slug}`,
+      siteName: 'Tolee Communities',
+      type: 'website',
+      images: [
+        {
+          url: bannerImage,
+          width: 1200,
+          height: 630,
+          alt: `${tolee.name} Banner`,
+        },
+      ],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: [bannerImage],
+    },
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: {
+        index: true,
+        follow: true,
+        'max-image-preview': 'large',
+        'max-snippet': -1,
+      },
+    },
+  };
+}
+
+export default async function ToleePage({ params }: ToleePageProps) {
+  const { slug } = params instanceof Promise ? await params : params;
   const session = await getServerSession(authOptions);
   const currentUserId = session?.user ? (session.user as any).id : null;
 
-  const res = await getToleeBySlug(params.slug);
+  const res = await getToleeBySlug(slug);
   let dbTolee = res.tolee;
   
   // Demo Mode for landing page links
@@ -340,16 +425,68 @@ export default async function ToleePage({ params }: { params: { slug: string } }
 
   toleeData.posts = interleavedGroupFeed;
 
+  const jsonLdCommunity = !dbTolee.isPrivate ? {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": dbTolee.name,
+    "description": dbTolee.description || `The ${dbTolee.name} community group on Tolee`,
+    "url": `https://tolee.in/t/${dbTolee.slug}`,
+    "logo": dbTolee.avatar || "https://tolee.in/logo.png",
+    "image": dbTolee.coverImage || dbTolee.avatar || "https://tolee.in/logo.png",
+    "interactionStatistic": {
+      "@type": "InteractionCounter",
+      "interactionType": "https://schema.org/FollowAction",
+      "userInteractionCount": dbTolee._count?.members || 0
+    }
+  } : null;
+
+  const jsonLdBreadcrumbs = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Home",
+        "item": "https://tolee.in"
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": "Discover Communities",
+        "item": "https://tolee.in/discover"
+      },
+      {
+        "@type": "ListItem",
+        "position": 3,
+        "name": dbTolee.name,
+        "item": `https://tolee.in/t/${dbTolee.slug}`
+      }
+    ]
+  };
+
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-[#fafafa] dark:bg-[#0a0a0a] flex items-center justify-center">
-        <div className="w-10 h-10 border-4 border-[#0a7c85]/20 border-t-[#0a7c85] rounded-full animate-spin" />
-      </div>
-    }>
-      <ToleeView 
-        toleeData={toleeData} 
-        currentUserId={currentUserId} 
+    <>
+      {jsonLdCommunity && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdCommunity) }}
+        />
+      )}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdBreadcrumbs) }}
       />
-    </Suspense>
+      <Suspense fallback={
+        <div className="min-h-screen bg-[#fafafa] dark:bg-[#0a0a0a] flex items-center justify-center">
+          <div className="w-10 h-10 border-4 border-[#0a7c85]/20 border-t-[#0a7c85] rounded-full animate-spin" />
+        </div>
+      }>
+        <ToleeView 
+          toleeData={toleeData} 
+          currentUserId={currentUserId} 
+        />
+      </Suspense>
+    </>
   );
 }

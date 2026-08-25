@@ -9,12 +9,11 @@ import { toggleFollow } from '@/actions/user';
 
 export default async function UserProfile({ params }: { params: { username: string } }) {
   const session = await getServerSession(authOptions);
+  const currentUserId = (session?.user as any)?.id || null;
   
-  if (!session?.user) {
+  if (params.username === 'me' && !currentUserId) {
     redirect('/');
   }
-  
-  const currentUserId = (session?.user as any)?.id;
 
   let user;
   const userSelect = {
@@ -371,15 +370,14 @@ export default async function UserProfile({ params }: { params: { username: stri
     // NewsPost table may not exist yet
   }
 
-  const isSuperAdmin = session?.user?.email === process.env.SUPER_ADMIN_EMAIL;
-
   return (
-    <InstagramProfileView 
-      user={{
-        ...user,
-        level: user.level || 1,
-        trustScore: user.trustScore || 100
-      }}
+    <>
+      <InstagramProfileView 
+        user={{
+          ...user,
+          level: user.level || 1,
+          trustScore: user.trustScore || 100
+        }}
       posts={userPosts}
       savedPosts={savedPosts}
       resharedPosts={resharedPosts}
@@ -399,6 +397,67 @@ export default async function UserProfile({ params }: { params: { username: stri
       initialSubscribed={isSubscribed}
       initialBellPreference={bellPreference}
     />
+
+    {!user.isPrivate && user.searchEngineIndexable !== false && (
+      <>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "ProfilePage",
+              "dateCreated": user.createdAt ? new Date(user.createdAt).toISOString() : new Date().toISOString(),
+              "mainEntity": {
+                "@type": "Person",
+                "name": user.name || user.username,
+                "alternateName": `@${user.username}`,
+                "identifier": user.username,
+                "description": user.bio || `Profile of ${user.name} on Tolee`,
+                "image": user.avatar || "https://tolee.in/logo.png",
+                "url": `https://tolee.in/u/${user.username}`,
+                "interactionStatistic": [
+                  {
+                    "@type": "InteractionCounter",
+                    "interactionType": "https://schema.org/FollowAction",
+                    "userInteractionCount": subscriberCount || 0
+                  }
+                ]
+              }
+            })
+          }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "BreadcrumbList",
+              "itemListElement": [
+                {
+                  "@type": "ListItem",
+                  "position": 1,
+                  "name": "Home",
+                  "item": "https://tolee.in"
+                },
+                {
+                  "@type": "ListItem",
+                  "position": 2,
+                  "name": "Users",
+                  "item": "https://tolee.in/discover"
+                },
+                {
+                  "@type": "ListItem",
+                  "position": 3,
+                  "name": user.name || `@${user.username}`,
+                  "item": `https://tolee.in/u/${user.username}`
+                }
+              ]
+            })
+          }}
+        />
+      </>
+    )}
+    </>
   );
 }
 
@@ -409,13 +468,13 @@ export async function generateMetadata({ params }: { params: { username: string 
   try {
     let user = await prisma.user.findUnique({
       where: { username },
-      select: { name: true, username: true, bio: true, image: true, isPrivate: true, searchEngineIndexable: true }
+      select: { name: true, username: true, bio: true, image: true, avatar: true, isPrivate: true, searchEngineIndexable: true }
     });
 
     if (!user) {
       user = await prisma.user.findUnique({
         where: { id: username },
-        select: { name: true, username: true, bio: true, image: true, isPrivate: true, searchEngineIndexable: true }
+        select: { name: true, username: true, bio: true, image: true, avatar: true, isPrivate: true, searchEngineIndexable: true }
       });
     }
 
@@ -436,19 +495,22 @@ export async function generateMetadata({ params }: { params: { username: string 
       };
     }
 
-    const title = `${user.name || user.username} (@${user.username}) | Tolee`;
-    const description = user.bio || `Check out ${user.name}'s profile and posts on Tolee.`;
-    const image = user.image || 'https://www.tolee.in/default-user-avatar.svg';
+    const title = `${user.name || user.username} (@${user.username}) | Tolee Profile`;
+    const description = user.bio || `Connect with ${user.name} on Tolee. Discover posts, reels, and community updates.`;
+    const image = user.avatar || user.image || 'https://tolee.in/logo.png';
 
     return {
       title,
       description,
+      alternates: {
+        canonical: `https://tolee.in/u/${user.username}`,
+      },
       openGraph: {
         title,
         description,
-        url: `https://www.tolee.in/u/${user.username}`,
+        url: `https://tolee.in/u/${user.username}`,
         siteName: 'Tolee',
-        images: [{ url: image }],
+        images: [{ url: image, width: 600, height: 600, alt: `${user.name} on Tolee` }],
         type: 'profile',
       },
       twitter: {

@@ -1,14 +1,24 @@
 import { MetadataRoute } from 'next';
 
 export default function robots(): MetadataRoute.Robots {
-  const baseUrl = 'https://www.tolee.in';
+  const baseUrl = 'https://tolee.in';
 
   const publicRoutes = [
     '/',
     '/discover',
     '/reels',
+    '/reel/*',
+    '/news',
+    '/news/*',
     '/marketplace',
+    '/marketplace/*',
+    '/screen',
+    '/screen/watch/*',
     '/world',
+    '/world/*',
+    '/radar',
+    '/radar/*',
+    '/map',
     '/creator-program',
     '/about',
     '/privacy',
@@ -19,39 +29,33 @@ export default function robots(): MetadataRoute.Robots {
     '/blog/*',
     '/restaurant/*',
     '/store/*',
-    '/marketplace/listing/*',
     '/u/*',
-    '/news',
-    '/news/*',
-    '/screen',
-    '/screen/watch/*',
     '/post/*',
   ];
 
   const disallowedRoutes = [
     '/api/',
     '/api/*',
-    '/graphql/',
-    '/rest/',
-    '/rpc/',
-    '/server/',
-    '/backend/',
-    '/internal/',
-    '/functions/',
-    '/webhook/',
     '/auth/',
-    '/socket/',
-    '/admin/',
-    '/super-admin/',
-    '/dashboard/',
-    '/settings/',
-    '/chat/',
-    '/messages/',
-    '/ads/',
-    '/ai-manager/',
     '/login/',
     '/signup/',
     '/forgot-password/',
+    '/admin/',
+    '/super-admin/',
+    '/dashboard/',
+    '/creator-dashboard/',
+    '/ads-manager/',
+    '/settings/',
+    '/chat/',
+    '/messages/',
+    '/notifications/',
+    '/ai-manager/',
+    '/feed',
+    '/feed/*',
+    '/my-tolees',
+    '/my-tolees/*',
+    '/ads/',
+    '/internal/',
   ];
 
   return {
@@ -61,9 +65,22 @@ export default function robots(): MetadataRoute.Robots {
         allow: publicRoutes,
         disallow: disallowedRoutes,
       },
-      // Search Engine & AI Crawler rules (AEO / GEO Optimization)
+      // Search Engine & AI Crawler rules (AEO / GEO / Search Engine Optimization)
       {
-        userAgent: ['Googlebot', 'Bingbot', 'GPTBot', 'ChatGPT-User', 'PerplexityBot', 'ClaudeBot', 'Google-Extended'],
+        userAgent: [
+          'Googlebot',
+          'Bingbot',
+          'Slurp',
+          'DuckDuckBot',
+          'Baiduspider',
+          'YandexBot',
+          'GPTBot',
+          'ChatGPT-User',
+          'PerplexityBot',
+          'ClaudeBot',
+          'Google-Extended',
+          'Applebot'
+        ],
         allow: publicRoutes,
         disallow: disallowedRoutes,
       },
@@ -71,3 +88,4 @@ export default function robots(): MetadataRoute.Robots {
     sitemap: `${baseUrl}/sitemap.xml`,
   };
 }
+

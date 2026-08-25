@@ -47,25 +47,28 @@ export async function generateMetadata({ params }: { params: { slug: string } })
 
   const headline = post.caption || news.headline || 'Tolee News Article';
   const description = news.summary || news.metaDescription || headline;
-  const mediaUrl = post.mediaUrls ? post.mediaUrls.split(',')[0] : 'https://www.tolee.in/tolee-news-default.png';
+  const mediaUrl = post.mediaUrls ? post.mediaUrls.split(',')[0] : 'https://tolee.in/logo.png';
 
   return {
     title: `${headline} | Tolee News`,
     description,
     keywords: news.keywords ? news.keywords.split(',') : undefined,
+    alternates: {
+      canonical: `https://tolee.in/news/${params.slug}`,
+    },
     openGraph: {
-      title: headline,
+      title: `${headline} | Tolee News`,
       description,
-      url: `https://www.tolee.in/news/${params.slug}`,
+      url: `https://tolee.in/news/${params.slug}`,
       siteName: 'Tolee News',
       type: 'article',
-      images: [{ url: mediaUrl }],
+      images: [{ url: mediaUrl, width: 1200, height: 630, alt: headline }],
       publishedTime: new Date(news.createdAt).toISOString(),
       authors: [post.author?.name || 'Tolee Creator'],
     },
     twitter: {
       card: 'summary_large_image',
-      title: headline,
+      title: `${headline} | Tolee News`,
       description,
       images: [mediaUrl],
     },
@@ -109,8 +112,71 @@ export default async function NewsReaderPage({ params }: { params: { slug: strin
     contentBlocks = [{ type: 'paragraph', value: news.content }];
   }
 
+  const headline = post.caption || news.headline || 'Tolee News Article';
+  const mediaUrl = post.mediaUrls ? post.mediaUrls.split(',')[0] : 'https://tolee.in/logo.png';
+
+  const jsonLdArticle = {
+    "@context": "https://schema.org",
+    "@type": "NewsArticle",
+    "headline": headline,
+    "description": news.summary || news.metaDescription || headline,
+    "image": [mediaUrl],
+    "datePublished": new Date(news.createdAt).toISOString(),
+    "dateModified": new Date(news.updatedAt || news.createdAt).toISOString(),
+    "author": {
+      "@type": "Person",
+      "name": authorName,
+      "url": authorUsername ? `https://tolee.in/u/${authorUsername}` : `https://tolee.in`
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "Tolee News",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://tolee.in/logo.png"
+      }
+    },
+    "mainEntityOfPage": {
+      "@type": "WebPage",
+      "@id": `https://tolee.in/news/${params.slug}`
+    }
+  };
+
+  const jsonLdBreadcrumbs = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Home",
+        "item": "https://tolee.in"
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": "News Hub",
+        "item": "https://tolee.in/news"
+      },
+      {
+        "@type": "ListItem",
+        "position": 3,
+        "name": headline,
+        "item": `https://tolee.in/news/${params.slug}`
+      }
+    ]
+  };
+
   return (
     <div className="min-h-screen bg-white dark:bg-[#0a0a0a] text-gray-900 dark:text-zinc-200 pb-20">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdArticle) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdBreadcrumbs) }}
+      />
       
       {/* Reader Header Nav */}
       <div className="sticky top-0 z-30 bg-white/95 dark:bg-[#0a0a0a]/95 backdrop-blur-md border-b border-gray-100 dark:border-zinc-900 px-4 py-3 flex items-center justify-between">

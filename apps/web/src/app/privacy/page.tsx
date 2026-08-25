@@ -1,4 +1,17 @@
 import React from 'react';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'Privacy Policy | Tolee',
+  description: 'Learn how Tolee protects and respects your personal privacy, data security, and community information.',
+  alternates: {
+    canonical: 'https://tolee.in/privacy',
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+};
 
 export default function PrivacyPolicy() {
   return (

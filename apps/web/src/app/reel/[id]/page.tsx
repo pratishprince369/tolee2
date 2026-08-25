@@ -1,7 +1,7 @@
 import { ReelsStream } from '@/components/ReelsStream';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
-import { redirect } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import type { Metadata } from 'next';
 
@@ -20,7 +20,8 @@ export async function generateMetadata({ params }: ReelPageProps): Promise<Metad
       select: {
         caption: true,
         mediaUrls: true,
-        author: { select: { name: true, username: true, isPrivate: true } },
+        createdAt: true,
+        author: { select: { name: true, username: true, isPrivate: true, avatar: true } },
         tolees: { select: { tolee: { select: { isPrivate: true } } } },
       },
     });
@@ -31,7 +32,7 @@ export async function generateMetadata({ params }: ReelPageProps): Promise<Metad
 
       if (isPrivateAuthor || isPrivateGroup) {
         return {
-          title: 'Private Reel – Tolee',
+          title: 'Private Reel | Tolee',
           description: 'This reel is private.',
           robots: {
             index: false,
@@ -46,25 +47,33 @@ export async function generateMetadata({ params }: ReelPageProps): Promise<Metad
         };
       }
 
-      const title = `${post.author?.name || post.author?.username || 'Creator'} Reel – Tolee`;
-      const description = post.caption?.slice(0, 160) || 'Watch this reel on Tolee';
-      const videoUrl = post.mediaUrls ? post.mediaUrls.split(',')[0] : '';
+      const creatorName = post.author?.name || post.author?.username || 'Creator';
+      const captionSnippet = post.caption ? post.caption.replace(/(\r\n|\n|\r)/gm, " ").trim() : 'Watch trending reel';
+      const title = `${captionSnippet.slice(0, 60)} | ${creatorName} Reel on Tolee`;
+      const description = captionSnippet.slice(0, 160) || `Watch video reel by ${creatorName} on Tolee.`;
+      const videoUrl = post.mediaUrls ? post.mediaUrls.split(/,(?=https?:\/\/)/)[0] : '';
+      const posterImage = post.author?.avatar || 'https://tolee.in/logo.png';
 
       return {
         title,
         description,
+        alternates: {
+          canonical: `https://tolee.in/reel/${id}`,
+        },
         openGraph: {
           title,
           description,
-          url: `https://www.tolee.in/reel/${id}`,
+          url: `https://tolee.in/reel/${id}`,
           siteName: 'Tolee Reels',
           type: 'video.other',
           videos: videoUrl ? [{ url: videoUrl }] : undefined,
+          images: [{ url: posterImage }],
         },
         twitter: {
           card: 'player',
           title,
           description,
+          images: [posterImage],
         },
         robots: {
           index: true,
@@ -73,25 +82,24 @@ export async function generateMetadata({ params }: ReelPageProps): Promise<Metad
             index: true,
             follow: true,
             'max-image-preview': 'large',
+            'max-snippet': -1,
           }
         }
       };
     }
   } catch {}
-  return { title: 'Reel – Tolee' };
+  return { title: 'Reel | Tolee' };
 }
 
 export default async function ReelDeepLinkPage({ params }: ReelPageProps) {
   const session = await getServerSession(authOptions);
-  if (!session?.user) {
-    redirect('/');
-  }
+  const currentUserId = (session?.user as any)?.id || null;
 
   const { id } = params instanceof Promise ? await params : params;
-  const currentUserId = (session?.user as any)?.id;
 
   // Fetch the target reel + a feed of other reels for continued scrolling
   let dbReels: any[] = [];
+  let targetPost: any = null;
 
   try {
     // ── 1. Fetch the target reel directly ──────────────────────────────────
@@ -108,10 +116,25 @@ export default async function ReelDeepLinkPage({ params }: ReelPageProps) {
       },
     });
 
+    targetPost = post;
+
     const isVideo = (p: any) =>
       p && p.mediaUrls && (p.postType === 'reel' || p.mediaTypes?.includes('video'));
 
     if (post && isVideo(post)) {
+      // If private reel and user is not author, protect privacy
+      if (post.author?.isPrivate && (!currentUserId || post.authorId !== currentUserId)) {
+        return (
+          <div className="min-h-screen flex items-center justify-center bg-background p-4">
+            <div className="max-w-md w-full text-center p-8 bg-card border rounded-3xl space-y-4 shadow-lg">
+              <div className="w-12 h-12 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto text-xl font-bold">🔒</div>
+              <h2 className="text-xl font-bold">Private Reel</h2>
+              <p className="text-sm text-muted-foreground">This reel is private and only available to approved followers.</p>
+            </div>
+          </div>
+        );
+      }
+
       const firstTolee = post.tolees?.[0]?.tolee;
       const likedByMe = currentUserId
         ? post.likes.some((l: any) => l.userId === currentUserId)
@@ -179,74 +202,69 @@ export default async function ReelDeepLinkPage({ params }: ReelPageProps) {
       };
 
       dbReels.push(targetReel);
-    } else {
-      // Target not found / not a video — render unavailable placeholder
-      dbReels.push({
-        id,
-        isUnavailable: true,
-        caption: 'This reel is no longer available.',
-        author: 'Unavailable',
-        video: '',
-        likes: 0,
-        comments: 0,
-        views: 0,
-      });
     }
 
-    // ── 2. Load supporting reels for continued scroll (exclude the target) ──
-    const supportingPosts = await prisma.post.findMany({
+    // ── 2. Fetch a batch of other public reels (excluding the target) ──────
+    const morePosts = await prisma.post.findMany({
       where: {
         id: { not: id },
-        postType: 'reel',
-        isArchived: false,
         status: 'published',
-        mediaTypes: { contains: 'video' },
         visibility: 'public',
+        postType: 'reel',
+        mediaUrls: { not: null },
         author: { isPrivate: false },
       },
+      take: 20,
       orderBy: { createdAt: 'desc' },
-      take: 30,
       include: {
-        author: { select: { id: true, name: true, username: true, avatar: true, isPrivate: true } },
-        likes: { select: { userId: true } },
-        savedBy: { select: { userId: true } },
-        reposts: { orderBy: { createdAt: 'desc' }, include: { user: { select: { id: true, name: true, username: true, avatar: true } } } },
-        tolees: { include: { tolee: { select: { id: true, name: true, slug: true, ownerId: true } } } },
+        author: true,
+        likes: currentUserId ? { where: { userId: currentUserId }, select: { userId: true } } : false,
+        savedBy: currentUserId ? { where: { userId: currentUserId }, select: { userId: true } } : false,
+        reposts: currentUserId ? { where: { userId: currentUserId }, select: { userId: true } } : false,
+        comments: { take: 3, orderBy: { createdAt: 'desc' } },
+        tolees: { include: { tolee: true } },
         _count: { select: { likes: true, comments: true, reposts: true, views: true } },
       },
     });
 
-    // Batch follow + story lookups for the supporting authors
-    const authorIds = supportingPosts.map((p: any) => p.author.id);
+    const otherAuthorIds = morePosts.map((p: any) => p.author.id);
+
     let followedAuthorIds: string[] = [];
     let pendingFollowAuthorIds: string[] = [];
-    let authorsWithActiveStories: string[] = [];
-
-    if (currentUserId && authorIds.length > 0) {
+    if (currentUserId && otherAuthorIds.length > 0) {
       const follows = await prisma.follow.findMany({
-        where: { followerId: currentUserId, followingId: { in: authorIds } },
+        where: { followerId: currentUserId, followingId: { in: otherAuthorIds } },
         select: { followingId: true, status: true },
       });
-      followedAuthorIds = follows.filter((f: any) => f.status === 'approved').map((f: any) => f.followingId);
-      pendingFollowAuthorIds = follows.filter((f: any) => f.status === 'pending').map((f: any) => f.followingId);
-    }
-    if (authorIds.length > 0) {
-      const stories = await prisma.story.findMany({
-        where: { authorId: { in: authorIds }, expiresAt: { gte: new Date() } },
-        select: { authorId: true },
-      });
-      authorsWithActiveStories = stories.map((s: any) => s.authorId);
+      followedAuthorIds = follows
+        .filter((f: any) => f.status === 'approved')
+        .map((f: any) => f.followingId);
+      pendingFollowAuthorIds = follows
+        .filter((f: any) => f.status === 'pending')
+        .map((f: any) => f.followingId);
     }
 
-    for (const p of supportingPosts) {
+    let authorsWithActiveStories: string[] = [];
+    if (otherAuthorIds.length > 0) {
+      const activeStories = await prisma.story.findMany({
+        where: { authorId: { in: otherAuthorIds }, expiresAt: { gte: new Date() } },
+        select: { authorId: true },
+      });
+      authorsWithActiveStories = activeStories.map((s: any) => s.authorId);
+    }
+
+    for (const p of morePosts) {
+      if (!p.mediaUrls) continue;
       const firstTolee = p.tolees?.[0]?.tolee;
-      const likedByMe = currentUserId ? p.likes.some((l: any) => l.userId === currentUserId) : false;
-      const savedByMe = currentUserId ? p.savedBy?.some((s: any) => s.userId === currentUserId) : false;
-      const repostedByMe = currentUserId ? p.reposts?.some((r: any) => r.userId === currentUserId) : false;
+      const likedByMe = currentUserId ? (p.likes as any[])?.length > 0 : false;
+      const savedByMe = currentUserId ? (p.savedBy as any[])?.length > 0 : false;
+      const repostedByMe = currentUserId ? (p.reposts as any[])?.length > 0 : false;
       const isFollowing = followedAuthorIds.includes(p.author.id);
-      const followStatus = pendingFollowAuthorIds.includes(p.author.id)
+      const followStatus = isFollowing
+        ? 'approved'
+        : pendingFollowAuthorIds.includes(p.author.id)
         ? 'pending'
-        : isFollowing ? 'approved' : null;
+        : null;
       const hasActiveStory = authorsWithActiveStories.includes(p.author.id);
 
       dbReels.push({
@@ -289,6 +307,68 @@ export default async function ReelDeepLinkPage({ params }: ReelPageProps) {
     console.error('[ReelDeepLinkPage] Error:', err);
   }
 
-  // ReelsStream will treat index 0 as the active reel on mount
-  return <ReelsStream initialReels={dbReels} />;
+  const creatorName = targetPost?.author?.name || targetPost?.author?.username || 'Tolee Creator';
+  const videoUrl = targetPost?.mediaUrls ? targetPost.mediaUrls.split(/,(?=https?:\/\/)/)[0] : '';
+
+  const jsonLdVideo = targetPost ? {
+    "@context": "https://schema.org",
+    "@type": "VideoObject",
+    "name": targetPost.caption?.slice(0, 100) || `Reel by ${creatorName}`,
+    "description": targetPost.caption || `Watch vertical video reel by ${creatorName} on Tolee.`,
+    "thumbnailUrl": targetPost.author?.avatar || "https://tolee.in/logo.png",
+    "uploadDate": targetPost.createdAt ? new Date(targetPost.createdAt).toISOString() : new Date().toISOString(),
+    "contentUrl": videoUrl,
+    "embedUrl": `https://tolee.in/reel/${id}`,
+    "author": {
+      "@type": "Person",
+      "name": creatorName,
+      "url": targetPost.author?.username ? `https://tolee.in/u/${targetPost.author.username}` : `https://tolee.in`
+    },
+    "interactionStatistic": {
+      "@type": "InteractionCounter",
+      "interactionType": "https://schema.org/WatchAction",
+      "userInteractionCount": targetPost._count?.views || 0
+    }
+  } : null;
+
+  const jsonLdBreadcrumbs = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Home",
+        "item": "https://tolee.in"
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": "Reels",
+        "item": "https://tolee.in/reels"
+      },
+      {
+        "@type": "ListItem",
+        "position": 3,
+        "name": targetPost?.caption ? `${targetPost.caption.slice(0, 30)}...` : `Reel #${id}`,
+        "item": `https://tolee.in/reel/${id}`
+      }
+    ]
+  };
+
+  return (
+    <>
+      {jsonLdVideo && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdVideo) }}
+        />
+      )}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdBreadcrumbs) }}
+      />
+      <ReelsStream initialReels={dbReels} />
+    </>
+  );
 }

@@ -43,10 +43,7 @@ export function DiscoverGrid({ initialTolees, tolees: propTolees, isAuthenticate
   };
 
   const handleCardClick = (e: React.MouseEvent, slug: string) => {
-    if (!isAuthenticated) {
-      e.preventDefault();
-      triggerAuthModal('Login or create an account to explore this Tolee community.');
-    }
+    // Allows standard crawlable link navigation to public /t/[slug] landing page
   };
 
   const handleJoin = async (e: React.MouseEvent, toleeId: string, isPrivate: boolean) => {

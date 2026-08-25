@@ -4,9 +4,43 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
+import type { Metadata } from 'next';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+
+export const metadata: Metadata = {
+  title: 'Tolee Reels – Discover Trending Short Videos & Creator Clips',
+  description: 'Watch viral vertical video reels, discover trending local creators, comedy clips, dances, and tutorials across India on Tolee Reels.',
+  keywords: ['Tolee Reels', 'short videos', 'reels India', 'trending videos', 'creator clips', 'viral reels', 'local videos'],
+  alternates: {
+    canonical: 'https://tolee.in/reels',
+  },
+  openGraph: {
+    title: 'Tolee Reels – Discover Trending Short Videos & Creator Clips',
+    description: 'Watch viral vertical video reels, discover trending local creators, comedy clips, dances, and tutorials on Tolee Reels.',
+    url: 'https://tolee.in/reels',
+    siteName: 'Tolee Reels',
+    images: [{ url: 'https://tolee.in/logo.png', width: 1200, height: 630, alt: 'Tolee Reels' }],
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Tolee Reels – Discover Trending Short Videos & Creator Clips',
+    description: 'Watch viral vertical video reels and discover trending creators on Tolee Reels.',
+    images: ['https://tolee.in/logo.png'],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
+};
 
 export default async function ReelsPage({ searchParams }: { searchParams: { videoId?: string } }) {
   const session = await getServerSession(authOptions);
