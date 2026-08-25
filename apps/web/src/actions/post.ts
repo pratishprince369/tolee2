@@ -3079,6 +3079,48 @@ export async function getPostById(id: string) {
     const savedByMe = currentUserId ? post.savedBy.some((s: any) => s.userId === currentUserId) : false;
     const repostedByMe = currentUserId ? post.reposts.some((r: any) => r.userId === currentUserId) : false;
 
+    // Serialize comments with pure string dates and plain objects
+    const serializedComments = (post.comments || []).map((c: any) => ({
+      id: c.id,
+      content: c.content,
+      createdAt: c.createdAt ? new Date(c.createdAt).toISOString() : new Date().toISOString(),
+      likesCount: c.likes?.length || 0,
+      likedByMe: currentUserId ? (c.likes || []).some((l: any) => l.userId === currentUserId) : false,
+      author: c.author ? {
+        id: c.author.id,
+        name: c.author.name || c.author.username || 'User',
+        username: c.author.username || c.author.name || 'user',
+        avatar: c.author.avatar || '/default-user-avatar.svg',
+      } : {
+        id: 'unknown',
+        name: 'User',
+        username: 'user',
+        avatar: '/default-user-avatar.svg',
+      },
+      replies: (c.replies || []).map((r: any) => ({
+        id: r.id,
+        content: r.content,
+        createdAt: r.createdAt ? new Date(r.createdAt).toISOString() : new Date().toISOString(),
+        author: r.author ? {
+          id: r.author.id,
+          name: r.author.name || r.author.username || 'User',
+          username: r.author.username || r.author.name || 'user',
+          avatar: r.author.avatar || '/default-user-avatar.svg',
+        } : {
+          id: 'unknown',
+          name: 'User',
+          username: 'user',
+          avatar: '/default-user-avatar.svg',
+        },
+      })),
+    }));
+
+    // Extract first image or video safely
+    const mediaUrlsList = post.mediaUrls ? post.mediaUrls.split(/,(?=https?:\/\/)/).filter(Boolean) : [];
+    const mediaTypesList = post.mediaTypes ? post.mediaTypes.split(',') : [];
+    const firstMediaType = mediaTypesList[0] || (post.postType === 'reel' ? 'video' : 'image');
+    const firstMediaUrl = mediaUrlsList[0] || null;
+
     const mappedPost = {
       id: post.id,
       authorId: post.author?.id || null,
@@ -3088,13 +3130,13 @@ export async function getPostById(id: string) {
       authorIsPrivate: post.author?.isPrivate || false,
       toleeName: firstTolee?.name || null,
       toleeSlug: firstTolee?.slug || null,
-      postType: post.postType,
+      postType: post.postType || 'normal',
       caption: post.caption || '',
       mediaUrls: post.mediaUrls || '',
       mediaTypes: post.mediaTypes || '',
-      image: post.mediaTypes?.split(',')[0] === 'image' ? post.mediaUrls?.split(/,(?=https?:\/\/)/)[0] : null,
-      video: post.mediaTypes?.split(',')[0] === 'video' ? post.mediaUrls?.split(/,(?=https?:\/\/)/)[0] : null,
-      visibility: post.visibility,
+      image: firstMediaType === 'image' ? firstMediaUrl : null,
+      video: firstMediaType === 'video' ? firstMediaUrl : null,
+      visibility: post.visibility || 'public',
       location: post.location || null,
       subLocation: post.subLocation || null,
       likes: post._count?.likes || 0,
@@ -3104,9 +3146,17 @@ export async function getPostById(id: string) {
       likedByMe,
       savedByMe,
       repostedByMe,
-      commentsList: post.comments || [],
-      newsRelation: post.newsRelation || null,
-      createdAt: post.createdAt.toISOString(),
+      commentsList: serializedComments,
+      newsRelation: post.newsRelation ? {
+        id: post.newsRelation.id,
+        headline: post.newsRelation.headline,
+        slug: post.newsRelation.slug,
+        summary: post.newsRelation.summary,
+        category: post.newsRelation.category,
+        readingTime: post.newsRelation.readingTime,
+        viewsCount: post.newsRelation.viewsCount,
+      } : null,
+      createdAt: post.createdAt ? new Date(post.createdAt).toISOString() : new Date().toISOString(),
       isSimulation: post.isSimulation || false,
     };
 

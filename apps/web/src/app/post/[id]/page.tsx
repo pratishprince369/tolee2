@@ -117,7 +117,8 @@ export default async function PostPage({ params }: PostPageProps) {
     redirect(`/reel/${id}`);
   }
 
-  const authorName = post.author?.name || post.author?.username || post.author || 'Tolee Creator';
+  const authorName = post.authorName || post.author || 'Tolee Creator';
+  const authorUsername = post.author || 'creator';
   const mediaUrl = post.image || post.mediaUrls?.split(',')[0] || 'https://tolee.in/logo.png';
 
   const jsonLdPost = {
@@ -130,7 +131,7 @@ export default async function PostPage({ params }: PostPageProps) {
     "author": {
       "@type": "Person",
       "name": authorName,
-      "url": post.author?.username ? `https://tolee.in/u/${post.author.username}` : `https://tolee.in`
+      "url": `https://tolee.in/u/${authorUsername}`
     },
     "image": mediaUrl,
     "interactionStatistic": [
