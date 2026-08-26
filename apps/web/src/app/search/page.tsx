@@ -715,6 +715,10 @@ export default function SearchPage() {
                             <Button 
                               size="sm" 
                               variant="outline"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleResultClick(item);
+                              }}
                               className="text-xs font-bold px-5 shrink-0 rounded-full border-[#0a7c85] text-[#0a7c85] hover:bg-[#0a7c85]/5 dark:border-[#0a7c85] dark:text-[#0a7c85] hover:scale-105 active:scale-95 transition-all duration-300"
                             >
                               View Profile

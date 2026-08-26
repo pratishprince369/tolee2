@@ -7,11 +7,18 @@ import { InstagramProfileView } from '@/components/InstagramProfileView';
 import { toggleLike, addComment, getComments, getLikes } from '@/actions/post';
 import { toggleFollow } from '@/actions/user';
 
-export default async function UserProfile({ params }: { params: { username: string } }) {
+interface PageProps {
+  params: Promise<{ username: string }> | { username: string };
+}
+
+export default async function UserProfile({ params }: PageProps) {
   const session = await getServerSession(authOptions);
   const currentUserId = (session?.user as any)?.id || null;
   
-  if (params.username === 'me' && !currentUserId) {
+  const resolvedParams = params instanceof Promise ? await params : params;
+  const rawUsername = resolvedParams?.username || '';
+
+  if (rawUsername === 'me' && !currentUserId) {
     redirect('/');
   }
 
@@ -55,23 +62,23 @@ export default async function UserProfile({ params }: { params: { username: stri
     }
   };
 
-  if (params.username === 'me') {
+  if (rawUsername === 'me') {
     if (!currentUserId) return notFound();
     user = await prisma.user.findUnique({
       where: { id: currentUserId },
       select: userSelect
     });
-  } else {
+  } else if (rawUsername) {
     // Attempt lookup by username first
     user = await prisma.user.findUnique({
-      where: { username: params.username },
+      where: { username: rawUsername },
       select: userSelect
     });
     
     // If not found, attempt lookup by user ID
     if (!user) {
       user = await prisma.user.findUnique({
-        where: { id: params.username },
+        where: { id: rawUsername },
         select: userSelect
       });
     }
@@ -370,6 +377,10 @@ export default async function UserProfile({ params }: { params: { username: stri
     // NewsPost table may not exist yet
   }
 
+  const isSuperAdmin = session?.user?.email === process.env.SUPER_ADMIN_EMAIL;
+  const profileUsername = user.username || user.id;
+  const profileName = user.name || user.username || 'Creator';
+
   return (
     <>
       <InstagramProfileView 
@@ -378,103 +389,104 @@ export default async function UserProfile({ params }: { params: { username: stri
           level: user.level || 1,
           trustScore: user.trustScore || 100
         }}
-      posts={userPosts}
-      savedPosts={savedPosts}
-      resharedPosts={resharedPosts}
-      tolees={myTolees}
-      newsArticles={userNewsArticles}
-      isMe={isMe}
-      isSuperAdmin={isSuperAdmin}
-      currentUserId={currentUserId}
-      initialIsFollowing={isFollowing}
-      initialFollowStatus={followStatus}
-      toggleFollowAction={toggleFollow}
-      toggleLikeAction={toggleLike}
-      addCommentAction={addComment}
-      getCommentsAction={getComments}
-      getLikesAction={getLikes}
-      initialSubscriberCount={subscriberCount}
-      initialSubscribed={isSubscribed}
-      initialBellPreference={bellPreference}
-    />
+        posts={userPosts}
+        savedPosts={savedPosts}
+        resharedPosts={resharedPosts}
+        tolees={myTolees}
+        newsArticles={userNewsArticles}
+        isMe={isMe}
+        isSuperAdmin={isSuperAdmin}
+        currentUserId={currentUserId}
+        initialIsFollowing={isFollowing}
+        initialFollowStatus={followStatus}
+        toggleFollowAction={toggleFollow}
+        toggleLikeAction={toggleLike}
+        addCommentAction={addComment}
+        getCommentsAction={getComments}
+        getLikesAction={getLikes}
+        initialSubscriberCount={subscriberCount}
+        initialSubscribed={isSubscribed}
+        initialBellPreference={bellPreference}
+      />
 
-    {!user.isPrivate && user.searchEngineIndexable !== false && (
-      <>
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              "@context": "https://schema.org",
-              "@type": "ProfilePage",
-              "dateCreated": user.createdAt ? new Date(user.createdAt).toISOString() : new Date().toISOString(),
-              "mainEntity": {
-                "@type": "Person",
-                "name": user.name || user.username,
-                "alternateName": `@${user.username}`,
-                "identifier": user.username,
-                "description": user.bio || `Profile of ${user.name} on Tolee`,
-                "image": user.avatar || "https://tolee.in/logo.png",
-                "url": `https://tolee.in/u/${user.username}`,
-                "interactionStatistic": [
+      {!user.isPrivate && user.searchEngineIndexable !== false && (
+        <>
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{
+              __html: JSON.stringify({
+                "@context": "https://schema.org",
+                "@type": "ProfilePage",
+                "dateCreated": user.createdAt ? new Date(user.createdAt).toISOString() : new Date().toISOString(),
+                "mainEntity": {
+                  "@type": "Person",
+                  "name": profileName,
+                  "alternateName": user.username ? `@${user.username}` : profileName,
+                  "identifier": profileUsername,
+                  "description": user.bio || `Profile of ${profileName} on Tolee`,
+                  "image": user.avatar || "https://tolee.in/logo.png",
+                  "url": `https://tolee.in/u/${profileUsername}`,
+                  "interactionStatistic": [
+                    {
+                      "@type": "InteractionCounter",
+                      "interactionType": "https://schema.org/FollowAction",
+                      "userInteractionCount": subscriberCount || 0
+                    }
+                  ]
+                }
+              })
+            }}
+          />
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{
+              __html: JSON.stringify({
+                "@context": "https://schema.org",
+                "@type": "BreadcrumbList",
+                "itemListElement": [
                   {
-                    "@type": "InteractionCounter",
-                    "interactionType": "https://schema.org/FollowAction",
-                    "userInteractionCount": subscriberCount || 0
+                    "@type": "ListItem",
+                    "position": 1,
+                    "name": "Home",
+                    "item": "https://tolee.in"
+                  },
+                  {
+                    "@type": "ListItem",
+                    "position": 2,
+                    "name": "Users",
+                    "item": "https://tolee.in/discover"
+                  },
+                  {
+                    "@type": "ListItem",
+                    "position": 3,
+                    "name": profileName,
+                    "item": `https://tolee.in/u/${profileUsername}`
                   }
                 ]
-              }
-            })
-          }}
-        />
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              "@context": "https://schema.org",
-              "@type": "BreadcrumbList",
-              "itemListElement": [
-                {
-                  "@type": "ListItem",
-                  "position": 1,
-                  "name": "Home",
-                  "item": "https://tolee.in"
-                },
-                {
-                  "@type": "ListItem",
-                  "position": 2,
-                  "name": "Users",
-                  "item": "https://tolee.in/discover"
-                },
-                {
-                  "@type": "ListItem",
-                  "position": 3,
-                  "name": user.name || `@${user.username}`,
-                  "item": `https://tolee.in/u/${user.username}`
-                }
-              ]
-            })
-          }}
-        />
-      </>
-    )}
+              })
+            }}
+          />
+        </>
+      )}
     </>
   );
 }
 
-export async function generateMetadata({ params }: { params: { username: string } }) {
-  const username = params.username === 'me' ? null : params.username;
-  if (!username) return {};
+export async function generateMetadata({ params }: PageProps) {
+  const resolvedParams = params instanceof Promise ? await params : params;
+  const rawUsername = resolvedParams?.username === 'me' ? null : resolvedParams?.username;
+  if (!rawUsername) return {};
 
   try {
     let user = await prisma.user.findUnique({
-      where: { username },
-      select: { name: true, username: true, bio: true, image: true, avatar: true, isPrivate: true, searchEngineIndexable: true }
+      where: { username: rawUsername },
+      select: { id: true, name: true, username: true, bio: true, image: true, avatar: true, isPrivate: true, searchEngineIndexable: true }
     });
 
     if (!user) {
       user = await prisma.user.findUnique({
-        where: { id: username },
-        select: { name: true, username: true, bio: true, image: true, avatar: true, isPrivate: true, searchEngineIndexable: true }
+        where: { id: rawUsername },
+        select: { id: true, name: true, username: true, bio: true, image: true, avatar: true, isPrivate: true, searchEngineIndexable: true }
       });
     }
 
@@ -495,22 +507,24 @@ export async function generateMetadata({ params }: { params: { username: string 
       };
     }
 
-    const title = `${user.name || user.username} (@${user.username}) | Tolee Profile`;
-    const description = user.bio || `Connect with ${user.name} on Tolee. Discover posts, reels, and community updates.`;
+    const profileUsername = user.username || user.id;
+    const profileName = user.name || user.username || 'Creator';
+    const title = user.username ? `${profileName} (@${user.username}) | Tolee Profile` : `${profileName} | Tolee Profile`;
+    const description = user.bio || `Connect with ${profileName} on Tolee. Discover posts, reels, and community updates.`;
     const image = user.avatar || user.image || 'https://tolee.in/logo.png';
 
     return {
       title,
       description,
       alternates: {
-        canonical: `https://tolee.in/u/${user.username}`,
+        canonical: `https://tolee.in/u/${profileUsername}`,
       },
       openGraph: {
         title,
         description,
-        url: `https://tolee.in/u/${user.username}`,
+        url: `https://tolee.in/u/${profileUsername}`,
         siteName: 'Tolee',
-        images: [{ url: image, width: 600, height: 600, alt: `${user.name} on Tolee` }],
+        images: [{ url: image, width: 600, height: 600, alt: `${profileName} on Tolee` }],
         type: 'profile',
       },
       twitter: {

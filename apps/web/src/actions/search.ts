@@ -314,7 +314,7 @@ export async function performSearch(
           createdAt: u.createdAt,
           score,
           meta: {
-            username: u.username || '',
+            username: u.username || u.id,
             avatar: u.avatar || u.image || '',
             isVerified: u.isVerified
           }
