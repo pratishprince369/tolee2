@@ -86,6 +86,7 @@ export default function PostViewer({ post }: PostViewerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const [mounted, setMounted] = useState(false);
+  const [carouselIdx, setCarouselIdx] = useState(0);
   const [liked, setLiked] = useState(post.likedByMe || false);
   const [likesCount, setLikesCount] = useState(post.likes || 0);
   const [saved, setSaved] = useState(post.savedByMe || false);
@@ -102,27 +103,27 @@ export default function PostViewer({ post }: PostViewerProps) {
     setMounted(true);
   }, []);
 
-  // Compute media list safely
-  const allMediaUrls = React.useMemo(() => {
-    if (post.mediaUrls && post.mediaUrls.trim() !== '') {
-      const splitUrls = post.mediaUrls.split(/,(?=https?:\/\/)/).filter(Boolean);
-      if (splitUrls.length > 0) return splitUrls;
-    }
-    if (post.image) return [post.image];
-    if (post.video) return [post.video];
-    return [];
-  }, [post.mediaUrls, post.image, post.video]);
+  // Compute media list safely without hook overhead
+  let allMediaUrls: string[] = [];
+  if (post.mediaUrls && post.mediaUrls.trim() !== '') {
+    const splitUrls = post.mediaUrls.split(/,(?=https?:\/\/)/).filter(Boolean);
+    if (splitUrls.length > 0) allMediaUrls = splitUrls;
+  }
+  if (allMediaUrls.length === 0 && post.image) {
+    allMediaUrls = [post.image];
+  } else if (allMediaUrls.length === 0 && post.video) {
+    allMediaUrls = [post.video];
+  }
 
-  const allMediaTypes = React.useMemo(() => {
-    if (post.mediaTypes && post.mediaTypes.trim() !== '') {
-      return post.mediaTypes.split(',');
-    }
-    if (post.video || post.postType === 'reel') return ['video'];
-    if (post.image) return ['image'];
-    return [];
-  }, [post.mediaTypes, post.video, post.postType, post.image]);
+  let allMediaTypes: string[] = [];
+  if (post.mediaTypes && post.mediaTypes.trim() !== '') {
+    allMediaTypes = post.mediaTypes.split(',');
+  } else if (post.video || post.postType === 'reel') {
+    allMediaTypes = ['video'];
+  } else if (post.image) {
+    allMediaTypes = ['image'];
+  }
 
-  const [carouselIdx, setCarouselIdx] = useState(0);
   const hasMedia = allMediaUrls.length > 0;
   const currentMediaUrl = allMediaUrls[carouselIdx] || '';
   const currentMediaType = allMediaTypes[carouselIdx] || (post.video ? 'video' : 'image');
@@ -130,7 +131,7 @@ export default function PostViewer({ post }: PostViewerProps) {
   const isVideo = currentMediaType === 'video' || post.postType === 'reel';
 
   const authorDisplayName = post.authorName || post.author || 'Tolee Creator';
-  const authorUsername = post.author || post.authorName || 'creator';
+  const authorUsername = post.author || post.authorName || post.authorId || 'creator';
   const authorAvatarUrl = post.authorAvatar || '/default-user-avatar.svg';
 
   const handleBack = () => {

@@ -47,19 +47,16 @@ export function ShareModal({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
 
-  // Compute permanent share URL with origin fallback
-  const finalShareUrl = React.useMemo(() => {
-    if (shareUrl && shareUrl.trim() !== '') return shareUrl;
-    if (typeof window !== 'undefined' && window.location.origin) {
-      return `${window.location.origin}/post/${postId}`;
-    }
-    return `https://tolee.in/post/${postId}`;
-  }, [shareUrl, postId]);
-
-  // Story sharing states
   const [isStoryEditorOpen, setIsStoryEditorOpen] = useState(false);
   const [storyMediaUrl, setStoryMediaUrl] = useState('');
   const [storyMediaType, setStoryMediaType] = useState<'image' | 'video'>('image');
+
+  // Compute permanent share URL with origin fallback
+  const finalShareUrl = shareUrl && shareUrl.trim() !== ''
+    ? shareUrl
+    : typeof window !== 'undefined' && window.location.origin
+    ? `${window.location.origin}/post/${postId}`
+    : `https://tolee.in/post/${postId}`;
 
   useEffect(() => {
     if (isOpen && currentUserId) {
