@@ -26,6 +26,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toggleLike, addComment, toggleSavePost } from '@/actions/post';
 import { ShareModal } from '@/components/ShareModal';
+import { HLSVideo } from '@/components/HLSVideo';
 import Link from 'next/link';
 
 function formatDistanceToNowSafe(dateString: string | null | undefined): string {
@@ -126,9 +127,9 @@ export default function PostViewer({ post }: PostViewerProps) {
 
   const hasMedia = allMediaUrls.length > 0;
   const currentMediaUrl = allMediaUrls[carouselIdx] || '';
-  const currentMediaType = allMediaTypes[carouselIdx] || (post.video ? 'video' : 'image');
+  const currentMediaType = allMediaTypes[carouselIdx] || (post.video ? 'video' : (currentMediaUrl.includes('.m3u8') || currentMediaUrl.includes('.mp4') ? 'video' : 'image'));
   const isMultiple = allMediaUrls.length > 1;
-  const isVideo = currentMediaType === 'video' || post.postType === 'reel';
+  const isVideo = currentMediaType === 'video' || post.postType === 'reel' || currentMediaUrl.includes('.m3u8') || currentMediaUrl.includes('.mp4');
 
   const authorDisplayName = post.authorName || 'Tolee Creator';
   const authorUsername = post.author && !post.author.includes(' ') ? post.author : (post.authorId || 'creator');
@@ -270,31 +271,53 @@ export default function PostViewer({ post }: PostViewerProps) {
         <div className="relative bg-[#02050b] flex items-center justify-center lg:flex-1 lg:max-h-full p-4 min-h-[340px]">
           {hasMedia ? (
             isVideo ? (
-              <div className="relative w-full max-w-2xl mx-auto aspect-[9/16] lg:aspect-auto lg:h-full flex items-center justify-center">
-                <video
+              <div className="relative w-full max-w-2xl mx-auto aspect-[9/16] lg:aspect-auto lg:h-full flex items-center justify-center group">
+                <HLSVideo
                   ref={videoRef}
                   src={currentMediaUrl}
-                  className="w-full h-full max-h-[calc(100vh-80px)] object-contain rounded-2xl"
+                  isActive={true}
+                  shouldLoad={true}
+                  ignoreGlobalActive={true}
+                  contentId={post.id}
+                  contentType="post"
+                  className="w-full h-full max-h-[calc(100vh-80px)] object-contain rounded-2xl cursor-pointer"
                   loop
                   muted={muted}
                   playsInline
+                  autoPlay
                   onPlay={() => setIsPlaying(true)}
                   onPause={() => setIsPlaying(false)}
                   onClick={togglePlayPause}
                 />
-                <div className="absolute bottom-4 left-4 flex gap-2">
+                
+                {/* Center Play Overlay when Paused */}
+                {!isPlaying && (
                   <button
                     onClick={togglePlayPause}
-                    className="w-9 h-9 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center hover:bg-black/80 transition-all text-white shadow-lg"
+                    className="absolute inset-0 m-auto w-16 h-16 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center text-white shadow-2xl hover:scale-110 active:scale-95 transition-all z-20"
+                    aria-label="Play video"
+                  >
+                    <Play className="w-8 h-8 fill-white ml-1" />
+                  </button>
+                )}
+
+                {/* Bottom Video Controls */}
+                <div className="absolute bottom-4 left-4 flex gap-2 z-20">
+                  <button
+                    onClick={togglePlayPause}
+                    className="w-9 h-9 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center hover:bg-black/80 transition-all text-white shadow-lg cursor-pointer"
+                    aria-label={isPlaying ? "Pause video" : "Play video"}
                   >
                     {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 fill-white ml-0.5" />}
                   </button>
                   <button
                     onClick={() => {
-                      setMuted((m) => !m);
-                      if (videoRef.current) videoRef.current.muted = !muted;
+                      const nextMuted = !muted;
+                      setMuted(nextMuted);
+                      if (videoRef.current) videoRef.current.muted = nextMuted;
                     }}
-                    className="w-9 h-9 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center hover:bg-black/80 transition-all text-white shadow-lg"
+                    className="w-9 h-9 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center hover:bg-black/80 transition-all text-white shadow-lg cursor-pointer"
+                    aria-label={muted ? "Unmute video" : "Mute video"}
                   >
                     {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
                   </button>
