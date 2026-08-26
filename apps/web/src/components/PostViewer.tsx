@@ -257,26 +257,17 @@ export default function PostViewer({ post }: PostViewerProps) {
 
   return (
     <div className="min-h-screen bg-[#070b13] text-white flex flex-col font-sans selection:bg-teal-500 selection:text-black">
-      {/* Top Navigation Bar */}
-      <header className="sticky top-0 z-50 flex items-center justify-between px-4 py-3 bg-[#0a0f1d]/90 backdrop-blur-md border-b border-[#141e33]">
+      {/* 1. Top Navigation Bar */}
+      <header className="sticky top-0 z-50 flex items-center justify-between px-4 py-3 bg-[#0a0f1d]/95 backdrop-blur-md border-b border-[#141e33]">
         <div className="flex items-center gap-3">
           <button
             onClick={handleBack}
-            className="w-9 h-9 flex items-center justify-center rounded-xl bg-[#141e33] hover:bg-[#1f2d4a] text-gray-300 hover:text-white transition-all shadow-sm"
+            className="w-9 h-9 flex items-center justify-center rounded-xl bg-[#141e33] hover:bg-[#1f2d4a] text-gray-300 hover:text-white transition-all shadow-sm cursor-pointer"
             aria-label="Go back"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <div>
-            <h1 className="text-sm font-bold text-white flex items-center gap-2">
-              <span>Post</span>
-              {post.toleeName && (
-                <span className="text-xs font-normal text-teal-400 bg-teal-950/60 px-2 py-0.5 rounded-full border border-teal-800/40">
-                  {post.toleeName}
-                </span>
-              )}
-            </h1>
-          </div>
+          <span className="text-base font-bold text-white tracking-wide">Posts</span>
         </div>
 
         <div className="flex items-center gap-2">
@@ -286,12 +277,12 @@ export default function PostViewer({ post }: PostViewerProps) {
               className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-400 hover:to-emerald-500 text-black text-xs font-extrabold flex items-center gap-1.5 transition-all shadow-md"
             >
               <LogIn className="w-3.5 h-3.5" />
-              <span>Log in to interact</span>
+              <span>Log in</span>
             </Link>
           ) : (
             <button
               onClick={() => setShareModalOpen(true)}
-              className="p-2 rounded-xl bg-[#141e33] hover:bg-[#1f2d4a] text-gray-300 hover:text-white transition-colors"
+              className="p-2 rounded-xl bg-[#141e33] hover:bg-[#1f2d4a] text-gray-300 hover:text-white transition-colors cursor-pointer"
               title="Share Post"
             >
               <Share2 className="w-4 h-4" />
@@ -300,151 +291,15 @@ export default function PostViewer({ post }: PostViewerProps) {
         </div>
       </header>
 
-      {/* Main Content Layout */}
-      <main className="flex-1 flex flex-col lg:flex-row lg:max-h-[calc(100vh-57px)] overflow-hidden">
-        {/* LEFT PANEL: Media or Prominent Post Card */}
-        <div className="relative bg-[#02050b] flex items-center justify-center lg:flex-1 lg:max-h-full p-4 min-h-[340px]">
-          {hasMedia ? (
-            isVideo ? (
-              <div className="relative w-full max-w-2xl mx-auto aspect-[9/16] lg:aspect-auto lg:h-full flex items-center justify-center group">
-                <HLSVideo
-                  ref={videoRef}
-                  src={currentMediaUrl}
-                  isActive={true}
-                  shouldLoad={true}
-                  ignoreGlobalActive={true}
-                  contentId={post.id}
-                  contentType="post"
-                  className="w-full h-full max-h-[calc(100vh-80px)] object-contain rounded-2xl cursor-pointer"
-                  loop
-                  muted={muted}
-                  playsInline
-                  autoPlay
-                  onPlay={() => setIsPlaying(true)}
-                  onPause={() => setIsPlaying(false)}
-                  onClick={togglePlayPause}
-                />
-                
-                {/* Center Play Overlay when Paused */}
-                {!isPlaying && (
-                  <button
-                    onClick={togglePlayPause}
-                    className="absolute inset-0 m-auto w-16 h-16 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center text-white shadow-2xl hover:scale-110 active:scale-95 transition-all z-20"
-                    aria-label="Play video"
-                  >
-                    <Play className="w-8 h-8 fill-white ml-1" />
-                  </button>
-                )}
-
-                {/* Bottom Video Controls */}
-                <div className="absolute bottom-4 left-4 flex gap-2 z-20">
-                  <button
-                    onClick={togglePlayPause}
-                    className="w-9 h-9 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center hover:bg-black/80 transition-all text-white shadow-lg cursor-pointer"
-                    aria-label={isPlaying ? "Pause video" : "Play video"}
-                  >
-                    {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 fill-white ml-0.5" />}
-                  </button>
-                  <button
-                    onClick={() => {
-                      const nextMuted = !muted;
-                      setMuted(nextMuted);
-                      if (videoRef.current) videoRef.current.muted = nextMuted;
-                    }}
-                    className="w-9 h-9 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center hover:bg-black/80 transition-all text-white shadow-lg cursor-pointer"
-                    aria-label={muted ? "Unmute video" : "Mute video"}
-                  >
-                    {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="relative w-full max-w-2xl mx-auto flex items-center justify-center">
-                <div className="relative aspect-square lg:aspect-auto lg:max-h-[calc(100vh-80px)] w-full flex items-center justify-center overflow-hidden rounded-2xl bg-[#060b16]">
-                  <img
-                    src={currentMediaUrl}
-                    alt={post.caption || 'Post image'}
-                    className="w-full h-full object-contain max-h-[calc(100vh-80px)]"
-                  />
-                </div>
-                {isMultiple && (
-                  <>
-                    {carouselIdx > 0 && (
-                      <button
-                        onClick={prevSlide}
-                        className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/70 backdrop-blur-md flex items-center justify-center hover:bg-black/90 transition-all text-white shadow-lg"
-                      >
-                        <ChevronLeft className="w-5 h-5" />
-                      </button>
-                    )}
-                    {carouselIdx < allMediaUrls.length - 1 && (
-                      <button
-                        onClick={nextSlide}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/70 backdrop-blur-md flex items-center justify-center hover:bg-black/90 transition-all text-white shadow-lg"
-                      >
-                        <ChevronRight className="w-5 h-5" />
-                      </button>
-                    )}
-                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 bg-black/50 backdrop-blur-sm px-3 py-1.5 rounded-full">
-                      {allMediaUrls.map((_, i) => (
-                        <button
-                          key={i}
-                          onClick={() => setCarouselIdx(i)}
-                          className={`h-1.5 rounded-full transition-all ${
-                            i === carouselIdx ? 'bg-teal-400 w-4' : 'bg-white/40 w-1.5'
-                          }`}
-                        />
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-            )
-          ) : (
-            // Text-only post presentation card
-            <div className="w-full max-w-xl p-8 sm:p-12 rounded-3xl bg-gradient-to-br from-[#0c1424] via-[#09101d] to-[#050a14] border border-[#17253f] shadow-2xl relative overflow-hidden flex flex-col justify-between">
-              <div className="absolute top-0 right-0 w-64 h-64 bg-teal-500/5 rounded-full blur-3xl pointer-events-none" />
-              
-              <div className="flex items-center gap-3.5 mb-6">
-                <Link href={`/u/${authorUsername}`} className="shrink-0">
-                  <Avatar className="w-12 h-12 border-2 border-teal-500/40 shadow-inner">
-                    <AvatarImage src={authorAvatarUrl} />
-                    <AvatarFallback className="bg-zinc-800 text-white font-bold">
-                      {authorDisplayName?.[0]?.toUpperCase() || 'U'}
-                    </AvatarFallback>
-                  </Avatar>
-                </Link>
-                <div>
-                  <Link href={`/u/${authorUsername}`} className="text-base font-bold text-white hover:underline block">
-                    {authorDisplayName}
-                  </Link>
-                  <p className="text-xs text-gray-400">@{authorUsername}</p>
-                </div>
-              </div>
-
-              <div className="my-6">
-                <p className="text-lg sm:text-xl font-medium text-gray-100 leading-relaxed whitespace-pre-wrap">
-                  {post.caption || 'Shared post on Tolee.'}
-                </p>
-              </div>
-
-              {(post.location || post.subLocation) && (
-                <div className="flex items-center gap-1.5 text-xs text-teal-400 font-medium">
-                  <MapPin className="w-3.5 h-3.5" />
-                  <span>{[post.location, post.subLocation].filter(Boolean).join(', ')}</span>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* RIGHT PANEL: Author, Caption, Comments & Actions */}
-        <div className="lg:w-[420px] lg:border-l border-[#141e33] flex flex-col bg-[#090e1a] lg:overflow-hidden">
-          {/* Author Header */}
-          <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-[#141e33]">
+      {/* 2. Instagram-Style Feed Post Container */}
+      <main className="flex-1 flex justify-center py-0 sm:py-6 px-0 sm:px-4">
+        <article className="w-full max-w-xl bg-[#090e1a] sm:rounded-3xl border-0 sm:border border-[#141e33] overflow-hidden flex flex-col shadow-2xl pb-24 sm:pb-6">
+          
+          {/* Post Creator Header */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-[#141e33]/60 bg-[#090e1a]">
             <div className="flex items-center gap-3 min-w-0">
               <Link href={`/u/${authorUsername}`} className="shrink-0">
-                <Avatar className="w-10 h-10 border border-[#1b2b48]">
+                <Avatar className="w-10 h-10 border-2 border-teal-500/40">
                   <AvatarImage src={authorAvatarUrl} />
                   <AvatarFallback className="bg-zinc-800 text-white text-xs font-bold">
                     {authorDisplayName?.[0]?.toUpperCase() || 'U'}
@@ -453,128 +308,260 @@ export default function PostViewer({ post }: PostViewerProps) {
               </Link>
               <div className="min-w-0">
                 <Link href={`/u/${authorUsername}`} className="text-sm font-bold text-white hover:underline truncate block">
-                  {authorDisplayName}
+                  {authorUsername}
                 </Link>
-                <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                  <span>@{authorUsername}</span>
-                  {post.toleeName && (
-                    <>
-                      <span>•</span>
-                      <Link href={`/t/${post.toleeSlug || ''}`} className="text-teal-400 hover:underline truncate">
-                        {post.toleeName}
-                      </Link>
-                    </>
+                <div className="flex items-center gap-1 text-[11px] text-gray-400 truncate">
+                  {post.toleeName ? (
+                    <Link href={`/t/${post.toleeSlug || ''}`} className="text-teal-400 hover:underline truncate flex items-center gap-1">
+                      <Users className="w-3 h-3" />
+                      <span>{post.toleeName}</span>
+                    </Link>
+                  ) : (post.location || post.subLocation) ? (
+                    <span className="flex items-center gap-0.5 text-gray-400 truncate">
+                      <MapPin className="w-3 h-3 text-teal-400" />
+                      {[post.location, post.subLocation].filter(Boolean).join(', ')}
+                    </span>
+                  ) : (
+                    <span>{authorDisplayName}</span>
                   )}
                 </div>
               </div>
             </div>
 
-            <button 
+            <button
               onClick={() => setShareModalOpen(true)}
-              className="p-2 rounded-xl text-gray-400 hover:text-white hover:bg-[#141e33] transition-colors"
+              className="p-2 rounded-xl text-gray-400 hover:text-white hover:bg-[#141e33] transition-colors cursor-pointer"
+              title="Share"
             >
               <Share2 className="w-4 h-4" />
             </button>
           </div>
 
-          {/* Caption & Comments List (Scrollable) */}
-          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/10">
-            {/* Caption in list if media exists */}
-            {hasMedia && post.caption && (
-              <div className="flex gap-3.5 pb-4 border-b border-[#141e33]">
-                <Avatar className="w-8 h-8 shrink-0 mt-0.5 border border-[#1b2b48]">
-                  <AvatarImage src={authorAvatarUrl} />
-                  <AvatarFallback className="bg-zinc-800 text-white text-[10px] font-bold">
-                    {authorDisplayName?.[0]?.toUpperCase() || 'U'}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1">
-                  <p className="text-sm text-gray-200 leading-relaxed whitespace-pre-wrap">
-                    <Link href={`/u/${authorUsername}`} className="font-bold text-white mr-1.5 hover:underline">
-                      {authorDisplayName}
-                    </Link>
-                    {renderFormattedCaption(post.caption)}
-                  </p>
-                  {(post.location || post.subLocation) && (
-                    <div className="flex items-center gap-1 mt-1 text-xs text-teal-400">
-                      <MapPin className="w-3 h-3" />
-                      <span>{[post.location, post.subLocation].filter(Boolean).join(', ')}</span>
-                    </div>
+          {/* Media Presentation Container */}
+          <div className="relative w-full bg-[#02050b] flex items-center justify-center min-h-[300px] overflow-hidden">
+            {hasMedia ? (
+              isVideo ? (
+                <div className="relative w-full aspect-[9/16] sm:aspect-square max-h-[75vh] flex items-center justify-center group bg-black">
+                  <HLSVideo
+                    ref={videoRef}
+                    src={currentMediaUrl}
+                    isActive={true}
+                    shouldLoad={true}
+                    ignoreGlobalActive={true}
+                    contentId={post.id}
+                    contentType="post"
+                    className="w-full h-full object-contain cursor-pointer"
+                    loop
+                    muted={muted}
+                    playsInline
+                    autoPlay
+                    onPlay={() => setIsPlaying(true)}
+                    onPause={() => setIsPlaying(false)}
+                    onClick={togglePlayPause}
+                  />
+
+                  {!isPlaying && (
+                    <button
+                      onClick={togglePlayPause}
+                      className="absolute inset-0 m-auto w-16 h-16 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center text-white shadow-2xl hover:scale-110 active:scale-95 transition-all z-20 cursor-pointer"
+                    >
+                      <Play className="w-8 h-8 fill-white ml-1" />
+                    </button>
                   )}
-                  {timeAgoString && <p className="text-[10px] text-gray-500 mt-1.5">{timeAgoString}</p>}
+
+                  <div className="absolute bottom-3 left-3 flex gap-2 z-20">
+                    <button
+                      onClick={togglePlayPause}
+                      className="w-8 h-8 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center text-white cursor-pointer hover:bg-black/80 transition-all"
+                    >
+                      {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 fill-white ml-0.5" />}
+                    </button>
+                    <button
+                      onClick={() => {
+                        const nextMuted = !muted;
+                        setMuted(nextMuted);
+                        if (videoRef.current) videoRef.current.muted = nextMuted;
+                      }}
+                      className="w-8 h-8 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center text-white cursor-pointer hover:bg-black/80 transition-all"
+                    >
+                      {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
+              ) : (
+                <div className="relative w-full flex items-center justify-center bg-black">
+                  <img
+                    src={currentMediaUrl}
+                    alt={post.caption || 'Post image'}
+                    className="w-full h-auto max-h-[75vh] object-contain select-none"
+                  />
+                  {isMultiple && (
+                    <>
+                      {carouselIdx > 0 && (
+                        <button
+                          onClick={prevSlide}
+                          className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/70 backdrop-blur-md flex items-center justify-center text-white shadow-lg cursor-pointer"
+                        >
+                          <ChevronLeft className="w-5 h-5" />
+                        </button>
+                      )}
+                      {carouselIdx < allMediaUrls.length - 1 && (
+                        <button
+                          onClick={nextSlide}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/70 backdrop-blur-md flex items-center justify-center text-white shadow-lg cursor-pointer"
+                        >
+                          <ChevronRight className="w-5 h-5" />
+                        </button>
+                      )}
+                      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 bg-black/60 backdrop-blur-sm px-3 py-1.5 rounded-full z-20">
+                        {allMediaUrls.map((_, i) => (
+                          <button
+                            key={i}
+                            onClick={() => setCarouselIdx(i)}
+                            className={`h-1.5 rounded-full transition-all cursor-pointer ${
+                              i === carouselIdx ? 'bg-teal-400 w-4' : 'bg-white/40 w-1.5'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )
+            ) : (
+              // Text post display
+              <div className="w-full p-8 bg-gradient-to-br from-[#0c1424] to-[#060b14] text-center">
+                <p className="text-lg font-medium text-gray-100 leading-relaxed whitespace-pre-wrap">
+                  {renderFormattedCaption(post.caption) || 'Shared post on Tolee.'}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Social Action Bar Directly Below Media */}
+          <div className="flex items-center justify-between px-4 py-3 bg-[#090e1a]">
+            <div className="flex items-center gap-4">
+              {/* Like */}
+              <button
+                onClick={handleLike}
+                className="flex items-center gap-1.5 cursor-pointer group"
+                aria-label="Like"
+              >
+                <Heart
+                  className={`w-6 h-6 transition-transform group-hover:scale-110 active:scale-125 ${
+                    liked ? 'text-rose-500 fill-rose-500' : 'text-gray-200 hover:text-white'
+                  }`}
+                />
+                <span className={`text-xs font-bold ${liked ? 'text-rose-400' : 'text-gray-300'}`}>
+                  {likesCount}
+                </span>
+              </button>
+
+              {/* Comment */}
+              <button
+                onClick={() => document.getElementById('post-comment-input')?.focus()}
+                className="flex items-center gap-1.5 text-gray-200 hover:text-white cursor-pointer group"
+                aria-label="Comment"
+              >
+                <MessageCircle className="w-6 h-6 transition-transform group-hover:scale-110" />
+                <span className="text-xs font-bold text-gray-300">
+                  {commentsCount}
+                </span>
+              </button>
+
+              {/* Repost */}
+              <button
+                onClick={handleRepost}
+                className="flex items-center gap-1.5 cursor-pointer group"
+                aria-label="Repost"
+              >
+                <Repeat
+                  className={`w-6 h-6 transition-transform group-hover:scale-110 ${
+                    reposted ? 'text-emerald-400' : 'text-gray-200 hover:text-white'
+                  }`}
+                />
+                {repostsCount > 0 && (
+                  <span className={`text-xs font-bold ${reposted ? 'text-emerald-400' : 'text-gray-300'}`}>
+                    {repostsCount}
+                  </span>
+                )}
+              </button>
+
+              {/* Share */}
+              <button
+                onClick={() => setShareModalOpen(true)}
+                className="text-gray-200 hover:text-white cursor-pointer group"
+                aria-label="Share"
+              >
+                <Share2 className="w-6 h-6 transition-transform group-hover:scale-110" />
+              </button>
+            </div>
+
+            {/* Save / Bookmark */}
+            <div className="flex items-center gap-3">
+              {post.views > 0 && (
+                <div className="flex items-center gap-1 text-xs text-gray-400 font-medium">
+                  <Eye className="w-4 h-4" />
+                  <span>{post.views}</span>
+                </div>
+              )}
+              <button
+                onClick={handleSave}
+                className="text-gray-200 hover:text-white cursor-pointer transition-colors"
+                aria-label="Save"
+              >
+                <Bookmark className={`w-6 h-6 ${saved ? 'text-teal-400 fill-teal-400' : ''}`} />
+              </button>
+            </div>
+          </div>
+
+          {/* Caption & Metadata Section */}
+          <div className="px-4 py-2 space-y-2 border-b border-[#141e33]/50">
+            {post.caption && (
+              <div className="text-sm text-gray-200 leading-relaxed whitespace-pre-wrap">
+                <Link href={`/u/${authorUsername}`} className="font-extrabold text-white mr-2 hover:underline">
+                  {authorUsername}
+                </Link>
+                {renderFormattedCaption(post.caption)}
               </div>
             )}
 
-            {/* Comments Header */}
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-gray-400">
-                Comments ({commentsCount})
-              </span>
-            </div>
+            {timeAgoString && (
+              <p className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">
+                {timeAgoString}
+              </p>
+            )}
+          </div>
 
-            {/* Comments */}
+          {/* Comments Stream */}
+          <div className="px-4 py-3 space-y-3 flex-1">
+            <span className="text-xs font-bold uppercase tracking-wider text-gray-400 block">
+              Comments ({commentsCount})
+            </span>
+
             {comments.length === 0 ? (
-              <div className="py-12 text-center text-gray-500">
-                <MessageCircle className="w-8 h-8 mx-auto mb-2 opacity-40" />
-                <p className="text-xs">No comments yet. Be the first to start the conversation!</p>
-              </div>
+              <p className="text-xs text-gray-500 py-3">No comments yet. Start the conversation!</p>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-3 pt-1">
                 {comments.map((comment) => {
                   const commentAuthorName = comment.author?.name || comment.author?.username || 'User';
                   const commentAuthorAvatar = comment.author?.avatar || '/default-user-avatar.svg';
 
                   return (
-                    <div key={comment.id} className="flex gap-3 text-xs group">
+                    <div key={comment.id} className="flex gap-2.5 text-xs">
                       <Avatar className="w-7 h-7 shrink-0 mt-0.5 border border-[#1b2b48]">
                         <AvatarImage src={commentAuthorAvatar} />
                         <AvatarFallback className="bg-zinc-800 text-white text-[9px] font-bold">
                           {commentAuthorName?.[0]?.toUpperCase() || 'U'}
                         </AvatarFallback>
                       </Avatar>
-                      <div className="flex-1">
-                        <div className="bg-[#0e1626] border border-[#16233a] p-3 rounded-2xl">
-                          <p className="font-bold text-white mb-0.5">
-                            {commentAuthorName}
-                          </p>
-                          <p className="text-gray-300 leading-relaxed whitespace-pre-wrap">
-                            {comment.content}
-                          </p>
-                        </div>
+                      <div className="flex-1 bg-[#0c1424] border border-[#16233a] p-2.5 rounded-2xl">
+                        <span className="font-bold text-white mr-1.5">{commentAuthorName}</span>
+                        <span className="text-gray-300 leading-relaxed">{comment.content}</span>
                         {comment.createdAt && mounted && (
-                          <span className="text-[10px] text-gray-500 mt-1 inline-block ml-2">
+                          <span className="text-[10px] text-gray-500 block mt-1">
                             {formatDistanceToNowSafe(comment.createdAt)}
                           </span>
-                        )}
-
-                        {/* Replies */}
-                        {comment.replies && comment.replies.length > 0 && (
-                          <div className="mt-2.5 ml-2 space-y-2 border-l border-[#1b2b48] pl-3">
-                            {comment.replies.map((reply: any) => {
-                              const replyAuthorName = reply.author?.name || reply.author?.username || 'User';
-                              const replyAuthorAvatar = reply.author?.avatar || '/default-user-avatar.svg';
-
-                              return (
-                                <div key={reply.id} className="flex gap-2">
-                                  <Avatar className="w-5 h-5 shrink-0 mt-0.5">
-                                    <AvatarImage src={replyAuthorAvatar} />
-                                    <AvatarFallback className="bg-zinc-800 text-white text-[8px]">
-                                      {replyAuthorName?.[0]?.toUpperCase() || 'U'}
-                                    </AvatarFallback>
-                                  </Avatar>
-                                  <div className="bg-[#0b1220] border border-[#141f33] p-2.5 rounded-xl flex-1">
-                                    <span className="font-bold text-white block mb-0.5 text-[11px]">
-                                      {replyAuthorName}
-                                    </span>
-                                    <p className="text-gray-300 text-[11px]">
-                                      {reply.content}
-                                    </p>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
                         )}
                       </div>
                     </div>
@@ -584,77 +571,9 @@ export default function PostViewer({ post }: PostViewerProps) {
             )}
           </div>
 
-          {/* Action Bar & Comment Box */}
-          <div className="border-t border-[#141e33] px-5 py-4 bg-[#070b13] space-y-3.5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <button
-                  onClick={handleLike}
-                  className="flex items-center gap-1.5 group cursor-pointer"
-                  aria-label="Like"
-                >
-                  <Heart
-                    className={`w-5 h-5 transition-transform group-hover:scale-110 ${
-                      liked ? 'text-rose-500 fill-rose-500' : 'text-gray-400 group-hover:text-white'
-                    }`}
-                  />
-                  <span className={`text-xs font-semibold ${liked ? 'text-rose-400' : 'text-gray-400 group-hover:text-white'}`}>
-                    {likesCount > 0 ? likesCount : 'Like'}
-                  </span>
-                </button>
-
-                <button
-                  onClick={() => document.getElementById('post-comment-input')?.focus()}
-                  className="flex items-center gap-1.5 group text-gray-400 hover:text-white cursor-pointer"
-                  aria-label="Comment"
-                >
-                  <MessageCircle className="w-5 h-5 transition-transform group-hover:scale-110" />
-                  <span className="text-xs font-semibold">
-                    {commentsCount > 0 ? commentsCount : 'Comment'}
-                  </span>
-                </button>
-
-                <button
-                  onClick={handleRepost}
-                  className="flex items-center gap-1.5 group text-gray-400 hover:text-white cursor-pointer"
-                  aria-label="Repost"
-                >
-                  <Repeat className={`w-5 h-5 transition-transform group-hover:scale-110 ${reposted ? 'text-emerald-400' : ''}`} />
-                  {repostsCount > 0 && (
-                    <span className={`text-xs font-semibold ${reposted ? 'text-emerald-400' : ''}`}>
-                      {repostsCount}
-                    </span>
-                  )}
-                </button>
-
-                <button
-                  onClick={() => setShareModalOpen(true)}
-                  className="flex items-center gap-1.5 group text-gray-400 hover:text-white cursor-pointer"
-                  aria-label="Share"
-                >
-                  <Share2 className="w-5 h-5 transition-transform group-hover:scale-110" />
-                </button>
-              </div>
-
-              <div className="flex items-center gap-3">
-                {post.views > 0 && (
-                  <div className="flex items-center gap-1 text-xs text-gray-500 font-medium">
-                    <Eye className="w-4 h-4" />
-                    <span>{post.views}</span>
-                  </div>
-                )}
-                <button 
-                  onClick={handleSave} 
-                  className="text-gray-400 hover:text-white transition-colors cursor-pointer"
-                  aria-label="Save"
-                >
-                  <Bookmark className={`w-5 h-5 ${saved ? 'text-teal-400 fill-teal-400' : ''}`} />
-                </button>
-              </div>
-            </div>
-
-            {/* Comment Input */}
-            <form onSubmit={handleComment} className="flex items-center gap-2 pt-1">
+          {/* Sticky Bottom Quick Comment Bar */}
+          <div className="p-3 border-t border-[#141e33] bg-[#070b13]">
+            <form onSubmit={handleComment} className="flex items-center gap-2">
               <Avatar className="w-8 h-8 shrink-0 border border-[#1b2b48]">
                 <AvatarImage src={session?.user?.image || '/default-user-avatar.svg'} />
                 <AvatarFallback className="bg-zinc-800 text-white text-[10px] font-bold">
@@ -667,21 +586,21 @@ export default function PostViewer({ post }: PostViewerProps) {
                   type="text"
                   value={commentInput}
                   onChange={(e) => setCommentInput(e.target.value)}
-                  placeholder={session?.user ? "Write a comment..." : "Log in to post a comment..."}
-                  className="w-full bg-[#0e1626] border border-[#18263e] focus:border-teal-500 rounded-xl px-3.5 py-2 text-xs text-white placeholder-gray-500 outline-none transition-all"
+                  placeholder={session?.user ? "Add a comment..." : "Log in to comment..."}
+                  className="w-full bg-[#0e1626] border border-[#18263e] focus:border-teal-500 rounded-full px-4 py-2 text-xs text-white placeholder-gray-500 outline-none transition-all"
                 />
               </div>
               <button
                 type="submit"
                 disabled={submittingComment || !commentInput.trim()}
-                className="p-2 rounded-xl bg-teal-500 hover:bg-teal-400 disabled:opacity-30 text-black font-bold transition-all"
-                title="Send Comment"
+                className="px-4 py-2 rounded-full bg-teal-500 hover:bg-teal-400 disabled:opacity-30 text-black text-xs font-bold transition-all cursor-pointer"
               >
-                <Send className="w-3.5 h-3.5" />
+                Post
               </button>
             </form>
           </div>
-        </div>
+
+        </article>
       </main>
 
       {/* Share Modal */}
@@ -700,9 +619,9 @@ export default function PostViewer({ post }: PostViewerProps) {
         />
       )}
 
-      {/* Guest Auth Prompt Modal */}
+      {/* Guest Auth Prompt */}
       {authPromptOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
           <div className="max-w-sm w-full bg-[#0d1526] border border-[#1b2b48] p-6 rounded-3xl text-center space-y-4 shadow-2xl">
             <div className="w-12 h-12 rounded-2xl bg-teal-500/10 text-teal-400 flex items-center justify-center mx-auto">
               <Sparkles className="w-6 h-6" />
@@ -710,7 +629,7 @@ export default function PostViewer({ post }: PostViewerProps) {
             <div>
               <h3 className="text-lg font-bold text-white">Join the Conversation</h3>
               <p className="text-xs text-gray-400 mt-1">
-                Sign in to like, comment, save posts, and follow your favorite creators on Tolee.
+                Sign in to like, comment, save posts, and follow creators on Tolee.
               </p>
             </div>
             <div className="flex gap-2.5 pt-2">
