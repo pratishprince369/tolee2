@@ -6,18 +6,20 @@ import { authOptions } from '@/lib/auth';
 import { ProfileReelsView } from '@/components/ProfileReelsView';
 import { toggleFollow } from '@/actions/user';
 
-export default async function UserProfileReels({ 
-  params 
-}: { 
-  params: { username: string } 
-}) {
+interface PageProps {
+  params: Promise<{ username: string }> | { username: string };
+}
+
+export default async function UserProfileReels({ params }: PageProps) {
   const session = await getServerSession(authOptions);
+  const currentUserId = (session?.user as any)?.id || null;
   
-  if (!session?.user) {
+  const resolvedParams = params instanceof Promise ? await params : params;
+  const rawUsername = resolvedParams?.username || '';
+
+  if (rawUsername === 'me' && !currentUserId) {
     redirect('/');
   }
-  
-  const currentUserId = (session?.user as any)?.id;
 
   let user;
   const userSelect = {
@@ -47,21 +49,21 @@ export default async function UserProfileReels({
     }
   };
 
-  if (params.username === 'me') {
+  if (rawUsername === 'me') {
     if (!currentUserId) return notFound();
     user = await prisma.user.findUnique({
       where: { id: currentUserId },
       select: userSelect
     });
-  } else {
+  } else if (rawUsername) {
     user = await prisma.user.findUnique({
-      where: { username: params.username },
+      where: { username: rawUsername },
       select: userSelect
     });
     
     if (!user) {
       user = await prisma.user.findUnique({
-        where: { id: params.username },
+        where: { id: rawUsername },
         select: userSelect
       });
     }
@@ -169,7 +171,7 @@ export default async function UserProfileReels({
       authorId: post.authorId,
       visibility: post.visibility,
       video: post.mediaUrls,
-      author: user.username || 'user',
+      author: user.username || user.name || 'user',
       authorAvatar: user.avatar,
       toleeName: firstTolee?.name || null,
       toleeSlug: firstTolee?.slug || null,

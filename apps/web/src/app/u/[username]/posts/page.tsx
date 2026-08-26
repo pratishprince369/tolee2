@@ -7,18 +7,20 @@ import { ProfileFeedView } from '@/components/ProfileFeedView';
 import { toggleLike, addComment, getComments, getLikes } from '@/actions/post';
 import { toggleFollow } from '@/actions/user';
 
-export default async function UserProfileFeed({ 
-  params 
-}: { 
-  params: { username: string } 
-}) {
+interface PageProps {
+  params: Promise<{ username: string }> | { username: string };
+}
+
+export default async function UserProfileFeed({ params }: PageProps) {
   const session = await getServerSession(authOptions);
+  const currentUserId = (session?.user as any)?.id || null;
   
-  if (!session?.user) {
+  const resolvedParams = params instanceof Promise ? await params : params;
+  const rawUsername = resolvedParams?.username || '';
+
+  if (rawUsername === 'me' && !currentUserId) {
     redirect('/');
   }
-  
-  const currentUserId = (session?.user as any)?.id;
 
   let user;
   const userSelect = {
@@ -48,21 +50,21 @@ export default async function UserProfileFeed({
     }
   };
 
-  if (params.username === 'me') {
+  if (rawUsername === 'me') {
     if (!currentUserId) return notFound();
     user = await prisma.user.findUnique({
       where: { id: currentUserId },
       select: userSelect
     });
-  } else {
+  } else if (rawUsername) {
     user = await prisma.user.findUnique({
-      where: { username: params.username },
+      where: { username: rawUsername },
       select: userSelect
     });
     
     if (!user) {
       user = await prisma.user.findUnique({
-        where: { id: params.username },
+        where: { id: rawUsername },
         select: userSelect
       });
     }
@@ -159,10 +161,10 @@ export default async function UserProfileFeed({
       postType: post.postType,
       visibility: post.visibility,
       authorId: post.authorId,
-      createdAt: post.createdAt,
+      createdAt: post.createdAt ? new Date(post.createdAt).toISOString() : new Date().toISOString(),
       shareCount: post.shareCount || 0,
-      author: user.username || 'user',
-      authorName: user.name,
+      author: user.username || user.name || 'user',
+      authorName: user.name || user.username || 'Creator',
       authorAvatar: user.avatar,
       isVerified: user.isVerified,
       toleeName: firstTolee?.name || null,

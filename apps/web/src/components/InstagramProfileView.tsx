@@ -1306,11 +1306,12 @@ export function InstagramProfileView({
                     {profilePosts.map((post) => {
                       const hasVideo = post.mediaTypes && post.mediaTypes.split(',')[0] === 'video';
                       const isCarousel = getMediaUrlsCount(post.mediaUrls) > 1;
+                      const profileHandle = user.username || user.id;
                       return (
                         <div 
                           key={post.id} 
-                          onClick={() => router.push(`/u/${user.username}/posts?postId=${post.id}`)}
-                          onMouseEnter={() => router.prefetch(`/u/${user.username}/posts?postId=${post.id}`)}
+                          onClick={() => router.push(`/u/${profileHandle}/posts?postId=${post.id}`)}
+                          onMouseEnter={() => router.prefetch(`/u/${profileHandle}/posts?postId=${post.id}`)}
                           className="aspect-square bg-slate-100 dark:bg-zinc-800 relative group cursor-pointer overflow-hidden"
                         >
                           {isMe && post.visibility && post.visibility !== 'public' && (
@@ -1361,27 +1362,30 @@ export function InstagramProfileView({
               <div className="animate-in fade-in duration-200">
                 {reelsPosts.length > 0 ? (
                   <div className="grid grid-cols-3 gap-[1px] sm:gap-[2px] bg-white">
-                    {reelsPosts.map((post) => (
-                      <div 
-                        key={post.id} 
-                        onClick={() => router.push(`/u/${user.username}/reels?reelId=${post.id}`)} 
-                        onMouseEnter={() => router.prefetch(`/u/${user.username}/reels?reelId=${post.id}`)}
-                        className="aspect-[3/4] bg-slate-100 dark:bg-zinc-800 relative group cursor-pointer overflow-hidden"
-                      >
-                        {renderMediaThumbnail(post, 'portrait')}
-                        <div className="absolute top-2 right-2 bg-black/40 backdrop-blur-[2px] p-1.5 rounded-lg z-10 flex items-center justify-center">
-                          <Play className="w-3.5 h-3.5 text-white fill-white stroke-[1.5]" />
+                    {reelsPosts.map((post) => {
+                      const profileHandle = user.username || user.id;
+                      return (
+                        <div 
+                          key={post.id} 
+                          onClick={() => router.push(`/u/${profileHandle}/reels?reelId=${post.id}`)} 
+                          onMouseEnter={() => router.prefetch(`/u/${profileHandle}/reels?reelId=${post.id}`)}
+                          className="aspect-[3/4] bg-slate-100 dark:bg-zinc-800 relative group cursor-pointer overflow-hidden"
+                        >
+                          {renderMediaThumbnail(post, 'portrait')}
+                          <div className="absolute top-2 right-2 bg-black/40 backdrop-blur-[2px] p-1.5 rounded-lg z-10 flex items-center justify-center">
+                            <Play className="w-3.5 h-3.5 text-white fill-white stroke-[1.5]" />
+                          </div>
+                          <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-black/20 px-1.5 py-0.5 rounded-md text-white text-[11px] font-bold drop-shadow z-10">
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>{formatViewCount(post._count?.views || 0)}</span>
+                          </div>
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center gap-6 z-20">
+                            <div className="flex items-center gap-1.5 text-white font-bold text-[14px] transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300 delay-75"><Heart className="w-4 h-4 fill-white stroke-white" /><span>{post._count.likes}</span></div>
+                            <div className="flex items-center gap-1.5 text-white font-bold text-[14px] transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300 delay-100"><MessageCircle className="w-4 h-4 fill-white stroke-white" /><span>{post._count.comments}</span></div>
+                          </div>
                         </div>
-                        <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-black/20 px-1.5 py-0.5 rounded-md text-white text-[11px] font-bold drop-shadow z-10">
-                          <Eye className="w-3.5 h-3.5" />
-                          <span>{formatViewCount(post._count?.views || 0)}</span>
-                        </div>
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center gap-6 z-20">
-                          <div className="flex items-center gap-1.5 text-white font-bold text-[14px] transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300 delay-75"><Heart className="w-4 h-4 fill-white stroke-white" /><span>{post._count.likes}</span></div>
-                          <div className="flex items-center gap-1.5 text-white font-bold text-[14px] transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300 delay-100"><MessageCircle className="w-4 h-4 fill-white stroke-white" /><span>{post._count.comments}</span></div>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center py-20 text-center px-6">
@@ -1401,11 +1405,12 @@ export function InstagramProfileView({
                     {profileResharedPosts.map((post: any) => {
                       const hasVideo = post.mediaTypes && post.mediaTypes.split(',')[0] === 'video';
                       const isCarousel = getMediaUrlsCount(post.mediaUrls) > 1;
+                      const profileHandle = user.username || user.id;
                       return (
                         <div 
                           key={post.id} 
-                          onClick={() => router.push(`/u/${user.username}/posts?postId=${post.id}`)} 
-                          onMouseEnter={() => router.prefetch(`/u/${user.username}/posts?postId=${post.id}`)}
+                          onClick={() => router.push(`/u/${profileHandle}/posts?postId=${post.id}`)} 
+                          onMouseEnter={() => router.prefetch(`/u/${profileHandle}/posts?postId=${post.id}`)}
                           className="aspect-square bg-slate-100 dark:bg-zinc-800 relative group cursor-pointer overflow-hidden"
                         >
                           {renderMediaThumbnail(post, 'square')}
@@ -1536,11 +1541,12 @@ export function InstagramProfileView({
                       const post = saved.post;
                       const hasVideo = post.mediaTypes && post.mediaTypes.split(',')[0] === 'video';
                       const isCarousel = getMediaUrlsCount(post.mediaUrls) > 1;
+                      const profileHandle = user.username || user.id;
                       return (
                         <div 
                           key={post.id} 
-                          onClick={() => router.push(`/u/${user.username}/posts?postId=${post.id}`)} 
-                          onMouseEnter={() => router.prefetch(`/u/${user.username}/posts?postId=${post.id}`)}
+                          onClick={() => router.push(`/u/${profileHandle}/posts?postId=${post.id}`)} 
+                          onMouseEnter={() => router.prefetch(`/u/${profileHandle}/posts?postId=${post.id}`)}
                           className="aspect-square bg-slate-100 dark:bg-zinc-800 relative group cursor-pointer overflow-hidden"
                         >
                           {renderMediaThumbnail(post, 'square')}
