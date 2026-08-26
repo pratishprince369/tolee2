@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Home, Compass, Film, MessageCircle, Menu, User, Settings, Globe, Store, LogOut, MessageSquare, Map, Radio, Briefcase, Award, Newspaper, Tv, Bot, Bell, Megaphone, Zap, HelpCircle, FileText } from 'lucide-react';
+import { Home, Compass, Film, MessageCircle, Menu, User, Settings, Globe, Store, LogOut, MessageSquare, Map, Radio, Briefcase, Award, Newspaper, Tv, Bot, Bell, Megaphone, Zap, HelpCircle, FileText, Wallet } from 'lucide-react';
 import { useSession, signOut } from 'next-auth/react';
 import { getSidebarDataCached } from '@/lib/sidebar-data';
 import { getDrafts } from '@/lib/draftManager';
@@ -228,6 +228,15 @@ export function BottomNav() {
                 <DropdownMenuSeparator />
 
                 {/* ── Creator & Business Group ── */}
+                <DropdownMenuItem onClick={() => { setClickedPath('/tolee-credit'); router.push('/tolee-credit'); }} className={getDropdownItemClass('/tolee-credit')}>
+                  <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center">
+                      <Wallet className={getDropdownIconClass('/tolee-credit')} />
+                      <span className="font-semibold">Tolee Credit</span>
+                    </div>
+                    <span className="text-[8px] font-extrabold uppercase text-white bg-teal-500 px-1.5 py-0.5 rounded shadow-xs">REVENUE</span>
+                  </div>
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => { setClickedPath('/ads-manager'); router.push('/ads-manager'); }} className={getDropdownItemClass('/ads-manager')}>
                   <Megaphone className={getDropdownIconClass('/ads-manager')} />
                   <span>Ads Manager</span>

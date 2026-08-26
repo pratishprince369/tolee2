@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Search, Bell, MessageCircle, LogOut, User, Settings, Compass, Store, Globe, Heart, Bot, Zap, MessageSquare, Briefcase, Award, FileText, Radio } from 'lucide-react';
+import { Search, Bell, MessageCircle, LogOut, User, Settings, Compass, Store, Globe, Heart, Bot, Zap, MessageSquare, Briefcase, Award, FileText, Radio, Wallet } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -453,6 +453,15 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
                   <DropdownMenuItem onClick={() => router.push('/feedback')} className="cursor-pointer flex w-full items-center">
                     <MessageSquare className="mr-2 h-4 w-4" />
                     <span>Send Feedback</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => router.push('/tolee-credit')} className="cursor-pointer flex w-full items-center justify-between">
+                    <div className="flex items-center">
+                      <Wallet className="mr-2 h-4 w-4 text-teal-500" />
+                      <span>Tolee Credit</span>
+                    </div>
+                    <span className="text-[9px] font-extrabold bg-teal-500/10 text-teal-600 dark:text-teal-400 px-1.5 py-0.5 rounded-full">
+                      EARNINGS
+                    </span>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => router.push('/my-tolees')} className="cursor-pointer flex w-full items-center">
                     <Globe className="mr-2 h-4 w-4" />

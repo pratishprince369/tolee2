@@ -106,6 +106,12 @@ model User {
   subscribedTo      Subscription[]       @relation("SubscriberSubscriptions")
   videoReports      ScreenVideoReport[]
 
+  // Tolee Credit Monetization System
+  creditWallet          CreditWallet?
+  creditBankAccounts    CreditBankAccount[]
+  creditWithdrawals     CreditWithdrawal[]
+  creditTransactions    CreditTransaction[]
+
 
   pincode               String?
   receivePromotions     Boolean           @default(true)
@@ -243,6 +249,7 @@ model Tolee {
   meetings             Meeting[]           @relation("ToleeMeeting")
   chats                Chat[]
   joinRequests         ToleeJoinRequest[]
+  creditConfig         GroupCreditConfig?
 }
 
 model ToleeMember {
@@ -2059,6 +2066,194 @@ model RadarPostLike {
   createdAt   DateTime  @default(now())
 
   @@unique([radarPostId, userId])
+}
+
+// =========================================================
+// TOLEE CREDIT — MONETIZATION, WALLET & REVENUE SYSTEM
+// =========================================================
+
+model CreditWallet {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currency         String   @default("INR")
+  availableBalance Float    @default(0.0)
+  pendingBalance   Float    @default(0.0)
+  totalEarned      Float    @default(0.0)
+  totalWithdrawn   Float    @default(0.0)
+  status           String   @default("active") // "active" | "frozen" | "under_review" | "closed"
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  transactions     CreditTransaction[]
+  withdrawals      CreditWithdrawal[]
+  bankAccounts     CreditBankAccount[]
+  groupCreditConfigs GroupCreditConfig[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+model CreditTransaction {
+  id                  String       @id @default(cuid())
+  transactionId       String       @unique // e.g. TXN_...
+  walletId            String
+  wallet              CreditWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  userId              String
+  user                User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type                String       // "ad_revenue" | "group_revenue" | "bonus" | "referral" | "withdrawal" | "refund" | "reversal" | "admin_adjustment"
+  amount              Float
+  currency            String       @default("INR")
+  status              String       @default("pending") // "pending" | "settled" | "available" | "failed" | "reversed" | "under_review"
+  sourceType          String       // "ad_campaign" | "group_share" | "system_bonus" | "payout" | "creator_reward"
+  sourceId            String?
+  groupId             String?
+  groupName           String?
+  campaignId          String?
+  campaignName        String?
+  revenueSharePercent Float?       // e.g. 20.0
+  grossAdSpend        Float?       // e.g. 100.0
+  description         String?
+  metadata            Json?
+  settlesAt           DateTime?
+  settledAt           DateTime?
+  eventId             String?      @unique // Idempotency key from ad event
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  @@index([walletId])
+  @@index([userId])
+  @@index([groupId])
+  @@index([status])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model GroupCreditConfig {
+  id                        String       @id @default(cuid())
+  toleeId                   String       @unique
+  tolee                     Tolee        @relation(fields: [toleeId], references: [id], onDelete: Cascade)
+  walletId                  String
+  wallet                    CreditWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  ownerId                   String
+  creditEnabled             Boolean      @default(true)
+  revenueShareEnabled       Boolean      @default(true)
+  customRevenueSharePercent Float?       // null = default global config
+  totalRevenueGenerated     Float        @default(0.0)
+  totalAdminShareEarned     Float        @default(0.0)
+  ownershipTransferredAt    DateTime?
+  previousOwnerIds          String?      // JSON array of past owners
+  createdAt                 DateTime     @default(now())
+  updatedAt                 DateTime     @updatedAt
+
+  @@index([toleeId])
+  @@index([walletId])
+  @@index([ownerId])
+}
+
+model CreditAdAttributionEvent {
+  id                  String   @id @default(cuid())
+  eventId             String   @unique // Strict idempotency key
+  campaignId          String
+  groupId             String?
+  memberUserId        String?
+  adEventType         String   // "impression" | "click" | "conversion" | "spend"
+  grossSpend          Float
+  revenueSharePercent Float
+  calculatedShare     Float
+  beneficiaryUserId   String
+  status              String   @default("processed") // "processed" | "ignored_duplicate" | "flagged_fraud"
+  fraudRiskScore      Int      @default(0)
+  fraudReason         String?
+  ipAddress           String?
+  userAgent           String?
+  createdAt           DateTime @default(now())
+
+  @@index([eventId])
+  @@index([campaignId])
+  @@index([groupId])
+  @@index([beneficiaryUserId])
+  @@index([status])
+}
+
+model CreditWithdrawal {
+  id                   String       @id @default(cuid())
+  withdrawalId         String       @unique // e.g. WD_...
+  walletId             String
+  wallet               CreditWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  userId               String
+  user                 User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount               Float
+  currency             String       @default("INR")
+  bankAccountId        String?
+  bankAccountSnapshot  Json?
+  status               String       @default("pending") // "pending" | "processing" | "completed" | "failed" | "rejected" | "cancelled"
+  failureReason        String?
+  adminNotes           String?
+  payoutReference      String?
+  requestedAt          DateTime     @default(now())
+  processedAt          DateTime?
+  completedAt          DateTime?
+
+  @@index([withdrawalId])
+  @@index([walletId])
+  @@index([userId])
+  @@index([status])
+  @@index([requestedAt])
+}
+
+model CreditBankAccount {
+  id                     String       @id @default(cuid())
+  userId                 String
+  user                   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  walletId               String
+  wallet                 CreditWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  accountHolderName      String
+  accountNumberEncrypted  String
+  accountNumberLast4     String
+  ifscCode               String
+  bankName               String?
+  upiId                  String?
+  isPrimary              Boolean      @default(true)
+  isVerified             Boolean      @default(false)
+  verificationStatus     String       @default("pending") // "pending" | "verified" | "rejected"
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+
+  @@index([userId])
+  @@index([walletId])
+}
+
+model CreditSystemConfig {
+  id                         String   @id @default("global_credit_config")
+  defaultRevenueSharePercent Float    @default(20.0) // 20%
+  minimumWithdrawalAmount    Float    @default(500.0) // ₹500
+  settlementPeriodDays       Int      @default(7) // 7 days
+  fraudCheckEnabled          Boolean  @default(true)
+  kycRequiredForWithdrawal   Boolean  @default(false)
+  maxDailyWithdrawalLimit    Float    @default(50000.0)
+  allowNewWallets            Boolean  @default(true)
+  eligibleAdTypes            String   @default("sponsored,boost,banner,video")
+  updatedAt                  DateTime @updatedAt
+  updatedBy                  String?
+}
+
+model CreditAuditLog {
+  id         String   @id @default(cuid())
+  actorId    String
+  actorRole  String   @default("user") // "user" | "admin" | "system"
+  action     String   // "wallet_created" | "group_connected" | "revenue_attributed" | "settlement_processed" | "withdrawal_requested" | "withdrawal_approved" | "config_updated" | "fraud_flagged"
+  targetType String   // "wallet" | "group" | "transaction" | "withdrawal" | "config"
+  targetId   String
+  amount     Float?
+  details    Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  @@index([actorId])
+  @@index([action])
+  @@index([targetId])
+  @@index([createdAt])
 }
 
 
