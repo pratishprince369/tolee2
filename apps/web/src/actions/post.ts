@@ -2263,8 +2263,8 @@ export async function sharePostToFriends(
       // 2. Format a message that recipient will receive
       let msgContent;
       if (postDetails || screenDetails || newsDetails || listingDetails) {
-        const origin = shareUrl ? new URL(shareUrl).origin : 'https://tolee.com';
-        const finalShareUrl = contentType === 'reel' 
+        const origin = shareUrl ? new URL(shareUrl).origin : 'https://tolee.in';
+        const finalShareUrl = (isVideo || contentType === 'reel')
           ? `${origin}/reel/${postId}` 
           : contentType === 'screen' 
           ? `${origin}/screen/watch/${postId}` 
@@ -2278,9 +2278,19 @@ export async function sharePostToFriends(
           ? postDetails.mediaUrls.split(/,(?=https?:\/\/)/).length 
           : 1;
 
+        const deepLink = (isVideo || contentType === 'reel')
+          ? `/reel/${postId}`
+          : contentType === 'screen'
+          ? `/screen/watch/${postId}`
+          : contentType === 'news'
+          ? `/news/${postId}`
+          : contentType === 'marketplace'
+          ? `/marketplace/listing/${postId}`
+          : `/post/${postId}`;
+
         const payload = {
           type: isVideo ? 'shared_video' : 'shared_post',
-          contentType,
+          contentType: isVideo ? 'reel' : contentType,
           videoId: postId,
           creatorId,
           creatorName,
@@ -2292,7 +2302,7 @@ export async function sharePostToFriends(
           likesCount,
           viewsCount,
           shareUrl: finalShareUrl,
-          deepLink: contentType === 'reel' ? `/reel/${postId}` : `/post/${postId}`,
+          deepLink,
           mediaCount,
           newsCategory,
           newsReadingTime,

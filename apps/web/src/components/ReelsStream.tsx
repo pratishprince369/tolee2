@@ -321,6 +321,21 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
   const mobileActiveIndex = useActiveReelIndex(mobileScrollRef, itemsToRender.length);
   const desktopActiveIndex = useActiveReelIndex(desktopScrollRef, itemsToRender.length);
 
+  // Sync active reel to browser URL so sharing/refreshing keeps the current reel position
+  useEffect(() => {
+    const activeIdx = isDesktop ? desktopActiveIndex : mobileActiveIndex;
+    const activeItem = itemsToRender[activeIdx];
+    if (activeItem && activeItem.id && typeof window !== 'undefined') {
+      const currentPath = window.location.pathname;
+      if (currentPath.startsWith('/reel/') || currentPath.startsWith('/reels')) {
+        const targetUrl = `/reel/${activeItem.id}`;
+        if (currentPath !== targetUrl) {
+          window.history.replaceState(null, '', targetUrl);
+        }
+      }
+    }
+  }, [mobileActiveIndex, desktopActiveIndex, isDesktop, itemsToRender]);
+
   const network = useNetworkConfig();
   const lastIndexRef = useRef(0);
   const [direction, setDirection] = useState<'down' | 'up'>('down');

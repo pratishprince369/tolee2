@@ -14,17 +14,17 @@ import {
   Pause,
   Volume2,
   VolumeX,
-  MoreHorizontal,
   ArrowLeft,
   MapPin,
   Eye,
   LogIn,
   Send,
-  Sparkles,
-  FileText
+  Repeat,
+  Users,
+  Sparkles
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { toggleLike, addComment, toggleSavePost } from '@/actions/post';
+import { toggleLike, addComment, toggleSavePost, toggleRepost } from '@/actions/post';
 import { ShareModal } from '@/components/ShareModal';
 import { HLSVideo } from '@/components/HLSVideo';
 import Link from 'next/link';
@@ -46,6 +46,28 @@ function formatDistanceToNowSafe(dateString: string | null | undefined): string 
   } catch {
     return '';
   }
+}
+
+function renderFormattedCaption(text: string) {
+  if (!text) return null;
+  const parts = text.split(/(\s+)/);
+  return parts.map((part, idx) => {
+    if (part.startsWith('#') && part.length > 1) {
+      return (
+        <span key={idx} className="text-teal-400 font-semibold hover:underline">
+          {part}
+        </span>
+      );
+    }
+    if (part.startsWith('@') && part.length > 1) {
+      return (
+        <span key={idx} className="text-emerald-400 font-semibold hover:underline">
+          {part}
+        </span>
+      );
+    }
+    return part;
+  });
 }
 
 interface PostViewerProps {
@@ -90,12 +112,14 @@ export default function PostViewer({ post }: PostViewerProps) {
   const [carouselIdx, setCarouselIdx] = useState(0);
   const [liked, setLiked] = useState(post.likedByMe || false);
   const [likesCount, setLikesCount] = useState(post.likes || 0);
+  const [reposted, setReposted] = useState(post.repostedByMe || false);
+  const [repostsCount, setRepostsCount] = useState(post.reposts || 0);
   const [saved, setSaved] = useState(post.savedByMe || false);
   const [comments, setComments] = useState<any[]>(post.commentsList || []);
   const [commentsCount, setCommentsCount] = useState(post.comments || 0);
   const [commentInput, setCommentInput] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(true);
   const [muted, setMuted] = useState(true);
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [authPromptOpen, setAuthPromptOpen] = useState(false);
@@ -139,7 +163,7 @@ export default function PostViewer({ post }: PostViewerProps) {
     if (typeof window !== 'undefined' && window.history.length > 1) {
       router.back();
     } else {
-      router.push('/');
+      router.push('/feed');
     }
   };
 
@@ -152,6 +176,17 @@ export default function PostViewer({ post }: PostViewerProps) {
     setLiked(newLiked);
     setLikesCount((c) => (newLiked ? c + 1 : Math.max(0, c - 1)));
     await toggleLike(post.id);
+  };
+
+  const handleRepost = async () => {
+    if (!session?.user) {
+      setAuthPromptOpen(true);
+      return;
+    }
+    const newReposted = !reposted;
+    setReposted(newReposted);
+    setRepostsCount((c) => (newReposted ? c + 1 : Math.max(0, c - 1)));
+    await toggleRepost(post.id);
   };
 
   const handleSave = async () => {
@@ -458,7 +493,7 @@ export default function PostViewer({ post }: PostViewerProps) {
                     <Link href={`/u/${authorUsername}`} className="font-bold text-white mr-1.5 hover:underline">
                       {authorDisplayName}
                     </Link>
-                    {post.caption}
+                    {renderFormattedCaption(post.caption)}
                   </p>
                   {(post.location || post.subLocation) && (
                     <div className="flex items-center gap-1 mt-1 text-xs text-teal-400">
@@ -555,7 +590,7 @@ export default function PostViewer({ post }: PostViewerProps) {
               <div className="flex items-center gap-4">
                 <button
                   onClick={handleLike}
-                  className="flex items-center gap-1.5 group"
+                  className="flex items-center gap-1.5 group cursor-pointer"
                   aria-label="Like"
                 >
                   <Heart
@@ -563,14 +598,14 @@ export default function PostViewer({ post }: PostViewerProps) {
                       liked ? 'text-rose-500 fill-rose-500' : 'text-gray-400 group-hover:text-white'
                     }`}
                   />
-                  <span className="text-xs font-semibold text-gray-400 group-hover:text-white">
+                  <span className={`text-xs font-semibold ${liked ? 'text-rose-400' : 'text-gray-400 group-hover:text-white'}`}>
                     {likesCount > 0 ? likesCount : 'Like'}
                   </span>
                 </button>
 
                 <button
                   onClick={() => document.getElementById('post-comment-input')?.focus()}
-                  className="flex items-center gap-1.5 group text-gray-400 hover:text-white"
+                  className="flex items-center gap-1.5 group text-gray-400 hover:text-white cursor-pointer"
                   aria-label="Comment"
                 >
                   <MessageCircle className="w-5 h-5 transition-transform group-hover:scale-110" />
@@ -580,12 +615,24 @@ export default function PostViewer({ post }: PostViewerProps) {
                 </button>
 
                 <button
+                  onClick={handleRepost}
+                  className="flex items-center gap-1.5 group text-gray-400 hover:text-white cursor-pointer"
+                  aria-label="Repost"
+                >
+                  <Repeat className={`w-5 h-5 transition-transform group-hover:scale-110 ${reposted ? 'text-emerald-400' : ''}`} />
+                  {repostsCount > 0 && (
+                    <span className={`text-xs font-semibold ${reposted ? 'text-emerald-400' : ''}`}>
+                      {repostsCount}
+                    </span>
+                  )}
+                </button>
+
+                <button
                   onClick={() => setShareModalOpen(true)}
-                  className="flex items-center gap-1.5 group text-gray-400 hover:text-white"
+                  className="flex items-center gap-1.5 group text-gray-400 hover:text-white cursor-pointer"
                   aria-label="Share"
                 >
                   <Share2 className="w-5 h-5 transition-transform group-hover:scale-110" />
-                  <span className="text-xs font-semibold">Share</span>
                 </button>
               </div>
 
@@ -598,7 +645,7 @@ export default function PostViewer({ post }: PostViewerProps) {
                 )}
                 <button 
                   onClick={handleSave} 
-                  className="text-gray-400 hover:text-white transition-colors"
+                  className="text-gray-400 hover:text-white transition-colors cursor-pointer"
                   aria-label="Save"
                 >
                   <Bookmark className={`w-5 h-5 ${saved ? 'text-teal-400 fill-teal-400' : ''}`} />

@@ -38,8 +38,9 @@ export function getContentPermanentUrl(item: ShareableItem | string): string {
   }
 
   const type = (item.contentType || item.postType || '').toLowerCase();
+  const isVideo = type === 'reel' || item.video || (typeof item.mediaTypes === 'string' && item.mediaTypes.includes('video'));
 
-  if (type === 'reel') {
+  if (isVideo) {
     return `${baseUrl}/reel/${item.id}`;
   }
   if (type === 'screen') {

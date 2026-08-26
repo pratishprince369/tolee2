@@ -94,7 +94,29 @@ export default async function PostPage({ params }: PostPageProps) {
   const res = await getPostById(id);
 
   if (!res.success || !res.post) {
-    notFound();
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#070b13] text-white p-4 font-sans">
+        <div className="max-w-md w-full text-center p-8 bg-[#0b1220] border border-[#16233a] rounded-3xl space-y-5 shadow-2xl">
+          <div className="w-14 h-14 rounded-2xl bg-teal-500/10 text-teal-400 flex items-center justify-center mx-auto text-2xl font-bold border border-teal-500/20">
+            📄
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-xl font-extrabold text-white">Post Unavailable</h2>
+            <p className="text-xs text-gray-400 leading-relaxed">
+              This post may have been removed by the creator, set to private, or the link is invalid.
+            </p>
+          </div>
+          <div className="pt-2 flex gap-3">
+            <a
+              href="/feed"
+              className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-400 hover:to-emerald-500 text-black text-xs font-bold transition-all shadow-md block text-center"
+            >
+              Explore Feed
+            </a>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   const post = res.post;
@@ -102,11 +124,25 @@ export default async function PostPage({ params }: PostPageProps) {
   // If private post and visitor is not the author, protect privacy
   if ((post.authorIsPrivate || post.visibility === 'private') && (!currentUserId || post.authorId !== currentUserId)) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
-        <div className="max-w-md w-full text-center p-8 bg-card border rounded-3xl space-y-4 shadow-lg">
-          <div className="w-12 h-12 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto text-xl font-bold">🔒</div>
-          <h2 className="text-xl font-bold">Private Post</h2>
-          <p className="text-sm text-muted-foreground">This content has been marked as private by the creator and is only accessible to authorized members.</p>
+      <div className="min-h-screen flex items-center justify-center bg-[#070b13] text-white p-4 font-sans">
+        <div className="max-w-md w-full text-center p-8 bg-[#0b1220] border border-[#16233a] rounded-3xl space-y-5 shadow-2xl">
+          <div className="w-14 h-14 rounded-2xl bg-amber-500/10 text-amber-400 flex items-center justify-center mx-auto text-2xl font-bold border border-amber-500/20">
+            🔒
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-xl font-extrabold text-white">Private Post</h2>
+            <p className="text-xs text-gray-400 leading-relaxed">
+              This content has been marked as private by the creator and is only accessible to authorized members.
+            </p>
+          </div>
+          <div className="pt-2 flex gap-3">
+            <a
+              href="/feed"
+              className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-400 hover:to-emerald-500 text-black text-xs font-bold transition-all shadow-md block text-center"
+            >
+              Back to Feed
+            </a>
+          </div>
         </div>
       </div>
     );
