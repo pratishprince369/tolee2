@@ -117,8 +117,8 @@ export default async function PostPage({ params }: PostPageProps) {
     redirect(`/reel/${id}`);
   }
 
-  const authorName = post.authorName || post.author || 'Tolee Creator';
-  const authorUsername = post.author || 'creator';
+  const authorName = post.authorName || 'Tolee Creator';
+  const authorUsername = post.author && !post.author.includes(' ') ? post.author : (post.authorId || 'creator');
   const mediaUrl = post.image || post.mediaUrls?.split(',')[0] || 'https://tolee.in/logo.png';
 
   const jsonLdPost = {

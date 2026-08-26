@@ -130,8 +130,8 @@ export default function PostViewer({ post }: PostViewerProps) {
   const isMultiple = allMediaUrls.length > 1;
   const isVideo = currentMediaType === 'video' || post.postType === 'reel';
 
-  const authorDisplayName = post.authorName || post.author || 'Tolee Creator';
-  const authorUsername = post.author || post.authorName || post.authorId || 'creator';
+  const authorDisplayName = post.authorName || 'Tolee Creator';
+  const authorUsername = post.author && !post.author.includes(' ') ? post.author : (post.authorId || 'creator');
   const authorAvatarUrl = post.authorAvatar || '/default-user-avatar.svg';
 
   const handleBack = () => {
