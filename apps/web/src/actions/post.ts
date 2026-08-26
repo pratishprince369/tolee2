@@ -3035,15 +3035,14 @@ export async function getPostById(id: string) {
           take: 30,
           include: {
             author: {
-              select: { id: true, name: true, username: true, avatar: true },
+              select: { id: true, name: true, username: true, avatar: true, image: true },
             },
-            likes: { select: { userId: true } },
             replies: {
               orderBy: { createdAt: 'asc' },
               take: 5,
               include: {
                 author: {
-                  select: { id: true, name: true, username: true, avatar: true },
+                  select: { id: true, name: true, username: true, avatar: true, image: true },
                 },
               },
             },
@@ -3085,13 +3084,13 @@ export async function getPostById(id: string) {
       id: c.id,
       content: c.content,
       createdAt: c.createdAt ? new Date(c.createdAt).toISOString() : new Date().toISOString(),
-      likesCount: c.likes?.length || 0,
-      likedByMe: currentUserId ? (c.likes || []).some((l: any) => l.userId === currentUserId) : false,
+      likesCount: 0,
+      likedByMe: false,
       author: c.author ? {
         id: c.author.id,
         name: c.author.name || c.author.username || 'User',
         username: c.author.username || c.author.name || 'user',
-        avatar: c.author.avatar || '/default-user-avatar.svg',
+        avatar: c.author.avatar || c.author.image || '/default-user-avatar.svg',
       } : {
         id: 'unknown',
         name: 'User',
@@ -3106,7 +3105,7 @@ export async function getPostById(id: string) {
           id: r.author.id,
           name: r.author.name || r.author.username || 'User',
           username: r.author.username || r.author.name || 'user',
-          avatar: r.author.avatar || '/default-user-avatar.svg',
+          avatar: r.author.avatar || r.author.image || '/default-user-avatar.svg',
         } : {
           id: 'unknown',
           name: 'User',
