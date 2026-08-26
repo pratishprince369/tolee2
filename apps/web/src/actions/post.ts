@@ -3134,7 +3134,7 @@ export async function getPostById(id: string) {
     const mappedPost = {
       id: post.id,
       authorId: post.author?.id || null,
-      author: post.author?.username || post.author?.id || 'creator',
+      author: post.author?.username || post.author?.name || 'creator',
       authorName: post.author?.name || post.author?.username || 'Tolee Creator',
       authorAvatar: post.author?.avatar || post.author?.image || '/default-user-avatar.svg',
       authorIsPrivate: post.author?.isPrivate || false,

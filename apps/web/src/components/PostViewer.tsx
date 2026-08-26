@@ -155,8 +155,10 @@ export default function PostViewer({ post }: PostViewerProps) {
   const isMultiple = allMediaUrls.length > 1;
   const isVideo = currentMediaType === 'video' || post.postType === 'reel' || currentMediaUrl.includes('.m3u8') || currentMediaUrl.includes('.mp4');
 
-  const authorDisplayName = post.authorName || 'Tolee Creator';
-  const authorUsername = post.author && !post.author.includes(' ') ? post.author : (post.authorId || 'creator');
+  const authorDisplayName = post.authorName || post.author || 'Tolee Creator';
+  const authorUsername = post.author && !post.author.startsWith('cmt') && !post.author.includes(' ')
+    ? post.author
+    : (post.authorName ? post.authorName.toLowerCase().replace(/\s+/g, '_') : 'creator');
   const authorAvatarUrl = post.authorAvatar || '/default-user-avatar.svg';
 
   const handleBack = () => {
@@ -252,13 +254,13 @@ export default function PostViewer({ post }: PostViewerProps) {
   const timeAgoString = mounted ? formatDistanceToNowSafe(post.createdAt) : '';
 
   return (
-    <div className="min-h-screen bg-[#070b13] text-white flex flex-col font-sans selection:bg-teal-500 selection:text-black">
-      {/* Top Header Navigation (Instagram style with Tolee branding) */}
-      <header className="sticky top-0 z-50 flex items-center justify-between px-4 py-3 bg-[#0a0f1d]/95 backdrop-blur-md border-b border-[#141e33]">
+    <div className="min-h-screen bg-zinc-100/70 dark:bg-[#070b13] text-zinc-900 dark:text-zinc-50 flex flex-col font-sans selection:bg-teal-500 selection:text-black">
+      {/* Top Header Navigation matching Tolee Branding */}
+      <header className="sticky top-0 z-50 flex items-center justify-between px-4 py-3 bg-white/95 dark:bg-[#0a0f1d]/95 backdrop-blur-md border-b border-zinc-200/80 dark:border-[#141e33] shadow-xs">
         <div className="flex items-center gap-3">
           <button
             onClick={handleBack}
-            className="w-9 h-9 flex items-center justify-center rounded-xl bg-[#141e33] hover:bg-[#1f2d4a] text-gray-200 hover:text-white transition-all cursor-pointer shadow-sm active:scale-95"
+            className="w-9 h-9 flex items-center justify-center rounded-xl bg-zinc-100 dark:bg-[#141e33] hover:bg-zinc-200 dark:hover:bg-[#1f2d4a] text-zinc-700 dark:text-gray-200 transition-all cursor-pointer shadow-xs active:scale-95"
             aria-label="Go to Feed"
             title="Back to Feed"
           >
@@ -268,10 +270,10 @@ export default function PostViewer({ post }: PostViewerProps) {
 
         {/* Center Tolee Wordmark */}
         <Link href="/feed" className="flex items-center gap-1 group">
-          <span className="text-xl font-black tracking-tight text-white group-hover:text-teal-400 transition-colors">
+          <span className="text-xl font-black tracking-tight text-zinc-900 dark:text-white group-hover:text-teal-500 transition-colors">
             tolee
           </span>
-          <span className="w-1.5 h-1.5 rounded-full bg-teal-400 -mt-2"></span>
+          <span className="w-1.5 h-1.5 rounded-full bg-teal-500 -mt-2"></span>
         </Link>
 
         {/* Top Right Actions */}
@@ -287,7 +289,7 @@ export default function PostViewer({ post }: PostViewerProps) {
           ) : (
             <button
               onClick={() => setShareModalOpen(true)}
-              className="w-9 h-9 flex items-center justify-center rounded-xl bg-[#141e33] hover:bg-[#1f2d4a] text-gray-300 hover:text-white transition-colors cursor-pointer"
+              className="w-9 h-9 flex items-center justify-center rounded-xl bg-zinc-100 dark:bg-[#141e33] hover:bg-zinc-200 dark:hover:bg-[#1f2d4a] text-zinc-700 dark:text-gray-300 transition-colors cursor-pointer"
               title="Share Post"
             >
               <Share2 className="w-4.5 h-4.5" />
@@ -296,51 +298,66 @@ export default function PostViewer({ post }: PostViewerProps) {
         </div>
       </header>
 
-      {/* Main Container - Single Column Social Post Feed Card */}
-      <main className="flex-1 w-full max-w-[580px] mx-auto pb-24 sm:py-5 sm:px-3">
-        <div className="bg-[#090e1a] sm:border border-[#141e33] sm:rounded-3xl overflow-hidden shadow-2xl">
-          {/* Post Header: Creator Info */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-[#141e33]/70">
-            <div className="flex items-center gap-3 min-w-0">
-              <Link href={`/u/${authorUsername}`} className="shrink-0 relative group">
-                <div className="p-0.5 rounded-full bg-gradient-to-tr from-teal-500 to-emerald-400">
-                  <Avatar className="w-9 h-9 border-2 border-[#090e1a]">
-                    <AvatarImage src={authorAvatarUrl} />
-                    <AvatarFallback className="bg-zinc-800 text-white text-xs font-bold">
-                      {authorDisplayName?.[0]?.toUpperCase() || 'U'}
-                    </AvatarFallback>
-                  </Avatar>
-                </div>
+      {/* Main Container - Centered Feed Post Card */}
+      <main className="flex-1 w-full max-w-[620px] mx-auto py-3 sm:py-6 px-0 sm:px-4">
+        <div className="bg-white dark:bg-[#000000] border border-gray-200/80 dark:border-zinc-800/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.25)] rounded-none sm:rounded-3xl overflow-hidden transition-all duration-300">
+          
+          {/* Tolee/Group Header if post belongs to a community */}
+          {post.toleeName && (
+            <div className="px-4 py-2.5 border-b border-gray-100 dark:border-zinc-900 flex items-center gap-2.5 bg-gray-50/70 dark:bg-zinc-900/30">
+              <div className="w-7 h-7 bg-teal-500 dark:bg-zinc-800 rounded-full flex items-center justify-center text-white shrink-0 shadow-xs">
+                <Users strokeWidth={2} className="w-4 h-4 text-white" />
+              </div>
+              <Link href={`/t/${post.toleeSlug || ''}`} className="flex-grow">
+                <span className="text-[12px] font-extrabold text-teal-600 dark:text-zinc-200 hover:underline cursor-pointer uppercase tracking-wider">
+                  {post.toleeName}
+                </span>
               </Link>
-              <div className="min-w-0">
-                <Link
-                  href={`/u/${authorUsername}`}
-                  className="text-sm font-bold text-white hover:text-teal-400 transition-colors truncate block leading-tight"
-                >
-                  {authorUsername}
+            </div>
+          )}
+
+          {/* Creator Profile Header */}
+          <div className="p-4 pb-2 flex flex-row items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Link href={`/u/${authorUsername}`} className="shrink-0">
+                <Avatar className="w-10 h-10 border border-zinc-100 dark:border-zinc-800 shadow-xs cursor-pointer">
+                  <AvatarImage src={authorAvatarUrl} alt={authorDisplayName} />
+                  <AvatarFallback className="bg-zinc-800 text-white font-bold">
+                    {authorDisplayName?.[0]?.toUpperCase() || 'U'}
+                  </AvatarFallback>
+                </Avatar>
+              </Link>
+              <div className="flex flex-col">
+                <Link href={`/u/${authorUsername}`}>
+                  <span className="font-bold text-[14.5px] text-zinc-900 dark:text-zinc-50 hover:underline cursor-pointer leading-none">
+                    {authorDisplayName}
+                  </span>
                 </Link>
-                {(post.location || post.subLocation || post.toleeName) && (
-                  <div className="flex items-center gap-1 text-[11px] text-gray-400 truncate mt-0.5">
-                    {post.toleeName ? (
-                      <Link href={`/t/${post.toleeSlug || ''}`} className="text-teal-400 hover:underline flex items-center gap-1 truncate">
-                        <Users className="w-3 h-3 shrink-0" />
-                        <span className="truncate">{post.toleeName}</span>
-                      </Link>
-                    ) : (
-                      <>
-                        <MapPin className="w-3 h-3 text-teal-400 shrink-0" />
-                        <span className="truncate">{[post.location, post.subLocation].filter(Boolean).join(', ')}</span>
-                      </>
-                    )}
-                  </div>
-                )}
+                <div className="flex items-center gap-1.5 text-[11px] text-zinc-400 dark:text-zinc-500 font-medium mt-1">
+                  <span>@{authorUsername}</span>
+                  {timeAgoString && (
+                    <>
+                      <span>•</span>
+                      <span>{timeAgoString}</span>
+                    </>
+                  )}
+                  {(post.location || post.subLocation) && (
+                    <>
+                      <span>•</span>
+                      <span className="flex items-center gap-0.5 text-teal-600 dark:text-teal-400">
+                        <MapPin className="w-3 h-3 shrink-0" />
+                        <span>{[post.location, post.subLocation].filter(Boolean).join(', ')}</span>
+                      </span>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
 
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setShareModalOpen(true)}
-                className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-white hover:bg-[#141e33] transition-colors cursor-pointer"
+                className="h-8 w-8 rounded-full flex items-center justify-center text-zinc-400 dark:text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900/60 active:scale-95 transition-all cursor-pointer"
                 title="Share Post"
               >
                 <Share2 className="w-4 h-4" />
@@ -348,8 +365,17 @@ export default function PostViewer({ post }: PostViewerProps) {
             </div>
           </div>
 
+          {/* Caption Content */}
+          {post.caption && (
+            <div className="px-5 py-2">
+              <p className="text-[14.5px] leading-snug text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap">
+                {renderFormattedCaption(post.caption)}
+              </p>
+            </div>
+          )}
+
           {/* Media Presentation Container */}
-          <div className="relative bg-[#02050b] flex items-center justify-center w-full min-h-[300px] overflow-hidden">
+          <div className="relative w-full overflow-hidden bg-black">
             {hasMedia ? (
               isVideo ? (
                 <div className="relative w-full aspect-square sm:aspect-auto sm:max-h-[640px] flex items-center justify-center group overflow-hidden">
@@ -399,7 +425,7 @@ export default function PostViewer({ post }: PostViewerProps) {
                 </div>
               ) : (
                 <div className="relative w-full flex items-center justify-center">
-                  <div className="relative w-full flex items-center justify-center overflow-hidden bg-[#04070e]">
+                  <div className="relative w-full flex items-center justify-center overflow-hidden bg-black">
                     <img
                       src={currentMediaUrl}
                       alt={post.caption || 'Post image'}
@@ -443,131 +469,113 @@ export default function PostViewer({ post }: PostViewerProps) {
                 </div>
               )
             ) : (
-              // Text-only Post presentation
-              <div className="w-full p-8 sm:p-12 bg-gradient-to-br from-[#0c1424] via-[#09101d] to-[#050a14] relative overflow-hidden flex flex-col justify-between">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-teal-500/5 rounded-full blur-3xl pointer-events-none" />
-                <p className="text-lg sm:text-xl font-medium text-gray-100 leading-relaxed whitespace-pre-wrap">
+              // Text-only Post Presentation
+              <div className="w-full p-8 sm:p-12 bg-gradient-to-br from-zinc-50 via-zinc-100 to-zinc-200 dark:from-[#0c1424] dark:via-[#09101d] dark:to-[#050a14] relative overflow-hidden flex flex-col justify-between">
+                <p className="text-lg sm:text-xl font-medium text-zinc-900 dark:text-gray-100 leading-relaxed whitespace-pre-wrap">
                   {renderFormattedCaption(post.caption) || 'Shared post on Tolee.'}
                 </p>
               </div>
             )}
           </div>
 
-          {/* Social Action Bar (Instagram style) */}
-          <div className="px-4 pt-3 pb-2">
-            <div className="flex items-center justify-between">
+          {/* Social Action Bar (Tolee Feed Style) */}
+          <div className="px-5 pb-4 pt-3 flex flex-col gap-3">
+            <div className="flex items-center justify-between w-full pt-1 border-t border-zinc-100 dark:border-zinc-900/60">
               {/* Left Action Buttons */}
-              <div className="flex items-center gap-4">
-                {/* Like Button with Count */}
+              <div className="flex items-center gap-5">
+                {/* 1. Like Icon + Count */}
                 <button
                   onClick={handleLike}
-                  className="flex items-center gap-1.5 group cursor-pointer active:scale-90 transition-transform"
+                  className={`flex items-center gap-1.5 transition-all duration-200 active:scale-110 focus:outline-none cursor-pointer ${
+                    liked ? 'text-red-500' : 'text-zinc-600 dark:text-zinc-400 hover:text-red-500'
+                  }`}
                   aria-label="Like"
                 >
                   <Heart
-                    className={`w-6 h-6 transition-transform ${
-                      liked ? 'text-rose-500 fill-rose-500' : 'text-gray-200 group-hover:text-white'
+                    strokeWidth={1.5}
+                    className={`w-[22px] h-[22px] transition-colors ${
+                      liked ? 'fill-red-500 stroke-red-500' : 'fill-transparent'
                     }`}
                   />
-                  {likesCount > 0 && (
-                    <span className={`text-sm font-bold ${liked ? 'text-rose-400' : 'text-gray-200'}`}>
-                      {likesCount}
-                    </span>
-                  )}
+                  <span className="text-[13px] font-semibold">{likesCount}</span>
                 </button>
 
-                {/* Comment Button with Count */}
+                {/* 2. Comment Icon + Count */}
                 <button
                   onClick={() => document.getElementById('post-comment-input')?.focus()}
-                  className="flex items-center gap-1.5 group text-gray-200 hover:text-white cursor-pointer active:scale-90 transition-transform"
+                  className="flex items-center gap-1.5 text-zinc-600 dark:text-zinc-400 hover:text-blue-500 transition-all duration-200 active:scale-110 focus:outline-none cursor-pointer"
                   aria-label="Comment"
                 >
-                  <MessageCircle className="w-6 h-6" />
-                  {commentsCount > 0 && (
-                    <span className="text-sm font-bold text-gray-200">
-                      {commentsCount}
-                    </span>
-                  )}
+                  <MessageCircle strokeWidth={1.5} className="w-[22px] h-[22px] fill-transparent" />
+                  <span className="text-[13px] font-semibold">{commentsCount}</span>
                 </button>
 
-                {/* Repost Button with Count */}
+                {/* 3. Repost Icon + Count */}
                 <button
                   onClick={handleRepost}
-                  className="flex items-center gap-1.5 group text-gray-200 hover:text-white cursor-pointer active:scale-90 transition-transform"
+                  className={`flex items-center gap-1.5 transition-all duration-200 active:scale-110 focus:outline-none cursor-pointer ${
+                    reposted ? 'text-green-500' : 'text-zinc-600 dark:text-zinc-400 hover:text-green-500'
+                  }`}
                   aria-label="Repost"
                 >
-                  <Repeat className={`w-6 h-6 ${reposted ? 'text-emerald-400' : ''}`} />
+                  <Repeat strokeWidth={1.5} className={`w-[22px] h-[22px] transition-colors ${reposted ? 'text-green-500' : ''}`} />
                   {repostsCount > 0 && (
-                    <span className={`text-sm font-bold ${reposted ? 'text-emerald-400' : 'text-gray-200'}`}>
-                      {repostsCount}
-                    </span>
+                    <span className="text-[13px] font-semibold">{repostsCount}</span>
                   )}
                 </button>
 
-                {/* Share Button */}
+                {/* 4. Share Icon */}
                 <button
                   onClick={() => setShareModalOpen(true)}
-                  className="flex items-center gap-1.5 group text-gray-200 hover:text-white cursor-pointer active:scale-90 transition-transform"
+                  className="flex items-center gap-1.5 text-zinc-600 dark:text-zinc-400 hover:text-teal-500 transition-all duration-200 active:scale-110 focus:outline-none cursor-pointer"
                   aria-label="Share"
                 >
-                  <Send className="w-5.5 h-5.5 -rotate-45 mb-0.5" />
+                  <Send strokeWidth={1.5} className="w-[22px] h-[22px] fill-transparent" />
                 </button>
               </div>
 
-              {/* Right Action: Bookmark / Save */}
+              {/* Right Action: Views & Bookmark */}
               <div className="flex items-center gap-3">
                 {post.views > 0 && (
-                  <div className="flex items-center gap-1 text-xs text-gray-400 font-medium">
-                    <Eye className="w-4 h-4" />
+                  <span className="flex items-center gap-1 text-[13px] font-semibold text-zinc-400 dark:text-zinc-500">
+                    <Eye strokeWidth={1.5} className="w-[18px] h-[18px]" />
                     <span>{post.views}</span>
-                  </div>
+                  </span>
                 )}
                 <button
                   onClick={handleSave}
-                  className="text-gray-200 hover:text-white transition-transform active:scale-90 cursor-pointer"
+                  className="flex items-center gap-1 transition-all duration-200 active:scale-125 focus:outline-none text-zinc-600 dark:text-zinc-400 hover:text-yellow-500 cursor-pointer"
                   aria-label="Save"
                 >
-                  <Bookmark className={`w-6 h-6 ${saved ? 'text-teal-400 fill-teal-400' : ''}`} />
+                  <Bookmark
+                    strokeWidth={1.5}
+                    className={`w-[22px] h-[22px] transition-colors ${
+                      saved ? 'fill-teal-500 text-teal-500 dark:fill-white dark:text-white' : 'fill-transparent'
+                    }`}
+                  />
                 </button>
               </div>
             </div>
 
-            {/* Likes Count Line */}
+            {/* Likes Summary Line */}
             {likesCount > 0 && (
-              <div className="mt-2 text-xs font-bold text-white">
+              <div className="text-[13px] font-bold text-zinc-900 dark:text-zinc-100">
                 {likesCount} {likesCount === 1 ? 'like' : 'likes'}
               </div>
             )}
 
-            {/* Caption & Description Section */}
-            {post.caption && (
-              <div className="mt-2 text-sm leading-relaxed text-gray-200">
-                <Link href={`/u/${authorUsername}`} className="font-bold text-white mr-1.5 hover:underline">
-                  {authorUsername}
-                </Link>
-                <span className="whitespace-pre-wrap">{renderFormattedCaption(post.caption)}</span>
-              </div>
-            )}
-
-            {/* Timestamp */}
-            {timeAgoString && (
-              <div className="mt-1.5 text-[11px] text-gray-400 uppercase tracking-wide">
-                {timeAgoString}
-              </div>
-            )}
-
             {/* Comments Stream */}
-            <div className="mt-4 pt-3 border-t border-[#141e33]/70 space-y-3">
-              <div className="flex items-center justify-between text-xs font-bold text-gray-400 uppercase tracking-wider">
+            <div className="mt-2 pt-3 border-t border-zinc-100 dark:border-zinc-900/60 space-y-3">
+              <div className="flex items-center justify-between text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
                 <span>Comments ({commentsCount})</span>
               </div>
 
               {comments.length === 0 ? (
-                <p className="text-xs text-gray-400 py-2">
+                <p className="text-xs text-zinc-400 dark:text-zinc-500 py-1">
                   No comments yet. Be the first to comment!
                 </p>
               ) : (
-                <div className="space-y-3 max-h-80 overflow-y-auto pr-1 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/10">
+                <div className="space-y-3 max-h-80 overflow-y-auto pr-1 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-zinc-300 dark:scrollbar-thumb-white/10">
                   {comments.map((comment) => {
                     const commentAuthorName = comment.author?.name || comment.author?.username || 'User';
                     const commentAuthorUsername = comment.author?.username || 'user';
@@ -575,23 +583,23 @@ export default function PostViewer({ post }: PostViewerProps) {
 
                     return (
                       <div key={comment.id} className="flex gap-2.5 text-xs group">
-                        <Avatar className="w-7 h-7 shrink-0 mt-0.5 border border-[#1b2b48]">
+                        <Avatar className="w-7 h-7 shrink-0 mt-0.5 border border-zinc-200 dark:border-[#1b2b48]">
                           <AvatarImage src={commentAuthorAvatar} />
-                          <AvatarFallback className="bg-zinc-800 text-white text-[9px] font-bold">
+                          <AvatarFallback className="bg-zinc-200 dark:bg-zinc-800 text-zinc-800 dark:text-white text-[9px] font-bold">
                             {commentAuthorName?.[0]?.toUpperCase() || 'U'}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1">
-                          <div className="bg-[#0e1626] border border-[#16233a] px-3 py-2 rounded-2xl">
-                            <span className="font-bold text-white mr-1.5">
+                          <div className="bg-zinc-100 dark:bg-[#0e1626] border border-zinc-200/80 dark:border-[#16233a] px-3 py-2 rounded-2xl">
+                            <span className="font-bold text-zinc-900 dark:text-white mr-1.5">
                               {commentAuthorUsername}
                             </span>
-                            <span className="text-gray-300 whitespace-pre-wrap">
+                            <span className="text-zinc-700 dark:text-gray-300 whitespace-pre-wrap">
                               {comment.content}
                             </span>
                           </div>
                           {comment.createdAt && mounted && (
-                            <span className="text-[10px] text-gray-400 mt-1 inline-block ml-2">
+                            <span className="text-[10px] text-zinc-400 dark:text-gray-500 mt-1 inline-block ml-2">
                               {formatDistanceToNowSafe(comment.createdAt)}
                             </span>
                           )}
@@ -602,14 +610,12 @@ export default function PostViewer({ post }: PostViewerProps) {
                 </div>
               )}
             </div>
-          </div>
 
-          {/* Quick Comment Input Form at Bottom */}
-          <div className="border-t border-[#141e33] px-4 py-3 bg-[#070b13]">
-            <form onSubmit={handleComment} className="flex items-center gap-2.5">
-              <Avatar className="w-7 h-7 shrink-0 border border-[#1b2b48]">
+            {/* Quick Comment Input Form at Bottom */}
+            <form onSubmit={handleComment} className="flex items-center gap-2.5 pt-2">
+              <Avatar className="w-8 h-8 shrink-0 border border-zinc-200 dark:border-[#1b2b48]">
                 <AvatarImage src={session?.user?.image || '/default-user-avatar.svg'} />
-                <AvatarFallback className="bg-zinc-800 text-white text-[10px] font-bold">
+                <AvatarFallback className="bg-zinc-200 dark:bg-zinc-800 text-zinc-800 dark:text-white text-[10px] font-bold">
                   {session?.user?.name?.[0]?.toUpperCase() || 'U'}
                 </AvatarFallback>
               </Avatar>
@@ -619,12 +625,12 @@ export default function PostViewer({ post }: PostViewerProps) {
                 value={commentInput}
                 onChange={(e) => setCommentInput(e.target.value)}
                 placeholder={session?.user ? "Add a comment..." : "Log in to comment..."}
-                className="flex-1 bg-[#0e1626] border border-[#18263e] focus:border-teal-500 rounded-xl px-3 py-2 text-xs text-white placeholder-gray-500 outline-none transition-all"
+                className="flex-1 bg-zinc-50 dark:bg-[#0e1626] border border-zinc-200 dark:border-[#18263e] focus:border-teal-500 rounded-xl px-3.5 py-2 text-xs text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-gray-500 outline-none transition-all"
               />
               <button
                 type="submit"
                 disabled={submittingComment || !commentInput.trim()}
-                className="px-3 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 disabled:opacity-30 text-black font-extrabold text-xs transition-all cursor-pointer"
+                className="px-3.5 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 disabled:opacity-30 text-black font-extrabold text-xs transition-all cursor-pointer shadow-xs"
               >
                 Post
               </button>
@@ -652,18 +658,18 @@ export default function PostViewer({ post }: PostViewerProps) {
       {/* Auth Prompt Modal */}
       {authPromptOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
-          <div className="bg-[#0b1220] border border-[#16233a] rounded-3xl p-6 max-w-sm w-full text-center space-y-4 shadow-2xl">
-            <div className="w-12 h-12 rounded-full bg-teal-500/10 text-teal-400 flex items-center justify-center mx-auto text-xl font-bold">
+          <div className="bg-white dark:bg-[#0b1220] border border-zinc-200 dark:border-[#16233a] rounded-3xl p-6 max-w-sm w-full text-center space-y-4 shadow-2xl">
+            <div className="w-12 h-12 rounded-full bg-teal-500/10 text-teal-500 flex items-center justify-center mx-auto text-xl font-bold">
               ✨
             </div>
-            <h3 className="text-base font-bold text-white">Join the Conversation</h3>
-            <p className="text-xs text-gray-400 leading-relaxed">
+            <h3 className="text-base font-bold text-zinc-900 dark:text-white">Join the Conversation</h3>
+            <p className="text-xs text-zinc-500 dark:text-gray-400 leading-relaxed">
               Log in or sign up on Tolee to like, comment, repost, and connect with creators.
             </p>
             <div className="flex gap-2.5 pt-2">
               <button
                 onClick={() => setAuthPromptOpen(false)}
-                className="flex-1 py-2 rounded-xl bg-[#141f33] hover:bg-[#1a2942] text-xs font-semibold text-gray-300 transition-colors"
+                className="flex-1 py-2 rounded-xl bg-zinc-100 dark:bg-[#141f33] hover:bg-zinc-200 dark:hover:bg-[#1a2942] text-xs font-semibold text-zinc-700 dark:text-gray-300 transition-colors"
               >
                 Cancel
               </button>
