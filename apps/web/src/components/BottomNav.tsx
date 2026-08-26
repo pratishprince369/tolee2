@@ -105,26 +105,26 @@ export function BottomNav() {
 
   return (
     <>
-    <div className={`fixed bottom-0 left-0 right-0 w-full h-[calc(4.2rem+env(safe-area-inset-bottom))] flex items-center justify-around z-50 lg:hidden border-t px-3 pb-[env(safe-area-inset-bottom)] transition-all duration-300 backdrop-blur-md ${activePath === '/reels' ? 'bg-black/95 border-zinc-800/50 shadow-black/40' : 'bg-white/95 dark:bg-zinc-950/95 border-zinc-150/80 dark:border-zinc-900 shadow-zinc-200/40 dark:shadow-black/60'}`}>
+    <div className={`fixed bottom-0 left-0 right-0 w-full h-[calc(4.2rem+env(safe-area-inset-bottom))] flex items-center justify-around z-50 lg:hidden border-t px-3 pb-[env(safe-area-inset-bottom)] transition-all duration-300 backdrop-blur-md ${activePath === '/reels' ? 'bg-black/95 border-zinc-800/50 shadow-black/40' : 'bg-white/95 dark:bg-zinc-950/95 border-zinc-200/80 dark:border-zinc-900 shadow-zinc-200/40 dark:shadow-black/60'}`}>
       {navItems.map((item) => {
         const Icon = item.icon;
         const isActive = activePath === item.href || (activePath.startsWith('/t/') && item.name === 'Feed');
-        const activeColor = activePath === '/reels' ? 'text-white' : 'text-[#0E9F9A] dark:text-white';
-        const inactiveColor = activePath === '/reels' ? 'text-zinc-500 hover:text-white' : 'text-zinc-400 hover:text-[#0E9F9A] dark:hover:text-white';
+        const activeColor = activePath === '/reels' ? 'text-white' : 'text-teal-600 dark:text-teal-400';
+        const inactiveColor = activePath === '/reels' ? 'text-zinc-500 hover:text-white' : 'text-zinc-400 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-300';
 
         if (item.isAvatar) {
           return (
             <DropdownMenu key={item.name}>
               <DropdownMenuTrigger className="relative w-full h-full flex flex-col items-center justify-center focus:outline-none select-none">
-                <div className={`flex flex-col items-center justify-center w-full h-full relative pb-1.5 transition-colors duration-200 ${isActive ? activeColor : inactiveColor}`}>
+                <div className={`flex flex-col items-center justify-center w-full h-full relative pb-1 transition-colors duration-200 ${isActive ? activeColor : inactiveColor}`}>
                   <div className="relative">
-                    <div className={`w-7 h-7 rounded-full overflow-hidden border transition-all duration-300 ${isActive ? (activePath === '/reels' ? 'border-white border-2' : 'border-[#0E9F9A] dark:border-white border-2 scale-105') : 'border-zinc-250 dark:border-zinc-800'}`}>
+                    <div className={`w-7 h-7 rounded-full overflow-hidden border transition-all duration-300 ${isActive ? (activePath === '/reels' ? 'border-white border-2 scale-105' : 'border-teal-600 dark:border-teal-400 border-2 scale-105') : 'border-zinc-200 dark:border-zinc-800'}`}>
                       <img src={(!session?.user?.image || session.user.image === 'null' || session.user.image === 'undefined' || session.user.image.trim() === '') ? '/default-user-avatar.svg' : session.user.image} alt="Profile" className="w-full h-full object-cover" />
                     </div>
                   </div>
-                  <span className="text-[10px] mt-[4px] font-semibold leading-none">{item.name}</span>
+                  <span className={`text-[10px] mt-[3px] leading-none transition-all duration-200 ${isActive ? 'font-bold' : 'font-medium'}`}>{item.name}</span>
                   {isActive && (
-                    <span className={`absolute bottom-0 w-1 h-1 rounded-full animate-in fade-in zoom-in duration-300 ${activePath === '/reels' ? 'bg-white' : 'bg-[#0E9F9A] dark:bg-white'}`} />
+                    <span className={`absolute bottom-0 w-6 h-[3px] rounded-full transition-all duration-300 ${activePath === '/reels' ? 'bg-white' : 'bg-teal-600 dark:bg-teal-400'}`} />
                   )}
                 </div>
               </DropdownMenuTrigger>
@@ -283,9 +283,8 @@ export function BottomNav() {
               <div className="relative">
                 {Icon && (
                   <Icon 
-                    strokeWidth={isActive ? 2.2 : 1.5}
-                    fill={isActive ? 'currentColor' : 'none'}
-                    className={`w-[22px] h-[22px] transition-all duration-300 ${isActive ? 'scale-110' : 'active:scale-90'}`} 
+                    strokeWidth={isActive ? 2.5 : 1.6}
+                    className={`w-[22px] h-[22px] transition-all duration-200 ${isActive ? 'scale-110' : 'active:scale-90'}`} 
                   />
                 )}
                 {item.badge && (
@@ -296,7 +295,7 @@ export function BottomNav() {
               </div>
               <span className={`text-[10px] mt-[3px] leading-none transition-all duration-200 ${isActive ? 'font-bold' : 'font-medium'}`}>{item.name}</span>
               {isActive && (
-                <span className={`absolute bottom-0 w-5 h-[3px] rounded-full transition-all duration-500 ease-out ${activePath === '/reels' ? 'bg-white' : 'bg-[#0E9F9A] dark:bg-white'}`} />
+                <span className={`absolute bottom-0 w-6 h-[3px] rounded-full transition-all duration-300 ease-out ${activePath === '/reels' ? 'bg-white' : 'bg-teal-600 dark:bg-teal-400'}`} />
               )}
             </div>
           </Link>
