@@ -150,12 +150,14 @@ export interface AdAttributionInput {
   eventId: string; // Unique idempotency ID
   campaignId: string;
   campaignName?: string;
-  toleeId?: string; // Group ID
-  memberUserId?: string;
+  toleeId?: string; // Group ID (if placement-specific)
+  advertiserUserId?: string; // Advertiser who created/spent on the ad (e.g. Dham)
+  memberUserId?: string; // Viewer or interacting member
   adEventType: 'impression' | 'click' | 'conversion' | 'spend';
   grossSpend: number; // In INR (e.g. 100.0)
   ipAddress?: string;
   userAgent?: string;
+  attributionModel?: 'placement' | 'global_origin_referral';
 }
 
 export interface AttributionResult {
