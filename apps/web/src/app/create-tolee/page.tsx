@@ -16,8 +16,7 @@ import {
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { createTolee } from '@/actions/tolee';
-import { TOLEE_TYPE_REGISTRY } from '@/modules/tolee-types/registry';
-import { CreditTermsModal } from '@/modules/tolee-credit';
+import { CreditTermsModal } from '@/modules/tolee-credit/components/CreditTermsModal';
 
 const ICON_MAP: Record<string, any> = {
   Building2, Briefcase, TrendingUp, PartyPopper, GraduationCap,
