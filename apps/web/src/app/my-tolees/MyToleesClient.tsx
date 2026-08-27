@@ -35,8 +35,13 @@ import {
   TrendingUp,
   BarChart3,
   ExternalLink,
-  Sparkles
+  Sparkles,
+  Eye,
+  Sliders,
+  MoreVertical,
+  Award,
 } from 'lucide-react';
+import { CreditTermsModal } from '@/modules/tolee-credit/components/CreditTermsModal';
 
 interface MyToleesClientProps {
   initialTolees: any[];
@@ -52,6 +57,7 @@ export function MyToleesClient({ initialTolees }: MyToleesClientProps) {
   const [toleeToDelete, setToleeToDelete] = useState<any | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [analyticsTolee, setAnalyticsTolee] = useState<any | null>(null);
+  const [isCreditTermsModalOpen, setIsCreditTermsModalOpen] = useState(false);
 
   useEffect(() => {
     setTolees(initialTolees);
@@ -127,11 +133,12 @@ export function MyToleesClient({ initialTolees }: MyToleesClientProps) {
           <p className="text-gray-500 dark:text-gray-400 mb-8 text-base max-w-md mx-auto leading-relaxed">
             You haven't created any Tolee communities yet. Start your own group to share posts, host classrooms, and build a thriving audience.
           </p>
-          <Link href="/create-tolee">
-            <Button className="rounded-full font-black px-8 py-6 text-lg shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all bg-primary hover:bg-primary/90 text-white">
-              Create Your First Tolee
-            </Button>
-          </Link>
+          <Button
+            onClick={() => setIsCreditTermsModalOpen(true)}
+            className="rounded-full font-black px-8 py-6 text-lg shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all bg-primary hover:bg-primary/90 text-white cursor-pointer"
+          >
+            Create Your First Tolee
+          </Button>
         </div>
       </div>
     );
@@ -151,11 +158,12 @@ export function MyToleesClient({ initialTolees }: MyToleesClientProps) {
               Manage the groups you created, view engagement, edit settings, or moderate members.
             </p>
           </div>
-          <Link href="/create-tolee">
-            <Button className="rounded-full font-bold shadow-md hover:shadow-lg hover:scale-102 active:scale-98 transition-all px-6 py-5 bg-primary text-white hover:bg-primary/95 flex items-center gap-1.5 self-start md:self-auto">
-              <Plus className="w-5 h-5" /> Create Tolee
-            </Button>
-          </Link>
+          <Button
+            onClick={() => setIsCreditTermsModalOpen(true)}
+            className="rounded-full font-bold shadow-md hover:shadow-lg hover:scale-102 active:scale-98 transition-all px-6 py-5 bg-primary text-white hover:bg-primary/95 flex items-center gap-1.5 self-start md:self-auto cursor-pointer"
+          >
+            <Plus className="w-5 h-5" /> Create Tolee
+          </Button>
         </div>
 
         {/* Stats Dashboard */}
@@ -477,6 +485,12 @@ export function MyToleesClient({ initialTolees }: MyToleesClientProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <CreditTermsModal
+        isOpen={isCreditTermsModalOpen}
+        onClose={() => setIsCreditTermsModalOpen(false)}
+        redirectUrl="/create-tolee"
+      />
     </div>
   );
 }

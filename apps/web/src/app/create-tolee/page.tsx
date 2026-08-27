@@ -86,6 +86,21 @@ export default function CreateToleePage() {
                       lat !== null &&
                       agreedToCreditTerms;
 
+  // Check if user has accepted Tolee Credit monetization terms
+  React.useEffect(() => {
+    try {
+      const accepted = localStorage.getItem('tolee_credit_terms_accepted');
+      if (accepted !== 'true') {
+        setIsCreditTermsModalOpen(true);
+        setAgreedToCreditTerms(false);
+      } else {
+        setAgreedToCreditTerms(true);
+      }
+    } catch {
+      setIsCreditTermsModalOpen(true);
+    }
+  }, []);
+
   // Dynamically initialize Leaflet map inside modal
   React.useEffect(() => {
     if (!isMapModalOpen) {

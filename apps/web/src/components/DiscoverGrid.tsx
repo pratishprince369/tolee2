@@ -12,6 +12,7 @@ import { MapPin, Users, Shield, Loader2, Check, Search, Sparkles, Lock, ArrowRig
 import { joinTolee } from '@/actions/tolee';
 import { triggerAuthModal } from '@/components/AuthModal';
 import { formatViewCount } from '@/lib/utils';
+import { CreditTermsModal } from '@/modules/tolee-credit/components/CreditTermsModal';
 
 const categories = [
   { name: 'All', icon: '🌐' },
@@ -32,14 +33,17 @@ export function DiscoverGrid({ initialTolees, tolees: propTolees, isAuthenticate
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [tolees, setTolees] = useState(initialTolees || propTolees || []);
   const [joiningIds, setJoiningIds] = useState<Record<string, boolean>>({});
+  const [isCreditTermsModalOpen, setIsCreditTermsModalOpen] = useState(false);
 
   const totalMembers = tolees.reduce((acc: number, t: any) => acc + (t.members || 0), 0);
 
   const handleCreateToleeClick = (e: React.MouseEvent) => {
+    e.preventDefault();
     if (!isAuthenticated) {
-      e.preventDefault();
       triggerAuthModal('Login or create an account to create your own Tolee community.');
+      return;
     }
+    setIsCreditTermsModalOpen(true);
   };
 
   const handleCardClick = (e: React.MouseEvent, slug: string) => {
@@ -277,6 +281,12 @@ export function DiscoverGrid({ initialTolees, tolees: propTolees, isAuthenticate
           </div>
         )}
       </main>
+
+      <CreditTermsModal
+        isOpen={isCreditTermsModalOpen}
+        onClose={() => setIsCreditTermsModalOpen(false)}
+        redirectUrl="/create-tolee"
+      />
     </div>
   );
 }

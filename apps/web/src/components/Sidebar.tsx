@@ -8,6 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { useSession } from 'next-auth/react';
 import { getSidebarDataCached } from '@/lib/sidebar-data';
+import { CreditTermsModal } from '@/modules/tolee-credit/components/CreditTermsModal';
 
 interface SidebarNavItemProps {
   name: string;
@@ -137,6 +138,8 @@ export function Sidebar() {
     isVerifiedCreator: false,
   });
 
+  const [isCreditTermsModalOpen, setIsCreditTermsModalOpen] = React.useState(false);
+
   React.useEffect(() => {
     if (!isAuthenticated) return;
 
@@ -220,11 +223,15 @@ export function Sidebar() {
           <div className="mb-6">
             <div className="flex items-center justify-between px-3 mb-3">
               <h3 className="text-[11px] font-bold text-[#6B7280] dark:text-zinc-500 uppercase tracking-wider">Tolees You Manage</h3>
-              <Link href="/create-tolee">
-                <Button variant="ghost" size="icon" className="w-7 h-7 rounded-lg border border-[#E5E7EB] dark:border-zinc-800 text-[#6B7280] hover:text-[#0E9F9A] hover:border-[#0E9F9A] bg-white dark:bg-zinc-900/50 shadow-sm hover:shadow transition-colors duration-105 flex items-center justify-center">
-                  <Plus className="w-3.5 h-3.5" />
-                </Button>
-              </Link>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsCreditTermsModalOpen(true)}
+                className="w-7 h-7 rounded-lg border border-[#E5E7EB] dark:border-zinc-800 text-[#6B7280] hover:text-[#0E9F9A] hover:border-[#0E9F9A] bg-white dark:bg-zinc-900/50 shadow-xs hover:shadow transition-colors duration-105 flex items-center justify-center cursor-pointer"
+                title="Create Tolee Group"
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </Button>
             </div>
             <div className="space-y-1.5">
               {managedTolees.map((tolee) => (
@@ -299,6 +306,12 @@ export function Sidebar() {
           <span>© 2026 Tolee</span>
         </div>
       </div>
+
+      <CreditTermsModal
+        isOpen={isCreditTermsModalOpen}
+        onClose={() => setIsCreditTermsModalOpen(false)}
+        redirectUrl="/create-tolee"
+      />
     </aside>
   );
 }

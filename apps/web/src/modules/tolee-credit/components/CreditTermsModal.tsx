@@ -38,6 +38,9 @@ export function CreditTermsModal({
 
   const handleProceed = () => {
     if (!agreed) return;
+    try {
+      localStorage.setItem('tolee_credit_terms_accepted', 'true');
+    } catch {}
     if (onAccept) {
       onAccept();
     } else {
