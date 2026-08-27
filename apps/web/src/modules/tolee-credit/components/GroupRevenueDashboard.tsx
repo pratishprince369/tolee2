@@ -9,9 +9,10 @@ import { Users, Plus, ShieldCheck, ArrowRight } from 'lucide-react';
 interface GroupRevenueDashboardProps {
   groups: GroupCreditSummaryDto[];
   onConnectGroup: (toleeId: string) => void;
+  onOpenCreateGroupTerms?: () => void;
 }
 
-export function GroupRevenueDashboard({ groups, onConnectGroup }: GroupRevenueDashboardProps) {
+export function GroupRevenueDashboard({ groups, onConnectGroup, onOpenCreateGroupTerms }: GroupRevenueDashboardProps) {
   return (
     <div id="tolee-credit-groups-section" className="space-y-4">
       <div className="flex items-center justify-between">
@@ -27,13 +28,13 @@ export function GroupRevenueDashboard({ groups, onConnectGroup }: GroupRevenueDa
           </p>
         </div>
 
-        <Link
-          href="/create-tolee"
-          className="px-3.5 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-black text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 shadow-sm"
+        <button
+          onClick={onOpenCreateGroupTerms || (() => {})}
+          className="px-3.5 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-black text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 shadow-sm cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           <span>Create Tolee</span>
-        </Link>
+        </button>
       </div>
 
       {groups.length === 0 ? (
@@ -45,13 +46,13 @@ export function GroupRevenueDashboard({ groups, onConnectGroup }: GroupRevenueDa
           <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-sm mx-auto">
             Create your community and start building your Tolee network to earn eligible ad revenue.
           </p>
-          <Link
-            href="/create-tolee"
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-black text-xs font-bold transition-all shadow-sm"
+          <button
+            onClick={onOpenCreateGroupTerms || (() => {})}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-black text-xs font-bold transition-all shadow-sm cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Create Your First Tolee</span>
-          </Link>
+          </button>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -7,12 +7,13 @@ import { GroupRevenueDashboard } from './GroupRevenueDashboard';
 import { TransactionLedgerView } from './TransactionLedgerView';
 import { WithdrawalModal } from './WithdrawalModal';
 import { BankAccountModal } from './BankAccountModal';
+import { CreditTermsModal } from './CreditTermsModal';
 import {
   connectGroupToCreditAction,
   addBankAccountAction,
   requestWithdrawalAction,
 } from '@/actions/toleeCredit';
-import { ShieldCheck, Info, Sparkles } from 'lucide-react';
+import { ShieldCheck, Info, Sparkles, Plus } from 'lucide-react';
 
 interface ToleeCreditHubProps {
   initialWallet: CreditWalletDto;
@@ -36,6 +37,7 @@ export function ToleeCreditHub({
 
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
   const [isAddBankModalOpen, setIsAddBankModalOpen] = useState(false);
+  const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
 
   const handleConnectGroup = async (toleeId: string) => {
     const res = await connectGroupToCreditAction(toleeId);
@@ -91,12 +93,22 @@ export function ToleeCreditHub({
       </div>
 
       {/* 3. My Connected Groups Section */}
-      <GroupRevenueDashboard groups={groups} onConnectGroup={handleConnectGroup} />
+      <GroupRevenueDashboard
+        groups={groups}
+        onConnectGroup={handleConnectGroup}
+        onOpenCreateGroupTerms={() => setIsTermsModalOpen(true)}
+      />
 
       {/* 4. Immutable Transaction Ledger Section */}
       <TransactionLedgerView transactions={transactions} />
 
       {/* Modals */}
+      <CreditTermsModal
+        isOpen={isTermsModalOpen}
+        onClose={() => setIsTermsModalOpen(false)}
+        redirectUrl="/create-tolee"
+      />
+
       <WithdrawalModal
         isOpen={isWithdrawModalOpen}
         onClose={() => setIsWithdrawModalOpen(false)}

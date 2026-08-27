@@ -11,12 +11,13 @@ import {
   ArrowRight, ArrowLeft, Search, Eye, EyeOff, Sparkles, Building2,
   Briefcase, TrendingUp, PartyPopper, GraduationCap, School, ShoppingCart,
   Landmark, HeartHandshake, Factory, ClipboardList, Stethoscope, Home,
-  Utensils, Sun, Users
+  Utensils, Sun, Users, Wallet, Percent, ShieldCheck
 } from 'lucide-react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { createTolee } from '@/actions/tolee';
 import { TOLEE_TYPE_REGISTRY } from '@/modules/tolee-types/registry';
+import { CreditTermsModal } from '@/modules/tolee-credit';
 
 const ICON_MAP: Record<string, any> = {
   Building2, Briefcase, TrendingUp, PartyPopper, GraduationCap,
@@ -73,6 +74,8 @@ export default function CreateToleePage() {
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
   
   const [isCreating, setIsCreating] = useState(false);
+  const [isCreditTermsModalOpen, setIsCreditTermsModalOpen] = useState(false);
+  const [agreedToCreditTerms, setAgreedToCreditTerms] = useState(true);
 
   const categories = ['Buy and Sell', 'Business', 'Education', 'Jobs', 'Real Estate', 'Community', 'Gaming', 'Tech'];
 
@@ -80,7 +83,8 @@ export default function CreateToleePage() {
                       privacy !== null && 
                       country.trim().length > 0 && 
                       city.trim().length > 0 && 
-                      lat !== null;
+                      lat !== null &&
+                      agreedToCreditTerms;
 
   // Dynamically initialize Leaflet map inside modal
   React.useEffect(() => {
@@ -728,15 +732,53 @@ export default function CreateToleePage() {
           </div>
         </div>
 
+        {/* Tolee Credit Monetization & 20% Revenue Sharing Agreement */}
+        <div className="p-4 border-t border-gray-200 dark:border-gray-800 bg-teal-500/5 dark:bg-[#0c1424] space-y-2.5 text-left">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 text-teal-600 dark:text-teal-400 font-extrabold text-xs">
+              <Percent className="w-3.5 h-3.5" />
+              <span>Tolee Credit Monetization (20% Share)</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsCreditTermsModalOpen(true)}
+              className="text-[11px] font-bold text-teal-600 dark:text-teal-400 underline hover:opacity-80 cursor-pointer"
+            >
+              View Scheme Terms
+            </button>
+          </div>
+
+          <label className="flex items-start gap-2 cursor-pointer select-none text-[11px] text-zinc-600 dark:text-zinc-300">
+            <input
+              type="checkbox"
+              checked={agreedToCreditTerms}
+              onChange={(e) => setAgreedToCreditTerms(e.target.checked)}
+              className="mt-0.5 w-3.5 h-3.5 rounded accent-teal-500 cursor-pointer"
+            />
+            <span>
+              I accept the <strong>Tolee Credit Community Revenue Sharing Scheme</strong> (20% ad share on group & origin member traffic).
+            </span>
+          </label>
+        </div>
+
         <div className="p-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-[#121212]">
           <Button 
-            className="w-full h-11 text-base font-bold rounded-lg"
+            className="w-full h-11 text-base font-bold rounded-lg bg-teal-500 hover:bg-teal-400 text-black shadow-md"
             disabled={!isFormValid || isCreating}
             onClick={handleCreate}
           >
-            {isCreating ? 'Creating...' : 'Create'}
+            {isCreating ? 'Creating Group...' : 'Create Group'}
           </Button>
         </div>
+
+        <CreditTermsModal
+          isOpen={isCreditTermsModalOpen}
+          onClose={() => setIsCreditTermsModalOpen(false)}
+          onAccept={() => {
+            setAgreedToCreditTerms(true);
+            setIsCreditTermsModalOpen(false);
+          }}
+        />
       </div>
 
       {/* RIGHT SIDEBAR (Preview) */}
