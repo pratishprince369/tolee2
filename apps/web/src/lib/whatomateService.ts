@@ -1,5 +1,6 @@
 import { prismaAI } from '@/lib/prisma-ai';
 import { generateInstantQR, sendDirectWhatsAppMessage } from '@/lib/baileysSession';
+import { EvolutionEngine } from './evolutionApiService';
 
 /**
  * Whatomate WhatsApp Business & Broadcast Engine
@@ -140,21 +141,46 @@ export const WhatomateCampaignEngine = {
         let errorMsg: string | null = null;
         let deliveredMsgId: string | null = null;
 
-        // 1. Send via Whatomate Baileys Direct Socket
+        // 1. Send via Evolution API or Baileys Direct Socket
         try {
-          const directRes = await sendDirectWhatsAppMessage(
-            userId,
-            msg.recipient,
-            msg.message,
-            shoot.mediaUrl,
-            shoot.mediaType
-          );
+          const instanceName = `tolee_${userId}`;
+          let evoRes: any = null;
 
-          if (directRes && directRes.success) {
-            isSuccess = true;
-            deliveredMsgId = `wtm_${Date.now()}_${msg.messageNumber}`;
+          if (shoot.mediaUrl) {
+            evoRes = await EvolutionEngine.sendMediaMessage(
+              instanceName,
+              msg.recipient,
+              shoot.mediaUrl,
+              shoot.mediaType || 'image',
+              msg.message
+            );
           } else {
-            errorMsg = directRes?.error || 'Direct socket transmission pending';
+            evoRes = await EvolutionEngine.sendTextMessage(
+              instanceName,
+              msg.recipient,
+              msg.message
+            );
+          }
+
+          if (evoRes && evoRes.success) {
+            isSuccess = true;
+            deliveredMsgId = evoRes.messageId || `evo_${Date.now()}_${msg.messageNumber}`;
+          } else {
+            // Direct Baileys socket fallback
+            const directRes = await sendDirectWhatsAppMessage(
+              userId,
+              msg.recipient,
+              msg.message,
+              shoot.mediaUrl,
+              shoot.mediaType
+            );
+
+            if (directRes && directRes.success) {
+              isSuccess = true;
+              deliveredMsgId = `wtm_${Date.now()}_${msg.messageNumber}`;
+            } else {
+              errorMsg = directRes?.error || evoRes?.error || 'Device not linked. Please scan QR first.';
+            }
           }
         } catch (e: any) {
           errorMsg = e.message;

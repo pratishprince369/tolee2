@@ -1,6 +1,7 @@
 import { prismaAI } from '@/lib/prisma-ai';
 import { getOrCreateWhatsAppSession, sendDirectWhatsAppMessage, logoutWhatsAppSession, generateInstantQR } from '@/lib/baileysSession';
 import { WhatomateCampaignEngine } from './whatomateService';
+import { EvolutionEngine } from './evolutionApiService';
 
 // OpenWA Environment Configurations
 const OPENWA_API_URL = process.env.OPENWA_API_URL || 'https://openwa-h8st.onrender.com';
@@ -62,21 +63,30 @@ export const WhatsAppSessionService = {
       };
     }
 
-    // Initialize real Baileys socket in background to capture live QR code
+    // Initialize Evolution API / Baileys socket in background to capture live QR code
     let qrDataUrl: string | null = null;
     try {
-      const realSess = await getOrCreateWhatsAppSession(userId);
-      if (realSess.status === 'CONNECTED' && realSess.phoneNumber) {
-        return {
-          status: 'CONNECTED',
-          phoneNumber: realSess.phoneNumber,
-          qrCodeDataUrl: null,
-          openwaSessionId: `openwa_${userId}`,
-          apiUrl: customApiUrl || OPENWA_API_URL,
-        };
+      const evoRes = await EvolutionEngine.connectInstance(`tolee_${userId}`);
+      if (evoRes && evoRes.qrCodeDataUrl) {
+        qrDataUrl = evoRes.qrCodeDataUrl;
       }
-      qrDataUrl = realSess.qrCodeDataUrl;
     } catch {}
+
+    if (!qrDataUrl) {
+      try {
+        const realSess = await getOrCreateWhatsAppSession(userId);
+        if (realSess.status === 'CONNECTED' && realSess.phoneNumber) {
+          return {
+            status: 'CONNECTED',
+            phoneNumber: realSess.phoneNumber,
+            qrCodeDataUrl: null,
+            openwaSessionId: `openwa_${userId}`,
+            apiUrl: customApiUrl || OPENWA_API_URL,
+          };
+        }
+        qrDataUrl = realSess.qrCodeDataUrl;
+      } catch {}
+    }
 
     if (!qrDataUrl) {
       qrDataUrl = await generateInstantQR(`2@tolee_${userId}_${Date.now()}@${Math.random().toString(36).slice(2, 9)}`);
