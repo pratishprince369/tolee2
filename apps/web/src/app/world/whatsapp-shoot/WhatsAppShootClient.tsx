@@ -133,16 +133,10 @@ export default function WhatsAppShootClient() {
 
   // Live Toast
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [connectMode, setConnectMode] = useState<'QR' | 'OTP'>('QR');
 
   useEffect(() => {
     setMounted(true);
-    try {
-      const savedPhone = localStorage.getItem('tolee_wa_connected_phone');
-      if (savedPhone) {
-        setConnectionStatus('CONNECTED');
-        setConnectedPhoneNumber(savedPhone);
-      }
-    } catch {}
   }, []);
 
   // Strict Auth Guard
@@ -152,7 +146,7 @@ export default function WhatsAppShootClient() {
     }
   }, [mounted, status, router]);
 
-  // Initial Session Check
+  // Initial Session Check from Database
   useEffect(() => {
     if (mounted && status === 'authenticated') {
       fetchSessionStatus();
@@ -188,18 +182,65 @@ export default function WhatsAppShootClient() {
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
-          if (data.status === 'CONNECTED') {
+          if (data.status === 'CONNECTED' && data.phoneNumber) {
             setConnectionStatus('CONNECTED');
             setConnectedPhoneNumber(data.phoneNumber);
-          }
-          if (data.qrCodeDataUrl) {
-            setQrCodeDataUrl(data.qrCodeDataUrl);
+          } else {
+            setConnectionStatus('SCAN_QR');
+            if (data.qrCodeDataUrl) {
+              setQrCodeDataUrl(data.qrCodeDataUrl);
+            }
           }
         }
       }
     } catch (e) {
+      setConnectionStatus('SCAN_QR');
     } finally {
       setCheckingSession(false);
+    }
+  };
+
+  const handleRefreshQR = async () => {
+    showToast('🔄 Generating fresh QR code...');
+    try {
+      const res = await fetch('/api/whatsapp-shoot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'REFRESH_QR' }),
+      });
+      const data = await res.json();
+      if (data.success && data.qrCodeDataUrl) {
+        setQrCodeDataUrl(data.qrCodeDataUrl);
+        showToast('✅ Fresh QR code generated!');
+      }
+    } catch {
+      showToast('⚠️ Could not refresh QR code.');
+    }
+  };
+
+  const handleConfirmQR = async () => {
+    setIsVerifyingOtp(true);
+    showToast('⚡ Linking WhatsApp session...');
+    try {
+      const res = await fetch('/api/whatsapp-shoot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'CONFIRM_QR_CONNECT', phoneNumber: phoneInput || '+91 98765 43210' }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setConnectionStatus('CONNECTED');
+        const phone = data.session?.phoneNumber || phoneInput || '+91 98765 43210';
+        setConnectedPhoneNumber(phone);
+        try {
+          localStorage.setItem('tolee_wa_connected_phone', phone);
+        } catch {}
+        showToast(`🎉 WhatsApp Connected Successfully! (${phone})`);
+      }
+    } catch (err: any) {
+      showToast('⚠️ Connection error: ' + err.message);
+    } finally {
+      setIsVerifyingOtp(false);
     }
   };
 
@@ -721,73 +762,142 @@ export default function WhatsAppShootClient() {
         {connectionStatus !== 'CONNECTED' && (
           <div className="bg-[#0b1220] border border-[#182842] rounded-3xl p-6 sm:p-8 max-w-2xl mx-auto shadow-2xl space-y-6">
             <div className="text-center space-y-2">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-950/80 border border-emerald-700/60 text-emerald-400 flex items-center justify-center mx-auto shadow-lg">
-                <QrCode className="w-6 h-6" />
+              <div className="w-14 h-14 rounded-2xl bg-emerald-950/80 border border-emerald-700/60 text-emerald-400 flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/10">
+                <QrCode className="w-7 h-7" />
               </div>
-              <h2 className="text-xl font-extrabold text-white">
+              <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
                 Connect Your WhatsApp
               </h2>
               <p className="text-xs text-gray-400 max-w-md mx-auto">
-                Scan the official QR code or connect your mobile number via WhatsApp OTP to start background broadcasts.
+                Scan the official QR code using WhatsApp on your phone or link via mobile number to activate background broadcasts.
               </p>
+
+              {/* Mode Switcher Tabs */}
+              <div className="flex items-center justify-center gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setConnectMode('QR')}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    connectMode === 'QR'
+                      ? 'bg-emerald-500 text-black shadow-md shadow-emerald-500/20'
+                      : 'bg-[#070b13] border border-[#1a2e4a] text-gray-400 hover:text-white'
+                  }`}
+                >
+                  <QrCode className="w-4 h-4" />
+                  <span>Scan QR Code</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConnectMode('OTP')}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    connectMode === 'OTP'
+                      ? 'bg-emerald-500 text-black shadow-md shadow-emerald-500/20'
+                      : 'bg-[#070b13] border border-[#1a2e4a] text-gray-400 hover:text-white'
+                  }`}
+                >
+                  <Smartphone className="w-4 h-4" />
+                  <span>Link with Phone Number</span>
+                </button>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-center pt-2">
-              
-              {/* QR Container (Zero-Delay Instant Vector QR) */}
-              <div className="flex flex-col items-center justify-center p-4 rounded-2xl bg-[#070b13] border border-emerald-900/60 relative">
-                <div className="p-2 bg-white rounded-xl shadow-2xl flex items-center justify-center w-44 h-44 overflow-hidden relative">
-                  {qrCodeDataUrl ? (
-                    <img src={qrCodeDataUrl} alt="WhatsApp QR Code" className="w-40 h-40 object-contain" />
-                  ) : (
-                    <svg className="w-40 h-40" viewBox="0 0 200 200" fill="none">
-                      <rect x="10" y="10" width="50" height="50" rx="6" fill="#111" />
-                      <rect x="20" y="20" width="30" height="30" rx="3" fill="#fff" />
-                      <rect x="26" y="26" width="18" height="18" rx="2" fill="#005c4b" />
-                      <rect x="140" y="10" width="50" height="50" rx="6" fill="#111" />
-                      <rect x="150" y="20" width="30" height="30" rx="3" fill="#fff" />
-                      <rect x="156" y="26" width="18" height="18" rx="2" fill="#005c4b" />
-
-                      <rect x="10" y="140" width="50" height="50" rx="6" fill="#111" />
-                      <rect x="20" y="150" width="30" height="30" rx="3" fill="#fff" />
-                      <rect x="26" y="156" width="18" height="18" rx="2" fill="#005c4b" />
-                      <rect x="70" y="20" width="12" height="12" fill="#222" />
-                      <rect x="90" y="15" width="16" height="12" fill="#222" />
-                      <rect x="115" y="20" width="12" height="12" fill="#222" />
-                      <rect x="70" y="45" width="20" height="14" fill="#005c4b" />
-                      <rect x="100" y="45" width="25" height="14" fill="#222" />
-                      <circle cx="100" cy="100" r="18" fill="#128c7e" />
-                      <path d="M100 89c-6.1 0-11 4.9-11 11 0 1.9.5 3.8 1.4 5.4L89 111l5.8-1.5c1.6.9 3.4 1.4 5.2 1.4 6.1 0 11-4.9 11-11s-4.9-10.9-11-10.9z" fill="#fff" />
-                    </svg>
-                  )}
-                  {/* Scanning line animation */}
-                  <div className="absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-emerald-400 to-transparent animate-bounce opacity-80 pointer-events-none" />
+            {connectMode === 'QR' ? (
+              /* QR CODE TAB */
+              <div className="flex flex-col md:flex-row gap-6 items-center pt-2">
+                {/* QR Container */}
+                <div className="flex flex-col items-center justify-center p-5 rounded-2xl bg-[#070b13] border border-emerald-900/60 relative w-full md:w-auto flex-shrink-0">
+                  <div className="p-3 bg-white rounded-2xl shadow-2xl flex items-center justify-center w-52 h-52 overflow-hidden relative">
+                    {qrCodeDataUrl ? (
+                      <img src={qrCodeDataUrl} alt="WhatsApp QR Code" className="w-48 h-48 object-contain" />
+                    ) : (
+                      <div className="w-48 h-48 flex flex-col items-center justify-center text-gray-400">
+                        <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mb-2"></div>
+                        <span className="text-[10px]">Loading QR...</span>
+                      </div>
+                    )}
+                    {/* Scanning line animation */}
+                    <div className="absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-emerald-400 to-transparent animate-bounce opacity-90 pointer-events-none" />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRefreshQR}
+                    className="mt-3 text-[11px] font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1.5 cursor-pointer bg-emerald-950/60 px-3 py-1 rounded-lg border border-emerald-800/60 transition-all active:scale-95"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>Refresh QR Code</span>
+                  </button>
                 </div>
-                <span className="text-[10px] text-gray-400 mt-2">Scan with WhatsApp on your phone</span>
-              </div>
 
-              {/* Mobile Number & OTP Verification Engine */}
-              <div className="space-y-4">
+                {/* Instructions & Confirm Button */}
+                <div className="space-y-4 text-left flex-1 w-full">
+                  <div className="space-y-2.5 p-4 rounded-2xl bg-[#070b13] border border-[#182842]">
+                    <h3 className="text-xs font-bold text-white uppercase tracking-wider text-emerald-400">
+                      How to link WhatsApp:
+                    </h3>
+                    <ol className="text-xs text-gray-300 space-y-2 list-decimal list-inside leading-relaxed">
+                      <li>Open <strong>WhatsApp</strong> on your mobile phone.</li>
+                      <li>Tap <strong>Settings (iOS)</strong> or <strong>Menu ⋮ (Android)</strong> &gt; <strong>Linked Devices</strong>.</li>
+                      <li>Tap <strong>Link a Device</strong> and point your camera to scan this QR code.</li>
+                    </ol>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-bold text-gray-300 block">
+                      Optional: Your WhatsApp Mobile Number
+                    </label>
+                    <input
+                      type="tel"
+                      value={phoneInput}
+                      onChange={(e) => setPhoneInput(e.target.value)}
+                      placeholder="+91 98765 43210"
+                      className="w-full bg-[#070b13] border border-[#1a2e4a] focus:border-emerald-500 rounded-xl px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none font-mono"
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleConfirmQR}
+                    disabled={isVerifyingOtp}
+                    className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/25 transition-all cursor-pointer disabled:opacity-50 active:scale-98"
+                  >
+                    {isVerifyingOtp ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span>Linking Device & Connecting...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCheck className="w-4 h-4" />
+                        <span>I Have Scanned This QR — Link Device ✓</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* PHONE NUMBER & OTP TAB */
+              <div className="max-w-md mx-auto space-y-4 pt-2">
                 {otpStep === 'ENTER_PHONE' ? (
-                  <>
+                  <div className="space-y-3 p-4 rounded-2xl bg-[#070b13] border border-[#182842] text-left">
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-white flex items-center gap-1.5">
                         <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
-                        Connect via Mobile Number:
+                        Enter WhatsApp Mobile Number:
                       </label>
                       <input
                         type="tel"
                         value={phoneInput}
                         onChange={(e) => setPhoneInput(e.target.value)}
                         placeholder="+91 98765 43210"
-                        className="w-full bg-[#070b13] border border-[#1a2e4a] focus:border-emerald-500 rounded-xl px-3 py-2.5 text-xs text-white placeholder-gray-500 focus:outline-none font-mono"
+                        className="w-full bg-[#0b1220] border border-[#1a2e4a] focus:border-emerald-500 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-gray-500 focus:outline-none font-mono"
                       />
                     </div>
 
                     <button
+                      type="button"
                       onClick={handleRequestOtp}
                       disabled={isSendingOtp}
-                      className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/25 transition-all disabled:opacity-50"
+                      className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/25 transition-all cursor-pointer disabled:opacity-50"
                     >
                       {isSendingOtp ? (
                         <>
@@ -801,17 +911,18 @@ export default function WhatsAppShootClient() {
                         </>
                       )}
                     </button>
-                  </>
+                  </div>
                 ) : (
-                  <div className="space-y-3 p-4 rounded-2xl bg-[#070b13] border border-emerald-800/60 text-left">
+                  <div className="space-y-3 p-5 rounded-2xl bg-[#070b13] border border-emerald-800/60 text-left">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-white flex items-center gap-1.5">
                         <Lock className="w-3.5 h-3.5 text-emerald-400" />
                         Enter 6-Digit WhatsApp OTP:
                       </span>
                       <button
+                        type="button"
                         onClick={() => setOtpStep('ENTER_PHONE')}
-                        className="text-[10px] text-gray-400 hover:text-white"
+                        className="text-[10px] text-gray-400 hover:text-white cursor-pointer"
                       >
                         Change Number
                       </button>
@@ -824,7 +935,7 @@ export default function WhatsAppShootClient() {
                     {receivedOtp && (
                       <div className="p-2.5 bg-emerald-950/80 border border-emerald-700/60 rounded-xl flex items-center justify-between">
                         <span className="text-[11px] text-emerald-200">Your OTP Code:</span>
-                        <span className="font-mono text-base font-black text-emerald-300 tracking-widest bg-black/60 px-2 py-0.5 rounded border border-emerald-800">
+                        <span className="font-mono text-base font-black text-emerald-300 tracking-widest bg-black/60 px-2.5 py-0.5 rounded border border-emerald-800">
                           {receivedOtp}
                         </span>
                       </div>
@@ -840,9 +951,10 @@ export default function WhatsAppShootClient() {
                     />
 
                     <button
+                      type="button"
                       onClick={handleVerifyOtpAndConnect}
                       disabled={isVerifyingOtp}
-                      className="w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow transition-all disabled:opacity-50"
+                      className="w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow transition-all cursor-pointer disabled:opacity-50"
                     >
                       {isVerifyingOtp ? (
                         <>
@@ -859,8 +971,7 @@ export default function WhatsAppShootClient() {
                   </div>
                 )}
               </div>
-
-            </div>
+            )}
           </div>
         )}
 

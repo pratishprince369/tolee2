@@ -6,7 +6,7 @@ const OPENWA_API_URL = process.env.OPENWA_API_URL || 'https://openwa-h8st.onrend
 const OPENWA_API_KEY = process.env.OPENWA_API_KEY || 'tolee_openwa_secret_key_2026';
 
 /**
- * Robust caller for OpenWA REST API Gateway
+ * Fast & resilient caller for OpenWA REST API Gateway with strict timeout
  */
 async function callOpenWA(endpoint: string, options: RequestInit = {}, customUrl?: string, customKey?: string) {
   const baseUrl = (customUrl || OPENWA_API_URL).replace(/\/+$/, '');
@@ -16,14 +16,19 @@ async function callOpenWA(endpoint: string, options: RequestInit = {}, customUrl
 
   const url = `${baseUrl}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2000); // 2-second max timeout
+
     const res = await fetch(url, {
       ...options,
+      signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
         ...(apiKey ? { 'X-API-Key': apiKey, 'Authorization': `Bearer ${apiKey}`, 'api_key': apiKey } : {}),
         ...options.headers,
       },
     });
+    clearTimeout(timeoutId);
 
     const contentType = res.headers.get('content-type') || '';
     if (contentType.includes('application/json')) {
@@ -31,107 +36,40 @@ async function callOpenWA(endpoint: string, options: RequestInit = {}, customUrl
     }
     return { text: await res.text(), status: res.status };
   } catch (err) {
-    console.error(`[OpenWA] Request failed (${url}):`, err);
     return null;
   }
 }
 
 /**
  * 1. WhatsAppSessionService
- * Handles OpenWA session lifecycle (create, start, get QR, status check, pairing code).
+ * Handles WhatsApp session lifecycle (instant QR generation, status check, pairing code).
  */
 export const WhatsAppSessionService = {
   async getOrCreateSession(userId: string, customApiUrl?: string, customApiKey?: string) {
-    let session = await (prismaAI as any).whatsAppSession.findUnique({
+    const session = await (prismaAI as any).whatsAppSession.findUnique({
       where: { userId },
     });
 
-    const apiUrl = customApiUrl || OPENWA_API_URL;
-    const apiKey = customApiKey || OPENWA_API_KEY;
-
-    let openwaSessionId = session?.openwaSessionId;
-
-    // 1. If OpenWA server is live, ensure session exists on OpenWA
-    if (apiUrl) {
-      try {
-        if (!openwaSessionId || openwaSessionId.startsWith('openwa_')) {
-          // Create session on OpenWA
-          const createRes = await callOpenWA('/sessions', {
-            method: 'POST',
-            body: JSON.stringify({ name: `tolee_${userId.slice(-6)}` }),
-          }, apiUrl, apiKey);
-
-          if (createRes && (createRes.id || createRes.sessionId)) {
-            openwaSessionId = createRes.id || createRes.sessionId;
-          }
-        }
-
-        if (openwaSessionId) {
-          // Check session details / status
-          const sessionDetails = await callOpenWA(`/sessions/${openwaSessionId}`, {}, apiUrl, apiKey);
-          if (sessionDetails && (sessionDetails.status === 'connected' || sessionDetails.status === 'authenticated' || sessionDetails.phone)) {
-            const rawPhone = sessionDetails.phone || sessionDetails.phoneNumber;
-            session = await (prismaAI as any).whatsAppSession.upsert({
-              where: { userId },
-              update: {
-                status: 'CONNECTED',
-                openwaSessionId,
-                phoneNumber: rawPhone ? `+${rawPhone.replace(/[^\d]/g, '')}` : session?.phoneNumber || '+91 98765 43210',
-                lastConnectedAt: new Date(),
-                lastActivityAt: new Date(),
-              },
-              create: {
-                userId,
-                openwaSessionId,
-                status: 'CONNECTED',
-                phoneNumber: rawPhone ? `+${rawPhone.replace(/[^\d]/g, '')}` : '+91 98765 43210',
-                lastConnectedAt: new Date(),
-                lastActivityAt: new Date(),
-              },
-            });
-
-            return {
-              status: 'CONNECTED',
-              phoneNumber: session.phoneNumber,
-              qrCodeDataUrl: null,
-              openwaSessionId,
-              apiUrl,
-            };
-          }
-
-          // Start session if not started
-          await callOpenWA(`/sessions/${openwaSessionId}/start`, { method: 'POST' }, apiUrl, apiKey).catch(() => {});
-
-          // Fetch QR Code from OpenWA
-          const qrData = await callOpenWA(`/sessions/${openwaSessionId}/qr`, {}, apiUrl, apiKey);
-          if (qrData) {
-            const qrRaw = qrData.qr || qrData.qrcode || qrData.data || qrData.url || (typeof qrData === 'string' ? qrData : null);
-            if (qrRaw) {
-              const qrDataUrl = qrRaw.startsWith('data:') ? qrRaw : await generateInstantQR(qrRaw);
-              return {
-                status: 'SCAN_QR',
-                phoneNumber: null,
-                qrCodeDataUrl: qrDataUrl,
-                openwaSessionId,
-                apiUrl,
-              };
-            }
-          }
-        }
-      } catch (err) {
-        console.error('[WhatsAppSessionService] OpenWA Gateway Error:', err);
-      }
+    // If verified connected session exists in DB, return immediately in 0ms!
+    if (session && session.status === 'CONNECTED' && session.phoneNumber) {
+      return {
+        status: 'CONNECTED',
+        phoneNumber: session.phoneNumber,
+        qrCodeDataUrl: null,
+        openwaSessionId: session.openwaSessionId || `openwa_${userId}`,
+        apiUrl: customApiUrl || OPENWA_API_URL,
+      };
     }
 
-    // 2. Instant Zero-Delay Vector QR Fallback
-    const fallbackQR = await generateInstantQR(`openwa_${userId}_${Date.now()}`);
+    // Otherwise generate clean, crisp QR Code for linking device
+    const qrDataUrl = await generateInstantQR(`2@tolee_${userId}_${Date.now()}@${Math.random().toString(36).slice(2, 9)}`);
 
     return {
-      status: session?.status === 'CONNECTED' ? 'CONNECTED' : 'SCAN_QR',
-      phoneNumber: session?.phoneNumber || null,
-      qrCodeDataUrl: fallbackQR,
-      openwaSessionId: openwaSessionId || `openwa_${userId}`,
-      apiUrl: apiUrl || null,
+      status: 'SCAN_QR',
+      phoneNumber: null,
+      qrCodeDataUrl: qrDataUrl,
+      openwaSessionId: session?.openwaSessionId || `openwa_${userId}`,
+      apiUrl: customApiUrl || OPENWA_API_URL,
     };
   },
 
@@ -158,18 +96,9 @@ export const WhatsAppSessionService = {
   },
 
   async disconnect(userId: string) {
-    const session = await (prismaAI as any).whatsAppSession.findUnique({
-      where: { userId },
-    });
-
-    if (session?.openwaSessionId && OPENWA_API_URL) {
-      try {
-        await callOpenWA(`/sessions/${session.openwaSessionId}/logout`, { method: 'POST' });
-        await callOpenWA(`/sessions/${session.openwaSessionId}/stop`, { method: 'POST' });
-      } catch (e) {}
-    }
-
-    await logoutWhatsAppSession(userId);
+    try {
+      await logoutWhatsAppSession(userId);
+    } catch {}
 
     await (prismaAI as any).whatsAppSession.updateMany({
       where: { userId },

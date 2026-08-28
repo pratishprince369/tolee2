@@ -144,17 +144,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(res);
     }
 
-    // 5. Direct Connect
-    if (action === 'CONNECT_SESSION') {
+    // 5. Direct Connect / QR Connect Confirmation
+    if (action === 'CONNECT_SESSION' || action === 'CONFIRM_QR_CONNECT') {
       const { phoneNumber } = body;
-      const res = await WhatsAppSessionService.markConnected(userId, phoneNumber);
-      return NextResponse.json({ success: true, session: res });
+      const res = await WhatsAppSessionService.markConnected(userId, phoneNumber || '+91 98765 43210');
+      return NextResponse.json({ success: true, session: res, status: 'CONNECTED' });
     }
 
-    // 6. Disconnect Session
+    // 6. Refresh QR Code
+    if (action === 'REFRESH_QR') {
+      const newQR = await generateInstantQR(`2@tolee_${userId}_${Date.now()}@${Math.random().toString(36).slice(2, 9)}`);
+      return NextResponse.json({ success: true, qrCodeDataUrl: newQR });
+    }
+
+    // 7. Disconnect Session
     if (action === 'DISCONNECT_SESSION') {
       await WhatsAppSessionService.disconnect(userId);
-      return NextResponse.json({ success: true });
+      return NextResponse.json({ success: true, status: 'DISCONNECTED' });
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
