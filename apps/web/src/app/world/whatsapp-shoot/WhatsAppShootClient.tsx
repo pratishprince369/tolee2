@@ -734,16 +734,17 @@ export default function WhatsAppShootClient() {
               <div>
                 <div className="text-xs font-bold text-white flex items-center gap-1.5">
                   <span>WhatsApp Connected ✓</span>
-                  <span className="text-[10px] text-emerald-300 font-mono">({connectedPhoneNumber || '+91 98765 43210'})</span>
+                  <span className="text-[10px] text-emerald-300 font-mono">({connectedPhoneNumber || 'My Linked Device'})</span>
                 </div>
-                <div className="text-[10px] text-emerald-400">Background Engine Active</div>
+                <div className="text-[10px] text-emerald-400">Background Engine Ready</div>
               </div>
               <button
                 onClick={handleDisconnectSession}
-                className="ml-2 text-xs text-gray-400 hover:text-rose-400 p-1"
-                title="Disconnect WhatsApp"
+                className="ml-3 px-2.5 py-1 text-[11px] font-bold text-rose-300 hover:text-white bg-rose-950/60 hover:bg-rose-900/80 border border-rose-800/60 rounded-xl transition-all flex items-center gap-1 cursor-pointer active:scale-95 shadow-sm"
+                title="Scan new WhatsApp or link another number"
               >
-                ✕
+                <RotateCcw className="w-3 h-3" />
+                <span>Scan New QR / Switch</span>
               </button>
             </div>
           ) : (

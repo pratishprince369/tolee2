@@ -74,7 +74,7 @@ export const WhatsAppSessionService = {
   },
 
   async markConnected(userId: string, phoneNumber?: string) {
-    const cleanPhone = (phoneNumber || '+91 98765 43210').replace(/[^\d+]/g, '');
+    const cleanPhone = phoneNumber ? phoneNumber.replace(/[^\d+]/g, '') : 'Linked Device';
     const session = await (prismaAI as any).whatsAppSession.upsert({
       where: { userId },
       update: {

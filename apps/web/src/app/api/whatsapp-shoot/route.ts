@@ -147,7 +147,7 @@ export async function POST(req: NextRequest) {
     // 5. Direct Connect / QR Connect Confirmation
     if (action === 'CONNECT_SESSION' || action === 'CONFIRM_QR_CONNECT') {
       const { phoneNumber } = body;
-      const res = await WhatsAppSessionService.markConnected(userId, phoneNumber || '+91 98765 43210');
+      const res = await WhatsAppSessionService.markConnected(userId, phoneNumber);
       return NextResponse.json({ success: true, session: res, status: 'CONNECTED' });
     }
 
