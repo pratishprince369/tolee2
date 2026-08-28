@@ -98,6 +98,16 @@ export const WhatomateStudio: React.FC<WhatomateStudioProps> = ({ initialTemplat
     return () => clearInterval(interval);
   }, [activeShootId, liveProgress]);
 
+  useEffect(() => {
+    let statusInterval: NodeJS.Timeout;
+    if (connectionStatus !== 'CONNECTED') {
+      statusInterval = setInterval(() => {
+        fetchSessionStatus();
+      }, 2500);
+    }
+    return () => clearInterval(statusInterval);
+  }, [connectionStatus]);
+
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
@@ -518,37 +528,12 @@ export const WhatomateStudio: React.FC<WhatomateStudioProps> = ({ initialTemplat
                     </ol>
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-[11px] font-bold text-gray-300 block">
-                      Optional: Your WhatsApp Mobile Number
-                    </label>
-                    <input
-                      type="tel"
-                      value={phoneInput}
-                      onChange={(e) => setPhoneInput(e.target.value)}
-                      placeholder="+91 98765 43210"
-                      className="w-full bg-[#070b13] border border-[#1a2e4a] focus:border-emerald-500 rounded-xl px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none font-mono"
-                    />
+                  <div className="p-3.5 rounded-2xl bg-emerald-950/40 border border-emerald-800/40 flex items-center gap-3">
+                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping flex-shrink-0" />
+                    <p className="text-xs text-emerald-300/90 font-medium leading-relaxed">
+                      Waiting for scan... Once scanned with your WhatsApp camera, the dashboard will open automatically.
+                    </p>
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={handleConfirmQR}
-                    disabled={isVerifyingOtp}
-                    className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/25 transition-all cursor-pointer disabled:opacity-50 active:scale-98"
-                  >
-                    {isVerifyingOtp ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        <span>Linking Device...</span>
-                      </>
-                    ) : (
-                      <>
-                        <CheckCheck className="w-4 h-4" />
-                        <span>I Have Scanned This QR — Link Device & Open Dashboard ✓</span>
-                      </>
-                    )}
-                  </button>
                 </div>
               </div>
             ) : (
@@ -657,24 +642,12 @@ export const WhatomateStudio: React.FC<WhatomateStudioProps> = ({ initialTemplat
                         </ol>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={handleConfirmQR}
-                        disabled={isVerifyingOtp}
-                        className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/25 transition-all cursor-pointer disabled:opacity-50 active:scale-98"
-                      >
-                        {isVerifyingOtp ? (
-                          <>
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                            <span>Linking Device...</span>
-                          </>
-                        ) : (
-                          <>
-                            <CheckCheck className="w-4 h-4" />
-                            <span>I Have Entered This Code in WhatsApp — Open Dashboard ✓</span>
-                          </>
-                        )}
-                      </button>
+                      <div className="p-3.5 rounded-2xl bg-emerald-950/40 border border-emerald-800/40 flex items-center gap-3">
+                        <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping flex-shrink-0" />
+                        <p className="text-xs text-emerald-300/90 font-medium leading-relaxed">
+                          Waiting for phone confirmation... Once you type the 8-character code in WhatsApp on your phone, your device will connect automatically.
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>
