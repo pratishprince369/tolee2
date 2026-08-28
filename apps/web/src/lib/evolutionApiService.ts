@@ -100,7 +100,11 @@ export class EvolutionApiService {
 
       const data = await res.json().catch(() => ({}));
       if (res.ok && (data.base64 || data.code)) {
-        const qrUrl = data.base64?.startsWith('data:image') ? data.base64 : data.base64 ? `data:image/png;base64,${data.base64}` : null;
+        const qrUrl = data.base64?.startsWith('data:image')
+          ? data.base64
+          : data.base64
+          ? `data:image/png;base64,${data.base64}`
+          : null;
         return {
           success: true,
           qrCodeDataUrl: qrUrl || (await generateInstantQR(data.code)),
@@ -109,15 +113,15 @@ export class EvolutionApiService {
         };
       }
 
-      // Fallback: Generate clean dynamic QR
-      const instantQR = await generateInstantQR(`2@evolution_${instanceName}_${Date.now()}`);
       return {
-        success: true,
-        qrCodeDataUrl: instantQR,
+        success: false,
+        error: 'Evolution API server is not responding. Please check server URL or link via Phone Number / Instant Link button below.',
       };
     } catch (err: any) {
-      const instantQR = await generateInstantQR(`2@evolution_${instanceName}_${Date.now()}`);
-      return { success: true, qrCodeDataUrl: instantQR };
+      return {
+        success: false,
+        error: 'Evolution API server unreachable. Please verify EVOLUTION_API_URL or use instant connect.',
+      };
     }
   }
 
