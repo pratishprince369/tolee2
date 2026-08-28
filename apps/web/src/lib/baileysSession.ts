@@ -1,3 +1,4 @@
+import { prismaAI } from '@/lib/prisma-ai';
 import makeWASocket, {
   DisconnectReason,
   useMultiFileAuthState,
@@ -106,6 +107,26 @@ export async function getOrCreateWhatsAppSession(userId: string): Promise<UserSe
         const rawPhone = jid.split(':')[0] || jid.split('@')[0];
         userSession.phoneNumber = rawPhone ? `+${rawPhone}` : 'Connected Device';
         userSession.lastUpdated = Date.now();
+
+        try {
+          await (prismaAI as any).whatsAppSession.upsert({
+            where: { userId },
+            update: {
+              status: 'CONNECTED',
+              phoneNumber: userSession.phoneNumber,
+              lastConnectedAt: new Date(),
+              lastActivityAt: new Date(),
+            },
+            create: {
+              userId,
+              openwaSessionId: `openwa_${userId}`,
+              status: 'CONNECTED',
+              phoneNumber: userSession.phoneNumber,
+              lastConnectedAt: new Date(),
+              lastActivityAt: new Date(),
+            },
+          });
+        } catch {}
       }
 
       if (connection === 'close') {
@@ -114,6 +135,13 @@ export async function getOrCreateWhatsAppSession(userId: string): Promise<UserSe
 
         userSession.status = 'DISCONNECTED';
         userSession.socket = null;
+
+        try {
+          await (prismaAI as any).whatsAppSession.updateMany({
+            where: { userId },
+            data: { status: 'DISCONNECTED' },
+          });
+        } catch {}
 
         if (shouldReconnect) {
           setTimeout(() => {

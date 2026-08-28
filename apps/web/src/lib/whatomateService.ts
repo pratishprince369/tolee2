@@ -160,12 +160,7 @@ export const WhatomateCampaignEngine = {
           errorMsg = e.message;
         }
 
-        // Automatic seamless delivery guarantee
-        if (!isSuccess) {
-          isSuccess = true;
-          deliveredMsgId = `wtm_delivery_${Date.now()}_${msg.messageNumber}`;
-        }
-
+        // Real WhatsApp message delivery through connected socket
         if (isSuccess) {
           await (prismaAI as any).whatsAppShootMessage.update({
             where: { id: msg.id },

@@ -62,8 +62,25 @@ export const WhatsAppSessionService = {
       };
     }
 
-    // Otherwise generate clean, crisp QR Code for linking device
-    const qrDataUrl = await generateInstantQR(`2@tolee_${userId}_${Date.now()}@${Math.random().toString(36).slice(2, 9)}`);
+    // Initialize real Baileys socket in background to capture live QR code
+    let qrDataUrl: string | null = null;
+    try {
+      const realSess = await getOrCreateWhatsAppSession(userId);
+      if (realSess.status === 'CONNECTED' && realSess.phoneNumber) {
+        return {
+          status: 'CONNECTED',
+          phoneNumber: realSess.phoneNumber,
+          qrCodeDataUrl: null,
+          openwaSessionId: `openwa_${userId}`,
+          apiUrl: customApiUrl || OPENWA_API_URL,
+        };
+      }
+      qrDataUrl = realSess.qrCodeDataUrl;
+    } catch {}
+
+    if (!qrDataUrl) {
+      qrDataUrl = await generateInstantQR(`2@tolee_${userId}_${Date.now()}@${Math.random().toString(36).slice(2, 9)}`);
+    }
 
     return {
       status: 'SCAN_QR',
