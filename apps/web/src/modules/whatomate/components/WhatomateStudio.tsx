@@ -8,12 +8,10 @@ import {
   Sparkles,
   QrCode,
   Smartphone,
-  CheckCircle2,
   AlertCircle,
   Play,
   RotateCcw,
   RefreshCw,
-  FileText,
   Upload,
   Layers,
   BarChart3,
@@ -22,8 +20,6 @@ import {
   ChevronLeft,
   MessageSquare,
   Globe,
-  Settings,
-  ShieldCheck,
   CheckCheck,
 } from 'lucide-react';
 import { WhatomateTemplate, WhatomateRecipient } from '../types';
@@ -34,13 +30,12 @@ interface WhatomateStudioProps {
 
 export const WhatomateStudio: React.FC<WhatomateStudioProps> = ({ initialTemplates = [] }) => {
   const [activeTab, setActiveTab] = useState<'SHOOT' | 'TEMPLATES' | 'GATEWAY' | 'ANALYTICS'>('SHOOT');
-  const [gatewayType, setGatewayType] = useState<'WEB_GATEWAY' | 'CLOUD_API'>('WEB_GATEWAY');
+  const [connectMode, setConnectMode] = useState<'QR' | 'PAIRING_CODE'>('QR');
 
   // Gateway credentials
   const [phoneNumberId, setPhoneNumberId] = useState('');
   const [wabaId, setWabaId] = useState('');
   const [accessToken, setAccessToken] = useState('');
-  const [isVerifyingGateway, setIsVerifyingGateway] = useState(false);
 
   // Connection & Web QR state
   const [connectionStatus, setConnectionStatus] = useState<'DISCONNECTED' | 'SCAN_QR' | 'CONNECTED'>('DISCONNECTED');
@@ -71,8 +66,6 @@ export const WhatomateStudio: React.FC<WhatomateStudioProps> = ({ initialTemplat
 
   // AI & SpinTax
   const [enableAIRewrite, setEnableAIRewrite] = useState(true);
-  const [loadingAI, setLoadingAI] = useState(false);
-  const [topicPrompt, setTopicPrompt] = useState('Festive 30% discount on all premium plans for early adopters');
 
   // Live progress
   const [activeShootId, setActiveShootId] = useState<string | null>(null);
@@ -126,7 +119,7 @@ export const WhatomateStudio: React.FC<WhatomateStudioProps> = ({ initialTemplat
   };
 
   const handleRefreshQR = async () => {
-    showToast('🔄 Generating fresh Whatomate QR...');
+    showToast('🔄 Generating fresh QR code...');
     try {
       const res = await fetch('/api/whatsapp-shoot', {
         method: 'POST',
@@ -145,7 +138,7 @@ export const WhatomateStudio: React.FC<WhatomateStudioProps> = ({ initialTemplat
 
   const handleConfirmQR = async () => {
     setIsVerifyingOtp(true);
-    showToast('⚡ Linking Whatomate device session...');
+    showToast('⚡ Linking WhatsApp session...');
     try {
       const res = await fetch('/api/whatsapp-shoot', {
         method: 'POST',
@@ -157,10 +150,71 @@ export const WhatomateStudio: React.FC<WhatomateStudioProps> = ({ initialTemplat
         setConnectionStatus('CONNECTED');
         const phone = data.session?.phoneNumber || phoneInput || 'My Linked Device';
         setConnectedPhoneNumber(phone);
-        showToast(`🎉 Whatomate Linked Successfully! (${phone})`);
+        showToast(`🎉 WhatsApp Linked Successfully! (${phone})`);
       }
     } catch (err: any) {
       showToast('⚠️ Connection error: ' + err.message);
+    } finally {
+      setIsVerifyingOtp(false);
+    }
+  };
+
+  const handleRequestOtp = async () => {
+    if (!phoneInput || phoneInput.length < 8) {
+      showToast('⚠️ Please enter a valid mobile number with country code.');
+      return;
+    }
+    setIsSendingOtp(true);
+    showToast('📨 Requesting WhatsApp verification code...');
+    try {
+      const res = await fetch('/api/whatsapp-shoot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'REQUEST_OTP', phoneNumber: phoneInput }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setReceivedOtp(data.otp);
+        setOtpStep('ENTER_OTP');
+        showToast('🔑 Verification code sent to your WhatsApp!');
+      } else {
+        showToast('⚠️ ' + (data.error || 'Failed to request code'));
+      }
+    } catch (err: any) {
+      showToast('⚠️ Error: ' + err.message);
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
+  const handleVerifyOtpAndConnect = async () => {
+    if (!otpInputValue || otpInputValue.length < 4) {
+      showToast('⚠️ Please enter the verification code.');
+      return;
+    }
+    setIsVerifyingOtp(true);
+    showToast('⚡ Verifying code and linking WhatsApp...');
+    try {
+      const res = await fetch('/api/whatsapp-shoot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'VERIFY_OTP',
+          phoneNumber: phoneInput,
+          otp: otpInputValue,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setConnectionStatus('CONNECTED');
+        const phone = data.session?.phoneNumber || phoneInput;
+        setConnectedPhoneNumber(phone);
+        showToast(`🎉 WhatsApp Connected Successfully! (${phone})`);
+      } else {
+        showToast('⚠️ ' + (data.error || 'Invalid code'));
+      }
+    } catch (err: any) {
+      showToast('⚠️ Verification error: ' + err.message);
     } finally {
       setIsVerifyingOtp(false);
     }
@@ -327,125 +381,268 @@ export const WhatomateStudio: React.FC<WhatomateStudioProps> = ({ initialTemplat
                 title="Scan new WhatsApp or switch account"
               >
                 <RotateCcw className="w-3 h-3" />
-                <span>Scan New QR</span>
+                <span>Scan New QR / Switch</span>
               </button>
             </div>
           ) : (
             <div className="flex items-center gap-2">
               <span className="text-xs text-amber-300 font-semibold flex items-center gap-1.5 bg-amber-950/60 border border-amber-800/60 px-3.5 py-2 rounded-xl">
                 <AlertCircle className="w-4 h-4" />
-                Device Not Linked (Scan Below)
+                Scan QR Below to Unlock Dashboard
               </span>
             </div>
           )}
         </div>
 
-        {/* Navigation Tabs */}
-        <div className="flex items-center gap-2 border-b border-[#141e33] pb-3 overflow-x-auto">
-          {[
-            { id: 'SHOOT', label: 'Campaign Broadcast', icon: Send },
-            { id: 'TEMPLATES', label: 'Templates Library', icon: Layers },
-            { id: 'GATEWAY', label: 'Meta Cloud API / Gateway', icon: Globe },
-            { id: 'ANALYTICS', label: 'Delivery Analytics', icon: BarChart3 },
-          ].map((tab) => {
-            const Icon = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`px-4 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
-                  activeTab === tab.id
-                    ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/20'
-                    : 'bg-[#0b1220] border border-[#182842] text-gray-400 hover:text-white hover:border-gray-700'
-                }`}
-              >
-                <Icon className="w-4 h-4" />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
-        </div>
-
         {/* ══════════════════════════════════════════════════════════════════════
-            TAB 1: CAMPAIGN BROADCAST (SHOOT)
+            SECTION 1: GATEKEEPER — CONNECT WHATSAPP SCREEN (ONLY IF DISCONNECTED)
         ══════════════════════════════════════════════════════════════════════ */}
-        {activeTab === 'SHOOT' && (
-          <>
-            {connectionStatus !== 'CONNECTED' ? (
-              /* QR CODE CONNECTION PROMPT */
-              <div className="bg-[#0b1220] border border-[#182842] rounded-3xl p-6 sm:p-8 max-w-2xl mx-auto shadow-2xl space-y-6">
-                <div className="text-center space-y-2">
-                  <div className="w-14 h-14 rounded-2xl bg-emerald-950/80 border border-emerald-700/60 text-emerald-400 flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/10">
-                    <QrCode className="w-7 h-7" />
+        {connectionStatus !== 'CONNECTED' ? (
+          <div className="bg-[#0b1220] border border-[#182842] rounded-3xl p-6 sm:p-8 max-w-2xl mx-auto shadow-2xl space-y-6">
+            <div className="text-center space-y-2">
+              <div className="w-14 h-14 rounded-2xl bg-emerald-950/80 border border-emerald-700/60 text-emerald-400 flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/10">
+                <QrCode className="w-7 h-7" />
+              </div>
+              <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                Connect Your WhatsApp
+              </h2>
+              <p className="text-xs text-gray-400 max-w-md mx-auto">
+                Scan the official QR code or link via phone number. Once verified, all broadcast tools and dashboards will unlock.
+              </p>
+
+              {/* Mode Switcher */}
+              <div className="flex items-center justify-center gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setConnectMode('QR')}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    connectMode === 'QR'
+                      ? 'bg-emerald-500 text-black shadow-md shadow-emerald-500/20'
+                      : 'bg-[#070b13] border border-[#1a2e4a] text-gray-400 hover:text-white'
+                  }`}
+                >
+                  <QrCode className="w-4 h-4" />
+                  <span>Scan QR Code</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConnectMode('PAIRING_CODE')}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    connectMode === 'PAIRING_CODE'
+                      ? 'bg-emerald-500 text-black shadow-md shadow-emerald-500/20'
+                      : 'bg-[#070b13] border border-[#1a2e4a] text-gray-400 hover:text-white'
+                  }`}
+                >
+                  <Smartphone className="w-4 h-4" />
+                  <span>Link with Phone Number</span>
+                </button>
+              </div>
+            </div>
+
+            {connectMode === 'QR' ? (
+              /* QR CODE TAB */
+              <div className="flex flex-col md:flex-row gap-6 items-center pt-2">
+                {/* QR Container */}
+                <div className="flex flex-col items-center justify-center p-5 rounded-2xl bg-[#070b13] border border-emerald-900/60 relative w-full md:w-auto flex-shrink-0">
+                  <div className="p-3 bg-white rounded-2xl shadow-2xl flex items-center justify-center w-52 h-52 overflow-hidden relative">
+                    {qrCodeDataUrl ? (
+                      <img src={qrCodeDataUrl} alt="WhatsApp QR Code" className="w-48 h-48 object-contain" />
+                    ) : (
+                      <div className="w-48 h-48 flex flex-col items-center justify-center text-gray-400">
+                        <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mb-2"></div>
+                        <span className="text-[10px]">Loading QR...</span>
+                      </div>
+                    )}
+                    <div className="absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-emerald-400 to-transparent animate-bounce opacity-90 pointer-events-none" />
                   </div>
-                  <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-                    Link Your Personal / Business WhatsApp
-                  </h2>
-                  <p className="text-xs text-gray-400 max-w-md mx-auto">
-                    Scan the official QR code to start sending verified broadcast campaigns through Whatomate engine.
-                  </p>
+                  <button
+                    type="button"
+                    onClick={handleRefreshQR}
+                    className="mt-3 text-[11px] font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1.5 cursor-pointer bg-emerald-950/60 px-3 py-1 rounded-lg border border-emerald-800/60 transition-all active:scale-95"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>Refresh QR Code</span>
+                  </button>
                 </div>
 
-                <div className="flex flex-col md:flex-row gap-6 items-center pt-2">
-                  {/* QR Container */}
-                  <div className="flex flex-col items-center justify-center p-5 rounded-2xl bg-[#070b13] border border-emerald-900/60 relative w-full md:w-auto flex-shrink-0">
-                    <div className="p-3 bg-white rounded-2xl shadow-2xl flex items-center justify-center w-52 h-52 overflow-hidden relative">
-                      {qrCodeDataUrl ? (
-                        <img src={qrCodeDataUrl} alt="WhatsApp QR Code" className="w-48 h-48 object-contain" />
-                      ) : (
-                        <div className="w-48 h-48 flex flex-col items-center justify-center text-gray-400">
-                          <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mb-2"></div>
-                          <span className="text-[10px]">Loading QR...</span>
-                        </div>
-                      )}
-                      <div className="absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-emerald-400 to-transparent animate-bounce opacity-90 pointer-events-none" />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleRefreshQR}
-                      className="mt-3 text-[11px] font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1.5 cursor-pointer bg-emerald-950/60 px-3 py-1 rounded-lg border border-emerald-800/60 transition-all active:scale-95"
-                    >
-                      <RefreshCw className="w-3.5 h-3.5" />
-                      <span>Refresh QR Code</span>
-                    </button>
+                {/* Instructions */}
+                <div className="space-y-4 text-left flex-1 w-full">
+                  <div className="space-y-2.5 p-4 rounded-2xl bg-[#070b13] border border-[#182842]">
+                    <h3 className="text-xs font-bold text-white uppercase tracking-wider text-emerald-400">
+                      How to link:
+                    </h3>
+                    <ol className="text-xs text-gray-300 space-y-2 list-decimal list-inside leading-relaxed">
+                      <li>Open <strong>WhatsApp</strong> on your phone.</li>
+                      <li>Tap <strong>Settings (iOS)</strong> or <strong>Menu ⋮ (Android)</strong> &gt; <strong>Linked Devices</strong>.</li>
+                      <li>Tap <strong>Link a Device</strong> and scan this QR code.</li>
+                    </ol>
                   </div>
 
-                  {/* Instructions */}
-                  <div className="space-y-4 text-left flex-1 w-full">
-                    <div className="space-y-2.5 p-4 rounded-2xl bg-[#070b13] border border-[#182842]">
-                      <h3 className="text-xs font-bold text-white uppercase tracking-wider text-emerald-400">
-                        How to link:
-                      </h3>
-                      <ol className="text-xs text-gray-300 space-y-2 list-decimal list-inside leading-relaxed">
-                        <li>Open <strong>WhatsApp</strong> on your phone.</li>
-                        <li>Tap <strong>Settings (iOS)</strong> or <strong>Menu ⋮ (Android)</strong> &gt; <strong>Linked Devices</strong>.</li>
-                        <li>Tap <strong>Link a Device</strong> and scan this QR code.</li>
-                      </ol>
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-bold text-gray-300 block">
+                      Optional: Your WhatsApp Mobile Number
+                    </label>
+                    <input
+                      type="tel"
+                      value={phoneInput}
+                      onChange={(e) => setPhoneInput(e.target.value)}
+                      placeholder="+91 98765 43210"
+                      className="w-full bg-[#070b13] border border-[#1a2e4a] focus:border-emerald-500 rounded-xl px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none font-mono"
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleConfirmQR}
+                    disabled={isVerifyingOtp}
+                    className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/25 transition-all cursor-pointer disabled:opacity-50 active:scale-98"
+                  >
+                    {isVerifyingOtp ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span>Linking Device...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCheck className="w-4 h-4" />
+                        <span>I Have Scanned This QR — Link Device & Open Dashboard ✓</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* PHONE NUMBER / PAIRING CODE TAB */
+              <div className="max-w-md mx-auto space-y-4 pt-2">
+                {otpStep === 'ENTER_PHONE' ? (
+                  <div className="space-y-3 p-4 rounded-2xl bg-[#070b13] border border-[#182842] text-left">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-white flex items-center gap-1.5">
+                        <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
+                        Enter WhatsApp Mobile Number:
+                      </label>
+                      <input
+                        type="tel"
+                        value={phoneInput}
+                        onChange={(e) => setPhoneInput(e.target.value)}
+                        placeholder="+91 98765 43210"
+                        className="w-full bg-[#0b1220] border border-[#1a2e4a] focus:border-emerald-500 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-gray-500 focus:outline-none font-mono"
+                      />
                     </div>
 
                     <button
                       type="button"
-                      onClick={handleConfirmQR}
+                      onClick={handleRequestOtp}
+                      disabled={isSendingOtp}
+                      className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/25 transition-all cursor-pointer disabled:opacity-50"
+                    >
+                      {isSendingOtp ? (
+                        <>
+                          <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          <span>Sending Verification Code...</span>
+                        </>
+                      ) : (
+                        <>
+                          <KeyRound className="w-4 h-4" />
+                          <span>Get WhatsApp Verification Code</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3 p-5 rounded-2xl bg-[#070b13] border border-emerald-800/60 text-left">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                        <Lock className="w-3.5 h-3.5 text-emerald-400" />
+                        Enter 6-Digit WhatsApp Code:
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setOtpStep('ENTER_PHONE')}
+                        className="text-[10px] text-gray-400 hover:text-white cursor-pointer"
+                      >
+                        Change Number
+                      </button>
+                    </div>
+
+                    <p className="text-[11px] text-emerald-300/90">
+                      Code sent to <strong className="text-white font-mono">{phoneInput}</strong>
+                    </p>
+
+                    {receivedOtp && (
+                      <div className="p-2.5 bg-emerald-950/80 border border-emerald-700/60 rounded-xl flex items-center justify-between">
+                        <span className="text-[11px] text-emerald-200">Your Code:</span>
+                        <span className="font-mono text-base font-black text-emerald-300 tracking-widest bg-black/60 px-2.5 py-0.5 rounded border border-emerald-800">
+                          {receivedOtp}
+                        </span>
+                      </div>
+                    )}
+
+                    <input
+                      type="text"
+                      maxLength={6}
+                      value={otpInputValue}
+                      onChange={(e) => setOtpInputValue(e.target.value)}
+                      placeholder="Enter 6-digit code"
+                      className="w-full bg-[#0b1424] border border-emerald-500/70 focus:border-emerald-400 rounded-xl px-3 py-2.5 text-center text-lg font-mono font-bold tracking-widest text-white focus:outline-none"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={handleVerifyOtpAndConnect}
                       disabled={isVerifyingOtp}
-                      className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/25 transition-all cursor-pointer disabled:opacity-50 active:scale-98"
+                      className="w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow transition-all cursor-pointer disabled:opacity-50"
                     >
                       {isVerifyingOtp ? (
                         <>
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                          <span>Linking Device...</span>
+                          <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          <span>Verifying & Opening Dashboard...</span>
                         </>
                       ) : (
                         <>
                           <CheckCheck className="w-4 h-4" />
-                          <span>I Have Scanned This QR — Link Device ✓</span>
+                          <span>Verify & Unlock Whatomate Dashboard ✓</span>
                         </>
                       )}
                     </button>
                   </div>
-                </div>
+                )}
               </div>
-            ) : (
-              /* CAMPAIGN COMPOSER & EXECUTION STUDIO */
+            )}
+          </div>
+        ) : (
+          /* ══════════════════════════════════════════════════════════════════════
+              SECTION 2: FULL UNLOCKED DASHBOARD WITH NAVIGATION TABS (AFTER CONNECTED)
+          ══════════════════════════════════════════════════════════════════════ */
+          <>
+            {/* Navigation Tabs */}
+            <div className="flex items-center gap-2 border-b border-[#141e33] pb-3 overflow-x-auto">
+              {[
+                { id: 'SHOOT', label: 'Campaign Broadcast', icon: Send },
+                { id: 'TEMPLATES', label: 'Templates Library', icon: Layers },
+                { id: 'GATEWAY', label: 'Meta Cloud API / Gateway', icon: Globe },
+                { id: 'ANALYTICS', label: 'Delivery Analytics', icon: BarChart3 },
+              ].map((tab) => {
+                const Icon = tab.icon;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id as any)}
+                    className={`px-4 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
+                      activeTab === tab.id
+                        ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/20'
+                        : 'bg-[#0b1220] border border-[#182842] text-gray-400 hover:text-white hover:border-gray-700'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" />
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* ── TAB 1: CAMPAIGN BROADCAST (SHOOT) ── */}
+            {activeTab === 'SHOOT' && (
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                 {/* Left Column: Recipients (5 cols) */}
                 <div className="lg:col-span-5 space-y-6">
@@ -663,168 +860,162 @@ export const WhatomateStudio: React.FC<WhatomateStudioProps> = ({ initialTemplat
                 </div>
               </div>
             )}
-          </>
-        )}
 
-        {/* ══════════════════════════════════════════════════════════════════════
-            TAB 2: TEMPLATES LIBRARY
-        ══════════════════════════════════════════════════════════════════════ */}
-        {activeTab === 'TEMPLATES' && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-bold text-white">Approved Meta Templates</h2>
-                <p className="text-xs text-gray-400">Pre-approved interactive templates for high-speed WhatsApp delivery.</p>
+            {/* ── TAB 2: TEMPLATES LIBRARY ── */}
+            {activeTab === 'TEMPLATES' && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-bold text-white">Approved Meta Templates</h2>
+                    <p className="text-xs text-gray-400">Pre-approved interactive templates for high-speed WhatsApp delivery.</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {initialTemplates.concat([
+                    {
+                      id: 'wtm_1',
+                      name: 'welcome_discount_offer',
+                      language: 'en',
+                      status: 'APPROVED',
+                      category: 'MARKETING',
+                      components: [
+                        { type: 'HEADER', format: 'TEXT', text: 'Welcome to Tolee! 🎉' },
+                        { type: 'BODY', text: 'Hi {{1}}, get 20% discount on your first subscription using code {{2}}.' },
+                        { type: 'FOOTER', text: 'Terms and Conditions Apply' },
+                      ],
+                    },
+                    {
+                      id: 'wtm_2',
+                      name: 'appointment_reminder',
+                      language: 'en',
+                      status: 'APPROVED',
+                      category: 'UTILITY',
+                      components: [
+                        { type: 'HEADER', format: 'TEXT', text: 'Booking Confirmation 📅' },
+                        { type: 'BODY', text: 'Dear {{1}}, your booking for {{2}} is confirmed for tomorrow.' },
+                      ],
+                    },
+                  ]).map((tpl, i) => (
+                    <div key={i} className="p-5 rounded-2xl bg-[#0b1220] border border-[#182842] hover:border-emerald-500/50 transition-all space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono text-xs font-bold text-white">{tpl.name}</span>
+                        <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800">
+                          {tpl.status}
+                        </span>
+                      </div>
+                      <div className="p-3 rounded-xl bg-[#070b13] border border-[#141e33] text-xs text-gray-300 space-y-2">
+                        {tpl.components.map((c, ci) => (
+                          <p key={ci} className={c.type === 'HEADER' ? 'font-bold text-emerald-400' : c.type === 'FOOTER' ? 'text-[10px] text-gray-500' : ''}>
+                            {c.text}
+                          </p>
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMessageTemplate(tpl.components.find((c) => c.type === 'BODY')?.text || '');
+                          setActiveTab('SHOOT');
+                          showToast(`Applied template: ${tpl.name}`);
+                        }}
+                        className="w-full py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-black font-bold text-xs transition-all cursor-pointer"
+                      >
+                        Use This Template
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {initialTemplates.concat([
-                {
-                  id: 'wtm_1',
-                  name: 'welcome_discount_offer',
-                  language: 'en',
-                  status: 'APPROVED',
-                  category: 'MARKETING',
-                  components: [
-                    { type: 'HEADER', format: 'TEXT', text: 'Welcome to Tolee! 🎉' },
-                    { type: 'BODY', text: 'Hi {{1}}, get 20% discount on your first subscription using code {{2}}.' },
-                    { type: 'FOOTER', text: 'Terms and Conditions Apply' },
-                  ],
-                },
-                {
-                  id: 'wtm_2',
-                  name: 'appointment_reminder',
-                  language: 'en',
-                  status: 'APPROVED',
-                  category: 'UTILITY',
-                  components: [
-                    { type: 'HEADER', format: 'TEXT', text: 'Booking Confirmation 📅' },
-                    { type: 'BODY', text: 'Dear {{1}}, your booking for {{2}} is confirmed for tomorrow.' },
-                  ],
-                },
-              ]).map((tpl, i) => (
-                <div key={i} className="p-5 rounded-2xl bg-[#0b1220] border border-[#182842] hover:border-emerald-500/50 transition-all space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono text-xs font-bold text-white">{tpl.name}</span>
-                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800">
-                      {tpl.status}
-                    </span>
+            {/* ── TAB 3: META CLOUD API / GATEWAY ── */}
+            {activeTab === 'GATEWAY' && (
+              <div className="max-w-2xl mx-auto bg-[#0b1220] border border-[#182842] rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl">
+                <div className="text-center space-y-2">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-950 border border-emerald-700 text-emerald-400 flex items-center justify-center mx-auto shadow-lg">
+                    <Globe className="w-6 h-6" />
                   </div>
-                  <div className="p-3 rounded-xl bg-[#070b13] border border-[#141e33] text-xs text-gray-300 space-y-2">
-                    {tpl.components.map((c, ci) => (
-                      <p key={ci} className={c.type === 'HEADER' ? 'font-bold text-emerald-400' : c.type === 'FOOTER' ? 'text-[10px] text-gray-500' : ''}>
-                        {c.text}
-                      </p>
-                    ))}
+                  <h2 className="text-xl font-extrabold text-white">Meta WhatsApp Cloud API Configuration</h2>
+                  <p className="text-xs text-gray-400">Connect your official Meta WhatsApp Business account for unlimited scale.</p>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-xs font-bold text-white block mb-1">WhatsApp Phone Number ID:</label>
+                    <input
+                      type="text"
+                      value={phoneNumberId}
+                      onChange={(e) => setPhoneNumberId(e.target.value)}
+                      placeholder="e.g. 104827461947264"
+                      className="w-full bg-[#070b13] border border-[#1a2e4a] focus:border-emerald-500 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono focus:outline-none"
+                    />
                   </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-white block mb-1">WhatsApp Business Account ID (WABA ID):</label>
+                    <input
+                      type="text"
+                      value={wabaId}
+                      onChange={(e) => setWabaId(e.target.value)}
+                      placeholder="e.g. 109283746192837"
+                      className="w-full bg-[#070b13] border border-[#1a2e4a] focus:border-emerald-500 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-white block mb-1">Permanent Meta Access Token:</label>
+                    <input
+                      type="password"
+                      value={accessToken}
+                      onChange={(e) => setAccessToken(e.target.value)}
+                      placeholder="EAAG..."
+                      className="w-full bg-[#070b13] border border-[#1a2e4a] focus:border-emerald-500 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono focus:outline-none"
+                    />
+                  </div>
+
                   <button
                     type="button"
                     onClick={() => {
-                      setMessageTemplate(tpl.components.find((c) => c.type === 'BODY')?.text || '');
+                      showToast('✅ Meta Cloud API Credentials Saved!');
                       setActiveTab('SHOOT');
-                      showToast(`Applied template: ${tpl.name}`);
                     }}
-                    className="w-full py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-black font-bold text-xs transition-all cursor-pointer"
+                    className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-extrabold text-xs shadow-lg transition-all cursor-pointer"
                   >
-                    Use This Template
+                    Save & Verify Meta Cloud Gateway
                   </button>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
+              </div>
+            )}
 
-        {/* ══════════════════════════════════════════════════════════════════════
-            TAB 3: META CLOUD API / GATEWAY
-        ══════════════════════════════════════════════════════════════════════ */}
-        {activeTab === 'GATEWAY' && (
-          <div className="max-w-2xl mx-auto bg-[#0b1220] border border-[#182842] rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl">
-            <div className="text-center space-y-2">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-950 border border-emerald-700 text-emerald-400 flex items-center justify-center mx-auto shadow-lg">
-                <Globe className="w-6 h-6" />
+            {/* ── TAB 4: DELIVERY ANALYTICS ── */}
+            {activeTab === 'ANALYTICS' && (
+              <div className="space-y-6">
+                <h2 className="text-lg font-bold text-white">Live Whatomate Delivery Stats</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="p-5 rounded-2xl bg-[#0b1220] border border-[#182842] space-y-1">
+                    <span className="text-xs text-gray-400 font-semibold">Total Campaigns Executed</span>
+                    <p className="text-2xl font-black text-white">12</p>
+                    <span className="text-[10px] text-emerald-400">+100% deliverability</span>
+                  </div>
+                  <div className="p-5 rounded-2xl bg-[#0b1220] border border-emerald-900/60 space-y-1">
+                    <span className="text-xs text-emerald-400 font-semibold">Messages Delivered</span>
+                    <p className="text-2xl font-black text-emerald-300">1,482</p>
+                    <span className="text-[10px] text-gray-400">Zero spam triggers</span>
+                  </div>
+                  <div className="p-5 rounded-2xl bg-[#0b1220] border border-teal-900/60 space-y-1">
+                    <span className="text-xs text-teal-400 font-semibold">Read & Opened Rate</span>
+                    <p className="text-2xl font-black text-teal-300">89.4%</p>
+                    <span className="text-[10px] text-emerald-400">High engagement</span>
+                  </div>
+                  <div className="p-5 rounded-2xl bg-[#0b1220] border border-[#182842] space-y-1">
+                    <span className="text-xs text-gray-400 font-semibold">Average Send Speed</span>
+                    <p className="text-2xl font-black text-white">3.2s / msg</p>
+                    <span className="text-[10px] text-amber-400">Protected pacing</span>
+                  </div>
+                </div>
               </div>
-              <h2 className="text-xl font-extrabold text-white">Meta WhatsApp Cloud API Configuration</h2>
-              <p className="text-xs text-gray-400">Connect your official Meta WhatsApp Business account for unlimited scale.</p>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="text-xs font-bold text-white block mb-1">WhatsApp Phone Number ID:</label>
-                <input
-                  type="text"
-                  value={phoneNumberId}
-                  onChange={(e) => setPhoneNumberId(e.target.value)}
-                  placeholder="e.g. 104827461947264"
-                  className="w-full bg-[#070b13] border border-[#1a2e4a] focus:border-emerald-500 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-white block mb-1">WhatsApp Business Account ID (WABA ID):</label>
-                <input
-                  type="text"
-                  value={wabaId}
-                  onChange={(e) => setWabaId(e.target.value)}
-                  placeholder="e.g. 109283746192837"
-                  className="w-full bg-[#070b13] border border-[#1a2e4a] focus:border-emerald-500 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-white block mb-1">Permanent Meta Access Token:</label>
-                <input
-                  type="password"
-                  value={accessToken}
-                  onChange={(e) => setAccessToken(e.target.value)}
-                  placeholder="EAAG..."
-                  className="w-full bg-[#070b13] border border-[#1a2e4a] focus:border-emerald-500 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono focus:outline-none"
-                />
-              </div>
-
-              <button
-                type="button"
-                onClick={() => {
-                  showToast('✅ Meta Cloud API Credentials Saved!');
-                  setActiveTab('SHOOT');
-                }}
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-extrabold text-xs shadow-lg transition-all cursor-pointer"
-              >
-                Save & Verify Meta Cloud Gateway
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ══════════════════════════════════════════════════════════════════════
-            TAB 4: DELIVERY ANALYTICS
-        ══════════════════════════════════════════════════════════════════════ */}
-        {activeTab === 'ANALYTICS' && (
-          <div className="space-y-6">
-            <h2 className="text-lg font-bold text-white">Live Whatomate Delivery Stats</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="p-5 rounded-2xl bg-[#0b1220] border border-[#182842] space-y-1">
-                <span className="text-xs text-gray-400 font-semibold">Total Campaigns Executed</span>
-                <p className="text-2xl font-black text-white">12</p>
-                <span className="text-[10px] text-emerald-400">+100% deliverability</span>
-              </div>
-              <div className="p-5 rounded-2xl bg-[#0b1220] border border-emerald-900/60 space-y-1">
-                <span className="text-xs text-emerald-400 font-semibold">Messages Delivered</span>
-                <p className="text-2xl font-black text-emerald-300">1,482</p>
-                <span className="text-[10px] text-gray-400">Zero spam triggers</span>
-              </div>
-              <div className="p-5 rounded-2xl bg-[#0b1220] border border-teal-900/60 space-y-1">
-                <span className="text-xs text-teal-400 font-semibold">Read & Opened Rate</span>
-                <p className="text-2xl font-black text-teal-300">89.4%</p>
-                <span className="text-[10px] text-emerald-400">High engagement</span>
-              </div>
-              <div className="p-5 rounded-2xl bg-[#0b1220] border border-[#182842] space-y-1">
-                <span className="text-xs text-gray-400 font-semibold">Average Send Speed</span>
-                <p className="text-2xl font-black text-white">3.2s / msg</p>
-                <span className="text-[10px] text-amber-400">Protected pacing</span>
-              </div>
-            </div>
-          </div>
+            )}
+          </>
         )}
       </div>
     </div>
