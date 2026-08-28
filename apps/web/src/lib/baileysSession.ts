@@ -56,13 +56,10 @@ export async function getOrCreateWhatsAppSession(userId: string): Promise<UserSe
 
   const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
 
-  // Default Instant QR fallback so UI is instant (0ms delay!)
-  const instantQR = await generateInstantQR(`2@${userId}@${Date.now()}`);
-
   const userSession: UserSessionState = {
     socket: null,
     status: 'SCAN_QR',
-    qrCodeDataUrl: instantQR,
+    qrCodeDataUrl: null,
     phoneNumber: null,
     lastUpdated: Date.now(),
   };
@@ -76,25 +73,44 @@ export async function getOrCreateWhatsAppSession(userId: string): Promise<UserSe
       version,
       auth: state,
       printQRInTerminal: false,
-      browser: ['Tolee World', 'Chrome', '1.0.0'],
+      browser: ['Tolee World WhatsApp', 'Chrome', '124.0.0'],
       syncFullHistory: false,
-      connectTimeoutMs: 15000,
-      defaultQueryTimeoutMs: 15000,
+      connectTimeoutMs: 25000,
+      defaultQueryTimeoutMs: 25000,
+      keepAliveIntervalMs: 15000,
     });
 
     userSession.socket = sock;
 
     sock.ev.on('creds.update', saveCreds);
 
+    // Wait for the first real QR event or open connection
+    let resolveFirstQR: ((val: string | null) => void) | null = null;
+    const firstQRPromise = new Promise<string | null>((resolve) => {
+      resolveFirstQR = resolve;
+      setTimeout(() => resolve(null), 4000);
+    });
+
     sock.ev.on('connection.update', async (update) => {
       const { connection, lastDisconnect, qr } = update;
 
       if (qr) {
         try {
-          const qrDataUrl = await QRCode.toDataURL(qr, { margin: 2, scale: 6 });
+          const qrDataUrl = await QRCode.toDataURL(qr, {
+            margin: 2,
+            scale: 8,
+            color: {
+              dark: '#000000',
+              light: '#ffffff',
+            },
+          });
           userSession.status = 'SCAN_QR';
           userSession.qrCodeDataUrl = qrDataUrl;
           userSession.lastUpdated = Date.now();
+          if (resolveFirstQR) {
+            resolveFirstQR(qrDataUrl);
+            resolveFirstQR = null;
+          }
         } catch (err) {
           console.error('[Baileys] QR Gen Error:', err);
         }
@@ -107,6 +123,10 @@ export async function getOrCreateWhatsAppSession(userId: string): Promise<UserSe
         const rawPhone = jid.split(':')[0] || jid.split('@')[0];
         userSession.phoneNumber = rawPhone ? `+${rawPhone}` : 'Connected Device';
         userSession.lastUpdated = Date.now();
+        if (resolveFirstQR) {
+          resolveFirstQR(null);
+          resolveFirstQR = null;
+        }
 
         try {
           await (prismaAI as any).whatsAppSession.upsert({
@@ -156,6 +176,11 @@ export async function getOrCreateWhatsAppSession(userId: string): Promise<UserSe
         }
       }
     });
+
+    const qrResult = await firstQRPromise;
+    if (qrResult) {
+      userSession.qrCodeDataUrl = qrResult;
+    }
 
     return userSession;
   } catch (err: any) {
