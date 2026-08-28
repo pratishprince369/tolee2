@@ -718,11 +718,11 @@ export default function WhatsAppShootClient() {
                   WhatsApp Shoot
                 </h1>
                 <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-700/50 uppercase tracking-wider">
-                  OPENWA ENGINE 🚀
+                  WHATOMATE ENGINE ⚡
                 </span>
               </div>
               <p className="text-xs text-gray-400 mt-1">
-                Background batch broadcasting with live progress tracker and AI SpinTax rewriter.
+                Modern WhatsApp Business broadcasting with Whatomate anti-ban rate limiting, live delivery logs & AI SpinTax.
               </p>
             </div>
           </div>

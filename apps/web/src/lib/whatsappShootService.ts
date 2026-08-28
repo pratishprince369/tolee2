@@ -1,5 +1,6 @@
 import { prismaAI } from '@/lib/prisma-ai';
 import { getOrCreateWhatsAppSession, sendDirectWhatsAppMessage, logoutWhatsAppSession, generateInstantQR } from '@/lib/baileysSession';
+import { WhatomateCampaignEngine } from './whatomateService';
 
 // OpenWA Environment Configurations
 const OPENWA_API_URL = process.env.OPENWA_API_URL || 'https://openwa-h8st.onrender.com';
@@ -173,8 +174,8 @@ export const WhatsAppShootService = {
       data: messageRows,
     });
 
-    // Trigger background queue processing asynchronously
-    WhatsAppQueueService.processShoot(shoot.id, params.userId).catch(console.error);
+    // Trigger background queue processing with Whatomate Engine
+    WhatomateCampaignEngine.executeCampaign(shoot.id, params.userId).catch(console.error);
 
     return shoot;
   },
