@@ -21,6 +21,7 @@ import {
   MessageSquare,
   Globe,
   CheckCheck,
+  Copy,
 } from 'lucide-react';
 import { WhatomateTemplate, WhatomateRecipient } from '../types';
 
@@ -42,6 +43,8 @@ export const WhatomateStudio: React.FC<WhatomateStudioProps> = ({ initialTemplat
   const [connectedPhoneNumber, setConnectedPhoneNumber] = useState<string | null>(null);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
   const [phoneInput, setPhoneInput] = useState('+91');
+  const [pairingCode, setPairingCode] = useState<string | null>(null);
+  const [isRequestingPairingCode, setIsRequestingPairingCode] = useState(false);
   const [otpStep, setOtpStep] = useState<'ENTER_PHONE' | 'ENTER_OTP'>('ENTER_PHONE');
   const [receivedOtp, setReceivedOtp] = useState<string | null>(null);
   const [otpInputValue, setOtpInputValue] = useState('');
@@ -156,6 +159,44 @@ export const WhatomateStudio: React.FC<WhatomateStudioProps> = ({ initialTemplat
       showToast('⚠️ Connection error: ' + err.message);
     } finally {
       setIsVerifyingOtp(false);
+    }
+  };
+
+  const handleRequestPairingCode = async () => {
+    const clean = phoneInput.replace(/[^\d+]/g, '');
+    if (!clean || clean.length < 9) {
+      showToast('⚠️ Please enter your WhatsApp phone number with country code (e.g. +91 9876543210).');
+      return;
+    }
+    setIsRequestingPairingCode(true);
+    showToast('🔑 Generating WhatsApp 8-Character Pairing Code...');
+    try {
+      const res = await fetch('/api/whatsapp-shoot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'REQUEST_PAIRING_CODE',
+          phoneNumber: clean,
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.pairingCode) {
+        setPairingCode(data.pairingCode);
+        showToast('🎉 8-Character Code generated! Enter it in WhatsApp on your phone.');
+      } else {
+        showToast('⚠️ ' + (data.error || 'Failed to generate code'));
+      }
+    } catch (err: any) {
+      showToast('⚠️ Error: ' + err.message);
+    } finally {
+      setIsRequestingPairingCode(false);
+    }
+  };
+
+  const handleCopyPairingCode = () => {
+    if (pairingCode) {
+      navigator.clipboard.writeText(pairingCode.replace('-', ''));
+      showToast('📋 Pairing Code copied to clipboard!');
     }
   };
 
@@ -511,101 +552,132 @@ export const WhatomateStudio: React.FC<WhatomateStudioProps> = ({ initialTemplat
                 </div>
               </div>
             ) : (
-              /* PHONE NUMBER / PAIRING CODE TAB */
-              <div className="max-w-md mx-auto space-y-4 pt-2">
-                {otpStep === 'ENTER_PHONE' ? (
-                  <div className="space-y-3 p-4 rounded-2xl bg-[#070b13] border border-[#182842] text-left">
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-white flex items-center gap-1.5">
-                        <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
-                        Enter WhatsApp Mobile Number:
-                      </label>
+              /* PHONE NUMBER / PAIRING CODE TAB (Official WhatsApp Link with Phone Number) */
+              <div className="max-w-xl mx-auto space-y-6 pt-2 text-left">
+                <div className="space-y-4 p-6 rounded-3xl bg-[#070b13] border border-[#182842]">
+                  <div className="flex items-center gap-3 border-b border-[#141e33] pb-4">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-950/80 border border-emerald-700/60 text-emerald-400 flex items-center justify-center flex-shrink-0 shadow">
+                      <Smartphone className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-white">Link with WhatsApp Phone Number</h3>
+                      <p className="text-xs text-gray-400">
+                        Generate an 8-character code and enter it on your phone to link without camera.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-200 block">
+                      Enter Your WhatsApp Mobile Number (With Country Code):
+                    </label>
+                    <div className="flex gap-2">
                       <input
                         type="tel"
                         value={phoneInput}
                         onChange={(e) => setPhoneInput(e.target.value)}
                         placeholder="+91 98765 43210"
-                        className="w-full bg-[#0b1220] border border-[#1a2e4a] focus:border-emerald-500 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-gray-500 focus:outline-none font-mono"
+                        className="flex-1 bg-[#0b1220] border border-[#1a2e4a] focus:border-emerald-500 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none font-mono font-bold"
                       />
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={handleRequestOtp}
-                      disabled={isSendingOtp}
-                      className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/25 transition-all cursor-pointer disabled:opacity-50"
-                    >
-                      {isSendingOtp ? (
-                        <>
-                          <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                          <span>Sending Verification Code...</span>
-                        </>
-                      ) : (
-                        <>
-                          <KeyRound className="w-4 h-4" />
-                          <span>Get WhatsApp Verification Code</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                ) : (
-                  <div className="space-y-3 p-5 rounded-2xl bg-[#070b13] border border-emerald-800/60 text-left">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                        <Lock className="w-3.5 h-3.5 text-emerald-400" />
-                        Enter 6-Digit WhatsApp Code:
-                      </span>
                       <button
                         type="button"
-                        onClick={() => setOtpStep('ENTER_PHONE')}
-                        className="text-[10px] text-gray-400 hover:text-white cursor-pointer"
+                        onClick={handleRequestPairingCode}
+                        disabled={isRequestingPairingCode}
+                        className="px-5 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/25 transition-all cursor-pointer disabled:opacity-50 active:scale-95"
                       >
-                        Change Number
+                        {isRequestingPairingCode ? (
+                          <>
+                            <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            <span>Generating...</span>
+                          </>
+                        ) : (
+                          <>
+                            <KeyRound className="w-4 h-4" />
+                            <span>Get 8-Digit Code</span>
+                          </>
+                        )}
                       </button>
                     </div>
-
-                    <p className="text-[11px] text-emerald-300/90">
-                      Code sent to <strong className="text-white font-mono">{phoneInput}</strong>
-                    </p>
-
-                    {receivedOtp && (
-                      <div className="p-2.5 bg-emerald-950/80 border border-emerald-700/60 rounded-xl flex items-center justify-between">
-                        <span className="text-[11px] text-emerald-200">Your Code:</span>
-                        <span className="font-mono text-base font-black text-emerald-300 tracking-widest bg-black/60 px-2.5 py-0.5 rounded border border-emerald-800">
-                          {receivedOtp}
-                        </span>
-                      </div>
-                    )}
-
-                    <input
-                      type="text"
-                      maxLength={6}
-                      value={otpInputValue}
-                      onChange={(e) => setOtpInputValue(e.target.value)}
-                      placeholder="Enter 6-digit code"
-                      className="w-full bg-[#0b1424] border border-emerald-500/70 focus:border-emerald-400 rounded-xl px-3 py-2.5 text-center text-lg font-mono font-bold tracking-widest text-white focus:outline-none"
-                    />
-
-                    <button
-                      type="button"
-                      onClick={handleVerifyOtpAndConnect}
-                      disabled={isVerifyingOtp}
-                      className="w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow transition-all cursor-pointer disabled:opacity-50"
-                    >
-                      {isVerifyingOtp ? (
-                        <>
-                          <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                          <span>Verifying & Opening Dashboard...</span>
-                        </>
-                      ) : (
-                        <>
-                          <CheckCheck className="w-4 h-4" />
-                          <span>Verify & Unlock Whatomate Dashboard ✓</span>
-                        </>
-                      )}
-                    </button>
                   </div>
-                )}
+
+                  {/* 8-CHARACTER PAIRING CODE DISPLAY BOXES */}
+                  {pairingCode && (
+                    <div className="space-y-4 pt-4 border-t border-[#141e33] animate-fadeIn">
+                      <div className="text-center space-y-1">
+                        <span className="text-xs font-extrabold text-emerald-400 uppercase tracking-wider">
+                          Your WhatsApp 8-Character Pairing Code:
+                        </span>
+                        <p className="text-[11px] text-gray-400">
+                          Enter these 8 characters on your phone screen in WhatsApp:
+                        </p>
+                      </div>
+
+                      {/* 8 Character Cards (Matching WhatsApp Mobile Screen) */}
+                      <div className="flex items-center justify-center gap-1.5 sm:gap-2.5 py-3">
+                        {pairingCode.split('-')[0]?.split('').map((char, idx) => (
+                          <div
+                            key={`p1-${idx}`}
+                            className="w-9 h-12 sm:w-11 sm:h-14 rounded-xl bg-[#0b1424] border-2 border-emerald-500/80 flex items-center justify-center text-xl sm:text-2xl font-mono font-black text-white shadow-lg shadow-emerald-500/20"
+                          >
+                            {char}
+                          </div>
+                        ))}
+                        <span className="text-2xl font-black text-emerald-500 px-1">-</span>
+                        {(pairingCode.split('-')[1] || pairingCode.slice(4))?.split('').map((char, idx) => (
+                          <div
+                            key={`p2-${idx}`}
+                            className="w-9 h-12 sm:w-11 sm:h-14 rounded-xl bg-[#0b1424] border-2 border-emerald-500/80 flex items-center justify-center text-xl sm:text-2xl font-mono font-black text-white shadow-lg shadow-emerald-500/20"
+                          >
+                            {char}
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="flex items-center justify-center gap-3">
+                        <button
+                          type="button"
+                          onClick={handleCopyPairingCode}
+                          className="px-4 py-2 rounded-xl bg-[#0b1424] hover:bg-[#112038] border border-emerald-700/60 text-emerald-300 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-sm"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                          <span>Copy Code ({pairingCode.replace('-', '')})</span>
+                        </button>
+                      </div>
+
+                      {/* Step by Step Instructions */}
+                      <div className="p-4 rounded-2xl bg-[#0b1424] border border-[#182842] space-y-2">
+                        <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wider">
+                          How to enter on phone:
+                        </h4>
+                        <ol className="text-xs text-gray-300 space-y-1.5 list-decimal list-inside leading-relaxed">
+                          <li>Open <strong>WhatsApp</strong> on your phone.</li>
+                          <li>Tap <strong>Settings (iOS)</strong> or <strong>Menu ⋮ (Android)</strong> &gt; <strong>Linked Devices</strong>.</li>
+                          <li>Tap <strong>Link a Device</strong> &gt; Tap <strong>Link with phone number</strong> at the bottom.</li>
+                          <li>Type the <strong>8-character code</strong> above into the boxes on your phone!</li>
+                        </ol>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleConfirmQR}
+                        disabled={isVerifyingOtp}
+                        className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/25 transition-all cursor-pointer disabled:opacity-50 active:scale-98"
+                      >
+                        {isVerifyingOtp ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            <span>Linking Device...</span>
+                          </>
+                        ) : (
+                          <>
+                            <CheckCheck className="w-4 h-4" />
+                            <span>I Have Entered This Code in WhatsApp — Open Dashboard ✓</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>

@@ -126,6 +126,38 @@ export class EvolutionApiService {
   }
 
   /**
+   * 2.1 Request Official WhatsApp 8-Character Pairing Code
+   */
+  async requestPairingCode(
+    instanceName: string,
+    phoneNumber: string
+  ): Promise<{ success: boolean; pairingCode?: string; error?: string }> {
+    try {
+      await this.createInstance(instanceName);
+      const cleanNumber = phoneNumber.replace(/[^\d]/g, '');
+      const url = `${this.baseUrl}/instance/connect/${encodeURIComponent(instanceName)}`;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 4000);
+
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        signal: controller.signal,
+        body: JSON.stringify({ number: cleanNumber }),
+      });
+      clearTimeout(timeout);
+
+      const data = await res.json().catch(() => ({}));
+      if (data.pairingCode || data.code) {
+        return { success: true, pairingCode: data.pairingCode || data.code };
+      }
+      return { success: false, error: data.response?.message || 'Could not fetch pairing code' };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  }
+
+  /**
    * 3. Get Real Connection State (open, connecting, close)
    */
   async getConnectionState(instanceName: string): Promise<EvolutionConnectionState> {

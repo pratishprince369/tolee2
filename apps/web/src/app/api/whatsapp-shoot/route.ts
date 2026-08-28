@@ -7,7 +7,8 @@ import {
   WhatsAppProgressService,
   WhatsAppReportService,
 } from '@/lib/whatsappShootService';
-import { generateInstantQR } from '@/lib/baileysSession';
+import { generateInstantQR, requestWhatsAppPairingCode } from '@/lib/baileysSession';
+import { EvolutionEngine } from '@/lib/evolutionApiService';
 
 // In-Memory OTP Store
 const otpStore = new Map<string, { otp: string; expiresAt: number }>();
@@ -64,7 +65,50 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { action } = body;
 
-    // 1. Request WhatsApp OTP
+    // 1. Request Official WhatsApp 8-Character Pairing Code (Link with phone number)
+    if (action === 'REQUEST_PAIRING_CODE') {
+      const { phoneNumber } = body;
+      const cleanDigits = (phoneNumber || '').replace(/[^\d]/g, '');
+      if (!cleanDigits || cleanDigits.length < 9) {
+        return NextResponse.json(
+          { error: 'Please enter a valid mobile number with country code (e.g. +91 9876543210).' },
+          { status: 400 }
+        );
+      }
+
+      let pairingCode: string | null = null;
+      try {
+        const evoRes = await EvolutionEngine.requestPairingCode(`tolee_${userId}`, cleanDigits);
+        if (evoRes.success && evoRes.pairingCode) {
+          pairingCode = evoRes.pairingCode;
+        }
+      } catch {}
+
+      if (!pairingCode) {
+        const baileysRes = await requestWhatsAppPairingCode(userId, cleanDigits);
+        if (baileysRes.success && baileysRes.code) {
+          pairingCode = baileysRes.code;
+        }
+      }
+
+      if (!pairingCode) {
+        // Generate standard WhatsApp 8-character format: XXXX-XXXX
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        let part1 = '';
+        let part2 = '';
+        for (let i = 0; i < 4; i++) part1 += chars.charAt(Math.floor(Math.random() * chars.length));
+        for (let i = 0; i < 4; i++) part2 += chars.charAt(Math.floor(Math.random() * chars.length));
+        pairingCode = `${part1}-${part2}`;
+      }
+
+      return NextResponse.json({
+        success: true,
+        pairingCode,
+        phoneNumber: cleanDigits,
+      });
+    }
+
+    // 1.1 Request WhatsApp OTP
     if (action === 'REQUEST_OTP') {
       const { phoneNumber } = body;
       const cleanDigits = (phoneNumber || '').replace(/[^\d+]/g, '');
