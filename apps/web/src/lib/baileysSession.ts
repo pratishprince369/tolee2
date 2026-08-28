@@ -35,9 +35,9 @@ export async function generateInstantQR(seedText?: string): Promise<string> {
   const seed = seedText || `tolee_wa_${Date.now()}_${Math.random().toString(36).substring(7)}`;
   return await QRCode.toDataURL(seed, {
     margin: 2,
-    scale: 6,
+    scale: 8,
     color: {
-      dark: '#005c4b',
+      dark: '#000000',
       light: '#ffffff',
     },
   });

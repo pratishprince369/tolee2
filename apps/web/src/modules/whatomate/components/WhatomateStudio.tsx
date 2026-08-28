@@ -442,23 +442,22 @@ export const WhatomateStudio: React.FC<WhatomateStudioProps> = ({ initialTemplat
             {connectMode === 'QR' ? (
               /* QR CODE TAB */
               <div className="flex flex-col md:flex-row gap-6 items-center pt-2">
-                {/* QR Container */}
-                <div className="flex flex-col items-center justify-center p-5 rounded-2xl bg-[#070b13] border border-emerald-900/60 relative w-full md:w-auto flex-shrink-0">
-                  <div className="p-3 bg-white rounded-2xl shadow-2xl flex items-center justify-center w-52 h-52 overflow-hidden relative">
+                {/* QR Container (Real Clean WhatsApp Web Scanner Style) */}
+                <div className="flex flex-col items-center justify-center p-5 rounded-2xl bg-[#070b13] border border-[#1a2e4a] relative w-full md:w-auto flex-shrink-0 shadow-xl">
+                  <div className="p-4 bg-white rounded-2xl shadow-2xl flex items-center justify-center w-56 h-56 overflow-hidden relative border border-gray-200">
                     {qrCodeDataUrl ? (
-                      <img src={qrCodeDataUrl} alt="WhatsApp QR Code" className="w-48 h-48 object-contain" />
+                      <img src={qrCodeDataUrl} alt="WhatsApp QR Code" className="w-52 h-52 object-contain" />
                     ) : (
-                      <div className="w-48 h-48 flex flex-col items-center justify-center text-gray-400">
+                      <div className="w-52 h-52 flex flex-col items-center justify-center text-gray-500">
                         <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mb-2"></div>
-                        <span className="text-[10px]">Loading QR...</span>
+                        <span className="text-[11px] font-medium">Generating QR...</span>
                       </div>
                     )}
-                    <div className="absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-emerald-400 to-transparent animate-bounce opacity-90 pointer-events-none" />
                   </div>
                   <button
                     type="button"
                     onClick={handleRefreshQR}
-                    className="mt-3 text-[11px] font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1.5 cursor-pointer bg-emerald-950/60 px-3 py-1 rounded-lg border border-emerald-800/60 transition-all active:scale-95"
+                    className="mt-3.5 text-xs font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1.5 cursor-pointer bg-[#0b1424] hover:bg-[#101e36] px-3.5 py-1.5 rounded-xl border border-emerald-800/60 transition-all active:scale-95"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
                     <span>Refresh QR Code</span>
