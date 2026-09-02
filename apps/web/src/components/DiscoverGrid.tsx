@@ -282,6 +282,138 @@ export function DiscoverGrid({ initialTolees, tolees: propTolees, isAuthenticate
         )}
       </main>
 
+      {/* Branded Search & Sitelinks Footer Section */}
+      <footer className="mt-16 border-t border-gray-200 dark:border-zinc-800/80 pt-12 pb-8 max-w-5xl mx-auto px-4 text-left">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-8 mb-10">
+          <div>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-[#0a7c85] mb-3">
+              Explore Tolee
+            </h4>
+            <ul className="space-y-2 text-xs text-gray-600 dark:text-gray-400 font-medium">
+              <li>
+                <Link href="/reels" className="hover:text-[#0a7c85] transition-colors">
+                  Tolee Reels (Short Videos)
+                </Link>
+              </li>
+              <li>
+                <Link href="/news" className="hover:text-[#0a7c85] transition-colors">
+                  Tolee News (Local Updates)
+                </Link>
+              </li>
+              <li>
+                <Link href="/marketplace" className="hover:text-[#0a7c85] transition-colors">
+                  Tolee Marketplace (0% Fee)
+                </Link>
+              </li>
+              <li>
+                <Link href="/discover" className="hover:text-[#0a7c85] transition-colors">
+                  Discover Groups
+                </Link>
+              </li>
+              <li>
+                <Link href="/screen" className="hover:text-[#0a7c85] transition-colors">
+                  Tolee Screen (Video Shows)
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-[#0a7c85] mb-3">
+              Local & Categories
+            </h4>
+            <ul className="space-y-2 text-xs text-gray-600 dark:text-gray-400 font-medium">
+              <li>
+                <Link href="/map" className="hover:text-[#0a7c85] transition-colors">
+                  Tolee Live Map
+                </Link>
+              </li>
+              <li>
+                <Link href="/location/mumbai" className="hover:text-[#0a7c85] transition-colors">
+                  Mumbai Communities
+                </Link>
+              </li>
+              <li>
+                <Link href="/location/delhi" className="hover:text-[#0a7c85] transition-colors">
+                  Delhi Communities
+                </Link>
+              </li>
+              <li>
+                <Link href="/category/business" className="hover:text-[#0a7c85] transition-colors">
+                  Business & Startups
+                </Link>
+              </li>
+              <li>
+                <Link href="/category/technology" className="hover:text-[#0a7c85] transition-colors">
+                  Technology & AI
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-[#0a7c85] mb-3">
+              Account & Creators
+            </h4>
+            <ul className="space-y-2 text-xs text-gray-600 dark:text-gray-400 font-medium">
+              <li>
+                <Link href="/login" className="hover:text-[#0a7c85] transition-colors">
+                  Log into Tolee
+                </Link>
+              </li>
+              <li>
+                <Link href="/signup" className="hover:text-[#0a7c85] transition-colors">
+                  Create New Account
+                </Link>
+              </li>
+              <li>
+                <Link href="/creator-program" className="hover:text-[#0a7c85] transition-colors">
+                  Tolee Creator Program
+                </Link>
+              </li>
+              <li>
+                <Link href="/world" className="hover:text-[#0a7c85] transition-colors">
+                  Tolee World & Tools
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-[#0a7c85] mb-3">
+              Company
+            </h4>
+            <ul className="space-y-2 text-xs text-gray-600 dark:text-gray-400 font-medium">
+              <li>
+                <Link href="/about" className="hover:text-[#0a7c85] transition-colors">
+                  About Tolee India
+                </Link>
+              </li>
+              <li>
+                <Link href="/contact" className="hover:text-[#0a7c85] transition-colors">
+                  Contact & Support
+                </Link>
+              </li>
+              <li>
+                <Link href="/privacy" className="hover:text-[#0a7c85] transition-colors">
+                  Privacy Policy
+                </Link>
+              </li>
+              <li>
+                <Link href="/terms" className="hover:text-[#0a7c85] transition-colors">
+                  Terms of Service
+                </Link>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <div className="border-t border-gray-100 dark:border-zinc-800 pt-6 flex flex-col sm:flex-row items-center justify-between text-xs text-gray-500 gap-2">
+          <p>© {new Date().getFullYear()} Tolee Social Network. All rights reserved.</p>
+          <p>Tolee is India&apos;s leading social community platform connecting people, reels, and local marketplace.</p>
+        </div>
+      </footer>
+
       <CreditTermsModal
         isOpen={isCreditTermsModalOpen}
         onClose={() => setIsCreditTermsModalOpen(false)}

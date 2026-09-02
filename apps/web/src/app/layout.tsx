@@ -111,11 +111,23 @@ export default async function RootLayout({
     "@context": "https://schema.org",
     "@type": "Organization",
     "name": "Tolee",
-    "alternateName": ["Tolee Social Network", "Tolee App", "Tolee India", "Tolee Communities"],
+    "alternateName": [
+      "Tolee App",
+      "Tolee.in",
+      "Tolee Social Network",
+      "Tolee Social Media",
+      "Tolee India",
+      "Tolee Communities"
+    ],
     "url": "https://tolee.in",
     "logo": "https://tolee.in/logo.png",
+    "description": "Tolee is India's leading community social network. Connect with local Tolee groups, watch vertical video reels, discover breaking local news, shop on Tolee Marketplace, stream videos, and explore AI tools.",
+    "foundingDate": "2024",
     "sameAs": [
-      "https://play.google.com/store/apps/details?id=in.tolee.app"
+      "https://play.google.com/store/apps/details?id=in.tolee.app",
+      "https://www.instagram.com/tolee.in",
+      "https://twitter.com/tolee_in",
+      "https://www.linkedin.com/company/tolee"
     ]
   };
 
@@ -123,6 +135,7 @@ export default async function RootLayout({
     "@context": "https://schema.org",
     "@type": "WebSite",
     "name": "Tolee",
+    "alternateName": "Tolee Social Network",
     "url": "https://tolee.in",
     "potentialAction": {
       "@type": "SearchAction",
@@ -169,34 +182,48 @@ export default async function RootLayout({
       {
         "@type": "SiteNavigationElement",
         "position": 5,
-        "name": "Tolee Screen",
-        "description": "Stream high-quality long form videos, live stages, and masterclasses on Tolee Screen.",
-        "url": "https://tolee.in/screen"
-      },
-      {
-        "@type": "SiteNavigationElement",
-        "position": 6,
         "name": "Tolee Discover Groups",
         "description": "Find and join verified local community groups and private interest Tolees.",
         "url": "https://tolee.in/discover"
       },
       {
         "@type": "SiteNavigationElement",
+        "position": 6,
+        "name": "Log into Tolee",
+        "description": "Sign in to your Tolee account to connect with communities and manage your profile.",
+        "url": "https://tolee.in/login"
+      },
+      {
+        "@type": "SiteNavigationElement",
         "position": 7,
+        "name": "Create New Account",
+        "description": "Sign up for a free Tolee account to join groups, share reels, and connect with creators.",
+        "url": "https://tolee.in/signup"
+      },
+      {
+        "@type": "SiteNavigationElement",
+        "position": 8,
+        "name": "Tolee Screen",
+        "description": "Stream high-quality long form videos, live stages, and masterclasses on Tolee Screen.",
+        "url": "https://tolee.in/screen"
+      },
+      {
+        "@type": "SiteNavigationElement",
+        "position": 9,
         "name": "Tolee World",
         "description": "Explore digital books, AI micro-websites, online stores, blogs, and tools on Tolee World.",
         "url": "https://tolee.in/world"
       },
       {
         "@type": "SiteNavigationElement",
-        "position": 8,
-        "name": "Tolee Radar",
-        "description": "Discover real-time neighborhood local alerts, food spots and deals around your area.",
-        "url": "https://tolee.in/radar"
+        "position": 10,
+        "name": "Tolee Live Map",
+        "description": "Explore hyper-local neighborhood communities and city hubs on Tolee Map.",
+        "url": "https://tolee.in/map"
       },
       {
         "@type": "SiteNavigationElement",
-        "position": 9,
+        "position": 11,
         "name": "Tolee Creator Program",
         "description": "Monetize your content, build subscription groups, and earn with Tolee Creator Program.",
         "url": "https://tolee.in/creator-program"
