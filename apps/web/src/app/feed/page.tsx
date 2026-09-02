@@ -10,8 +10,19 @@ import { redirect } from 'next/navigation';
 import { publishDailyNewsBatch } from '@/lib/newsAutoPublisher';
 import { publishYouTubeVideosBatch } from '@/lib/youtubeAutoPublisher';
 
+import type { Metadata } from 'next';
+
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+
+export const metadata: Metadata = {
+  title: 'Feed | Tolee',
+  robots: {
+    index: false,
+    follow: false,
+    nocache: true,
+  },
+};
 
 export default async function GlobalFeedPage() {
   const session = await getServerSession(authOptions);

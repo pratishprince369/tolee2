@@ -217,19 +217,73 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.8,
       };
     });
-  } catch (error) {
-    console.error('[Sitemap] Error fetching projects:', error);
-  }
+    let categoryUrls: MetadataRoute.Sitemap = [
+      'business',
+      'technology',
+      'real-estate',
+      'entertainment',
+      'music',
+      'sports',
+      'health',
+      'lifestyle',
+      'spirituality',
+      'education',
+    ].map((cat) => ({
+      url: `${baseUrl}/category/${cat}`,
+      lastModified: new Date(),
+      changeFrequency: 'daily' as const,
+      priority: 0.85,
+    }));
 
-  return [
-    ...staticUrls,
-    ...toleeUrls,
-    ...newsUrls,
-    ...listingUrls,
-    ...reelUrls,
-    ...postUrls,
-    ...screenUrls,
-    ...userUrls,
-    ...projectUrls,
-  ];
+    let locationUrls: MetadataRoute.Sitemap = [
+      'mumbai',
+      'delhi',
+      'bangalore',
+      'pune',
+      'hyderabad',
+      'kolkata',
+      'chennai',
+      'ahmedabad',
+      'jaipur',
+      'chandigarh',
+      'dubai',
+    ].map((loc) => ({
+      url: `${baseUrl}/location/${loc}`,
+      lastModified: new Date(),
+      changeFrequency: 'daily' as const,
+      priority: 0.85,
+    }));
+
+    let topicUrls: MetadataRoute.Sitemap = [
+      'mumbai-real-estate',
+      'tech-startups-india',
+      'delhi-food-guide',
+      'bollywood-updates',
+      'cricket-ipl',
+      'health-fitness-tips',
+    ].map((top) => ({
+      url: `${baseUrl}/topic/${top}`,
+      lastModified: new Date(),
+      changeFrequency: 'daily' as const,
+      priority: 0.8,
+    }));
+
+    return [
+      ...staticUrls,
+      ...categoryUrls,
+      ...locationUrls,
+      ...topicUrls,
+      ...toleeUrls,
+      ...newsUrls,
+      ...listingUrls,
+      ...reelUrls,
+      ...postUrls,
+      ...screenUrls,
+      ...userUrls,
+      ...projectUrls,
+    ];
+  } catch (error) {
+    console.error('[Sitemap] Critical error:', error);
+    return staticUrls;
+  }
 }
