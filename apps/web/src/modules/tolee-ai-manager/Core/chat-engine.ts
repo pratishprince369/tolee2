@@ -258,13 +258,55 @@ export async function generateAIImageWithFallback(prompt: string, modelType?: st
 
   const modelBlueprint = (modelType && MODEL_BLUEPRINTS[modelType]) || MODEL_BLUEPRINTS.flux_realism;
 
-  const enhancedPrompt = `${cleanPrompt}, ${modelBlueprint}, masterpiece, highly detailed, photorealistic 8k HD resolution, professional studio lighting, cinematic composition, award winning visual quality`;
+  // Sanitize prompt from conversational noise
+  const sanitizedPrompt = cleanPrompt
+    .replace(/^(🤖\s*)?\*?\*?Tolee[^*]*\*\*?:?/i, '')
+    .replace(/Main aapke request par poora support.*/i, '')
+    .trim() || 'Cinematic high quality 8k wallpaper, masterpiece';
+
+  const enhancedPrompt = `${sanitizedPrompt}, ${modelBlueprint}, masterpiece, highly detailed, photorealistic 8k HD resolution, professional studio lighting, cinematic composition, award winning visual quality`;
   const encoded = encodeURIComponent(enhancedPrompt);
+
+  // 1. ChatGPT Tier 1: OpenAI DALL-E 3 (Exact ChatGPT Creative Engine)
+  if (process.env.OPENAI_API_KEY) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
+
+      const res = await fetch("https://api.openai.com/v1/images/generations", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
+        },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: "dall-e-3",
+          prompt: sanitizedPrompt.slice(0, 950),
+          n: 1,
+          size: "1024x1024",
+          quality: "standard",
+          style: "vivid"
+        })
+      });
+
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        const data = await res.json();
+        const dallEUrl = data.data?.[0]?.url;
+        if (dallEUrl) {
+          const cdnUrl = await uploadToCloudinarySafe(dallEUrl);
+          return cdnUrl;
+        }
+      }
+    } catch (err: any) {}
+  }
 
   const sdKey = process.env.NVIDIA_SD35_KEY || "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";
   const fluxKey = process.env.NVIDIA_FLUX_SCHNELL_KEY || "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";
 
-  // 1. Try NVIDIA NIM Stability AI SD 3.5 Large & Black Forest Labs FLUX.1 Schnell
+  // 2. NVIDIA NIM Stability AI SD 3.5 Large & Black Forest Labs FLUX.1 Schnell
   const providers = [
     {
       key: sdKey,
@@ -317,9 +359,9 @@ export async function generateAIImageWithFallback(prompt: string, modelType?: st
     } catch (err: any) {}
   }
 
-  // 2. High-Fidelity 4K FLUX Realism Direct Cloudinary Ingestion
+  // 3. High-Fidelity 4K FLUX Realism Direct Cloudinary Ingestion
   const seed = Math.floor(Math.random() * 99999);
-  const rawUrl = `https://image.pollinations.ai/prompt/${encoded}?model=flux-realism&enhance=true&width=1080&height=1080&seed=${seed}&nologo=true`;
+  const rawUrl = `https://image.pollinations.ai/prompt/${encoded}?model=flux&enhance=true&width=1080&height=1080&seed=${seed}&nologo=true`;
   
   const cdnUrl = await uploadToCloudinarySafe(rawUrl);
   return cdnUrl;

@@ -131,7 +131,16 @@ async function fetchLiveNewsForToleeAI(categoryQuery?: string): Promise<{ title:
 async function cleanAndTranslateImagePrompt(rawCommand: string): Promise<string> {
   const lower = rawCommand.toLowerCase();
   
-  // 1. Direct Term Mapping for Indian Festivals, National Days & Common Typos
+  // 1. Direct Term Mapping for Indian Festivals, Movie Sets, Business & Popular Themes
+  if (lower.includes('एक्शन सेट') || lower.includes('action set') || lower.includes('action movie') || lower.includes('स्टंट') || lower.includes('stunt')) {
+    return 'Cinematic high-octane Hollywood blockbuster movie action film set, explosive stunt scene with pyrotechnics, fire embers and smoke, film cameras on large crane rigs, film director and crew behind the scenes, dramatic low angle lighting, 8k resolution, photorealistic masterpiece';
+  }
+  if (lower.includes('फिल्म सेट') || lower.includes('movie set') || lower.includes('shooting set') || lower.includes('शूटिंग सेट') || lower.includes('cinema set')) {
+    return 'Behind the scenes film production movie set with professional studio lighting rigs, high-end 8k cinema cameras, stage monitors, boom microphones, film crew, cinematic atmosphere';
+  }
+  if (lower.includes('कार रेस') || lower.includes('car race') || lower.includes('racing') || lower.includes('सुपरकार') || lower.includes('supercar')) {
+    return 'High-speed sports supercar drift racing on neon-lit city highway at midnight, glowing brake calipers, smoke from tires, dramatic motion blur, 8k cinematic photography';
+  }
   if (lower.includes('15') && (lower.includes('aug') || lower.includes('अगस्त') || lower.includes('augest') || lower.includes('august') || lower.includes('independe') || lower.includes('azadi') || lower.includes('aazadi'))) {
     return '15th August Indian Independence Day patriotic celebration commercial banner poster design, vibrant tricolor saffron white green ribbons, Indian national flag fluttering majestically, 3D typography Happy Independence Day, Ashoka Chakra emblem, celebratory patriotic background, 8k resolution graphic design';
   }
@@ -172,23 +181,32 @@ async function cleanAndTranslateImagePrompt(rawCommand: string): Promise<string>
   // 2. High-Speed LLM Creative Prompt Translation & Expansion
   try {
     const translationPrompt = `You are a World-Class Creative Art Director & Prompt Engineer.
-Convert this user request (which may be in Hindi, Hinglish, Marathi, or English) into an ultra-detailed, professional 8K commercial graphic banner / advertising poster prompt for FLUX.1/Stable Diffusion:
+Convert this user request (which may be in Hindi, Hinglish, Marathi, or English) into an ultra-detailed, professional 8K commercial graphic banner / advertising poster prompt for FLUX.1 / DALL-E 3 / Stable Diffusion:
 User request: "${rawCommand}"
 
-Requirements:
-- Identify the exact core subject, festival, business, or product.
-- Describe the visual composition, color scheme, background, lighting, and graphic design style.
-- Output ONLY the final visual prompt in English without conversational commentary or quotes.`;
+CRITICAL RULES:
+- Identify the exact core subject, theme, or concept.
+- Describe visual composition, scenery, lighting, camera angle, and artistic medium in English.
+- Output ONLY the final visual prompt description in English.
+- DO NOT include conversational sentences, greetings, emojis, or markdown intro like "Here is the prompt:".`;
 
     const expanded = await callNvidiaLLM([{ role: 'user', content: translationPrompt }]);
-    if (expanded && expanded.length > 15) {
+    if (
+      expanded &&
+      expanded.length > 10 &&
+      !expanded.includes('Tolee') &&
+      !expanded.includes('🤖') &&
+      !expanded.includes('ready hoon') &&
+      !expanded.includes('Main aapke') &&
+      !expanded.includes('Kshama')
+    ) {
       return `${expanded.trim().replace(/^["']|["']$/g, '')}, professional graphic design, commercial poster banner, 8k resolution, award-winning lighting, crisp detail`;
     }
   } catch (err) {}
 
   // 3. Fallback clean up
   const cleaned = rawCommand
-    .replace(/generate|image|photo|pic|banao|bana do|creative|poster|banner|इमेज|जनरेट|फोटो|बनाओ|करके|दो|मुझे|कि|मैं|तो|का|की|के|ko|pe|par|ek|hai|please|बैनर|बेनर|बना|बनाएं|बनाये|बनाकर/gi, '')
+    .replace(/generate|image|photo|pic|banao|bana do|bana de|bana ke do|creative|poster|banner|इमेज|जनरेट|फोटो|बनाओ|बना कर दो|बना के दो|करके|दो|मुझे|कि|मैं|तो|का|की|के|ko|pe|par|ek|hai|please|बैनर|बेनर|बना|बनाएं|बनाये|बनाकर/gi, '')
     .replace(/[^\w\s\u0900-\u097F]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();

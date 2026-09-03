@@ -83,13 +83,23 @@ export const OPENWORK_SKILL_REGISTRY: Record<string, OpenWorkSkill> = {
         enhancedPrompt = '26th January Indian Republic Day celebration creative banner, India Gate backdrop, majestic tricolor flag, patriotic typography, 8k commercial visual design';
       } else if (lower.includes('diwali') || lower.includes('deepawali') || lower.includes('दिवाली')) {
         enhancedPrompt = 'Happy Diwali grand festive celebration poster banner, glowing golden diyas, fireworks, traditional rangoli, luxury royal festive background, 8k resolution';
+      } else if (lower.includes('एक्शन सेट') || lower.includes('action set') || lower.includes('action movie') || lower.includes('स्टंट') || lower.includes('stunt')) {
+        enhancedPrompt = 'Cinematic high-octane Hollywood blockbuster movie action film set, explosive stunt scene with pyrotechnics, fire embers and smoke, film cameras on large crane rigs, film director and crew behind the scenes, dramatic low angle lighting, 8k resolution';
       } else {
         try {
           const trans = await callNvidiaLLM([{ 
             role: 'user', 
-            content: `You are an Award-Winning Creative Art Director. Convert this user request into an ultra-detailed, professional 8K graphic banner prompt using the "${preset.name}" design aesthetic:\nRequest: "${rawPrompt}"\nOutput ONLY the final prompt in English.`
+            content: `You are an Award-Winning Creative Art Director. Convert this user request into an ultra-detailed, professional 8K graphic banner prompt using the "${preset.name}" design aesthetic:\nRequest: "${rawPrompt}"\nOutput ONLY the final prompt in English without conversational text or greetings.`
           }]);
-          if (trans && trans.length > 15) {
+          if (
+            trans &&
+            trans.length > 10 &&
+            !trans.includes('Tolee') &&
+            !trans.includes('🤖') &&
+            !trans.includes('ready hoon') &&
+            !trans.includes('Main aapke') &&
+            !trans.includes('Kshama')
+          ) {
             enhancedPrompt = `${trans.trim().replace(/^["']|["']$/g, '')}, ${preset.visualBlueprint}`;
           }
         } catch (e) {}
