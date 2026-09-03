@@ -165,45 +165,19 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
           : "border-zinc-100 dark:border-zinc-900 shadow-none"
       )}>
       
-      {/* Left: Compact Logo */}
+      {/* Left: Full Brand Logo (Mobile & Desktop) */}
       <div className="flex items-center flex-shrink-0">
-        <Link href={session?.user ? "/feed" : "/"} className="flex items-center gap-2 sm:gap-3 hover:opacity-90 active:scale-95 transition-all duration-200">
-          {branding.mobileLogoUrl && branding.headerLogoUrl ? (
-            <>
-              {/* Mobile compact logo */}
-              <img
-                src={branding.mobileLogoUrl}
-                alt={branding.siteName}
-                className="h-8 w-auto max-w-[80px] object-contain sm:hidden"
-              />
-              {/* Desktop header logo */}
-              <img
-                src={branding.headerLogoUrl}
-                alt={branding.siteName}
-                className="h-9 max-w-[140px] object-contain hidden sm:block"
-              />
-            </>
-          ) : branding.headerLogoUrl ? (
+        <Link href={session?.user ? "/feed" : "/"} className="flex items-center gap-2 hover:opacity-90 active:scale-95 transition-all duration-200">
+          {branding.headerLogoUrl ? (
             <img
               src={branding.headerLogoUrl}
-              alt={branding.siteName}
-              className="h-8 sm:h-9 max-w-[80px] xs:max-w-[100px] sm:max-w-[140px] object-contain"
-            />
-          ) : branding.mobileLogoUrl ? (
-            <img
-              src={branding.mobileLogoUrl}
-              alt={branding.siteName}
-              className="h-8 sm:h-9 max-w-[80px] xs:max-w-[100px] sm:max-w-[140px] object-contain"
+              alt={branding.siteName || 'tolee'}
+              className="h-7 sm:h-9 w-auto max-w-[100px] xs:max-w-[120px] sm:max-w-[150px] object-contain"
             />
           ) : (
-            <>
-              <div className="w-8 h-8 sm:w-9 sm:h-9 bg-primary text-primary-foreground rounded-xl flex items-center justify-center font-bold text-base sm:text-lg shadow-sm flex-shrink-0">
-                {branding.siteName?.[0]?.toLowerCase() || 't'}
-              </div>
-              <span className="text-base sm:text-xl font-extrabold tracking-tight text-primary dark:text-white hidden sm:inline-block">
-                {branding.siteName || 'tolee'}
-              </span>
-            </>
+            <span className="text-xl sm:text-2xl font-black tracking-tight text-primary dark:text-[#0E9F9A] select-none lowercase">
+              {branding.siteName || 'tolee'}
+            </span>
           )}
         </Link>
       </div>
