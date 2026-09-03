@@ -165,14 +165,14 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
           : "border-zinc-100 dark:border-zinc-900 shadow-none"
       )}>
       
-      {/* Left: Full Brand Logo (Mobile & Desktop) */}
+      {/* Left: Full Brand Logo (Mobile & Desktop with Transparent Blending) */}
       <div className="flex items-center flex-shrink-0">
         <Link href={session?.user ? "/feed" : "/"} className="flex items-center gap-2 hover:opacity-90 active:scale-95 transition-all duration-200">
           {branding.headerLogoUrl ? (
             <img
               src={branding.headerLogoUrl}
               alt={branding.siteName || 'tolee'}
-              className="h-7 sm:h-9 w-auto max-w-[100px] xs:max-w-[120px] sm:max-w-[150px] object-contain"
+              className="h-7 sm:h-9 w-auto max-w-[100px] xs:max-w-[120px] sm:max-w-[150px] object-contain mix-blend-multiply dark:mix-blend-screen bg-transparent"
             />
           ) : (
             <span className="text-xl sm:text-2xl font-black tracking-tight text-primary dark:text-[#0E9F9A] select-none lowercase">
