@@ -952,3 +952,60 @@ export async function getSuperAdminSearchAnalytics(): Promise<{
     return { success: false, totalQueries: 0, averageCTR: 0, trendingKeyword: 'N/A', topKeywords: [], clickLogs: [] };
   }
 }
+
+// 10. EXPLORE FEED (Mixed Photos, Videos, and Reels for Discovery Grid)
+export async function getExploreFeed(page: number = 1, limit: number = 24) {
+  try {
+    const skip = (page - 1) * limit;
+
+    const posts = await prisma.post.findMany({
+      where: {
+        status: 'published',
+        visibility: 'public',
+        isArchived: false,
+        mediaUrls: { not: null },
+      },
+      include: {
+        author: {
+          select: { id: true, name: true, username: true, avatar: true },
+        },
+        _count: {
+          select: { likes: true, comments: true, views: true },
+        },
+      },
+      orderBy: [{ createdAt: 'desc' }],
+      take: limit,
+      skip,
+    });
+
+    const items = posts.map((p) => {
+      const isReel = p.postType === 'reel' || p.mediaTypes === 'video';
+      const firstMedia = p.mediaUrls ? p.mediaUrls.split(/,(?=https?:\/\/)/)[0] : '';
+      return {
+        id: p.id,
+        type: isReel ? ('reel' as const) : ('post' as const),
+        mediaUrl: firstMedia,
+        mediaType: p.mediaTypes || (isReel ? 'video' : 'image'),
+        caption: p.caption || '',
+        likesCount: p._count.likes || 0,
+        commentsCount: p._count.comments || 0,
+        viewsCount: p._count.views || 0,
+        author: {
+          id: p.author.id,
+          name: p.author.name || 'User',
+          username: p.author.username || '',
+          avatar: p.author.avatar || '/default-user-avatar.svg',
+        },
+      };
+    }).filter(item => Boolean(item.mediaUrl));
+
+    return {
+      success: true,
+      items,
+    };
+  } catch (error) {
+    console.error('Error fetching explore feed:', error);
+    return { success: false, items: [] };
+  }
+}
+

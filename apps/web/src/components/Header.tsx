@@ -182,64 +182,54 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
         </Link>
       </div>
 
-      {/* Middle: Embedded Search Bar (Fully Responsive & Dynamic) */}
+      {/* Middle: Embedded Search Bar (Desktop / Tablet only, hidden on mobile) */}
       {pathname !== '/discover' && pathname !== '/' && (
-        <div className="flex-1 min-w-[90px] sm:min-w-[180px] max-w-[160px] sm:max-w-sm md:max-w-md mx-1 sm:mx-2 flex items-center gap-1.5">
+        <div className="hidden md:flex flex-1 min-w-[180px] max-w-sm md:max-w-md mx-2 lg:mx-4 items-center gap-1.5">
           <div className="flex-1">
             <SearchInput />
           </div>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={() => router.push('/radar')}
-            className={cn(
-              "rounded-xl md:hidden flex items-center justify-center h-8 w-8 xs:h-9 xs:w-9 flex-shrink-0 transition-all active:scale-95 border border-zinc-200 dark:border-zinc-800",
-              pathname.startsWith('/radar') 
-                ? 'text-[#0E9F9A] bg-[#0E9F9A]/5 border-[#0E9F9A]/20' 
-                : 'text-gray-500 dark:text-zinc-400 hover:bg-gray-50 dark:hover:bg-zinc-900/50'
-            )}
-            title="Tolee Radar"
-          >
-            <Radio className="w-4 h-4 xs:w-[18px] xs:h-[18px]" />
-          </Button>
         </div>
       )}
 
       {/* Right: User Profile & Actions */}
-      <div className="flex items-center justify-end gap-1 sm:gap-2 md:gap-3 flex-shrink-0">
+      <div className="flex items-center justify-end gap-1 xs:gap-1.5 sm:gap-2 md:gap-3 flex-shrink-0">
         
         {status === 'loading' ? (
           <div className="w-8 h-8 xs:w-9 xs:h-9 sm:w-10 sm:h-10 rounded-full bg-gray-200 dark:bg-gray-800 animate-pulse" />
         ) : session?.user ? (
           <>
-            {/* Mobile Marketplace Shortcut */}
+            {/* Mobile Dedicated Search Icon Button */}
             <Button 
               variant="ghost" 
               size="icon" 
-              onClick={() => router.push('/marketplace')}
-              className={`rounded-full md:hidden flex items-center justify-center h-8 w-8 xs:h-9 xs:w-9 sm:h-10 sm:w-10 flex-shrink-0 transition-all active:scale-95 ${
-                pathname.startsWith('/marketplace') 
-                  ? 'text-primary bg-primary/5 border border-primary/10' 
-                  : 'text-gray-500 dark:text-zinc-400 hover:bg-gray-50 dark:hover:bg-zinc-900/50'
-              }`}
-              title="Marketplace"
+              onClick={() => router.push('/search')}
+              className={cn(
+                "rounded-full md:hidden flex items-center justify-center h-8.5 w-8.5 xs:h-9 xs:w-9 flex-shrink-0 transition-all active:scale-95",
+                pathname.startsWith('/search') 
+                  ? 'text-primary bg-primary/10 border border-primary/20' 
+                  : 'text-gray-700 dark:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-800'
+              )}
+              aria-label="Search"
+              title="Search"
             >
-              <Store className="w-4 h-4 xs:w-5 xs:h-5 sm:w-5 sm:h-5" />
+              <Search className="w-4.5 h-4.5 xs:w-5 xs:h-5 text-gray-700 dark:text-zinc-200" />
             </Button>
 
-            {/* Mobile Tolee World Shortcut (Responsive display based on screen width) */}
+            {/* Mobile Radar Shortcut */}
             <Button 
               variant="ghost" 
               size="icon" 
-              onClick={() => router.push('/world')}
-              className={`rounded-full md:hidden flex items-center justify-center h-8 w-8 xs:h-9 xs:w-9 sm:h-10 sm:w-10 flex-shrink-0 transition-all active:scale-95 hidden xs:flex ${
-                pathname.startsWith('/world') 
-                  ? 'text-primary bg-primary/5 border border-primary/10' 
-                  : 'text-gray-500 dark:text-zinc-400 hover:bg-gray-50 dark:hover:bg-zinc-900/50'
-              }`}
-              title="Tolee World"
+              onClick={() => router.push('/radar')}
+              className={cn(
+                "rounded-full md:hidden flex items-center justify-center h-8.5 w-8.5 xs:h-9 xs:w-9 flex-shrink-0 transition-all active:scale-95",
+                pathname.startsWith('/radar') 
+                  ? 'text-primary bg-primary/10 border border-primary/20' 
+                  : 'text-gray-700 dark:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-800'
+              )}
+              aria-label="Tolee Radar"
+              title="Tolee Radar"
             >
-              <Globe className="w-4 h-4 xs:w-5 xs:h-5 sm:w-5 sm:h-5" />
+              <Radio className="w-4.5 h-4.5 xs:w-5 xs:h-5" />
             </Button>
 
             {/* Mobile AI Manager Shortcut */}
@@ -247,40 +237,19 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
               variant="ghost" 
               size="icon" 
               onClick={() => router.push('/ai-manager')}
-              className={`rounded-full md:hidden flex items-center justify-center h-8 w-8 xs:h-9 xs:w-9 sm:h-10 sm:w-10 flex-shrink-0 transition-all active:scale-95 relative ${
+              className={cn(
+                "rounded-full md:hidden flex items-center justify-center h-8.5 w-8.5 xs:h-9 xs:w-9 flex-shrink-0 transition-all active:scale-95 relative",
                 pathname.startsWith('/ai-manager') 
-                  ? 'text-primary bg-primary/5 border border-primary/10' 
-                  : 'text-gray-500 dark:text-zinc-400 hover:bg-gray-50 dark:hover:bg-zinc-900/50'
-              }`}
+                  ? 'text-primary bg-primary/10 border border-primary/20' 
+                  : 'text-gray-700 dark:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-800'
+              )}
+              aria-label="AI Manager"
               title="AI Tolee Manager"
             >
-              <span className="text-[11px] font-extrabold tracking-wider leading-none">AI</span>
+              <Bot className="w-4.5 h-4.5 xs:w-5 xs:h-5" />
               {!pathname.startsWith('/ai-manager') && (
-                <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse border border-white dark:border-black"></span>
+                <span className="absolute top-1 right-1 w-2 h-2 bg-emerald-500 rounded-full animate-pulse border border-white dark:border-black"></span>
               )}
-            </Button>
-
-            {/* Mobile Creator Program Shortcut */}
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => router.push('/creator-program')}
-              className={`rounded-full md:hidden flex items-center justify-center h-8 w-8 xs:h-9 xs:w-9 sm:h-10 sm:w-10 flex-shrink-0 transition-all active:scale-95 relative ${
-                pathname.startsWith('/creator-program') 
-                  ? 'bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800' 
-                  : 'hover:bg-purple-50 dark:hover:bg-purple-950/30'
-              }`}
-              title="Creator Program"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <defs>
-                  <linearGradient id="bolt-grad" x1="12" y1="2" x2="12" y2="22" gradientUnits="userSpaceOnUse">
-                    <stop offset="0%" stopColor="#a855f7" />
-                    <stop offset="100%" stopColor="#6366f1" />
-                  </linearGradient>
-                </defs>
-                <path d="M13 2L4.5 13.5H11.5L11 22L19.5 10.5H12.5L13 2Z" fill="url(#bolt-grad)" stroke="url(#bolt-grad)" strokeWidth="0.5" strokeLinejoin="round"/>
-              </svg>
             </Button>
 
             {/* Inline Upload Status Component in Header */}
@@ -369,23 +338,25 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
               variant="ghost"
               size="icon"
               onClick={() => router.push('/notifications')}
-              className={`rounded-full md:hidden flex items-center justify-center h-8 w-8 xs:h-9 xs:w-9 sm:h-10 sm:w-10 flex-shrink-0 transition-all active:scale-95 relative ${
+              className={cn(
+                "rounded-full md:hidden flex items-center justify-center h-8.5 w-8.5 xs:h-9 xs:w-9 flex-shrink-0 transition-all active:scale-95 relative",
                 pathname.startsWith('/notifications')
-                  ? 'text-primary bg-primary/5 border border-primary/10'
-                  : 'text-gray-500 dark:text-zinc-400 hover:bg-gray-50 dark:hover:bg-zinc-900/50'
-              }`}
+                  ? 'text-primary bg-primary/10 border border-primary/20'
+                  : 'text-gray-700 dark:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-800'
+              )}
+              aria-label="Notifications"
               title="Notifications"
             >
-              <Bell className="w-4 h-4 xs:w-5 xs:h-5 sm:w-5 sm:h-5" />
+              <Bell className="w-4.5 h-4.5 xs:w-5 xs:h-5" />
               {counts.notifications > 0 && (
-                <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 bg-primary text-primary-foreground text-[8px] font-bold flex items-center justify-center rounded-full border border-white dark:border-black">
-                  {counts.notifications}
+                <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 bg-red-500 text-white text-[8px] font-bold flex items-center justify-center rounded-full border border-white dark:border-black">
+                  {counts.notifications > 9 ? '9+' : counts.notifications}
                 </span>
               )}
             </Button>
 
-            {/* Unified Avatar Dropdown (Shown on Desktop only, hidden on Mobile) */}
-            <div className="hidden md:flex items-center">
+            {/* Unified Avatar Dropdown (Both Mobile & Desktop) */}
+            <div className="flex items-center">
               <DropdownMenu>
                 <DropdownMenuTrigger className="relative h-8 w-8 xs:h-9 xs:w-9 sm:h-10 sm:w-10 rounded-full flex items-center justify-center hover:bg-gray-50 dark:hover:bg-zinc-900/50 transition-colors focus:outline-none">
                   <Avatar className="h-7 w-7 xs:h-8 xs:w-8 sm:h-9 sm:w-9 border border-gray-200 dark:border-zinc-800 hover:border-primary transition-colors cursor-pointer">
@@ -458,6 +429,17 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
           </>
         ) : (
           <div className="flex items-center gap-1.5 sm:gap-3">
+            {/* Mobile Search Button for guests */}
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => router.push('/search')}
+              className="rounded-full md:hidden flex items-center justify-center h-8.5 w-8.5 xs:h-9 xs:w-9 flex-shrink-0 text-gray-700 dark:text-zinc-200"
+              aria-label="Search"
+              title="Search"
+            >
+              <Search className="w-4.5 h-4.5 xs:w-5 xs:h-5" />
+            </Button>
             <Link href="/auth/signin">
               <Button 
                 variant="outline" 
