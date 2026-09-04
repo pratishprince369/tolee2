@@ -43,6 +43,42 @@ export interface SearchResultItem {
   };
 }
 
+// Universal Media Thumbnail Extraction for Posts, Videos, Reels and Embeds
+function extractMediaThumbnail(mediaUrls?: string | null, mediaTypes?: string | null, postType?: string | null): string | null {
+  if (!mediaUrls || typeof mediaUrls !== 'string' || !mediaUrls.trim()) {
+    return null;
+  }
+
+  // Split multiple URLs
+  const urls = mediaUrls.split(/,(?=https?:\/\/|\/uploads\/)/).map(u => u.trim()).filter(Boolean);
+  if (urls.length === 0) return null;
+
+  // 1. If an image is explicitly in the list, prioritize it
+  const imageCandidate = urls.find(u => /\.(jpeg|jpg|png|webp|gif|avif)($|\?)/i.test(u) && !u.includes('/video/'));
+  if (imageCandidate) return imageCandidate;
+
+  const first = urls[0];
+
+  // 2. YouTube Video (watch, embed, shorts, youtu.be)
+  const ytMatch = first.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=|shorts\/))([\w-]{11})/i);
+  if (ytMatch && ytMatch[1]) {
+    return `https://img.youtube.com/vi/${ytMatch[1]}/hqdefault.jpg`;
+  }
+
+  // 3. Cloudinary Video (.m3u8, .mp4, .mov, etc.)
+  if (first.includes('cloudinary.com') && (first.includes('/video/upload/') || /\.(m3u8|mp4|webm|mov|mkv)($|\?)/i.test(first))) {
+    let clean = first.replace(/\.(m3u8|mp4|webm|mov|mkv|avi)($|\?.*)/i, '.jpg');
+    clean = clean.replace(/\/video\/upload\/(sp_[a-zA-Z0-9_-]+\/)?/, '/video/upload/so_0,f_jpg,q_auto,w_600/');
+    return clean;
+  }
+
+  // 4. Check if any secondary URL is a thumbnail (e.g. Coverr, custom poster)
+  const thumbCandidate = urls.find(u => u.includes('thumbnail') || u.includes('poster') || u.includes('/preview/'));
+  if (thumbCandidate) return thumbCandidate;
+
+  return first;
+}
+
 // Helper to sanitize search query
 function getCleanQuery(query: string): string {
   return sanitizeText(query || '', 100);
@@ -336,14 +372,16 @@ export async function performSearch(
 
       const eng = isSimOn ? getSimulatedEngagement(p.id) : null;
 
+      const mediaThumb = extractMediaThumbnail(p.mediaUrls, p.mediaTypes, p.postType);
+
       results.push({
         id: p.id,
         type,
         title: p.author.name,
         subtitle: p.author.username ? `@${p.author.username}` : null,
         description: p.caption,
-        mediaUrl: p.mediaUrls ? p.mediaUrls.split(/,(?=https?:\/\/)/)[0] : null,
-        mediaType: p.mediaTypes ? p.mediaTypes.split(',')[0] : null,
+        mediaUrl: mediaThumb,
+        mediaType: p.mediaTypes ? p.mediaTypes.split(',')[0] : (type === 'reel' ? 'video' : 'image'),
         location: p.location || p.subLocation,
         createdAt: p.createdAt,
         score,
@@ -974,30 +1012,35 @@ export async function getExploreFeed(page: number = 1, limit: number = 24) {
         },
       },
       orderBy: [{ createdAt: 'desc' }],
-      take: limit,
+      take: limit * 2,
       skip,
     });
 
-    const items = posts.map((p) => {
-      const isReel = p.postType === 'reel' || p.mediaTypes === 'video';
-      const firstMedia = p.mediaUrls ? p.mediaUrls.split(/,(?=https?:\/\/)/)[0] : '';
-      return {
-        id: p.id,
-        type: isReel ? ('reel' as const) : ('post' as const),
-        mediaUrl: firstMedia,
-        mediaType: p.mediaTypes || (isReel ? 'video' : 'image'),
-        caption: p.caption || '',
-        likesCount: p._count.likes || 0,
-        commentsCount: p._count.comments || 0,
-        viewsCount: p._count.views || 0,
-        author: {
-          id: p.author.id,
-          name: p.author.name || 'User',
-          username: p.author.username || '',
-          avatar: p.author.avatar || '/default-user-avatar.svg',
-        },
-      };
-    }).filter(item => Boolean(item.mediaUrl));
+    const items = posts
+      .map((p) => {
+        const isReel = p.postType === 'reel' || p.mediaTypes === 'video' || Boolean(p.mediaUrls && (p.mediaUrls.includes('.m3u8') || p.mediaUrls.includes('.mp4') || p.mediaUrls.includes('youtube') || p.mediaUrls.includes('youtu.be')));
+        const mediaThumb = extractMediaThumbnail(p.mediaUrls, p.mediaTypes, p.postType);
+        if (!mediaThumb) return null;
+
+        return {
+          id: p.id,
+          type: isReel ? ('reel' as const) : ('post' as const),
+          mediaUrl: mediaThumb,
+          mediaType: p.mediaTypes || (isReel ? 'video' : 'image'),
+          caption: p.caption || '',
+          likesCount: p._count.likes || 0,
+          commentsCount: p._count.comments || 0,
+          viewsCount: p._count.views || 0,
+          author: {
+            id: p.author.id,
+            name: p.author.name || 'User',
+            username: p.author.username || '',
+            avatar: p.author.avatar || '/default-user-avatar.svg',
+          },
+        };
+      })
+      .filter((item): item is NonNullable<typeof item> => Boolean(item && item.mediaUrl))
+      .slice(0, limit);
 
     return {
       success: true,

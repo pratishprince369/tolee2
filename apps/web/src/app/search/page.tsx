@@ -48,15 +48,69 @@ function formatCount(count: number): string {
   return count.toString();
 }
 
+// Resilient Thumbnail Component with Smooth Loading & Fallback
+function DiscoveryThumbnail({
+  src,
+  alt,
+  isVideo = false,
+  fallbackText = ''
+}: {
+  src?: string | null;
+  alt?: string;
+  isVideo?: boolean;
+  fallbackText?: string;
+}) {
+  const [hasError, setHasError] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  // If no source is provided or image errored out, show a clean Tolee branded card
+  if (!src || hasError) {
+    return (
+      <div className="w-full h-full p-3 flex flex-col justify-between bg-gradient-to-br from-teal-900/40 via-zinc-900 to-zinc-950 border border-teal-500/20 text-white select-none">
+        <div className="flex items-center justify-between">
+          <div className="w-6 h-6 rounded-lg bg-teal-500/20 text-teal-400 flex items-center justify-center text-xs font-bold">
+            {isVideo ? <Video className="w-3.5 h-3.5" /> : <FileText className="w-3.5 h-3.5" />}
+          </div>
+        </div>
+        <span className="text-[11px] sm:text-xs font-semibold line-clamp-3 text-zinc-200 leading-snug">
+          {fallbackText || alt || (isVideo ? 'Watch Video' : 'View Post')}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative w-full h-full bg-zinc-900 overflow-hidden">
+      {!isLoaded && (
+        <div className="absolute inset-0 bg-zinc-800/60 animate-pulse" />
+      )}
+      <img
+        src={src}
+        alt={alt || 'Tolee media'}
+        onLoad={() => setIsLoaded(true)}
+        onError={() => setHasError(true)}
+        loading="lazy"
+        decoding="async"
+        className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 ${
+          isLoaded ? 'opacity-100' : 'opacity-0'
+        }`}
+      />
+    </div>
+  );
+}
+
 export default function SearchPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
+
   const queryParam = searchParams.get('q') || '';
+  const tabParam = (searchParams.get('type') || 'all') as any;
+  const sortParam = (searchParams.get('sort') || 'relevance') as any;
 
   // Local state
   const [query, setQuery] = useState(queryParam);
-  const [activeTab, setActiveTab] = useState<'all' | 'users' | 'reels' | 'posts' | 'groups' | 'marketplace' | 'news'>('all');
-  const [sortBy, setSortBy] = useState<'relevance' | 'newest' | 'engagement'>('relevance');
+  const [activeTab, setActiveTab] = useState<'all' | 'users' | 'reels' | 'posts' | 'groups' | 'marketplace' | 'news'>(tabParam);
+  const [sortBy, setSortBy] = useState<'relevance' | 'newest' | 'engagement'>(sortParam);
   const [results, setResults] = useState<SearchResultItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -78,13 +132,50 @@ export default function SearchPage() {
   const [hashtagData, setHashtagData] = useState<any>(null);
   const [isHashtagView, setIsHashtagView] = useState(false);
 
-  // Fetch explore grid content (Mixed photos, videos, reels)
-  const fetchExploreFeed = useCallback(async () => {
+  // Restore scroll position when navigating back
+  useEffect(() => {
+    try {
+      const savedScroll = sessionStorage.getItem('tolee_search_scroll');
+      if (savedScroll) {
+        const posY = parseInt(savedScroll, 10);
+        if (!isNaN(posY) && posY > 0) {
+          setTimeout(() => {
+            window.scrollTo({ top: posY, behavior: 'instant' as any });
+          }, 50);
+        }
+      }
+    } catch {
+      // Ignore
+    }
+  }, []);
+
+  // Fetch explore grid content (Mixed photos, videos, reels) with caching
+  const fetchExploreFeed = useCallback(async (forceRefresh = false) => {
+    if (!forceRefresh) {
+      try {
+        const cached = sessionStorage.getItem('tolee_explore_cache');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setExploreItems(parsed);
+            return;
+          }
+        }
+      } catch {
+        // Fallback to fetch
+      }
+    }
+
     setIsExploreLoading(true);
     try {
       const res = await getExploreFeed(1, 36);
       if (res.success && res.items) {
         setExploreItems(res.items);
+        try {
+          sessionStorage.setItem('tolee_explore_cache', JSON.stringify(res.items));
+        } catch {
+          // Quota handling
+        }
       }
     } catch (err) {
       console.error('Failed to load explore feed:', err);
@@ -103,11 +194,9 @@ export default function SearchPage() {
     }
   }, []);
 
-  // Handle Search Submission / Execution
-  const handleSearch = async (resetPage = true, customQuery?: string) => {
-    const targetQuery = customQuery !== undefined ? customQuery : query;
+  // Handle Search Execution
+  const executeSearch = async (targetQuery: string, currentTab: string, currentSort: string, targetPage = 1) => {
     const cleanQ = targetQuery.trim();
-
     setShowSuggestions(false);
 
     if (!cleanQ) {
@@ -119,16 +208,13 @@ export default function SearchPage() {
       return;
     }
 
-    const curPage = resetPage ? 1 : page;
-    if (resetPage) {
-      setPage(1);
+    if (targetPage === 1) {
       setIsLoading(true);
     } else {
       setIsMoreLoading(true);
     }
 
     try {
-      // Check if it's a hashtag search
       if (cleanQ.startsWith('#')) {
         setIsHashtagView(true);
         const data = await getHashtagDetails(cleanQ);
@@ -141,19 +227,18 @@ export default function SearchPage() {
         setHashtagData(null);
       }
 
-      // Normal Search
       const res = await performSearch(
         cleanQ,
         {
-          type: activeTab === 'all' ? 'all' : (activeTab as any),
-          sortBy,
+          type: currentTab === 'all' ? 'all' : (currentTab as any),
+          sortBy: currentSort as any,
         },
-        curPage,
+        targetPage,
         18
       );
 
       if (res.success) {
-        if (resetPage) {
+        if (targetPage === 1) {
           setResults(res.data);
         } else {
           setResults((prev) => [...prev, ...res.data]);
@@ -168,24 +253,48 @@ export default function SearchPage() {
     }
   };
 
-  // Sync state with URL parameter
+  // Sync state with URL parameter changes
   useEffect(() => {
     setQuery(queryParam);
+    setActiveTab(tabParam);
+    setSortBy(sortParam);
+
     if (queryParam) {
-      handleSearch(true, queryParam);
+      executeSearch(queryParam, tabParam, sortParam, 1);
     } else {
       setIsHashtagView(false);
       fetchExploreFeed();
       fetchTrending();
     }
-  }, [queryParam]);
+  }, [queryParam, tabParam, sortParam, fetchExploreFeed, fetchTrending]);
 
-  // Handle Tab changes
-  useEffect(() => {
-    if (query) {
-      handleSearch(true);
-    }
-  }, [activeTab, sortBy]);
+  // Handle Tab changes & sync URL params
+  const handleTabChange = (newTab: 'all' | 'users' | 'reels' | 'posts' | 'groups' | 'marketplace' | 'news') => {
+    setActiveTab(newTab);
+    setPage(1);
+
+    const params = new URLSearchParams();
+    if (query.trim()) params.set('q', query.trim());
+    if (newTab !== 'all') params.set('type', newTab);
+    if (sortBy !== 'relevance') params.set('sort', sortBy);
+
+    const queryString = params.toString();
+    router.replace(queryString ? `/search?${queryString}` : '/search', { scroll: false });
+  };
+
+  // Handle Sort changes & sync URL params
+  const handleSortChange = (newSort: 'relevance' | 'newest' | 'engagement') => {
+    setSortBy(newSort);
+    setPage(1);
+
+    const params = new URLSearchParams();
+    if (query.trim()) params.set('q', query.trim());
+    if (activeTab !== 'all') params.set('type', activeTab);
+    if (newSort !== 'relevance') params.set('sort', newSort);
+
+    const queryString = params.toString();
+    router.replace(queryString ? `/search?${queryString}` : '/search', { scroll: false });
+  };
 
   // Handle live autocomplete debounce
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -203,7 +312,7 @@ export default function SearchPage() {
         } catch {
           setSuggestions([]);
         }
-      }, 200);
+      }, 180);
     } else {
       setSuggestions([]);
       setShowSuggestions(false);
@@ -211,38 +320,42 @@ export default function SearchPage() {
   };
 
   const loadMore = () => {
-    setPage((prev) => prev + 1);
+    const nextPage = page + 1;
+    setPage(nextPage);
+    executeSearch(query, activeTab, sortBy, nextPage);
   };
 
-  useEffect(() => {
-    if (page > 1) {
-      handleSearch(false);
-    }
-  }, [page]);
+  // Helper to determine destination URL for any item
+  const getItemHref = (item: { id: string; type: string; meta?: any }) => {
+    if (item.type === 'user') return `/u/${item.meta?.username || item.id}`;
+    if (item.type === 'group') return `/t/${item.id}`;
+    if (item.type === 'listing' || item.type === 'marketplace') return `/marketplace/${item.id}`;
+    if (item.type === 'reel') return `/reels?videoId=${item.id}`;
+    return `/post/${item.id}`;
+  };
 
-  // Clicking an item in Search / Explore
-  const handleResultClick = async (item: { id: string; type: string; meta?: any }) => {
-    await logSearchClick(query || 'explore', item.id, item.type);
-
-    if (item.type === 'user') {
-      router.push(`/u/${item.meta?.username || item.id}`);
-    } else if (item.type === 'group') {
-      router.push(`/t/${item.id}`);
-    } else if (item.type === 'listing' || item.type === 'marketplace') {
-      router.push(`/marketplace/${item.id}`);
-    } else if (item.type === 'reel') {
-      router.push(`/reels?videoId=${item.id}`);
-    } else {
-      router.push(`/post/${item.id}`);
+  // Click handler: Record click asynchronously without blocking navigation & save scroll
+  const handleItemClick = (item: { id: string; type: string; meta?: any }) => {
+    try {
+      sessionStorage.setItem('tolee_search_scroll', window.scrollY.toString());
+    } catch {
+      // Ignore
     }
+    // Asynchronous non-blocking telemetry
+    void logSearchClick(query || 'explore', item.id, item.type);
   };
 
   // Search local submit trigger
   const handleLocalSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setShowSuggestions(false);
-    if (query.trim()) {
-      router.push(`/search?q=${encodeURIComponent(query.trim())}`);
+    const cleanQ = query.trim();
+    if (cleanQ) {
+      const params = new URLSearchParams();
+      params.set('q', cleanQ);
+      if (activeTab !== 'all') params.set('type', activeTab);
+      if (sortBy !== 'relevance') params.set('sort', sortBy);
+      router.push(`/search?${params.toString()}`);
     }
   };
 
@@ -489,25 +602,23 @@ export default function SearchPage() {
                   <div className="grid grid-cols-3 gap-1 sm:gap-2 md:gap-3">
                     {exploreItems.map((item) => {
                       const isReel = item.type === 'reel';
+                      const href = getItemHref(item);
+
                       return (
-                        <div
+                        <Link
                           key={item.id}
-                          onClick={() => handleResultClick(item)}
-                          className="group relative aspect-square rounded-lg sm:rounded-xl overflow-hidden bg-zinc-900 cursor-pointer border border-black/5 dark:border-zinc-800/80 active:scale-[0.98] transition-all duration-200 shadow-2xs"
+                          href={href}
+                          onClick={() => handleItemClick(item)}
+                          prefetch={true}
+                          className="group relative aspect-square rounded-lg sm:rounded-xl overflow-hidden bg-zinc-900 border border-black/5 dark:border-zinc-800/80 active:scale-[0.97] transition-all duration-200 shadow-2xs block cursor-pointer"
                         >
-                          {/* Media Thumbnail */}
-                          {item.mediaUrl ? (
-                            <img
-                              src={item.mediaUrl}
-                              alt={item.caption || 'Explore item'}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                              loading="lazy"
-                            />
-                          ) : (
-                            <div className="w-full h-full p-3 flex flex-col justify-between bg-zinc-950 text-white">
-                              <span className="text-xs line-clamp-3 font-semibold">{item.caption}</span>
-                            </div>
-                          )}
+                          {/* Resilient Media Thumbnail */}
+                          <DiscoveryThumbnail
+                            src={item.mediaUrl}
+                            alt={item.caption || 'Explore item'}
+                            isVideo={isReel}
+                            fallbackText={item.caption}
+                          />
 
                           {/* Reel / Video Indicator Badge (Top-Right) */}
                           {isReel && (
@@ -535,7 +646,7 @@ export default function SearchPage() {
                               {formatCount(item.commentsCount)}
                             </span>
                           </div>
-                        </div>
+                        </Link>
                       );
                     })}
                   </div>
@@ -568,7 +679,7 @@ export default function SearchPage() {
                           setQuery(tag);
                           router.push(`/search?q=${encodeURIComponent(tag)}`);
                         }}
-                        className="px-3 py-1 bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
+                        className="px-3 py-1 bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full text-xs font-semibold text-primary hover:bg-primary/10 transition-colors cursor-pointer"
                       >
                         {tag}
                       </button>
@@ -588,25 +699,22 @@ export default function SearchPage() {
                     <div className="grid grid-cols-3 gap-1 sm:gap-2 md:gap-3">
                       {results.map((item) => {
                         const isReel = item.type === 'reel';
+                        const href = getItemHref(item);
+
                         return (
-                          <div
+                          <Link
                             key={item.id}
-                            onClick={() => handleResultClick(item)}
-                            className="group relative aspect-square rounded-lg sm:rounded-xl overflow-hidden bg-zinc-900 cursor-pointer border border-black/5 dark:border-zinc-800/80 active:scale-[0.98] transition-all duration-200 shadow-2xs"
+                            href={href}
+                            onClick={() => handleItemClick(item)}
+                            prefetch={true}
+                            className="group relative aspect-square rounded-lg sm:rounded-xl overflow-hidden bg-zinc-900 border border-black/5 dark:border-zinc-800/80 active:scale-[0.97] transition-all duration-200 shadow-2xs block cursor-pointer"
                           >
-                            {item.mediaUrl ? (
-                              <img
-                                src={item.mediaUrl}
-                                alt={item.title || 'Result item'}
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                loading="lazy"
-                              />
-                            ) : (
-                              <div className="w-full h-full p-3 flex flex-col justify-between bg-zinc-950 text-white">
-                                <span className="text-xs line-clamp-3 font-semibold">{item.description || item.title}</span>
-                                <span className="text-[10px] text-slate-400 uppercase">{item.type}</span>
-                              </div>
-                            )}
+                            <DiscoveryThumbnail
+                              src={item.mediaUrl}
+                              alt={item.title || 'Result item'}
+                              isVideo={isReel}
+                              fallbackText={item.description || item.title}
+                            />
 
                             {/* Badge */}
                             {isReel && (
@@ -626,7 +734,7 @@ export default function SearchPage() {
                                 {formatCount(item.meta?.commentsCount || 0)}
                               </span>
                             </div>
-                          </div>
+                          </Link>
                         );
                       })}
                     </div>
@@ -636,10 +744,12 @@ export default function SearchPage() {
                   {activeTab === 'users' && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {results.map((item) => (
-                        <div
+                        <Link
                           key={item.id}
-                          onClick={() => handleResultClick(item)}
-                          className="flex items-center justify-between p-3.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl cursor-pointer hover:border-primary/30 transition-all shadow-2xs"
+                          href={getItemHref(item)}
+                          onClick={() => handleItemClick(item)}
+                          prefetch={true}
+                          className="flex items-center justify-between p-3.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl hover:border-primary/30 active:scale-[0.98] transition-all shadow-2xs block cursor-pointer"
                         >
                           <div className="flex items-center gap-3 min-w-0">
                             <Avatar className="w-12 h-12 rounded-full border border-slate-200 dark:border-zinc-700">
@@ -656,10 +766,10 @@ export default function SearchPage() {
                               )}
                             </div>
                           </div>
-                          <Button size="sm" variant="outline" className="rounded-full text-xs font-bold px-4 shrink-0 text-primary border-primary hover:bg-primary/5">
+                          <Button size="sm" variant="outline" className="rounded-full text-xs font-bold px-4 shrink-0 text-primary border-primary hover:bg-primary/5 pointer-events-none">
                             View
                           </Button>
-                        </div>
+                        </Link>
                       ))}
                     </div>
                   )}
@@ -668,10 +778,12 @@ export default function SearchPage() {
                   {activeTab === 'groups' && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {results.map((item) => (
-                        <div
+                        <Link
                           key={item.id}
-                          onClick={() => handleResultClick(item)}
-                          className="flex items-center justify-between p-3.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl cursor-pointer hover:border-primary/30 transition-all shadow-2xs"
+                          href={getItemHref(item)}
+                          onClick={() => handleItemClick(item)}
+                          prefetch={true}
+                          className="flex items-center justify-between p-3.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl hover:border-primary/30 active:scale-[0.98] transition-all shadow-2xs block cursor-pointer"
                         >
                           <div className="flex items-center gap-3 min-w-0">
                             <Avatar className="w-12 h-12 rounded-xl border border-slate-200 dark:border-zinc-700">
@@ -686,7 +798,7 @@ export default function SearchPage() {
                           <Badge className="bg-primary/10 text-primary text-[10px] font-bold py-1 px-2.5 rounded-full shrink-0">
                             {item.meta?.memberCount || 0} members
                           </Badge>
-                        </div>
+                        </Link>
                       ))}
                     </div>
                   )}
@@ -695,10 +807,12 @@ export default function SearchPage() {
                   {activeTab === 'marketplace' && (
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                       {results.map((item) => (
-                        <div
+                        <Link
                           key={item.id}
-                          onClick={() => handleResultClick(item)}
-                          className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl overflow-hidden cursor-pointer hover:shadow-md transition-all flex flex-col justify-between"
+                          href={getItemHref(item)}
+                          onClick={() => handleItemClick(item)}
+                          prefetch={true}
+                          className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl overflow-hidden hover:shadow-md active:scale-[0.98] transition-all flex flex-col justify-between block cursor-pointer"
                         >
                           <div className="aspect-[4/3] w-full overflow-hidden bg-slate-100 dark:bg-zinc-800 relative">
                             {item.mediaUrl ? (
@@ -714,7 +828,7 @@ export default function SearchPage() {
                             <span className="text-xs font-bold text-slate-800 dark:text-zinc-100 line-clamp-1">{item.title}</span>
                             <span className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">{item.description}</span>
                           </div>
-                        </div>
+                        </Link>
                       ))}
                     </div>
                   )}
@@ -723,25 +837,29 @@ export default function SearchPage() {
                   {(activeTab === 'posts' || activeTab === 'news') && (
                     <div className="space-y-3">
                       {results.map((item) => (
-                        <Card
+                        <Link
                           key={item.id}
-                          onClick={() => handleResultClick(item)}
-                          className="hover:border-primary/30 transition-all cursor-pointer rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-2xs"
+                          href={getItemHref(item)}
+                          onClick={() => handleItemClick(item)}
+                          prefetch={true}
+                          className="block cursor-pointer"
                         >
-                          <CardContent className="p-4 flex flex-col gap-2.5">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2.5">
-                                <Avatar className="w-8 h-8">
-                                  <AvatarImage src={item.meta?.avatar || '/default-user-avatar.svg'} />
-                                  <AvatarFallback>{item.title[0]}</AvatarFallback>
-                                </Avatar>
-                                <span className="font-bold text-xs sm:text-sm text-slate-800 dark:text-zinc-200">{item.title}</span>
+                          <Card className="hover:border-primary/30 active:scale-[0.99] transition-all rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-2xs">
+                            <CardContent className="p-4 flex flex-col gap-2.5">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2.5">
+                                  <Avatar className="w-8 h-8">
+                                    <AvatarImage src={item.meta?.avatar || '/default-user-avatar.svg'} />
+                                    <AvatarFallback>{item.title[0]}</AvatarFallback>
+                                  </Avatar>
+                                  <span className="font-bold text-xs sm:text-sm text-slate-800 dark:text-zinc-200">{item.title}</span>
+                                </div>
+                                <span className="text-[10px] text-slate-400">{new Date(item.createdAt).toLocaleDateString()}</span>
                               </div>
-                              <span className="text-[10px] text-slate-400">{new Date(item.createdAt).toLocaleDateString()}</span>
-                            </div>
-                            <p className="text-xs sm:text-sm text-slate-700 dark:text-zinc-300 line-clamp-3">{item.description}</p>
-                          </CardContent>
-                        </Card>
+                              <p className="text-xs sm:text-sm text-slate-700 dark:text-zinc-300 line-clamp-3">{item.description}</p>
+                            </CardContent>
+                          </Card>
+                        </Link>
                       ))}
                     </div>
                   )}
@@ -752,7 +870,7 @@ export default function SearchPage() {
                       <Button
                         onClick={loadMore}
                         disabled={isMoreLoading}
-                        className="bg-primary hover:bg-primary/95 text-primary-foreground font-bold px-8 py-2 rounded-full text-xs shadow-md transition-all active:scale-95"
+                        className="bg-primary hover:bg-primary/95 text-primary-foreground font-bold px-8 py-2 rounded-full text-xs shadow-md transition-all active:scale-95 cursor-pointer"
                       >
                         {isMoreLoading ? 'Loading more...' : 'Load More Results'}
                       </Button>

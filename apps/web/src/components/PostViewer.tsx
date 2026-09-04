@@ -162,7 +162,11 @@ export default function PostViewer({ post }: PostViewerProps) {
   const authorAvatarUrl = post.authorAvatar || '/default-user-avatar.svg';
 
   const handleBack = () => {
-    router.push('/feed');
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back();
+    } else {
+      router.push('/feed');
+    }
   };
 
   const handleLike = async () => {
