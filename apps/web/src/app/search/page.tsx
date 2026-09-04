@@ -199,7 +199,8 @@ export default function SearchPage() {
     const cleanQ = targetQuery.trim();
     setShowSuggestions(false);
 
-    if (!cleanQ) {
+    // If query is empty and tab is 'all', show the mixed explore feed
+    if (!cleanQ && currentTab === 'all') {
       setIsHashtagView(false);
       setHashtagData(null);
       setResults([]);
@@ -234,7 +235,7 @@ export default function SearchPage() {
           sortBy: currentSort as any,
         },
         targetPage,
-        18
+        24
       );
 
       if (res.success) {
@@ -259,7 +260,7 @@ export default function SearchPage() {
     setActiveTab(tabParam);
     setSortBy(sortParam);
 
-    if (queryParam) {
+    if (queryParam || tabParam !== 'all') {
       executeSearch(queryParam, tabParam, sortParam, 1);
     } else {
       setIsHashtagView(false);
@@ -350,13 +351,11 @@ export default function SearchPage() {
     e.preventDefault();
     setShowSuggestions(false);
     const cleanQ = query.trim();
-    if (cleanQ) {
-      const params = new URLSearchParams();
-      params.set('q', cleanQ);
-      if (activeTab !== 'all') params.set('type', activeTab);
-      if (sortBy !== 'relevance') params.set('sort', sortBy);
-      router.push(`/search?${params.toString()}`);
-    }
+    const params = new URLSearchParams();
+    if (cleanQ) params.set('q', cleanQ);
+    if (activeTab !== 'all') params.set('type', activeTab);
+    if (sortBy !== 'relevance') params.set('sort', sortBy);
+    router.push(params.toString() ? `/search?${params.toString()}` : '/search');
   };
 
   // Render Category Filter Pills
@@ -372,16 +371,16 @@ export default function SearchPage() {
     ];
 
     return (
-      <div className="flex items-center justify-between border-t border-slate-200/60 dark:border-zinc-800/60 pt-3 mt-3.5 overflow-x-auto no-scrollbar gap-3 select-none">
-        <div className="flex gap-1.5 min-w-max">
+      <div className="flex items-center justify-between border-t border-slate-200/60 dark:border-zinc-800/60 pt-2.5 mt-2.5 overflow-x-auto no-scrollbar gap-3 select-none">
+        <div className="flex gap-1.5 min-w-max pb-0.5">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all duration-200 active:scale-95 ${
+                onClick={() => handleTabChange(tab.id as any)}
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all duration-200 active:scale-95 cursor-pointer ${
                   isActive
                     ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/20 font-extrabold'
                     : 'bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-slate-600 dark:text-zinc-400 hover:bg-slate-50 dark:hover:bg-zinc-800'
@@ -399,7 +398,7 @@ export default function SearchPage() {
           <SlidersHorizontal className="w-3 h-3 text-slate-400" />
           <select
             value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as any)}
+            onChange={(e) => handleSortChange(e.target.value as any)}
             className="text-[11px] font-bold bg-transparent border-none text-slate-600 dark:text-zinc-400 focus:ring-0 focus:outline-none cursor-pointer p-0 pr-2"
           >
             <option value="relevance">Top</option>
@@ -412,10 +411,10 @@ export default function SearchPage() {
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto px-2 sm:px-4 lg:px-6 pt-2 sm:pt-4 pb-24 min-h-screen">
+    <div className="w-full max-w-4xl mx-auto px-2 sm:px-4 lg:px-6 pt-0 pb-24 min-h-screen">
       
       {/* 1. TOP STICKY SEARCH BAR CARD */}
-      <div className="sticky top-14 sm:top-16 z-30 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-md pt-1 pb-3 border-b border-slate-100 dark:border-zinc-900">
+      <div className="sticky top-16 z-30 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md pt-2 pb-2.5 border-b border-slate-200/80 dark:border-zinc-800/80 shadow-2xs">
         <form onSubmit={handleLocalSubmit} className="relative w-full group">
           <div className="relative flex items-center">
             <Search className="absolute left-3.5 w-4.5 h-4.5 text-slate-400 group-focus-within:text-primary transition-colors pointer-events-none" />
@@ -569,9 +568,9 @@ export default function SearchPage() {
 
           {/* ========================================================
               B. DEFAULT EXPLORE DISCOVERY GRID (Instagram Reference)
-                 Rendered when query is empty and not hashtag view
+                 Rendered when query is empty and tab is 'all'
              ======================================================== */}
-          {!query && !isHashtagView && (
+          {!query && !isHashtagView && activeTab === 'all' && (
             <div className="pt-3 space-y-6 animate-in fade-in duration-200">
               
               {/* Trending Tag Chips */}
@@ -658,7 +657,7 @@ export default function SearchPage() {
           {/* ========================================================
               C. ACTIVE SEARCH RESULTS (Filtered by Tab or All)
              ======================================================== */}
-          {query && !isHashtagView && (
+          {(Boolean(query) || activeTab !== 'all') && !isHashtagView && (
             <div className="pt-3 animate-in fade-in duration-200">
               {results.length === 0 ? (
                 /* Empty Search State */
@@ -666,7 +665,9 @@ export default function SearchPage() {
                   <div className="w-12 h-12 bg-slate-100 dark:bg-zinc-800 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-3">
                     <Search className="w-6 h-6" />
                   </div>
-                  <h3 className="text-base font-bold text-slate-800 dark:text-zinc-200">No results found for "{query}"</h3>
+                  <h3 className="text-base font-bold text-slate-800 dark:text-zinc-200">
+                    {query ? `No results found for "${query}"` : `No ${activeTab} found`}
+                  </h3>
                   <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1 max-w-sm mx-auto">
                     Try checking your spelling, using more general keywords, or exploring trending topics below.
                   </p>

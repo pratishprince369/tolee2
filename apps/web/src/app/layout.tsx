@@ -292,7 +292,7 @@ export default async function RootLayout({
             {isAuthenticated && <Sidebar />}
             
             {/* Main Content Area - padded left on large screens to accommodate fixed sidebar */}
-            <div className={cn("flex-grow w-full min-w-0 overflow-x-hidden", isAuthenticated && "lg:pl-64")}>
+            <div className={cn("flex-grow w-full min-w-0 overflow-x-clip", isAuthenticated && "lg:pl-64")}>
               {children}
             </div>
           </div>
