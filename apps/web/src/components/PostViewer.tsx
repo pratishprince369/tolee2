@@ -27,6 +27,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toggleLike, addComment, toggleSavePost, toggleRepost } from '@/actions/post';
 import { ShareModal } from '@/components/ShareModal';
 import { HLSVideo } from '@/components/HLSVideo';
+import { extractYouTubeVideoId, getYouTubeEmbedUrl, getYouTubeWatchUrl } from '@/lib/youtube';
 import Link from 'next/link';
 
 function formatDistanceToNowSafe(dateString: string | null | undefined): string {
@@ -381,53 +382,84 @@ export default function PostViewer({ post }: PostViewerProps) {
           {/* Media Presentation Container */}
           <div className="relative w-full overflow-hidden bg-black">
             {hasMedia ? (
-              isVideo ? (
-                <div className="relative w-full aspect-square sm:aspect-auto sm:max-h-[640px] flex items-center justify-center group overflow-hidden">
-                  <HLSVideo
-                    ref={videoRef}
-                    src={currentMediaUrl}
-                    isActive={true}
-                    shouldLoad={true}
-                    ignoreGlobalActive={true}
-                    contentId={post.id}
-                    contentType="post"
-                    className="w-full h-full max-h-[640px] object-contain cursor-pointer"
-                    loop
-                    muted={muted}
-                    playsInline
-                    autoPlay
-                    onPlay={() => setIsPlaying(true)}
-                    onPause={() => setIsPlaying(false)}
-                    onClick={togglePlayPause}
-                  />
+              (() => {
+                const ytVideoId = extractYouTubeVideoId(currentMediaUrl) || extractYouTubeVideoId(post.sourceUrl) || extractYouTubeVideoId(post.mediaUrls);
+                if (ytVideoId) {
+                  const embedSrc = getYouTubeEmbedUrl(ytVideoId, { autoplay: true, muted: muted, controls: true });
+                  const watchUrl = getYouTubeWatchUrl(ytVideoId);
+                  return (
+                    <div className="relative w-full aspect-video sm:max-h-[640px] flex items-center justify-center bg-black overflow-hidden group">
+                      <iframe
+                        src={embedSrc}
+                        title={post.caption || 'YouTube Video'}
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        allowFullScreen
+                        className="w-full h-full aspect-video border-0"
+                      />
+                      <a
+                        href={watchUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="absolute top-3 right-3 px-3 py-1 rounded-full bg-black/60 hover:bg-black/90 backdrop-blur-md text-white text-[11px] font-bold border border-white/20 transition-all opacity-0 group-hover:opacity-100 z-10"
+                      >
+                        Watch on YouTube
+                      </a>
+                    </div>
+                  );
+                }
 
-                  {/* Center Play Overlay when Paused */}
-                  {!isPlaying && (
-                    <button
-                      onClick={togglePlayPause}
-                      className="absolute inset-0 m-auto w-16 h-16 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center text-white shadow-2xl hover:scale-110 active:scale-95 transition-all z-20 cursor-pointer"
-                      aria-label="Play video"
-                    >
-                      <Play className="w-8 h-8 fill-white ml-1" />
-                    </button>
-                  )}
+                if (isVideo) {
+                  return (
+                    <div className="relative w-full aspect-square sm:aspect-auto sm:max-h-[640px] flex items-center justify-center group overflow-hidden">
+                      <HLSVideo
+                        ref={videoRef}
+                        src={currentMediaUrl}
+                        isActive={true}
+                        shouldLoad={true}
+                        ignoreGlobalActive={true}
+                        contentId={post.id}
+                        contentType="post"
+                        className="w-full h-full max-h-[640px] object-contain cursor-pointer"
+                        loop
+                        muted={muted}
+                        playsInline
+                        autoPlay
+                        onPlay={() => setIsPlaying(true)}
+                        onPause={() => setIsPlaying(false)}
+                        onClick={togglePlayPause}
+                      />
 
-                  {/* Bottom Video Controls */}
-                  <div className="absolute bottom-3 right-3 flex gap-2 z-20">
-                    <button
-                      onClick={() => {
-                        const nextMuted = !muted;
-                        setMuted(nextMuted);
-                        if (videoRef.current) videoRef.current.muted = nextMuted;
-                      }}
-                      className="w-8 h-8 rounded-full bg-black/70 backdrop-blur-md flex items-center justify-center hover:bg-black/90 transition-all text-white shadow-lg cursor-pointer"
-                      aria-label={muted ? "Unmute video" : "Mute video"}
-                    >
-                      {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-              ) : (
+                      {/* Center Play Overlay when Paused */}
+                      {!isPlaying && (
+                        <button
+                          onClick={togglePlayPause}
+                          className="absolute inset-0 m-auto w-16 h-16 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center text-white shadow-2xl hover:scale-110 active:scale-95 transition-all z-20 cursor-pointer"
+                          aria-label="Play video"
+                        >
+                          <Play className="w-8 h-8 fill-white ml-1" />
+                        </button>
+                      )}
+
+                      {/* Bottom Video Controls */}
+                      <div className="absolute bottom-3 right-3 flex gap-2 z-20">
+                        <button
+                          onClick={() => {
+                            const nextMuted = !muted;
+                            setMuted(nextMuted);
+                            if (videoRef.current) videoRef.current.muted = nextMuted;
+                          }}
+                          className="w-8 h-8 rounded-full bg-black/70 backdrop-blur-md flex items-center justify-center hover:bg-black/90 transition-all text-white shadow-lg cursor-pointer"
+                          aria-label={muted ? "Unmute video" : "Mute video"}
+                        >
+                          {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                }
+
+                return null;
+              })() || (
                 <div className="relative w-full flex items-center justify-center">
                   <div className="relative w-full flex items-center justify-center overflow-hidden bg-black">
                     <img

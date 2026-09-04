@@ -6,6 +6,7 @@ import { authOptions } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
 import { sanitizeText } from '@/lib/sanitize';
 import { getSimulationSettings, getGroupMemberCount, getSimulatedEngagement } from '@/lib/simulation';
+import { extractYouTubeVideoId } from '@/lib/youtube';
 
 export interface SearchFilters {
   type?: 'all' | 'users' | 'reels' | 'posts' | 'groups' | 'marketplace' | 'requirements' | 'locations' | 'trending';
@@ -40,6 +41,8 @@ export interface SearchResultItem {
     condition?: string | null;
     memberCount?: number;
     ownerName?: string;
+    isYouTube?: boolean;
+    youtubeId?: string | null;
   };
 }
 
@@ -49,21 +52,21 @@ function extractMediaThumbnail(mediaUrls?: string | null, mediaTypes?: string | 
     return null;
   }
 
+  // 1. YouTube Video (watch, embed, shorts, youtu.be, raw ID)
+  const ytId = extractYouTubeVideoId(mediaUrls);
+  if (ytId) {
+    return `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
+  }
+
   // Split multiple URLs
   const urls = mediaUrls.split(/,(?=https?:\/\/|\/uploads\/)/).map(u => u.trim()).filter(Boolean);
   if (urls.length === 0) return null;
 
-  // 1. If an image is explicitly in the list, prioritize it
+  // 2. If an image is explicitly in the list, prioritize it
   const imageCandidate = urls.find(u => /\.(jpeg|jpg|png|webp|gif|avif)($|\?)/i.test(u) && !u.includes('/video/'));
   if (imageCandidate) return imageCandidate;
 
   const first = urls[0];
-
-  // 2. YouTube Video (watch, embed, shorts, youtu.be)
-  const ytMatch = first.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=|shorts\/))([\w-]{11})/i);
-  if (ytMatch && ytMatch[1]) {
-    return `https://img.youtube.com/vi/${ytMatch[1]}/hqdefault.jpg`;
-  }
 
   // 3. Cloudinary Video (.m3u8, .mp4, .mov, etc.)
   if (first.includes('cloudinary.com') && (first.includes('/video/upload/') || /\.(m3u8|mp4|webm|mov|mkv)($|\?)/i.test(first))) {
@@ -364,6 +367,9 @@ export async function performSearch(
       if (p.postType === 'reel') type = 'reel';
       else if (p.postType === 'requirement') type = 'requirement';
 
+      const ytId = extractYouTubeVideoId(p.mediaUrls) || extractYouTubeVideoId(p.sourceUrl);
+      const isYouTube = Boolean(ytId);
+
       const score = calculateRelevanceScore(p, type, {
         primary: p.caption || '',
         secondary: p.visualTags || '',
@@ -392,7 +398,9 @@ export async function performSearch(
           likesCount: eng ? eng.likes : (p.likes?.length || 0),
           commentsCount: eng ? eng.comments : (p.comments?.length || 0),
           savesCount: eng ? eng.saves : (p.savedBy?.length || 0),
-          viewsCount: eng ? eng.views : (p.views?.length || 0)
+          viewsCount: eng ? eng.views : (p.views?.length || 0),
+          isYouTube,
+          youtubeId: ytId
         }
       });
     }
@@ -1018,7 +1026,9 @@ export async function getExploreFeed(page: number = 1, limit: number = 24) {
 
     const items = posts
       .map((p) => {
-        const isReel = p.postType === 'reel' || p.mediaTypes === 'video' || Boolean(p.mediaUrls && (p.mediaUrls.includes('.m3u8') || p.mediaUrls.includes('.mp4') || p.mediaUrls.includes('youtube') || p.mediaUrls.includes('youtu.be')));
+        const ytId = extractYouTubeVideoId(p.mediaUrls) || extractYouTubeVideoId(p.sourceUrl);
+        const isYouTube = Boolean(ytId);
+        const isReel = p.postType === 'reel' || isYouTube || p.mediaTypes === 'video' || Boolean(p.mediaUrls && (p.mediaUrls.includes('.m3u8') || p.mediaUrls.includes('.mp4')));
         const mediaThumb = extractMediaThumbnail(p.mediaUrls, p.mediaTypes, p.postType);
         if (!mediaThumb) return null;
 
@@ -1031,6 +1041,8 @@ export async function getExploreFeed(page: number = 1, limit: number = 24) {
           likesCount: p._count.likes || 0,
           commentsCount: p._count.comments || 0,
           viewsCount: p._count.views || 0,
+          isYouTube,
+          youtubeId: ytId,
           author: {
             id: p.author.id,
             name: p.author.name || 'User',

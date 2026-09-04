@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
+import { extractYouTubeVideoId } from '@/lib/youtube';
 import type { Metadata } from 'next';
 
 export const dynamic = 'force-dynamic';
@@ -172,7 +173,11 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
           if (post) {
             const isAuthorized = post.visibility !== 'only_me' || post.authorId === currentUserId;
             const isPublished = post.status === 'published';
-            const hasVideo = post.mediaUrls && (post.postType === 'reel' || post.mediaTypes?.includes('video'));
+            const ytId = extractYouTubeVideoId(post.mediaUrls) || extractYouTubeVideoId(post.sourceUrl);
+            const isYouTube = Boolean(ytId);
+            const hasVideo = Boolean(
+              post.mediaUrls && (post.postType === 'reel' || post.postType === 'video' || post.mediaTypes?.includes('video') || isYouTube)
+            );
 
             if (!isAuthorized || !isPublished || !hasVideo) {
               dbReels.unshift({
@@ -220,7 +225,9 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
                 authorId: post.author.id,
                 authorIsPrivate: post.author.isPrivate || false,
                 visibility: post.visibility,
-                video: post.mediaUrls.split(/,(?=https?:\/\/)/)[0],
+                video: post.mediaUrls ? post.mediaUrls.split(/,(?=https?:\/\/)/)[0] : '',
+                isYouTube,
+                youtubeId: ytId,
                 author: post.author.username,
                 authorAvatar: post.author.avatar || '/default-user-avatar.svg',
                 toleeName: firstTolee?.name || null,
@@ -247,7 +254,7 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
                 createdAt: post.createdAt,
                 duration: 15,
                 aspectRatio: '9:16',
-                videoType: 'hls',
+                videoType: isYouTube ? 'youtube' : 'hls',
                 audioInfo: 'Original Audio',
               };
               dbReels.unshift(singleReel);

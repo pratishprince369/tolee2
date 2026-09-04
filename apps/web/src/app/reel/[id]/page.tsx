@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { notFound, redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
+import { extractYouTubeVideoId } from '@/lib/youtube';
 import type { Metadata } from 'next';
 
 export const dynamic = 'force-dynamic';
@@ -118,8 +119,10 @@ export default async function ReelDeepLinkPage({ params }: ReelPageProps) {
 
     targetPost = post;
 
+    const ytId = extractYouTubeVideoId(post?.mediaUrls) || extractYouTubeVideoId(post?.sourceUrl);
+    const isYouTube = Boolean(ytId);
     const isVideo = (p: any) =>
-      p && p.mediaUrls && (p.postType === 'reel' || p.mediaTypes?.includes('video'));
+      p && p.mediaUrls && (p.postType === 'reel' || p.postType === 'video' || p.mediaTypes?.includes('video') || isYouTube);
 
     if (post && isVideo(post)) {
       // If private reel and user is not author, protect privacy
@@ -170,7 +173,9 @@ export default async function ReelDeepLinkPage({ params }: ReelPageProps) {
         authorId: post.author.id,
         authorIsPrivate: post.author.isPrivate || false,
         visibility: post.visibility,
-        video: post.mediaUrls.split(/,(?=https?:\/\/)/)[0],
+        video: post.mediaUrls ? post.mediaUrls.split(/,(?=https?:\/\/)/)[0] : '',
+        isYouTube,
+        youtubeId: ytId,
         author: post.author.username || post.author.name || 'creator',
         authorAvatar: post.author.avatar || '/default-user-avatar.svg',
         toleeName: firstTolee?.name || null,
@@ -197,7 +202,7 @@ export default async function ReelDeepLinkPage({ params }: ReelPageProps) {
         createdAt: post.createdAt,
         duration: 15,
         aspectRatio: '9:16',
-        videoType: 'mp4',
+        videoType: isYouTube ? 'youtube' : 'mp4',
         audioInfo: 'Original Audio',
       };
 

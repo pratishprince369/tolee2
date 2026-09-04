@@ -35,6 +35,8 @@ import { QuickBoostModal } from '@/components/QuickBoostModal';
 import { AdTracker } from '@/components/AdTracker';
 import { fetchEligibleAds } from '@/actions/ads';
 import { isVideoUrl, getMediaThumbnail, getPosterUrl } from '@/lib/media';
+import { YouTubeReelPlayer } from '@/components/YouTubeReelPlayer';
+import { extractYouTubeVideoId, decodeHtmlEntities } from '@/lib/youtube';
 
 const getValidAvatarUrl = (url: string | null | undefined): string => {
   if (!url || url === 'null' || url === 'undefined' || url.trim() === '') {
@@ -1170,67 +1172,86 @@ const ReelSlide = memo(function ReelSlide({
     session.user.name === reel.author
   );
 
+  const youtubeId = extractYouTubeVideoId(reel.video) || 
+                    extractYouTubeVideoId(reel.youtubeId) || 
+                    extractYouTubeVideoId(reel.sourceUrl) || 
+                    extractYouTubeVideoId(reel.mediaUrls);
+  const isYouTube = Boolean(youtubeId);
+
   return (
     <div
       data-index={index}
       className="reel-container w-full h-full snap-start snap-always relative flex items-center justify-center overflow-hidden bg-black"
       style={{ scrollSnapStop: 'always' }}
     >
-      {/* ── Video ── */}
-      <HLSVideo
-        src={reel.video}
-        className={`w-full h-full object-cover transition-opacity duration-300 ${isReady ? 'opacity-100' : 'opacity-0'}`}
-        poster={getPosterUrl(reel.video)}
-        isActive={isActive}
-        shouldLoad={shouldLoad}
-        preload={preload}
-        contentId={reel.id}
-        contentType="reel"
-        trafficSource="reels"
-        isVisible={isActive}
-        loop
-        muted={isMuted}
-        playsInline
-        onCanPlay={() => setIsReady(true)}
-        onError={handleVideoError}
-        onLoadStart={() => {
-          setIsReady(false);
-          setIsError(false);
-        }}
-      />
-
-      {/* ── Thumbnail Overlay (shown before first frame is ready) ── */}
-      {!isReady && !isError && getPosterUrl(reel.video) && (
-        <img
-          src={getPosterUrl(reel.video)}
-          alt="Thumbnail"
-          className="absolute inset-0 w-full h-full object-cover z-0 filter blur-[2px] scale-105"
+      {/* ── Video Playback: YouTube Player vs Native Tolee Video ── */}
+      {isYouTube && youtubeId ? (
+        <YouTubeReelPlayer
+          videoId={youtubeId}
+          title={reel.caption || 'YouTube Video'}
+          isActive={isActive}
+          isMuted={isMuted}
+          desktop={desktop}
+          posterUrl={getPosterUrl(reel.video)}
         />
-      )}
+      ) : (
+        <>
+          <HLSVideo
+            src={reel.video}
+            className={`w-full h-full object-cover transition-opacity duration-300 ${isReady ? 'opacity-100' : 'opacity-0'}`}
+            poster={getPosterUrl(reel.video)}
+            isActive={isActive}
+            shouldLoad={shouldLoad}
+            preload={preload}
+            contentId={reel.id}
+            contentType="reel"
+            trafficSource="reels"
+            isVisible={isActive}
+            loop
+            muted={isMuted}
+            playsInline
+            onCanPlay={() => setIsReady(true)}
+            onError={handleVideoError}
+            onLoadStart={() => {
+              setIsReady(false);
+              setIsError(false);
+            }}
+          />
 
-      {/* ── Reel Loading Skeleton Shimmer ── */}
-      {isActive && !isReady && !isError && (
-        <div className="absolute inset-0 bg-zinc-950/20 backdrop-blur-xs flex flex-col justify-end p-6 pb-24 space-y-4 animate-pulse pointer-events-none z-10">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-white/20" />
-            <div className="w-24 h-4 bg-white/20 rounded-md" />
-          </div>
-          <div className="w-2/3 h-4 bg-white/10 rounded-md" />
-          <div className="w-1/2 h-3.5 bg-white/10 rounded-md" />
-        </div>
-      )}
+          {/* ── Thumbnail Overlay (shown before first frame is ready) ── */}
+          {!isReady && !isError && getPosterUrl(reel.video) && (
+            <img
+              src={getPosterUrl(reel.video)}
+              alt="Thumbnail"
+              className="absolute inset-0 w-full h-full object-cover z-0 filter blur-[2px] scale-105"
+            />
+          )}
 
-      {/* ── Error Placeholder ── */}
-      {isError && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-950 text-center p-6 z-10 space-y-4">
-          <div className="p-3 bg-red-500/10 rounded-full border border-red-500/30">
-            <AlertCircle className="w-10 h-10 text-red-500" />
-          </div>
-          <div className="space-y-1">
-            <h4 className="font-bold text-sm text-zinc-200">Video Unavailable</h4>
-            <p className="text-xs text-zinc-500 max-w-[200px]">This simulated asset could not be loaded.</p>
-          </div>
-        </div>
+          {/* ── Reel Loading Skeleton Shimmer ── */}
+          {isActive && !isReady && !isError && (
+            <div className="absolute inset-0 bg-zinc-950/20 backdrop-blur-xs flex flex-col justify-end p-6 pb-24 space-y-4 animate-pulse pointer-events-none z-10">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-white/20" />
+                <div className="w-24 h-4 bg-white/20 rounded-md" />
+              </div>
+              <div className="w-2/3 h-4 bg-white/10 rounded-md" />
+              <div className="w-1/2 h-3.5 bg-white/10 rounded-md" />
+            </div>
+          )}
+
+          {/* ── Error Placeholder ── */}
+          {isError && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-950 text-center p-6 z-10 space-y-4">
+              <div className="p-3 bg-red-500/10 rounded-full border border-red-500/30">
+                <AlertCircle className="w-10 h-10 text-red-500" />
+              </div>
+              <div className="space-y-1">
+                <h4 className="font-bold text-sm text-zinc-200">Video Unavailable</h4>
+                <p className="text-xs text-zinc-500 max-w-[200px]">This video asset could not be loaded.</p>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Gradient overlay */}
@@ -1293,9 +1314,10 @@ const ReelSlide = memo(function ReelSlide({
         </div>
         {(() => {
           if (!reel.caption) return null;
-          const lines = reel.caption.split('\n');
+          const cleanCap = decodeHtmlEntities(reel.caption);
+          const lines = cleanCap.split('\n');
           const maxLines = 2;
-          const isLongCaption = lines.length > maxLines || reel.caption.length > 120;
+          const isLongCaption = lines.length > maxLines || cleanCap.length > 120;
           
           if (isLongCaption) {
             let displayCaption = lines.slice(0, maxLines).join('\n');
@@ -1315,7 +1337,7 @@ const ReelSlide = memo(function ReelSlide({
             );
           }
           return (
-            <p className="text-[13px] text-white drop-shadow leading-snug whitespace-pre-wrap">{reel.caption}</p>
+            <p className="text-[13px] text-white drop-shadow leading-snug whitespace-pre-wrap">{cleanCap}</p>
           );
         })()}
         <div className="flex items-center gap-1.5 text-[12px] text-white/80 drop-shadow">
