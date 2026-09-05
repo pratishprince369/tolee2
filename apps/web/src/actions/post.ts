@@ -2105,7 +2105,7 @@ export async function sharePostToFriends(
     }
 
     const isVideo = postDetails
-      ? (postDetails.postType === 'reel' || postDetails.postType === 'win' || postDetails.postType === 'news' || postDetails.mediaTypes?.split(',')[0] === 'video' || postDetails.mediaTypes === 'video')
+      ? (postDetails.postType === 'reel')
       : (screenDetails ? true : false);
 
     let contentType = 'feed';
@@ -2264,7 +2264,7 @@ export async function sharePostToFriends(
       let msgContent;
       if (postDetails || screenDetails || newsDetails || listingDetails) {
         const origin = shareUrl ? new URL(shareUrl).origin : 'https://tolee.in';
-        const finalShareUrl = (isVideo || contentType === 'reel')
+        const finalShareUrl = (contentType === 'reel')
           ? `${origin}/reel/${postId}` 
           : contentType === 'screen' 
           ? `${origin}/screen/watch/${postId}` 
@@ -2278,7 +2278,7 @@ export async function sharePostToFriends(
           ? postDetails.mediaUrls.split(/,(?=https?:\/\/)/).length 
           : 1;
 
-        const deepLink = (isVideo || contentType === 'reel')
+        const deepLink = (contentType === 'reel')
           ? `/reel/${postId}`
           : contentType === 'screen'
           ? `/screen/watch/${postId}`
@@ -2289,8 +2289,8 @@ export async function sharePostToFriends(
           : `/post/${postId}`;
 
         const payload = {
-          type: isVideo ? 'shared_video' : 'shared_post',
-          contentType: isVideo ? 'reel' : contentType,
+          type: contentType === 'reel' ? 'shared_video' : 'shared_post',
+          contentType: contentType,
           videoId: postId,
           creatorId,
           creatorName,
