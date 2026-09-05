@@ -343,7 +343,7 @@ export function MediaAttachmentMessage({
     }
 
     return (
-      <div className="w-full max-w-[270px] sm:max-w-[340px] md:max-w-[360px] my-0.5 select-none">
+      <div className="w-full max-w-[270px] sm:max-w-[340px] md:max-w-[360px] my-0 select-none">
         <div 
           onClick={(e) => {
             e.stopPropagation();
@@ -357,7 +357,7 @@ export function MediaAttachmentMessage({
               window.open(mediaInfo.url, '_blank');
             }
           }}
-          className="relative group cursor-pointer overflow-hidden rounded-xl bg-black/5 dark:bg-black/40 border border-black/5 dark:border-white/10 flex items-center justify-center min-h-[140px] max-h-[360px] sm:max-h-[400px] transition-transform active:scale-[0.99]"
+          className="relative group cursor-pointer overflow-hidden rounded-xl bg-black/5 dark:bg-black/40 flex items-center justify-center min-h-[140px] max-h-[360px] sm:max-h-[400px] transition-transform active:scale-[0.99]"
         >
           {/* Skeleton placeholder shown behind image while loading */}
           {!isImgLoaded && (
@@ -387,7 +387,7 @@ export function MediaAttachmentMessage({
           </div>
         </div>
         {mediaInfo.caption && (
-          <p className="mt-1.5 px-0.5 text-[14px] sm:text-[15px] leading-relaxed select-text whitespace-pre-wrap break-words">
+          <p className="mt-1.5 px-1 pb-0.5 text-[14px] sm:text-[15px] leading-relaxed select-text whitespace-pre-wrap break-words text-gray-900 dark:text-gray-100">
             {mediaInfo.caption}
           </p>
         )}

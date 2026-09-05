@@ -2407,218 +2407,239 @@ export default function ChatPage() {
                               </span>
                             )}
                             
-                            <div 
-                              className={`relative px-3 py-1.5 rounded-2xl shadow-sm border transition-all min-w-0 select-text cursor-pointer ${
-                                msg.isMe 
-                                  ? 'bg-primary border-primary text-primary-foreground rounded-tr-sm rounded-br-2xl rounded-l-2xl' 
-                                  : 'bg-white border-zinc-200/50 dark:border-zinc-800/60 dark:bg-zinc-900 text-gray-900 dark:text-gray-100 rounded-tl-sm rounded-bl-2xl rounded-r-2xl'
-                              }`}
-                              onContextMenu={(e) => {
-                                e.preventDefault();
-                                setContextMenu({ x: e.clientX, y: e.clientY, message: msg });
-                              }}
-                              onMouseDown={(e) => handleMessagePressStart(e, msg)}
-                              onMouseUp={handleMessagePressEnd}
-                              onMouseLeave={handleMessagePressEnd}
-                              onTouchStart={(e) => handleMessagePressStart(e, msg)}
-                              onTouchEnd={handleMessagePressEnd}
-                            >
-                              {/* Quoted Reply rendering inside bubbles */}
-                              {msg.replyTo && (
-                                <div 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    scrollToMessageId(msg.replyTo.id);
-                                  }}
-                                  className={`mb-1 p-2 rounded-xl bg-black/5 dark:bg-white/5 border-l-4 text-left cursor-pointer hover:bg-black/10 dark:hover:bg-white/10 transition-colors ${
-                                    msg.isMe ? 'border-white/60' : 'border-primary'
-                                  }`}
-                                >
-                                  <p 
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      navigateToProfile(msg.replyTo.senderUsername, msg.replyTo.senderId);
-                                    }}
-                                    className={`text-[10px] font-bold truncate hover:underline cursor-pointer ${
-                                      msg.isMe ? 'text-white dark:text-white' : 'text-primary dark:text-teal-400'
-                                    }`}
-                                  >
-                                    {msg.replyTo.sender}
-                                  </p>
-                                  <p className={`text-xs truncate leading-snug ${
-                                    msg.isMe ? 'text-white/80 dark:text-zinc-300' : 'text-gray-500 dark:text-zinc-400'
-                                  }`}>
-                                    {msg.replyTo.text}
-                                  </p>
-                                </div>
-                              )}
+                            {(() => {
+                              const isCallLog = msg.text?.startsWith('[CALL_LOG]:');
+                              const isSharedContent = msg.text?.includes('__SHARED_CONTENT__:');
+                              const mediaInfo = (!isCallLog && !isSharedContent) ? detectMediaInfo(msg.mediaUrl, msg.text, msg.mediaResourceType) : null;
+                              const isImageMsg = mediaInfo?.kind === 'image' && !!mediaInfo?.url;
 
-                              {/* Quoted Story Reply rendering */}
-                              {msg.storyId && (
+                              return (
                                 <div 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    const isExpired = isStoryExpired(msg.storyCreatedAt);
-                                    if (isExpired) {
-                                      alert("This story is no longer available.");
-                                      return;
-                                    }
-                                    let uploaderName = '';
-                                    let uploaderAvatar = '';
-                                    if (msg.storyUploaderId === msg.senderId) {
-                                      uploaderName = msg.sender;
-                                      uploaderAvatar = msg.senderAvatar || '/default-user-avatar.svg';
-                                    } else if (msg.storyUploaderId === currentUserId) {
-                                      uploaderName = session?.user?.name || 'You';
-                                      uploaderAvatar = session?.user?.image || '/default-user-avatar.svg';
-                                    } else {
-                                      uploaderName = activeChatDetails?.name || 'User';
-                                      uploaderAvatar = activeChatDetails?.avatar || '/default-user-avatar.svg';
-                                    }
-                                    openStoryViewer(msg.storyUploaderId, uploaderName, uploaderAvatar, msg.storyId);
+                                  className={`relative transition-all min-w-0 select-text cursor-pointer ${
+                                    isImageMsg
+                                      ? msg.isMe
+                                        ? 'bg-teal-500/10 dark:bg-teal-950/25 border border-teal-500/20 dark:border-teal-500/30 text-gray-900 dark:text-gray-100 rounded-tr-sm rounded-br-2xl rounded-l-2xl p-1 sm:p-1.5 pb-1 shadow-none'
+                                        : 'bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/80 text-gray-900 dark:text-gray-100 rounded-tl-sm rounded-bl-2xl rounded-r-2xl p-1 sm:p-1.5 pb-1 shadow-none'
+                                      : msg.isMe 
+                                        ? 'px-3 py-1.5 shadow-sm border bg-primary border-primary text-primary-foreground rounded-tr-sm rounded-br-2xl rounded-l-2xl' 
+                                        : 'px-3 py-1.5 shadow-sm border bg-white border-zinc-200/50 dark:border-zinc-800/60 dark:bg-zinc-900 text-gray-900 dark:text-gray-100 rounded-tl-sm rounded-bl-2xl rounded-r-2xl'
+                                  }`}
+                                  onContextMenu={(e) => {
+                                    e.preventDefault();
+                                    setContextMenu({ x: e.clientX, y: e.clientY, message: msg });
                                   }}
-                                  className="mb-2 p-2 rounded-xl bg-black/10 dark:bg-white/10 border-l-4 border-primary/70 text-left cursor-pointer hover:bg-black/15 dark:hover:bg-white/15 transition-colors flex items-center justify-between gap-3 overflow-hidden select-none"
+                                  onMouseDown={(e) => handleMessagePressStart(e, msg)}
+                                  onMouseUp={handleMessagePressEnd}
+                                  onMouseLeave={handleMessagePressEnd}
+                                  onTouchStart={(e) => handleMessagePressStart(e, msg)}
+                                  onTouchEnd={handleMessagePressEnd}
                                 >
-                                  <div className="flex-grow min-w-0 flex flex-col gap-0.5">
-                                    <span className="text-[10px] font-bold text-primary dark:text-teal-400">
-                                      {msg.isMe ? 'You replied to their story' : `${msg.sender} replied to your story`}
-                                    </span>
-                                    {isStoryExpired(msg.storyCreatedAt) ? (
-                                      <span className="text-xs text-red-400 dark:text-red-400 italic flex items-center gap-1 font-semibold">
-                                        🚫 This story is no longer available
-                                      </span>
-                                    ) : (
-                                      <span className="text-xs text-zinc-500 dark:text-zinc-400 truncate font-medium">
-                                        Replied to your story {msg.storyType || 'media'}
-                                      </span>
-                                    )}
-                                  </div>
-                                  {!isStoryExpired(msg.storyCreatedAt) && msg.storyThumbnail && (
-                                    <div className="w-10 h-14 rounded-lg overflow-hidden shrink-0 border border-white/10 bg-zinc-950 flex items-center justify-center">
-                                      {msg.storyType === 'video' ? (
-                                        <div className="relative w-full h-full">
-                                          <video 
-                                            src={msg.storyThumbnail} 
-                                            className="w-full h-full object-cover pointer-events-none" 
-                                            preload="metadata"
-                                            muted
-                                            playsInline
-                                          />
-                                          <div className="absolute inset-0 bg-black/25 flex items-center justify-center">
-                                            <Play className="w-3 h-3 text-white fill-white" />
-                                          </div>
+                                  {/* Quoted Reply rendering inside bubbles */}
+                                  {msg.replyTo && (
+                                    <div 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        scrollToMessageId(msg.replyTo.id);
+                                      }}
+                                      className={`mb-1 p-2 rounded-xl bg-black/5 dark:bg-white/5 border-l-4 text-left cursor-pointer hover:bg-black/10 dark:hover:bg-white/10 transition-colors ${
+                                        isImageMsg
+                                          ? 'border-primary'
+                                          : msg.isMe ? 'border-white/60' : 'border-primary'
+                                      }`}
+                                    >
+                                      <p 
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          navigateToProfile(msg.replyTo.senderUsername, msg.replyTo.senderId);
+                                        }}
+                                        className={`text-[10px] font-bold truncate hover:underline cursor-pointer ${
+                                          isImageMsg
+                                            ? 'text-primary dark:text-teal-400'
+                                            : msg.isMe ? 'text-white dark:text-white' : 'text-primary dark:text-teal-400'
+                                        }`}
+                                      >
+                                        {msg.replyTo.sender}
+                                      </p>
+                                      <p className={`text-xs truncate leading-snug ${
+                                        isImageMsg
+                                          ? 'text-gray-500 dark:text-zinc-400'
+                                          : msg.isMe ? 'text-white/80 dark:text-zinc-300' : 'text-gray-500 dark:text-zinc-400'
+                                      }`}>
+                                        {msg.replyTo.text}
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  {/* Quoted Story Reply rendering */}
+                                  {msg.storyId && (
+                                    <div 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const isExpired = isStoryExpired(msg.storyCreatedAt);
+                                        if (isExpired) {
+                                          alert("This story is no longer available.");
+                                          return;
+                                        }
+                                        let uploaderName = '';
+                                        let uploaderAvatar = '';
+                                        if (msg.storyUploaderId === msg.senderId) {
+                                          uploaderName = msg.sender;
+                                          uploaderAvatar = msg.senderAvatar || '/default-user-avatar.svg';
+                                        } else if (msg.storyUploaderId === currentUserId) {
+                                          uploaderName = session?.user?.name || 'You';
+                                          uploaderAvatar = session?.user?.image || '/default-user-avatar.svg';
+                                        } else {
+                                          uploaderName = activeChatDetails?.name || 'User';
+                                          uploaderAvatar = activeChatDetails?.avatar || '/default-user-avatar.svg';
+                                        }
+                                        openStoryViewer(msg.storyUploaderId, uploaderName, uploaderAvatar, msg.storyId);
+                                      }}
+                                      className="mb-2 p-2 rounded-xl bg-black/10 dark:bg-white/10 border-l-4 border-primary/70 text-left cursor-pointer hover:bg-black/15 dark:hover:bg-white/15 transition-colors flex items-center justify-between gap-3 overflow-hidden select-none"
+                                    >
+                                      <div className="flex-grow min-w-0 flex flex-col gap-0.5">
+                                        <span className="text-[10px] font-bold text-primary dark:text-teal-400">
+                                          {msg.isMe ? 'You replied to their story' : `${msg.sender} replied to your story`}
+                                        </span>
+                                        {isStoryExpired(msg.storyCreatedAt) ? (
+                                          <span className="text-xs text-red-400 dark:text-red-400 italic flex items-center gap-1 font-semibold">
+                                            🚫 This story is no longer available
+                                          </span>
+                                        ) : (
+                                          <span className="text-xs text-zinc-500 dark:text-zinc-400 truncate font-medium">
+                                            Replied to your story {msg.storyType || 'media'}
+                                          </span>
+                                        )}
+                                      </div>
+                                      {!isStoryExpired(msg.storyCreatedAt) && msg.storyThumbnail && (
+                                        <div className="w-10 h-14 rounded-lg overflow-hidden shrink-0 border border-white/10 bg-zinc-950 flex items-center justify-center">
+                                          {msg.storyType === 'video' ? (
+                                            <div className="relative w-full h-full">
+                                              <video 
+                                                src={msg.storyThumbnail} 
+                                                className="w-full h-full object-cover pointer-events-none" 
+                                                preload="metadata"
+                                                muted
+                                                playsInline
+                                              />
+                                              <div className="absolute inset-0 bg-black/25 flex items-center justify-center">
+                                                <Play className="w-3 h-3 text-white fill-white" />
+                                              </div>
+                                            </div>
+                                          ) : (
+                                            <img 
+                                              src={msg.storyThumbnail} 
+                                              alt="" 
+                                              className="w-full h-full object-cover pointer-events-none" 
+                                            />
+                                          )}
                                         </div>
-                                      ) : (
-                                        <img 
-                                          src={msg.storyThumbnail} 
-                                          alt="" 
-                                          className="w-full h-full object-cover pointer-events-none"
-                                        />
                                       )}
                                     </div>
                                   )}
-                                </div>
-                              )}
 
-                              {/* Message Content / Attachment / Shared Card */}
-                              {msg.text.startsWith('[CALL_LOG]:') ? (
-                                (() => {
-                                  const parts = msg.text.split(':');
-                                  const cType = parts[1]; // 'audio' | 'video'
-                                  const cStatus = parts[2]; // 'connected' | 'missed' | 'declined' | 'busy'
-                                  const cDuration = parseInt(parts[3] || '0', 10);
-                                  
-                                  const formattedDur = cDuration < 60 
-                                    ? `${cDuration}s` 
-                                    : `${Math.floor(cDuration / 60)}m ${cDuration % 60}s`;
+                                  {/* Message Content / Attachment / Shared Card */}
+                                  {isCallLog ? (
+                                    (() => {
+                                      const parts = msg.text.split(':');
+                                      const cType = parts[1]; // 'audio' | 'video'
+                                      const cStatus = parts[2]; // 'connected' | 'missed' | 'declined' | 'busy'
+                                      const cDuration = parseInt(parts[3] || '0', 10);
+                                      
+                                      const formattedDur = cDuration < 60 
+                                        ? `${cDuration}s` 
+                                        : `${Math.floor(cDuration / 60)}m ${cDuration % 60}s`;
 
-                                  return (
-                                    <div className="flex items-center gap-3 py-1 px-1.5 w-full select-none">
-                                      <div className={`p-2 rounded-full flex-shrink-0 ${
-                                        msg.isMe 
-                                          ? 'bg-black/15 text-primary-foreground border border-white/10' 
-                                          : cStatus === 'missed' 
-                                            ? 'bg-red-50 dark:bg-red-950/20 text-red-500 border border-red-100 dark:border-red-900/30' 
-                                            : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-650 dark:text-zinc-350 border border-zinc-200/40 dark:border-zinc-700/30'
-                                      }`}>
-                                        {cType === 'video' ? (
-                                          cStatus === 'missed' ? <VideoOff className="w-5 h-5 shrink-0" /> : <Video className="w-5 h-5 shrink-0" />
-                                        ) : (
-                                          cStatus === 'missed' ? <PhoneOff className="w-5 h-5 shrink-0" /> : <Phone className="w-5 h-5 shrink-0" />
-                                        )}
-                                      </div>
-                                      <div className="flex flex-col min-w-0 flex-grow text-left">
-                                        <span className="text-[13px] font-bold tracking-tight block text-current">
-                                          {cType === 'audio' ? 'Voice Call' : 'Video Call'}
-                                        </span>
-                                        <span className={`text-[11px] block mt-0.5 ${msg.isMe ? 'text-primary-foreground/80' : 'text-zinc-500 dark:text-zinc-400'}`}>
-                                          {msg.isMe ? 'Outgoing' : 'Incoming'} • {
-                                            cStatus === 'connected' 
-                                              ? `Answered (${formattedDur})` 
+                                      return (
+                                        <div className="flex items-center gap-3 py-1 px-1.5 w-full select-none">
+                                          <div className={`p-2 rounded-full flex-shrink-0 ${
+                                            msg.isMe 
+                                              ? 'bg-black/15 text-primary-foreground border border-white/10' 
                                               : cStatus === 'missed' 
-                                                ? 'Missed' 
-                                                : cStatus === 'declined' 
-                                                  ? 'Declined' 
-                                                  : 'Busy'
-                                          }
-                                        </span>
-                                      </div>
-                                    </div>
-                                  );
-                                })()
-                              ) : msg.text.includes('__SHARED_CONTENT__:') ? (
-                                (() => {
-                                  try {
-                                    const jsonIdx = msg.text.indexOf('__SHARED_CONTENT__:');
-                                    const payload = JSON.parse(msg.text.substring(jsonIdx + 19));
-                                    return <SharedContentCard payload={payload} />;
-                                  } catch (e) {
-                                    return (
-                                      <p className="text-[14px] sm:text-[15px] leading-relaxed whitespace-pre-wrap break-words [word-break:break-word] [overflow-wrap:anywhere] flex-1 select-text">
-                                        {msg.text}
-                                      </p>
-                                    );
-                                  }
-                                })()
-                              ) : (() => {
-                                const mediaInfo = detectMediaInfo(msg.mediaUrl, msg.text, msg.mediaResourceType);
-                                if (mediaInfo) {
-                                  return (
+                                                ? 'bg-red-50 dark:bg-red-950/20 text-red-500 border border-red-100 dark:border-red-900/30' 
+                                                : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-650 dark:text-zinc-350 border border-zinc-200/40 dark:border-zinc-700/30'
+                                          }`}>
+                                            {cType === 'video' ? (
+                                              cStatus === 'missed' ? <VideoOff className="w-5 h-5 shrink-0" /> : <Video className="w-5 h-5 shrink-0" />
+                                            ) : (
+                                              cStatus === 'missed' ? <PhoneOff className="w-5 h-5 shrink-0" /> : <Phone className="w-5 h-5 shrink-0" />
+                                            )}
+                                          </div>
+                                          <div className="flex flex-col min-w-0 flex-grow text-left">
+                                            <span className="text-[13px] font-bold tracking-tight block text-current">
+                                              {cType === 'audio' ? 'Voice Call' : 'Video Call'}
+                                            </span>
+                                            <span className={`text-[11px] block mt-0.5 ${msg.isMe ? 'text-primary-foreground/80' : 'text-zinc-500 dark:text-zinc-400'}`}>
+                                              {msg.isMe ? 'Outgoing' : 'Incoming'} • {
+                                                cStatus === 'connected' 
+                                                  ? `Answered (${formattedDur})` 
+                                                  : cStatus === 'missed' 
+                                                    ? 'Missed' 
+                                                    : cStatus === 'declined' 
+                                                      ? 'Declined' 
+                                                      : 'Busy'
+                                              }
+                                            </span>
+                                          </div>
+                                        </div>
+                                      );
+                                    })()
+                                  ) : isSharedContent ? (
+                                    (() => {
+                                      try {
+                                        const jsonIdx = msg.text.indexOf('__SHARED_CONTENT__:');
+                                        const payload = JSON.parse(msg.text.substring(jsonIdx + 19));
+                                        return <SharedContentCard payload={payload} />;
+                                      } catch (e) {
+                                        return (
+                                          <p className="text-[14px] sm:text-[15px] leading-relaxed whitespace-pre-wrap break-words [word-break:break-word] [overflow-wrap:anywhere] flex-1 select-text">
+                                            {msg.text}
+                                          </p>
+                                        );
+                                      }
+                                    })()
+                                  ) : mediaInfo ? (
                                     <MediaAttachmentMessage
                                       mediaInfo={mediaInfo}
                                       isMe={msg.isMe}
                                       onOpenMediaViewer={(m) => setActiveMediaViewer({ ...m, sender: msg.sender })}
                                     />
-                                  );
-                                }
-                                return (
-                                  <p className="text-[14px] sm:text-[15px] leading-relaxed whitespace-pre-wrap break-words [word-break:break-word] [overflow-wrap:anywhere] flex-1 select-text">
-                                    {msg.text}
-                                  </p>
-                                );
-                              })()}
-
-                              <div className="flex flex-wrap items-end justify-between gap-x-4 min-w-0 w-full">
-                                
-                                <div className={`inline-flex items-center gap-1 text-[9px] select-none ml-auto mt-0.5 shrink-0 ${msg.isMe ? 'text-primary-foreground/75' : 'text-gray-400 dark:text-zinc-500'}`}>
-                                  <span>{msg.time}</span>
-                                  {msg.isMe && (
-                                    msg.id.startsWith('temp-') ? (
-                                      <Clock className="w-3.5 h-3.5 text-primary-foreground/75 animate-pulse shrink-0" />
-                                    ) : (
-                                      <CheckCheck 
-                                        className={`w-3.5 h-3.5 shrink-0 ${
-                                          !activeChatDetails?.isGroup && msg.isRead 
-                                            ? 'text-sky-300 dark:text-sky-350' 
-                                            : 'text-primary-foreground/60'
-                                        }`} 
-                                        strokeWidth={2.5} 
-                                      />
-                                    )
+                                  ) : (
+                                    <p className="text-[14px] sm:text-[15px] leading-relaxed whitespace-pre-wrap break-words [word-break:break-word] [overflow-wrap:anywhere] flex-1 select-text">
+                                      {msg.text}
+                                    </p>
                                   )}
+
+                                  <div className={`flex flex-wrap items-end justify-between gap-x-4 min-w-0 w-full ${isImageMsg ? 'mt-0.5 px-0.5' : ''}`}>
+                                    
+                                    <div className={`inline-flex items-center gap-1 text-[9px] select-none ml-auto mt-0.5 shrink-0 ${
+                                      isImageMsg
+                                        ? 'text-gray-500 dark:text-zinc-400'
+                                        : msg.isMe 
+                                          ? 'text-primary-foreground/75' 
+                                          : 'text-gray-400 dark:text-zinc-500'
+                                    }`}>
+                                      <span>{msg.time}</span>
+                                      {msg.isMe && (
+                                        msg.id.startsWith('temp-') ? (
+                                          <Clock className={`w-3.5 h-3.5 animate-pulse shrink-0 ${isImageMsg ? 'text-teal-600 dark:text-teal-400' : 'text-primary-foreground/75'}`} />
+                                        ) : (
+                                          <CheckCheck 
+                                            className={`w-3.5 h-3.5 shrink-0 ${
+                                              !activeChatDetails?.isGroup && msg.isRead 
+                                                ? 'text-sky-500 dark:text-sky-350' 
+                                                : isImageMsg
+                                                  ? 'text-teal-600 dark:text-teal-400'
+                                                  : 'text-primary-foreground/60'
+                                            }`} 
+                                            strokeWidth={2.5} 
+                                          />
+                                        )
+                                      )}
+                                    </div>
+                                  </div>
                                 </div>
-                              </div>
-                            </div>
+                              );
+                            })()}
                           </div>
                         </div>
                       </div>
