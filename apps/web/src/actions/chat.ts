@@ -106,6 +106,8 @@ export async function fetchRealChatData() {
         senderAvatar: msg.sender.avatar || msg.sender.image || '/default-user-avatar.svg',
         text: msg.content,
         mediaUrl: msg.mediaUrl || null,
+        mediaResourceType: msg.mediaResourceType || null,
+        mediaPublicId: msg.mediaPublicId || null,
         isRead: msg.isRead,
         createdAt: msg.createdAt.toISOString(),
         time: msg.createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -219,6 +221,8 @@ export async function fetchRealChatData() {
         senderAvatar: msg.sender.avatar || msg.sender.image || '/default-user-avatar.svg',
         text: msg.content,
         mediaUrl: msg.mediaUrl || null,
+        mediaResourceType: msg.mediaResourceType || null,
+        mediaPublicId: msg.mediaPublicId || null,
         isRead: msg.isRead,
         createdAt: msg.createdAt.toISOString(),
         isPromotion: msg.isPromotion,
@@ -306,6 +310,11 @@ export async function sendRealChatMessage(
     storyThumbnail: string;
     storyUploaderId: string;
     storyCreatedAt: Date | string;
+  },
+  mediaData?: {
+    mediaUrl?: string;
+    mediaPublicId?: string;
+    mediaResourceType?: string;
   }
 ) {
   try {
@@ -334,7 +343,7 @@ export async function sendRealChatMessage(
     const { sanitizeText } = require('@/lib/sanitize');
     const safeContent = sanitizeText(content || '', 5000);
 
-    if (!safeContent) {
+    if (!safeContent && !mediaData?.mediaUrl) {
       return { success: false, error: 'Message cannot be empty.' };
     }
 
@@ -370,7 +379,10 @@ export async function sendRealChatMessage(
 
     const message = await prisma.message.create({
       data: {
-        content: safeContent,
+        content: safeContent || (mediaData?.mediaUrl ? '' : 'Message'),
+        mediaUrl: mediaData?.mediaUrl || null,
+        mediaPublicId: mediaData?.mediaPublicId || null,
+        mediaResourceType: mediaData?.mediaResourceType || null,
         senderId,
         chatId,
         parentId: parentId || null,
@@ -458,6 +470,8 @@ export async function sendRealChatMessage(
           senderUsername: message.parent.sender.username || null
         } : null,
         mediaUrl: message.mediaUrl || null,
+        mediaResourceType: message.mediaResourceType || null,
+        mediaPublicId: message.mediaPublicId || null,
         createdAt: message.createdAt.toISOString(),
         storyId: message.storyId || null,
         storyType: message.storyType || null,
@@ -652,6 +666,8 @@ export async function fetchChatMessages(chatId: string, beforeMessageId?: string
       senderAvatar: msg.sender.avatar || msg.sender.image || '/default-user-avatar.svg',
       text: msg.content,
       mediaUrl: msg.mediaUrl || null,
+      mediaResourceType: msg.mediaResourceType || null,
+      mediaPublicId: msg.mediaPublicId || null,
       isRead: msg.isRead,
       createdAt: msg.createdAt.toISOString(),
       isPromotion: msg.isPromotion,

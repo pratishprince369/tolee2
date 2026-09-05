@@ -17,16 +17,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'No file provided' });
     }
 
-    // MIME Type Validation
-    const isValidType = file.type.startsWith('image/') || file.type.startsWith('video/') || file.type.startsWith('application/pdf');
+    // MIME Type Validation - allow images, videos, audio, PDFs, and common documents
+    const isImage = file.type.startsWith('image/');
+    const isVideo = file.type.startsWith('video/');
+    const isAudio = file.type.startsWith('audio/');
+    const isDoc = file.type.startsWith('application/') || file.type.startsWith('text/') || 
+      file.name.match(/\.(pdf|doc|docx|xls|xlsx|ppt|pptx|txt|rtf|csv|zip|rar|7z|tar|gz)$/i);
+
+    const isValidType = isImage || isVideo || isAudio || Boolean(isDoc);
     if (!isValidType) {
-      return NextResponse.json({ success: false, error: 'Invalid file type. Only images, videos, and PDFs are allowed.' }, { status: 400 });
+      return NextResponse.json({ success: false, error: 'Invalid file type. Unsupported format.' }, { status: 400 });
     }
 
-    // Size limits (50MB for videos, 5MB for images/other)
-    const maxSize = file.type.startsWith('video/') ? 50 * 1024 * 1024 : 5 * 1024 * 1024;
+    // Size limits (50MB for videos, 25MB for audio/documents/images)
+    const maxSize = isVideo ? 50 * 1024 * 1024 : 25 * 1024 * 1024;
     if (file.size > maxSize) {
-      return NextResponse.json({ success: false, error: 'File size exceeds maximum allowed limit.' }, { status: 413 });
+      return NextResponse.json({ success: false, error: `File size exceeds limit (${isVideo ? '50MB' : '25MB'}).` }, { status: 413 });
     }
 
     const arrayBuffer = await file.arrayBuffer();

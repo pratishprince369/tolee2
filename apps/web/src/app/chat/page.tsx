@@ -28,7 +28,7 @@ import {
   Search, MoreVertical, Phone, Video, Paperclip, Smile, Send, Check, CheckCheck, 
   EyeOff, Users, ShieldCheck, PlusCircle, MessageCircle, ChevronLeft, X, 
   Image as ImageIcon, AlertCircle, BellOff, LogOut, Clock, Copy, Reply, Trash2, ArrowRight, Layers,
-  PhoneOff, VideoOff, Play, Pin, Clapperboard, Newspaper, MapPin
+  PhoneOff, VideoOff, Play, Pin, Clapperboard, Newspaper, MapPin, Music, FileText, Download, Loader2
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -41,6 +41,14 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuPortal
 } from "@/components/ui/dropdown-menu";
+
+import { 
+  MediaAttachmentMessage, 
+  detectMediaInfo, 
+  MediaAttachmentInfo 
+} from '@/components/chat/MediaAttachmentMessage';
+import { MediaViewerModal } from '@/components/chat/MediaViewerModal';
+import { uploadFile } from '@/lib/upload';
 
 import { 
   getUserPromotionPreferences, 
@@ -605,11 +613,30 @@ export default function ChatPage() {
   const [searchMatches, setSearchMatches] = useState<string[]>([]);
   const [currentSearchMatchIndex, setCurrentSearchMatchIndex] = useState(0);
 
-  // --- Attachment Modal ---
+  // --- Attachment Modal & Media Preview States ---
   const [showAttachmentModal, setShowAttachmentModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
+  const audioInputRef = useRef<HTMLInputElement>(null);
+
+  const [pendingAttachment, setPendingAttachment] = useState<{
+    file: File;
+    previewUrl: string;
+    kind: 'image' | 'video' | 'audio' | 'pdf' | 'document';
+    name: string;
+    sizeFormatted: string;
+  } | null>(null);
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  // --- Fullscreen Media Viewer Modal State ---
+  const [activeMediaViewer, setActiveMediaViewer] = useState<{
+    type: 'image' | 'video';
+    url: string;
+    filename?: string;
+    sender?: string;
+  } | null>(null);
 
   // --- Emoji Picker ---
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -1223,11 +1250,60 @@ export default function ChatPage() {
     }
   };
 
-  const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
+  const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>, explicitKind?: 'image' | 'video' | 'audio' | 'document') => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    const isVideo = file.type.startsWith('video/') || explicitKind === 'video';
+    const maxSize = isVideo ? 50 * 1024 * 1024 : 25 * 1024 * 1024;
+
+    if (file.size > maxSize) {
+      alert(`File size exceeds limit (${isVideo ? '50MB' : '25MB'}).`);
+      e.target.value = '';
+      return;
+    }
+
+    let kind: 'image' | 'video' | 'audio' | 'pdf' | 'document' = 'document';
+    if (explicitKind) {
+      if (explicitKind === 'document' && (file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf')) {
+        kind = 'pdf';
+      } else {
+        kind = explicitKind;
+      }
+    } else if (file.type.startsWith('image/')) {
+      kind = 'image';
+    } else if (file.type.startsWith('video/')) {
+      kind = 'video';
+    } else if (file.type.startsWith('audio/')) {
+      kind = 'audio';
+    } else if (file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf') {
+      kind = 'pdf';
+    } else {
+      kind = 'document';
+    }
+
+    const previewUrl = URL.createObjectURL(file);
+
+    // Revoke previous preview URL if any
+    if (pendingAttachment?.previewUrl) {
+      URL.revokeObjectURL(pendingAttachment.previewUrl);
+    }
+
+    setPendingAttachment({
+      file,
+      previewUrl,
+      kind,
+      name: file.name,
+      sizeFormatted: formatFileSize(file.size)
+    });
+
     setShowAttachmentModal(false);
-    setNewMessage(prev => prev ? prev + ` [📎 ${file.name}]` : `[📎 ${file.name}]`);
     e.target.value = '';
   };
 
@@ -1448,19 +1524,23 @@ export default function ChatPage() {
 
   const handleSendMessage = async () => {
     if (isSendingRef.current) return;
-    if (!newMessage.trim()) return;
+    if (!newMessage.trim() && !pendingAttachment) return;
     if (!activeChat) return;
 
     isSendingRef.current = true;
     const contentToSend = newMessage.trim();
     const parentIdToSend = replyingToMessage?.id;
+    const attachmentToSend = pendingAttachment;
     const tempId = 'temp-' + Date.now();
+
     const newMsg = {
       id: tempId,
       sender: 'Me',
       senderAvatar: session?.user?.image || '/default-user-avatar.svg',
       senderId: currentUserId,
       text: contentToSend,
+      mediaUrl: attachmentToSend?.previewUrl || null,
+      mediaResourceType: attachmentToSend?.kind || null,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       createdAt: new Date().toISOString(),
       isMe: true,
@@ -1476,15 +1556,20 @@ export default function ChatPage() {
     // Clear input state immediately to prevent duplicate mobile taps/submissions
     setNewMessage('');
     setReplyingToMessage(null);
+    setPendingAttachment(null);
 
     setMessagesByChat(prev => ({
       ...prev,
       [activeChat]: [...(prev[activeChat] || []), newMsg]
     }));
     
+    const lastMsgDisplay = attachmentToSend 
+      ? `Me: ${attachmentToSend.kind === 'image' ? '📷 Photo' : attachmentToSend.kind === 'video' ? '🎥 Video' : attachmentToSend.kind === 'audio' ? '🎵 Audio' : '📄 Document'} ${contentToSend ? `"${contentToSend}"` : ''}`
+      : `Me: ${contentToSend}`;
+
     setChats(prev => prev.map(chat => 
       chat.id === activeChat 
-        ? { ...chat, lastMessage: `Me: ${contentToSend}`, time: newMsg.time, lastMessageCreatedAt: new Date().toISOString() }
+        ? { ...chat, lastMessage: lastMsgDisplay, time: newMsg.time, lastMessageCreatedAt: new Date().toISOString() }
         : chat
     ));
 
@@ -1492,7 +1577,56 @@ export default function ChatPage() {
     emitTyping(activeChat, false);
 
     try {
-      const res = await sendRealChatMessage(activeChat, contentToSend, parentIdToSend);
+      let uploadedMediaUrl: string | null = null;
+      let uploadedPublicId: string | null = null;
+      let uploadedResourceType: string | null = null;
+
+      if (attachmentToSend) {
+        setIsUploadingAttachment(true);
+        setUploadProgress(15);
+        try {
+          // 1. Direct failover upload to Cloudinary
+          const uploadRes = await uploadFile(attachmentToSend.file, (p) => setUploadProgress(p));
+          uploadedMediaUrl = uploadRes.secure_url;
+          uploadedPublicId = uploadRes.public_id;
+          uploadedResourceType = uploadRes.resource_type;
+        } catch (clientUploadErr) {
+          console.warn("[Upload] Direct upload failed, falling back to server route...", clientUploadErr);
+          // 2. Server route fallback
+          const formData = new FormData();
+          formData.append('file', attachmentToSend.file);
+          const apiRes = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData
+          }).then(r => r.json());
+
+          if (apiRes.success && apiRes.url) {
+            uploadedMediaUrl = apiRes.url;
+            uploadedPublicId = apiRes.publicId;
+            uploadedResourceType = apiRes.resourceType;
+          } else {
+            alert(apiRes.error || "Failed to upload media attachment. Please check file size and try again.");
+            setIsUploadingAttachment(false);
+            isSendingRef.current = false;
+            setMessagesByChat(prev => ({
+              ...prev,
+              [activeChat]: (prev[activeChat] || []).filter(m => m.id !== tempId)
+            }));
+            return;
+          }
+        } finally {
+          setIsUploadingAttachment(false);
+          setUploadProgress(0);
+        }
+      }
+
+      const mediaPayload = uploadedMediaUrl ? {
+        mediaUrl: uploadedMediaUrl,
+        mediaPublicId: uploadedPublicId || undefined,
+        mediaResourceType: uploadedResourceType || attachmentToSend?.kind || undefined
+      } : undefined;
+
+      const res = await sendRealChatMessage(activeChat, contentToSend, parentIdToSend, undefined, mediaPayload);
       if (res.success && res.message) {
         setMessagesByChat(prev => {
           const msgs = prev[activeChat] || [];
@@ -1514,7 +1648,8 @@ export default function ChatPage() {
             senderName: session?.user?.name || 'User',
             senderAvatar: session?.user?.image || '/default-user-avatar.svg',
             text: contentToSend,
-            mediaUrl: (res.message as any).mediaUrl || null,
+            mediaUrl: (res.message as any).mediaUrl || uploadedMediaUrl || null,
+            mediaResourceType: (res.message as any).mediaResourceType || uploadedResourceType || null,
             isGroup: activeChatDetails?.isGroup || false,
             receiverId: activeChatDetails?.otherUserId || null,
             createdAt: (res.message as any).createdAt || new Date().toISOString(),
@@ -1541,6 +1676,7 @@ export default function ChatPage() {
       }));
     } finally {
       isSendingRef.current = false;
+      setIsUploadingAttachment(false);
     }
   };
 
@@ -2376,94 +2512,85 @@ export default function ChatPage() {
                                 </div>
                               )}
 
-                              {/* Media Attachments */}
-                              {msg.mediaUrl && (
-                                <div className="mt-0.5 mb-1.5 rounded-xl overflow-hidden max-w-full border border-zinc-200/40 dark:border-zinc-800/80 shadow-sm bg-zinc-50 dark:bg-black/30">
-                                  {msg.mediaUrl.match(/\.(mp4|webm|mov|ogg)$/i) || msg.mediaUrl.includes('video') ? (
-                                    <video 
-                                      src={msg.mediaUrl} 
-                                      controls 
-                                      preload="metadata" 
-                                      className="max-h-60 w-full object-cover rounded-xl"
-                                    />
-                                  ) : (
-                                    <a href={msg.mediaUrl} target="_blank" rel="noopener noreferrer" className="block relative group cursor-pointer overflow-hidden rounded-xl">
-                                      <img 
-                                        src={msg.mediaUrl} 
-                                        alt="Shared media" 
-                                        loading="lazy"
-                                        className="max-h-60 w-full object-cover transition-transform duration-300 group-hover:scale-102"
-                                      />
-                                    </a>
-                                  )}
-                                </div>
-                              )}
+                              {/* Message Content / Attachment / Shared Card */}
+                              {msg.text.startsWith('[CALL_LOG]:') ? (
+                                (() => {
+                                  const parts = msg.text.split(':');
+                                  const cType = parts[1]; // 'audio' | 'video'
+                                  const cStatus = parts[2]; // 'connected' | 'missed' | 'declined' | 'busy'
+                                  const cDuration = parseInt(parts[3] || '0', 10);
+                                  
+                                  const formattedDur = cDuration < 60 
+                                    ? `${cDuration}s` 
+                                    : `${Math.floor(cDuration / 60)}m ${cDuration % 60}s`;
 
-                              <div className="flex flex-wrap items-end justify-between gap-x-4 min-w-0 w-full">
-                                {msg.text.startsWith('[CALL_LOG]:') ? (
-                                  (() => {
-                                    const parts = msg.text.split(':');
-                                    const cType = parts[1]; // 'audio' | 'video'
-                                    const cStatus = parts[2]; // 'connected' | 'missed' | 'declined' | 'busy'
-                                    const cDuration = parseInt(parts[3] || '0', 10);
-                                    
-                                    const formattedDur = cDuration < 60 
-                                      ? `${cDuration}s` 
-                                      : `${Math.floor(cDuration / 60)}m ${cDuration % 60}s`;
-
-                                    return (
-                                      <div className="flex items-center gap-3 py-1 px-1.5 w-full select-none">
-                                        <div className={`p-2 rounded-full flex-shrink-0 ${
-                                          msg.isMe 
-                                            ? 'bg-black/15 text-primary-foreground border border-white/10' 
-                                            : cStatus === 'missed' 
-                                              ? 'bg-red-50 dark:bg-red-950/20 text-red-500 border border-red-100 dark:border-red-900/30' 
-                                              : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-650 dark:text-zinc-350 border border-zinc-200/40 dark:border-zinc-700/30'
-                                        }`}>
-                                          {cType === 'video' ? (
-                                            cStatus === 'missed' ? <VideoOff className="w-5 h-5 shrink-0" /> : <Video className="w-5 h-5 shrink-0" />
-                                          ) : (
-                                            cStatus === 'missed' ? <PhoneOff className="w-5 h-5 shrink-0" /> : <Phone className="w-5 h-5 shrink-0" />
-                                          )}
-                                        </div>
-                                        <div className="flex flex-col min-w-0 flex-grow text-left">
-                                          <span className="text-[13px] font-bold tracking-tight block text-current">
-                                            {cType === 'audio' ? 'Voice Call' : 'Video Call'}
-                                          </span>
-                                          <span className={`text-[11px] block mt-0.5 ${msg.isMe ? 'text-primary-foreground/80' : 'text-zinc-500 dark:text-zinc-400'}`}>
-                                            {msg.isMe ? 'Outgoing' : 'Incoming'} • {
-                                              cStatus === 'connected' 
-                                                ? `Answered (${formattedDur})` 
-                                                : cStatus === 'missed' 
-                                                  ? 'Missed' 
-                                                  : cStatus === 'declined' 
-                                                    ? 'Declined' 
-                                                    : 'Busy'
-                                            }
-                                          </span>
-                                        </div>
+                                  return (
+                                    <div className="flex items-center gap-3 py-1 px-1.5 w-full select-none">
+                                      <div className={`p-2 rounded-full flex-shrink-0 ${
+                                        msg.isMe 
+                                          ? 'bg-black/15 text-primary-foreground border border-white/10' 
+                                          : cStatus === 'missed' 
+                                            ? 'bg-red-50 dark:bg-red-950/20 text-red-500 border border-red-100 dark:border-red-900/30' 
+                                            : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-650 dark:text-zinc-350 border border-zinc-200/40 dark:border-zinc-700/30'
+                                      }`}>
+                                        {cType === 'video' ? (
+                                          cStatus === 'missed' ? <VideoOff className="w-5 h-5 shrink-0" /> : <Video className="w-5 h-5 shrink-0" />
+                                        ) : (
+                                          cStatus === 'missed' ? <PhoneOff className="w-5 h-5 shrink-0" /> : <Phone className="w-5 h-5 shrink-0" />
+                                        )}
                                       </div>
+                                      <div className="flex flex-col min-w-0 flex-grow text-left">
+                                        <span className="text-[13px] font-bold tracking-tight block text-current">
+                                          {cType === 'audio' ? 'Voice Call' : 'Video Call'}
+                                        </span>
+                                        <span className={`text-[11px] block mt-0.5 ${msg.isMe ? 'text-primary-foreground/80' : 'text-zinc-500 dark:text-zinc-400'}`}>
+                                          {msg.isMe ? 'Outgoing' : 'Incoming'} • {
+                                            cStatus === 'connected' 
+                                              ? `Answered (${formattedDur})` 
+                                              : cStatus === 'missed' 
+                                                ? 'Missed' 
+                                                : cStatus === 'declined' 
+                                                  ? 'Declined' 
+                                                  : 'Busy'
+                                          }
+                                        </span>
+                                      </div>
+                                    </div>
+                                  );
+                                })()
+                              ) : msg.text.includes('__SHARED_CONTENT__:') ? (
+                                (() => {
+                                  try {
+                                    const jsonIdx = msg.text.indexOf('__SHARED_CONTENT__:');
+                                    const payload = JSON.parse(msg.text.substring(jsonIdx + 19));
+                                    return <SharedContentCard payload={payload} />;
+                                  } catch (e) {
+                                    return (
+                                      <p className="text-[14px] sm:text-[15px] leading-relaxed whitespace-pre-wrap break-words [word-break:break-word] [overflow-wrap:anywhere] flex-1 select-text">
+                                        {msg.text}
+                                      </p>
                                     );
-                                  })()
-                                ) : msg.text.includes('__SHARED_CONTENT__:') ? (
-                                  (() => {
-                                    try {
-                                      const jsonIdx = msg.text.indexOf('__SHARED_CONTENT__:');
-                                      const payload = JSON.parse(msg.text.substring(jsonIdx + 19));
-                                      return <SharedContentCard payload={payload} />;
-                                    } catch (e) {
-                                      return (
-                                        <p className="text-[14px] sm:text-[15px] leading-relaxed whitespace-pre-wrap break-words [word-break:break-word] [overflow-wrap:anywhere] flex-1 select-text">
-                                          {msg.text}
-                                        </p>
-                                      );
-                                    }
-                                  })()
-                                ) : (
+                                  }
+                                })()
+                              ) : (() => {
+                                const mediaInfo = detectMediaInfo(msg.mediaUrl, msg.text, msg.mediaResourceType);
+                                if (mediaInfo) {
+                                  return (
+                                    <MediaAttachmentMessage
+                                      mediaInfo={mediaInfo}
+                                      isMe={msg.isMe}
+                                      onOpenMediaViewer={(m) => setActiveMediaViewer({ ...m, sender: msg.sender })}
+                                    />
+                                  );
+                                }
+                                return (
                                   <p className="text-[14px] sm:text-[15px] leading-relaxed whitespace-pre-wrap break-words [word-break:break-word] [overflow-wrap:anywhere] flex-1 select-text">
                                     {msg.text}
                                   </p>
-                                )}
+                                );
+                              })()}
+
+                              <div className="flex flex-wrap items-end justify-between gap-x-4 min-w-0 w-full">
                                 
                                 <div className={`inline-flex items-center gap-1 text-[9px] select-none ml-auto mt-0.5 shrink-0 ${msg.isMe ? 'text-primary-foreground/75' : 'text-gray-400 dark:text-zinc-500'}`}>
                                   <span>{msg.time}</span>
@@ -2594,6 +2721,67 @@ export default function ChatPage() {
             ) : (
               <div className="relative p-3 lg:p-4 bg-zinc-50 dark:bg-zinc-950/80 backdrop-blur-md border-t border-zinc-150/80 dark:border-zinc-900 z-10 w-full overflow-visible shrink-0 min-h-[72px] pb-[calc(12px+env(safe-area-inset-bottom))]">
                 
+                {/* Pending Attachment Preview Card */}
+                {pendingAttachment && (
+                  <div className="mb-2 p-2.5 rounded-2xl bg-white dark:bg-zinc-900 border border-teal-500/30 shadow-md flex items-center justify-between gap-3 animate-in slide-in-from-bottom-2 select-none">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      {pendingAttachment.kind === 'image' ? (
+                        <div className="w-13 h-13 rounded-xl overflow-hidden bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex-shrink-0">
+                          <img src={pendingAttachment.previewUrl} alt="Preview" className="w-full h-full object-cover" />
+                        </div>
+                      ) : pendingAttachment.kind === 'video' ? (
+                        <div className="w-13 h-13 rounded-xl overflow-hidden bg-zinc-950 border border-zinc-700 flex-shrink-0 relative flex items-center justify-center">
+                          <video src={pendingAttachment.previewUrl} className="w-full h-full object-cover pointer-events-none" />
+                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                            <Play className="w-4 h-4 text-white fill-white ml-0.5" />
+                          </div>
+                        </div>
+                      ) : pendingAttachment.kind === 'audio' ? (
+                        <div className="w-13 h-13 rounded-xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center text-teal-600 dark:text-teal-400 flex-shrink-0">
+                          <Music className="w-6 h-6" />
+                        </div>
+                      ) : (
+                        <div className="w-13 h-13 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-600 dark:text-blue-400 flex-shrink-0">
+                          <FileText className="w-6 h-6" />
+                        </div>
+                      )}
+
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-bold text-gray-900 dark:text-white truncate">
+                          {pendingAttachment.name}
+                        </p>
+                        <p className="text-[11px] text-gray-500 dark:text-zinc-400">
+                          {pendingAttachment.kind.toUpperCase()} • {pendingAttachment.sizeFormatted}
+                        </p>
+                        {isUploadingAttachment && (
+                          <div className="w-full bg-zinc-200 dark:bg-zinc-800 h-1.5 rounded-full mt-1.5 overflow-hidden">
+                            <div 
+                              className="bg-primary dark:bg-teal-400 h-full transition-all duration-200" 
+                              style={{ width: `${Math.max(uploadProgress, 10)}%` }} 
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      disabled={isUploadingAttachment}
+                      onClick={() => {
+                        if (pendingAttachment?.previewUrl) {
+                          URL.revokeObjectURL(pendingAttachment.previewUrl);
+                        }
+                        setPendingAttachment(null);
+                      }}
+                      className="h-8 w-8 rounded-full text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20"
+                      title="Cancel attachment"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
+
                 {/* Emoji Picker Popup */}
                 {showEmojiPicker && (
                   <div
@@ -2647,6 +2835,15 @@ export default function ChatPage() {
                       Video
                     </button>
                     <button
+                      onClick={() => { audioInputRef.current?.click(); }}
+                      className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left text-sm font-medium text-gray-700 dark:text-gray-200"
+                    >
+                      <span className="w-9 h-9 rounded-full bg-teal-100 dark:bg-teal-900/40 flex items-center justify-center text-teal-600 dark:text-teal-400 flex-shrink-0">
+                        <Music className="w-4 h-4 stroke-[2]" />
+                      </span>
+                      Audio
+                    </button>
+                    <button
                       onClick={() => { fileInputRef.current?.click(); }}
                       className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left text-sm font-medium text-gray-700 dark:text-gray-200"
                     >
@@ -2661,9 +2858,34 @@ export default function ChatPage() {
                 )}
 
                 {/* Hidden File Inputs */}
-                <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelected} />
-                <input ref={videoInputRef} type="file" accept="video/*" className="hidden" onChange={handleFileSelected} />
-                <input ref={fileInputRef} type="file" accept="*/*" className="hidden" onChange={handleFileSelected} />
+                <input 
+                  ref={imageInputRef} 
+                  type="file" 
+                  accept="image/*" 
+                  className="hidden" 
+                  onChange={(e) => handleFileSelected(e, 'image')} 
+                />
+                <input 
+                  ref={videoInputRef} 
+                  type="file" 
+                  accept="video/*" 
+                  className="hidden" 
+                  onChange={(e) => handleFileSelected(e, 'video')} 
+                />
+                <input 
+                  ref={audioInputRef} 
+                  type="file" 
+                  accept="audio/*" 
+                  className="hidden" 
+                  onChange={(e) => handleFileSelected(e, 'audio')} 
+                />
+                <input 
+                  ref={fileInputRef} 
+                  type="file" 
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.rtf,.csv,.zip,.rar,.7z,.tar,.gz,application/*,text/*" 
+                  className="hidden" 
+                  onChange={(e) => handleFileSelected(e, 'document')} 
+                />
 
                 {/* Input Row */}
                 <div className="flex items-center gap-2 sm:gap-3">
@@ -2686,7 +2908,7 @@ export default function ChatPage() {
                     </Button>
                     
                     <textarea 
-                      placeholder="Type a message..." 
+                      placeholder={pendingAttachment ? "Add a caption..." : "Type a message..."}
                       className="w-full min-w-0 max-h-32 min-h-[36px] bg-transparent border-none focus:ring-0 focus-visible:ring-0 resize-none py-1.5 text-sm sm:text-[15px] text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none leading-relaxed select-text"
                       rows={1}
                       value={newMessage}
@@ -2714,10 +2936,15 @@ export default function ChatPage() {
                   
                   <Button 
                     onClick={handleSendMessage}
+                    disabled={isUploadingAttachment}
                     size="icon" 
-                    className="h-10 w-10 sm:h-11 sm:w-11 rounded-full bg-gradient-to-tr from-primary to-teal-600 hover:from-primary/95 hover:to-teal-500 active:scale-95 text-primary-foreground shadow-md hover:shadow-lg transition-all duration-200 flex-shrink-0 flex items-center justify-center"
+                    className="h-10 w-10 sm:h-11 sm:w-11 rounded-full bg-gradient-to-tr from-primary to-teal-600 hover:from-primary/95 hover:to-teal-500 active:scale-95 text-primary-foreground shadow-md hover:shadow-lg transition-all duration-200 flex-shrink-0 flex items-center justify-center disabled:opacity-50"
                   >
-                    <Send className="w-[18px] h-[18px] ml-0.5 stroke-[1.5]" />
+                    {isUploadingAttachment ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <Send className="w-[18px] h-[18px] ml-0.5 stroke-[1.5]" />
+                    )}
                   </Button>
                 </div>
               </div>
@@ -3184,6 +3411,14 @@ export default function ChatPage() {
             </ScrollArea>
           </DialogContent>
         </Dialog>
+      )}
+
+      {/* ── Full-Screen WhatsApp-Style Media Viewer Modal (Images & Videos) ── */}
+      {activeMediaViewer && (
+        <MediaViewerModal
+          media={activeMediaViewer}
+          onClose={() => setActiveMediaViewer(null)}
+        />
       )}
 
     </div>

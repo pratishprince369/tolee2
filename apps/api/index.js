@@ -677,7 +677,7 @@ io.on('connection', (socket) => {
   });
 
   // 9. Real-time general chat messages relay
-  socket.on('send-chat-message', ({ id, messageId, chatId, senderId, senderName, senderAvatar, text, mediaUrl, isGroup, receiverId, createdAt, time, replyTo }) => {
+  socket.on('send-chat-message', ({ id, messageId, chatId, senderId, senderName, senderAvatar, text, mediaUrl, mediaResourceType, mediaPublicId, isGroup, receiverId, createdAt, time, replyTo }) => {
     console.log(`[Signaling] Chat message sent in chat ${chatId} by user ${senderId}`);
     
     const messagePayload = {
@@ -687,6 +687,8 @@ io.on('connection', (socket) => {
       senderAvatar,
       text,
       mediaUrl,
+      mediaResourceType,
+      mediaPublicId,
       isRead: false,
       createdAt,
       time,
