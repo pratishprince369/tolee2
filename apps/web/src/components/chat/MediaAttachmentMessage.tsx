@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   Play, Pause, Download, FileText, FileSpreadsheet, 
-  Presentation, Archive, File, Music, ExternalLink,
+  Presentation, Archive, File, Music,
   AlertCircle, RefreshCw, Eye, Image as ImageIcon
 } from 'lucide-react';
 
@@ -20,22 +20,10 @@ export interface MediaAttachmentInfo {
 }
 
 /**
- * Optimizes Cloudinary URLs for chat message previews by adding auto-format,
- * compression, and responsive max width constraint (w_720, c_limit).
+ * Returns a clean, direct media URL ensuring validity and cross-browser loading.
  */
 export function getOptimizedMediaUrl(url: string, width = 720): string {
   if (!url) return '';
-  if (url.includes('cloudinary.com') && url.includes('/upload/')) {
-    if (url.includes('/upload/c_limit,')) {
-      return url;
-    }
-    if (url.includes('/upload/q_auto,f_auto/')) {
-      return url.replace('/upload/q_auto,f_auto/', `/upload/c_limit,w_${width},q_auto,f_auto/`);
-    }
-    if (url.includes('/upload/')) {
-      return url.replace('/upload/', `/upload/c_limit,w_${width},q_auto,f_auto/`);
-    }
-  }
   return url;
 }
 
@@ -111,7 +99,9 @@ export function detectMediaInfo(
       resourceType === 'image' || 
       extension.match(/^(jpg|jpeg|png|gif|webp|svg|bmp|avif)$/i) || 
       !extension || 
-      mediaUrl.includes('/image/upload/')
+      mediaUrl.includes('/image/upload/') ||
+      mediaUrl.startsWith('blob:') ||
+      mediaUrl.startsWith('data:image')
     ) {
       return {
         url: mediaUrl,
@@ -216,6 +206,12 @@ export function MediaAttachmentMessage({
   const [isImgLoaded, setIsImgLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
 
+  // Reset states when media URL changes
+  useEffect(() => {
+    setIsImgLoaded(false);
+    setHasError(false);
+  }, [mediaInfo.url]);
+
   // --- Audio Player State ---
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioDuration, setAudioDuration] = useState(0);
@@ -295,7 +291,7 @@ export function MediaAttachmentMessage({
 
   if (hasError) {
     return (
-      <div className="w-full max-w-[280px] sm:max-w-[340px] p-3 my-1 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 flex items-center gap-2.5 text-xs font-medium select-none">
+      <div className="w-full max-w-[270px] sm:max-w-[320px] p-3 my-1 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 flex items-center gap-2.5 text-xs font-medium select-none">
         <AlertCircle className="w-4 h-4 flex-shrink-0" />
         <span className="flex-1 truncate">Unable to load media preview</span>
         {mediaInfo.url && (
@@ -318,7 +314,7 @@ export function MediaAttachmentMessage({
     // If URL is missing (e.g. legacy message with only filename), render a graceful card
     if (!mediaInfo.url) {
       return (
-        <div className="w-full max-w-[280px] sm:max-w-[340px] my-1 rounded-2xl p-2.5 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 select-none">
+        <div className="w-full max-w-[270px] sm:max-w-[320px] my-1 rounded-2xl p-2.5 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 select-none">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-900/40 flex items-center justify-center text-teal-600 dark:text-teal-400 flex-shrink-0">
               <ImageIcon className="w-5 h-5" />
@@ -346,8 +342,6 @@ export function MediaAttachmentMessage({
       );
     }
 
-    const previewUrl = getOptimizedMediaUrl(mediaInfo.url, 720);
-
     return (
       <div className="w-full max-w-[270px] sm:max-w-[340px] md:max-w-[360px] my-0.5 select-none">
         <div 
@@ -363,23 +357,30 @@ export function MediaAttachmentMessage({
               window.open(mediaInfo.url, '_blank');
             }
           }}
-          className="relative group cursor-pointer overflow-hidden rounded-xl bg-black/5 dark:bg-black/40 border border-black/5 dark:border-white/10 flex items-center justify-center transition-transform active:scale-[0.99]"
+          className="relative group cursor-pointer overflow-hidden rounded-xl bg-black/5 dark:bg-black/40 border border-black/5 dark:border-white/10 flex items-center justify-center min-h-[140px] max-h-[360px] sm:max-h-[400px] transition-transform active:scale-[0.99]"
         >
+          {/* Skeleton placeholder shown behind image while loading */}
           {!isImgLoaded && (
-            <div className="h-48 sm:h-60 w-full bg-zinc-200/60 dark:bg-zinc-800/70 animate-pulse flex flex-col items-center justify-center gap-2">
-              <ImageIcon className="w-8 h-8 text-zinc-400 animate-pulse" />
-              <span className="text-xs text-zinc-400 font-medium">Loading image...</span>
+            <div className="absolute inset-0 bg-zinc-200/50 dark:bg-zinc-800/60 animate-pulse flex flex-col items-center justify-center gap-2 pointer-events-none z-0">
+              <ImageIcon className="w-7 h-7 text-zinc-400/80 animate-pulse" />
             </div>
           )}
+
           <img 
-            src={previewUrl} 
-            alt={mediaInfo.filename} 
+            src={mediaInfo.url} 
+            alt={mediaInfo.filename || 'Image'} 
             onLoad={() => setIsImgLoaded(true)}
-            onError={() => setHasError(true)}
+            onError={() => {
+              // If image fails, mark error
+              setHasError(true);
+            }}
             loading="lazy"
-            className={`w-full max-h-[340px] sm:max-h-[380px] object-cover rounded-xl transition-all duration-300 group-hover:scale-[1.01] ${!isImgLoaded ? 'hidden' : 'block'}`}
+            className={`w-full max-h-[340px] sm:max-h-[380px] object-cover rounded-xl transition-opacity duration-300 relative z-10 ${
+              isImgLoaded ? 'opacity-100' : 'opacity-90'
+            }`}
           />
-          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100 pointer-events-none">
+
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100 pointer-events-none z-20">
             <div className="bg-black/60 text-white rounded-full p-2 backdrop-blur-md shadow-md transform group-hover:scale-110 transition-transform">
               <Eye className="w-5 h-5" />
             </div>
