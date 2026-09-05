@@ -2729,66 +2729,137 @@ export default function ChatPage() {
             ) : (
               <div className="relative p-3 lg:p-4 bg-zinc-50 dark:bg-zinc-950/80 backdrop-blur-md border-t border-zinc-150/80 dark:border-zinc-900 z-10 w-full overflow-visible shrink-0 min-h-[72px] pb-[calc(12px+env(safe-area-inset-bottom))]">
                 
-                {/* Pending Attachment Preview Card */}
-                {pendingAttachment && (
-                  <div className="mb-2 p-2.5 rounded-2xl bg-white dark:bg-zinc-900 border border-teal-500/30 shadow-md flex items-center justify-between gap-3 animate-in slide-in-from-bottom-2 select-none">
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                      {pendingAttachment.kind === 'image' ? (
-                        <div className="w-13 h-13 rounded-xl overflow-hidden bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex-shrink-0">
-                          <img src={pendingAttachment.previewUrl} alt="Preview" className="w-full h-full object-cover" />
-                        </div>
-                      ) : pendingAttachment.kind === 'video' ? (
-                        <div className="w-13 h-13 rounded-xl overflow-hidden bg-zinc-950 border border-zinc-700 flex-shrink-0 relative flex items-center justify-center">
-                          <video src={pendingAttachment.previewUrl} className="w-full h-full object-cover pointer-events-none" />
-                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                            <Play className="w-4 h-4 text-white fill-white ml-0.5" />
-                          </div>
-                        </div>
-                      ) : pendingAttachment.kind === 'audio' ? (
-                        <div className="w-13 h-13 rounded-xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center text-teal-600 dark:text-teal-400 flex-shrink-0">
-                          <Music className="w-6 h-6" />
-                        </div>
-                      ) : (
-                        <div className="w-13 h-13 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-600 dark:text-blue-400 flex-shrink-0">
-                          <FileText className="w-6 h-6" />
-                        </div>
-                      )}
+            {/* WhatsApp-Style Dedicated Attachment Preview Stage */}
+            {pendingAttachment && (
+              <div className="absolute inset-0 z-40 bg-zinc-950 flex flex-col justify-between overflow-hidden animate-in fade-in duration-200 select-none">
+                {/* 1. Top Header Bar: Cancel/Remove Button, Title, File Size */}
+                <div className="h-14 px-4 sm:px-6 flex items-center justify-between border-b border-white/10 shrink-0 bg-zinc-900/60 backdrop-blur-md">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    disabled={isUploadingAttachment}
+                    onClick={() => {
+                      if (pendingAttachment?.previewUrl) {
+                        URL.revokeObjectURL(pendingAttachment.previewUrl);
+                      }
+                      setPendingAttachment(null);
+                    }}
+                    className="h-9 w-9 rounded-full text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+                    title="Cancel and remove attachment"
+                  >
+                    <X className="w-5 h-5" />
+                  </Button>
 
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-bold text-gray-900 dark:text-white truncate">
-                          {pendingAttachment.name}
-                        </p>
-                        <p className="text-[11px] text-gray-500 dark:text-zinc-400">
-                          {pendingAttachment.kind.toUpperCase()} • {pendingAttachment.sizeFormatted}
-                        </p>
-                        {isUploadingAttachment && (
-                          <div className="w-full bg-zinc-200 dark:bg-zinc-800 h-1.5 rounded-full mt-1.5 overflow-hidden">
-                            <div 
-                              className="bg-primary dark:bg-teal-400 h-full transition-all duration-200" 
-                              style={{ width: `${Math.max(uploadProgress, 10)}%` }} 
-                            />
-                          </div>
-                        )}
-                      </div>
+                  <div className="flex flex-col items-center min-w-0 px-2">
+                    <p className="text-sm font-bold text-white truncate max-w-xs sm:max-w-md">
+                      {pendingAttachment.name}
+                    </p>
+                    <p className="text-[11px] text-white/60">
+                      {pendingAttachment.kind.toUpperCase()} • {pendingAttachment.sizeFormatted}
+                    </p>
+                  </div>
+
+                  <div className="w-9" />
+                </div>
+
+                {/* 2. Main Preview Stage (Bounded & Strictly Contained) */}
+                <div className="flex-1 min-h-0 w-full p-4 sm:p-6 flex items-center justify-center overflow-hidden bg-zinc-950">
+                  {pendingAttachment.kind === 'image' ? (
+                    <div className="relative w-full h-full max-h-[60vh] flex items-center justify-center">
+                      <img 
+                        src={pendingAttachment.previewUrl} 
+                        alt="Attachment Preview" 
+                        className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl transition-all"
+                      />
                     </div>
+                  ) : pendingAttachment.kind === 'video' ? (
+                    <div className="w-full max-w-xl aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl flex items-center justify-center border border-white/10">
+                      <video 
+                        src={pendingAttachment.previewUrl} 
+                        controls 
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                  ) : pendingAttachment.kind === 'audio' ? (
+                    <div className="p-6 rounded-3xl bg-white/10 border border-white/15 flex flex-col items-center gap-3 text-white max-w-sm w-full shadow-2xl">
+                      <div className="w-16 h-16 rounded-full bg-teal-500/20 text-teal-400 flex items-center justify-center">
+                        <Music className="w-8 h-8" />
+                      </div>
+                      <p className="font-bold text-sm truncate max-w-full">{pendingAttachment.name}</p>
+                      <span className="text-xs text-white/60">{pendingAttachment.sizeFormatted}</span>
+                    </div>
+                  ) : (
+                    <div className="p-6 rounded-3xl bg-white/10 border border-white/15 flex flex-col items-center gap-3 text-white max-w-sm w-full shadow-2xl">
+                      <div className="w-16 h-16 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center">
+                        <FileText className="w-8 h-8" />
+                      </div>
+                      <p className="font-bold text-sm truncate max-w-full">{pendingAttachment.name}</p>
+                      <span className="text-xs text-white/60">{pendingAttachment.sizeFormatted}</span>
+                    </div>
+                  )}
+                </div>
 
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      disabled={isUploadingAttachment}
-                      onClick={() => {
-                        if (pendingAttachment?.previewUrl) {
-                          URL.revokeObjectURL(pendingAttachment.previewUrl);
-                        }
-                        setPendingAttachment(null);
-                      }}
-                      className="h-8 w-8 rounded-full text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20"
-                      title="Cancel attachment"
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
+                {/* 3. Upload Progress Indicator */}
+                {isUploadingAttachment && (
+                  <div className="px-6 py-2 shrink-0 bg-zinc-900/80 border-t border-white/10">
+                    <div className="w-full bg-white/20 h-1.5 rounded-full overflow-hidden">
+                      <div 
+                        className="bg-teal-400 h-full transition-all duration-200" 
+                        style={{ width: `${Math.max(uploadProgress, 10)}%` }} 
+                      />
+                    </div>
+                    <p className="text-[11px] text-teal-300 font-medium text-center mt-1">
+                      Uploading {pendingAttachment.kind}... {uploadProgress > 0 ? `${uploadProgress}%` : ''}
+                    </p>
                   </div>
                 )}
+
+                {/* 4. Bottom Anchored Caption Bar + Send Button (ALWAYS VISIBLE & ANCHORED) */}
+                <div className="p-3 sm:p-4 bg-zinc-900/95 border-t border-white/10 shrink-0">
+                  <div className="flex items-center gap-2 sm:gap-3 max-w-4xl mx-auto">
+                    <div className="flex-grow min-w-0 flex items-center gap-2 bg-white/15 backdrop-blur-md rounded-full px-4 py-2 border border-white/15 focus-within:border-teal-400 focus-within:ring-2 focus-within:ring-teal-400/20 transition-all">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={() => setShowEmojiPicker(prev => !prev)}
+                        className="text-white/70 hover:text-white rounded-full h-8 w-8 flex-shrink-0 p-0 hover:bg-white/10"
+                      >
+                        <Smile className="w-5 h-5" />
+                      </Button>
+
+                      <input 
+                        type="text"
+                        placeholder="Add a caption..."
+                        value={newMessage}
+                        autoFocus
+                        onChange={(e) => setNewMessage(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleSendMessage();
+                          }
+                        }}
+                        className="w-full bg-transparent border-none text-sm sm:text-base text-white placeholder:text-white/50 focus:outline-none"
+                      />
+                    </div>
+
+                    <Button 
+                      onClick={handleSendMessage}
+                      disabled={isUploadingAttachment}
+                      size="icon" 
+                      className="h-11 w-11 sm:h-12 sm:w-12 rounded-full bg-gradient-to-tr from-primary to-teal-500 hover:from-primary/95 hover:to-teal-400 active:scale-95 text-white shadow-xl flex-shrink-0 flex items-center justify-center disabled:opacity-50 transition-all"
+                      title="Send"
+                    >
+                      {isUploadingAttachment ? (
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                      ) : (
+                        <Send className="w-5 h-5 fill-current ml-0.5" />
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
 
                 {/* Emoji Picker Popup */}
                 {showEmojiPicker && (
