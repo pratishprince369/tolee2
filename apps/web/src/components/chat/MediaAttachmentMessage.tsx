@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
   Play, Pause, Download, FileText, FileSpreadsheet, 
   Presentation, Archive, File, Music, ExternalLink,
-  AlertCircle, RefreshCw, Eye
+  AlertCircle, RefreshCw, Eye, Image as ImageIcon
 } from 'lucide-react';
 
 export type MediaKind = 'image' | 'video' | 'audio' | 'pdf' | 'document';
@@ -19,8 +19,45 @@ export interface MediaAttachmentInfo {
   caption?: string;
 }
 
-export function detectMediaInfo(mediaUrl?: string | null, text?: string | null, resourceType?: string | null): MediaAttachmentInfo | null {
-  if (!mediaUrl && !text) return null;
+/**
+ * Optimizes Cloudinary URLs for chat message previews by adding auto-format,
+ * compression, and responsive max width constraint (w_720, c_limit).
+ */
+export function getOptimizedMediaUrl(url: string, width = 720): string {
+  if (!url) return '';
+  if (url.includes('cloudinary.com') && url.includes('/upload/')) {
+    if (url.includes('/upload/c_limit,')) {
+      return url;
+    }
+    if (url.includes('/upload/q_auto,f_auto/')) {
+      return url.replace('/upload/q_auto,f_auto/', `/upload/c_limit,w_${width},q_auto,f_auto/`);
+    }
+    if (url.includes('/upload/')) {
+      return url.replace('/upload/', `/upload/c_limit,w_${width},q_auto,f_auto/`);
+    }
+  }
+  return url;
+}
+
+/**
+ * Comprehensive parser that detects attachment metadata from direct URL, MIME type,
+ * file extensions, text-embedded URLs, or legacy bracket syntax `[📎 filename.ext]`.
+ */
+export function detectMediaInfo(
+  mediaUrl?: string | null, 
+  text?: string | null, 
+  resourceType?: string | null
+): MediaAttachmentInfo | null {
+  const trimmedText = (text || '').trim();
+
+  // Helper to extract clean caption removing bracket strings like [📎 filename]
+  const cleanCaption = (rawText?: string | null): string | undefined => {
+    if (!rawText) return undefined;
+    const stripped = rawText
+      .replace(/\[\s*(?:📎|attachment:?)\s*[^\]]+\]/gi, '')
+      .trim();
+    return stripped.length > 0 ? stripped : undefined;
+  };
 
   // 1. Direct mediaUrl inspection
   if (mediaUrl) {
@@ -28,24 +65,24 @@ export function detectMediaInfo(mediaUrl?: string | null, text?: string | null, 
     const rawFilename = cleanUrl.substring(cleanUrl.lastIndexOf('/') + 1) || 'Attachment';
     const extension = (rawFilename.split('.').pop() || '').toLowerCase();
 
-    // Check by resourceType first if known
-    if (resourceType === 'video' || extension.match(/^(mp4|webm|mov|mkv|m4v|3gp)$/)) {
+    // Check by resourceType or extension
+    if (resourceType === 'video' || extension.match(/^(mp4|webm|mov|mkv|m4v|3gp)$/i)) {
       return {
         url: mediaUrl,
         kind: 'video',
         filename: rawFilename,
-        extension,
-        caption: text && !text.startsWith('[📎') ? text : undefined
+        extension: extension || 'mp4',
+        caption: cleanCaption(trimmedText)
       };
     }
 
-    if (resourceType === 'audio' || extension.match(/^(mp3|wav|ogg|m4a|aac|flac|wma)$/)) {
+    if (resourceType === 'audio' || extension.match(/^(mp3|wav|ogg|m4a|aac|flac|wma)$/i)) {
       return {
         url: mediaUrl,
         kind: 'audio',
         filename: rawFilename,
-        extension,
-        caption: text && !text.startsWith('[📎') ? text : undefined
+        extension: extension || 'mp3',
+        caption: cleanCaption(trimmedText)
       };
     }
 
@@ -55,28 +92,33 @@ export function detectMediaInfo(mediaUrl?: string | null, text?: string | null, 
         kind: 'pdf',
         filename: rawFilename,
         extension: 'pdf',
-        caption: text && !text.startsWith('[📎') ? text : undefined
+        caption: cleanCaption(trimmedText)
       };
     }
 
-    if (extension.match(/^(doc|docx|xls|xlsx|ppt|pptx|txt|rtf|csv|zip|rar|7z|tar|gz)$/)) {
+    if (extension.match(/^(doc|docx|xls|xlsx|ppt|pptx|txt|rtf|csv|zip|rar|7z|tar|gz)$/i)) {
       return {
         url: mediaUrl,
         kind: 'document',
         filename: rawFilename,
         extension,
-        caption: text && !text.startsWith('[📎') ? text : undefined
+        caption: cleanCaption(trimmedText)
       };
     }
 
-    // Default to image if image extension or image resourceType or standard URL
-    if (resourceType === 'image' || extension.match(/^(jpg|jpeg|png|gif|webp|svg|bmp|avif)$/) || !extension) {
+    // Default to image if image resourceType, image extension, or standard upload URL
+    if (
+      resourceType === 'image' || 
+      extension.match(/^(jpg|jpeg|png|gif|webp|svg|bmp|avif)$/i) || 
+      !extension || 
+      mediaUrl.includes('/image/upload/')
+    ) {
       return {
         url: mediaUrl,
         kind: 'image',
         filename: rawFilename,
         extension: extension || 'jpg',
-        caption: text && !text.startsWith('[📎') ? text : undefined
+        caption: cleanCaption(trimmedText)
       };
     }
 
@@ -84,17 +126,76 @@ export function detectMediaInfo(mediaUrl?: string | null, text?: string | null, 
       url: mediaUrl,
       kind: 'document',
       filename: rawFilename,
-      extension,
-      caption: text && !text.startsWith('[📎') ? text : undefined
+      extension: extension || 'bin',
+      caption: cleanCaption(trimmedText)
     };
   }
 
   // 2. Fallback check for URL patterns inside text
-  if (text) {
-    const urlMatch = text.match(/https?:\/\/[^\s]+?\.(jpg|jpeg|png|gif|webp|mp4|webm|mov|pdf|docx?|xlsx?|pptx?|mp3|wav|ogg|m4a|zip)/i);
+  if (trimmedText) {
+    const urlMatch = trimmedText.match(/https?:\/\/[^\s]+?\.(jpg|jpeg|png|gif|webp|avif|svg|mp4|webm|mov|pdf|docx?|xlsx?|pptx?|mp3|wav|ogg|m4a|zip)/i);
     if (urlMatch) {
       const detectedUrl = urlMatch[0];
-      return detectMediaInfo(detectedUrl, text.replace(detectedUrl, '').trim(), resourceType);
+      const remainingText = trimmedText.replace(detectedUrl, '').trim();
+      return detectMediaInfo(detectedUrl, remainingText, resourceType);
+    }
+  }
+
+  // 3. Fallback check for legacy bracket strings: [📎 filename.ext] or [ 📎 filename.ext ] or [attachment: filename.ext]
+  if (trimmedText) {
+    const bracketMatch = trimmedText.match(/\[\s*(?:📎|attachment:?)\s*([^\]]+)\]/i);
+    if (bracketMatch) {
+      const filename = bracketMatch[1].trim();
+      const extension = (filename.split('.').pop() || '').toLowerCase();
+      const extractedCaption = cleanCaption(trimmedText);
+
+      if (extension.match(/^(jpg|jpeg|png|gif|webp|svg|bmp|avif)$/i)) {
+        return {
+          url: '',
+          kind: 'image',
+          filename,
+          extension: extension || 'jpg',
+          caption: extractedCaption
+        };
+      }
+
+      if (extension.match(/^(mp4|webm|mov|mkv|m4v|3gp)$/i)) {
+        return {
+          url: '',
+          kind: 'video',
+          filename,
+          extension: extension || 'mp4',
+          caption: extractedCaption
+        };
+      }
+
+      if (extension.match(/^(mp3|wav|ogg|m4a|aac|flac|wma)$/i)) {
+        return {
+          url: '',
+          kind: 'audio',
+          filename,
+          extension: extension || 'mp3',
+          caption: extractedCaption
+        };
+      }
+
+      if (extension === 'pdf') {
+        return {
+          url: '',
+          kind: 'pdf',
+          filename,
+          extension: 'pdf',
+          caption: extractedCaption
+        };
+      }
+
+      return {
+        url: '',
+        kind: 'document',
+        filename,
+        extension: extension || 'bin',
+        caption: extractedCaption
+      };
     }
   }
 
@@ -122,7 +223,7 @@ export function MediaAttachmentMessage({
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    if (mediaInfo.kind === 'audio') {
+    if (mediaInfo.kind === 'audio' && mediaInfo.url) {
       const audio = new Audio(mediaInfo.url);
       audioRef.current = audio;
 
@@ -181,6 +282,7 @@ export function MediaAttachmentMessage({
 
   const handleDownload = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!mediaInfo.url) return;
     const link = document.createElement('a');
     link.href = mediaInfo.url;
     link.download = mediaInfo.filename || 'download';
@@ -193,60 +295,98 @@ export function MediaAttachmentMessage({
 
   if (hasError) {
     return (
-      <div className="p-3 my-1 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 flex items-center gap-2.5 text-xs font-medium select-none">
+      <div className="w-full max-w-[280px] sm:max-w-[340px] p-3 my-1 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 flex items-center gap-2.5 text-xs font-medium select-none">
         <AlertCircle className="w-4 h-4 flex-shrink-0" />
-        <span className="flex-1 truncate">Unable to load media attachment</span>
-        <button 
-          onClick={() => { setHasError(false); }} 
-          className="p-1 hover:bg-red-500/20 rounded-md transition-colors"
-          title="Retry"
-        >
-          <RefreshCw className="w-3.5 h-3.5" />
-        </button>
+        <span className="flex-1 truncate">Unable to load media preview</span>
+        {mediaInfo.url && (
+          <button 
+            onClick={() => { setHasError(false); setIsImgLoaded(false); }} 
+            className="p-1 hover:bg-red-500/20 rounded-md transition-colors"
+            title="Retry"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
     );
   }
 
-  // 1. IMAGE MESSAGE
+  // =========================================================================
+  // 1. IMAGE MESSAGE (Responsive, Controlled Dimensions, Aspect-Ratio Safe)
+  // =========================================================================
   if (mediaInfo.kind === 'image') {
+    // If URL is missing (e.g. legacy message with only filename), render a graceful card
+    if (!mediaInfo.url) {
+      return (
+        <div className="w-full max-w-[280px] sm:max-w-[340px] my-1 rounded-2xl p-2.5 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 select-none">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-900/40 flex items-center justify-center text-teal-600 dark:text-teal-400 flex-shrink-0">
+              <ImageIcon className="w-5 h-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className={`text-[13px] font-bold truncate leading-tight ${isMe ? 'text-primary-foreground' : 'text-gray-900 dark:text-white'}`}>
+                {mediaInfo.filename}
+              </p>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded-[4px] bg-teal-100 text-teal-700 dark:bg-teal-900/50 dark:text-teal-300">
+                  PHOTO
+                </span>
+                <span className={`text-[10px] ${isMe ? 'text-primary-foreground/75' : 'text-gray-500 dark:text-zinc-400'}`}>
+                  {mediaInfo.sizeFormatted || 'Photo attachment'}
+                </span>
+              </div>
+            </div>
+          </div>
+          {mediaInfo.caption && (
+            <p className="mt-2 text-[14px] sm:text-[15px] leading-relaxed select-text whitespace-pre-wrap break-words">
+              {mediaInfo.caption}
+            </p>
+          )}
+        </div>
+      );
+    }
+
+    const previewUrl = getOptimizedMediaUrl(mediaInfo.url, 720);
+
     return (
-      <div className="w-full my-0.5 overflow-hidden rounded-xl">
+      <div className="w-full max-w-[270px] sm:max-w-[340px] md:max-w-[360px] my-0.5 select-none">
         <div 
           onClick={(e) => {
             e.stopPropagation();
             if (onOpenMediaViewer) {
               onOpenMediaViewer({
                 type: 'image',
-                url: mediaInfo.url,
+                url: mediaInfo.url, // Open high-resolution original in viewer modal
                 filename: mediaInfo.filename
               });
             } else {
               window.open(mediaInfo.url, '_blank');
             }
           }}
-          className="relative group cursor-pointer overflow-hidden rounded-xl bg-zinc-950/20 dark:bg-black/40 border border-black/5 dark:border-white/10"
+          className="relative group cursor-pointer overflow-hidden rounded-xl bg-black/5 dark:bg-black/40 border border-black/5 dark:border-white/10 flex items-center justify-center transition-transform active:scale-[0.99]"
         >
           {!isImgLoaded && (
-            <div className="h-48 sm:h-64 w-full bg-zinc-200/50 dark:bg-zinc-800/60 animate-pulse flex items-center justify-center">
+            <div className="h-48 sm:h-60 w-full bg-zinc-200/60 dark:bg-zinc-800/70 animate-pulse flex flex-col items-center justify-center gap-2">
+              <ImageIcon className="w-8 h-8 text-zinc-400 animate-pulse" />
               <span className="text-xs text-zinc-400 font-medium">Loading image...</span>
             </div>
           )}
           <img 
-            src={mediaInfo.url} 
+            src={previewUrl} 
             alt={mediaInfo.filename} 
             onLoad={() => setIsImgLoaded(true)}
             onError={() => setHasError(true)}
             loading="lazy"
-            className={`w-full max-h-[360px] sm:max-h-[420px] object-cover rounded-xl transition-all duration-300 group-hover:scale-[1.01] ${!isImgLoaded ? 'hidden' : 'block'}`}
+            className={`w-full max-h-[340px] sm:max-h-[380px] object-cover rounded-xl transition-all duration-300 group-hover:scale-[1.01] ${!isImgLoaded ? 'hidden' : 'block'}`}
           />
-          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/15 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100 pointer-events-none">
-            <div className="bg-black/60 text-white rounded-full p-2 backdrop-blur-md shadow-md">
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100 pointer-events-none">
+            <div className="bg-black/60 text-white rounded-full p-2 backdrop-blur-md shadow-md transform group-hover:scale-110 transition-transform">
               <Eye className="w-5 h-5" />
             </div>
           </div>
         </div>
         {mediaInfo.caption && (
-          <p className="mt-2 text-[14px] sm:text-[15px] leading-relaxed select-text whitespace-pre-wrap break-words">
+          <p className="mt-1.5 px-0.5 text-[14px] sm:text-[15px] leading-relaxed select-text whitespace-pre-wrap break-words">
             {mediaInfo.caption}
           </p>
         )}
@@ -254,33 +394,43 @@ export function MediaAttachmentMessage({
     );
   }
 
+  // =========================================================================
   // 2. VIDEO MESSAGE
+  // =========================================================================
   if (mediaInfo.kind === 'video') {
     return (
-      <div className="w-full my-0.5 overflow-hidden rounded-xl">
+      <div className="w-full max-w-[270px] sm:max-w-[340px] md:max-w-[360px] my-0.5 select-none">
         <div 
           onClick={(e) => {
             e.stopPropagation();
-            if (onOpenMediaViewer) {
+            if (mediaInfo.url && onOpenMediaViewer) {
               onOpenMediaViewer({
                 type: 'video',
                 url: mediaInfo.url,
                 filename: mediaInfo.filename
               });
+            } else if (mediaInfo.url) {
+              window.open(mediaInfo.url, '_blank');
             }
           }}
           className="relative group cursor-pointer overflow-hidden rounded-xl bg-zinc-950 border border-black/10 dark:border-white/10 aspect-video flex items-center justify-center"
         >
-          <video 
-            src={mediaInfo.url} 
-            preload="metadata"
-            className="w-full h-full object-cover rounded-xl pointer-events-none"
-            onError={() => setHasError(true)}
-          />
+          {mediaInfo.url ? (
+            <video 
+              src={mediaInfo.url} 
+              preload="metadata"
+              className="w-full h-full object-cover rounded-xl pointer-events-none"
+              onError={() => setHasError(true)}
+            />
+          ) : (
+            <div className="w-full h-full bg-zinc-900 flex items-center justify-center">
+              <Play className="w-8 h-8 text-zinc-500" />
+            </div>
+          )}
           {/* Frosted Glass Play Button Overlay */}
           <div className="absolute inset-0 bg-black/30 group-hover:bg-black/40 transition-colors flex items-center justify-center">
-            <div className="w-13 h-13 rounded-full bg-white/30 hover:bg-white/45 backdrop-blur-md flex items-center justify-center shadow-lg transition-transform active:scale-95 border border-white/30">
-              <Play className="w-6 h-6 text-white fill-white ml-0.5" />
+            <div className="w-12 h-12 rounded-full bg-white/30 hover:bg-white/45 backdrop-blur-md flex items-center justify-center shadow-lg transition-transform active:scale-95 border border-white/30">
+              <Play className="w-5 h-5 text-white fill-white ml-0.5" />
             </div>
           </div>
           <div className="absolute bottom-2 left-2 bg-black/70 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-bold text-white tracking-wide uppercase">
@@ -288,7 +438,7 @@ export function MediaAttachmentMessage({
           </div>
         </div>
         {mediaInfo.caption && (
-          <p className="mt-2 text-[14px] sm:text-[15px] leading-relaxed select-text whitespace-pre-wrap break-words">
+          <p className="mt-1.5 px-0.5 text-[14px] sm:text-[15px] leading-relaxed select-text whitespace-pre-wrap break-words">
             {mediaInfo.caption}
           </p>
         )}
@@ -296,13 +446,16 @@ export function MediaAttachmentMessage({
     );
   }
 
+  // =========================================================================
   // 3. AUDIO MESSAGE
+  // =========================================================================
   if (mediaInfo.kind === 'audio') {
     return (
-      <div className="w-full my-1 rounded-2xl p-2.5 sm:p-3 bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 select-none">
+      <div className="w-full max-w-[270px] sm:max-w-[320px] md:max-w-[340px] my-1 rounded-2xl p-2.5 sm:p-3 bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 select-none">
         <div className="flex items-center gap-3">
           <button
             onClick={togglePlayAudio}
+            disabled={!mediaInfo.url}
             className={`w-10 h-10 rounded-full flex items-center justify-center shadow-md flex-shrink-0 transition-transform active:scale-95 ${
               isMe 
                 ? 'bg-white text-primary hover:bg-white/90 dark:bg-white dark:text-zinc-900' 
@@ -323,6 +476,7 @@ export function MediaAttachmentMessage({
               max={audioDuration || 100} 
               value={currentTime} 
               onChange={handleSeekAudio}
+              disabled={!mediaInfo.url}
               className="w-full h-1.5 bg-zinc-300 dark:bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-primary dark:accent-teal-400 focus:outline-none"
             />
             <div className={`flex items-center justify-between text-[11px] font-semibold ${
@@ -345,7 +499,9 @@ export function MediaAttachmentMessage({
     );
   }
 
+  // =========================================================================
   // 4. DOCUMENT / PDF MESSAGE CARD
+  // =========================================================================
   const getDocIcon = (ext: string) => {
     switch (ext) {
       case 'pdf':
@@ -404,10 +560,10 @@ export function MediaAttachmentMessage({
   const docStyle = getDocIcon(mediaInfo.extension);
 
   return (
-    <div className="w-full my-1 rounded-2xl overflow-hidden select-none">
+    <div className="w-full max-w-[270px] sm:max-w-[340px] md:max-w-[360px] my-1 rounded-2xl overflow-hidden select-none">
       <div 
         onClick={handleDownload}
-        className={`p-3 rounded-2xl flex items-center justify-between gap-3 border shadow-xs transition-all hover:shadow-md cursor-pointer ${
+        className={`p-3 rounded-2xl flex items-center justify-between gap-3 border shadow-xs transition-all hover:shadow-md ${mediaInfo.url ? 'cursor-pointer' : 'opacity-90'} ${
           isMe 
             ? 'bg-black/10 dark:bg-white/10 border-white/15 hover:bg-black/15 dark:hover:bg-white/15' 
             : 'bg-white dark:bg-zinc-950 border-zinc-200/80 dark:border-zinc-800 hover:border-teal-500/40'
@@ -437,13 +593,15 @@ export function MediaAttachmentMessage({
           </div>
         </div>
 
-        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
-          isMe 
-            ? 'bg-white/20 text-white hover:bg-white/30' 
-            : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-teal-50 hover:text-teal-600 dark:hover:bg-teal-950/40 dark:hover:text-teal-400'
-        }`}>
-          <Download className="w-4 h-4" />
-        </div>
+        {mediaInfo.url && (
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
+            isMe 
+              ? 'bg-white/20 text-white hover:bg-white/30' 
+              : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-teal-50 hover:text-teal-600 dark:hover:bg-teal-950/40 dark:hover:text-teal-400'
+          }`}>
+            <Download className="w-4 h-4" />
+          </div>
+        )}
       </div>
 
       {mediaInfo.caption && (

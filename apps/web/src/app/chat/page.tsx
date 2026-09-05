@@ -873,9 +873,17 @@ export default function ChatPage() {
           } catch (_) {}
         }
 
+        const lastMediaDisplay = message.text 
+          ? `${message.sender}: ${message.text}`
+          : `${message.sender}: ${
+              message.mediaResourceType === 'image' || message.mediaUrl?.match(/\.(jpg|jpeg|png|gif|webp|avif)$/i) ? '📷 Photo' :
+              message.mediaResourceType === 'video' || message.mediaUrl?.match(/\.(mp4|webm|mov)$/i) ? '🎥 Video' :
+              message.mediaResourceType === 'audio' || message.mediaUrl?.match(/\.(mp3|wav|ogg|m4a)$/i) ? '🎵 Audio' : '📄 Attachment'
+            }`;
+
         updatedChats[chatIndex] = {
           ...chat,
-          lastMessage: `${message.sender}: ${message.text}`,
+          lastMessage: lastMediaDisplay,
           time: message.time,
           lastMessageCreatedAt: message.createdAt,
           unread: unreadCount

@@ -86,7 +86,13 @@ export async function fetchRealChatData() {
         isGroup: true,
         membersCount: tolee._count.members,
         hideMembers: false,
-        lastMessage: messages.length > 0 ? `${messages[messages.length-1].sender.name || 'User'}: ${messages[messages.length-1].content}` : 'No messages yet.',
+        lastMessage: messages.length > 0 
+          ? (messages[messages.length-1].content || (
+              messages[messages.length-1].mediaResourceType === 'image' || messages[messages.length-1].mediaUrl?.match(/\.(jpg|jpeg|png|gif|webp|avif)$/i) ? '📷 Photo' :
+              messages[messages.length-1].mediaResourceType === 'video' || messages[messages.length-1].mediaUrl?.match(/\.(mp4|webm|mov)$/i) ? '🎥 Video' :
+              messages[messages.length-1].mediaResourceType === 'audio' || messages[messages.length-1].mediaUrl?.match(/\.(mp3|wav|ogg|m4a)$/i) ? '🎵 Audio' : '📄 Document'
+            ) ? `${messages[messages.length-1].sender.name || 'User'}: ${messages[messages.length-1].content || (messages[messages.length-1].mediaResourceType === 'image' || messages[messages.length-1].mediaUrl?.match(/\.(jpg|jpeg|png|gif|webp|avif)$/i) ? '📷 Photo' : messages[messages.length-1].mediaResourceType === 'video' || messages[messages.length-1].mediaUrl?.match(/\.(mp4|webm|mov)$/i) ? '🎥 Video' : '📄 Attachment')}` : 'No messages yet.') 
+          : 'No messages yet.',
         time: messages.length > 0 ? messages[messages.length-1].createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
         lastMessageCreatedAt: messages.length > 0 ? messages[messages.length-1].createdAt.toISOString() : chat.createdAt.toISOString(),
         phone: '',
@@ -202,7 +208,13 @@ export async function fetchRealChatData() {
         otherUserId: otherUser.id,
         membersCount: 2,
         hideMembers: true,
-        lastMessage: dmMessages.length > 0 ? dmMessages[dmMessages.length - 1].content : 'No messages yet.',
+        lastMessage: dmMessages.length > 0 
+          ? (dmMessages[dmMessages.length - 1].content || (
+              dmMessages[dmMessages.length - 1].mediaResourceType === 'image' || dmMessages[dmMessages.length - 1].mediaUrl?.match(/\.(jpg|jpeg|png|gif|webp|avif)$/i) ? '📷 Photo' :
+              dmMessages[dmMessages.length - 1].mediaResourceType === 'video' || dmMessages[dmMessages.length - 1].mediaUrl?.match(/\.(mp4|webm|mov)$/i) ? '🎥 Video' :
+              dmMessages[dmMessages.length - 1].mediaResourceType === 'audio' || dmMessages[dmMessages.length - 1].mediaUrl?.match(/\.(mp3|wav|ogg|m4a)$/i) ? '🎵 Audio' : '📄 Document'
+            ))
+          : 'No messages yet.',
         time: dmMessages.length > 0 ? dmMessages[dmMessages.length - 1].createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
         lastMessageCreatedAt: dmMessages.length > 0 ? dmMessages[dmMessages.length - 1].createdAt.toISOString() : dm.createdAt.toISOString(),
         phone: otherUser.phone || '',
