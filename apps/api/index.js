@@ -677,11 +677,11 @@ io.on('connection', (socket) => {
   });
 
   // 9. Real-time general chat messages relay
-  socket.on('send-chat-message', ({ chatId, senderId, senderName, senderAvatar, text, mediaUrl, isGroup, receiverId, createdAt, time, replyTo }) => {
+  socket.on('send-chat-message', ({ id, messageId, chatId, senderId, senderName, senderAvatar, text, mediaUrl, isGroup, receiverId, createdAt, time, replyTo }) => {
     console.log(`[Signaling] Chat message sent in chat ${chatId} by user ${senderId}`);
     
     const messagePayload = {
-      id: 'msg-' + Math.random().toString(36).substr(2, 9),
+      id: id || messageId || ('msg-' + Math.random().toString(36).substr(2, 9)),
       sender: senderName,
       senderId,
       senderAvatar,

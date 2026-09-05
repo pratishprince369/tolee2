@@ -56,7 +56,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-// Helper to merge polled messages without overwriting loaded scroll history or duplicating optimistic items
+// Helper to merge polled messages without overwriting loaded scroll history or duplicating optimistic/socket items
 function mergePollMessages(oldMsgs: any[] = [], pollMsgs: any[] = []) {
   if (oldMsgs.length === 0) return pollMsgs;
   if (pollMsgs.length === 0) return oldMsgs;
@@ -64,20 +64,42 @@ function mergePollMessages(oldMsgs: any[] = [], pollMsgs: any[] = []) {
   const merged = [...oldMsgs];
 
   for (const newMsg of pollMsgs) {
+    // 1. Direct ID match
     const existingIndex = merged.findIndex(m => m.id === newMsg.id);
     if (existingIndex > -1) {
       merged[existingIndex] = { ...merged[existingIndex], ...newMsg };
-    } else {
-      const tempIndex = merged.findIndex(m => 
-        m.id.startsWith('temp-') && 
-        m.text === newMsg.text && 
-        newMsg.isMe
-      );
-      if (tempIndex > -1) {
-        merged[tempIndex] = newMsg;
-      } else {
-        merged.push(newMsg);
+      continue;
+    }
+
+    // 2. Temp / ephemeral ID match (for optimistic sender items or socket ephemeral IDs)
+    const tempIndex = merged.findIndex(m => 
+      (m.id.startsWith('temp-') || m.id.startsWith('msg-')) && 
+      m.text === newMsg.text && 
+      (m.isMe || m.senderId === newMsg.senderId)
+    );
+    if (tempIndex > -1) {
+      merged[tempIndex] = { ...merged[tempIndex], ...newMsg };
+      continue;
+    }
+
+    // 3. Sender + Text + Timestamp match (to deduplicate any socket ephemeral IDs vs database IDs)
+    const fuzzyIndex = merged.findIndex(m => {
+      if (m.text !== newMsg.text) return false;
+      const isSameSender = m.senderId === newMsg.senderId || (m.isMe && newMsg.isMe);
+      if (!isSameSender) return false;
+
+      const t1 = new Date(m.createdAt || m.time || 0).getTime();
+      const t2 = new Date(newMsg.createdAt || newMsg.time || 0).getTime();
+      if (!isNaN(t1) && !isNaN(t2) && t1 > 0 && t2 > 0) {
+        return Math.abs(t1 - t2) < 30000;
       }
+      return m.time === newMsg.time;
+    });
+
+    if (fuzzyIndex > -1) {
+      merged[fuzzyIndex] = { ...merged[fuzzyIndex], ...newMsg };
+    } else {
+      merged.push(newMsg);
     }
   }
   return merged;
@@ -552,6 +574,7 @@ export default function ChatPage() {
   const [pinnedChatIds, setPinnedChatIds] = useState<string[]>([]);
   const [mutedChatIds, setMutedChatIds] = useState<string[]>([]);
   const [messagesByChat, setMessagesByChat] = useState<Record<string, any[]>>({});
+  const isSendingRef = useRef<boolean>(false);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTypingEmitRef = useRef<number>(0);
@@ -761,13 +784,45 @@ export default function ChatPage() {
     s.on('chat-message-received', ({ chatId, message }) => {
       console.log('[Chat Client] Real-time message received:', message);
 
-      // Append to messagesByChat
+      const isMe = message.senderId === currentUserId;
+      const processedMessage = {
+        ...message,
+        isMe: isMe || message.isMe
+      };
+
+      // Append to messagesByChat with deduplication
       setMessagesByChat(prev => {
         const msgs = prev[chatId] || [];
-        if (msgs.some(m => m.id === message.id)) return prev;
+
+        // Check if message already exists by ID or content/timestamp
+        const duplicateIndex = msgs.findIndex(m => {
+          if (m.id === processedMessage.id) return true;
+          if ((m.id.startsWith('temp-') || m.id.startsWith('msg-')) && m.text === processedMessage.text && (m.isMe === processedMessage.isMe || m.senderId === processedMessage.senderId)) {
+            return true;
+          }
+          if (m.text === processedMessage.text && (m.senderId === processedMessage.senderId || (m.isMe && processedMessage.isMe))) {
+            const t1 = new Date(m.createdAt || m.time || 0).getTime();
+            const t2 = new Date(processedMessage.createdAt || processedMessage.time || 0).getTime();
+            if (!isNaN(t1) && !isNaN(t2) && t1 > 0 && t2 > 0) {
+              return Math.abs(t1 - t2) < 30000;
+            }
+            return m.time === processedMessage.time;
+          }
+          return false;
+        });
+
+        if (duplicateIndex > -1) {
+          const updated = [...msgs];
+          updated[duplicateIndex] = { ...updated[duplicateIndex], ...processedMessage };
+          return {
+            ...prev,
+            [chatId]: updated
+          };
+        }
+
         return {
           ...prev,
-          [chatId]: [...msgs, message]
+          [chatId]: [...msgs, processedMessage]
         };
       });
 
@@ -1392,16 +1447,22 @@ export default function ChatPage() {
   };
 
   const handleSendMessage = async () => {
+    if (isSendingRef.current) return;
     if (!newMessage.trim()) return;
     if (!activeChat) return;
 
+    isSendingRef.current = true;
+    const contentToSend = newMessage.trim();
+    const parentIdToSend = replyingToMessage?.id;
     const tempId = 'temp-' + Date.now();
     const newMsg = {
       id: tempId,
       sender: 'Me',
       senderAvatar: session?.user?.image || '/default-user-avatar.svg',
-      text: newMessage,
+      senderId: currentUserId,
+      text: contentToSend,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      createdAt: new Date().toISOString(),
       isMe: true,
       replyTo: replyingToMessage ? {
         id: replyingToMessage.id,
@@ -1412,6 +1473,10 @@ export default function ChatPage() {
       } : null
     };
     
+    // Clear input state immediately to prevent duplicate mobile taps/submissions
+    setNewMessage('');
+    setReplyingToMessage(null);
+
     setMessagesByChat(prev => ({
       ...prev,
       [activeChat]: [...(prev[activeChat] || []), newMsg]
@@ -1419,56 +1484,63 @@ export default function ChatPage() {
     
     setChats(prev => prev.map(chat => 
       chat.id === activeChat 
-        ? { ...chat, lastMessage: `Me: ${newMessage}`, time: newMsg.time, lastMessageCreatedAt: new Date().toISOString() }
+        ? { ...chat, lastMessage: `Me: ${contentToSend}`, time: newMsg.time, lastMessageCreatedAt: new Date().toISOString() }
         : chat
     ));
-    
-    const contentToSend = newMessage;
-    const parentIdToSend = replyingToMessage?.id;
-    setNewMessage('');
-    setReplyingToMessage(null);
 
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     emitTyping(activeChat, false);
 
-    const res = await sendRealChatMessage(activeChat, contentToSend, parentIdToSend);
-    if (res.success && res.message) {
-      setMessagesByChat(prev => {
-        const msgs = prev[activeChat] || [];
-        return {
-          ...prev,
-          [activeChat]: msgs.map(m => m.id === tempId ? res.message : m)
-        };
-      });
-
-      // Emit socket event for real-time relay
-      if (socket) {
-        const currentUserId = (session?.user as any)?.id;
-        const activeChatDetails = chats.find(c => c.id === activeChat);
-        socket.emit('send-chat-message', {
-          chatId: activeChat,
-          senderId: currentUserId,
-          senderName: session?.user?.name || 'User',
-          senderAvatar: session?.user?.image || '/default-user-avatar.svg',
-          text: contentToSend,
-          mediaUrl: (res.message as any).mediaUrl || null,
-          isGroup: activeChatDetails?.isGroup || false,
-          receiverId: activeChatDetails?.otherUserId || null,
-          createdAt: (res.message as any).createdAt || new Date().toISOString(),
-          time: res.message.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          replyTo: res.message.replyTo || null
+    try {
+      const res = await sendRealChatMessage(activeChat, contentToSend, parentIdToSend);
+      if (res.success && res.message) {
+        setMessagesByChat(prev => {
+          const msgs = prev[activeChat] || [];
+          return {
+            ...prev,
+            [activeChat]: msgs.map(m => m.id === tempId ? { ...res.message, isMe: true } : m)
+          };
         });
-      }
 
-      fetchChats();
-    } else {
-      console.error("Failed to send message:", res?.error);
-      alert(res?.error || "Failed to send message. Please try again.");
+        // Emit socket event for real-time relay with canonical database message ID
+        if (socket) {
+          const currentUserId = (session?.user as any)?.id;
+          const activeChatDetails = chats.find(c => c.id === activeChat);
+          socket.emit('send-chat-message', {
+            id: res.message.id,
+            messageId: res.message.id,
+            chatId: activeChat,
+            senderId: currentUserId,
+            senderName: session?.user?.name || 'User',
+            senderAvatar: session?.user?.image || '/default-user-avatar.svg',
+            text: contentToSend,
+            mediaUrl: (res.message as any).mediaUrl || null,
+            isGroup: activeChatDetails?.isGroup || false,
+            receiverId: activeChatDetails?.otherUserId || null,
+            createdAt: (res.message as any).createdAt || new Date().toISOString(),
+            time: res.message.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            replyTo: res.message.replyTo || null
+          });
+        }
+
+        fetchChats();
+      } else {
+        console.error("Failed to send message:", res?.error);
+        alert(res?.error || "Failed to send message. Please try again.");
+        setMessagesByChat(prev => ({
+          ...prev,
+          [activeChat]: (prev[activeChat] || []).filter(m => m.id !== tempId)
+        }));
+        fetchChats();
+      }
+    } catch (err) {
+      console.error("Error in handleSendMessage:", err);
       setMessagesByChat(prev => ({
         ...prev,
         [activeChat]: (prev[activeChat] || []).filter(m => m.id !== tempId)
       }));
-      fetchChats();
+    } finally {
+      isSendingRef.current = false;
     }
   };
 
