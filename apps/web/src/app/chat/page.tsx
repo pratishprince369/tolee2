@@ -51,6 +51,7 @@ import { MediaViewerModal } from '@/components/chat/MediaViewerModal';
 import { AttachmentMenu } from '@/components/chat/AttachmentMenu';
 import { AttachmentPreviewModal, PendingAttachmentItem } from '@/components/chat/AttachmentPreviewModal';
 import { uploadFile } from '@/lib/upload';
+import { formatLastSeen, isUserOnline } from '@/lib/presence';
 
 import { 
   getUserPromotionPreferences, 
@@ -817,7 +818,66 @@ export default function ChatPage() {
       if (chats.length > 0) {
         const groupChatIds = chats.filter(c => c.isGroup).map(c => c.id);
         s.emit('join-chat-rooms', { chatIds: groupChatIds });
+
+        const dmUserIds = chats.filter(c => !c.isGroup && c.otherUserId).map(c => c.otherUserId);
+        if (dmUserIds.length > 0) {
+          s.emit('get-users-presence', { userIds: dmUserIds }, (res: any) => {
+            if (res?.presence) {
+              setChats(prev => prev.map(c => {
+                if (!c.isGroup && c.otherUserId && res.presence[c.otherUserId]) {
+                  const p = res.presence[c.otherUserId];
+                  const userOnline = p.isOnline;
+                  const ts = p.lastSeenAt;
+                  return {
+                    ...c,
+                    isOnline: userOnline,
+                    lastActiveAt: ts,
+                    online: userOnline ? 'Online' : formatLastSeen(ts, false, c.showActivityStatus !== false)
+                  };
+                }
+                return c;
+              }));
+            }
+          });
+        }
       }
+    });
+
+    // ─── Realtime WhatsApp-Style Presence Event Listener ───
+    s.on('user-status-changed', ({ userId, status, isOnline, lastSeenAt, lastActiveAt }: any) => {
+      const online = isOnline !== undefined ? isOnline : (status === 'online');
+      const timestamp = lastSeenAt || lastActiveAt || new Date().toISOString();
+
+      setChats(prev => prev.map(chat => {
+        if (!chat.isGroup && chat.otherUserId === userId) {
+          const formatted = online ? 'Online' : formatLastSeen(timestamp, false, chat.showActivityStatus !== false);
+          return {
+            ...chat,
+            isOnline: online,
+            lastActiveAt: timestamp,
+            online: formatted
+          };
+        }
+        return chat;
+      }));
+
+      setGroupDetails((prev: any) => {
+        if (!prev || !prev.members) return prev;
+        return {
+          ...prev,
+          members: prev.members.map((m: any) => {
+            if (m.id === userId) {
+              return {
+                ...m,
+                isOnline: online,
+                lastActiveAt: timestamp,
+                lastSeenText: online ? 'Online' : formatLastSeen(timestamp, false, m.showActivityStatus !== false)
+              };
+            }
+            return m;
+          })
+        };
+      });
     });
 
     s.on('chat-message-received', ({ chatId, message }) => {
@@ -928,6 +988,61 @@ export default function ChatPage() {
       s.disconnect();
     };
   }, [currentUserId, mutedChatIds]);
+
+  // Periodic Chat Presence Heartbeat & Visibility Recovery
+  useEffect(() => {
+    if (!socket || !currentUserId) return;
+
+    const pingHeartbeat = () => {
+      if (socket.connected && typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        socket.emit('user-presence-heartbeat', { userId: currentUserId });
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible' && socket.connected) {
+        socket.emit('register-user', { userId: currentUserId });
+        socket.emit('user-presence-heartbeat', { userId: currentUserId });
+
+        // Refresh DM presence
+        const dmUserIds = chats.filter(c => !c.isGroup && c.otherUserId).map(c => c.otherUserId);
+        if (dmUserIds.length > 0) {
+          socket.emit('get-users-presence', { userIds: dmUserIds }, (res: any) => {
+            if (res?.presence) {
+              setChats(prev => prev.map(c => {
+                if (!c.isGroup && c.otherUserId && res.presence[c.otherUserId]) {
+                  const p = res.presence[c.otherUserId];
+                  const userOnline = p.isOnline;
+                  const ts = p.lastSeenAt;
+                  return {
+                    ...c,
+                    isOnline: userOnline,
+                    lastActiveAt: ts,
+                    online: userOnline ? 'Online' : formatLastSeen(ts, false, c.showActivityStatus !== false)
+                  };
+                }
+                return c;
+              }));
+            }
+          });
+        }
+      }
+    };
+
+    const interval = setInterval(pingHeartbeat, 15000);
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      window.addEventListener('focus', handleVisibilityChange);
+    }
+
+    return () => {
+      clearInterval(interval);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+        window.removeEventListener('focus', handleVisibilityChange);
+      }
+    };
+  }, [socket, currentUserId, chats]);
 
   // Join group rooms when chats are loaded or socket changes
   useEffect(() => {
@@ -2243,8 +2358,8 @@ export default function ChatPage() {
                         </Avatar>
                       </div>
                     </div>
-                    {(chat.online === 'Online') && (
-                      <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white dark:border-[#121212] rounded-full z-10"></div>
+                    {(chat.isOnline || chat.online === 'Online') && (
+                      <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 border-2 border-white dark:border-zinc-950 rounded-full z-10"></div>
                     )}
                   </div>
                   
@@ -2507,19 +2622,19 @@ export default function ChatPage() {
                         </span>
                         typing...
                       </span>
-                    ) : activeChatDetails.online === 'Online' ? (
-                      <span className="text-primary dark:text-teal-400 font-semibold text-[11px] flex items-center gap-1 select-none">
+                    ) : (activeChatDetails.isOnline || activeChatDetails.online === 'Online') ? (
+                      <span className="text-emerald-600 dark:text-emerald-400 font-semibold text-[11px] sm:text-xs flex items-center gap-1.5 select-none">
                         <span className="relative flex h-2 w-2 items-center justify-center">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary dark:bg-teal-400 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-primary dark:bg-teal-400"></span>
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
                         </span>
                         Online
                       </span>
-                    ) : (
-                      <span className="text-zinc-500 dark:text-zinc-400 text-[11px] select-none">
+                    ) : activeChatDetails.online ? (
+                      <span className="text-zinc-500 dark:text-zinc-400 text-[11px] sm:text-xs select-none">
                         {activeChatDetails.online}
                       </span>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               </div>
@@ -3312,7 +3427,15 @@ export default function ChatPage() {
                                     <p className="text-xs font-bold text-gray-900 dark:text-white truncate">
                                       {member.name} {member.id === currentUserId && "(You)"}
                                     </p>
-                                    <p className="text-[10px] text-gray-400 truncate">@{member.username}</p>
+                                    <p className="text-[10px] text-gray-400 truncate">
+                                      {member.isOnline ? (
+                                        <span className="text-emerald-500 font-semibold">Online</span>
+                                      ) : member.lastSeenText ? (
+                                        <span>{member.lastSeenText}</span>
+                                      ) : (
+                                        <span>@{member.username}</span>
+                                      )}
+                                    </p>
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-2 flex-shrink-0 select-none">
@@ -3322,7 +3445,7 @@ export default function ChatPage() {
                                     </span>
                                   )}
                                   {member.isOnline && (
-                                    <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0"></span>
+                                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse flex-shrink-0"></span>
                                   )}
                                 </div>
                               </div>
@@ -3677,7 +3800,15 @@ export default function ChatPage() {
                         <p className="text-sm font-bold text-white truncate">
                           {member.name} {member.id === currentUserId && "(You)"}
                         </p>
-                        <p className="text-[10px] text-zinc-400">@{member.username}</p>
+                        <p className="text-[10px] text-zinc-400 truncate">
+                          {member.isOnline ? (
+                            <span className="text-emerald-400 font-semibold">Online</span>
+                          ) : member.lastSeenText ? (
+                            <span>{member.lastSeenText}</span>
+                          ) : (
+                            <span>@{member.username}</span>
+                          )}
+                        </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0 select-none">
@@ -3687,7 +3818,7 @@ export default function ChatPage() {
                         </span>
                       )}
                       {member.isOnline && (
-                        <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse border-2 border-zinc-950 shrink-0" />
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse border-2 border-zinc-950 shrink-0" />
                       )}
                     </div>
                   </div>

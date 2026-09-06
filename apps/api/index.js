@@ -45,6 +45,51 @@ app.get('/presence', (req, res) => {
   });
 });
 
+// REST Presence Query for specific User IDs
+app.post('/api/presence/query', async (req, res) => {
+  try {
+    const { userIds } = req.body;
+    if (!Array.isArray(userIds) || userIds.length === 0) {
+      return res.json({ success: true, presence: {} });
+    }
+
+    const presence = {};
+    const dbUserIds = [];
+
+    userIds.forEach(uid => {
+      const isOnline = activeUsers.has(uid) && activeUsers.get(uid).size > 0;
+      if (isOnline) {
+        presence[uid] = {
+          isOnline: true,
+          lastSeenAt: new Date().toISOString()
+        };
+      } else {
+        dbUserIds.push(uid);
+      }
+    });
+
+    if (dbUserIds.length > 0) {
+      const users = await prisma.user.findMany({
+        where: { id: { in: dbUserIds } },
+        select: { id: true, lastActiveAt: true, showActivityStatus: true }
+      });
+
+      users.forEach(u => {
+        presence[u.id] = {
+          isOnline: false,
+          lastSeenAt: u.lastActiveAt ? u.lastActiveAt.toISOString() : null,
+          showActivityStatus: u.showActivityStatus !== false
+        };
+      });
+    }
+
+    res.json({ success: true, presence });
+  } catch (err) {
+    console.error('[Signaling] Presence query error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Root route
 app.get('/', (req, res) => {
   res.json({ status: 'ok', service: 'Tolee Signaling Server', version: '1.0.0' });
@@ -69,7 +114,7 @@ const io = new Server(server, {
   pingInterval: 15000
 });
 
-// Map of userId -> Set of socketIds (handles multiple active tabs)
+// Map of userId -> Set of socketIds (handles multiple active tabs/devices)
 const activeUsers = new Map();
 // Map of socketId -> userId
 const socketToUser = new Map();
@@ -78,6 +123,11 @@ const activeCalls = new Map();
 
 // Map of socketId -> Session Details (Realtime Presence)
 const activeSessions = new Map();
+
+// Grace period timeouts for disconnects (prevents flicker on refresh)
+const disconnectTimeouts = new Map();
+// Throttled DB update tracker (userId -> timestamp ms)
+const lastDbUpdate = new Map();
 
 function broadcastPresence() {
   const sessionsArray = Array.from(activeSessions.values());
@@ -225,26 +275,39 @@ io.on('connection', (socket) => {
   socket.on('register-user', async ({ userId }) => {
     if (!userId) return;
     
+    // Clear any pending disconnect grace timeout
+    if (disconnectTimeouts.has(userId)) {
+      clearTimeout(disconnectTimeouts.get(userId));
+      disconnectTimeouts.delete(userId);
+    }
+
     socketToUser.set(socket.id, userId);
     if (!activeUsers.has(userId)) {
       activeUsers.set(userId, new Set());
     }
     activeUsers.get(userId).add(socket.id);
     
-    console.log(`[Signaling] User registered: ${userId} on socket ${socket.id}`);
+    console.log(`[Signaling] User registered: ${userId} on socket ${socket.id} (Active sockets: ${activeUsers.get(userId).size})`);
     
-    // Update lastActiveAt in database
-    try {
-      await prisma.user.update({
+    const now = new Date();
+    // Throttled DB update on connect (at most once every 30s)
+    const lastUpdate = lastDbUpdate.get(userId) || 0;
+    if (Date.now() - lastUpdate > 30000) {
+      lastDbUpdate.set(userId, Date.now());
+      prisma.user.update({
         where: { id: userId },
-        data: { lastActiveAt: new Date() }
-      });
-    } catch (dbErr) {
-      console.error('[Signaling] Failed to update presence in DB:', dbErr);
+        data: { lastActiveAt: now }
+      }).catch(dbErr => console.error('[Signaling] Failed to update presence in DB:', dbErr));
     }
 
-    // Broadcast user online status
-    io.emit('user-status-changed', { userId, status: 'online' });
+    // Broadcast user online status with server timestamp
+    io.emit('user-status-changed', {
+      userId,
+      status: 'online',
+      isOnline: true,
+      lastSeenAt: now.toISOString(),
+      lastActiveAt: now.toISOString()
+    });
 
     // Check if there is an active ringing call for this user
     activeCalls.forEach((callInfo, callId) => {
@@ -260,6 +323,85 @@ io.on('connection', (socket) => {
         });
       }
     });
+  });
+
+  // Realtime Presence Heartbeat
+  socket.on('user-presence-heartbeat', async ({ userId }) => {
+    if (!userId) return;
+
+    if (disconnectTimeouts.has(userId)) {
+      clearTimeout(disconnectTimeouts.get(userId));
+      disconnectTimeouts.delete(userId);
+    }
+
+    socketToUser.set(socket.id, userId);
+    if (!activeUsers.has(userId)) {
+      activeUsers.set(userId, new Set());
+    }
+    activeUsers.get(userId).add(socket.id);
+
+    const now = new Date();
+    const lastUpdate = lastDbUpdate.get(userId) || 0;
+    // Throttled DB write: persist at most every 60s per user during heartbeat
+    if (Date.now() - lastUpdate > 60000) {
+      lastDbUpdate.set(userId, Date.now());
+      prisma.user.update({
+        where: { id: userId },
+        data: { lastActiveAt: now }
+      }).catch(err => console.error('[Signaling] Heartbeat DB update error:', err));
+    }
+
+    socket.emit('presence-heartbeat-ack', {
+      success: true,
+      serverTime: now.toISOString()
+    });
+  });
+
+  // Direct presence query over WebSocket
+  socket.on('get-users-presence', async ({ userIds }, callback) => {
+    if (!Array.isArray(userIds) || userIds.length === 0) {
+      if (typeof callback === 'function') callback({ presence: {} });
+      return;
+    }
+
+    const presence = {};
+    const dbUserIds = [];
+
+    userIds.forEach(uid => {
+      const isOnline = activeUsers.has(uid) && activeUsers.get(uid).size > 0;
+      if (isOnline) {
+        presence[uid] = {
+          isOnline: true,
+          lastSeenAt: new Date().toISOString()
+        };
+      } else {
+        dbUserIds.push(uid);
+      }
+    });
+
+    if (dbUserIds.length > 0) {
+      try {
+        const users = await prisma.user.findMany({
+          where: { id: { in: dbUserIds } },
+          select: { id: true, lastActiveAt: true, showActivityStatus: true }
+        });
+        users.forEach(u => {
+          presence[u.id] = {
+            isOnline: false,
+            lastSeenAt: u.lastActiveAt ? u.lastActiveAt.toISOString() : null,
+            showActivityStatus: u.showActivityStatus !== false
+          };
+        });
+      } catch (err) {
+        console.error('[Signaling] Error fetching presence from DB:', err);
+      }
+    }
+
+    if (typeof callback === 'function') {
+      callback({ presence });
+    } else {
+      socket.emit('users-presence-response', { presence });
+    }
   });
 
   // 2. Initiate Audio/Video Call
@@ -785,11 +927,41 @@ io.on('connection', (socket) => {
       if (userSockets) {
         userSockets.delete(socket.id);
         if (userSockets.size === 0) {
-          activeUsers.delete(userId);
-          console.log(`[Signaling] User fully disconnected: ${userId}`);
-          
-          // Broadcast user offline
-          io.emit('user-status-changed', { userId, status: 'offline' });
+          // Set a 4-second grace period before declaring user offline (handles page reloads & brief hops)
+          if (disconnectTimeouts.has(userId)) {
+            clearTimeout(disconnectTimeouts.get(userId));
+          }
+
+          const timeoutId = setTimeout(async () => {
+            const currentSockets = activeUsers.get(userId);
+            if (!currentSockets || currentSockets.size === 0) {
+              activeUsers.delete(userId);
+              disconnectTimeouts.delete(userId);
+
+              const now = new Date();
+              console.log(`[Signaling] User marked OFFLINE: ${userId} at ${now.toISOString()}`);
+              
+              try {
+                await prisma.user.update({
+                  where: { id: userId },
+                  data: { lastActiveAt: now }
+                });
+              } catch (dbErr) {
+                console.error('[Signaling] Failed to update offline lastSeen in DB:', dbErr);
+              }
+
+              // Broadcast user offline with authoritative server timestamp
+              io.emit('user-status-changed', {
+                userId,
+                status: 'offline',
+                isOnline: false,
+                lastSeenAt: now.toISOString(),
+                lastActiveAt: now.toISOString()
+              });
+            }
+          }, 4000);
+
+          disconnectTimeouts.set(userId, timeoutId);
         }
       }
     }

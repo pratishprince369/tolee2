@@ -94,8 +94,12 @@ export default function AnalyticsTracker() {
 
       socket.on('connect', () => {
         console.log('[Presence] Socket connected:', socket.id);
+        const uId = (session?.user as any)?.id || null;
+        if (uId) {
+          socket.emit('register-user', { userId: uId });
+        }
         socket.emit('register-session', {
-          userId: (session?.user as any)?.id || null,
+          userId: uId,
           name: session?.user?.name || 'Guest',
           device: getDeviceType(),
           location: 'India',
@@ -108,14 +112,53 @@ export default function AnalyticsTracker() {
       });
     } else if (socketRef.current.connected) {
       // Already connected — re-register with latest info (user may have logged in)
+      const uId = (session?.user as any)?.id || null;
+      if (uId) {
+        socketRef.current.emit('register-user', { userId: uId });
+      }
       socketRef.current.emit('register-session', {
-        userId: (session?.user as any)?.id || null,
+        userId: uId,
         name: session?.user?.name || 'Guest',
         device: getDeviceType(),
         location: 'India',
         currentPage: pathname || '/'
       });
     }
+  }, [session]);
+
+  // Periodic presence heartbeat & visibility tracking
+  useEffect(() => {
+    const userId = (session?.user as any)?.id;
+    if (!userId) return;
+
+    const pingHeartbeat = () => {
+      if (socketRef.current?.connected && typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        socketRef.current.emit('user-presence-heartbeat', { userId });
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        if (socketRef.current?.connected) {
+          socketRef.current.emit('register-user', { userId });
+          socketRef.current.emit('user-presence-heartbeat', { userId });
+        }
+      }
+    };
+
+    const interval = setInterval(pingHeartbeat, 20000);
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      window.addEventListener('focus', handleVisibilityChange);
+    }
+
+    return () => {
+      clearInterval(interval);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+        window.removeEventListener('focus', handleVisibilityChange);
+      }
+    };
   }, [session]);
 
   // ─── PAGE VIEW TRACKING (separate — does not block presence) ─────────────

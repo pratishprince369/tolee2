@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { unstable_noStore as noStore } from 'next/cache';
 import { createSystemNotification, createSystemNotificationsMany } from '@/lib/notification-service';
+import { formatLastSeen, isUserOnline } from '@/lib/presence';
 
 // Fetch real chats and messages for the user
 export async function fetchRealChatData() {
@@ -180,15 +181,13 @@ export async function fetchRealChatData() {
         }
       });
 
-      // Presence Status heartbeat check (Online if active within last 35 seconds)
-      const isOnline = otherUser.showActivityStatus && (
-        otherUser.lastActiveAt && (new Date().getTime() - new Date(otherUser.lastActiveAt).getTime()) < 35000
+      // Accurate Server-Side WhatsApp-Style Presence
+      const userOnline = isUserOnline(otherUser.lastActiveAt, false, otherUser.showActivityStatus !== false);
+      const lastSeenText = formatLastSeen(
+        otherUser.lastActiveAt,
+        userOnline,
+        otherUser.showActivityStatus !== false
       );
-      const lastSeenText = isOnline 
-        ? 'Online' 
-        : (otherUser.showActivityStatus && otherUser.lastActiveAt) 
-          ? `Last seen ${otherUser.lastActiveAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-          : '';
 
       // Golden Story Ring Detection
       const activeStoriesCount = await prisma.story.count({
@@ -206,6 +205,7 @@ export async function fetchRealChatData() {
         isGroup: false,
         isPromotion: dm.isPromotion,
         otherUserId: otherUser.id,
+        showActivityStatus: otherUser.showActivityStatus !== false,
         membersCount: 2,
         hideMembers: true,
         lastMessage: dmMessages.length > 0 
@@ -219,6 +219,8 @@ export async function fetchRealChatData() {
         lastMessageCreatedAt: dmMessages.length > 0 ? dmMessages[dmMessages.length - 1].createdAt.toISOString() : dm.createdAt.toISOString(),
         phone: otherUser.phone || '',
         unread: unreadCount,
+        isOnline: userOnline,
+        lastActiveAt: otherUser.lastActiveAt ? otherUser.lastActiveAt.toISOString() : null,
         online: lastSeenText,
         hasActiveStories: activeStoriesCount > 0,
         status: dm.status,
@@ -857,9 +859,8 @@ export async function fetchGroupChatDetails(chatId: string) {
     });
 
     const members = membersRaw.map(member => {
-      const isOnline = member.showActivityStatus && (
-        member.lastActiveAt && (new Date().getTime() - new Date(member.lastActiveAt).getTime()) < 35000
-      );
+      const isOnline = isUserOnline(member.lastActiveAt, false, member.showActivityStatus !== false);
+      const lastSeenText = formatLastSeen(member.lastActiveAt, isOnline, member.showActivityStatus !== false);
       const memberRecord = tolee.members.find(m => m.userId === member.id);
       let role = memberRecord?.role || 'member';
       if (member.id === tolee.ownerId) {
@@ -871,6 +872,9 @@ export async function fetchGroupChatDetails(chatId: string) {
         username: member.username || '',
         avatar: member.avatar || member.image || '/default-user-avatar.svg',
         isOnline,
+        lastActiveAt: member.lastActiveAt ? member.lastActiveAt.toISOString() : null,
+        lastSeenText,
+        showActivityStatus: member.showActivityStatus !== false,
         role
       };
     });
