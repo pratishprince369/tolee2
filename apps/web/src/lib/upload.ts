@@ -20,15 +20,20 @@ export interface UploadResponse {
 export async function uploadFile(
   file: File,
   onProgress?: (percent: number) => void,
-  retryCount = 0
+  retryCount = 0,
+  abortSignal?: AbortSignal
 ): Promise<UploadResponse> {
   const maxRetries = 9;
   const isVideo = file.type.startsWith('video/');
   const resourceType = isVideo ? 'video' : 'auto';
 
+  if (abortSignal?.aborted) {
+    throw new Error('Upload aborted by user');
+  }
+
   // 1. Get Signature & Active Account Details
   const sigUrl = isVideo ? '/api/upload-signature?type=video' : '/api/upload-signature';
-  const sigRes = await fetch(sigUrl);
+  const sigRes = await fetch(sigUrl, { signal: abortSignal });
   if (!sigRes.ok) {
     throw new Error(`Failed to retrieve upload signature (Status: ${sigRes.status})`);
   }
@@ -60,6 +65,14 @@ export async function uploadFile(
       const xhr = new XMLHttpRequest();
       xhr.open('POST', uploadUrl);
 
+      if (abortSignal) {
+        const onAbort = () => {
+          xhr.abort();
+          reject(new Error('Upload aborted by user'));
+        };
+        abortSignal.addEventListener('abort', onAbort, { once: true });
+      }
+
       if (onProgress) {
         xhr.upload.onprogress = (e) => {
           if (e.lengthComputable) {
@@ -85,6 +98,10 @@ export async function uploadFile(
         reject(new Error('Network error during Cloudinary upload'));
       };
 
+      xhr.onabort = () => {
+        reject(new Error('Upload aborted by user'));
+      };
+
       xhr.send(formData);
     });
 
@@ -106,7 +123,11 @@ export async function uploadFile(
       eager: uploadData.eager,
     };
 
-  } catch (error) {
+  } catch (error: any) {
+    if (abortSignal?.aborted || error?.message?.includes('aborted')) {
+      throw error;
+    }
+
     console.warn(`[CLOUDINARY CLIENT UPLOAD ERROR] Error occurred on account index ${activeIndex} (${cloudName}). Retrying with rotation...`, error);
     
     if (retryCount >= maxRetries) {
@@ -130,6 +151,6 @@ export async function uploadFile(
     }
 
     // 5. Recursively retry upload (gets a new signature for the next account)
-    return uploadFile(file, onProgress, retryCount + 1);
+    return uploadFile(file, onProgress, retryCount + 1, abortSignal);
   }
 }

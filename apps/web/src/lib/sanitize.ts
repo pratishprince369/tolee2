@@ -123,6 +123,17 @@ export function validateBufferMagicBytes(
                   headerHex.startsWith('664c6143') || // fLaC
                   (headerHex.startsWith('52494646') && buffer.subarray(8, 12).toString('ascii') === 'WAVE');
 
+  // Zip / Office OpenXML (.docx, .xlsx, .pptx, .zip): PK\x03\x04 (50 4b 03 04)
+  const isZipOrOffice = headerHex.startsWith('504b0304');
+  // Legacy Office Doc (.doc, .xls, .ppt): D0 CF 11 E0
+  const isLegacyOffice = headerHex.startsWith('d0cf11e0');
+  // 7z archive: 37 7A BC AF 27 1C
+  const is7z = headerHex.startsWith('377abcaf271c');
+  // RAR archive: 52 61 72 21 (Rar!)
+  const isRar = headerHex.startsWith('52617221');
+  // Plaintext / RTF / generic text check
+  const isTextOrRtf = headerHex.startsWith('7b5c727466') || buffer.subarray(0, 100).every(b => (b >= 9 && b <= 13) || (b >= 32 && b <= 126) || b >= 128);
+
   // SVG inspection: if it's text/xml/svg, block if contains script tags or javascript protocols
   if (mimeType?.includes('svg') || buffer.subarray(0, 100).toString('utf8').toLowerCase().includes('<svg')) {
     const svgContent = buffer.toString('utf8').toLowerCase();
@@ -158,7 +169,7 @@ export function validateBufferMagicBytes(
   }
 
   // General validity check
-  const hasRecognizedSignature = isJpeg || isPng || isGif || isWebp || isPdf || isMp4 || isAudio;
+  const hasRecognizedSignature = isJpeg || isPng || isGif || isWebp || isPdf || isMp4 || isAudio || isZipOrOffice || isLegacyOffice || is7z || isRar || isTextOrRtf;
   return { valid: hasRecognizedSignature };
 }
 
@@ -206,17 +217,29 @@ export function validateFileUpload(
       return { valid: false, error: `Audio size exceeds the ${SECURITY_CONFIG.UPLOAD_LIMITS.AUDIO_MAX_SIZE / (1024 * 1024)}MB limit.` };
     }
   } else {
-    // Only allow specific document mime types if needed, otherwise block
+    // Allowed document, presentation, spreadsheet, text, and archive mime types
     const allowedDocTypes = [
       "application/pdf", 
       "application/msword", 
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       "application/vnd.ms-excel",
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/vnd.ms-powerpoint",
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
       "text/plain",
-      "text/csv"
+      "text/csv",
+      "text/rtf",
+      "application/rtf",
+      "application/zip",
+      "application/x-zip-compressed",
+      "application/x-7z-compressed",
+      "application/x-rar-compressed",
+      "application/x-tar",
+      "application/gzip",
+      "application/octet-stream"
     ];
-    if (!allowedDocTypes.includes(mimeType)) {
+    const isDocExtension = /\.(pdf|doc|docx|xls|xlsx|ppt|pptx|txt|rtf|csv|zip|rar|7z|tar|gz)$/i.test(cleanName);
+    if (!allowedDocTypes.includes(mimeType) && !isDocExtension) {
       return { valid: false, error: "Unsupported file format." };
     }
     if (fileSize > SECURITY_CONFIG.UPLOAD_LIMITS.DOC_MAX_SIZE) {

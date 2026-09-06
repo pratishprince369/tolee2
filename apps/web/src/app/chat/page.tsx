@@ -48,6 +48,8 @@ import {
   MediaAttachmentInfo 
 } from '@/components/chat/MediaAttachmentMessage';
 import { MediaViewerModal } from '@/components/chat/MediaViewerModal';
+import { AttachmentMenu } from '@/components/chat/AttachmentMenu';
+import { AttachmentPreviewModal, PendingAttachmentItem } from '@/components/chat/AttachmentPreviewModal';
 import { uploadFile } from '@/lib/upload';
 
 import { 
@@ -622,26 +624,27 @@ export default function ChatPage() {
   const [searchMatches, setSearchMatches] = useState<string[]>([]);
   const [currentSearchMatchIndex, setCurrentSearchMatchIndex] = useState(0);
 
-  // --- Attachment Modal & Media Preview States ---
+  // --- WhatsApp-Style Attachment & Media States ---
   const [showAttachmentModal, setShowAttachmentModal] = useState(false);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [pendingAttachments, setPendingAttachments] = useState<PendingAttachmentItem[]>([]);
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
+  const documentInputRef = useRef<HTMLInputElement>(null);
 
-  const [pendingAttachment, setPendingAttachment] = useState<{
-    file: File;
-    previewUrl: string;
-    kind: 'image' | 'video' | 'audio' | 'pdf' | 'document';
-    name: string;
-    sizeFormatted: string;
-  } | null>(null);
-  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
+  const replacingItemIdRef = useRef<string | null>(null);
+  const uploadAbortControllersRef = useRef<Map<string, AbortController>>(new Map());
 
   // --- Fullscreen Media Viewer Modal State ---
   const [activeMediaViewer, setActiveMediaViewer] = useState<{
-    type: 'image' | 'video';
+    type: 'image' | 'video' | 'pdf' | 'document' | 'audio';
     url: string;
     filename?: string;
     sender?: string;
@@ -1280,55 +1283,337 @@ export default function ChatPage() {
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   };
 
-  const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>, explicitKind?: 'image' | 'video' | 'audio' | 'document') => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const addFilesToPending = (files: FileList | File[], explicitKind?: 'image' | 'video' | 'audio' | 'document') => {
+    const fileArray = Array.from(files);
+    if (fileArray.length === 0) return;
 
-    const isVideo = file.type.startsWith('video/') || explicitKind === 'video';
-    const maxSize = isVideo ? 50 * 1024 * 1024 : 25 * 1024 * 1024;
+    const newItems: PendingAttachmentItem[] = [];
+    fileArray.forEach(file => {
+      const isVideo = file.type.startsWith('video/') || explicitKind === 'video';
+      const maxSize = isVideo ? 100 * 1024 * 1024 : 25 * 1024 * 1024;
 
-    if (file.size > maxSize) {
-      alert(`File size exceeds limit (${isVideo ? '50MB' : '25MB'}).`);
-      e.target.value = '';
-      return;
-    }
+      if (file.size > maxSize) {
+        alert(`File "${file.name}" exceeds limit (${isVideo ? '100MB' : '25MB'}).`);
+        return;
+      }
 
-    let kind: 'image' | 'video' | 'audio' | 'pdf' | 'document' = 'document';
-    if (explicitKind) {
-      if (explicitKind === 'document' && (file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf')) {
+      let kind: 'image' | 'video' | 'audio' | 'pdf' | 'document' = 'document';
+      if (explicitKind) {
+        if (explicitKind === 'document' && (file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf')) {
+          kind = 'pdf';
+        } else {
+          kind = explicitKind;
+        }
+      } else if (file.type.startsWith('image/')) {
+        kind = 'image';
+      } else if (file.type.startsWith('video/')) {
+        kind = 'video';
+      } else if (file.type.startsWith('audio/')) {
+        kind = 'audio';
+      } else if (file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf') {
         kind = 'pdf';
       } else {
-        kind = explicitKind;
+        kind = 'document';
       }
-    } else if (file.type.startsWith('image/')) {
-      kind = 'image';
-    } else if (file.type.startsWith('video/')) {
-      kind = 'video';
-    } else if (file.type.startsWith('audio/')) {
-      kind = 'audio';
-    } else if (file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf') {
-      kind = 'pdf';
-    } else {
-      kind = 'document';
-    }
 
-    const previewUrl = URL.createObjectURL(file);
+      const previewUrl = URL.createObjectURL(file);
+      const item: PendingAttachmentItem = {
+        id: `pending-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        file,
+        previewUrl,
+        kind,
+        name: file.name,
+        sizeFormatted: formatFileSize(file.size),
+        caption: ''
+      };
 
-    // Revoke previous preview URL if any
-    if (pendingAttachment?.previewUrl) {
-      URL.revokeObjectURL(pendingAttachment.previewUrl);
-    }
-
-    setPendingAttachment({
-      file,
-      previewUrl,
-      kind,
-      name: file.name,
-      sizeFormatted: formatFileSize(file.size)
+      if (replacingItemIdRef.current) {
+        setPendingAttachments(prev => prev.map(p => p.id === replacingItemIdRef.current ? item : p));
+        replacingItemIdRef.current = null;
+      } else {
+        newItems.push(item);
+      }
     });
 
+    if (newItems.length > 0) {
+      setPendingAttachments(prev => [...prev, ...newItems]);
+    }
+    setShowPreviewModal(true);
     setShowAttachmentModal(false);
-    e.target.value = '';
+  };
+
+  // Clipboard Paste Support (e.g. Ctrl+V screenshots or copied files)
+  useEffect(() => {
+    const handleWindowPaste = (e: ClipboardEvent) => {
+      if (!activeChat) return;
+      const items = e.clipboardData?.items;
+      if (!items || items.length === 0) return;
+
+      const files: File[] = [];
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].kind === 'file') {
+          const file = items[i].getAsFile();
+          if (file) files.push(file);
+        }
+      }
+
+      if (files.length > 0) {
+        e.preventDefault();
+        addFilesToPending(files);
+      }
+    };
+
+    window.addEventListener('paste', handleWindowPaste);
+    return () => window.removeEventListener('paste', handleWindowPaste);
+  }, [activeChat]);
+
+  const handleSelectAttachmentOption = (opt: 'camera' | 'image' | 'video' | 'document' | 'audio') => {
+    setShowAttachmentModal(false);
+    if (opt === 'camera') {
+      cameraInputRef.current?.click();
+    } else if (opt === 'image') {
+      imageInputRef.current?.click();
+    } else if (opt === 'video') {
+      videoInputRef.current?.click();
+    } else if (opt === 'document') {
+      documentInputRef.current?.click();
+    } else if (opt === 'audio') {
+      audioInputRef.current?.click();
+    }
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>, explicitKind?: 'image' | 'video' | 'audio' | 'document') => {
+    if (e.target.files && e.target.files.length > 0) {
+      addFilesToPending(e.target.files, explicitKind);
+      e.target.value = '';
+    }
+  };
+
+  const handleRemovePendingItem = (id: string) => {
+    setPendingAttachments(prev => {
+      const item = prev.find(p => p.id === id);
+      if (item?.previewUrl?.startsWith('blob:')) {
+        URL.revokeObjectURL(item.previewUrl);
+      }
+      const filtered = prev.filter(p => p.id !== id);
+      if (filtered.length === 0) {
+        setShowPreviewModal(false);
+      }
+      return filtered;
+    });
+  };
+
+  const handleReplacePendingItem = (id: string) => {
+    replacingItemIdRef.current = id;
+    const item = pendingAttachments.find(p => p.id === id);
+    if (item?.kind === 'image') imageInputRef.current?.click();
+    else if (item?.kind === 'video') videoInputRef.current?.click();
+    else if (item?.kind === 'audio') audioInputRef.current?.click();
+    else documentInputRef.current?.click();
+  };
+
+  const handleAddMorePending = () => {
+    replacingItemIdRef.current = null;
+    fileInputRef.current?.click();
+  };
+
+  const handleCancelUpload = (tempId: string) => {
+    const controller = uploadAbortControllersRef.current.get(tempId);
+    if (controller) {
+      controller.abort();
+      uploadAbortControllersRef.current.delete(tempId);
+    }
+    if (activeChat) {
+      setMessagesByChat(prev => ({
+        ...prev,
+        [activeChat]: (prev[activeChat] || []).filter(m => m.id !== tempId)
+      }));
+    }
+  };
+
+  const sendSingleAttachmentMessage = async (item: PendingAttachmentItem) => {
+    if (!activeChat) return;
+
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const currentUserId = (session?.user as any)?.id;
+    const activeChatDetails = chats.find(c => c.id === activeChat);
+
+    const optimisticMsg = {
+      id: tempId,
+      sender: session?.user?.name || 'You',
+      senderId: currentUserId,
+      senderUsername: (session?.user as any)?.username || null,
+      senderAvatar: session?.user?.image || '/default-user-avatar.svg',
+      text: item.caption || '',
+      mediaUrl: item.previewUrl,
+      mediaResourceType: item.kind,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      createdAt: new Date().toISOString(),
+      isMe: true,
+      uploadStatus: 'uploading' as const,
+      uploadProgress: 15,
+      replyTo: replyingToMessage ? {
+        id: replyingToMessage.id,
+        text: replyingToMessage.text,
+        sender: replyingToMessage.sender,
+        senderId: replyingToMessage.senderId,
+        senderUsername: replyingToMessage.senderUsername || null
+      } : null,
+      _rawFile: item.file
+    };
+
+    setMessagesByChat(prev => ({
+      ...prev,
+      [activeChat]: [...(prev[activeChat] || []), optimisticMsg]
+    }));
+
+    const lastMsgDisplay = `Me: ${item.kind === 'image' ? '📷 Photo' : item.kind === 'video' ? '🎥 Video' : item.kind === 'audio' ? '🎵 Audio' : '📄 Document'} ${item.caption ? `"${item.caption}"` : ''}`;
+    setChats(prev => prev.map(chat => 
+      chat.id === activeChat 
+        ? { ...chat, lastMessage: lastMsgDisplay, time: optimisticMsg.time, lastMessageCreatedAt: new Date().toISOString() }
+        : chat
+    ));
+
+    const abortController = new AbortController();
+    uploadAbortControllersRef.current.set(tempId, abortController);
+
+    try {
+      let uploadedMediaUrl: string | null = null;
+      let uploadedPublicId: string | null = null;
+      let uploadedResourceType: string | null = null;
+
+      try {
+        const uploadRes = await uploadFile(
+          item.file,
+          (percent) => {
+            setMessagesByChat(prev => {
+              const msgs = prev[activeChat] || [];
+              return {
+                ...prev,
+                [activeChat]: msgs.map(m => m.id === tempId ? { ...m, uploadProgress: Math.max(percent, 15) } : m)
+              };
+            });
+          },
+          0,
+          abortController.signal
+        );
+        uploadedMediaUrl = uploadRes.secure_url;
+        uploadedPublicId = uploadRes.public_id;
+        uploadedResourceType = uploadRes.resource_type;
+      } catch (directErr: any) {
+        if (abortController.signal.aborted) {
+          return;
+        }
+        console.warn("[Upload] Direct upload failed, falling back to server route...", directErr);
+        const formData = new FormData();
+        formData.append('file', item.file);
+        const apiRes = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+          signal: abortController.signal
+        }).then(r => r.json());
+
+        if (apiRes.success && apiRes.url) {
+          uploadedMediaUrl = apiRes.url;
+          uploadedPublicId = apiRes.publicId;
+          uploadedResourceType = apiRes.resourceType;
+        } else {
+          throw new Error(apiRes.error || "Upload failed");
+        }
+      }
+
+      if (abortController.signal.aborted) return;
+
+      const mediaPayload = {
+        mediaUrl: uploadedMediaUrl!,
+        mediaPublicId: uploadedPublicId || undefined,
+        mediaResourceType: uploadedResourceType || item.kind
+      };
+
+      const res = await sendRealChatMessage(
+        activeChat,
+        item.caption || '',
+        replyingToMessage?.id,
+        undefined,
+        mediaPayload
+      );
+
+      if (res.success && res.message) {
+        setMessagesByChat(prev => {
+          const msgs = prev[activeChat] || [];
+          return {
+            ...prev,
+            [activeChat]: msgs.map(m => m.id === tempId ? { 
+              ...res.message, 
+              isMe: true, 
+              uploadStatus: 'completed',
+              uploadProgress: 100 
+            } : m)
+          };
+        });
+
+        if (socket) {
+          socket.emit('send-chat-message', {
+            id: res.message.id,
+            messageId: res.message.id,
+            chatId: activeChat,
+            senderId: currentUserId,
+            senderName: session?.user?.name || 'User',
+            senderAvatar: session?.user?.image || '/default-user-avatar.svg',
+            text: item.caption || '',
+            mediaUrl: (res.message as any).mediaUrl || uploadedMediaUrl,
+            mediaResourceType: (res.message as any).mediaResourceType || uploadedResourceType || item.kind,
+            isGroup: activeChatDetails?.isGroup || false,
+            receiverId: activeChatDetails?.otherUserId || null,
+            createdAt: (res.message as any).createdAt || new Date().toISOString(),
+            time: res.message.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            replyTo: res.message.replyTo || null
+          });
+        }
+
+        fetchChats();
+      } else {
+        throw new Error(res.error || "Failed to persist chat message");
+      }
+    } catch (err: any) {
+      if (abortController.signal.aborted) return;
+      console.error("[sendSingleAttachmentMessage] Error:", err);
+      setMessagesByChat(prev => {
+        const msgs = prev[activeChat] || [];
+        return {
+          ...prev,
+          [activeChat]: msgs.map(m => m.id === tempId ? { ...m, uploadStatus: 'failed' } : m)
+        };
+      });
+    } finally {
+      uploadAbortControllersRef.current.delete(tempId);
+    }
+  };
+
+  const handleRetryUpload = (msg: any) => {
+    if (!msg._rawFile || !activeChat) return;
+    const item: PendingAttachmentItem = {
+      id: `retry-${Date.now()}`,
+      file: msg._rawFile,
+      previewUrl: msg.mediaUrl || URL.createObjectURL(msg._rawFile),
+      kind: msg.mediaResourceType || 'document',
+      name: msg._rawFile.name,
+      sizeFormatted: formatFileSize(msg._rawFile.size),
+      caption: msg.text || ''
+    };
+    setMessagesByChat(prev => ({
+      ...prev,
+      [activeChat]: (prev[activeChat] || []).filter(m => m.id !== msg.id)
+    }));
+    sendSingleAttachmentMessage(item);
+  };
+
+  const handleSendAttachments = async (items: PendingAttachmentItem[]) => {
+    setShowPreviewModal(false);
+    setPendingAttachments([]);
+    for (const item of items) {
+      await sendSingleAttachmentMessage(item);
+    }
   };
 
   const scrollToBottom = (behavior: 'smooth' | 'auto' = 'smooth') => {
@@ -2364,12 +2649,41 @@ export default function ChatPage() {
               </div>
             )}
 
-            {/* Messages Area */}
+            {/* Messages Area with Drag & Drop Zone */}
             <div 
               ref={scrollContainerRef}
               onScroll={handleScroll}
-              className="flex-1 min-h-0 p-3 lg:p-6 z-10 overflow-y-auto scroll-smooth scrollbar-none"
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsDraggingOver(true);
+              }}
+              onDragLeave={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsDraggingOver(false);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsDraggingOver(false);
+                if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
+                  addFilesToPending(e.dataTransfer.files);
+                }
+              }}
+              className="relative flex-1 min-h-0 p-3 lg:p-6 z-10 overflow-y-auto scroll-smooth scrollbar-none"
             >
+              {/* Drag & Drop Visual Overlay */}
+              {isDraggingOver && (
+                <div className="absolute inset-2 z-40 bg-teal-500/10 dark:bg-teal-500/15 border-2 border-dashed border-teal-500 rounded-3xl backdrop-blur-xs flex flex-col items-center justify-center p-6 text-teal-600 dark:text-teal-400 pointer-events-none animate-in fade-in duration-150">
+                  <div className="w-16 h-16 rounded-3xl bg-teal-500/20 flex items-center justify-center mb-3 shadow-lg">
+                    <Paperclip className="w-8 h-8 stroke-[2.5]" />
+                  </div>
+                  <p className="text-base font-bold">Drop files here to send</p>
+                  <p className="text-xs text-teal-600/70 dark:text-teal-400/70 mt-1">Photos, videos, PDFs & documents</p>
+                </div>
+              )}
+
               <div className="flex flex-col gap-1 min-h-full justify-end">
                 {/* Lazy history load loader */}
                 {loadingHistory && (
@@ -2613,6 +2927,10 @@ export default function ChatPage() {
                                       mediaInfo={mediaInfo}
                                       isMe={msg.isMe}
                                       onOpenMediaViewer={(m) => setActiveMediaViewer({ ...m, sender: msg.sender })}
+                                      uploadStatus={msg.uploadStatus}
+                                      uploadProgress={msg.uploadProgress}
+                                      onCancelUpload={() => handleCancelUpload(msg.id)}
+                                      onRetryUpload={() => handleRetryUpload(msg)}
                                     />
                                   );
                                 }
@@ -2754,69 +3072,6 @@ export default function ChatPage() {
             ) : (
               <div className="relative p-3 lg:p-4 bg-zinc-50 dark:bg-zinc-950/80 backdrop-blur-md border-t border-zinc-200/80 dark:border-zinc-900 z-10 w-full overflow-visible shrink-0 min-h-[72px] pb-[calc(12px+env(safe-area-inset-bottom))]">
                 
-            {/* Attachment Preview Card above Input Row */}
-            {pendingAttachment && (
-              <div className="mb-2.5 p-2 sm:p-2.5 bg-white dark:bg-zinc-900/90 rounded-2xl border border-teal-500/30 shadow-md animate-in slide-in-from-bottom-2 duration-150 flex items-center gap-3">
-                {/* Thumbnail / Icon */}
-                <div className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-xl overflow-hidden bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 shrink-0 flex items-center justify-center">
-                  {pendingAttachment.kind === 'image' ? (
-                    <img 
-                      src={pendingAttachment.previewUrl} 
-                      alt="Attachment Preview" 
-                      className="w-full h-full object-cover"
-                    />
-                  ) : pendingAttachment.kind === 'video' ? (
-                    <div className="w-full h-full bg-black/80 flex items-center justify-center text-white">
-                      <Play className="w-5 h-5 fill-current text-white/90" />
-                    </div>
-                  ) : pendingAttachment.kind === 'audio' ? (
-                    <div className="w-full h-full bg-teal-50 dark:bg-teal-950/40 text-teal-600 dark:text-teal-400 flex items-center justify-center">
-                      <Music className="w-6 h-6" />
-                    </div>
-                  ) : (
-                    <div className="w-full h-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center">
-                      <FileText className="w-6 h-6" />
-                    </div>
-                  )}
-                </div>
-
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs sm:text-sm font-semibold text-gray-800 dark:text-zinc-200 truncate">
-                    {pendingAttachment.name}
-                  </p>
-                  <p className="text-[11px] text-gray-500 dark:text-zinc-400">
-                    {pendingAttachment.kind.toUpperCase()} • {pendingAttachment.sizeFormatted}
-                  </p>
-                  {isUploadingAttachment && (
-                    <div className="w-full bg-zinc-200 dark:bg-zinc-800 h-1.5 rounded-full overflow-hidden mt-1.5">
-                      <div 
-                        className="bg-teal-500 h-full transition-all duration-200" 
-                        style={{ width: `${Math.max(uploadProgress, 10)}%` }} 
-                      />
-                    </div>
-                  )}
-                </div>
-
-                {/* Cancel / Remove Button */}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  disabled={isUploadingAttachment}
-                  onClick={() => {
-                    if (pendingAttachment?.previewUrl) {
-                      URL.revokeObjectURL(pendingAttachment.previewUrl);
-                    }
-                    setPendingAttachment(null);
-                  }}
-                  className="h-8 w-8 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors shrink-0"
-                  title="Remove attachment"
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
-            )}
-
                 {/* Emoji Picker Popup */}
                 {showEmojiPicker && (
                   <div
@@ -2841,85 +3096,60 @@ export default function ChatPage() {
                   </div>
                 )}
 
-                {/* Attachment Modal Popup */}
-                {showAttachmentModal && (
-                  <div
-                    id="attachment-modal"
-                    className="absolute bottom-[76px] left-14 z-50 bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl border border-zinc-200/70 dark:border-zinc-800 p-2 w-52 animate-in slide-in-from-bottom-4 duration-200"
-                  >
-                    <button
-                      onClick={() => { imageInputRef.current?.click(); }}
-                      className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left text-sm font-medium text-gray-700 dark:text-gray-200"
-                    >
-                      <span className="w-9 h-9 rounded-full bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center text-purple-600 dark:text-purple-400 flex-shrink-0">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                      </span>
-                      Photo
-                    </button>
-                    <button
-                      onClick={() => { videoInputRef.current?.click(); }}
-                      className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left text-sm font-medium text-gray-700 dark:text-gray-200"
-                    >
-                      <span className="w-9 h-9 rounded-full bg-red-100 dark:bg-red-900/40 flex items-center justify-center text-red-500 dark:text-red-400 flex-shrink-0">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.069A1 1 0 0121 8.868v6.264a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                        </svg>
-                      </span>
-                      Video
-                    </button>
-                    <button
-                      onClick={() => { audioInputRef.current?.click(); }}
-                      className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left text-sm font-medium text-gray-700 dark:text-gray-200"
-                    >
-                      <span className="w-9 h-9 rounded-full bg-teal-100 dark:bg-teal-900/40 flex items-center justify-center text-teal-600 dark:text-teal-400 flex-shrink-0">
-                        <Music className="w-4 h-4 stroke-[2]" />
-                      </span>
-                      Audio
-                    </button>
-                    <button
-                      onClick={() => { fileInputRef.current?.click(); }}
-                      className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left text-sm font-medium text-gray-700 dark:text-gray-200"
-                    >
-                      <span className="w-9 h-9 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-blue-500 dark:text-blue-400 flex-shrink-0">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                      </span>
-                      Document
-                    </button>
-                  </div>
-                )}
+                {/* Modern WhatsApp-Style Attachment Menu */}
+                <AttachmentMenu
+                  isOpen={showAttachmentModal}
+                  onClose={() => setShowAttachmentModal(false)}
+                  onSelectOption={handleSelectAttachmentOption}
+                />
 
                 {/* Hidden File Inputs */}
+                <input 
+                  ref={cameraInputRef} 
+                  type="file" 
+                  accept="image/*,video/*" 
+                  capture="environment" 
+                  className="hidden" 
+                  onChange={(e) => handleFileInputChange(e)} 
+                />
                 <input 
                   ref={imageInputRef} 
                   type="file" 
                   accept="image/*" 
+                  multiple
                   className="hidden" 
-                  onChange={(e) => handleFileSelected(e, 'image')} 
+                  onChange={(e) => handleFileInputChange(e, 'image')} 
                 />
                 <input 
                   ref={videoInputRef} 
                   type="file" 
                   accept="video/*" 
+                  multiple
                   className="hidden" 
-                  onChange={(e) => handleFileSelected(e, 'video')} 
+                  onChange={(e) => handleFileInputChange(e, 'video')} 
                 />
                 <input 
                   ref={audioInputRef} 
                   type="file" 
                   accept="audio/*" 
+                  multiple
                   className="hidden" 
-                  onChange={(e) => handleFileSelected(e, 'audio')} 
+                  onChange={(e) => handleFileInputChange(e, 'audio')} 
+                />
+                <input 
+                  ref={documentInputRef} 
+                  type="file" 
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.rtf,.csv,.zip,.rar,.7z,.tar,.gz,application/*,text/*" 
+                  multiple
+                  className="hidden" 
+                  onChange={(e) => handleFileInputChange(e, 'document')} 
                 />
                 <input 
                   ref={fileInputRef} 
                   type="file" 
-                  accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.rtf,.csv,.zip,.rar,.7z,.tar,.gz,application/*,text/*" 
+                  multiple 
                   className="hidden" 
-                  onChange={(e) => handleFileSelected(e, 'document')} 
+                  onChange={(e) => handleFileInputChange(e)} 
                 />
 
                 {/* Input Row */}
@@ -2930,6 +3160,7 @@ export default function ChatPage() {
                       size="icon" 
                       onClick={() => { setShowEmojiPicker(prev => !prev); setShowAttachmentModal(false); }}
                       className={`text-gray-400 hover:text-teal-600 dark:hover:text-teal-400 rounded-full h-8 w-8 flex-shrink-0 p-0 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors flex items-center justify-center ${showEmojiPicker ? 'text-teal-600 dark:text-teal-400 bg-zinc-50 dark:bg-zinc-800' : ''}`}
+                      title="Emoji"
                     >
                       <Smile className="w-5 h-5 stroke-[1.5]" />
                     </Button>
@@ -2938,12 +3169,13 @@ export default function ChatPage() {
                       size="icon" 
                       onClick={() => { setShowAttachmentModal(prev => !prev); setShowEmojiPicker(false); }}
                       className={`text-gray-400 hover:text-teal-600 dark:hover:text-teal-400 rounded-full h-8 w-8 flex-shrink-0 p-0 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors flex items-center justify-center ${showAttachmentModal ? 'text-teal-600 dark:text-teal-400 bg-zinc-50 dark:bg-zinc-800' : ''}`}
+                      title="Attach media or documents"
                     >
                       <Paperclip className="w-5 h-5 stroke-[1.5]" />
                     </Button>
                     
                     <textarea 
-                      placeholder={pendingAttachment ? "Add a caption..." : "Type a message..."}
+                      placeholder="Type a message..."
                       className="w-full min-w-0 max-h-32 min-h-[36px] bg-transparent border-none focus:ring-0 focus-visible:ring-0 resize-none py-1.5 text-sm sm:text-[15px] text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none leading-relaxed select-text"
                       rows={1}
                       value={newMessage}
@@ -2974,6 +3206,7 @@ export default function ChatPage() {
                     disabled={isUploadingAttachment}
                     size="icon" 
                     className="h-10 w-10 sm:h-11 sm:w-11 rounded-full bg-gradient-to-tr from-primary to-teal-600 hover:from-primary/95 hover:to-teal-500 active:scale-95 text-primary-foreground shadow-md hover:shadow-lg transition-all duration-200 flex-shrink-0 flex items-center justify-center disabled:opacity-50"
+                    title="Send message"
                   >
                     {isUploadingAttachment ? (
                       <Loader2 className="w-5 h-5 animate-spin" />
@@ -2984,6 +3217,23 @@ export default function ChatPage() {
                 </div>
               </div>
             )}
+
+            {/* ── WhatsApp-Style Pre-Send Attachment Preview Modal ── */}
+            <AttachmentPreviewModal
+              isOpen={showPreviewModal}
+              items={pendingAttachments}
+              onClose={() => {
+                pendingAttachments.forEach(p => {
+                  if (p.previewUrl.startsWith('blob:')) URL.revokeObjectURL(p.previewUrl);
+                });
+                setPendingAttachments([]);
+                setShowPreviewModal(false);
+              }}
+              onSend={handleSendAttachments}
+              onRemoveItem={handleRemovePendingItem}
+              onAddMore={handleAddMorePending}
+              onReplaceItem={handleReplacePendingItem}
+            />
 
             {/* ── Slide-out Group Details Panel (Responsive Right-Sidebar) ── */}
             {showGroupInfo && activeChatDetails?.isGroup && (
