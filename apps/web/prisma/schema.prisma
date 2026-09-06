@@ -100,6 +100,10 @@ model User {
   aiMemories        AIMemory[]
   aiTasks           AITask[]
   aiReminders       AIReminder[]
+  selectedPersonaId String?
+  selectedPersona   AIPersona?   @relation("UserSelectedPersona", fields: [selectedPersonaId], references: [id], onDelete: SetNull)
+  aiConversations   AIConversation[]
+  aiUsageLogs       AIUsageLog[]
 
   // Subscription System (Creator ↔ Subscriber)
   subscribers       Subscription[]       @relation("CreatorSubscriptions")
@@ -1829,6 +1833,161 @@ model AIReminder {
   completedAt   DateTime?
   lastSnoozedAt DateTime?
 }
+
+// ---------------------------------------------------------
+// TOLEE GEMINI AI PLATFORM ENGINE
+// ---------------------------------------------------------
+
+model AIPersona {
+  id              String   @id @default(cuid())
+  name            String
+  avatar          String?
+  description     String?
+  systemPrompt    String   @db.Text
+  personality     String?
+  tone            String   @default("friendly") // "friendly", "professional", "creative", "direct", "concise", "humorous"
+  language        String   @default("auto")     // "auto", "en", "hi", "hinglish", "mr", "gu"
+  responseLength  String   @default("balanced") // "concise", "balanced", "detailed"
+  formality       String   @default("casual")   // "formal", "casual", "slang"
+  emojiBehavior   String   @default("moderate") // "none", "moderate", "expressive"
+  
+  // Voice configurations
+  voiceName       String   @default("Puck")     // "Puck", "Charon", "Kore", "Fenrir", "Aoede"
+  voiceGender     String   @default("neutral")  // "male", "female", "neutral"
+  voiceSpeed      Float    @default(1.0)
+  
+  // Routing preferences
+  preferredProvider String @default("gemini_official") // "gemini_web2api", "gemini_official", "fallback"
+  preferredModel    String @default("gemini-2.0-flash")
+  
+  isEnabled       Boolean  @default(true)
+  isDefault       Boolean  @default(false)
+  isSystem        Boolean  @default(false)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  selectedByUsers User[]   @relation("UserSelectedPersona")
+  conversations   AIConversation[]
+
+  @@index([isEnabled])
+  @@index([isDefault])
+}
+
+model AIProviderConfig {
+  id              String   @id @default(cuid())
+  name            String   // e.g. "Gemini Web2API", "Google Gemini Official", "NVIDIA NIM Fallback", "OpenAI Fallback"
+  providerType    String   // "gemini_web2api" | "gemini_official" | "openai" | "claude" | "nvidia"
+  baseUrl         String?
+  apiKey          String?
+  defaultModel    String   // "gemini-2.0-flash", "gpt-4o-mini", etc.
+  fallbackModel   String?
+  temperature     Float    @default(0.7)
+  maxTokens       Int      @default(2048)
+  
+  isStreaming     Boolean  @default(true)
+  isVision        Boolean  @default(true)
+  isVoice         Boolean  @default(false)
+  
+  isEnabled       Boolean  @default(true)
+  isDefault       Boolean  @default(false)
+  status          String   @default("CONNECTED") // "CONNECTED" | "DEGRADED" | "OFFLINE"
+  lastCheckedAt   DateTime?
+  errorRate       Float    @default(0.0)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([providerType])
+  @@index([isEnabled])
+  @@index([status])
+}
+
+model AIConversation {
+  id              String   @id @default(cuid())
+  title           String   @default("New Chat")
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  personaId       String?
+  persona         AIPersona? @relation(fields: [personaId], references: [id], onDelete: SetNull)
+  
+  provider        String?  // "gemini_web2api" | "gemini_official" | "fallback"
+  model           String?  // "gemini-2.0-flash", etc.
+  
+  pinned          Boolean  @default(false)
+  archived        Boolean  @default(false)
+  
+  messages        AIMessage[]
+  usageLogs       AIUsageLog[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
+  @@index([updatedAt])
+}
+
+model AIMessage {
+  id              String   @id @default(cuid())
+  conversationId  String
+  conversation    AIConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  
+  role            String   // "user" | "assistant" | "system"
+  content         String   @db.Text
+  
+  // Multimodal attachments
+  mediaUrl        String?
+  mediaType       String?  // "image/jpeg", "image/png", "video/mp4", "audio/mp3", "application/pdf"
+  
+  // Voice Metadata
+  isVoiceMessage  Boolean  @default(false)
+  voiceDurationMs Int?
+  
+  // Metrics & Performance
+  tokensUsed      Int?
+  latencyMs       Int?
+  provider        String?
+  model           String?
+  
+  // Rating & Feedback
+  feedbackRating  Int?     // 1 for thumbs up, -1 for thumbs down
+  feedbackText    String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([conversationId])
+  @@index([createdAt])
+}
+
+model AIUsageLog {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversationId    String?
+  conversation      AIConversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  
+  action            String   // "chat_completion", "stream_completion", "live_voice", "image_analysis", "reply_suggestion", "group_action"
+  provider          String   // "gemini_web2api", "gemini_official", "fallback"
+  model             String
+  
+  inputTokens       Int      @default(0)
+  outputTokens      Int      @default(0)
+  totalTokens       Int      @default(0)
+  
+  voiceDurationSec  Float?
+  requestDurationMs Int      @default(0)
+  isSuccess         Boolean  @default(true)
+  errorMessage      String?
+  estimatedCost     Float    @default(0.0)
+  
+  createdAt         DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
+
 
 // ---------------------------------------------------------
 // TOLEE WORLD APP: LINKEDIN EXTRACTOR (SCOUT OSINT ENGINE)

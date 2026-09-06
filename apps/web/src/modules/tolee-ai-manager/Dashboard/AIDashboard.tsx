@@ -22,6 +22,7 @@ import { OpenWorkAgentWorkspace } from '../Components/OpenWorkAgentWorkspace';
 import { getAIDashboardSummary, processAIPersonalMessage } from '@/actions/ai-manager';
 import { createPost } from '@/actions/post';
 import { Button } from '@/components/ui/button';
+import GeminiChatView from '@/components/ai/GeminiChatView';
 
 export type AIModuleTab = 
   | 'openwork'
@@ -287,118 +288,8 @@ export function AIDashboard() {
       {/* Main Content View */}
       <div className="flex-1 overflow-y-auto p-3 sm:p-6 max-w-6xl mx-auto w-full">
         {activeTab === 'chat' && (
-          <div className="flex flex-col h-[calc(100vh-140px)] max-w-4xl mx-auto w-full pb-20">
-            {/* Frontier Brain Intelligence Indicator */}
-            <div className="flex items-center justify-between px-3 py-2 bg-gradient-to-r from-violet-50 via-indigo-50 to-purple-50 dark:from-violet-950/30 dark:via-indigo-950/30 dark:to-purple-950/30 border border-violet-200/60 dark:border-violet-800/40 rounded-2xl mb-2 text-xs">
-              <div className="flex items-center gap-2">
-                <span className="flex h-2 w-2 relative">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                </span>
-                <span className="font-extrabold text-violet-900 dark:text-violet-200">
-                  🧠 Frontier Multi-Brain Engine
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5 text-[11px] font-bold text-violet-700 dark:text-violet-300">
-                <span className="bg-white/80 dark:bg-zinc-900 px-2 py-0.5 rounded-md border border-violet-200 dark:border-zinc-700">ChatGPT-4o</span>
-                <span className="bg-white/80 dark:bg-zinc-900 px-2 py-0.5 rounded-md border border-violet-200 dark:border-zinc-700">Claude 3.5</span>
-                <span className="bg-white/80 dark:bg-zinc-900 px-2 py-0.5 rounded-md border border-violet-200 dark:border-zinc-700">Gemini 1.5</span>
-              </div>
-            </div>
-
-            {/* ChatGPT Style Immersive Stream Container */}
-            <div className="flex-1 overflow-y-auto px-2 sm:px-4 py-4 space-y-4 no-scrollbar">
-              {messages.map((msg) => (
-                <div 
-                  key={msg.id} 
-                  className={`flex gap-3 ${msg.isAI ? 'justify-start' : 'justify-end'}`}
-                >
-                  {msg.isAI && (
-                    <div className="p-2.5 bg-violet-600 text-white rounded-2xl h-fit shadow-md shadow-violet-600/20">
-                      <Bot className="w-4 h-4" />
-                    </div>
-                  )}
-                  <div 
-                    className={`max-w-[88%] sm:max-w-[80%] rounded-3xl p-4 text-sm leading-relaxed shadow-sm ${
-                      msg.isAI 
-                        ? 'bg-white dark:bg-zinc-900 text-slate-800 dark:text-zinc-100 border border-slate-200/80 dark:border-zinc-800' 
-                        : 'bg-violet-600 text-white font-medium shadow-md shadow-violet-600/20'
-                    }`}
-                  >
-                    <div className="whitespace-pre-wrap">{msg.text}</div>
-                    {msg.interactiveAction && (
-                      <div className="mt-3 p-3.5 bg-slate-50 dark:bg-zinc-950 rounded-2xl border border-violet-200 dark:border-violet-800/80 shadow-sm space-y-3">
-                        {msg.interactiveAction.payload?.imageUrl && (
-                          <img 
-                            src={msg.interactiveAction.payload.imageUrl} 
-                            alt="AI Generated Visual" 
-                            className="w-full h-64 sm:h-80 object-cover rounded-xl border border-slate-200 dark:border-zinc-800 shadow-md"
-                          />
-                        )}
-                        <div className="space-y-1">
-                          <label className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-1">
-                            ✏️ Edit Post Caption:
-                          </label>
-                          <textarea
-                            rows={3}
-                            value={msg.interactiveAction.payload?.caption || ''}
-                            onChange={(e) => {
-                              const newCaption = e.target.value;
-                              setMessages((prev) =>
-                                prev.map((m) =>
-                                  m.id === msg.id && m.interactiveAction
-                                    ? {
-                                        ...m,
-                                        interactiveAction: {
-                                          ...m.interactiveAction,
-                                          payload: { ...m.interactiveAction.payload, caption: newCaption }
-                                        }
-                                      }
-                                    : m
-                                )
-                              );
-                            }}
-                            placeholder="Type or customize your post caption here..."
-                            className="w-full text-xs font-medium text-slate-800 dark:text-zinc-100 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl p-2.5 focus:ring-2 focus:ring-violet-500 focus:outline-none resize-y"
-                          />
-                        </div>
-                        <div className="flex flex-col sm:flex-row gap-2">
-                          {msg.interactiveAction.payload?.imageUrl && (
-                            <a
-                              href={msg.interactiveAction.payload.imageUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              download="tolee-ai-creative.jpg"
-                              className="flex-1 h-10 bg-slate-200 dark:bg-zinc-800 hover:bg-slate-300 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-1.5 transition-all"
-                            >
-                              <Download className="w-3.5 h-3.5" /> Save Image
-                            </a>
-                          )}
-                          <Button
-                            size="sm"
-                            disabled={msg.interactiveAction.executed || publishingActionId === msg.id}
-                            onClick={() => handleExecuteAction(msg.id, msg.interactiveAction)}
-                            className="flex-1 h-10 bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs rounded-xl shadow-md transition-all active:scale-[0.98] flex items-center justify-center gap-1.5"
-                          >
-                            <Sparkles className="w-3.5 h-3.5" />
-                            {publishingActionId === msg.id ? '🚀 Publishing to Tolees...' : msg.interactiveAction.label}
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                    <span suppressHydrationWarning className={`block text-[10px] mt-1.5 text-right ${msg.isAI ? 'text-slate-400' : 'text-violet-200'}`}>
-                      {msg.time}
-                    </span>
-                  </div>
-                </div>
-              ))}
-              {isLoading && (
-                <div className="flex gap-3 items-center text-xs text-slate-400 italic bg-white dark:bg-zinc-900 p-3 rounded-2xl w-fit border border-slate-200/60 dark:border-zinc-800 shadow-sm">
-                  <Bot className="w-4 h-4 text-violet-600 animate-spin" /> Tolee AI Manager is processing...
-                </div>
-              )}
-              <div ref={chatEndRef} />
-            </div>
+          <div className="h-[calc(100vh-140px)] max-w-4xl mx-auto w-full rounded-2xl overflow-hidden border border-slate-200/80 dark:border-zinc-800 shadow-lg">
+            <GeminiChatView />
           </div>
         )}
 

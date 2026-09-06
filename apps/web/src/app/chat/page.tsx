@@ -738,6 +738,11 @@ export default function ChatPage() {
   const replacingItemIdRef = useRef<string | null>(null);
   const uploadAbortControllersRef = useRef<Map<string, AbortController>>(new Map());
 
+  // --- AI Chat Assistant States ---
+  const [smartReplies, setSmartReplies] = useState<{ id: string; text: string; emoji?: string }[]>([]);
+  const [isGeneratingSmartReplies, setIsGeneratingSmartReplies] = useState(false);
+  const [aiSummaryModal, setAiSummaryModal] = useState<{ isOpen: boolean; title: string; text: string } | null>(null);
+
   // --- Fullscreen Media Viewer Modal State ---
   const [activeMediaViewer, setActiveMediaViewer] = useState<{
     type: 'image' | 'video' | 'pdf' | 'document' | 'audio';
@@ -2322,6 +2327,40 @@ export default function ChatPage() {
         }
 
         fetchChats();
+
+        // ── Group @AI Mention Automatic Response ──
+        if (contentToSend.includes('@AI') || contentToSend.includes('@ai')) {
+          const aiPrompt = contentToSend.replace(/@AI|@ai/g, '').trim();
+          fetch('/api/ai/group-action', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: aiPrompt.startsWith('summarize')
+                ? 'summarize'
+                : aiPrompt.startsWith('poll')
+                ? 'poll'
+                : aiPrompt.startsWith('translate')
+                ? 'translate'
+                : 'explain',
+              prompt: aiPrompt,
+              targetMessageContent: replyingToMessage?.text,
+            }),
+          })
+            .then((r) => r.json())
+            .then(async (aiRes) => {
+              if (aiRes.result) {
+                const aiMsg = await sendRealChatMessage(activeChat, `🤖 **Tolee AI:**\n${aiRes.result}`);
+                if (aiMsg.success && aiMsg.message) {
+                  setMessagesByChat((prev) => ({
+                    ...prev,
+                    [activeChat]: [...(prev[activeChat] || []), { ...aiMsg.message, isMe: false }],
+                  }));
+                  fetchChats();
+                }
+              }
+            })
+            .catch(() => {});
+        }
       } else {
         console.error("Failed to send message:", res?.error);
         alert(res?.error || "Failed to send message. Please try again.");
@@ -2698,6 +2737,86 @@ export default function ChatPage() {
       } else {
         alert(res.error || "Failed to delete message.");
       }
+    }
+  };
+
+  const handleGenerateSmartReplies = async (targetMsg?: any) => {
+    if (!activeChat) return;
+    setIsGeneratingSmartReplies(true);
+    try {
+      const currentMsgs = messagesByChat[activeChat] || [];
+      const formatted = currentMsgs.slice(-6).map((m) => ({
+        role: m.isMe ? 'assistant' : 'user',
+        content: m.text || '',
+      }));
+
+      if (targetMsg && targetMsg.text && !formatted.some((f) => f.content === targetMsg.text)) {
+        formatted.push({ role: 'user', content: targetMsg.text });
+      }
+
+      const res = await fetch('/api/ai/reply-suggestions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: formatted }),
+      });
+      const data = await res.json();
+      if (data.suggestions && data.suggestions.length > 0) {
+        setSmartReplies(data.suggestions);
+      }
+    } catch (err) {
+      console.error('Smart reply error:', err);
+    } finally {
+      setIsGeneratingSmartReplies(false);
+    }
+  };
+
+  const handleAITranslate = async (msg: any, targetLang: string = 'English') => {
+    if (!msg.text) return;
+    try {
+      const res = await fetch('/api/ai/group-action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'translate',
+          targetMessageContent: msg.text,
+          targetLanguage: targetLang,
+        }),
+      });
+      const data = await res.json();
+      if (data.result) {
+        setNewMessage(data.result);
+      }
+    } catch (err) {
+      alert('Translation failed.');
+    }
+  };
+
+  const handleAISummarize = async (msg?: any) => {
+    if (!activeChat) return;
+    try {
+      const currentMsgs = messagesByChat[activeChat] || [];
+      const res = await fetch('/api/ai/group-action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'summarize',
+          targetMessageContent: msg?.text,
+          recentMessages: currentMsgs.slice(-15).map((m) => ({
+            role: m.isMe ? 'assistant' : 'user',
+            content: m.text || '',
+          })),
+        }),
+      });
+      const data = await res.json();
+      if (data.result) {
+        setAiSummaryModal({
+          isOpen: true,
+          title: 'AI Summary',
+          text: data.result,
+        });
+      }
+    } catch (err) {
+      alert('Summary failed.');
     }
   };
 
@@ -3849,6 +3968,47 @@ export default function ChatPage() {
               </button>
             )}
 
+            {/* AI Smart Replies Suggestions Bar */}
+            {(smartReplies.length > 0 || isGeneratingSmartReplies) && (
+              <div className="px-3.5 py-2 bg-gradient-to-r from-teal-950/50 via-cyan-950/40 to-teal-950/50 border-t border-teal-800/40 backdrop-blur-md flex items-center gap-2 overflow-x-auto no-scrollbar animate-in slide-in-from-bottom-2 shrink-0">
+                <div className="flex items-center gap-1.5 text-[11px] font-bold text-teal-300 shrink-0 select-none">
+                  <Sparkles className="w-3.5 h-3.5 text-teal-400 animate-pulse" />
+                  <span>AI Replies:</span>
+                </div>
+                {isGeneratingSmartReplies ? (
+                  <div className="flex items-center gap-1.5 text-xs text-teal-400 animate-pulse font-medium">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Thinking...</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                    {smartReplies.map((reply) => (
+                      <button
+                        key={reply.id}
+                        onClick={() => {
+                          setNewMessage(reply.text);
+                          setSmartReplies([]);
+                        }}
+                        className="px-3 py-1 rounded-full bg-teal-900/70 hover:bg-teal-800 border border-teal-700/60 text-teal-100 text-xs font-medium whitespace-nowrap transition-all transform hover:scale-105 shadow-sm shrink-0 flex items-center gap-1"
+                      >
+                        {reply.emoji && <span>{reply.emoji}</span>}
+                        <span>{reply.text}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setSmartReplies([])}
+                  className="h-6 w-6 rounded-full text-zinc-400 hover:text-white shrink-0"
+                  title="Dismiss suggestions"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            )}
+
             {/* WhatsApp-Style Replying Box Preview */}
             {replyingToMessage && (
               <div className="px-4 py-2 bg-zinc-50 dark:bg-zinc-900 border-l-4 border-teal-500 z-20 flex items-center justify-between gap-3 shadow-xs animate-in slide-in-from-bottom-2 shrink-0 border-t border-zinc-200/50 dark:border-zinc-800/60">
@@ -4730,6 +4890,42 @@ export default function ChatPage() {
                 className="w-full rounded-xl h-8 text-xs font-semibold text-zinc-400 hover:text-white"
               >
                 Cancel
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* ── AI Summary & Action Dialog ── */}
+      {aiSummaryModal?.isOpen && (
+        <Dialog open={aiSummaryModal.isOpen} onOpenChange={(open) => !open && setAiSummaryModal(null)}>
+          <DialogContent className="sm:max-w-md bg-zinc-950 text-white border border-teal-800/60 rounded-2xl p-6 shadow-2xl">
+            <DialogHeader>
+              <DialogTitle className="text-base font-black text-white flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-teal-400" />
+                {aiSummaryModal.title}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="mt-4 p-4 rounded-xl bg-zinc-900/80 border border-zinc-800 text-xs sm:text-sm text-zinc-200 leading-relaxed max-h-72 overflow-y-auto whitespace-pre-wrap">
+              {aiSummaryModal.text}
+            </div>
+            <div className="flex items-center justify-end gap-2 mt-4">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  navigator.clipboard.writeText(aiSummaryModal.text);
+                  alert('Summary copied to clipboard!');
+                }}
+                className="rounded-xl text-xs font-bold border-zinc-700 bg-zinc-900 text-zinc-200 hover:bg-zinc-800"
+              >
+                <Copy className="w-3.5 h-3.5 mr-1" />
+                Copy
+              </Button>
+              <Button
+                onClick={() => setAiSummaryModal(null)}
+                className="rounded-xl text-xs font-bold bg-teal-600 hover:bg-teal-500 text-white"
+              >
+                Done
               </Button>
             </div>
           </DialogContent>
