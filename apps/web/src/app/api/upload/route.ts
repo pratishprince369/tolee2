@@ -2,6 +2,11 @@ import { NextResponse } from 'next/server';
 import cloudinary from '@/lib/cloudinary';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
+import { uploadLimiter, getClientIp, createRateLimitResponse } from '@/lib/rate-limit';
+import { validateFileUpload, sanitizeFilename } from '@/lib/sanitize';
+import { createSafeErrorResponse } from '@/lib/error-handler';
+
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
@@ -10,41 +15,42 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Rate Limiting Protection (per IP + per User ID)
+    const ip = getClientIp();
+    const userId = (session.user as any)?.id || 'anon';
+    if (uploadLimiter.isRateLimited(`${ip}:${userId}`)) {
+      return createRateLimitResponse(60);
+    }
+
     const data = await request.formData();
     const file: File | null = data.get('file') as unknown as File;
 
     if (!file) {
-      return NextResponse.json({ success: false, error: 'No file provided' });
-    }
-
-    // MIME Type Validation - allow images, videos, audio, PDFs, and common documents
-    const isImage = file.type.startsWith('image/');
-    const isVideo = file.type.startsWith('video/');
-    const isAudio = file.type.startsWith('audio/');
-    const isDoc = file.type.startsWith('application/') || file.type.startsWith('text/') || 
-      file.name.match(/\.(pdf|doc|docx|xls|xlsx|ppt|pptx|txt|rtf|csv|zip|rar|7z|tar|gz)$/i);
-
-    const isValidType = isImage || isVideo || isAudio || Boolean(isDoc);
-    if (!isValidType) {
-      return NextResponse.json({ success: false, error: 'Invalid file type. Unsupported format.' }, { status: 400 });
-    }
-
-    // Size limits (50MB for videos, 25MB for audio/documents/images)
-    const maxSize = isVideo ? 50 * 1024 * 1024 : 25 * 1024 * 1024;
-    if (file.size > maxSize) {
-      return NextResponse.json({ success: false, error: `File size exceeds limit (${isVideo ? '50MB' : '25MB'}).` }, { status: 413 });
+      return NextResponse.json({ success: false, error: 'No file provided.' }, { status: 400 });
     }
 
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Upload to Cloudinary using a Promise wrapper for the stream upload
+    // Deep server-side file validation (Extension, MIME, Max Size, and Magic Bytes)
+    const validation = validateFileUpload(file.name, file.size, file.type, buffer);
+    if (!validation.valid) {
+      return NextResponse.json(
+        { success: false, error: validation.error || 'Invalid or unsupported file format.' },
+        { status: 400 }
+      );
+    }
+
+    const sanitizedName = sanitizeFilename(file.name);
+
+    // Upload to Cloudinary using isolated storage folder
     try {
       const result = await new Promise((resolve, reject) => {
         cloudinary.uploader.upload_stream(
           {
             folder: 'tolee_uploads',
             resource_type: 'auto',
+            filename_override: sanitizedName,
           },
           (error, result) => {
             if (error) reject(error);
@@ -53,7 +59,6 @@ export async function POST(request: Request) {
         ).end(buffer);
       }) as any;
 
-      console.log('UPLOAD: SUCCESS! URL:', result.secure_url, 'Public ID:', result.public_id, 'Resource Type:', result.resource_type);
       return NextResponse.json({ 
         success: true, 
         url: result.secure_url,
@@ -61,15 +66,13 @@ export async function POST(request: Request) {
         resourceType: result.resource_type
       });
     } catch (uploadError: any) {
-      console.error("Cloudinary upload failed:", uploadError.message);
+      console.error("[Upload] Cloudinary stream upload failure:", uploadError.message);
       return NextResponse.json({ 
         success: false, 
-        error: 'Upload to Cloudinary failed',
-        details: uploadError.message 
-      });
+        error: 'Upload to storage provider failed. Please try again later.'
+      }, { status: 502 });
     }
   } catch (error: any) {
-    console.error("Critical error in upload route:", error);
-    return NextResponse.json({ success: false, error: 'Internal server error' });
+    return createSafeErrorResponse(error, 500, 'Failed to process file upload.', 'API_UPLOAD');
   }
 }

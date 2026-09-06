@@ -3,33 +3,34 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { extractPublicIdFromUrl, extractResourceTypeFromUrl, destroyAsset } from '@/lib/cloudinary-cleanup';
+import { writeLimiter, getClientIp, createRateLimitResponse } from '@/lib/rate-limit';
+import { sanitizeText, sanitizeUrl } from '@/lib/sanitize';
+import { createSafeErrorResponse } from '@/lib/error-handler';
+
+export const dynamic = 'force-dynamic';
 
 export async function PUT(req: Request) {
   try {
-    const { writeLimiter, getClientIp } = require('@/lib/rate-limit');
     const ip = getClientIp();
     if (writeLimiter.isRateLimited(ip)) {
-      return NextResponse.json({ error: 'Too many requests. Please wait and try again.' }, { status: 429 });
+      return createRateLimitResponse(60);
     }
 
     const session = await getServerSession(authOptions);
     if (!session || !session.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
 
     const userId = (session.user as any).id;
     const body = await req.json();
-    console.log('UPDATING PROFILE FOR USER:', userId, 'WITH DATA:', body);
     
-        const { name, bio, location, website, avatar, coverImage, username } = body;
-    console.log('VALIDATING DATA:', { avatar, coverImage, username });
+    const { name, bio, location, website, avatar, coverImage, username } = body;
 
-    if ((avatar && avatar.startsWith('blob:')) || (coverImage && coverImage.startsWith('blob:'))) {
-      console.error('REJECTED BLOB URL IN PROFILE UPDATE:', { avatar, coverImage });
-      return NextResponse.json({ error: 'Cannot save temporary blob URLs. Upload failed.' }, { status: 400 });
+    if ((avatar && typeof avatar === 'string' && avatar.startsWith('blob:')) || 
+        (coverImage && typeof coverImage === 'string' && coverImage.startsWith('blob:'))) {
+      return NextResponse.json({ success: false, error: 'Cannot save temporary blob URLs. Please upload image first.' }, { status: 400 });
     }
 
-    const { sanitizeText, sanitizeUrl } = require('@/lib/sanitize');
     const safeName = sanitizeText(name || '', 100);
     const safeBio = sanitizeText(bio || '', 500);
     const safeLocation = sanitizeText(location || '', 150);
@@ -39,7 +40,7 @@ export async function PUT(req: Request) {
 
     let finalUsername = undefined;
     if (username !== undefined && username !== null) {
-      const cleanUsername = username.trim().toLowerCase();
+      const cleanUsername = String(username).trim().toLowerCase();
       
       const existingDbUser = await prisma.user.findUnique({
         where: { id: userId },
@@ -48,27 +49,27 @@ export async function PUT(req: Request) {
       
       if (existingDbUser?.username) {
         if (existingDbUser.username !== cleanUsername) {
-          return NextResponse.json({ error: 'Username is permanent and cannot be changed.' }, { status: 400 });
+          return NextResponse.json({ success: false, error: 'Username is permanent and cannot be changed.' }, { status: 400 });
         }
       } else if (cleanUsername !== '') {
         const RESERVED_USERNAMES = [
           'admin', 'feed', 'reels', 'me', 'u', 'tolee', 'api', 'chat', 'settings',
           'notifications', 'search', 'explore', 'auth', 'login', 'signup', 'signin',
           'logout', 'profile', 'support', 'help', 'contact', 'terms', 'privacy',
-          'about', 'blog', 'jobs', 'press'
+          'about', 'blog', 'jobs', 'press', 'super-admin'
         ];
 
         if (cleanUsername.length < 3) {
-          return NextResponse.json({ error: 'Username must be at least 3 characters long.' }, { status: 400 });
+          return NextResponse.json({ success: false, error: 'Username must be at least 3 characters long.' }, { status: 400 });
         }
         if (cleanUsername.length > 30) {
-          return NextResponse.json({ error: 'Username cannot exceed 30 characters.' }, { status: 400 });
+          return NextResponse.json({ success: false, error: 'Username cannot exceed 30 characters.' }, { status: 400 });
         }
         if (!/^[a-z0-9_]+$/.test(cleanUsername)) {
-          return NextResponse.json({ error: 'Username can only contain letters, numbers, and underscores.' }, { status: 400 });
+          return NextResponse.json({ success: false, error: 'Username can only contain letters, numbers, and underscores.' }, { status: 400 });
         }
         if (RESERVED_USERNAMES.includes(cleanUsername)) {
-          return NextResponse.json({ error: 'This username is a reserved keyword.' }, { status: 400 });
+          return NextResponse.json({ success: false, error: 'This username is a reserved keyword.' }, { status: 400 });
         }
 
         const existingUserWithUsername = await prisma.user.findFirst({
@@ -80,8 +81,8 @@ export async function PUT(req: Request) {
           }
         });
 
-        if (existingUserWithUsername) {
-          return NextResponse.json({ error: 'This username is already taken.' }, { status: 400 });
+        if (existingUserWithUsername && existingUserWithUsername.id !== userId) {
+          return NextResponse.json({ success: false, error: 'This username is already taken.' }, { status: 400 });
         }
 
         finalUsername = cleanUsername;
@@ -103,17 +104,14 @@ export async function PUT(req: Request) {
       : (safeCoverImage ? extractPublicIdFromUrl(safeCoverImage) : null);
 
     if (existingUser) {
-      // Check avatar replacement
       if (existingUser.avatar && existingUser.avatar !== safeAvatar) {
         const deleteId = existingUser.avatarPublicId || extractPublicIdFromUrl(existingUser.avatar);
         if (deleteId) {
           const resType = extractResourceTypeFromUrl(existingUser.avatar);
-          // Trapped destruction (blocking/awaited)
           await destroyAsset(deleteId, resType);
         }
       }
       
-      // Check coverImage replacement
       if (existingUser.coverImage && existingUser.coverImage !== safeCoverImage) {
         const deleteId = existingUser.coverImagePublicId || extractPublicIdFromUrl(existingUser.coverImage);
         if (deleteId) {
@@ -123,7 +121,6 @@ export async function PUT(req: Request) {
       }
     }
 
-    console.log('DATABASE: Updating user in Prisma...', userId);
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: {
@@ -133,17 +130,28 @@ export async function PUT(req: Request) {
         website: safeWebsite,
         avatar: safeAvatar,
         avatarPublicId: newAvatarPublicId,
-        image: safeAvatar, // Also synchronize NextAuth image!
+        image: safeAvatar,
         coverImage: safeCoverImage,
         coverImagePublicId: newCoverImagePublicId,
         ...(finalUsername ? { username: finalUsername } : {}),
       },
+      select: {
+        id: true,
+        name: true,
+        username: true,
+        email: true,
+        bio: true,
+        location: true,
+        website: true,
+        avatar: true,
+        image: true,
+        coverImage: true,
+        isPrivate: true,
+      }
     });
-    console.log('DATABASE: Update successful!');
 
-    return NextResponse.json(updatedUser);
+    return NextResponse.json({ success: true, user: updatedUser });
   } catch (error) {
-    console.error('Error updating profile:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    return createSafeErrorResponse(error, 500, 'Failed to update user profile.', 'API_USER_PROFILE');
   }
 }

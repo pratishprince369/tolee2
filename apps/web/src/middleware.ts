@@ -4,13 +4,13 @@ import type { NextRequest } from "next/server";
 
 // Enterprise Security Headers
 const securityHeaders = {
-  "Content-Security-Policy": "default-src 'self' https: 'unsafe-inline' 'unsafe-eval'; img-src 'self' data: blob: https:; media-src 'self' https: blob:; connect-src 'self' https: wss: ws:;",
+  "Content-Security-Policy": "default-src 'self' https: 'unsafe-inline' 'unsafe-eval'; img-src 'self' data: blob: https:; media-src 'self' https: blob:; connect-src 'self' https: wss: ws:; frame-ancestors 'none';",
   "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
   "X-Frame-Options": "DENY",
   "X-Content-Type-Options": "nosniff",
   "X-XSS-Protection": "1; mode=block",
   "Referrer-Policy": "strict-origin-when-cross-origin",
-  "Permissions-Policy": "camera=*, microphone=*, geolocation=*",
+  "Permissions-Policy": "camera=(self), microphone=(self), geolocation=(self)",
 };
 
 // Route prefixes requiring authentication
@@ -62,6 +62,32 @@ const noindexRoutes = [
   "/auth/verify-email",
 ];
 
+function isAllowedOrigin(origin: string): boolean {
+  if (!origin) return false;
+  
+  // Local development & Capacitor mobile app origins
+  if (
+    origin.startsWith("http://localhost:") ||
+    origin.startsWith("https://localhost:") ||
+    origin.startsWith("http://127.0.0.1:") ||
+    origin === "capacitor://localhost" ||
+    origin === "http://localhost"
+  ) {
+    return true;
+  }
+
+  // Tolee Production and Staging domains
+  if (
+    origin === "https://tolee.in" ||
+    origin.endsWith(".tolee.in") ||
+    origin.endsWith(".vercel.app")
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
 // Wrap standard NextAuth withAuth middleware
 const authMiddleware = withAuth(
   function middleware(req) {
@@ -90,6 +116,21 @@ const authMiddleware = withAuth(
 export default function middleware(req: NextRequest, event: any) {
   const { pathname } = req.nextUrl;
 
+  // Handle preflight OPTIONS requests cleanly
+  if (req.method === "OPTIONS") {
+    const origin = req.headers.get("origin") || "";
+    const response = new NextResponse(null, { status: 204 });
+
+    if (isAllowedOrigin(origin)) {
+      response.headers.set("Access-Control-Allow-Origin", origin);
+      response.headers.set("Access-Control-Allow-Credentials", "true");
+    }
+    response.headers.set("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+    response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
+    response.headers.set("Access-Control-Max-Age", "86400");
+    return response;
+  }
+
   // 1. If it's a private auth-required route, delegate to NextAuth withAuth
   const isAuthRoute = authRoutes.some(route => pathname === route || pathname.startsWith(route + "/"));
   if (isAuthRoute) {
@@ -108,10 +149,12 @@ export default function middleware(req: NextRequest, event: any) {
   }
 
   const origin = req.headers.get("origin") || "";
-  response.headers.set("Access-Control-Allow-Origin", origin || "*");
+  if (isAllowedOrigin(origin)) {
+    response.headers.set("Access-Control-Allow-Origin", origin);
+    response.headers.set("Access-Control-Allow-Credentials", "true");
+  }
   response.headers.set("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
   response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
-  response.headers.set("Access-Control-Allow-Credentials", "true");
 
   return response;
 }
