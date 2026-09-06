@@ -25,7 +25,10 @@ export async function uploadFile(
 ): Promise<UploadResponse> {
   const maxRetries = 9;
   const isVideo = file.type.startsWith('video/');
-  const resourceType = isVideo ? 'video' : 'auto';
+  const isImage = file.type.startsWith('image/');
+  const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+  const isDoc = isPdf || /\.(doc|docx|xls|xlsx|ppt|pptx|txt|rtf|csv|zip|rar|7z|tar|gz)$/i.test(file.name);
+  const resourceType = isVideo ? 'video' : (isDoc ? 'auto' : (isImage ? 'image' : 'auto'));
 
   if (abortSignal?.aborted) {
     throw new Error('Upload aborted by user');
@@ -100,15 +103,15 @@ export async function uploadFile(
       xhr.send(formData);
     });
 
-    // 3. Optimize secure_url (Auto-Compression & Universal MP4 format)
+    // 3. Optimize secure_url (Auto-Compression for images & Universal MP4 for video)
     let optimizedUrl = uploadData.secure_url;
     if (isVideo) {
       // Ensure universal direct MP4 playback on all browsers (never .m3u8)
       if (optimizedUrl.includes('.m3u8')) {
         optimizedUrl = optimizedUrl.replace('/sp_hd/', '/').replace(/\.m3u8(\?.*)?$/i, '.mp4$1');
       }
-    } else if (optimizedUrl && optimizedUrl.includes('/upload/')) {
-      // Fallback for images: inject auto-format and auto-quality
+    } else if (isImage && !isDoc && !isPdf && optimizedUrl && optimizedUrl.includes('/upload/')) {
+      // Fallback ONLY for images: inject auto-format and auto-quality
       optimizedUrl = optimizedUrl.replace('/upload/', '/upload/q_auto,f_auto/');
     }
 
@@ -116,7 +119,7 @@ export async function uploadFile(
       secure_url: optimizedUrl,
       original_url: uploadData.secure_url,
       public_id: uploadData.public_id,
-      resource_type: uploadData.resource_type || (isVideo ? 'video' : 'image'),
+      resource_type: uploadData.resource_type || (isVideo ? 'video' : (isDoc ? 'raw' : 'image')),
       eager: uploadData.eager,
     };
 

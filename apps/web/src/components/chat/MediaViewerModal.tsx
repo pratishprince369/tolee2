@@ -168,8 +168,11 @@ export function MediaViewerModal({ media, onClose }: MediaViewerModalProps) {
 
   const handleDownload = (e: React.MouseEvent) => {
     e.stopPropagation();
+    const downloadUrl = (media.type === 'pdf' || media.type === 'document')
+      ? `/api/chat/document?url=${encodeURIComponent(media.url)}&filename=${encodeURIComponent(media.filename || 'document.pdf')}&download=1`
+      : effectiveUrl;
     const link = document.createElement('a');
-    link.href = effectiveUrl;
+    link.href = downloadUrl;
     link.download = media.filename || (media.type === 'video' ? 'video.mp4' : 'download');
     link.target = '_blank';
     link.rel = 'noopener noreferrer';
@@ -180,7 +183,10 @@ export function MediaViewerModal({ media, onClose }: MediaViewerModalProps) {
 
   const handleOpenExternal = (e: React.MouseEvent) => {
     e.stopPropagation();
-    window.open(effectiveUrl, '_blank', 'noopener,noreferrer');
+    const openUrl = (media.type === 'pdf' || media.type === 'document')
+      ? `/api/chat/document?url=${encodeURIComponent(media.url)}&filename=${encodeURIComponent(media.filename || 'document.pdf')}`
+      : effectiveUrl;
+    window.open(openUrl, '_blank', 'noopener,noreferrer');
   };
 
   return (
@@ -344,7 +350,7 @@ export function MediaViewerModal({ media, onClose }: MediaViewerModalProps) {
         {media.type === 'pdf' && (
           <div className="w-full max-w-4xl h-[80vh] bg-white rounded-2xl overflow-hidden shadow-2xl border border-white/10 flex flex-col">
             <iframe
-              src={`${media.url}#toolbar=1`}
+              src={`/api/chat/document?url=${encodeURIComponent(media.url)}&filename=${encodeURIComponent(media.filename || 'document.pdf')}#toolbar=1`}
               className="w-full flex-1 border-none"
               title={media.filename || 'PDF Document'}
             />

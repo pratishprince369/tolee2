@@ -94,6 +94,9 @@ export function parseUrlMetadata(url: string): {
   height?: number; 
   isHd?: boolean;
   orientation?: 'portrait' | 'landscape' | 'square';
+  filename?: string;
+  sizeFormatted?: string;
+  mimeType?: string;
 } {
   try {
     const hashIndex = url.indexOf('#');
@@ -105,6 +108,9 @@ export function parseUrlMetadata(url: string): {
     const w = params.get('w') || params.get('width');
     const h = params.get('h') || params.get('height');
     const hd = params.get('hd');
+    const fn = params.get('fn') || params.get('filename') || params.get('name');
+    const size = params.get('size') || params.get('s');
+    const mime = params.get('mime') || params.get('type');
 
     const duration = d ? parseFloat(d) : undefined;
     const width = w ? parseInt(w, 10) : undefined;
@@ -122,7 +128,10 @@ export function parseUrlMetadata(url: string): {
       width: width && !isNaN(width) ? width : undefined,
       height: height && !isNaN(height) ? height : undefined,
       isHd,
-      orientation
+      orientation,
+      filename: fn ? decodeURIComponent(fn) : undefined,
+      sizeFormatted: size ? decodeURIComponent(size) : undefined,
+      mimeType: mime ? decodeURIComponent(mime) : undefined,
     };
   } catch {
     return {};
@@ -147,11 +156,9 @@ export function getVideoThumbnailUrl(url?: string | null): string {
   if (!url) return '';
   if (url.includes('/video/upload/')) {
     const playbackUrl = getVideoPlaybackUrl(url);
-    return playbackUrl
-      .replace('/video/upload/', '/video/upload/so_0,q_auto,f_jpg/')
-      .replace(/\.[a-zA-Z0-9]+(\?.*)?$/, '.jpg$1');
+    return playbackUrl.replace('/video/upload/', '/video/upload/so_1.0,w_480,c_scale,f_jpg/');
   }
-  return '';
+  return url;
 }
 
 /**
@@ -163,10 +170,9 @@ export function detectMediaInfo(
   text?: string | null, 
   resourceType?: string | null
 ): MediaAttachmentInfo | null {
-  const trimmedText = (text || '').trim();
+  const trimmedText = text?.trim() || '';
 
-  // Helper to extract clean caption removing bracket strings like [📎 filename]
-  const cleanCaption = (rawText?: string | null): string | undefined => {
+  const cleanCaption = (rawText?: string) => {
     if (!rawText) return undefined;
     const stripped = rawText
       .replace(/\[\s*(?:📎|attachment:?)\s*[^\]]+\]/gi, '')
@@ -177,16 +183,26 @@ export function detectMediaInfo(
   // 1. Direct mediaUrl inspection
   if (mediaUrl) {
     const parsedMeta = parseUrlMetadata(mediaUrl);
-    const cleanUrl = mediaUrl.split('?')[0].split('#')[0];
-    const rawFilename = cleanUrl.substring(cleanUrl.lastIndexOf('/') + 1) || 'Attachment';
-    const extension = (rawFilename.split('.').pop() || '').toLowerCase();
+    let cleanUrl = mediaUrl.split('?')[0].split('#')[0];
+    
+    // Clean any accidental f_auto,q_auto from PDF / raw document URLs
+    const isPdfUrl = cleanUrl.toLowerCase().endsWith('.pdf') || resourceType === 'pdf' || parsedMeta.mimeType?.includes('pdf') || parsedMeta.filename?.toLowerCase().endsWith('.pdf');
+    const isDocUrl = isPdfUrl || resourceType === 'document' || parsedMeta.mimeType?.includes('document') || parsedMeta.mimeType?.includes('sheet') || parsedMeta.mimeType?.includes('presentation') || /\.(doc|docx|xls|xlsx|ppt|pptx|txt|rtf|csv|zip|rar|7z|tar|gz)$/i.test(cleanUrl) || /\.(doc|docx|xls|xlsx|ppt|pptx|txt|rtf|csv|zip|rar|7z|tar|gz)$/i.test(parsedMeta.filename || '');
+
+    if ((isPdfUrl || isDocUrl) && cleanUrl.includes('/upload/q_auto,f_auto/')) {
+      cleanUrl = cleanUrl.replace('/upload/q_auto,f_auto/', '/upload/');
+    }
+
+    const fallbackFilename = cleanUrl.substring(cleanUrl.lastIndexOf('/') + 1) || 'Attachment';
+    const displayFilename = parsedMeta.filename || fallbackFilename;
+    const extension = (displayFilename.split('.').pop() || fallbackFilename.split('.').pop() || '').toLowerCase();
 
     // Check by resourceType or extension
     if (resourceType === 'video' || extension.match(/^(mp4|webm|mov|mkv|m4v|3gp)$/i)) {
       return {
-        url: mediaUrl,
+        url: cleanUrl,
         kind: 'video',
-        filename: rawFilename,
+        filename: displayFilename,
         extension: extension || 'mp4',
         caption: cleanCaption(trimmedText),
         duration: parsedMeta.duration,
@@ -199,31 +215,35 @@ export function detectMediaInfo(
 
     if (resourceType === 'audio' || extension.match(/^(mp3|wav|ogg|m4a|aac|flac|wma)$/i)) {
       return {
-        url: mediaUrl,
+        url: cleanUrl,
         kind: 'audio',
-        filename: rawFilename,
+        filename: displayFilename,
         extension: extension || 'mp3',
         caption: cleanCaption(trimmedText),
         duration: parsedMeta.duration
       };
     }
 
-    if (extension === 'pdf') {
+    if (isPdfUrl || extension === 'pdf') {
       return {
-        url: mediaUrl,
+        url: cleanUrl,
         kind: 'pdf',
-        filename: rawFilename,
+        filename: displayFilename.endsWith('.pdf') ? displayFilename : `${displayFilename}.pdf`,
         extension: 'pdf',
+        sizeFormatted: parsedMeta.sizeFormatted,
+        mimeType: 'application/pdf',
         caption: cleanCaption(trimmedText)
       };
     }
 
-    if (extension.match(/^(doc|docx|xls|xlsx|ppt|pptx|txt|rtf|csv|zip|rar|7z|tar|gz)$/i)) {
+    if (isDocUrl || extension.match(/^(doc|docx|xls|xlsx|ppt|pptx|txt|rtf|csv|zip|rar|7z|tar|gz)$/i)) {
       return {
-        url: mediaUrl,
+        url: cleanUrl,
         kind: 'document',
-        filename: rawFilename,
+        filename: displayFilename,
         extension,
+        sizeFormatted: parsedMeta.sizeFormatted,
+        mimeType: parsedMeta.mimeType,
         caption: cleanCaption(trimmedText)
       };
     }
@@ -240,7 +260,7 @@ export function detectMediaInfo(
       return {
         url: mediaUrl,
         kind: 'image',
-        filename: rawFilename,
+        filename: displayFilename,
         extension: extension || 'jpg',
         caption: cleanCaption(trimmedText),
         width: parsedMeta.width,
@@ -250,10 +270,11 @@ export function detectMediaInfo(
     }
 
     return {
-      url: mediaUrl,
+      url: cleanUrl,
       kind: 'document',
-      filename: rawFilename,
+      filename: displayFilename,
       extension: extension || 'bin',
+      sizeFormatted: parsedMeta.sizeFormatted,
       caption: cleanCaption(trimmedText)
     };
   }
@@ -805,8 +826,9 @@ export function DocumentMessage({ mediaInfo, isMe, onOpenViewer }: DocumentMessa
   const handleDownload = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!mediaInfo.url) return;
+    const downloadUrl = `/api/chat/document?url=${encodeURIComponent(mediaInfo.url)}&filename=${encodeURIComponent(mediaInfo.filename || 'document')}&download=1`;
     const link = document.createElement('a');
-    link.href = mediaInfo.url;
+    link.href = downloadUrl;
     link.download = mediaInfo.filename || 'document';
     link.target = '_blank';
     link.rel = 'noopener noreferrer';

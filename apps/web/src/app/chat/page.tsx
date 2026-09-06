@@ -1822,13 +1822,19 @@ export default function ChatPage() {
       if (abortController.signal.aborted) return;
 
       let finalMediaUrl = uploadedMediaUrl!;
-      if (item.duration || item.width || item.height) {
-        const metaParams = new URLSearchParams();
-        if (item.duration) metaParams.set('d', String(Math.round(item.duration)));
-        if (item.width) metaParams.set('w', String(item.width));
-        if (item.height) metaParams.set('h', String(item.height));
-        if (item.isHd !== undefined) metaParams.set('hd', item.isHd ? '1' : '0');
-        finalMediaUrl = `${finalMediaUrl}#${metaParams.toString()}`;
+      const metaParams = new URLSearchParams();
+      if (item.duration) metaParams.set('d', String(Math.round(item.duration)));
+      if (item.width) metaParams.set('w', String(item.width));
+      if (item.height) metaParams.set('h', String(item.height));
+      if (item.isHd !== undefined) metaParams.set('hd', item.isHd ? '1' : '0');
+      if (item.kind === 'pdf' || item.kind === 'document' || item.name) {
+        if (item.name) metaParams.set('fn', item.name);
+        if (item.sizeFormatted) metaParams.set('size', item.sizeFormatted);
+        if (item.file?.type) metaParams.set('mime', item.file.type);
+      }
+      const metaStr = metaParams.toString();
+      if (metaStr) {
+        finalMediaUrl = `${finalMediaUrl}#${metaStr}`;
       }
 
       const mediaPayload = {

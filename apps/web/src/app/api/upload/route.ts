@@ -42,6 +42,11 @@ export async function POST(request: Request) {
     }
 
     const sanitizedName = sanitizeFilename(file.name);
+    const isVideo = file.type.startsWith('video/');
+    const isImage = file.type.startsWith('image/');
+    const isPdf = file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf';
+    const isDoc = isPdf || /\.(doc|docx|xls|xlsx|ppt|pptx|txt|rtf|csv|zip|rar|7z|tar|gz)$/i.test(file.name);
+    const resourceType = isVideo ? 'video' : (isPdf ? 'auto' : (isDoc ? 'raw' : (isImage ? 'image' : 'auto')));
 
     // Upload to Cloudinary using isolated storage folder
     try {
@@ -49,8 +54,10 @@ export async function POST(request: Request) {
         cloudinary.uploader.upload_stream(
           {
             folder: 'tolee_uploads',
-            resource_type: 'auto',
+            resource_type: resourceType,
             filename_override: sanitizedName,
+            use_filename: true,
+            unique_filename: true,
           },
           (error, result) => {
             if (error) reject(error);
