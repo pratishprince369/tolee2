@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useEffect, useRef } from 'react';
-import { Camera, Image as ImageIcon, Video, FileText, Music, X } from 'lucide-react';
+import { Camera, Image as ImageIcon, Video, FileText, Music, MapPin, User, X } from 'lucide-react';
 
 interface AttachmentMenuProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelectOption: (option: 'camera' | 'image' | 'video' | 'document' | 'audio') => void;
+  onSelectOption: (option: 'camera' | 'image' | 'video' | 'document' | 'audio' | 'location' | 'contact') => void;
 }
 
 export function AttachmentMenu({ isOpen, onClose, onSelectOption }: AttachmentMenuProps) {
@@ -73,6 +73,20 @@ export function AttachmentMenu({ isOpen, onClose, onSelectOption }: AttachmentMe
       icon: Music,
       bgGradient: 'from-teal-500 to-emerald-500 text-white shadow-teal-500/25',
       desc: 'Audio files & recordings'
+    },
+    {
+      id: 'location' as const,
+      label: 'Location',
+      icon: MapPin,
+      bgGradient: 'from-emerald-500 to-green-600 text-white shadow-emerald-500/25',
+      desc: 'Share current GPS location'
+    },
+    {
+      id: 'contact' as const,
+      label: 'Contact',
+      icon: User,
+      bgGradient: 'from-amber-500 to-orange-500 text-white shadow-amber-500/25',
+      desc: 'Share contact card'
     }
   ];
 

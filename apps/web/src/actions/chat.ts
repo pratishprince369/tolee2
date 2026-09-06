@@ -7,6 +7,81 @@ import { unstable_noStore as noStore } from 'next/cache';
 import { createSystemNotification, createSystemNotificationsMany } from '@/lib/notification-service';
 import { formatLastSeen, isUserOnline } from '@/lib/presence';
 
+// Format message record with extended WhatsApp attributes
+function formatMessageOutput(msg: any, currentUserId: string) {
+  let reactions: any[] = [];
+  try {
+    if (msg.reactions) reactions = typeof msg.reactions === 'string' ? JSON.parse(msg.reactions) : msg.reactions;
+  } catch (e) {}
+
+  let deletedFor: string[] = [];
+  try {
+    if (msg.deletedFor) deletedFor = typeof msg.deletedFor === 'string' ? JSON.parse(msg.deletedFor) : msg.deletedFor;
+  } catch (e) {}
+
+  let locationData: any = null;
+  try {
+    if (msg.locationData) locationData = typeof msg.locationData === 'string' ? JSON.parse(msg.locationData) : msg.locationData;
+  } catch (e) {}
+
+  let contactData: any = null;
+  try {
+    if (msg.contactData) contactData = typeof msg.contactData === 'string' ? JSON.parse(msg.contactData) : msg.contactData;
+  } catch (e) {}
+
+  const isDeletedForEveryone = !!msg.isDeletedForEveryone;
+  const isDeletedForMe = Array.isArray(deletedFor) && deletedFor.includes(currentUserId);
+
+  return {
+    id: msg.id,
+    sender: msg.sender?.name || msg.sender?.username || 'User',
+    senderId: msg.senderId,
+    senderUsername: msg.sender?.username || null,
+    senderAvatar: msg.sender?.avatar || msg.sender?.image || '/default-user-avatar.svg',
+    text: isDeletedForEveryone ? '🚫 This message was deleted' : msg.content,
+    mediaUrl: isDeletedForEveryone ? null : (msg.mediaUrl || null),
+    mediaResourceType: isDeletedForEveryone ? null : (msg.mediaResourceType || null),
+    mediaPublicId: isDeletedForEveryone ? null : (msg.mediaPublicId || null),
+    isRead: msg.isRead,
+    createdAt: msg.createdAt ? (msg.createdAt instanceof Date ? msg.createdAt.toISOString() : msg.createdAt) : new Date().toISOString(),
+    isPromotion: msg.isPromotion,
+    shoot: msg.shoot ? {
+      id: msg.shoot.id,
+      contentType: msg.shoot.contentType,
+      contentId: msg.shoot.contentId,
+      mediaUrl: msg.shoot.mediaUrl
+    } : null,
+    time: msg.createdAt ? (msg.createdAt instanceof Date ? msg.createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })) : '',
+    isMe: msg.senderId === currentUserId,
+    replyTo: msg.parent ? {
+      id: msg.parent.id,
+      text: msg.parent.isDeletedForEveryone ? '🚫 Original message deleted' : msg.parent.content,
+      sender: msg.parent.sender?.name || msg.parent.sender?.username || 'User',
+      senderId: msg.parent.senderId,
+      senderUsername: msg.parent.sender?.username || null,
+      mediaUrl: msg.parent.isDeletedForEveryone ? null : (msg.parent.mediaUrl || null),
+      mediaResourceType: msg.parent.isDeletedForEveryone ? null : (msg.parent.mediaResourceType || null)
+    } : null,
+    storyId: msg.storyId || null,
+    storyType: msg.storyType || null,
+    storyThumbnail: msg.storyThumbnail || null,
+    storyUploaderId: msg.storyUploaderId || null,
+    storyCreatedAt: msg.storyCreatedAt ? (msg.storyCreatedAt instanceof Date ? msg.storyCreatedAt.toISOString() : msg.storyCreatedAt) : null,
+    isEdited: !!msg.isEdited,
+    isForwarded: !!msg.isForwarded,
+    isPinned: !!msg.isPinned,
+    reactions,
+    deletedFor,
+    isDeletedForMe,
+    isDeletedForEveryone,
+    locationData,
+    contactData,
+    voiceDuration: msg.voiceDuration || null,
+    viewOnce: !!msg.viewOnce,
+    viewedAt: msg.viewedAt ? (msg.viewedAt instanceof Date ? msg.viewedAt.toISOString() : msg.viewedAt) : null
+  };
+}
+
 // Fetch real chats and messages for the user
 export async function fetchRealChatData() {
   noStore();
@@ -105,35 +180,7 @@ export async function fetchRealChatData() {
         mutedUntil: tm.mutedUntil || null
       });
 
-      messagesByChatObj[chat.id] = messages.map(msg => ({
-        id: msg.id,
-        sender: msg.sender.name || msg.sender.username || 'User',
-        senderId: msg.senderId,
-        senderUsername: msg.sender.username || null,
-        senderAvatar: msg.sender.avatar || msg.sender.image || '/default-user-avatar.svg',
-        text: msg.content,
-        mediaUrl: msg.mediaUrl || null,
-        mediaResourceType: msg.mediaResourceType || null,
-        mediaPublicId: msg.mediaPublicId || null,
-        isRead: msg.isRead,
-        createdAt: msg.createdAt.toISOString(),
-        time: msg.createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        isMe: msg.senderId === userId,
-        replyTo: msg.parent ? {
-          id: msg.parent.id,
-          text: msg.parent.content,
-          sender: msg.parent.sender.name || msg.parent.sender.username || 'User',
-          senderId: msg.parent.senderId,
-          senderUsername: msg.parent.sender.username || null,
-          mediaUrl: msg.parent.mediaUrl || null,
-          mediaResourceType: msg.parent.mediaResourceType || null
-        } : null,
-        storyId: msg.storyId || null,
-        storyType: msg.storyType || null,
-        storyThumbnail: msg.storyThumbnail || null,
-        storyUploaderId: msg.storyUploaderId || null,
-        storyCreatedAt: msg.storyCreatedAt ? msg.storyCreatedAt.toISOString() : null
-      }));
+      messagesByChatObj[chat.id] = messages.map(msg => formatMessageOutput(msg, userId));
     }
 
     // 2. Fetch Personal DM Chats
@@ -229,42 +276,7 @@ export async function fetchRealChatData() {
         requestSenderId: dm.requestSenderId
       });
 
-      messagesByChatObj[dm.id] = dmMessages.map(msg => ({
-        id: msg.id,
-        sender: msg.sender.name || msg.sender.username || 'User',
-        senderId: msg.senderId,
-        senderUsername: msg.sender.username || null,
-        senderAvatar: msg.sender.avatar || msg.sender.image || '/default-user-avatar.svg',
-        text: msg.content,
-        mediaUrl: msg.mediaUrl || null,
-        mediaResourceType: msg.mediaResourceType || null,
-        mediaPublicId: msg.mediaPublicId || null,
-        isRead: msg.isRead,
-        createdAt: msg.createdAt.toISOString(),
-        isPromotion: msg.isPromotion,
-        shoot: msg.shoot ? {
-          id: msg.shoot.id,
-          contentType: msg.shoot.contentType,
-          contentId: msg.shoot.contentId,
-          mediaUrl: msg.shoot.mediaUrl
-        } : null,
-        time: msg.createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        isMe: msg.senderId === userId,
-        replyTo: msg.parent ? {
-          id: msg.parent.id,
-          text: msg.parent.content,
-          sender: msg.parent.sender.name || msg.parent.sender.username || 'User',
-          senderId: msg.parent.senderId,
-          senderUsername: msg.parent.sender.username || null,
-          mediaUrl: msg.parent.mediaUrl || null,
-          mediaResourceType: msg.parent.mediaResourceType || null
-        } : null,
-        storyId: msg.storyId || null,
-        storyType: msg.storyType || null,
-        storyThumbnail: msg.storyThumbnail || null,
-        storyUploaderId: msg.storyUploaderId || null,
-        storyCreatedAt: msg.storyCreatedAt ? msg.storyCreatedAt.toISOString() : null
-      }));
+      messagesByChatObj[dm.id] = dmMessages.map(msg => formatMessageOutput(msg, userId));
     }
 
     // Sort: chats with unread > 0 at the top, then by last message time
@@ -335,6 +347,13 @@ export async function sendRealChatMessage(
     mediaUrl?: string;
     mediaPublicId?: string;
     mediaResourceType?: string;
+  },
+  extraData?: {
+    isForwarded?: boolean;
+    locationData?: any;
+    contactData?: any;
+    voiceDuration?: number;
+    viewOnce?: boolean;
   }
 ) {
   try {
@@ -363,7 +382,7 @@ export async function sendRealChatMessage(
     const { sanitizeText } = require('@/lib/sanitize');
     const safeContent = sanitizeText(content || '', 5000);
 
-    if (!safeContent && !mediaData?.mediaUrl) {
+    if (!safeContent && !mediaData?.mediaUrl && !extraData?.locationData && !extraData?.contactData) {
       return { success: false, error: 'Message cannot be empty.' };
     }
 
@@ -427,7 +446,7 @@ export async function sendRealChatMessage(
 
     const message = await prisma.message.create({
       data: {
-        content: safeContent || (mediaData?.mediaUrl ? '' : 'Message'),
+        content: safeContent || (mediaData?.mediaUrl ? '' : extraData?.locationData ? '📍 Shared Location' : extraData?.contactData ? '👤 Shared Contact' : 'Message'),
         mediaUrl: mediaData?.mediaUrl || null,
         mediaPublicId: mediaData?.mediaPublicId || null,
         mediaResourceType: mediaData?.mediaResourceType || null,
@@ -438,7 +457,12 @@ export async function sendRealChatMessage(
         storyType: storyReplyData?.storyType || null,
         storyThumbnail: storyReplyData?.storyThumbnail || null,
         storyUploaderId: storyReplyData?.storyUploaderId || null,
-        storyCreatedAt: storyReplyData?.storyCreatedAt ? new Date(storyReplyData.storyCreatedAt) : null
+        storyCreatedAt: storyReplyData?.storyCreatedAt ? new Date(storyReplyData.storyCreatedAt) : null,
+        isForwarded: !!extraData?.isForwarded,
+        locationData: extraData?.locationData ? JSON.stringify(extraData.locationData) : null,
+        contactData: extraData?.contactData ? JSON.stringify(extraData.contactData) : null,
+        voiceDuration: extraData?.voiceDuration || null,
+        viewOnce: !!extraData?.viewOnce
       },
       include: {
         sender: true,
@@ -503,34 +527,7 @@ export async function sendRealChatMessage(
 
     return { 
       success: true, 
-      message: {
-        id: message.id,
-        sender: message.sender.name || message.sender.username || 'User',
-        senderId: message.senderId,
-        senderUsername: message.sender.username || null,
-        senderAvatar: message.sender.avatar || message.sender.image || '/default-user-avatar.svg',
-        text: message.content,
-        time: message.createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        isMe: true,
-        replyTo: message.parent ? {
-          id: message.parent.id,
-          text: message.parent.content,
-          sender: message.parent.sender.name || message.parent.sender.username || 'User',
-          senderId: message.parent.senderId,
-          senderUsername: message.parent.sender.username || null,
-          mediaUrl: message.parent.mediaUrl || null,
-          mediaResourceType: message.parent.mediaResourceType || null
-        } : null,
-        mediaUrl: message.mediaUrl || null,
-        mediaResourceType: message.mediaResourceType || null,
-        mediaPublicId: message.mediaPublicId || null,
-        createdAt: message.createdAt.toISOString(),
-        storyId: message.storyId || null,
-        storyType: message.storyType || null,
-        storyThumbnail: message.storyThumbnail || null,
-        storyUploaderId: message.storyUploaderId || null,
-        storyCreatedAt: message.storyCreatedAt ? message.storyCreatedAt.toISOString() : null
-      }
+      message: formatMessageOutput(message, senderId)
     };
   } catch (error) {
     console.error("Error sending message:", error);
@@ -714,42 +711,7 @@ export async function fetchChatMessages(chatId: string, beforeMessageId?: string
       messagesRaw.pop();
     }
 
-    const messages = messagesRaw.reverse().map(msg => ({
-      id: msg.id,
-      sender: msg.sender.name || msg.sender.username || 'User',
-      senderId: msg.senderId,
-      senderUsername: msg.sender.username || null,
-      senderAvatar: msg.sender.avatar || msg.sender.image || '/default-user-avatar.svg',
-      text: msg.content,
-      mediaUrl: msg.mediaUrl || null,
-      mediaResourceType: msg.mediaResourceType || null,
-      mediaPublicId: msg.mediaPublicId || null,
-      isRead: msg.isRead,
-      createdAt: msg.createdAt.toISOString(),
-      isPromotion: msg.isPromotion,
-      shoot: msg.shoot ? {
-        id: msg.shoot.id,
-        contentType: msg.shoot.contentType,
-        contentId: msg.shoot.contentId,
-        mediaUrl: msg.shoot.mediaUrl
-      } : null,
-      time: msg.createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      isMe: msg.senderId === userId,
-      replyTo: msg.parent ? {
-        id: msg.parent.id,
-        text: msg.parent.content,
-        sender: msg.parent.sender.name || msg.parent.sender.username || 'User',
-        senderId: msg.parent.senderId,
-        senderUsername: msg.parent.sender.username || null,
-        mediaUrl: msg.parent.mediaUrl || null,
-        mediaResourceType: msg.parent.mediaResourceType || null
-      } : null,
-      storyId: msg.storyId || null,
-      storyType: msg.storyType || null,
-      storyThumbnail: msg.storyThumbnail || null,
-      storyUploaderId: msg.storyUploaderId || null,
-      storyCreatedAt: msg.storyCreatedAt ? msg.storyCreatedAt.toISOString() : null
-    }));
+    const messages = messagesRaw.reverse().map(msg => formatMessageOutput(msg, userId));
 
     return { success: true, messages, hasMore };
   } catch (error) {
@@ -945,8 +907,59 @@ export async function fetchGroupChatDetails(chatId: string) {
   }
 }
 
-// Delete a message permanently for everyone
+// Delete a message permanently for everyone (Tombstone update)
 export async function deleteChatMessage(messageId: string) {
+  return deleteMessageForEveryone(messageId);
+}
+
+// Delete a message for everyone (replaces content with tombstone and clears media)
+export async function deleteMessageForEveryone(messageId: string) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !(session.user as any).id) {
+      return { success: false, error: 'Unauthorized' };
+    }
+    const userId = (session.user as any).id;
+
+    const message = await prisma.message.findUnique({
+      where: { id: messageId },
+      include: { sender: true, parent: { include: { sender: true } } }
+    });
+
+    if (!message) {
+      return { success: false, error: 'Message not found' };
+    }
+
+    if (message.senderId !== userId) {
+      return { success: false, error: 'You can only delete your own messages.' };
+    }
+
+    const updated = await prisma.message.update({
+      where: { id: messageId },
+      data: {
+        isDeletedForEveryone: true,
+        content: 'This message was deleted',
+        mediaUrl: null,
+        mediaResourceType: null,
+        mediaPublicId: null
+      },
+      include: { sender: true, parent: { include: { sender: true } } }
+    });
+
+    return { 
+      success: true, 
+      messageId, 
+      chatId: message.chatId,
+      message: formatMessageOutput(updated, userId) 
+    };
+  } catch (error) {
+    console.error("Error deleting message for everyone:", error);
+    return { success: false, error: 'Failed to delete message' };
+  }
+}
+
+// Delete message for me only (adds user to deletedFor list)
+export async function deleteMessageForMe(messageId: string) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user || !(session.user as any).id) {
@@ -962,17 +975,283 @@ export async function deleteChatMessage(messageId: string) {
       return { success: false, error: 'Message not found' };
     }
 
-    if (message.senderId !== userId) {
-      return { success: false, error: 'You can only delete your own messages.' };
+    let deletedFor: string[] = [];
+    try {
+      if (message.deletedFor) deletedFor = JSON.parse(message.deletedFor);
+    } catch (e) {}
+
+    if (!deletedFor.includes(userId)) {
+      deletedFor.push(userId);
+      await prisma.message.update({
+        where: { id: messageId },
+        data: { deletedFor: JSON.stringify(deletedFor) }
+      });
     }
 
-    await prisma.message.delete({
-      where: { id: messageId }
-    });
-
-    return { success: true };
+    return { success: true, messageId, chatId: message.chatId };
   } catch (error) {
-    console.error("Error deleting message:", error);
+    console.error("Error deleting message for me:", error);
     return { success: false, error: 'Failed to delete message' };
   }
 }
+
+// React to a message with an emoji (add/toggle/replace)
+export async function reactToChatMessage(messageId: string, emoji: string) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !(session.user as any).id) {
+      return { success: false, error: 'Unauthorized' };
+    }
+    const userId = (session.user as any).id;
+    const userName = session.user.name || 'User';
+
+    const message = await prisma.message.findUnique({
+      where: { id: messageId }
+    });
+
+    if (!message || message.isDeletedForEveryone) {
+      return { success: false, error: 'Message not found' };
+    }
+
+    let reactions: Array<{ emoji: string; userId: string; userName: string }> = [];
+    try {
+      if (message.reactions) reactions = JSON.parse(message.reactions);
+    } catch (e) {}
+
+    const existingIdx = reactions.findIndex(r => r.userId === userId);
+    if (existingIdx > -1) {
+      if (reactions[existingIdx].emoji === emoji) {
+        // Toggle off if same emoji
+        reactions.splice(existingIdx, 1);
+      } else {
+        // Change to new emoji
+        reactions[existingIdx].emoji = emoji;
+      }
+    } else {
+      reactions.push({ emoji, userId, userName });
+    }
+
+    await prisma.message.update({
+      where: { id: messageId },
+      data: { reactions: JSON.stringify(reactions) }
+    });
+
+    return { success: true, messageId, chatId: message.chatId, reactions };
+  } catch (error) {
+    console.error("Error reacting to message:", error);
+    return { success: false, error: 'Failed to update reaction' };
+  }
+}
+
+// Edit a previously sent message
+export async function editChatMessage(messageId: string, newContent: string) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !(session.user as any).id) {
+      return { success: false, error: 'Unauthorized' };
+    }
+    const userId = (session.user as any).id;
+
+    const message = await prisma.message.findUnique({
+      where: { id: messageId },
+      include: { sender: true, parent: { include: { sender: true } } }
+    });
+
+    if (!message || message.isDeletedForEveryone) {
+      return { success: false, error: 'Message not found' };
+    }
+
+    if (message.senderId !== userId) {
+      return { success: false, error: 'You can only edit your own messages.' };
+    }
+
+    const { sanitizeText } = require('@/lib/sanitize');
+    const safeContent = sanitizeText(newContent || '', 5000);
+    if (!safeContent.trim()) {
+      return { success: false, error: 'Message cannot be empty.' };
+    }
+
+    const updated = await prisma.message.update({
+      where: { id: messageId },
+      data: {
+        content: safeContent,
+        isEdited: true
+      },
+      include: { sender: true, parent: { include: { sender: true } } }
+    });
+
+    return { 
+      success: true, 
+      messageId, 
+      chatId: message.chatId, 
+      message: formatMessageOutput(updated, userId) 
+    };
+  } catch (error) {
+    console.error("Error editing chat message:", error);
+    return { success: false, error: 'Failed to edit message' };
+  }
+}
+
+// Forward a message to one or more conversations
+export async function forwardChatMessage(messageId: string, targetChatIds: string[]) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !(session.user as any).id) {
+      return { success: false, error: 'Unauthorized' };
+    }
+    const userId = (session.user as any).id;
+
+    if (!targetChatIds || targetChatIds.length === 0) {
+      return { success: false, error: 'No target chats selected.' };
+    }
+
+    const originalMsg = await prisma.message.findUnique({
+      where: { id: messageId }
+    });
+
+    if (!originalMsg || originalMsg.isDeletedForEveryone) {
+      return { success: false, error: 'Original message not found.' };
+    }
+
+    const forwardedMessages = [];
+
+    for (const targetChatId of targetChatIds) {
+      const created = await prisma.message.create({
+        data: {
+          content: originalMsg.content,
+          mediaUrl: originalMsg.mediaUrl,
+          mediaPublicId: originalMsg.mediaPublicId,
+          mediaResourceType: originalMsg.mediaResourceType,
+          senderId: userId,
+          chatId: targetChatId,
+          isForwarded: true,
+          locationData: originalMsg.locationData,
+          contactData: originalMsg.contactData,
+          voiceDuration: originalMsg.voiceDuration
+        },
+        include: {
+          sender: true,
+          parent: { include: { sender: true } }
+        }
+      });
+
+      forwardedMessages.push({
+        chatId: targetChatId,
+        message: formatMessageOutput(created, userId)
+      });
+    }
+
+    return { success: true, forwardedMessages };
+  } catch (error) {
+    console.error("Error forwarding message:", error);
+    return { success: false, error: 'Failed to forward message' };
+  }
+}
+
+// Pin or unpin a message in a conversation
+export async function pinChatMessage(chatId: string, messageId: string, isPinned: boolean) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !(session.user as any).id) {
+      return { success: false, error: 'Unauthorized' };
+    }
+
+    if (isPinned) {
+      // Unpin any other pinned message in this chat
+      await prisma.message.updateMany({
+        where: { chatId, isPinned: true },
+        data: { isPinned: false }
+      });
+    }
+
+    await prisma.message.update({
+      where: { id: messageId },
+      data: { isPinned }
+    });
+
+    return { success: true, chatId, messageId, isPinned };
+  } catch (error) {
+    console.error("Error updating pinned message state:", error);
+    return { success: false, error: 'Failed to update pin state' };
+  }
+}
+
+// Fetch media, docs, and links gallery for a conversation
+export async function fetchChatMediaGallery(chatId: string) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !(session.user as any).id) {
+      return { success: false, error: 'Unauthorized' };
+    }
+
+    const messages = await prisma.message.findMany({
+      where: {
+        chatId,
+        isDeletedForEveryone: false
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+      select: {
+        id: true,
+        content: true,
+        mediaUrl: true,
+        mediaResourceType: true,
+        createdAt: true,
+        locationData: true
+      }
+    });
+
+    const media: any[] = [];
+    const docs: any[] = [];
+    const links: any[] = [];
+
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+
+    for (const m of messages) {
+      const isImg = m.mediaResourceType === 'image' || (m.mediaUrl && /\.(jpg|jpeg|png|gif|webp|avif)($|\?|#)/i.test(m.mediaUrl));
+      const isVid = m.mediaResourceType === 'video' || (m.mediaUrl && /\.(mp4|webm|mov)($|\?|#)/i.test(m.mediaUrl));
+      const isDoc = m.mediaResourceType === 'document' || m.mediaResourceType === 'pdf' || (m.mediaUrl && !isImg && !isVid);
+
+      if (m.mediaUrl && (isImg || isVid)) {
+        media.push({
+          id: m.id,
+          url: m.mediaUrl,
+          type: isVid ? 'video' : 'image',
+          createdAt: m.createdAt.toISOString()
+        });
+      } else if (m.mediaUrl && isDoc) {
+        docs.push({
+          id: m.id,
+          url: m.mediaUrl,
+          name: m.content || 'Document',
+          createdAt: m.createdAt.toISOString()
+        });
+      }
+
+      // Check text for URLs
+      if (m.content) {
+        const matches = m.content.match(urlRegex);
+        if (matches) {
+          matches.forEach(url => {
+            links.push({
+              id: m.id,
+              url,
+              createdAt: m.createdAt.toISOString()
+            });
+          });
+        }
+      }
+    }
+
+    return {
+      success: true,
+      media,
+      docs,
+      links
+    };
+  } catch (error) {
+    console.error("Error fetching chat media gallery:", error);
+    return { success: false, error: 'Failed to fetch gallery' };
+  }
+}
+

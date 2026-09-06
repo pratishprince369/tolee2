@@ -17,6 +17,13 @@ import {
   fetchUserActiveStories,
   fetchGroupChatDetails,
   deleteChatMessage,
+  deleteMessageForMe,
+  deleteMessageForEveryone,
+  reactToChatMessage,
+  editChatMessage,
+  forwardChatMessage,
+  pinChatMessage,
+  fetchChatMediaGallery,
   getOrCreatePersonalChat
 } from '@/actions/chat';
 import { TypingIndicator } from '@/components/TypingIndicator';
@@ -28,7 +35,8 @@ import {
   Search, MoreVertical, Phone, Video, Paperclip, Smile, Send, Check, CheckCheck, 
   EyeOff, Users, ShieldCheck, PlusCircle, MessageCircle, ChevronLeft, X, 
   Image as ImageIcon, AlertCircle, BellOff, LogOut, Clock, Copy, Reply, Trash2, ArrowRight, Layers,
-  PhoneOff, VideoOff, Play, Pin, Clapperboard, Newspaper, MapPin, Music, FileText, Download, Loader2
+  PhoneOff, VideoOff, Play, Pin, Clapperboard, Newspaper, MapPin, Music, FileText, Download, Loader2,
+  Mic, Pencil, Share2, Forward, SmilePlus, Navigation, User as UserIcon, ExternalLink, Bookmark
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -51,6 +59,10 @@ import {
 import { MediaViewerModal } from '@/components/chat/MediaViewerModal';
 import { AttachmentMenu } from '@/components/chat/AttachmentMenu';
 import { AttachmentPreviewModal, PendingAttachmentItem } from '@/components/chat/AttachmentPreviewModal';
+import { VoiceMessagePlayer, VoiceRecorder } from '@/components/chat/VoiceMessage';
+import { LocationCard, ContactCard } from '@/components/chat/LocationAndContactCards';
+import { ForwardModal, ReactionsBar, ReactionsBadges } from '@/components/chat/ForwardAndReactionModals';
+import { ChatMediaGalleryDrawer } from '@/components/chat/ChatMediaGalleryDrawer';
 import { uploadFile } from '@/lib/upload';
 import { formatLastSeen, isUserOnline } from '@/lib/presence';
 
@@ -759,6 +771,14 @@ export default function ChatPage() {
   const [replyingToMessage, setReplyingToMessage] = useState<any | null>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // --- Extended WhatsApp Messaging States ---
+  const [editingMessage, setEditingMessage] = useState<any | null>(null);
+  const [forwardingMessage, setForwardingMessage] = useState<any | null>(null);
+  const [isRecordingVoice, setIsRecordingVoice] = useState(false);
+  const [showMediaGallery, setShowMediaGallery] = useState(false);
+  const [reactionPicker, setReactionPicker] = useState<{ messageId: string; x: number; y: number } | null>(null);
+  const [deleteConfirmModal, setDeleteConfirmModal] = useState<{ isOpen: boolean; message: any } | null>(null);
+
   // --- Sync Redirection & Query Parameters ---
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -1063,6 +1083,56 @@ export default function ChatPage() {
         markChatNotificationsAsRead(chatId);
         markChatMessagesAsRead(chatId);
       }
+    });
+
+    s.on('message-reaction-updated', ({ chatId, messageId, reactions }: any) => {
+      setMessagesByChat(prev => {
+        const msgs = prev[chatId] || [];
+        return {
+          ...prev,
+          [chatId]: msgs.map(m => m.id === messageId ? { ...m, reactions } : m)
+        };
+      });
+    });
+
+    s.on('message-edited', ({ chatId, messageId, message }: any) => {
+      setMessagesByChat(prev => {
+        const msgs = prev[chatId] || [];
+        return {
+          ...prev,
+          [chatId]: msgs.map(m => m.id === messageId ? { ...m, ...message, isEdited: true } : m)
+        };
+      });
+    });
+
+    s.on('message-deleted', ({ chatId, messageId, message }: any) => {
+      setMessagesByChat(prev => {
+        const msgs = prev[chatId] || [];
+        return {
+          ...prev,
+          [chatId]: msgs.map(m => m.id === messageId ? { 
+            ...m, 
+            ...message, 
+            isDeletedForEveryone: true, 
+            text: '🚫 This message was deleted',
+            mediaUrl: null 
+          } : m)
+        };
+      });
+    });
+
+    s.on('message-pinned', ({ chatId, messageId, isPinned }: any) => {
+      setMessagesByChat(prev => {
+        const msgs = prev[chatId] || [];
+        return {
+          ...prev,
+          [chatId]: msgs.map(m => {
+            if (m.id === messageId) return { ...m, isPinned };
+            if (isPinned) return { ...m, isPinned: false };
+            return m;
+          })
+        };
+      });
     });
 
     setSocket(s);
@@ -1578,7 +1648,7 @@ export default function ChatPage() {
     return () => window.removeEventListener('paste', handleWindowPaste);
   }, [activeChat]);
 
-  const handleSelectAttachmentOption = (opt: 'camera' | 'image' | 'video' | 'document' | 'audio') => {
+  const handleSelectAttachmentOption = (opt: 'camera' | 'image' | 'video' | 'document' | 'audio' | 'location' | 'contact') => {
     setShowAttachmentModal(false);
     if (opt === 'camera') {
       cameraInputRef.current?.click();
@@ -1590,6 +1660,10 @@ export default function ChatPage() {
       documentInputRef.current?.click();
     } else if (opt === 'audio') {
       audioInputRef.current?.click();
+    } else if (opt === 'location') {
+      handleShareLocation();
+    } else if (opt === 'contact') {
+      handleShareContact();
     }
   };
 
@@ -2269,6 +2343,332 @@ export default function ChatPage() {
     }
   };
 
+  // ─── Extended WhatsApp Messaging Handlers ───
+  const handleReactToMessage = async (msgId: string, emoji: string) => {
+    if (!activeChat) return;
+    const currentMsgs = messagesByChat[activeChat] || [];
+    const targetMsg = currentMsgs.find(m => m.id === msgId);
+    if (!targetMsg) return;
+
+    let reactionsList: any[] = [];
+    if (typeof targetMsg.reactions === 'string') {
+      try { reactionsList = JSON.parse(targetMsg.reactions); } catch { reactionsList = []; }
+    } else if (Array.isArray(targetMsg.reactions)) {
+      reactionsList = [...targetMsg.reactions];
+    }
+
+    const existingIdx = reactionsList.findIndex(r => r.userId === currentUserId && r.emoji === emoji);
+    if (existingIdx > -1) {
+      reactionsList.splice(existingIdx, 1);
+    } else {
+      reactionsList = reactionsList.filter(r => r.userId !== currentUserId);
+      reactionsList.push({
+        emoji,
+        userId: currentUserId,
+        userName: session?.user?.name || 'User'
+      });
+    }
+
+    setMessagesByChat(prev => ({
+      ...prev,
+      [activeChat]: (prev[activeChat] || []).map(m => m.id === msgId ? { ...m, reactions: reactionsList } : m)
+    }));
+
+    if (socket) {
+      socket.emit('send-message-reaction', {
+        chatId: activeChat,
+        messageId: msgId,
+        reactions: reactionsList
+      });
+    }
+
+    const res = await reactToChatMessage(msgId, emoji);
+    if (res.success && res.reactions) {
+      setMessagesByChat(prev => ({
+        ...prev,
+        [activeChat]: (prev[activeChat] || []).map(m => m.id === msgId ? { ...m, reactions: res.reactions } : m)
+      }));
+    }
+  };
+
+  const handleStartEdit = (msg: any) => {
+    setEditingMessage(msg);
+    setNewMessage(msg.text || '');
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMessage(null);
+    setNewMessage('');
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingMessage || !activeChat) return;
+    const newText = newMessage.trim();
+    if (!newText) return;
+
+    const messageId = editingMessage.id;
+    setEditingMessage(null);
+    setNewMessage('');
+
+    setMessagesByChat(prev => ({
+      ...prev,
+      [activeChat]: (prev[activeChat] || []).map(m => m.id === messageId ? { ...m, text: newText, isEdited: true } : m)
+    }));
+
+    const res = await editChatMessage(messageId, newText);
+    if (res.success && res.message) {
+      if (socket) {
+        socket.emit('send-message-edit', {
+          chatId: activeChat,
+          messageId: messageId,
+          message: res.message
+        });
+      }
+      fetchChats();
+    }
+  };
+
+  const handleDeleteMessageOption = async (type: 'for_me' | 'for_everyone') => {
+    if (!deleteConfirmModal?.message || !activeChat) return;
+    const msg = deleteConfirmModal.message;
+    setDeleteConfirmModal(null);
+
+    if (type === 'for_me') {
+      setMessagesByChat(prev => ({
+        ...prev,
+        [activeChat]: (prev[activeChat] || []).filter(m => m.id !== msg.id)
+      }));
+      await deleteMessageForMe(msg.id);
+    } else {
+      setMessagesByChat(prev => ({
+        ...prev,
+        [activeChat]: (prev[activeChat] || []).map(m => m.id === msg.id ? { 
+          ...m, 
+          isDeletedForEveryone: true, 
+          text: '🚫 This message was deleted',
+          mediaUrl: null 
+        } : m)
+      }));
+      const res = await deleteMessageForEveryone(msg.id);
+      if (res.success && socket) {
+        socket.emit('send-message-delete', {
+          chatId: activeChat,
+          messageId: msg.id,
+          message: res.message
+        });
+      }
+      fetchChats();
+    }
+  };
+
+  const handleForwardMessage = async (targetChatIds: string[]) => {
+    if (!forwardingMessage) return;
+    const msgId = forwardingMessage.id;
+    setForwardingMessage(null);
+
+    const res = await forwardChatMessage(msgId, targetChatIds);
+    if (res.success) {
+      fetchChats();
+    } else {
+      alert("Failed to forward message: " + res.error);
+    }
+  };
+
+  const handlePinMessage = async (msg: any) => {
+    if (!activeChat) return;
+    const nextPinnedState = !msg.isPinned;
+
+    setMessagesByChat(prev => ({
+      ...prev,
+      [activeChat]: (prev[activeChat] || []).map(m => {
+        if (m.id === msg.id) return { ...m, isPinned: nextPinnedState };
+        if (nextPinnedState) return { ...m, isPinned: false };
+        return m;
+      })
+    }));
+
+    const res = await pinChatMessage(msg.id, nextPinnedState);
+    if (res.success && socket) {
+      socket.emit('send-message-pin', {
+        chatId: activeChat,
+        messageId: msg.id,
+        isPinned: nextPinnedState
+      });
+    }
+  };
+
+  const handleSendVoiceNote = async (audioBlob: Blob, durationSec: number) => {
+    if (!activeChat) return;
+    const tempId = `temp-voice-${Date.now()}`;
+    const previewUrl = URL.createObjectURL(audioBlob);
+
+    const optimisticMsg = {
+      id: tempId,
+      sender: session?.user?.name || 'You',
+      senderId: currentUserId,
+      senderAvatar: session?.user?.image || '/default-user-avatar.svg',
+      text: '',
+      mediaUrl: previewUrl,
+      mediaResourceType: 'audio',
+      voiceDuration: Math.round(durationSec),
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      createdAt: new Date().toISOString(),
+      isMe: true,
+      uploadStatus: 'uploading' as const,
+      uploadProgress: 25
+    };
+
+    setMessagesByChat(prev => ({
+      ...prev,
+      [activeChat]: [...(prev[activeChat] || []), optimisticMsg]
+    }));
+
+    try {
+      const audioFile = new File([audioBlob], `voice_${Date.now()}.webm`, { type: audioBlob.type || 'audio/webm' });
+      let uploadedMediaUrl = '';
+
+      try {
+        const uploadRes = await uploadFile(audioFile, () => {});
+        uploadedMediaUrl = uploadRes.secure_url;
+      } catch {
+        const formData = new FormData();
+        formData.append('file', audioFile);
+        const apiRes = await fetch('/api/upload', { method: 'POST', body: formData }).then(r => r.json());
+        if (apiRes.success && apiRes.url) {
+          uploadedMediaUrl = apiRes.url;
+        } else {
+          throw new Error('Voice upload failed');
+        }
+      }
+
+      const res = await sendRealChatMessage(activeChat, '', undefined, undefined, {
+        mediaUrl: uploadedMediaUrl,
+        mediaResourceType: 'audio',
+        voiceDuration: Math.round(durationSec)
+      });
+
+      if (res.success && res.message) {
+        setMessagesByChat(prev => ({
+          ...prev,
+          [activeChat]: (prev[activeChat] || []).map(m => m.id === tempId ? { ...res.message, isMe: true } : m)
+        }));
+
+        if (socket) {
+          socket.emit('send-chat-message', {
+            id: res.message.id,
+            messageId: res.message.id,
+            chatId: activeChat,
+            senderId: currentUserId,
+            senderName: session?.user?.name || 'User',
+            senderAvatar: session?.user?.image || '/default-user-avatar.svg',
+            text: '',
+            mediaUrl: uploadedMediaUrl,
+            mediaResourceType: 'audio',
+            voiceDuration: Math.round(durationSec),
+            isGroup: activeChatDetails?.isGroup || false,
+            receiverId: activeChatDetails?.otherUserId || null,
+            createdAt: (res.message as any).createdAt || new Date().toISOString(),
+            time: res.message.time
+          });
+        }
+        fetchChats();
+      }
+    } catch (err) {
+      console.error("Voice note send error:", err);
+      setMessagesByChat(prev => ({
+        ...prev,
+        [activeChat]: (prev[activeChat] || []).filter(m => m.id !== tempId)
+      }));
+    } finally {
+      setIsRecordingVoice(false);
+    }
+  };
+
+  const handleShareLocation = () => {
+    if (!navigator.geolocation) {
+      alert("Geolocation is not supported by your browser.");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        if (!activeChat) return;
+        const loc = {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          name: 'Current Location',
+          address: `${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`
+        };
+        const res = await sendRealChatMessage(activeChat, '📍 Location', undefined, undefined, {
+          locationData: loc
+        });
+        if (res.success && res.message) {
+          setMessagesByChat(prev => ({
+            ...prev,
+            [activeChat]: [...(prev[activeChat] || []), { ...res.message, isMe: true }]
+          }));
+          if (socket) {
+            socket.emit('send-chat-message', {
+              id: res.message.id,
+              messageId: res.message.id,
+              chatId: activeChat,
+              senderId: currentUserId,
+              senderName: session?.user?.name || 'User',
+              senderAvatar: session?.user?.image || '/default-user-avatar.svg',
+              text: '📍 Location',
+              locationData: loc,
+              isGroup: activeChatDetails?.isGroup || false,
+              receiverId: activeChatDetails?.otherUserId || null,
+              createdAt: (res.message as any).createdAt || new Date().toISOString(),
+              time: res.message.time
+            });
+          }
+          fetchChats();
+        }
+      },
+      (err) => {
+        alert("Unable to retrieve location: " + err.message);
+      },
+      { enableHighAccuracy: true }
+    );
+  };
+
+  const handleShareContact = async () => {
+    if (!activeChat) return;
+    const name = prompt("Enter contact name:") || '';
+    if (!name.trim()) return;
+    const phone = prompt("Enter phone number or info:") || '';
+    const contact = {
+      name: name.trim(),
+      phone: phone.trim()
+    };
+    const res = await sendRealChatMessage(activeChat, `👤 Contact: ${contact.name}`, undefined, undefined, {
+      contactData: contact
+    });
+    if (res.success && res.message) {
+      setMessagesByChat(prev => ({
+        ...prev,
+        [activeChat]: [...(prev[activeChat] || []), { ...res.message, isMe: true }]
+      }));
+      if (socket) {
+        socket.emit('send-chat-message', {
+          id: res.message.id,
+          messageId: res.message.id,
+          chatId: activeChat,
+          senderId: currentUserId,
+          senderName: session?.user?.name || 'User',
+          senderAvatar: session?.user?.image || '/default-user-avatar.svg',
+          text: `👤 Contact: ${contact.name}`,
+          contactData: contact,
+          isGroup: activeChatDetails?.isGroup || false,
+          receiverId: activeChatDetails?.otherUserId || null,
+          createdAt: (res.message as any).createdAt || new Date().toISOString(),
+          time: res.message.time
+        });
+      }
+      fetchChats();
+    }
+  };
+
   // Reply Privately Flow
   const handlePrivateReply = async (msg: any) => {
     if (!msg.senderId) {
@@ -2806,6 +3206,15 @@ export default function ChatPage() {
                 >
                   <Search className="w-4.5 h-4.5 stroke-[2]" />
                 </Button>
+                <Button 
+                  onClick={() => setShowMediaGallery(true)}
+                  variant="ghost" 
+                  size="icon" 
+                  title="Media, Links & Docs"
+                  className="text-zinc-500 hover:text-primary dark:hover:text-teal-400 rounded-full hover:bg-zinc-100/60 dark:hover:bg-zinc-900 h-9 w-9 p-0 flex items-center justify-center transition-all duration-200"
+                >
+                  <Layers className="w-4.5 h-4.5 stroke-[2]" />
+                </Button>
                 {activeChatDetails.isGroup ? (
                   <DropdownMenu>
                     <DropdownMenuTrigger className="text-zinc-500 hover:text-primary dark:hover:text-teal-400 rounded-full hover:bg-zinc-100/60 dark:hover:bg-zinc-900 h-9 w-9 p-0 flex items-center justify-center transition-all duration-200 focus:outline-none">
@@ -2815,6 +3224,10 @@ export default function ChatPage() {
                       <DropdownMenuItem onClick={handleGroupDetailsOpen} className="cursor-pointer">
                         <Users className="mr-2 h-4 w-4 stroke-[2]" />
                         <span>Group Info</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setShowMediaGallery(true)} className="cursor-pointer">
+                        <Layers className="mr-2 h-4 w-4 stroke-[2]" />
+                        <span>Media, Links & Docs</span>
                       </DropdownMenuItem>
                       <DropdownMenuSub>
                         <DropdownMenuSubTrigger className="cursor-pointer">
@@ -2854,10 +3267,55 @@ export default function ChatPage() {
                     </DropdownMenuContent>
                   </DropdownMenu>
                 ) : (
-                  <Button variant="ghost" size="icon" className="text-zinc-500 hover:text-primary dark:hover:text-teal-400 rounded-full hover:bg-zinc-100/60 dark:hover:bg-zinc-900 h-9 w-9 p-0 flex items-center justify-center transition-all duration-200"><MoreVertical className="w-4.5 h-4.5 stroke-[2]" /></Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger className="text-zinc-500 hover:text-primary dark:hover:text-teal-400 rounded-full hover:bg-zinc-100/60 dark:hover:bg-zinc-900 h-9 w-9 p-0 flex items-center justify-center transition-all duration-200 focus:outline-none">
+                      <MoreVertical className="w-4.5 h-4.5 stroke-[2]" />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-lg border-zinc-200/80 dark:border-zinc-900">
+                      <DropdownMenuItem onClick={() => navigateToProfile(activeChatDetails.username, activeChatDetails.otherUserId)} className="cursor-pointer">
+                        <UserIcon className="mr-2 h-4 w-4 stroke-[2]" />
+                        <span>View Profile</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setShowMediaGallery(true)} className="cursor-pointer">
+                        <Layers className="mr-2 h-4 w-4 stroke-[2]" />
+                        <span>Media, Links & Docs</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => toggleMuteChat(activeChatDetails.id, false)} className="cursor-pointer">
+                        <BellOff className="mr-2 h-4 w-4 stroke-[2]" />
+                        <span>{activeChatDetails.isMuted ? 'Unmute' : 'Mute'}</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 )}
               </div>
             </div>
+
+            {/* Pinned Message Sticky Banner */}
+            {(() => {
+              const pinnedMsg = messages.find(m => m.isPinned);
+              if (!pinnedMsg) return null;
+              return (
+                <div 
+                  onClick={() => scrollToMessageId(pinnedMsg.id)}
+                  className="px-4 py-2 bg-teal-50 dark:bg-teal-950/40 border-b border-teal-200/60 dark:border-teal-800/40 backdrop-blur-sm flex items-center justify-between gap-3 cursor-pointer z-20 shrink-0 text-teal-800 dark:text-teal-200 transition-colors hover:bg-teal-100/60 dark:hover:bg-teal-950/60 select-none shadow-xs"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Pin className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400 rotate-45 shrink-0" />
+                    <span className="text-[10px] font-black uppercase tracking-wider text-teal-600 dark:text-teal-400 shrink-0">Pinned</span>
+                    <span className="text-xs truncate font-medium text-zinc-700 dark:text-zinc-300">{pinnedMsg.text || 'Pinned attachment'}</span>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={(e) => { e.stopPropagation(); handlePinMessage(pinnedMsg); }}
+                    className="h-6 w-6 rounded-full hover:bg-teal-200/50 dark:hover:bg-teal-800/50 text-teal-600 dark:text-teal-400 shrink-0"
+                    title="Unpin message"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              );
+            })()}
 
             {/* In-Chat Sliding Search Panel */}
             {isSearchingInChat && (
@@ -3034,6 +3492,14 @@ export default function ChatPage() {
                               onTouchMove={handleMessagePressEnd}
                               onTouchEnd={handleMessagePressEnd}
                             >
+                              {/* Forwarded Header */}
+                              {msg.isForwarded && (
+                                <div className={`flex items-center gap-1 text-[10px] italic mb-1 select-none ${msg.isMe ? 'text-white/80' : 'text-zinc-500 dark:text-zinc-400'}`}>
+                                  <Forward className="w-3 h-3" />
+                                  <span>Forwarded</span>
+                                </div>
+                              )}
+
                               {/* WhatsApp-Style Quoted Reply rendering inside bubbles */}
                               {msg.replyTo && (
                                 <div 
@@ -3129,8 +3595,79 @@ export default function ChatPage() {
                                 </div>
                               )}
 
-                              {/* Message Content / Attachment / Shared Card */}
-                              {msg.text.startsWith('[CALL_LOG]:') ? (
+                              {/* Message Content / Attachment / Shared Card / Voice / Location / Contact / Deleted */}
+                              {msg.isDeletedForEveryone ? (
+                                <div className="flex items-center gap-1.5 py-1 px-1 italic text-xs text-zinc-400 dark:text-zinc-500 select-none">
+                                  <span>🚫</span>
+                                  <span>This message was deleted</span>
+                                  <span className="text-[9px] ml-2 not-italic text-zinc-400">{msg.time}</span>
+                                </div>
+                              ) : msg.locationData ? (
+                                <div className="space-y-1">
+                                  <LocationCard location={msg.locationData} isMe={msg.isMe} time={msg.time} />
+                                  {msg.text && msg.text !== '📍 Location' && (
+                                    <p className="text-[14px] sm:text-[15px] leading-relaxed whitespace-pre-wrap break-words">{msg.text}</p>
+                                  )}
+                                  <div className="flex flex-wrap items-end justify-between gap-x-4 min-w-0 w-full">
+                                    <div className={`inline-flex items-center gap-1 text-[9px] select-none ml-auto mt-0.5 shrink-0 ${msg.isMe ? 'text-primary-foreground/75' : 'text-gray-400 dark:text-zinc-500'}`}>
+                                      {msg.isEdited && <span className="italic text-[8px] opacity-80">(edited)</span>}
+                                      <span>{msg.time}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : msg.contactData ? (
+                                <div className="space-y-1">
+                                  <ContactCard 
+                                    contact={msg.contactData} 
+                                    isMe={msg.isMe}
+                                    onMessageUser={(userId) => {
+                                      if (userId) {
+                                        getOrCreatePersonalChat(userId).then(res => {
+                                          if (res.success && res.chatId) {
+                                            setActiveChat(res.chatId);
+                                            setActiveSidebarTab('personal');
+                                          }
+                                        });
+                                      }
+                                    }}
+                                  />
+                                  <div className="flex flex-wrap items-end justify-between gap-x-4 min-w-0 w-full">
+                                    <div className={`inline-flex items-center gap-1 text-[9px] select-none ml-auto mt-0.5 shrink-0 ${msg.isMe ? 'text-primary-foreground/75' : 'text-gray-400 dark:text-zinc-500'}`}>
+                                      {msg.isEdited && <span className="italic text-[8px] opacity-80">(edited)</span>}
+                                      <span>{msg.time}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : (msg.mediaResourceType === 'audio' || msg.voiceDuration) && msg.mediaUrl ? (
+                                <div className="py-1">
+                                  <VoiceMessagePlayer 
+                                    audioUrl={msg.mediaUrl}
+                                    duration={msg.voiceDuration}
+                                    isMe={msg.isMe}
+                                    time={msg.time}
+                                  />
+                                  <div className="flex flex-wrap items-end justify-between gap-x-4 min-w-0 w-full">
+                                    <div className={`inline-flex items-center gap-1 text-[9px] select-none ml-auto mt-0.5 shrink-0 ${msg.isMe ? 'text-primary-foreground/75' : 'text-gray-400 dark:text-zinc-500'}`}>
+                                      {msg.isEdited && <span className="italic text-[8px] opacity-80">(edited)</span>}
+                                      <span>{msg.time}</span>
+                                      {msg.isMe && (
+                                        msg.id.startsWith('temp-') ? (
+                                          <Clock className="w-3.5 h-3.5 text-primary-foreground/75 animate-pulse shrink-0" />
+                                        ) : (
+                                          <CheckCheck 
+                                            className={`w-3.5 h-3.5 shrink-0 ${
+                                              !activeChatDetails?.isGroup && msg.isRead 
+                                                ? 'text-sky-300 dark:text-sky-400' 
+                                                : 'text-primary-foreground/60'
+                                            }`} 
+                                            strokeWidth={2.5} 
+                                          />
+                                        )
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : msg.text.startsWith('[CALL_LOG]:') ? (
                                 (() => {
                                   const parts = msg.text.split(':');
                                   const cType = parts[1]; // 'audio' | 'video'
@@ -3217,6 +3754,7 @@ export default function ChatPage() {
                                       {!isFramedMediaWithoutCaption && (
                                         <div className="flex flex-wrap items-end justify-between gap-x-4 min-w-0 w-full">
                                           <div className={`inline-flex items-center gap-1 text-[9px] select-none ml-auto mt-0.5 shrink-0 ${msg.isMe ? 'text-primary-foreground/75' : 'text-gray-400 dark:text-zinc-500'}`}>
+                                            {msg.isEdited && <span className="italic text-[8px] opacity-80">(edited)</span>}
                                             <span>{msg.time}</span>
                                             {msg.isMe && (
                                               msg.id.startsWith('temp-') ? (
@@ -3245,6 +3783,7 @@ export default function ChatPage() {
                                     </p>
                                     <div className="flex flex-wrap items-end justify-between gap-x-4 min-w-0 w-full">
                                       <div className={`inline-flex items-center gap-1 text-[9px] select-none ml-auto mt-0.5 shrink-0 ${msg.isMe ? 'text-primary-foreground/75' : 'text-gray-400 dark:text-zinc-500'}`}>
+                                        {msg.isEdited && <span className="italic text-[8px] opacity-80">(edited)</span>}
                                         <span>{msg.time}</span>
                                         {msg.isMe && (
                                           msg.id.startsWith('temp-') ? (
@@ -3266,6 +3805,17 @@ export default function ChatPage() {
                                 );
                               })()}
                             </div>
+
+                            {/* WhatsApp-Style Reactions Badges */}
+                            {msg.reactions && (
+                              <div className={`mt-0.5 ${msg.isMe ? 'flex justify-end' : 'flex justify-start'}`}>
+                                <ReactionsBadges 
+                                  reactions={msg.reactions} 
+                                  currentUserId={currentUserId} 
+                                  onReact={(emoji) => handleReactToMessage(msg.id, emoji)} 
+                                />
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -3379,8 +3929,30 @@ export default function ChatPage() {
                 )}
               </div>
             ) : (
-              <div className="relative p-3 lg:p-4 bg-zinc-50 dark:bg-zinc-950/80 backdrop-blur-md border-t border-zinc-200/80 dark:border-zinc-900 z-10 w-full overflow-visible shrink-0 min-h-[72px] pb-[calc(12px+env(safe-area-inset-bottom))]">
+              <div className="relative bg-zinc-50 dark:bg-zinc-950/80 backdrop-blur-md border-t border-zinc-200/80 dark:border-zinc-900 z-10 w-full overflow-visible shrink-0 pb-[calc(12px+env(safe-area-inset-bottom))]">
                 
+                {/* Editing Message Banner */}
+                {editingMessage && (
+                  <div className="px-4 py-2 bg-amber-500/10 dark:bg-amber-500/15 border-l-4 border-amber-500 z-20 flex items-center justify-between gap-3 shrink-0 border-b border-amber-500/20">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Pencil className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Edit Message</span>
+                        <span className="text-xs truncate text-zinc-700 dark:text-zinc-300">{editingMessage.text}</span>
+                      </div>
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={handleCancelEdit}
+                      className="h-7 w-7 rounded-full text-zinc-400 hover:text-zinc-700 dark:hover:text-white"
+                      title="Cancel edit"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
+
                 {/* Emoji Picker Popup */}
                 {showEmojiPicker && (
                   <div
@@ -3461,68 +4033,94 @@ export default function ChatPage() {
                   onChange={(e) => handleFileInputChange(e)} 
                 />
 
-                {/* Input Row */}
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <div className="flex-grow min-w-0 flex items-center gap-1 bg-white dark:bg-zinc-900 rounded-full px-3 py-1.5 shadow-sm border border-zinc-200/60 dark:border-zinc-800/80 focus-within:ring-2 focus-within:ring-teal-500/10 focus-within:border-teal-500/50 transition-all duration-200">
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      onClick={() => { setShowEmojiPicker(prev => !prev); setShowAttachmentModal(false); }}
-                      className={`text-gray-400 hover:text-teal-600 dark:hover:text-teal-400 rounded-full h-8 w-8 flex-shrink-0 p-0 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors flex items-center justify-center ${showEmojiPicker ? 'text-teal-600 dark:text-teal-400 bg-zinc-50 dark:bg-zinc-800' : ''}`}
-                      title="Emoji"
-                    >
-                      <Smile className="w-5 h-5 stroke-[1.5]" />
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      onClick={() => { setShowAttachmentModal(prev => !prev); setShowEmojiPicker(false); }}
-                      className={`text-gray-400 hover:text-teal-600 dark:hover:text-teal-400 rounded-full h-8 w-8 flex-shrink-0 p-0 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors flex items-center justify-center ${showAttachmentModal ? 'text-teal-600 dark:text-teal-400 bg-zinc-50 dark:bg-zinc-800' : ''}`}
-                      title="Attach media or documents"
-                    >
-                      <Paperclip className="w-5 h-5 stroke-[1.5]" />
-                    </Button>
-                    
-                    <textarea 
-                      placeholder="Type a message..."
-                      className="w-full min-w-0 max-h-32 min-h-[36px] bg-transparent border-none focus:ring-0 focus-visible:ring-0 resize-none py-1.5 text-sm sm:text-[15px] text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none leading-relaxed select-text"
-                      rows={1}
-                      value={newMessage}
-                      onChange={(e) => {
-                        setNewMessage(e.target.value);
-                        if (activeChat && e.target.value.trim()) {
-                          emitTyping(activeChat, true);
-                          if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-                          typingTimeoutRef.current = setTimeout(() => {
-                            emitTyping(activeChat, false);
-                          }, 2000);
-                        } else if (!e.target.value.trim()) {
-                          if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-                          emitTyping(activeChat, false);
-                        }
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault();
-                          handleSendMessage();
-                        }
-                      }}
-                    ></textarea>
-                  </div>
-                  
-                  <Button 
-                    onClick={handleSendMessage}
-                    disabled={isUploadingAttachment}
-                    size="icon" 
-                    className="h-10 w-10 sm:h-11 sm:w-11 rounded-full bg-gradient-to-tr from-primary to-teal-600 hover:from-primary/95 hover:to-teal-500 active:scale-95 text-primary-foreground shadow-md hover:shadow-lg transition-all duration-200 flex-shrink-0 flex items-center justify-center disabled:opacity-50"
-                    title="Send message"
-                  >
-                    {isUploadingAttachment ? (
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                    ) : (
-                      <Send className="w-[18px] h-[18px] ml-0.5 stroke-[1.5]" />
-                    )}
-                  </Button>
+                {/* Input Row or Voice Recorder */}
+                <div className="p-3 lg:p-4">
+                  {isRecordingVoice ? (
+                    <VoiceRecorder 
+                      onSendVoice={handleSendVoiceNote} 
+                      onCancel={() => setIsRecordingVoice(false)} 
+                    />
+                  ) : (
+                    <div className="flex items-center gap-2 sm:gap-3">
+                      <div className="flex-grow min-w-0 flex items-center gap-1 bg-white dark:bg-zinc-900 rounded-full px-3 py-1.5 shadow-sm border border-zinc-200/60 dark:border-zinc-800/80 focus-within:ring-2 focus-within:ring-teal-500/10 focus-within:border-teal-500/50 transition-all duration-200">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => { setShowEmojiPicker(prev => !prev); setShowAttachmentModal(false); }}
+                          className={`text-gray-400 hover:text-teal-600 dark:hover:text-teal-400 rounded-full h-8 w-8 flex-shrink-0 p-0 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors flex items-center justify-center ${showEmojiPicker ? 'text-teal-600 dark:text-teal-400 bg-zinc-50 dark:bg-zinc-800' : ''}`}
+                          title="Emoji"
+                        >
+                          <Smile className="w-5 h-5 stroke-[1.5]" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => { setShowAttachmentModal(prev => !prev); setShowEmojiPicker(false); }}
+                          className={`text-gray-400 hover:text-teal-600 dark:hover:text-teal-400 rounded-full h-8 w-8 flex-shrink-0 p-0 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors flex items-center justify-center ${showAttachmentModal ? 'text-teal-600 dark:text-teal-400 bg-zinc-50 dark:bg-zinc-800' : ''}`}
+                          title="Attach media or documents"
+                        >
+                          <Paperclip className="w-5 h-5 stroke-[1.5]" />
+                        </Button>
+                        
+                        <textarea 
+                          placeholder="Type a message..."
+                          className="w-full min-w-0 max-h-32 min-h-[36px] bg-transparent border-none focus:ring-0 focus-visible:ring-0 resize-none py-1.5 text-sm sm:text-[15px] text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none leading-relaxed select-text"
+                          rows={1}
+                          value={newMessage}
+                          onChange={(e) => {
+                            setNewMessage(e.target.value);
+                            if (activeChat && e.target.value.trim()) {
+                              emitTyping(activeChat, true);
+                              if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+                              typingTimeoutRef.current = setTimeout(() => {
+                                emitTyping(activeChat, false);
+                              }, 2000);
+                            } else if (!e.target.value.trim()) {
+                              if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+                              emitTyping(activeChat, false);
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault();
+                              if (editingMessage) {
+                                handleSaveEdit();
+                              } else {
+                                handleSendMessage();
+                              }
+                            }
+                          }}
+                        ></textarea>
+                      </div>
+                      
+                      {newMessage.trim() || editingMessage ? (
+                        <Button 
+                          onClick={editingMessage ? handleSaveEdit : handleSendMessage}
+                          disabled={isUploadingAttachment}
+                          size="icon" 
+                          className="h-10 w-10 sm:h-11 sm:w-11 rounded-full bg-gradient-to-tr from-primary to-teal-600 hover:from-primary/95 hover:to-teal-500 active:scale-95 text-primary-foreground shadow-md hover:shadow-lg transition-all duration-200 flex-shrink-0 flex items-center justify-center disabled:opacity-50"
+                          title={editingMessage ? "Save edit" : "Send message"}
+                        >
+                          {isUploadingAttachment ? (
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                          ) : editingMessage ? (
+                            <Check className="w-5 h-5 stroke-[2.5]" />
+                          ) : (
+                            <Send className="w-[18px] h-[18px] ml-0.5 stroke-[1.5]" />
+                          )}
+                        </Button>
+                      ) : (
+                        <Button 
+                          onClick={() => setIsRecordingVoice(true)}
+                          size="icon" 
+                          className="h-10 w-10 sm:h-11 sm:w-11 rounded-full bg-gradient-to-tr from-primary to-teal-600 hover:from-primary/95 hover:to-teal-500 active:scale-95 text-primary-foreground shadow-md hover:shadow-lg transition-all duration-200 flex-shrink-0 flex items-center justify-center"
+                          title="Record voice note"
+                        >
+                          <Mic className="w-5 h-5 stroke-[1.8]" />
+                        </Button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -3703,16 +4301,34 @@ export default function ChatPage() {
             {/* Immersive WhatsApp-style Context Menu */}
             {contextMenu && (
               <div 
-                className="fixed bg-white dark:bg-zinc-900 border border-zinc-200/50 dark:border-zinc-800/80 rounded-2xl shadow-2xl py-1.5 w-44 z-[9999] animate-in zoom-in-95 duration-100"
+                className="fixed bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800 rounded-2xl shadow-2xl py-1 w-52 z-[9999] animate-in zoom-in-95 duration-100 overflow-hidden"
                 style={{
-                  top: Math.min(contextMenu.y, typeof window !== 'undefined' ? window.innerHeight - 200 : 500),
-                  left: Math.min(contextMenu.x, typeof window !== 'undefined' ? window.innerWidth - 200 : 300)
+                  top: Math.min(contextMenu.y, typeof window !== 'undefined' ? window.innerHeight - 300 : 500),
+                  left: Math.min(contextMenu.x, typeof window !== 'undefined' ? window.innerWidth - 220 : 300)
                 }}
                 onClick={e => e.stopPropagation()}
               >
+                {/* Quick Reactions Bar */}
+                <div className="flex items-center justify-between px-2.5 py-1.5 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-800/40">
+                  {['👍', '❤️', '😂', '😮', '😢', '🙏'].map((emoji) => (
+                    <button
+                      key={emoji}
+                      onClick={() => {
+                        handleReactToMessage(contextMenu.message.id, emoji);
+                        setContextMenu(null);
+                      }}
+                      className="text-lg hover:scale-125 active:scale-95 transition-transform p-0.5 rounded-full hover:bg-zinc-200/50 dark:hover:bg-zinc-700/50"
+                      title={emoji}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Actions */}
                 <button 
                   onClick={() => {
-                    navigator.clipboard.writeText(contextMenu.message.text);
+                    navigator.clipboard.writeText(contextMenu.message.text || '');
                     setContextMenu(null);
                   }}
                   className="flex items-center gap-2.5 w-full px-3.5 py-2 text-xs font-semibold text-gray-700 dark:text-gray-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-left"
@@ -3730,6 +4346,27 @@ export default function ChatPage() {
                   <Reply className="w-4 h-4 text-zinc-400" />
                   Reply in Chat
                 </button>
+                <button 
+                  onClick={() => {
+                    setForwardingMessage(contextMenu.message);
+                    setContextMenu(null);
+                  }}
+                  className="flex items-center gap-2.5 w-full px-3.5 py-2 text-xs font-semibold text-gray-700 dark:text-gray-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-left"
+                >
+                  <Forward className="w-4 h-4 text-zinc-400" />
+                  Forward
+                </button>
+                <button 
+                  onClick={() => {
+                    handlePinMessage(contextMenu.message);
+                    setContextMenu(null);
+                  }}
+                  className="flex items-center gap-2.5 w-full px-3.5 py-2 text-xs font-semibold text-gray-700 dark:text-gray-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-left"
+                >
+                  <Pin className="w-4 h-4 text-zinc-400" />
+                  {contextMenu.message.isPinned ? 'Unpin' : 'Pin'}
+                </button>
+
                 {activeChatDetails.isGroup && !contextMenu.message.isMe && (
                   <button 
                     onClick={() => {
@@ -3742,21 +4379,31 @@ export default function ChatPage() {
                     Reply Privately
                   </button>
                 )}
-                {contextMenu.message.isMe && (
-                  <>
-                    <DropdownMenuSeparator className="my-1 border-zinc-100 dark:border-zinc-800" />
-                    <button 
-                      onClick={() => {
-                        handleMessageDelete(contextMenu.message.id);
-                        setContextMenu(null);
-                      }}
-                      className="flex items-center gap-2.5 w-full px-3.5 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors text-left"
-                    >
-                      <Trash2 className="w-4 h-4 text-red-500" />
-                      Delete Message
-                    </button>
-                  </>
+
+                {contextMenu.message.isMe && !contextMenu.message.isDeletedForEveryone && (
+                  <button 
+                    onClick={() => {
+                      handleStartEdit(contextMenu.message);
+                      setContextMenu(null);
+                    }}
+                    className="flex items-center gap-2.5 w-full px-3.5 py-2 text-xs font-semibold text-amber-600 dark:text-amber-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-left"
+                  >
+                    <Pencil className="w-4 h-4 text-amber-500" />
+                    Edit Message
+                  </button>
                 )}
+
+                <DropdownMenuSeparator className="my-1 border-zinc-100 dark:border-zinc-800" />
+                <button 
+                  onClick={() => {
+                    setDeleteConfirmModal({ isOpen: true, message: contextMenu.message });
+                    setContextMenu(null);
+                  }}
+                  className="flex items-center gap-2.5 w-full px-3.5 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors text-left"
+                >
+                  <Trash2 className="w-4 h-4 text-red-500" />
+                  Delete...
+                </button>
               </div>
             )}
 
@@ -4029,6 +4676,64 @@ export default function ChatPage() {
           media={activeMediaViewer}
           onClose={() => setActiveMediaViewer(null)}
         />
+      )}
+
+      {/* ── WhatsApp-Style Message Forward Modal ── */}
+      {forwardingMessage && (
+        <ForwardModal
+          isOpen={!!forwardingMessage}
+          onClose={() => setForwardingMessage(null)}
+          chats={chats}
+          onForward={handleForwardMessage}
+        />
+      )}
+
+      {/* ── WhatsApp-Style Media, Links & Docs Drawer ── */}
+      <ChatMediaGalleryDrawer
+        isOpen={showMediaGallery}
+        onClose={() => setShowMediaGallery(false)}
+        chatId={activeChat}
+        chatTitle={activeChatDetails?.name}
+      />
+
+      {/* ── WhatsApp-Style Delete Message Confirmation Dialog ── */}
+      {deleteConfirmModal?.isOpen && (
+        <Dialog open={deleteConfirmModal.isOpen} onOpenChange={(open) => !open && setDeleteConfirmModal(null)}>
+          <DialogContent className="sm:max-w-xs bg-zinc-950 text-white border border-zinc-800 rounded-2xl p-5">
+            <DialogHeader>
+              <DialogTitle className="text-base font-bold text-white">Delete message?</DialogTitle>
+              <DialogDescription className="text-xs text-zinc-400">
+                Choose how you want to delete this message.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex flex-col gap-2 mt-3">
+              <Button 
+                variant="outline" 
+                onClick={() => handleDeleteMessageOption('for_me')}
+                className="w-full justify-start rounded-xl h-9 text-xs font-semibold bg-zinc-900 border-zinc-800 hover:bg-zinc-800 text-zinc-200"
+              >
+                <Trash2 className="w-3.5 h-3.5 mr-2 text-zinc-400" />
+                Delete for me
+              </Button>
+              {deleteConfirmModal.message?.isMe && !deleteConfirmModal.message?.isDeletedForEveryone && (
+                <Button 
+                  onClick={() => handleDeleteMessageOption('for_everyone')}
+                  className="w-full justify-start rounded-xl h-9 text-xs font-bold bg-red-600 hover:bg-red-700 text-white shadow-sm"
+                >
+                  <Trash2 className="w-3.5 h-3.5 mr-2" />
+                  Delete for everyone
+                </Button>
+              )}
+              <Button 
+                variant="ghost" 
+                onClick={() => setDeleteConfirmModal(null)}
+                className="w-full rounded-xl h-8 text-xs font-semibold text-zinc-400 hover:text-white"
+              >
+                Cancel
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
 
     </div>

@@ -867,6 +867,62 @@ io.on('connection', (socket) => {
     }
   });
 
+  // 10. Message Reactions relay
+  socket.on('send-message-reaction', ({ chatId, messageId, reactions, isGroup, receiverId }) => {
+    console.log(`[Signaling] Reaction update in chat ${chatId} for msg ${messageId}`);
+    const payload = { chatId, messageId, reactions };
+    if (isGroup) {
+      socket.to(`chat-${chatId}`).emit('message-reaction-updated', payload);
+    } else if (receiverId) {
+      const receiverSockets = activeUsers.get(receiverId);
+      if (receiverSockets) {
+        receiverSockets.forEach(sid => io.to(sid).emit('message-reaction-updated', payload));
+      }
+    }
+  });
+
+  // 11. Message Edited relay
+  socket.on('send-message-edit', ({ chatId, messageId, message, isGroup, receiverId }) => {
+    console.log(`[Signaling] Message edited in chat ${chatId} for msg ${messageId}`);
+    const payload = { chatId, messageId, message };
+    if (isGroup) {
+      socket.to(`chat-${chatId}`).emit('message-edited', payload);
+    } else if (receiverId) {
+      const receiverSockets = activeUsers.get(receiverId);
+      if (receiverSockets) {
+        receiverSockets.forEach(sid => io.to(sid).emit('message-edited', payload));
+      }
+    }
+  });
+
+  // 12. Message Deleted relay
+  socket.on('send-message-delete', ({ chatId, messageId, message, isGroup, receiverId }) => {
+    console.log(`[Signaling] Message deleted in chat ${chatId} for msg ${messageId}`);
+    const payload = { chatId, messageId, message };
+    if (isGroup) {
+      socket.to(`chat-${chatId}`).emit('message-deleted', payload);
+    } else if (receiverId) {
+      const receiverSockets = activeUsers.get(receiverId);
+      if (receiverSockets) {
+        receiverSockets.forEach(sid => io.to(sid).emit('message-deleted', payload));
+      }
+    }
+  });
+
+  // 13. Message Pinned relay
+  socket.on('send-message-pin', ({ chatId, messageId, isPinned, isGroup, receiverId }) => {
+    console.log(`[Signaling] Message pin state in chat ${chatId} for msg ${messageId}: ${isPinned}`);
+    const payload = { chatId, messageId, isPinned };
+    if (isGroup) {
+      socket.to(`chat-${chatId}`).emit('message-pinned', payload);
+    } else if (receiverId) {
+      const receiverSockets = activeUsers.get(receiverId);
+      if (receiverSockets) {
+        receiverSockets.forEach(sid => io.to(sid).emit('message-pinned', payload));
+      }
+    }
+  });
+
   // 8. Disconnect Cleanup
   socket.on('disconnecting', () => {
     socket.rooms.forEach(room => {

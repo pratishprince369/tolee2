@@ -625,6 +625,19 @@ model Message {
   storyThumbnail  String?
   storyUploaderId String?
   storyCreatedAt  DateTime?
+
+  // Extended WhatsApp features
+  isEdited            Boolean   @default(false)
+  isForwarded         Boolean   @default(false)
+  isPinned            Boolean   @default(false)
+  reactions           String?
+  deletedFor          String?
+  isDeletedForEveryone Boolean  @default(false)
+  locationData        String?
+  contactData         String?
+  voiceDuration       Int?
+  viewOnce            Boolean   @default(false)
+  viewedAt            DateTime?
 }
 
 model Chat {
