@@ -265,7 +265,9 @@ export async function fetchRealChatData() {
     chatsList.sort((a, b) => {
       if (a.unread > 0 && b.unread === 0) return -1;
       if (a.unread === 0 && b.unread > 0) return 1;
-      return 0;
+      const timeA = new Date(a.lastMessageCreatedAt || 0).getTime();
+      const timeB = new Date(b.lastMessageCreatedAt || 0).getTime();
+      return timeB - timeA;
     });
 
     return { success: true, chats: chatsList, messagesByChat: messagesByChatObj };
@@ -360,14 +362,30 @@ export async function sendRealChatMessage(
     }
 
     const chat = await prisma.chat.findUnique({
-      where: { id: chatId }
+      where: { id: chatId },
+      include: { participants: true }
     });
 
     if (!chat) {
       return { success: false, error: 'Chat not found.' };
     }
 
-    if (!chat.isGroupChat) {
+    if (chat.isGroupChat) {
+      // Verify sender is an approved member of this Tolee group
+      const tolee = await prisma.tolee.findFirst({
+        where: { name: chat.name || '' },
+        include: { members: { where: { userId: senderId, status: 'approved' } } }
+      });
+      if (!tolee || tolee.members.length === 0) {
+        return { success: false, error: 'You are not a member of this group.' };
+      }
+    } else {
+      // Verify sender is a participant of this 1-on-1 DM
+      const isParticipant = chat.participants.some(p => p.userId === senderId);
+      if (!isParticipant) {
+        return { success: false, error: 'You are not a participant in this conversation.' };
+      }
+
       if (chat.status === 'declined') {
         return { success: false, error: 'This conversation request has been declined.' };
       }
@@ -434,10 +452,11 @@ export async function sendRealChatMessage(
           .map(m => m.userId);
 
         if (userIdsToNotify.length > 0) {
+          const previewText = safeContent ? `"${safeContent.substring(0, 30)}${safeContent.length > 30 ? '...' : ''}"` : (mediaData?.mediaUrl ? 'an attachment' : 'a message');
           const notifications = userIdsToNotify.map(userId => ({
             userId,
             type: 'chat',
-            message: `${senderName} sent a message in ${tolee.name}: "${safeContent.substring(0, 30)}${safeContent.length > 30 ? '...' : ''}"`,
+            message: `${senderName} sent ${safeContent ? `a message in ${tolee.name}: ${previewText}` : `${previewText} in ${tolee.name}`}`,
             link: `/chat?chatId=${chatId}`
           }));
 
@@ -454,10 +473,11 @@ export async function sendRealChatMessage(
       });
 
       if (otherParticipant) {
+        const previewText = safeContent ? `"${safeContent.substring(0, 30)}${safeContent.length > 30 ? '...' : ''}"` : (mediaData?.mediaUrl ? 'an attachment' : 'a message');
         await createSystemNotification({
           userId: otherParticipant.userId,
           type: 'chat',
-          message: `${senderName} sent you a message: "${content.substring(0, 30)}${content.length > 30 ? '...' : ''}"`,
+          message: `${senderName} sent you ${safeContent ? `a message: ${previewText}` : previewText}`,
           link: `/chat?id=${chatId}`
         });
       }
@@ -582,6 +602,10 @@ export async function respondToChatRequest(chatId: string, action: 'accept' | 'd
     const isParticipant = chat.participants.some(p => p.userId === currentUserId);
     if (!isParticipant) {
       return { success: false, error: 'Unauthorized' };
+    }
+
+    if (chat.requestSenderId && chat.requestSenderId === currentUserId) {
+      return { success: false, error: 'You cannot respond to your own chat request.' };
     }
 
     if (action === 'accept') {
@@ -809,6 +833,12 @@ export async function fetchGroupChatDetails(chatId: string) {
 
     if (!tolee) {
       return { success: false, error: 'Associated Tolee not found' };
+    }
+
+    const userId = (session.user as any).id;
+    const isMember = tolee.members.some(m => m.userId === userId);
+    if (!isMember) {
+      return { success: false, error: 'You are not a member of this group' };
     }
 
     // Fetch details of all approved members

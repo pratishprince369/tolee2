@@ -324,7 +324,7 @@ export function MediaAttachmentMessage({
                 {mediaInfo.filename}
               </p>
               <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded-[4px] bg-teal-100 text-teal-700 dark:bg-teal-900/50 dark:text-teal-300">
+                <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded-[4px] bg-teal-100 text-teal-700 dark:bg-teal-900/50 dark:text-teal-300">
                   PHOTO
                 </span>
                 <span className={`text-[10px] ${isMe ? 'text-primary-foreground/75' : 'text-gray-500 dark:text-zinc-400'}`}>

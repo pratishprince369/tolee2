@@ -29,7 +29,7 @@ export default function Loading() {
         </div>
         <div className="flex-1 py-8 space-y-6 overflow-y-auto">
           <div className="flex justify-start"><div className="h-10 bg-zinc-200 dark:bg-zinc-800 rounded-2xl w-1/3" /></div>
-          <div className="flex justify-end"><div className="h-10 bg-indigo-500/10 dark:bg-indigo-550/15 rounded-2xl w-1/4" /></div>
+          <div className="flex justify-end"><div className="h-10 bg-indigo-500/10 dark:bg-indigo-500/15 rounded-2xl w-1/4" /></div>
           <div className="flex justify-start"><div className="h-12 bg-zinc-200 dark:bg-zinc-800 rounded-2xl w-1/2" /></div>
         </div>
         <div className="h-11 bg-zinc-200 dark:bg-zinc-800 rounded-2xl w-full" />

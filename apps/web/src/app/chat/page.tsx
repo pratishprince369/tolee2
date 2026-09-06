@@ -80,19 +80,28 @@ function mergePollMessages(oldMsgs: any[] = [], pollMsgs: any[] = []) {
     }
 
     // 2. Temp / ephemeral ID match (for optimistic sender items or socket ephemeral IDs)
-    const tempIndex = merged.findIndex(m => 
-      (m.id.startsWith('temp-') || m.id.startsWith('msg-')) && 
-      m.text === newMsg.text && 
-      (m.isMe || m.senderId === newMsg.senderId)
-    );
+    const tempIndex = merged.findIndex(m => {
+      const isTemp = m.id.startsWith('temp-') || m.id.startsWith('msg-');
+      if (!isTemp) return false;
+      const isSameSender = m.isMe || m.senderId === newMsg.senderId;
+      if (!isSameSender) return false;
+      if (newMsg.mediaUrl || m.mediaUrl) {
+        return m.mediaUrl === newMsg.mediaUrl;
+      }
+      return m.text === newMsg.text;
+    });
     if (tempIndex > -1) {
       merged[tempIndex] = { ...merged[tempIndex], ...newMsg };
       continue;
     }
 
-    // 3. Sender + Text + Timestamp match (to deduplicate any socket ephemeral IDs vs database IDs)
+    // 3. Sender + Text/Media + Timestamp match (to deduplicate any socket ephemeral IDs vs database IDs)
     const fuzzyIndex = merged.findIndex(m => {
-      if (m.text !== newMsg.text) return false;
+      if (newMsg.mediaUrl || m.mediaUrl) {
+        if (m.mediaUrl !== newMsg.mediaUrl) return false;
+      } else {
+        if (m.text !== newMsg.text) return false;
+      }
       const isSameSender = m.senderId === newMsg.senderId || (m.isMe && newMsg.isMe);
       if (!isSameSender) return false;
 
@@ -325,7 +334,7 @@ function SharedContentCard({ payload }: SharedContentCardProps) {
   if (available === false) {
     return (
       <div className="w-64 bg-zinc-100 dark:bg-zinc-950 rounded-2xl border border-zinc-200/50 dark:border-zinc-800/85 p-5 text-center select-none shadow-sm">
-        <AlertCircle className="w-8 h-8 mx-auto text-zinc-400 dark:text-zinc-650 mb-2.5" />
+        <AlertCircle className="w-8 h-8 mx-auto text-zinc-400 dark:text-zinc-500 mb-2.5" />
         <p className="text-xs font-bold text-zinc-500 dark:text-zinc-400">This content is no longer available.</p>
       </div>
     );
@@ -449,8 +458,8 @@ function SharedContentCard({ payload }: SharedContentCardProps) {
           )}
           {payload.listingLocation && (
             <div className="flex items-center gap-1 text-[9px] text-zinc-400 dark:text-zinc-500 font-bold pt-2 border-t border-zinc-100 dark:border-zinc-900">
-              <MapPin className="w-3 h-3 text-zinc-400 dark:text-zinc-650" />
-              <span className="truncate">{payload.listingLocation}</span>
+              <MapPin className="w-3 h-3 text-zinc-400 dark:text-zinc-500" />
+              <span className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 truncate">{payload.listingLocation}</span>
             </div>
           )}
         </div>
@@ -502,7 +511,7 @@ function SharedContentCard({ payload }: SharedContentCardProps) {
     >
       {/* Header */}
       <div className="p-2.5 flex items-center gap-2 border-b border-zinc-100 dark:border-zinc-900 bg-zinc-50/50 dark:bg-zinc-900/30">
-        <Avatar className="w-6 h-6 border border-zinc-200/50 dark:border-zinc-850">
+        <Avatar className="w-6 h-6 border border-zinc-200/50 dark:border-zinc-800">
           <AvatarImage src={payload.creatorAvatar} />
           <AvatarFallback className="text-[9px] bg-zinc-200 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-400 font-black">
             {payload.creatorName?.[0]}
@@ -824,18 +833,29 @@ export default function ChatPage() {
         // Check if message already exists by ID or content/timestamp
         const duplicateIndex = msgs.findIndex(m => {
           if (m.id === processedMessage.id) return true;
-          if ((m.id.startsWith('temp-') || m.id.startsWith('msg-')) && m.text === processedMessage.text && (m.isMe === processedMessage.isMe || m.senderId === processedMessage.senderId)) {
-            return true;
-          }
-          if (m.text === processedMessage.text && (m.senderId === processedMessage.senderId || (m.isMe && processedMessage.isMe))) {
-            const t1 = new Date(m.createdAt || m.time || 0).getTime();
-            const t2 = new Date(processedMessage.createdAt || processedMessage.time || 0).getTime();
-            if (!isNaN(t1) && !isNaN(t2) && t1 > 0 && t2 > 0) {
-              return Math.abs(t1 - t2) < 30000;
+          const isSameSender = m.isMe === processedMessage.isMe || m.senderId === processedMessage.senderId;
+          if (!isSameSender) return false;
+
+          const isTemp = m.id.startsWith('temp-') || m.id.startsWith('msg-');
+          if (isTemp) {
+            if (processedMessage.mediaUrl || m.mediaUrl) {
+              return m.mediaUrl === processedMessage.mediaUrl;
             }
-            return m.time === processedMessage.time;
+            return m.text === processedMessage.text;
           }
-          return false;
+
+          if (processedMessage.mediaUrl || m.mediaUrl) {
+            if (m.mediaUrl !== processedMessage.mediaUrl) return false;
+          } else {
+            if (m.text !== processedMessage.text) return false;
+          }
+
+          const t1 = new Date(m.createdAt || m.time || 0).getTime();
+          const t2 = new Date(processedMessage.createdAt || processedMessage.time || 0).getTime();
+          if (!isNaN(t1) && !isNaN(t2) && t1 > 0 && t2 > 0) {
+            return Math.abs(t1 - t2) < 30000;
+          }
+          return m.time === processedMessage.time;
         });
 
         if (duplicateIndex > -1) {
@@ -973,28 +993,24 @@ export default function ChatPage() {
       });
       
       let currentActive = activeChat;
-      if (queryToleeId) {
-        const matchedChat = res.chats.find(c => c.toleeId === queryToleeId);
-        if (matchedChat) {
-          if (activeChat !== matchedChat.id) {
+      if (!currentActive) {
+        if (queryToleeId) {
+          const matchedChat = res.chats.find(c => c.toleeId === queryToleeId);
+          if (matchedChat) {
             setActiveChat(matchedChat.id);
+            currentActive = matchedChat.id;
           }
-          currentActive = matchedChat.id;
-        } else {
-          if (activeChat) {
-            setActiveChat('');
+        } else if (queryChatId) {
+          const matchedChat = res.chats.find(c => c.id === queryChatId);
+          if (matchedChat) {
+            setActiveChat(queryChatId);
+            currentActive = queryChatId;
           }
-          currentActive = '';
-        }
-      } else if (queryChatId) {
-        if (activeChat !== queryChatId) {
-          setActiveChat(queryChatId);
-        }
-        currentActive = queryChatId;
-      } else if (res.chats.length > 0 && !activeChat) {
-        if (typeof window !== 'undefined' && window.innerWidth >= 768) {
-          setActiveChat(res.chats[0].id);
-          currentActive = res.chats[0].id;
+        } else if (res.chats.length > 0) {
+          if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+            setActiveChat(res.chats[0].id);
+            currentActive = res.chats[0].id;
+          }
         }
       }
       
@@ -1616,16 +1632,24 @@ export default function ChatPage() {
             alert(apiRes.error || "Failed to upload media attachment. Please check file size and try again.");
             setIsUploadingAttachment(false);
             isSendingRef.current = false;
+            if (attachmentToSend?.previewUrl?.startsWith('blob:')) {
+              URL.revokeObjectURL(attachmentToSend.previewUrl);
+            }
             setMessagesByChat(prev => ({
               ...prev,
               [activeChat]: (prev[activeChat] || []).filter(m => m.id !== tempId)
             }));
+            fetchChats();
             return;
           }
         } finally {
           setIsUploadingAttachment(false);
           setUploadProgress(0);
         }
+      }
+
+      if (attachmentToSend?.previewUrl?.startsWith('blob:')) {
+        URL.revokeObjectURL(attachmentToSend.previewUrl);
       }
 
       const mediaPayload = uploadedMediaUrl ? {
@@ -1815,7 +1839,7 @@ export default function ChatPage() {
               <DropdownMenuTrigger className="text-gray-500 rounded-full hover:bg-zinc-50 dark:hover:bg-zinc-900 h-9 w-9 flex items-center justify-center focus:outline-none">
                 <MoreVertical className="w-5 h-5 stroke-[1.5]" />
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-lg border-zinc-150/80 dark:border-zinc-900 bg-zinc-950 text-white">
+              <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-lg border-zinc-200/80 dark:border-zinc-900 bg-zinc-950 text-white">
                 <DropdownMenuItem onClick={() => setShowCallLogsModal(true)} className="cursor-pointer">
                   <Phone className="mr-2 h-4 w-4 stroke-[2]" />
                   <span>Call Logs</span>
@@ -1920,7 +1944,7 @@ export default function ChatPage() {
                     {/* Golden Story Ring Wrapper */}
                     <div 
                       onClick={(e) => {
-                        if (chat.hasActiveStories) {
+                        if (chat.hasActiveStories && chat.otherUserId) {
                           e.stopPropagation();
                           openStoryViewer(chat.otherUserId, chat.name, chat.avatar);
                         }
@@ -2145,12 +2169,12 @@ export default function ChatPage() {
         {activeChatDetails ? (
           <>
             {/* Chat Header */}
-            <div className="h-16 shrink-0 flex items-center justify-between px-3 sm:px-4 lg:px-6 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md border-b border-zinc-150/80 dark:border-zinc-900 z-20 min-w-0 shadow-sm sticky top-0">
+            <div className="h-16 shrink-0 flex items-center justify-between px-3 sm:px-4 lg:px-6 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md border-b border-zinc-200/80 dark:border-zinc-900 z-20 min-w-0 shadow-sm sticky top-0">
               <div 
                 className="flex items-center gap-2 sm:gap-3 cursor-pointer min-w-0 flex-1"
                 onClick={() => {
                   if (!activeChatDetails.isGroup) {
-                    navigateToProfile(activeChatDetails.username, activeChatDetails.recipientId);
+                    navigateToProfile(activeChatDetails.username, activeChatDetails.otherUserId);
                   } else if (activeChatDetails.isGroup) {
                     handleGroupDetailsOpen();
                   }
@@ -2174,7 +2198,7 @@ export default function ChatPage() {
                   <div className={activeChatDetails.hasActiveStories ? 'p-[1.5px] bg-white dark:bg-zinc-950 rounded-full' : ''}>
                     <Avatar className="w-10 h-10 border border-zinc-200/80 dark:border-zinc-800 shadow-sm flex-shrink-0 bg-teal-50 text-teal-800 font-bold dark:bg-zinc-900 dark:text-white">
                       <AvatarImage src={activeChatDetails.avatar} />
-                      <AvatarFallback className="bg-teal-50 text-teal-850 dark:bg-zinc-800 dark:text-teal-355 font-bold">
+                      <AvatarFallback className="bg-teal-50 text-teal-800 dark:bg-zinc-800 dark:text-teal-400 font-bold">
                         {activeChatDetails.name ? activeChatDetails.name[0]?.toUpperCase() : 'C'}
                       </AvatarFallback>
                     </Avatar>
@@ -2230,7 +2254,7 @@ export default function ChatPage() {
                     <DropdownMenuTrigger className="text-zinc-500 hover:text-primary dark:hover:text-teal-400 rounded-full hover:bg-zinc-100/60 dark:hover:bg-zinc-900 h-9 w-9 p-0 flex items-center justify-center transition-all duration-200 focus:outline-none">
                       <MoreVertical className="w-4.5 h-4.5 stroke-[2]" />
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-lg border-zinc-150/80 dark:border-zinc-900">
+                    <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-lg border-zinc-200/80 dark:border-zinc-900">
                       <DropdownMenuItem onClick={handleGroupDetailsOpen} className="cursor-pointer">
                         <Users className="mr-2 h-4 w-4 stroke-[2]" />
                         <span>Group Info</span>
@@ -2241,7 +2265,7 @@ export default function ChatPage() {
                           <span>Mute Notifications</span>
                         </DropdownMenuSubTrigger>
                         <DropdownMenuPortal>
-                          <DropdownMenuSubContent className="rounded-xl shadow-lg border-zinc-150/80 dark:border-zinc-900">
+                          <DropdownMenuSubContent className="rounded-xl shadow-lg border-zinc-200/80 dark:border-zinc-900">
                             {activeChatDetails.isMuted ? (
                               <DropdownMenuItem onClick={() => handleMuteGroup(activeChatDetails.toleeId, undefined)} className="cursor-pointer">
                                 <span>Unmute</span>
@@ -2280,7 +2304,7 @@ export default function ChatPage() {
 
             {/* In-Chat Sliding Search Panel */}
             {isSearchingInChat && (
-              <div className="px-4 py-2 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md border-b border-zinc-150/80 dark:border-zinc-900 z-20 flex items-center justify-between gap-3 animate-in slide-in-from-top-4 duration-200">
+              <div className="px-4 py-2 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md border-b border-zinc-200/80 dark:border-zinc-900 z-20 flex items-center justify-between gap-3 animate-in slide-in-from-top-4 duration-200">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <Input
@@ -2391,7 +2415,7 @@ export default function ChatPage() {
                               onClick={() => navigateToProfile(msg.senderUsername, msg.senderId)}
                             >
                               <AvatarImage src={msg.senderAvatar} />
-                              <AvatarFallback className="bg-teal-50 text-teal-850 dark:bg-zinc-850 dark:text-teal-355 font-bold text-xs">
+                              <AvatarFallback className="bg-teal-50 text-teal-800 dark:bg-zinc-800 dark:text-teal-400 font-bold text-xs">
                                 {msg.sender[0]?.toUpperCase()}
                               </AvatarFallback>
                             </Avatar>
@@ -2421,6 +2445,7 @@ export default function ChatPage() {
                               onMouseUp={handleMessagePressEnd}
                               onMouseLeave={handleMessagePressEnd}
                               onTouchStart={(e) => handleMessagePressStart(e, msg)}
+                              onTouchMove={handleMessagePressEnd}
                               onTouchEnd={handleMessagePressEnd}
                             >
                               {/* Quoted Reply rendering inside bubbles */}
@@ -2539,7 +2564,7 @@ export default function ChatPage() {
                                           ? 'bg-black/15 text-primary-foreground border border-white/10' 
                                           : cStatus === 'missed' 
                                             ? 'bg-red-50 dark:bg-red-950/20 text-red-500 border border-red-100 dark:border-red-900/30' 
-                                            : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-650 dark:text-zinc-350 border border-zinc-200/40 dark:border-zinc-700/30'
+                                            : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200/40 dark:border-zinc-700/30'
                                       }`}>
                                         {cType === 'video' ? (
                                           cStatus === 'missed' ? <VideoOff className="w-5 h-5 shrink-0" /> : <Video className="w-5 h-5 shrink-0" />
@@ -2609,7 +2634,7 @@ export default function ChatPage() {
                                       <CheckCheck 
                                         className={`w-3.5 h-3.5 shrink-0 ${
                                           !activeChatDetails?.isGroup && msg.isRead 
-                                            ? 'text-sky-300 dark:text-sky-350' 
+                                            ? 'text-sky-300 dark:text-sky-400' 
                                             : 'text-primary-foreground/60'
                                         }`} 
                                         strokeWidth={2.5} 
@@ -2727,7 +2752,7 @@ export default function ChatPage() {
                 )}
               </div>
             ) : (
-              <div className="relative p-3 lg:p-4 bg-zinc-50 dark:bg-zinc-950/80 backdrop-blur-md border-t border-zinc-150/80 dark:border-zinc-900 z-10 w-full overflow-visible shrink-0 min-h-[72px] pb-[calc(12px+env(safe-area-inset-bottom))]">
+              <div className="relative p-3 lg:p-4 bg-zinc-50 dark:bg-zinc-950/80 backdrop-blur-md border-t border-zinc-200/80 dark:border-zinc-900 z-10 w-full overflow-visible shrink-0 min-h-[72px] pb-[calc(12px+env(safe-area-inset-bottom))]">
                 
             {/* Attachment Preview Card above Input Row */}
             {pendingAttachment && (
@@ -2963,7 +2988,7 @@ export default function ChatPage() {
             {/* ── Slide-out Group Details Panel (Responsive Right-Sidebar) ── */}
             {showGroupInfo && activeChatDetails?.isGroup && (
               <div className="fixed inset-0 z-50 flex">
-                <div className="flex-1 bg-black/20 dark:bg-black/40 backdrop-blur-xs" onClick={() => setShowGroupInfo(false)} />
+                <div className="flex-1 bg-black/20 dark:bg-black/40 backdrop-blur-sm" onClick={() => setShowGroupInfo(false)} />
                 <div className="w-full max-w-sm bg-white dark:bg-zinc-950 h-full shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right duration-300 border-l border-zinc-100 dark:border-zinc-900">
                   {/* Panel Header */}
                   <div className="h-14 flex items-center gap-3 px-4 bg-primary text-primary-foreground flex-shrink-0 shadow-md">
@@ -2991,7 +3016,7 @@ export default function ChatPage() {
                     ) : groupDetails ? (
                       <div className="flex flex-col">
                         <div className="flex flex-col items-center py-8 bg-zinc-50 dark:bg-zinc-900/40 gap-3 border-b border-zinc-100 dark:border-zinc-900">
-                          <Avatar className="w-24 h-24 border-4 border-white dark:border-zinc-850 shadow-lg select-none">
+                          <Avatar className="w-24 h-24 border-4 border-white dark:border-zinc-800 shadow-lg select-none">
                             <AvatarImage src={groupDetails.groupInfo.avatar} />
                             <AvatarFallback className="text-3xl font-bold bg-teal-50 text-teal-800">{groupDetails.groupInfo.name ? groupDetails.groupInfo.name[0] : 'G'}</AvatarFallback>
                           </Avatar>
@@ -3031,7 +3056,7 @@ export default function ChatPage() {
                                 <div className="flex items-center gap-2.5 min-w-0">
                                   <Avatar className="w-8 h-8 border border-zinc-100 dark:border-zinc-800 select-none">
                                     <AvatarImage src={member.avatar} />
-                                    <AvatarFallback className="text-[10px] font-bold bg-teal-50 text-teal-850">{member.name ? member.name[0] : 'M'}</AvatarFallback>
+                                    <AvatarFallback className="text-[10px] font-bold bg-teal-50 text-teal-800">{member.name ? member.name[0] : 'M'}</AvatarFallback>
                                   </Avatar>
                                   <div className="min-w-0">
                                     <p className="text-xs font-bold text-gray-900 dark:text-white truncate">
@@ -3111,7 +3136,7 @@ export default function ChatPage() {
             {/* Immersive WhatsApp-style Context Menu */}
             {contextMenu && (
               <div 
-                className="fixed bg-white dark:bg-zinc-900 border border-zinc-250/50 dark:border-zinc-800/80 rounded-2xl shadow-2xl py-1.5 w-44 z-[9999] animate-in zoom-in-95 duration-100"
+                className="fixed bg-white dark:bg-zinc-900 border border-zinc-200/50 dark:border-zinc-800/80 rounded-2xl shadow-2xl py-1.5 w-44 z-[9999] animate-in zoom-in-95 duration-100"
                 style={{
                   top: Math.min(contextMenu.y, typeof window !== 'undefined' ? window.innerHeight - 200 : 500),
                   left: Math.min(contextMenu.x, typeof window !== 'undefined' ? window.innerWidth - 200 : 300)
@@ -3179,7 +3204,7 @@ export default function ChatPage() {
             </div>
             <div className="space-y-2">
               <h2 className="text-2xl font-black text-gray-900 dark:text-white">{nonMemberGroup.name}</h2>
-              <p className="text-xs font-bold text-gray-450 dark:text-zinc-400 uppercase tracking-wider">
+              <p className="text-xs font-bold text-gray-400 dark:text-zinc-400 uppercase tracking-wider">
                 {nonMemberGroup._count?.members || 0} Members
               </p>
               {nonMemberGroup.description && (
@@ -3190,7 +3215,7 @@ export default function ChatPage() {
             </div>
             <div className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-200/50 dark:border-zinc-800 p-5 rounded-2xl space-y-3">
               <AlertCircle className="w-8 h-8 text-amber-500 mx-auto" />
-              <p className="text-[13px] font-bold text-zinc-600 dark:text-zinc-350">
+              <p className="text-[13px] font-bold text-zinc-600 dark:text-zinc-400">
                 Join this Tolee to participate in the group chat.
               </p>
             </div>
@@ -3318,7 +3343,7 @@ export default function ChatPage() {
                             <p className="text-sm font-bold text-white truncate">
                               {partnerUser?.name || partnerUser?.username || 'Tolee User'}
                             </p>
-                            <p className="text-[10px] text-zinc-455 mt-0.5 flex items-center gap-1.5">
+                            <p className="text-[10px] text-zinc-400 mt-0.5 flex items-center gap-1.5">
                               {log.type === 'video' ? (
                                 <Video className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
                               ) : (
@@ -3327,9 +3352,9 @@ export default function ChatPage() {
                               <span className="truncate">
                                 {isOutgoing ? 'Outgoing' : 'Incoming'} •{' '}
                                 {isConnected ? (
-                                  <span className="text-emerald-455 font-semibold">Connected ({formatCallDur(log.duration)})</span>
+                                  <span className="text-emerald-400 font-semibold">Connected ({formatCallDur(log.duration)})</span>
                                 ) : isMissed ? (
-                                  <span className="text-red-455 font-semibold">Missed</span>
+                                  <span className="text-red-400 font-semibold">Missed</span>
                                 ) : isDeclined ? (
                                   <span className="text-amber-500 font-semibold">Declined</span>
                                 ) : (
