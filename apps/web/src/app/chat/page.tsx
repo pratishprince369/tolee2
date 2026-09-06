@@ -45,7 +45,8 @@ import {
 import { 
   MediaAttachmentMessage, 
   detectMediaInfo, 
-  MediaAttachmentInfo 
+  MediaAttachmentInfo,
+  extractVideoMetadata 
 } from '@/components/chat/MediaAttachmentMessage';
 import { MediaViewerModal } from '@/components/chat/MediaViewerModal';
 import { AttachmentMenu } from '@/components/chat/AttachmentMenu';
@@ -1442,6 +1443,19 @@ export default function ChatPage() {
         caption: ''
       };
 
+      if (kind === 'video') {
+        extractVideoMetadata(file).then(meta => {
+          setPendingAttachments(prev => prev.map(p => p.id === item.id ? {
+            ...p,
+            duration: meta.duration,
+            width: meta.width,
+            height: meta.height,
+            isHd: meta.isHd,
+            orientation: meta.orientation
+          } : p));
+        });
+      }
+
       if (replacingItemIdRef.current) {
         setPendingAttachments(prev => prev.map(p => p.id === replacingItemIdRef.current ? item : p));
         replacingItemIdRef.current = null;
@@ -1639,8 +1653,18 @@ export default function ChatPage() {
 
       if (abortController.signal.aborted) return;
 
+      let finalMediaUrl = uploadedMediaUrl!;
+      if (item.duration || item.width || item.height) {
+        const metaParams = new URLSearchParams();
+        if (item.duration) metaParams.set('d', String(Math.round(item.duration)));
+        if (item.width) metaParams.set('w', String(item.width));
+        if (item.height) metaParams.set('h', String(item.height));
+        if (item.isHd !== undefined) metaParams.set('hd', item.isHd ? '1' : '0');
+        finalMediaUrl = `${finalMediaUrl}#${metaParams.toString()}`;
+      }
+
       const mediaPayload = {
-        mediaUrl: uploadedMediaUrl!,
+        mediaUrl: finalMediaUrl,
         mediaPublicId: uploadedPublicId || undefined,
         mediaResourceType: uploadedResourceType || item.kind
       };
@@ -3036,46 +3060,80 @@ export default function ChatPage() {
                                 })()
                               ) : (() => {
                                 const mediaInfo = detectMediaInfo(msg.mediaUrl, msg.text, msg.mediaResourceType);
+                                const isFramedMediaWithoutCaption = !!mediaInfo && !mediaInfo.caption && (mediaInfo.kind === 'video');
+
                                 if (mediaInfo) {
                                   return (
-                                    <MediaAttachmentMessage
-                                      mediaInfo={mediaInfo}
-                                      isMe={msg.isMe}
-                                      onOpenMediaViewer={(m) => setActiveMediaViewer({ ...m, sender: msg.sender })}
-                                      uploadStatus={msg.uploadStatus}
-                                      uploadProgress={msg.uploadProgress}
-                                      onCancelUpload={() => handleCancelUpload(msg.id)}
-                                      onRetryUpload={() => handleRetryUpload(msg)}
-                                    />
+                                    <>
+                                      <MediaAttachmentMessage
+                                        mediaInfo={mediaInfo}
+                                        isMe={msg.isMe}
+                                        time={msg.time}
+                                        isRead={!activeChatDetails?.isGroup && msg.isRead}
+                                        isTemp={msg.id.startsWith('temp-')}
+                                        senderName={msg.sender || (msg.isMe ? 'You' : undefined)}
+                                        onOpenMediaViewer={(m) => setActiveMediaViewer({ 
+                                          ...m, 
+                                          sender: m.sender || msg.sender || (msg.isMe ? 'You' : undefined),
+                                          time: m.time || msg.time,
+                                          duration: m.duration
+                                        })}
+                                        uploadStatus={msg.uploadStatus}
+                                        uploadProgress={msg.uploadProgress}
+                                        onCancelUpload={() => handleCancelUpload(msg.id)}
+                                        onRetryUpload={() => handleRetryUpload(msg)}
+                                      />
+                                      {!isFramedMediaWithoutCaption && (
+                                        <div className="flex flex-wrap items-end justify-between gap-x-4 min-w-0 w-full">
+                                          <div className={`inline-flex items-center gap-1 text-[9px] select-none ml-auto mt-0.5 shrink-0 ${msg.isMe ? 'text-primary-foreground/75' : 'text-gray-400 dark:text-zinc-500'}`}>
+                                            <span>{msg.time}</span>
+                                            {msg.isMe && (
+                                              msg.id.startsWith('temp-') ? (
+                                                <Clock className="w-3.5 h-3.5 text-primary-foreground/75 animate-pulse shrink-0" />
+                                              ) : (
+                                                <CheckCheck 
+                                                  className={`w-3.5 h-3.5 shrink-0 ${
+                                                    !activeChatDetails?.isGroup && msg.isRead 
+                                                      ? 'text-sky-300 dark:text-sky-400' 
+                                                      : 'text-primary-foreground/60'
+                                                  }`} 
+                                                  strokeWidth={2.5} 
+                                                />
+                                              )
+                                            )}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </>
                                   );
                                 }
                                 return (
-                                  <p className="text-[14px] sm:text-[15px] leading-relaxed whitespace-pre-wrap break-words [word-break:break-word] [overflow-wrap:anywhere] flex-1 select-text">
-                                    {msg.text}
-                                  </p>
+                                  <>
+                                    <p className="text-[14px] sm:text-[15px] leading-relaxed whitespace-pre-wrap break-words [word-break:break-word] [overflow-wrap:anywhere] flex-1 select-text">
+                                      {msg.text}
+                                    </p>
+                                    <div className="flex flex-wrap items-end justify-between gap-x-4 min-w-0 w-full">
+                                      <div className={`inline-flex items-center gap-1 text-[9px] select-none ml-auto mt-0.5 shrink-0 ${msg.isMe ? 'text-primary-foreground/75' : 'text-gray-400 dark:text-zinc-500'}`}>
+                                        <span>{msg.time}</span>
+                                        {msg.isMe && (
+                                          msg.id.startsWith('temp-') ? (
+                                            <Clock className="w-3.5 h-3.5 text-primary-foreground/75 animate-pulse shrink-0" />
+                                          ) : (
+                                            <CheckCheck 
+                                              className={`w-3.5 h-3.5 shrink-0 ${
+                                                !activeChatDetails?.isGroup && msg.isRead 
+                                                  ? 'text-sky-300 dark:text-sky-400' 
+                                                  : 'text-primary-foreground/60'
+                                              }`} 
+                                              strokeWidth={2.5} 
+                                            />
+                                          )
+                                        )}
+                                      </div>
+                                    </div>
+                                  </>
                                 );
                               })()}
-
-                              <div className="flex flex-wrap items-end justify-between gap-x-4 min-w-0 w-full">
-                                
-                                <div className={`inline-flex items-center gap-1 text-[9px] select-none ml-auto mt-0.5 shrink-0 ${msg.isMe ? 'text-primary-foreground/75' : 'text-gray-400 dark:text-zinc-500'}`}>
-                                  <span>{msg.time}</span>
-                                  {msg.isMe && (
-                                    msg.id.startsWith('temp-') ? (
-                                      <Clock className="w-3.5 h-3.5 text-primary-foreground/75 animate-pulse shrink-0" />
-                                    ) : (
-                                      <CheckCheck 
-                                        className={`w-3.5 h-3.5 shrink-0 ${
-                                          !activeChatDetails?.isGroup && msg.isRead 
-                                            ? 'text-sky-300 dark:text-sky-400' 
-                                            : 'text-primary-foreground/60'
-                                        }`} 
-                                        strokeWidth={2.5} 
-                                      />
-                                    )
-                                  )}
-                                </div>
-                              </div>
                             </div>
                           </div>
                         </div>

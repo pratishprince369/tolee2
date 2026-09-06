@@ -4,7 +4,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
   Play, Pause, Download, FileText, FileSpreadsheet, 
   Presentation, Archive, File, Music,
-  AlertCircle, RefreshCw, Eye, Image as ImageIcon, ExternalLink
+  AlertCircle, RefreshCw, Eye, Image as ImageIcon, ExternalLink,
+  Clock, CheckCheck, Video as VideoIcon
 } from 'lucide-react';
 import { UploadProgressOverlay } from './UploadProgressOverlay';
 
@@ -19,6 +20,113 @@ export interface MediaAttachmentInfo {
   sizeFormatted?: string;
   caption?: string;
   duration?: number;
+  width?: number;
+  height?: number;
+  isHd?: boolean;
+  orientation?: 'portrait' | 'landscape' | 'square';
+}
+
+export function formatDuration(seconds?: number): string {
+  if (seconds === undefined || isNaN(seconds) || seconds < 0) return '0:00';
+  const totalSecs = Math.floor(seconds);
+  const mins = Math.floor(totalSecs / 60);
+  const secs = totalSecs % 60;
+  return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+}
+
+export function formatPlayerTime(seconds?: number): string {
+  if (seconds === undefined || isNaN(seconds) || seconds < 0) return '00:00';
+  const totalSecs = Math.floor(seconds);
+  const mins = Math.floor(totalSecs / 60);
+  const secs = totalSecs % 60;
+  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
+
+export function extractVideoMetadata(file: File): Promise<{
+  duration: number;
+  width: number;
+  height: number;
+  isHd: boolean;
+  orientation: 'portrait' | 'landscape' | 'square';
+}> {
+  return new Promise((resolve) => {
+    try {
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      const url = URL.createObjectURL(file);
+      video.src = url;
+
+      const cleanup = () => {
+        URL.revokeObjectURL(url);
+        video.removeAttribute('src');
+        video.load();
+      };
+
+      video.onloadedmetadata = () => {
+        const duration = isFinite(video.duration) ? video.duration : 0;
+        const width = video.videoWidth || 1280;
+        const height = video.videoHeight || 720;
+        const isHd = width >= 1280 || height >= 720;
+        const ratio = width / (height || 1);
+        const orientation = ratio < 0.85 ? 'portrait' : ratio > 1.2 ? 'landscape' : 'square';
+        cleanup();
+        resolve({ duration, width, height, isHd, orientation });
+      };
+
+      video.onerror = () => {
+        cleanup();
+        resolve({ duration: 0, width: 1280, height: 720, isHd: false, orientation: 'landscape' });
+      };
+
+      setTimeout(() => {
+        cleanup();
+        resolve({ duration: 0, width: 1280, height: 720, isHd: false, orientation: 'landscape' });
+      }, 4000);
+    } catch {
+      resolve({ duration: 0, width: 1280, height: 720, isHd: false, orientation: 'landscape' });
+    }
+  });
+}
+
+export function parseUrlMetadata(url: string): { 
+  duration?: number; 
+  width?: number; 
+  height?: number; 
+  isHd?: boolean;
+  orientation?: 'portrait' | 'landscape' | 'square';
+} {
+  try {
+    const hashIndex = url.indexOf('#');
+    if (hashIndex === -1) return {};
+    const hash = url.substring(hashIndex + 1);
+    const params = new URLSearchParams(hash);
+    
+    const d = params.get('d') || params.get('duration');
+    const w = params.get('w') || params.get('width');
+    const h = params.get('h') || params.get('height');
+    const hd = params.get('hd');
+
+    const duration = d ? parseFloat(d) : undefined;
+    const width = w ? parseInt(w, 10) : undefined;
+    const height = h ? parseInt(h, 10) : undefined;
+    const isHd = hd !== null ? (hd === '1' || hd === 'true') : (width && height ? (width >= 1280 || height >= 720) : undefined);
+    
+    let orientation: 'portrait' | 'landscape' | 'square' | undefined;
+    if (width && height) {
+      const ratio = width / height;
+      orientation = ratio < 0.85 ? 'portrait' : ratio > 1.2 ? 'landscape' : 'square';
+    }
+
+    return {
+      duration: duration && !isNaN(duration) ? duration : undefined,
+      width: width && !isNaN(width) ? width : undefined,
+      height: height && !isNaN(height) ? height : undefined,
+      isHd,
+      orientation
+    };
+  } catch {
+    return {};
+  }
 }
 
 export function getOptimizedMediaUrl(url: string, width = 720): string {
@@ -68,6 +176,7 @@ export function detectMediaInfo(
 
   // 1. Direct mediaUrl inspection
   if (mediaUrl) {
+    const parsedMeta = parseUrlMetadata(mediaUrl);
     const cleanUrl = mediaUrl.split('?')[0].split('#')[0];
     const rawFilename = cleanUrl.substring(cleanUrl.lastIndexOf('/') + 1) || 'Attachment';
     const extension = (rawFilename.split('.').pop() || '').toLowerCase();
@@ -79,7 +188,12 @@ export function detectMediaInfo(
         kind: 'video',
         filename: rawFilename,
         extension: extension || 'mp4',
-        caption: cleanCaption(trimmedText)
+        caption: cleanCaption(trimmedText),
+        duration: parsedMeta.duration,
+        width: parsedMeta.width,
+        height: parsedMeta.height,
+        isHd: parsedMeta.isHd,
+        orientation: parsedMeta.orientation
       };
     }
 
@@ -89,7 +203,8 @@ export function detectMediaInfo(
         kind: 'audio',
         filename: rawFilename,
         extension: extension || 'mp3',
-        caption: cleanCaption(trimmedText)
+        caption: cleanCaption(trimmedText),
+        duration: parsedMeta.duration
       };
     }
 
@@ -127,7 +242,10 @@ export function detectMediaInfo(
         kind: 'image',
         filename: rawFilename,
         extension: extension || 'jpg',
-        caption: cleanCaption(trimmedText)
+        caption: cleanCaption(trimmedText),
+        width: parsedMeta.width,
+        height: parsedMeta.height,
+        orientation: parsedMeta.orientation
       };
     }
 
@@ -329,7 +447,18 @@ export function ImageMessage({
 export interface VideoMessageProps {
   mediaInfo: MediaAttachmentInfo;
   isMe: boolean;
-  onOpenViewer?: (media: { type: 'video'; url: string; filename: string }) => void;
+  time?: string;
+  isRead?: boolean;
+  isTemp?: boolean;
+  senderName?: string;
+  onOpenViewer?: (media: { 
+    type: 'video'; 
+    url: string; 
+    filename?: string; 
+    sender?: string; 
+    time?: string; 
+    duration?: number;
+  }) => void;
   uploadStatus?: 'preparing' | 'uploading' | 'completed' | 'failed';
   uploadProgress?: number;
   onCancelUpload?: () => void;
@@ -339,6 +468,10 @@ export interface VideoMessageProps {
 export function VideoMessage({
   mediaInfo,
   isMe,
+  time,
+  isRead,
+  isTemp,
+  senderName,
   onOpenViewer,
   uploadStatus,
   uploadProgress = 0,
@@ -346,11 +479,56 @@ export function VideoMessage({
   onRetryUpload
 }: VideoMessageProps) {
   const [hasError, setHasError] = useState(false);
+  const [videoMeta, setVideoMeta] = useState({
+    duration: mediaInfo.duration,
+    width: mediaInfo.width,
+    height: mediaInfo.height,
+    isHd: mediaInfo.isHd,
+    orientation: mediaInfo.orientation
+  });
+
   const videoSrc = getVideoPlaybackUrl(mediaInfo.url);
   const posterSrc = getVideoThumbnailUrl(mediaInfo.url);
 
+  // Sync state if mediaInfo changes
+  useEffect(() => {
+    setVideoMeta({
+      duration: mediaInfo.duration,
+      width: mediaInfo.width,
+      height: mediaInfo.height,
+      isHd: mediaInfo.isHd,
+      orientation: mediaInfo.orientation
+    });
+  }, [mediaInfo.duration, mediaInfo.width, mediaInfo.height, mediaInfo.isHd, mediaInfo.orientation]);
+
+  const handleLoadedMetadata = (e: React.SyntheticEvent<HTMLVideoElement, Event>) => {
+    const video = e.currentTarget;
+    const dur = isFinite(video.duration) ? video.duration : 0;
+    const w = video.videoWidth || 1280;
+    const h = video.videoHeight || 720;
+    const isHd = w >= 1280 || h >= 720;
+    const ratio = w / (h || 1);
+    const orientation: 'portrait' | 'landscape' | 'square' = ratio < 0.85 ? 'portrait' : ratio > 1.2 ? 'landscape' : 'square';
+
+    setVideoMeta(prev => ({
+      duration: prev.duration || dur,
+      width: prev.width || w,
+      height: prev.height || h,
+      isHd: prev.isHd !== undefined ? prev.isHd : isHd,
+      orientation: prev.orientation || orientation
+    }));
+  };
+
+  const orientation = videoMeta.orientation || (videoMeta.width && videoMeta.height ? (videoMeta.width / videoMeta.height < 0.85 ? 'portrait' : videoMeta.width / videoMeta.height > 1.2 ? 'landscape' : 'square') : 'landscape');
+
+  const aspectStyle = orientation === 'portrait'
+    ? 'aspect-[9/16] max-w-[240px] sm:max-w-[280px] max-h-[380px]'
+    : orientation === 'square'
+    ? 'aspect-square max-w-[260px] sm:max-w-[300px]'
+    : 'aspect-video max-w-[280px] sm:max-w-[340px]';
+
   return (
-    <div className="w-full max-w-[270px] sm:max-w-[340px] md:max-w-[360px] my-0.5 select-none">
+    <div className="w-full my-0.5 select-none">
       <div
         onClick={(e) => {
           e.stopPropagation();
@@ -359,13 +537,16 @@ export function VideoMessage({
             onOpenViewer({
               type: 'video',
               url: videoSrc,
-              filename: mediaInfo.filename
+              filename: mediaInfo.filename,
+              sender: senderName,
+              time: time,
+              duration: videoMeta.duration
             });
           } else if (videoSrc) {
             window.open(videoSrc, '_blank');
           }
         }}
-        className="relative group cursor-pointer overflow-hidden rounded-2xl bg-zinc-950 border border-black/10 dark:border-white/10 aspect-video flex items-center justify-center"
+        className={`relative group cursor-pointer overflow-hidden rounded-2xl bg-zinc-950 border border-black/10 dark:border-white/10 ${aspectStyle} flex items-center justify-center`}
       >
         {videoSrc ? (
           <video
@@ -373,6 +554,7 @@ export function VideoMessage({
             poster={posterSrc || undefined}
             preload="metadata"
             playsInline
+            onLoadedMetadata={handleLoadedMetadata}
             className="w-full h-full object-cover rounded-2xl pointer-events-none"
             onError={() => setHasError(true)}
           />
@@ -391,16 +573,42 @@ export function VideoMessage({
             onRetry={onRetryUpload}
           />
         ) : (
-          <div className="absolute inset-0 bg-black/30 group-hover:bg-black/40 transition-colors flex items-center justify-center">
-            <div className="w-12 h-12 rounded-full bg-white/30 hover:bg-white/45 backdrop-blur-md flex items-center justify-center shadow-lg transition-transform active:scale-95 border border-white/30">
-              <Play className="w-5 h-5 text-white fill-white ml-0.5" />
+          <div className="absolute inset-0 bg-black/25 group-hover:bg-black/35 transition-colors flex items-center justify-center z-10">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-black/50 hover:bg-black/70 backdrop-blur-md flex items-center justify-center shadow-xl transition-transform active:scale-95 group-hover:scale-105 border border-white/25">
+              <Play className="w-5 h-5 sm:w-6 sm:h-6 text-white fill-white ml-0.5" />
             </div>
           </div>
         )}
 
-        <div className="absolute bottom-2 left-2 bg-black/70 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-bold text-white tracking-wide uppercase">
-          Video
+        {/* Bottom gradient shadow for readable text over any video frame */}
+        <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/85 via-black/40 to-transparent pointer-events-none rounded-b-2xl z-10" />
+
+        {/* Bottom-left: HD badge + Duration */}
+        <div className="absolute bottom-2 left-2 z-20 flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-black/60 backdrop-blur-md border border-white/15 text-white shadow-md select-none">
+          {videoMeta.isHd && (
+            <span className="text-[9px] font-extrabold uppercase px-1 py-0.2 bg-amber-400/25 text-amber-300 rounded border border-amber-400/35 leading-none">
+              HD
+            </span>
+          )}
+          <Play className="w-2.5 h-2.5 fill-white text-white" />
+          <span className="text-[11px] font-semibold tracking-wider font-mono">
+            {formatDuration(videoMeta.duration)}
+          </span>
         </div>
+
+        {/* Bottom-right: Timestamp inside bubble if no caption */}
+        {!mediaInfo.caption && time && (
+          <div className="absolute bottom-2 right-2 z-20 flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-black/60 backdrop-blur-md border border-white/10 text-white/90 text-[10px] font-medium shadow-md select-none">
+            <span>{time}</span>
+            {isMe && (
+              isTemp ? (
+                <Clock className="w-3 h-3 text-white/70 animate-pulse" />
+              ) : (
+                <CheckCheck className={`w-3.5 h-3.5 ${isRead ? 'text-sky-300' : 'text-white/80'}`} />
+              )
+            )}
+          </div>
+        )}
       </div>
 
       {mediaInfo.caption && (
@@ -709,10 +917,21 @@ export function DocumentMessage({ mediaInfo, isMe, onOpenViewer }: DocumentMessa
 // ─────────────────────────────────────────────────────────────────────────────
 // 5. MEDIA ATTACHMENT MESSAGE ORCHESTRATOR
 // ─────────────────────────────────────────────────────────────────────────────
-interface MediaAttachmentMessageProps {
+export interface MediaAttachmentMessageProps {
   mediaInfo: MediaAttachmentInfo;
   isMe: boolean;
-  onOpenMediaViewer?: (media: { type: 'image' | 'video' | 'pdf' | 'document'; url: string; filename: string }) => void;
+  time?: string;
+  isRead?: boolean;
+  isTemp?: boolean;
+  senderName?: string;
+  onOpenMediaViewer?: (media: { 
+    type: 'image' | 'video' | 'pdf' | 'document' | 'audio'; 
+    url: string; 
+    filename?: string;
+    sender?: string;
+    time?: string;
+    duration?: number;
+  }) => void;
   uploadStatus?: 'preparing' | 'uploading' | 'completed' | 'failed';
   uploadProgress?: number;
   onCancelUpload?: () => void;
@@ -722,6 +941,10 @@ interface MediaAttachmentMessageProps {
 export function MediaAttachmentMessage({
   mediaInfo,
   isMe,
+  time,
+  isRead,
+  isTemp,
+  senderName,
   onOpenMediaViewer,
   uploadStatus,
   uploadProgress,
@@ -747,6 +970,10 @@ export function MediaAttachmentMessage({
       <VideoMessage
         mediaInfo={mediaInfo}
         isMe={isMe}
+        time={time}
+        isRead={isRead}
+        isTemp={isTemp}
+        senderName={senderName}
         onOpenViewer={onOpenMediaViewer as any}
         uploadStatus={uploadStatus}
         uploadProgress={uploadProgress}
@@ -764,7 +991,7 @@ export function MediaAttachmentMessage({
     <DocumentMessage
       mediaInfo={mediaInfo}
       isMe={isMe}
-      onOpenViewer={onOpenMediaViewer}
+      onOpenViewer={onOpenMediaViewer as any}
     />
   );
 }

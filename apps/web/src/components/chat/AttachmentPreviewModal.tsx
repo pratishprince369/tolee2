@@ -7,6 +7,7 @@ import {
   RefreshCw, Image as ImageIcon, Video as VideoIcon
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { formatDuration } from './MediaAttachmentMessage';
 
 export interface PendingAttachmentItem {
   id: string;
@@ -17,6 +18,10 @@ export interface PendingAttachmentItem {
   sizeFormatted: string;
   caption?: string;
   duration?: number;
+  width?: number;
+  height?: number;
+  isHd?: boolean;
+  orientation?: 'portrait' | 'landscape' | 'square';
 }
 
 interface AttachmentPreviewModalProps {
@@ -132,7 +137,9 @@ export function AttachmentPreviewModal({
               {activeItem.name}
             </span>
             <span className="text-white/60 text-xs">
-              {activeItem.kind.toUpperCase()} • {activeItem.sizeFormatted} {items.length > 1 ? `(${activeIndex + 1}/${items.length})` : ''}
+              {activeItem.kind.toUpperCase()} • {activeItem.sizeFormatted}
+              {activeItem.kind === 'video' && activeItem.duration ? ` • ${formatDuration(activeItem.duration)}` : ''}
+              {items.length > 1 ? ` (${activeIndex + 1}/${items.length})` : ''}
             </span>
           </div>
         </div>
@@ -175,7 +182,7 @@ export function AttachmentPreviewModal({
         )}
 
         {activeItem.kind === 'video' && (
-          <div className="w-full max-w-2xl max-h-[42dvh] sm:max-h-[55dvh] aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl border border-white/10 flex items-center justify-center">
+          <div className="w-full max-w-2xl max-h-[42dvh] sm:max-h-[55dvh] bg-black rounded-2xl overflow-hidden shadow-2xl border border-white/10 flex items-center justify-center">
             <video 
               src={activeItem.previewUrl} 
               controls 
