@@ -853,13 +853,108 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
   }
 
   // ==========================================
-  // 9. FALLBACK CONVERSATIONAL AI ENGINE (NVIDIA Llama 3 70B)
+  // 9. SCHEDULE, TASKS & REMINDERS ORCHESTRATION
+  // ==========================================
+  if (
+    lower.includes('schedule') ||
+    lower.includes('kal kya hai') ||
+    lower.includes('aaj kya hai') ||
+    lower.includes('mera plan') ||
+    lower.includes('tasks') ||
+    lower.includes('task list') ||
+    lower.includes('reminder') ||
+    trimmed.includes('शेड्यूल') ||
+    trimmed.includes('टास्क') ||
+    trimmed.includes('रिमाइंडर')
+  ) {
+    const [tasks, reminders] = await Promise.all([
+      prisma.aITask.findMany({
+        where: { userId, status: 'pending' },
+        take: 5,
+        orderBy: { dueDate: 'asc' },
+      }),
+      prisma.aIReminder.findMany({
+        where: { userId, isDismissed: false, status: { in: ['PENDING', 'SNOOZED'] } },
+        take: 5,
+        orderBy: { remindAt: 'asc' },
+      }),
+    ]);
+
+    const taskText =
+      tasks.length > 0
+        ? tasks.map((t: any, i: number) => `   ${i + 1}. 📌 **${t.title}** ${t.priority === 'urgent' ? '🔥 (Urgent)' : ''}`).join('\n')
+        : '   ✨ No pending tasks.';
+
+    const reminderText =
+      reminders.length > 0
+        ? reminders.map((r: any, i: number) => `   ${i + 1}. ⏰ **${r.title}** (${new Date(r.remindAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })})`).join('\n')
+        : '   ✨ No pending reminders.';
+
+    logAIAction(userId, 'CHECK_SCHEDULE', command, 'SUCCESS', { tasksCount: tasks.length, remindersCount: reminders.length });
+    return {
+      success: true,
+      action: 'CHECK_SCHEDULE',
+      message: `📅 **Tolee AI Daily Manager Briefing**:\n\n**Pending Tasks:**\n${taskText}\n\n**Upcoming Reminders:**\n${reminderText}`,
+      interactiveAction: {
+        type: 'NAVIGATE',
+        label: '📅 Open Daily Planner & Tasks',
+        payload: { url: '/ai-manager' },
+      },
+    };
+  }
+
+  // ==========================================
+  // 10. CRM CLIENT & LEADS ORCHESTRATION
+  // ==========================================
+  if (
+    lower.includes('crm') ||
+    lower.includes('lead') ||
+    lower.includes('client') ||
+    lower.includes('customer') ||
+    trimmed.includes('लीड') ||
+    trimmed.includes('क्लाइंट')
+  ) {
+    const leads = await prisma.aICRMLead.findMany({
+      where: { userId },
+      take: 5,
+      orderBy: { updatedAt: 'desc' },
+      select: { name: true, phone: true, stage: true, dealValue: true },
+    });
+
+    if (leads.length > 0) {
+      const leadStr = leads
+        .map((l: any, i: number) => `   ${i + 1}. 👤 **${l.name}** — Stage: \`${l.stage}\`${l.dealValue ? ` | Value: ₹${l.dealValue}` : ''}`)
+        .join('\n');
+
+      logAIAction(userId, 'CHECK_CRM_LEADS', command, 'SUCCESS', { count: leads.length });
+      return {
+        success: true,
+        action: 'CHECK_CRM_LEADS',
+        message: `💼 **Tolee AI CRM Summary**:\n\n${leadStr}`,
+        interactiveAction: {
+          type: 'NAVIGATE',
+          label: '💼 Open CRM Dashboard',
+          payload: { url: '/ai-manager' },
+        },
+      };
+    }
+
+    logAIAction(userId, 'CHECK_CRM_LEADS', command, 'SUCCESS', { count: 0 });
+    return {
+      success: true,
+      action: 'CHECK_CRM_LEADS',
+      message: `💼 **Tolee AI Manager**: Aapke CRM me abhi koi new lead added nahi hai. Aap "Add new lead [Name]" bolkar direct lead create kar sakte hain!`,
+    };
+  }
+
+  // ==========================================
+  // 11. FALLBACK CONVERSATIONAL AI ENGINE (Capability-based Multi-Brain Router)
   // ==========================================
   try {
     const aiText = await callNvidiaLLM([
       {
         role: 'system',
-        content: `You are Tolee AI Manager, the personal AI Assistant and Central Brain of Tolee Platform. User: ${userNameStr}. Answer in helpful, warm conversational Hindi/English.`
+        content: `You are Tolee AI Manager, the personal AI Assistant and Central Brain of Tolee Platform. User: ${userNameStr}. Answer in helpful, warm conversational Hindi/English. Keep answers natural, intelligent, and concise.`
       },
       { role: 'user', content: trimmed }
     ]);
