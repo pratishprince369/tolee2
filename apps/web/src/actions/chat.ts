@@ -124,7 +124,9 @@ export async function fetchRealChatData() {
           text: msg.parent.content,
           sender: msg.parent.sender.name || msg.parent.sender.username || 'User',
           senderId: msg.parent.senderId,
-          senderUsername: msg.parent.sender.username || null
+          senderUsername: msg.parent.sender.username || null,
+          mediaUrl: msg.parent.mediaUrl || null,
+          mediaResourceType: msg.parent.mediaResourceType || null
         } : null,
         storyId: msg.storyId || null,
         storyType: msg.storyType || null,
@@ -253,7 +255,9 @@ export async function fetchRealChatData() {
           text: msg.parent.content,
           sender: msg.parent.sender.name || msg.parent.sender.username || 'User',
           senderId: msg.parent.senderId,
-          senderUsername: msg.parent.sender.username || null
+          senderUsername: msg.parent.sender.username || null,
+          mediaUrl: msg.parent.mediaUrl || null,
+          mediaResourceType: msg.parent.mediaResourceType || null
         } : null,
         storyId: msg.storyId || null,
         storyType: msg.storyType || null,
@@ -409,6 +413,18 @@ export async function sendRealChatMessage(
       }
     }
 
+    // Verify parentId belongs to the exact same chat
+    let validParentId: string | null = null;
+    if (parentId) {
+      const parentMsg = await prisma.message.findUnique({
+        where: { id: parentId },
+        select: { id: true, chatId: true }
+      });
+      if (parentMsg && parentMsg.chatId === chatId) {
+        validParentId = parentMsg.id;
+      }
+    }
+
     const message = await prisma.message.create({
       data: {
         content: safeContent || (mediaData?.mediaUrl ? '' : 'Message'),
@@ -417,7 +433,7 @@ export async function sendRealChatMessage(
         mediaResourceType: mediaData?.mediaResourceType || null,
         senderId,
         chatId,
-        parentId: parentId || null,
+        parentId: validParentId,
         storyId: storyReplyData?.storyId || null,
         storyType: storyReplyData?.storyType || null,
         storyThumbnail: storyReplyData?.storyThumbnail || null,
@@ -501,7 +517,9 @@ export async function sendRealChatMessage(
           text: message.parent.content,
           sender: message.parent.sender.name || message.parent.sender.username || 'User',
           senderId: message.parent.senderId,
-          senderUsername: message.parent.sender.username || null
+          senderUsername: message.parent.sender.username || null,
+          mediaUrl: message.parent.mediaUrl || null,
+          mediaResourceType: message.parent.mediaResourceType || null
         } : null,
         mediaUrl: message.mediaUrl || null,
         mediaResourceType: message.mediaResourceType || null,
@@ -722,7 +740,9 @@ export async function fetchChatMessages(chatId: string, beforeMessageId?: string
         text: msg.parent.content,
         sender: msg.parent.sender.name || msg.parent.sender.username || 'User',
         senderId: msg.parent.senderId,
-        senderUsername: msg.parent.sender.username || null
+        senderUsername: msg.parent.sender.username || null,
+        mediaUrl: msg.parent.mediaUrl || null,
+        mediaResourceType: msg.parent.mediaResourceType || null
       } : null,
       storyId: msg.storyId || null,
       storyType: msg.storyType || null,

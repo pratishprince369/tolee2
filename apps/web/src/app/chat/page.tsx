@@ -126,6 +126,88 @@ function mergePollMessages(oldMsgs: any[] = [], pollMsgs: any[] = []) {
   return merged;
 }
 
+// Helper to render WhatsApp-style rich quoted message snippet & thumbnail
+function renderQuotedMessageBody(replyTo: any, isMe: boolean) {
+  if (!replyTo) return null;
+
+  const hasText = !!replyTo.text && replyTo.text.trim().length > 0;
+  const mediaUrl = replyTo.mediaUrl;
+  const mediaType = replyTo.mediaResourceType;
+  
+  const isImage = mediaType === 'image' || (mediaUrl && /\.(jpg|jpeg|png|gif|webp|avif)($|\?|#)/i.test(mediaUrl));
+  const isVideo = mediaType === 'video' || (mediaUrl && /\.(mp4|webm|mov)($|\?|#)/i.test(mediaUrl));
+  const isAudio = mediaType === 'audio' || (mediaUrl && /\.(mp3|wav|ogg|m4a)($|\?|#)/i.test(mediaUrl));
+  const isPdf = mediaType === 'pdf' || (mediaUrl && /\.pdf($|\?|#)/i.test(mediaUrl));
+  const isDoc = mediaType === 'document' || (!isImage && !isVideo && !isAudio && !isPdf && !!mediaUrl);
+
+  const isDeleted = !hasText && !mediaUrl;
+
+  if (isDeleted) {
+    return (
+      <span className={`text-[12px] italic flex items-center gap-1 ${isMe ? 'text-white/70' : 'text-zinc-400 dark:text-zinc-500'}`}>
+        <span>🚫</span> Original message deleted
+      </span>
+    );
+  }
+
+  // Extract video duration from URL hash if present (#d=24)
+  let videoDurationStr = '';
+  if (isVideo && mediaUrl) {
+    const hashIdx = mediaUrl.indexOf('#');
+    if (hashIdx > -1) {
+      const params = new URLSearchParams(mediaUrl.substring(hashIdx + 1));
+      const durSec = parseInt(params.get('d') || '0', 10);
+      if (durSec > 0) {
+        const m = Math.floor(durSec / 60);
+        const s = durSec % 60;
+        videoDurationStr = `${m}:${s < 10 ? '0' : ''}${s}`;
+      }
+    }
+  }
+
+  return (
+    <div className="flex items-center justify-between gap-2.5 w-full overflow-hidden">
+      <div className="flex-1 min-w-0 flex items-center gap-1.5">
+        {isImage && <ImageIcon className={`w-3.5 h-3.5 shrink-0 ${isMe ? 'text-white/80' : 'text-zinc-500 dark:text-zinc-400'}`} />}
+        {isVideo && <Video className={`w-3.5 h-3.5 shrink-0 ${isMe ? 'text-white/80' : 'text-zinc-500 dark:text-zinc-400'}`} />}
+        {isAudio && <Music className={`w-3.5 h-3.5 shrink-0 ${isMe ? 'text-white/80' : 'text-zinc-500 dark:text-zinc-400'}`} />}
+        {(isPdf || isDoc) && <FileText className={`w-3.5 h-3.5 shrink-0 ${isMe ? 'text-white/80' : 'text-zinc-500 dark:text-zinc-400'}`} />}
+
+        <span className={`text-[12px] truncate leading-tight font-medium ${isMe ? 'text-white/90' : 'text-zinc-700 dark:text-zinc-300'}`}>
+          {hasText 
+            ? replyTo.text 
+            : isImage 
+              ? 'Photo' 
+              : isVideo 
+                ? (videoDurationStr ? `Video • ${videoDurationStr}` : 'Video') 
+                : isAudio 
+                  ? 'Audio' 
+                  : isPdf 
+                    ? 'PDF Document' 
+                    : 'Document'
+          }
+        </span>
+      </div>
+
+      {/* Mini Thumbnail Preview for Image / Video */}
+      {(isImage || isVideo) && mediaUrl && (
+        <div className={`w-8 h-8 rounded-md overflow-hidden shrink-0 border relative bg-black/20 ${isMe ? 'border-white/20' : 'border-black/10 dark:border-white/10'}`}>
+          {isImage ? (
+            <img src={mediaUrl} alt="" className="w-full h-full object-cover pointer-events-none" />
+          ) : (
+            <div className="w-full h-full relative flex items-center justify-center bg-zinc-950">
+              <video src={mediaUrl} className="w-full h-full object-cover pointer-events-none" preload="metadata" muted playsInline />
+              <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                <Play className="w-2.5 h-2.5 text-white fill-white" />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const formatLastMessage = (msgText: string) => {
   if (!msgText) return 'No messages yet.';
   
@@ -1567,6 +1649,19 @@ export default function ChatPage() {
     const currentUserId = (session?.user as any)?.id;
     const activeChatDetails = chats.find(c => c.id === activeChat);
 
+    const parentIdToSend = replyingToMessage?.id;
+    const replyToData = replyingToMessage ? {
+      id: replyingToMessage.id,
+      text: replyingToMessage.text,
+      sender: replyingToMessage.sender,
+      senderId: replyingToMessage.senderId,
+      senderUsername: replyingToMessage.senderUsername || null,
+      mediaUrl: replyingToMessage.mediaUrl || null,
+      mediaResourceType: replyingToMessage.mediaResourceType || null
+    } : null;
+
+    setReplyingToMessage(null);
+
     const optimisticMsg = {
       id: tempId,
       sender: session?.user?.name || 'You',
@@ -1581,13 +1676,7 @@ export default function ChatPage() {
       isMe: true,
       uploadStatus: 'uploading' as const,
       uploadProgress: 15,
-      replyTo: replyingToMessage ? {
-        id: replyingToMessage.id,
-        text: replyingToMessage.text,
-        sender: replyingToMessage.sender,
-        senderId: replyingToMessage.senderId,
-        senderUsername: replyingToMessage.senderUsername || null
-      } : null,
+      replyTo: replyToData,
       _rawFile: item.file
     };
 
@@ -1904,13 +1993,55 @@ export default function ChatPage() {
     }
   }, [chatSearchQuery, activeChat]);
 
-  const scrollToMessageId = (msgId: string) => {
-    const element = document.getElementById(`msg-${msgId}`);
+  const scrollToMessageId = async (msgId: string) => {
+    if (!msgId) return;
+    let element = document.getElementById(`msg-${msgId}`);
     if (element) {
       element.scrollIntoView({ behavior: 'smooth', block: 'center' });
       element.classList.add('animate-highlight-flash');
       setTimeout(() => {
-        element.classList.remove('animate-highlight-flash');
+        element?.classList.remove('animate-highlight-flash');
+      }, 1800);
+      return;
+    }
+
+    // If message is not in DOM, fetch historical chunks until found
+    if (!activeChat) return;
+    const currentMsgs = messagesByChat[activeChat] || [];
+    if (currentMsgs.length === 0) return;
+
+    let oldestId = currentMsgs[0]?.id;
+    let attempts = 0;
+
+    while (!element && attempts < 6) {
+      attempts++;
+      const res = await fetchChatMessages(activeChat, oldestId, 40);
+      if (!res.success || !res.messages || res.messages.length === 0) {
+        break;
+      }
+      oldestId = res.messages[0]?.id;
+
+      setMessagesByChat(prev => {
+        const existing = prev[activeChat] || [];
+        const existingIds = new Set(existing.map(m => m.id));
+        const newOnes = res.messages.filter((m: any) => !existingIds.has(m.id));
+        return {
+          ...prev,
+          [activeChat]: [...newOnes, ...existing]
+        };
+      });
+
+      // Wait a tick for React to render new messages in DOM
+      await new Promise(r => setTimeout(r, 80));
+      element = document.getElementById(`msg-${msgId}`);
+      if (!res.hasMore) break;
+    }
+
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      element.classList.add('animate-highlight-flash');
+      setTimeout(() => {
+        element?.classList.remove('animate-highlight-flash');
       }, 1800);
     }
   };
@@ -1997,7 +2128,9 @@ export default function ChatPage() {
         text: replyingToMessage.text,
         sender: replyingToMessage.sender,
         senderId: replyingToMessage.senderId,
-        senderUsername: replyingToMessage.senderUsername || null
+        senderUsername: replyingToMessage.senderUsername || null,
+        mediaUrl: replyingToMessage.mediaUrl || null,
+        mediaResourceType: replyingToMessage.mediaResourceType || null
       } : null
     };
     
@@ -2901,33 +3034,31 @@ export default function ChatPage() {
                               onTouchMove={handleMessagePressEnd}
                               onTouchEnd={handleMessagePressEnd}
                             >
-                              {/* Quoted Reply rendering inside bubbles */}
+                              {/* WhatsApp-Style Quoted Reply rendering inside bubbles */}
                               {msg.replyTo && (
                                 <div 
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     scrollToMessageId(msg.replyTo.id);
                                   }}
-                                  className={`mb-1 p-2 rounded-xl bg-black/5 dark:bg-white/5 border-l-4 text-left cursor-pointer hover:bg-black/10 dark:hover:bg-white/10 transition-colors ${
-                                    msg.isMe ? 'border-white/60' : 'border-primary'
+                                  className={`mb-1.5 p-2 rounded-xl text-left cursor-pointer transition-all select-none border-l-4 ${
+                                    msg.isMe 
+                                      ? 'bg-black/15 dark:bg-black/25 border-white/80 hover:bg-black/20 dark:hover:bg-black/30' 
+                                      : 'bg-zinc-100 dark:bg-zinc-800/80 border-teal-500 hover:bg-zinc-200/70 dark:hover:bg-zinc-800'
                                   }`}
                                 >
-                                  <p 
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      navigateToProfile(msg.replyTo.senderUsername, msg.replyTo.senderId);
-                                    }}
-                                    className={`text-[10px] font-bold truncate hover:underline cursor-pointer ${
-                                      msg.isMe ? 'text-white dark:text-white' : 'text-primary dark:text-teal-400'
-                                    }`}
-                                  >
-                                    {msg.replyTo.sender}
-                                  </p>
-                                  <p className={`text-xs truncate leading-snug ${
-                                    msg.isMe ? 'text-white/80 dark:text-zinc-300' : 'text-gray-500 dark:text-zinc-400'
-                                  }`}>
-                                    {msg.replyTo.text}
-                                  </p>
+                                  <div className="flex items-center justify-between gap-1 mb-0.5">
+                                    <span 
+                                      className={`text-[11px] font-extrabold truncate ${
+                                        msg.isMe 
+                                          ? 'text-white' 
+                                          : 'text-teal-600 dark:text-teal-400'
+                                      }`}
+                                    >
+                                      {msg.replyTo.senderId === currentUserId ? 'You' : (msg.replyTo.sender || 'User')}
+                                    </span>
+                                  </div>
+                                  {renderQuotedMessageBody(msg.replyTo, msg.isMe)}
                                 </div>
                               )}
 
@@ -3168,22 +3299,27 @@ export default function ChatPage() {
               </button>
             )}
 
-            {/* Replying Box Preview */}
+            {/* WhatsApp-Style Replying Box Preview */}
             {replyingToMessage && (
-              <div className="px-4 py-2 bg-zinc-50 dark:bg-zinc-900 border-l-4 border-teal-500 z-20 flex items-center justify-between animate-in slide-in-from-bottom-2 shrink-0">
-                <div className="flex-1 min-w-0">
-                  <span className="text-xs font-bold text-teal-600 block">
-                    Replying to {replyingToMessage.sender}
-                  </span>
-                  <span className="text-xs text-gray-500 dark:text-gray-400 truncate block">
-                    {replyingToMessage.text}
-                  </span>
+              <div className="px-4 py-2 bg-zinc-50 dark:bg-zinc-900 border-l-4 border-teal-500 z-20 flex items-center justify-between gap-3 shadow-xs animate-in slide-in-from-bottom-2 shrink-0 border-t border-zinc-200/50 dark:border-zinc-800/60">
+                <div 
+                  className="flex-1 min-w-0 flex items-center justify-between gap-3 cursor-pointer"
+                  onClick={() => scrollToMessageId(replyingToMessage.id)}
+                >
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-[12px] font-extrabold text-teal-600 dark:text-teal-400 block truncate">
+                      Replying to {replyingToMessage.senderId === currentUserId ? 'You' : (replyingToMessage.sender || 'User')}
+                    </span>
+                    <div className="text-[12px] text-gray-600 dark:text-zinc-300 truncate font-medium flex items-center gap-1.5 mt-0.5">
+                      {renderQuotedMessageBody(replyingToMessage, false)}
+                    </div>
+                  </div>
                 </div>
                 <Button 
                   variant="ghost" 
                   size="icon" 
                   onClick={() => setReplyingToMessage(null)}
-                  className="h-7 w-7 rounded-full text-zinc-400 hover:text-zinc-700 dark:hover:text-white"
+                  className="h-7 w-7 rounded-full text-zinc-400 hover:text-zinc-700 dark:hover:text-white shrink-0 hover:bg-zinc-200/50 dark:hover:bg-zinc-800"
                 >
                   <X className="w-4 h-4" />
                 </Button>
