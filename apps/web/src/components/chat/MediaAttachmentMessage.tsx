@@ -26,6 +26,26 @@ export function getOptimizedMediaUrl(url: string, width = 720): string {
   return url;
 }
 
+export function getVideoPlaybackUrl(url?: string | null): string {
+  if (!url) return '';
+  // Convert any legacy HLS .m3u8 URLs to universal direct .mp4 playback
+  if (url.includes('.m3u8')) {
+    return url.replace('/sp_hd/', '/').replace(/\.m3u8(\?.*)?$/i, '.mp4$1');
+  }
+  return url;
+}
+
+export function getVideoThumbnailUrl(url?: string | null): string {
+  if (!url) return '';
+  if (url.includes('/video/upload/')) {
+    const playbackUrl = getVideoPlaybackUrl(url);
+    return playbackUrl
+      .replace('/video/upload/', '/video/upload/so_0,q_auto,f_jpg/')
+      .replace(/\.[a-zA-Z0-9]+(\?.*)?$/, '.jpg$1');
+  }
+  return '';
+}
+
 /**
  * Comprehensive parser that detects attachment metadata from direct URL, MIME type,
  * file extensions, text-embedded URLs, or legacy bracket syntax `[📎 filename.ext]`.
@@ -326,6 +346,8 @@ export function VideoMessage({
   onRetryUpload
 }: VideoMessageProps) {
   const [hasError, setHasError] = useState(false);
+  const videoSrc = getVideoPlaybackUrl(mediaInfo.url);
+  const posterSrc = getVideoThumbnailUrl(mediaInfo.url);
 
   return (
     <div className="w-full max-w-[270px] sm:max-w-[340px] md:max-w-[360px] my-0.5 select-none">
@@ -333,22 +355,24 @@ export function VideoMessage({
         onClick={(e) => {
           e.stopPropagation();
           if (uploadStatus === 'uploading' || uploadStatus === 'preparing') return;
-          if (mediaInfo.url && onOpenViewer) {
+          if (videoSrc && onOpenViewer) {
             onOpenViewer({
               type: 'video',
-              url: mediaInfo.url,
+              url: videoSrc,
               filename: mediaInfo.filename
             });
-          } else if (mediaInfo.url) {
-            window.open(mediaInfo.url, '_blank');
+          } else if (videoSrc) {
+            window.open(videoSrc, '_blank');
           }
         }}
         className="relative group cursor-pointer overflow-hidden rounded-2xl bg-zinc-950 border border-black/10 dark:border-white/10 aspect-video flex items-center justify-center"
       >
-        {mediaInfo.url ? (
+        {videoSrc ? (
           <video
-            src={mediaInfo.url}
+            src={videoSrc}
+            poster={posterSrc || undefined}
             preload="metadata"
+            playsInline
             className="w-full h-full object-cover rounded-2xl pointer-events-none"
             onError={() => setHasError(true)}
           />

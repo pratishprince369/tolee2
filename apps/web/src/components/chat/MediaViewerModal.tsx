@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Download, ZoomIn, ZoomOut, RotateCcw, ExternalLink, FileText, File } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { getVideoPlaybackUrl, getVideoThumbnailUrl } from './MediaAttachmentMessage';
 
 interface MediaViewerModalProps {
   media: {
@@ -33,10 +34,13 @@ export function MediaViewerModal({ media, onClose }: MediaViewerModalProps) {
 
   if (!media) return null;
 
+  const rawUrl = media.url;
+  const effectiveUrl = media.type === 'video' ? getVideoPlaybackUrl(rawUrl) : rawUrl;
+
   const handleDownload = (e: React.MouseEvent) => {
     e.stopPropagation();
     const link = document.createElement('a');
-    link.href = media.url;
+    link.href = effectiveUrl;
     link.download = media.filename || 'download';
     link.target = '_blank';
     link.rel = 'noopener noreferrer';
@@ -47,12 +51,12 @@ export function MediaViewerModal({ media, onClose }: MediaViewerModalProps) {
 
   const handleOpenExternal = (e: React.MouseEvent) => {
     e.stopPropagation();
-    window.open(media.url, '_blank', 'noopener,noreferrer');
+    window.open(effectiveUrl, '_blank', 'noopener,noreferrer');
   };
 
   return (
     <div 
-      className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex flex-col items-center justify-between animate-in fade-in duration-200 select-none"
+      className="fixed inset-0 z-[150] h-[100dvh] max-h-[100dvh] w-full bg-black/95 backdrop-blur-md flex flex-col items-center justify-between animate-in fade-in duration-200 select-none overflow-hidden"
       onClick={onClose}
     >
       {/* Header Bar */}
@@ -156,10 +160,12 @@ export function MediaViewerModal({ media, onClose }: MediaViewerModalProps) {
         {media.type === 'video' && (
           <div className="w-full max-w-4xl aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl border border-white/10 flex items-center justify-center">
             <video 
-              src={media.url} 
+              src={effectiveUrl} 
+              poster={getVideoThumbnailUrl(media.url) || undefined}
               controls 
               autoPlay 
               playsInline
+              preload="auto"
               className="w-full h-full object-contain"
             />
           </div>

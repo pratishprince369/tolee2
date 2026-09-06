@@ -109,12 +109,12 @@ export function AttachmentPreviewModal({
 
   return (
     <div 
-      className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex flex-col items-center justify-between select-none animate-in fade-in duration-200"
+      className="fixed inset-0 z-[150] h-[100dvh] max-h-[100dvh] w-full bg-black/95 backdrop-blur-md flex flex-col justify-between select-none overflow-hidden animate-in fade-in duration-200"
       onClick={onClose}
     >
       {/* ── Header ── */}
       <div 
-        className="w-full h-16 px-4 sm:px-6 bg-gradient-to-b from-black/80 to-transparent flex items-center justify-between z-10"
+        className="shrink-0 w-full h-14 sm:h-16 px-4 sm:px-6 bg-gradient-to-b from-black/90 to-transparent flex items-center justify-between z-10"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center gap-3">
@@ -128,7 +128,7 @@ export function AttachmentPreviewModal({
             <X className="w-5 h-5" />
           </Button>
           <div className="flex flex-col min-w-0">
-            <span className="text-white text-sm font-bold truncate max-w-[200px] sm:max-w-md">
+            <span className="text-white text-sm font-bold truncate max-w-[180px] sm:max-w-md">
               {activeItem.name}
             </span>
             <span className="text-white/60 text-xs">
@@ -159,36 +159,37 @@ export function AttachmentPreviewModal({
         </div>
       </div>
 
-      {/* ── Main Preview Area ── */}
+      {/* ── Main Preview Area (Flex constrained for all mobile screen heights) ── */}
       <div 
-        className="flex-1 w-full max-w-4xl px-4 flex items-center justify-center overflow-hidden py-2"
+        className="flex-1 min-h-0 w-full max-w-4xl mx-auto px-3 sm:px-6 flex items-center justify-center overflow-hidden py-1 sm:py-2"
         onClick={e => e.stopPropagation()}
       >
         {activeItem.kind === 'image' && (
-          <div className="relative max-h-[65vh] max-w-full flex items-center justify-center">
+          <div className="relative max-h-[42dvh] sm:max-h-[60vh] max-w-full flex items-center justify-center">
             <img 
               src={activeItem.previewUrl} 
               alt={activeItem.name}
-              className="max-h-[62vh] max-w-full object-contain rounded-2xl shadow-2xl border border-white/10"
+              className="max-h-[40dvh] sm:max-h-[58vh] max-w-full object-contain rounded-2xl shadow-2xl border border-white/10"
             />
           </div>
         )}
 
         {activeItem.kind === 'video' && (
-          <div className="w-full max-w-2xl aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl border border-white/10 flex items-center justify-center">
+          <div className="w-full max-w-2xl max-h-[42dvh] sm:max-h-[55dvh] aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl border border-white/10 flex items-center justify-center">
             <video 
               src={activeItem.previewUrl} 
               controls 
               playsInline
-              className="w-full h-full object-contain"
+              preload="auto"
+              className="w-full h-full max-h-[42dvh] sm:max-h-[55dvh] object-contain"
             />
           </div>
         )}
 
         {activeItem.kind === 'audio' && (
-          <div className="w-full max-w-md p-6 bg-zinc-900/90 rounded-3xl border border-white/10 shadow-2xl flex flex-col items-center gap-4 text-center">
-            <div className="w-20 h-20 rounded-full bg-teal-500/20 border border-teal-500/40 flex items-center justify-center text-teal-400 shadow-inner">
-              <Music className="w-10 h-10" />
+          <div className="w-full max-w-md p-4 sm:p-6 bg-zinc-900/90 rounded-3xl border border-white/10 shadow-2xl flex flex-col items-center gap-3 sm:gap-4 text-center">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-teal-500/20 border border-teal-500/40 flex items-center justify-center text-teal-400 shadow-inner">
+              <Music className="w-8 h-8 sm:w-10 sm:h-10" />
             </div>
             <div>
               <p className="text-white font-bold text-sm truncate max-w-xs">{activeItem.name}</p>
@@ -197,22 +198,22 @@ export function AttachmentPreviewModal({
             <audio 
               src={activeItem.previewUrl} 
               controls 
-              className="w-full mt-2" 
+              className="w-full mt-1 sm:mt-2" 
             />
           </div>
         )}
 
         {(activeItem.kind === 'document' || activeItem.kind === 'pdf') && (
-          <div className="w-full max-w-md p-6 bg-zinc-900/90 rounded-3xl border border-white/10 shadow-2xl flex flex-col items-center gap-4 text-center">
+          <div className="w-full max-w-md p-4 sm:p-6 bg-zinc-900/90 rounded-3xl border border-white/10 shadow-2xl flex flex-col items-center gap-3 sm:gap-4 text-center">
             {(() => {
               const docStyle = getDocIcon(activeItem.name, activeItem.kind);
               return (
                 <>
-                  <div className={`w-20 h-20 rounded-2xl flex items-center justify-center border ${docStyle.color} shadow-md`}>
+                  <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex items-center justify-center border ${docStyle.color} shadow-md`}>
                     {docStyle.icon}
                   </div>
                   <div className="min-w-0 w-full">
-                    <p className="text-white font-bold text-base truncate px-4">{activeItem.name}</p>
+                    <p className="text-white font-bold text-sm sm:text-base truncate px-4">{activeItem.name}</p>
                     <div className="flex items-center justify-center gap-2 mt-1.5">
                       <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md border ${docStyle.color}`}>
                         {docStyle.badge}
@@ -231,58 +232,60 @@ export function AttachmentPreviewModal({
 
       {/* ── Bottom Strip: Multi-file carousel + Caption Input + Send Button ── */}
       <div 
-        className="w-full max-w-4xl px-3 sm:px-6 pb-4 sm:pb-6 flex flex-col gap-3 z-10"
+        className="shrink-0 w-full max-w-4xl mx-auto px-3 sm:px-6 pb-[calc(env(safe-area-inset-bottom,0px)+12px)] pt-1 flex flex-col gap-2.5 z-10"
         onClick={e => e.stopPropagation()}
       >
-        {/* Multi-Item Thumbnails Carousel Strip */}
-        <div className="flex items-center gap-2 overflow-x-auto py-1 scrollbar-none">
-          {items.map((item, idx) => {
-            const isCurrent = idx === activeIndex;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setActiveIndex(idx)}
-                className={`relative group h-14 w-14 sm:h-16 sm:w-16 rounded-xl overflow-hidden flex-shrink-0 transition-all border-2 ${
-                  isCurrent 
-                    ? 'border-teal-400 ring-2 ring-teal-400/40 scale-105' 
-                    : 'border-white/20 opacity-70 hover:opacity-100'
-                }`}
-              >
-                {item.kind === 'image' ? (
-                  <img src={item.previewUrl} alt={item.name} className="w-full h-full object-cover" />
-                ) : item.kind === 'video' ? (
-                  <div className="w-full h-full bg-zinc-900 flex items-center justify-center text-white">
-                    <VideoIcon className="w-5 h-5 text-red-400" />
-                  </div>
-                ) : item.kind === 'audio' ? (
-                  <div className="w-full h-full bg-zinc-900 flex items-center justify-center text-teal-400">
-                    <Music className="w-5 h-5" />
-                  </div>
-                ) : (
-                  <div className="w-full h-full bg-zinc-900 flex items-center justify-center text-blue-400">
-                    <FileText className="w-5 h-5" />
-                  </div>
-                )}
-                <span className="absolute bottom-0 inset-x-0 bg-black/70 text-[9px] text-white text-center truncate px-0.5">
-                  {item.kind.toUpperCase()}
-                </span>
-              </button>
-            );
-          })}
+        {/* Multi-Item Thumbnails Carousel Strip (shown when multiple items or add mode) */}
+        {items.length > 1 && (
+          <div className="flex items-center gap-2 overflow-x-auto py-1 scrollbar-none">
+            {items.map((item, idx) => {
+              const isCurrent = idx === activeIndex;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveIndex(idx)}
+                  className={`relative group h-12 w-12 sm:h-14 sm:w-14 rounded-xl overflow-hidden flex-shrink-0 transition-all border-2 ${
+                    isCurrent 
+                      ? 'border-emerald-400 ring-2 ring-emerald-400/40 scale-105' 
+                      : 'border-white/20 opacity-70 hover:opacity-100'
+                  }`}
+                >
+                  {item.kind === 'image' ? (
+                    <img src={item.previewUrl} alt={item.name} className="w-full h-full object-cover" />
+                  ) : item.kind === 'video' ? (
+                    <div className="w-full h-full bg-zinc-900 flex items-center justify-center text-white">
+                      <VideoIcon className="w-5 h-5 text-red-400" />
+                    </div>
+                  ) : item.kind === 'audio' ? (
+                    <div className="w-full h-full bg-zinc-900 flex items-center justify-center text-teal-400">
+                      <Music className="w-5 h-5" />
+                    </div>
+                  ) : (
+                    <div className="w-full h-full bg-zinc-900 flex items-center justify-center text-blue-400">
+                      <FileText className="w-5 h-5" />
+                    </div>
+                  )}
+                  <span className="absolute bottom-0 inset-x-0 bg-black/70 text-[9px] text-white text-center truncate px-0.5">
+                    {item.kind.toUpperCase()}
+                  </span>
+                </button>
+              );
+            })}
 
-          {/* Add more button */}
-          <button
-            onClick={onAddMore}
-            className="h-14 w-14 sm:h-16 sm:w-16 rounded-xl border-2 border-dashed border-white/30 hover:border-teal-400/80 bg-white/5 hover:bg-white/10 flex flex-col items-center justify-center text-white/70 hover:text-teal-400 transition-all flex-shrink-0"
-            title="Add another attachment"
-          >
-            <Plus className="w-5 h-5" />
-            <span className="text-[9px] font-bold mt-0.5">Add</span>
-          </button>
-        </div>
+            {/* Add more button */}
+            <button
+              onClick={onAddMore}
+              className="h-12 w-12 sm:h-14 sm:w-14 rounded-xl border-2 border-dashed border-white/30 hover:border-emerald-400/80 bg-white/5 hover:bg-white/10 flex flex-col items-center justify-center text-white/70 hover:text-emerald-400 transition-all flex-shrink-0"
+              title="Add another attachment"
+            >
+              <Plus className="w-4 h-4" />
+              <span className="text-[9px] font-bold mt-0.5">Add</span>
+            </button>
+          </div>
+        )}
 
         {/* Caption Input & Send Action */}
-        <div className="flex items-center gap-2 bg-zinc-900/90 backdrop-blur-xl border border-white/15 rounded-full p-1.5 shadow-2xl">
+        <div className="flex items-center gap-2 bg-zinc-900/95 backdrop-blur-xl border border-white/20 rounded-full p-1.5 shadow-2xl ring-1 ring-white/10">
           <input
             ref={inputRef}
             type="text"
@@ -300,10 +303,10 @@ export function AttachmentPreviewModal({
 
           <Button
             onClick={handleSendAll}
-            className="h-11 w-11 rounded-full bg-gradient-to-tr from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 text-white shadow-lg active:scale-95 flex items-center justify-center flex-shrink-0 p-0"
+            className="h-11 w-11 sm:h-12 sm:w-12 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg active:scale-95 flex items-center justify-center flex-shrink-0 p-0 transition-transform"
             title="Send attachment"
           >
-            <Send className="w-5 h-5 ml-0.5 stroke-[2]" />
+            <Send className="w-5 h-5 ml-0.5 stroke-[2.2]" />
           </Button>
         </div>
       </div>

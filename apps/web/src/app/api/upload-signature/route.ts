@@ -18,17 +18,11 @@ export async function GET(request: Request) {
 
     const timestamp = Math.round((new Date).getTime() / 1000);
     
-    // We must pass exactly the parameters we plan to use in the client
+    // Signature parameters
     const paramsToSign: Record<string, any> = { 
       timestamp, 
       folder: 'tolee_uploads' 
     };
-
-    // For video streaming (HLS)
-    if (type === 'video') {
-      paramsToSign.eager = 'sp_hd/m3u8';
-      paramsToSign.eager_async = 'true';
-    }
 
     const { account, index } = await getActiveCloudinaryAccount();
 
