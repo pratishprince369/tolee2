@@ -7,35 +7,67 @@ import {
   SmartReplySuggestion,
   GroupAIActionRequest,
 } from './types';
-import { GeminiWeb2APIProvider } from './providers/gemini-web2api';
+import { NvidiaNIMProvider } from './providers/nvidia-nim';
 import { GeminiOfficialProvider } from './providers/gemini-official';
+import { ClodOpenAIProvider } from './providers/clod-openai';
+import { GeminiWeb2APIProvider } from './providers/gemini-web2api';
 import { FallbackProvider } from './providers/fallback-provider';
 import { buildAIContext } from './context-builder';
 
 class AIGatewayRouter {
-  private web2api = new GeminiWeb2APIProvider();
+  private nvidia = new NvidiaNIMProvider();
   private geminiOfficial = new GeminiOfficialProvider();
+  private clod = new ClodOpenAIProvider();
+  private web2api = new GeminiWeb2APIProvider();
   private fallback = new FallbackProvider();
 
-  private getProviderOrder(preferred?: string): AIProvider[] {
+  private getProviderOrder(options?: AIRequestOptions): AIProvider[] {
+    const hasImage = options?.messages?.some((m) => m.mediaUrl && m.mediaType?.startsWith('image/'));
+    const preferred = options?.persona?.preferredProvider;
+
+    // 1. Multimodal / Vision routing -> Gemini Official first, then OpenAI fallback
+    if (hasImage) {
+      return [this.geminiOfficial, this.web2api, this.clod, this.nvidia, this.fallback];
+    }
+
+    // 2. Explicit provider preference
+    if (preferred === 'nvidia') {
+      return [this.nvidia, this.geminiOfficial, this.clod, this.fallback, this.web2api];
+    }
+    if (preferred === 'gemini_official') {
+      return [this.geminiOfficial, this.nvidia, this.clod, this.web2api, this.fallback];
+    }
+    if (preferred === 'claude' || preferred === 'openai') {
+      return [this.clod, this.nvidia, this.geminiOfficial, this.fallback, this.web2api];
+    }
     if (preferred === 'gemini_web2api') {
-      return [this.web2api, this.geminiOfficial, this.fallback];
+      return [this.web2api, this.nvidia, this.geminiOfficial, this.fallback];
     }
-    if (preferred === 'fallback' || preferred === 'nvidia' || preferred === 'openai') {
-      return [this.fallback, this.geminiOfficial, this.web2api];
-    }
-    // Default: Gemini Official -> Web2API -> Fallback
-    return [this.geminiOfficial, this.web2api, this.fallback];
+
+    // 3. Default Capability-based Order: NVIDIA NIM -> Google Gemini -> Claude/OpenAI -> Web2API -> Fallback
+    return [this.nvidia, this.geminiOfficial, this.clod, this.web2api, this.fallback];
   }
 
   async checkProvidersStatus() {
-    const [web2apiOk, geminiOk, fallbackOk] = await Promise.all([
-      this.web2api.isAvailable(),
-      this.geminiOfficial.isAvailable(),
-      this.fallback.isAvailable(),
+    const [nvidiaOk, geminiOk, clodOk, web2apiOk, fallbackOk] = await Promise.all([
+      this.nvidia.isAvailable().catch(() => false),
+      this.geminiOfficial.isAvailable().catch(() => false),
+      this.clod.isAvailable().catch(() => false),
+      this.web2api.isAvailable().catch(() => false),
+      this.fallback.isAvailable().catch(() => false),
     ]);
 
     return [
+      {
+        id: 'nvidia',
+        name: 'NVIDIA NIM Frontier Cluster',
+        type: 'nvidia',
+        status: nvidiaOk ? 'CONNECTED' : 'OFFLINE',
+        defaultModel: 'meta/llama-3.3-70b-instruct',
+        isVision: false,
+        isVoice: false,
+        isStreaming: true,
+      },
       {
         id: 'gemini_official',
         name: 'Google Gemini Official API',
@@ -44,24 +76,37 @@ class AIGatewayRouter {
         defaultModel: 'gemini-2.0-flash',
         isVision: true,
         isVoice: true,
+        isStreaming: true,
+      },
+      {
+        id: 'claude',
+        name: 'Claude / OpenAI Intelligent Engine',
+        type: 'claude',
+        status: clodOk ? 'CONNECTED' : 'OFFLINE',
+        defaultModel: 'anthropic/claude-3.5-sonnet',
+        isVision: false,
+        isVoice: false,
+        isStreaming: false,
       },
       {
         id: 'gemini_web2api',
         name: 'Gemini Web2API Layer',
         type: 'gemini_web2api',
         status: web2apiOk ? 'CONNECTED' : 'OFFLINE',
-        defaultModel: 'gemini-2.0-flash',
+        defaultModel: 'gemini-3.6-flash',
         isVision: true,
         isVoice: false,
+        isStreaming: true,
       },
       {
         id: 'fallback',
-        name: 'Resilient Fallback (NVIDIA / OpenAI)',
+        name: 'Resilient Multi-Tier Fallback AI',
         type: 'nvidia',
         status: fallbackOk ? 'CONNECTED' : 'OFFLINE',
         defaultModel: 'meta/llama-3.1-70b-instruct',
         isVision: false,
         isVoice: false,
+        isStreaming: true,
       },
     ];
   }
@@ -78,7 +123,7 @@ class AIGatewayRouter {
       messages: contextualMessages,
     };
 
-    const providers = this.getProviderOrder(options.persona?.voiceName ? 'gemini_official' : undefined);
+    const providers = this.getProviderOrder(options);
     let lastError: any = null;
 
     for (const provider of providers) {
@@ -98,24 +143,21 @@ class AIGatewayRouter {
                 action: 'chat_completion',
                 provider: result.provider,
                 model: result.model,
-                inputTokens: result.tokensUsed?.promptTokens || 0,
-                outputTokens: result.tokensUsed?.completionTokens || 0,
-                totalTokens: result.tokensUsed?.totalTokens || 0,
-                requestDurationMs: result.latencyMs,
-                isSuccess: true,
+                tokensUsed: result.tokensUsed?.totalTokens,
+                latencyMs: result.latencyMs,
               },
             })
-            .catch(() => {});
+            .catch((e) => console.warn('[AIGateway] Usage log notice:', e));
         }
 
         return result;
       } catch (err: any) {
+        console.warn(`[AIGateway] Provider ${provider.name} failed: ${err.message}. Retrying fallback...`);
         lastError = err;
-        console.warn(`Provider ${provider.name} failed:`, err.message);
       }
     }
 
-    throw lastError || new Error('All AI providers failed to generate response.');
+    throw lastError || new Error('All configured AI providers failed.');
   }
 
   async stream(
@@ -133,7 +175,7 @@ class AIGatewayRouter {
       messages: contextualMessages,
     };
 
-    const providers = this.getProviderOrder();
+    const providers = this.getProviderOrder(options);
     let lastError: any = null;
 
     for (const provider of providers) {
@@ -149,87 +191,85 @@ class AIGatewayRouter {
               data: {
                 userId: options.userId,
                 conversationId: options.conversationId,
-                action: 'stream_completion',
+                action: 'chat_stream',
                 provider: result.provider,
                 model: result.model,
-                inputTokens: result.tokensUsed?.promptTokens || 0,
-                outputTokens: result.tokensUsed?.completionTokens || 0,
-                totalTokens: result.tokensUsed?.totalTokens || 0,
-                requestDurationMs: result.latencyMs,
-                isSuccess: true,
+                latencyMs: result.latencyMs,
               },
             })
-            .catch(() => {});
+            .catch((e) => console.warn('[AIGateway] Usage log notice:', e));
         }
 
         return result;
       } catch (err: any) {
+        console.warn(`[AIGateway] Stream with ${provider.name} failed: ${err.message}. Retrying fallback...`);
         lastError = err;
-        console.warn(`Provider ${provider.name} streaming failed:`, err.message);
       }
     }
 
-    throw lastError || new Error('All AI providers failed to stream response.');
+    throw lastError || new Error('All configured AI stream providers failed.');
   }
 
-  async generateSmartReplies(
-    recentMessages: { role: string; content: string }[],
-    personaName?: string
-  ): Promise<SmartReplySuggestion[]> {
-    const prompt = `You are generating smart WhatsApp-style 1-tap quick replies for a user in a conversation.
-Based on the following recent messages, generate EXACTLY 3 natural, concise, and distinct quick reply suggestions (e.g. 1 positive/enthusiastic, 1 neutral/clarifying, 1 action-oriented).
-Keep each reply under 10 words. Respond ONLY with a valid JSON array of objects with keys "id", "text", "tone", and "emoji".
+  async generateSmartReplies(params: {
+    lastMessage: string;
+    recentMessages?: { role: string; content: string }[];
+    personaTone?: string;
+  }): Promise<SmartReplySuggestion[]> {
+    const prompt = `You are an AI Smart Reply Generator.
+Generate exactly 3 natural, short, contextual quick replies (max 6 words each) for the last message in the conversation.
+Conversation context:
+${params.recentMessages?.map((m) => `${m.role}: ${m.content}`).join('\n') || ''}
+Last message: "${params.lastMessage}"
 
-Recent messages:
-${recentMessages.map((m) => `${m.role}: ${m.content}`).join('\n')}
-
-Example JSON format:
-[
-  {"id": "1", "text": "Sure, that sounds great!", "tone": "positive", "emoji": "👍"},
-  {"id": "2", "text": "Can we discuss this tomorrow?", "tone": "neutral", "emoji": "📅"},
-  {"id": "3", "text": "Let me look into it right now.", "tone": "action", "emoji": "⚡"}
-]`;
+Tone: ${params.personaTone || 'natural, helpful, friendly'}.
+Output ONLY a valid JSON array of 3 strings, example: ["Sounds good!", "When are you free?", "Let's do it!"]`;
 
     try {
-      const res = await this.generate({
+      const result = await this.generate({
         messages: [{ role: 'user', content: prompt }],
-        temperature: 0.5,
-        maxTokens: 300,
+        temperature: 0.7,
+        maxTokens: 200,
       });
 
-      const cleaned = res.text.replace(/```json/g, '').replace(/```/g, '').trim();
-      const parsed = JSON.parse(cleaned);
+      const cleanJson = result.text.replace(/```json|```/g, '').trim();
+      const parsed: string[] = JSON.parse(cleanJson);
+
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed.slice(0, 3);
+        return parsed.slice(0, 3).map((text, i) => ({
+          id: `reply_${Date.now()}_${i}`,
+          text,
+          tone: params.personaTone || 'friendly',
+        }));
       }
     } catch {
-      // Safe fallback suggestions
+      // Return natural fallback suggestions
     }
 
     return [
-      { id: '1', text: 'Sounds good to me!', tone: 'positive', emoji: '👍' },
-      { id: '2', text: 'Let me get back to you in a bit.', tone: 'neutral', emoji: '⏳' },
-      { id: '3', text: 'Could you share more details?', tone: 'question', emoji: '🤔' },
+      { id: '1', text: '👍 Haan bilkul!', tone: 'friendly' },
+      { id: '2', text: 'Thoda detail me batayein.', tone: 'helpful' },
+      { id: '3', text: 'Main check karke batata hoon.', tone: 'professional' },
     ];
   }
 
-  async executeGroupAction(request: GroupAIActionRequest): Promise<string> {
+  async executeGroupAIAction(request: GroupAIActionRequest): Promise<string> {
     let systemPrompt = '';
     let userPrompt = '';
 
     switch (request.action) {
       case 'summarize':
-        systemPrompt = 'You are a concise meeting and group chat summarizer.';
-        userPrompt = `Please summarize the key decisions, topics discussed, and action items from the following messages in bullet points:\n\n${
+        systemPrompt = 'You are a concise group discussion summarizer. Provide key points and decisions in bullet points.';
+        userPrompt = `Please summarize the following conversation:\n\n${
+          request.recentMessages?.map((m) => `${m.role}: ${m.content}`).join('\n') ||
           request.targetMessageContent ||
-          request.recentMessages?.map((m) => `${m.role}: ${m.content}`).join('\n')
+          ''
         }`;
         break;
       case 'translate':
-        systemPrompt = `You are an expert translator. Translate the text accurately into ${
-          request.targetLanguage || 'English'
-        }. Return only the translated text.`;
-        userPrompt = request.targetMessageContent || '';
+        systemPrompt = `You are a translator. Translate the text accurately into ${
+          request.targetLanguage || 'Hindi'
+        }. Return ONLY the translated text.`;
+        userPrompt = request.targetMessageContent || request.prompt || '';
         break;
       case 'explain':
         systemPrompt = 'You are a helpful assistant explaining concepts clearly and simply.';
