@@ -12,18 +12,69 @@ export class GeminiWeb2APIProvider implements AIProvider {
     return process.env.GEMINI_WEB2API_API_KEY || process.env.AI_WEB2API_KEY || 'sk-default';
   }
 
+  /**
+   * STEP 5: Strict Isolated Backend Health Check
+   * Validates /v1/models AND /v1/chat/completions response content before allowing live traffic.
+   */
   async isAvailable(): Promise<boolean> {
+    const baseUrl = this.getBaseUrl();
+    const apiKey = this.getApiKey();
+
     try {
-      const baseUrl = this.getBaseUrl();
+      // 1. Health check: GET /v1/models
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2000);
-      const res = await fetch(`${baseUrl}/v1/models`, {
-        headers: { Authorization: `Bearer ${this.getApiKey()}` },
+      const timeoutId = setTimeout(() => controller.abort(), 2500);
+
+      const modelsRes = await fetch(`${baseUrl}/v1/models`, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${apiKey}` },
         signal: controller.signal,
       });
+
       clearTimeout(timeoutId);
-      return res.ok || res.status === 401 || res.status === 403;
-    } catch {
+
+      if (!modelsRes.ok) {
+        console.warn(`[GeminiWeb2API] /v1/models check failed with status: ${modelsRes.status}`);
+        return false;
+      }
+
+      // 2. Health check: POST /v1/chat/completions with test prompt
+      const postController = new AbortController();
+      const postTimeoutId = setTimeout(() => postController.abort(), 3500);
+
+      const testRes = await fetch(`${baseUrl}/v1/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'gemini-3.6-flash',
+          messages: [{ role: 'user', content: 'Reply with exactly: Tolee AI working' }],
+          stream: false,
+        }),
+        signal: postController.signal,
+      });
+
+      clearTimeout(postTimeoutId);
+
+      if (!testRes.ok) {
+        const errText = await testRes.text().catch(() => '');
+        console.warn(`[GeminiWeb2API] Test completion failed (${testRes.status}): ${errText}`);
+        return false;
+      }
+
+      const testData = await testRes.json();
+      const content = testData.choices?.[0]?.message?.content;
+
+      if (!content || typeof content !== 'string' || content.trim().length === 0) {
+        console.warn('[GeminiWeb2API] Test completion returned empty or malformed content.');
+        return false;
+      }
+
+      return true;
+    } catch (err: any) {
+      console.warn(`[GeminiWeb2API] Service offline at ${baseUrl}: ${err.message}`);
       return false;
     }
   }
@@ -31,7 +82,7 @@ export class GeminiWeb2APIProvider implements AIProvider {
   async generateText(options: AIRequestOptions): Promise<AICompletionResult> {
     const startTime = Date.now();
     const baseUrl = this.getBaseUrl();
-    const model = options.model || 'gemini-2.0-flash';
+    const model = options.model || 'gemini-3.6-flash';
 
     const formattedMessages = options.messages.map((m) => {
       if (m.mediaUrl && m.mediaType?.startsWith('image/')) {
@@ -73,6 +124,10 @@ export class GeminiWeb2APIProvider implements AIProvider {
     const data = await response.json();
     const text = data.choices?.[0]?.message?.content || '';
 
+    if (!text) {
+      throw new Error('Gemini Web2API returned empty message content');
+    }
+
     return {
       text,
       provider: this.type,
@@ -94,7 +149,7 @@ export class GeminiWeb2APIProvider implements AIProvider {
   ): Promise<AICompletionResult> {
     const startTime = Date.now();
     const baseUrl = this.getBaseUrl();
-    const model = options.model || 'gemini-2.0-flash';
+    const model = options.model || 'gemini-3.6-flash';
 
     const formattedMessages = options.messages.map((m) => {
       if (m.mediaUrl && m.mediaType?.startsWith('image/')) {

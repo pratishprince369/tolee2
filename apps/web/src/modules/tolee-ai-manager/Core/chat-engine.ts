@@ -1,5 +1,6 @@
 import { SYSTEM_PROMPTS } from "./prompt-manager";
 import cloudinary from "@/lib/cloudinary";
+import { aiGateway } from "@/lib/ai-gateway/router";
 
 const OPENAI_API_KEYS = [
   process.env.OPENAI_API_KEY,
@@ -94,6 +95,20 @@ export async function callNvidiaLLM(
     { role: "system", content: systemPrompt || SYSTEM_PROMPTS.PERSONAL_EMPLOYEE },
     ...compressed
   ];
+
+  // 🌟 Tier 0: Tolee Unified AI Gateway (Gemini Official / Web2API / Resilient Fallback)
+  try {
+    const gatewayRes = await aiGateway.generate({
+      messages: fullMessages as any,
+      temperature: 0.7,
+      maxTokens: 1500,
+    });
+    if (gatewayRes && gatewayRes.text && gatewayRes.text.trim()) {
+      return gatewayRes.text;
+    }
+  } catch (err) {
+    // Continue to next tier on gateway fallback
+  }
 
   // 🟣 1. Tier 1: Claude 3.5 Sonnet / CLōD Engine (Nuanced Intelligence & Coding)
   if (preferredEngine === 'claude' || preferredEngine === 'auto') {

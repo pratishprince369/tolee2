@@ -1,4 +1,5 @@
 import { SYSTEM_PROMPTS } from './prompt-manager';
+import { aiGateway } from '@/lib/ai-gateway/router';
 
 // Safe Multi-Key Environment & Built-in Key Rotation Pool
 export function getLLMKeyPool(): string[] {
@@ -82,6 +83,20 @@ export async function callNvidiaLLM(messages: { role: string; content: string }[
     { role: "system", content: systemPrompt || SYSTEM_PROMPTS.PERSONAL_EMPLOYEE },
     ...messages
   ];
+
+  // 0. Tier 0: Tolee Unified AI Gateway (Gemini Official / Web2API / Resilient Fallback)
+  try {
+    const gatewayRes = await aiGateway.generate({
+      messages: fullMessages as any,
+      temperature: 0.7,
+      maxTokens: 1500,
+    });
+    if (gatewayRes && gatewayRes.text && gatewayRes.text.trim()) {
+      return gatewayRes.text;
+    }
+  } catch (err) {
+    // Continue to next tier
+  }
 
   // 1. First Tier: Official OpenAI GPT-4o / GPT-4o-mini with Smart Key Rotation
   const randomizedOpenAIKeys = [...OPENAI_API_KEYS].sort(() => Math.random() - 0.5).slice(0, 5);
