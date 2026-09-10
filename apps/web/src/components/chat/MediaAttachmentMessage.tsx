@@ -5,7 +5,7 @@ import {
   Play, Pause, Download, FileText, FileSpreadsheet, 
   Presentation, Archive, File, Music,
   AlertCircle, RefreshCw, Eye, Image as ImageIcon, ExternalLink,
-  Clock, CheckCheck, Video as VideoIcon
+  Clock, CheckCheck, Video as VideoIcon, Loader2
 } from 'lucide-react';
 import { UploadProgressOverlay } from './UploadProgressOverlay';
 
@@ -768,6 +768,8 @@ export interface DocumentMessageProps {
 }
 
 export function DocumentMessage({ mediaInfo, isMe, onOpenViewer }: DocumentMessageProps) {
+  const [isDownloading, setIsDownloading] = useState(false);
+
   const getDocIcon = (ext: string) => {
     switch (ext) {
       case 'pdf':
@@ -823,29 +825,62 @@ export function DocumentMessage({ mediaInfo, isMe, onOpenViewer }: DocumentMessa
     }
   };
 
-  const handleDownload = (e: React.MouseEvent) => {
+  const handleDownload = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!mediaInfo.url || isDownloading) return;
+    setIsDownloading(true);
+
+    const filename = mediaInfo.filename || 'document';
+    const downloadUrl = `/api/chat/document?url=${encodeURIComponent(mediaInfo.url)}&filename=${encodeURIComponent(filename)}&download=1`;
+
+    try {
+      // Direct authenticated blob download for byte-accurate download with correct filename
+      const res = await fetch(downloadUrl);
+      if (!res.ok) throw new Error(`Download status: ${res.status}`);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+    } catch (err) {
+      console.warn('[DocumentMessage] Blob download fallback:', err);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = filename;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  const handleView = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!mediaInfo.url) return;
-    const downloadUrl = `/api/chat/document?url=${encodeURIComponent(mediaInfo.url)}&filename=${encodeURIComponent(mediaInfo.filename || 'document')}&download=1`;
-    const link = document.createElement('a');
-    link.href = downloadUrl;
-    link.download = mediaInfo.filename || 'document';
-    link.target = '_blank';
-    link.rel = 'noopener noreferrer';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    if (onOpenViewer) {
+      onOpenViewer({
+        type: mediaInfo.kind === 'pdf' ? 'pdf' : 'document',
+        url: mediaInfo.url,
+        filename: mediaInfo.filename
+      });
+    } else {
+      const viewUrl = `/api/chat/document?url=${encodeURIComponent(mediaInfo.url)}&filename=${encodeURIComponent(mediaInfo.filename || 'document.pdf')}`;
+      window.open(viewUrl, '_blank', 'noopener,noreferrer');
+    }
   };
 
   const handleCardClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!mediaInfo.url) return;
-    if (mediaInfo.kind === 'pdf' && onOpenViewer) {
-      onOpenViewer({
-        type: 'pdf',
-        url: mediaInfo.url,
-        filename: mediaInfo.filename
-      });
+    if (mediaInfo.kind === 'pdf') {
+      handleView(e);
     } else {
       handleDownload(e);
     }
@@ -889,39 +924,31 @@ export function DocumentMessage({ mediaInfo, isMe, onOpenViewer }: DocumentMessa
 
         {mediaInfo.url && (
           <div className="flex items-center gap-1">
-            {mediaInfo.kind === 'pdf' && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (onOpenViewer) {
-                    onOpenViewer({
-                      type: 'pdf',
-                      url: mediaInfo.url,
-                      filename: mediaInfo.filename
-                    });
-                  } else {
-                    window.open(mediaInfo.url, '_blank');
-                  }
-                }}
-                className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
-                  isMe ? 'bg-white/20 text-white hover:bg-white/30' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-teal-50 hover:text-teal-600'
-                }`}
-                title="Preview PDF"
-              >
-                <Eye className="w-4 h-4" />
-              </button>
-            )}
+            <button
+              onClick={handleView}
+              className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
+                isMe ? 'bg-white/20 text-white hover:bg-white/30' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-teal-50 hover:text-teal-600'
+              }`}
+              title="Preview document"
+            >
+              <Eye className="w-4 h-4" />
+            </button>
 
             <button
               onClick={handleDownload}
+              disabled={isDownloading}
               className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
                 isMe 
-                  ? 'bg-white/20 text-white hover:bg-white/30' 
-                  : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-teal-50 hover:text-teal-600 dark:hover:bg-teal-950/40 dark:hover:text-teal-400'
+                  ? 'bg-white/20 text-white hover:bg-white/30 disabled:opacity-50' 
+                  : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-teal-50 hover:text-teal-600 dark:hover:bg-teal-950/40 dark:hover:text-teal-400 disabled:opacity-50'
               }`}
-              title="Download file"
+              title={isDownloading ? "Downloading..." : "Download file"}
             >
-              <Download className="w-4 h-4" />
+              {isDownloading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
             </button>
           </div>
         )}

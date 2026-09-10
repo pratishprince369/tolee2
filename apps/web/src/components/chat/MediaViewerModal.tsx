@@ -3,8 +3,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   X, Download, ZoomIn, ZoomOut, RotateCcw, ExternalLink, 
-  File, Play, Pause, Volume2, VolumeX, Maximize, Minimize,
-  ArrowLeft, RotateCcw as RewindIcon, FastForward
+  File, FileText, Play, Pause, Volume2, VolumeX, Maximize, Minimize,
+  ArrowLeft, RotateCcw as RewindIcon, FastForward, Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getVideoPlaybackUrl, getVideoThumbnailUrl, formatPlayerTime } from './MediaAttachmentMessage';
@@ -166,19 +166,44 @@ export function MediaViewerModal({ media, onClose }: MediaViewerModalProps) {
     resetControlsTimeout();
   };
 
-  const handleDownload = (e: React.MouseEvent) => {
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleDownload = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    const downloadUrl = (media.type === 'pdf' || media.type === 'document')
-      ? `/api/chat/document?url=${encodeURIComponent(media.url)}&filename=${encodeURIComponent(media.filename || 'document.pdf')}&download=1`
+    if (isDownloading) return;
+    setIsDownloading(true);
+
+    const isDoc = media.type === 'pdf' || media.type === 'document';
+    const filename = media.filename || (media.type === 'video' ? 'video.mp4' : media.type === 'pdf' ? 'document.pdf' : 'download');
+    const downloadUrl = isDoc
+      ? `/api/chat/document?url=${encodeURIComponent(media.url)}&filename=${encodeURIComponent(filename)}&download=1`
       : effectiveUrl;
-    const link = document.createElement('a');
-    link.href = downloadUrl;
-    link.download = media.filename || (media.type === 'video' ? 'video.mp4' : 'download');
-    link.target = '_blank';
-    link.rel = 'noopener noreferrer';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+
+    try {
+      const res = await fetch(downloadUrl);
+      if (!res.ok) throw new Error(`Download failed with status: ${res.status}`);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+    } catch (err) {
+      console.warn('[MediaViewerModal] Blob download fallback:', err);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = filename;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   const handleOpenExternal = (e: React.MouseEvent) => {
@@ -348,12 +373,67 @@ export function MediaViewerModal({ media, onClose }: MediaViewerModalProps) {
         )}
 
         {media.type === 'pdf' && (
-          <div className="w-full max-w-4xl h-[80vh] bg-white rounded-2xl overflow-hidden shadow-2xl border border-white/10 flex flex-col">
-            <iframe
-              src={`/api/chat/document?url=${encodeURIComponent(media.url)}&filename=${encodeURIComponent(media.filename || 'document.pdf')}#toolbar=1`}
-              className="w-full flex-1 border-none"
-              title={media.filename || 'PDF Document'}
-            />
+          <div className="w-full max-w-5xl h-[85vh] bg-zinc-900/90 backdrop-blur-md rounded-2xl overflow-hidden shadow-2xl border border-white/15 flex flex-col">
+            <div className="shrink-0 px-4 py-2.5 bg-zinc-950/80 border-b border-white/10 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-7 h-7 rounded-lg bg-red-500/20 text-red-400 flex items-center justify-center flex-shrink-0">
+                  <FileText className="w-4 h-4" />
+                </div>
+                <span className="text-white text-xs sm:text-sm font-semibold truncate max-w-xs sm:max-w-md">
+                  {media.filename || 'PDF Document'}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleOpenExternal}
+                  className="h-8 px-2.5 text-xs text-zinc-300 hover:text-white hover:bg-white/10 rounded-lg gap-1.5"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">New Tab</span>
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleDownload}
+                  disabled={isDownloading}
+                  className="h-8 px-3 text-xs bg-teal-500 hover:bg-teal-600 text-white rounded-lg gap-1.5 font-bold shadow-xs"
+                >
+                  {isDownloading ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Download className="w-3.5 h-3.5" />
+                  )}
+                  <span>Download</span>
+                </Button>
+              </div>
+            </div>
+
+            <div className="relative flex-1 w-full h-full bg-zinc-950">
+              <object
+                data={`/api/chat/document?url=${encodeURIComponent(media.url)}&filename=${encodeURIComponent(media.filename || 'document.pdf')}#toolbar=1`}
+                type="application/pdf"
+                className="w-full h-full border-none"
+              >
+                <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center text-zinc-300 gap-4">
+                  <div className="w-16 h-16 rounded-2xl bg-red-500/20 text-red-400 flex items-center justify-center border border-red-500/30">
+                    <FileText className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <p className="text-white font-bold text-base">{media.filename || 'PDF Document'}</p>
+                    <p className="text-zinc-400 text-xs mt-1">Your browser cannot render PDF previews directly inside the app.</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Button onClick={handleDownload} className="bg-teal-500 hover:bg-teal-600 text-white rounded-xl gap-2 text-xs font-bold">
+                      <Download className="w-4 h-4" /> Download PDF
+                    </Button>
+                    <Button onClick={handleOpenExternal} variant="outline" className="text-white border-white/20 hover:bg-white/10 rounded-xl gap-2 text-xs font-bold">
+                      <ExternalLink className="w-4 h-4" /> Open in New Tab
+                    </Button>
+                  </div>
+                </div>
+              </object>
+            </div>
           </div>
         )}
 

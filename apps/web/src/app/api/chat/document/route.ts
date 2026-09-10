@@ -38,17 +38,37 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Missing document URL' }, { status: 400 });
     }
 
-    // Security check: Only allow fetching from trusted media storage
-    const parsedUrl = new URL(mediaUrl);
+    // Security check: Only allow fetching from trusted storage hosts
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(mediaUrl, request.url);
+    } catch {
+      return NextResponse.json({ error: 'Invalid document URL' }, { status: 400 });
+    }
+
     const isCloudinary = parsedUrl.hostname.includes('cloudinary.com') || parsedUrl.hostname.includes('res.cloudinary.com');
-    if (!isCloudinary && !parsedUrl.hostname.includes('localhost') && !parsedUrl.hostname.includes('127.0.0.1')) {
+    const isAllowedHost = isCloudinary || 
+      parsedUrl.hostname.includes('localhost') || 
+      parsedUrl.hostname.includes('127.0.0.1') ||
+      parsedUrl.hostname.includes('tolee.in') ||
+      parsedUrl.hostname.endsWith('.tolee.in') ||
+      parsedUrl.hostname.includes('firebasestorage.googleapis.com') ||
+      parsedUrl.hostname.includes('amazonaws.com');
+
+    if (!isAllowedHost) {
       return NextResponse.json({ error: 'Invalid document host' }, { status: 400 });
     }
 
-    // Clean any transformations from PDF URLs
-    let cleanFetchUrl = mediaUrl;
+    // Clean any transformations and hash fragments from URLs
+    let cleanFetchUrl = mediaUrl.split('#')[0];
     if (cleanFetchUrl.includes('/upload/q_auto,f_auto/')) {
       cleanFetchUrl = cleanFetchUrl.replace('/upload/q_auto,f_auto/', '/upload/');
+    }
+    if (cleanFetchUrl.includes('/upload/q_auto/')) {
+      cleanFetchUrl = cleanFetchUrl.replace('/upload/q_auto/', '/upload/');
+    }
+    if (cleanFetchUrl.includes('/upload/f_auto/')) {
+      cleanFetchUrl = cleanFetchUrl.replace('/upload/f_auto/', '/upload/');
     }
 
     // Forward range header if present
@@ -58,10 +78,36 @@ export async function GET(request: NextRequest) {
       fetchHeaders['Range'] = rangeHeader;
     }
 
-    const docRes = await fetch(cleanFetchUrl, {
+    let docRes = await fetch(cleanFetchUrl, {
       headers: fetchHeaders,
       cache: 'no-store',
     });
+
+    // If initial fetch failed with 404 on Cloudinary, try alternative resource_type paths
+    if (docRes.status === 404 && isCloudinary) {
+      const altUrls: string[] = [];
+      if (cleanFetchUrl.includes('/raw/upload/')) {
+        altUrls.push(cleanFetchUrl.replace('/raw/upload/', '/image/upload/'));
+        altUrls.push(cleanFetchUrl.replace('/raw/upload/', '/auto/upload/'));
+      } else if (cleanFetchUrl.includes('/image/upload/')) {
+        altUrls.push(cleanFetchUrl.replace('/image/upload/', '/raw/upload/'));
+        altUrls.push(cleanFetchUrl.replace('/image/upload/', '/auto/upload/'));
+      } else if (cleanFetchUrl.includes('/auto/upload/')) {
+        altUrls.push(cleanFetchUrl.replace('/auto/upload/', '/raw/upload/'));
+        altUrls.push(cleanFetchUrl.replace('/auto/upload/', '/image/upload/'));
+      }
+
+      for (const altUrl of altUrls) {
+        const retryRes = await fetch(altUrl, {
+          headers: fetchHeaders,
+          cache: 'no-store',
+        });
+        if (retryRes.ok || retryRes.status === 206) {
+          docRes = retryRes;
+          break;
+        }
+      }
+    }
 
     if (!docRes.ok && docRes.status !== 206) {
       return NextResponse.json(
