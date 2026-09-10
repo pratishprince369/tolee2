@@ -2191,58 +2191,60 @@ export default function ChatPage() {
     if (!newMessage.trim() && !pendingAttachment) return;
     if (!activeChat) return;
 
-    isSendingRef.current = true;
     const contentToSend = newMessage.trim();
     const parentIdToSend = replyingToMessage?.id;
     const attachmentToSend = pendingAttachment;
     const tempId = 'temp-' + Date.now();
 
-    const newMsg = {
-      id: tempId,
-      sender: 'Me',
-      senderAvatar: session?.user?.image || '/default-user-avatar.svg',
-      senderId: currentUserId,
-      text: contentToSend,
-      mediaUrl: attachmentToSend?.previewUrl || null,
-      mediaResourceType: attachmentToSend?.kind || null,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      createdAt: new Date().toISOString(),
-      isMe: true,
-      replyTo: replyingToMessage ? {
-        id: replyingToMessage.id,
-        text: replyingToMessage.text,
-        sender: replyingToMessage.sender,
-        senderId: replyingToMessage.senderId,
-        senderUsername: replyingToMessage.senderUsername || null,
-        mediaUrl: replyingToMessage.mediaUrl || null,
-        mediaResourceType: replyingToMessage.mediaResourceType || null
-      } : null
-    };
-    
-    // Clear input state immediately to prevent duplicate mobile taps/submissions
-    setNewMessage('');
-    setReplyingToMessage(null);
-    setPendingAttachment(null);
-
-    setMessagesByChat(prev => ({
-      ...prev,
-      [activeChat]: [...(prev[activeChat] || []), newMsg]
-    }));
-    
-    const lastMsgDisplay = attachmentToSend 
-      ? `Me: ${attachmentToSend.kind === 'image' ? '📷 Photo' : attachmentToSend.kind === 'video' ? '🎥 Video' : attachmentToSend.kind === 'audio' ? '🎵 Audio' : '📄 Document'} ${contentToSend ? `"${contentToSend}"` : ''}`
-      : `Me: ${contentToSend}`;
-
-    setChats(prev => prev.map(chat => 
-      chat.id === activeChat 
-        ? { ...chat, lastMessage: lastMsgDisplay, time: newMsg.time, lastMessageCreatedAt: new Date().toISOString() }
-        : chat
-    ));
-
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    emitTyping(activeChat, false);
+    isSendingRef.current = true;
 
     try {
+      const newMsg = {
+        id: tempId,
+        sender: 'Me',
+        senderAvatar: session?.user?.image || '/default-user-avatar.svg',
+        senderId: currentUserId,
+        text: contentToSend,
+        mediaUrl: attachmentToSend?.previewUrl || null,
+        mediaResourceType: attachmentToSend?.kind || null,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        createdAt: new Date().toISOString(),
+        isMe: true,
+        replyTo: replyingToMessage ? {
+          id: replyingToMessage.id,
+          text: replyingToMessage.text,
+          sender: replyingToMessage.sender,
+          senderId: replyingToMessage.senderId,
+          senderUsername: replyingToMessage.senderUsername || null,
+          mediaUrl: replyingToMessage.mediaUrl || null,
+          mediaResourceType: replyingToMessage.mediaResourceType || null
+        } : null
+      };
+      
+      // Clear composer inputs
+      setNewMessage('');
+      setReplyingToMessage(null);
+      setPendingAttachment(null);
+
+      setMessagesByChat(prev => ({
+        ...prev,
+        [activeChat]: [...(prev[activeChat] || []), newMsg]
+      }));
+      
+      const lastMsgDisplay = attachmentToSend 
+        ? `Me: ${attachmentToSend.kind === 'image' ? '📷 Photo' : attachmentToSend.kind === 'video' ? '🎥 Video' : attachmentToSend.kind === 'audio' ? '🎵 Audio' : '📄 Document'} ${contentToSend ? `"${contentToSend}"` : ''}`
+        : `Me: ${contentToSend}`;
+
+      setChats(prev => prev.map(chat => 
+        chat.id === activeChat 
+          ? { ...chat, lastMessage: lastMsgDisplay, time: newMsg.time, lastMessageCreatedAt: new Date().toISOString() }
+          : chat
+      ));
+
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      emitTyping(activeChat, false);
+      scrollToBottom('smooth');
+
       let uploadedMediaUrl: string | null = null;
       let uploadedPublicId: string | null = null;
       let uploadedResourceType: string | null = null;
@@ -2273,10 +2275,12 @@ export default function ChatPage() {
           } else {
             alert(apiRes.error || "Failed to upload media attachment. Please check file size and try again.");
             setIsUploadingAttachment(false);
-            isSendingRef.current = false;
             if (attachmentToSend?.previewUrl?.startsWith('blob:')) {
               URL.revokeObjectURL(attachmentToSend.previewUrl);
             }
+            // Restore composer state so user doesn't lose their input
+            setNewMessage(contentToSend);
+            setPendingAttachment(attachmentToSend);
             setMessagesByChat(prev => ({
               ...prev,
               [activeChat]: (prev[activeChat] || []).filter(m => m.id !== tempId)
@@ -2333,6 +2337,7 @@ export default function ChatPage() {
         }
 
         fetchChats();
+        scrollToBottom('smooth');
 
         // ── Group @AI Mention Automatic Response ──
         if (contentToSend.includes('@AI') || contentToSend.includes('@ai')) {
@@ -2362,6 +2367,7 @@ export default function ChatPage() {
                     [activeChat]: [...(prev[activeChat] || []), { ...aiMsg.message, isMe: false }],
                   }));
                   fetchChats();
+                  scrollToBottom('smooth');
                 }
               }
             })
@@ -2370,6 +2376,9 @@ export default function ChatPage() {
       } else {
         console.error("Failed to send message:", res?.error);
         alert(res?.error || "Failed to send message. Please try again.");
+        // Restore message in composer on failure
+        setNewMessage(contentToSend);
+        if (attachmentToSend) setPendingAttachment(attachmentToSend);
         setMessagesByChat(prev => ({
           ...prev,
           [activeChat]: (prev[activeChat] || []).filter(m => m.id !== tempId)
@@ -2378,6 +2387,9 @@ export default function ChatPage() {
       }
     } catch (err) {
       console.error("Error in handleSendMessage:", err);
+      // Restore message on catch
+      setNewMessage(contentToSend);
+      if (attachmentToSend) setPendingAttachment(attachmentToSend);
       setMessagesByChat(prev => ({
         ...prev,
         [activeChat]: (prev[activeChat] || []).filter(m => m.id !== tempId)
@@ -4261,10 +4273,20 @@ export default function ChatPage() {
                       
                       {newMessage.trim() || editingMessage ? (
                         <Button 
-                          onClick={editingMessage ? handleSaveEdit : handleSendMessage}
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (editingMessage) {
+                              handleSaveEdit();
+                            } else {
+                              handleSendMessage();
+                            }
+                          }}
+                          onMouseDown={(e) => e.preventDefault()}
                           disabled={isUploadingAttachment}
                           size="icon" 
-                          className="h-10 w-10 sm:h-11 sm:w-11 rounded-full bg-gradient-to-tr from-primary to-teal-600 hover:from-primary/95 hover:to-teal-500 active:scale-95 text-primary-foreground shadow-md hover:shadow-lg transition-all duration-200 flex-shrink-0 flex items-center justify-center disabled:opacity-50"
+                          className="h-10 w-10 sm:h-11 sm:w-11 rounded-full bg-gradient-to-tr from-primary to-teal-600 hover:from-primary/95 hover:to-teal-500 active:scale-95 text-primary-foreground shadow-md hover:shadow-lg transition-all duration-200 flex-shrink-0 flex items-center justify-center disabled:opacity-50 cursor-pointer"
                           title={editingMessage ? "Save edit" : "Send message"}
                         >
                           {isUploadingAttachment ? (
@@ -4277,6 +4299,7 @@ export default function ChatPage() {
                         </Button>
                       ) : (
                         <Button 
+                          type="button"
                           onClick={() => setIsRecordingVoice(true)}
                           size="icon" 
                           className="h-10 w-10 sm:h-11 sm:w-11 rounded-full bg-gradient-to-tr from-primary to-teal-600 hover:from-primary/95 hover:to-teal-500 active:scale-95 text-primary-foreground shadow-md hover:shadow-lg transition-all duration-200 flex-shrink-0 flex items-center justify-center"

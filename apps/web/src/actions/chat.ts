@@ -373,10 +373,10 @@ export async function sendRealChatMessage(
       return { success: false, error: 'You are restricted from sending messages.' };
     }
 
-    const { writeLimiter, getClientIp } = require('@/lib/rate-limit');
-    const ip = getClientIp();
-    if (writeLimiter.isRateLimited(ip)) {
-      return { success: false, error: 'Too many requests. Please cool down.' };
+    const { writeLimiter } = require('@/lib/rate-limit');
+    const userIdentifier = `chat_send:${senderId}`;
+    if (writeLimiter.isRateLimited(userIdentifier)) {
+      return { success: false, error: 'Sending too fast. Please wait a moment.' };
     }
 
     const { sanitizeText } = require('@/lib/sanitize');
@@ -417,17 +417,17 @@ export async function sendRealChatMessage(
 
       if (chat.status === 'pending') {
         if (!chat.requestSenderId) {
-          // This is the first message! Set the sender as the requestSenderId.
+          // Set the initial sender as requestSenderId
           await prisma.chat.update({
             where: { id: chatId },
             data: { requestSenderId: senderId }
           });
-        } else if (chat.requestSenderId === senderId) {
-          // Senders cannot send subsequent messages while the request is pending.
-          return { 
-            success: false, 
-            error: 'Your message request has been sent. You can continue chatting after the recipient accepts your request.' 
-          };
+        } else if (chat.requestSenderId !== senderId) {
+          // Recipient is replying -> automatically activate chat
+          await prisma.chat.update({
+            where: { id: chatId },
+            data: { status: 'accepted' }
+          });
         }
       }
     }
