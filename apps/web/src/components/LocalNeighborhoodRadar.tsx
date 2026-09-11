@@ -7,7 +7,8 @@ import {
   MoreVertical, ThumbsUp, SlidersHorizontal, X, Search, RefreshCw,
   LocateFixed, Globe, Loader2, Sun, Heart, Users, Share2, Maximize2,
   Minimize2, ZoomIn, ZoomOut, AlertCircle, Tag, Utensils, Newspaper, ChevronDown,
-  AlertTriangle, Flag, ShieldCheck, Check, Clock, Image as ImageIcon, Video, Play, Zap, Info, ShieldAlert
+  AlertTriangle, Flag, ShieldCheck, Check, Clock, Image as ImageIcon, Video, Play, Zap, Info, ShieldAlert,
+  MapPinOff, Settings
 } from 'lucide-react';
 import { 
   createRadarPostAction, 
@@ -18,6 +19,14 @@ import {
   reportRadarPostAction
 } from '@/actions/radar';
 import { calculateDistanceKm, formatDistance } from '@/lib/geo-utils';
+import {
+  RadarPermissionState,
+  checkRadarLocationPermission,
+  requestRadarLocationPermission,
+  openDeviceLocationSettings,
+  openDeviceAppSettings,
+  getRadarAccurateGPS
+} from '@/lib/radar-native-location';
 
 export interface LocalRadarPost {
   id: string;
@@ -57,16 +66,17 @@ export interface LocalRadarPost {
 }
 
 export function LocalNeighborhoodRadar() {
-  // Coordinates default to Kalyan/Mumbai region or restored from storage
-  const [coords, setCoords] = useState<{ lat: number; lng: number }>({
-    lat: 19.2565,
-    lng: 73.1329
-  });
-  const [userCity, setUserCity] = useState<string>('Asia, Kalyan');
-  const [subLocation, setSubLocation] = useState<string>('Kalyan');
-  const [isGettingLocation, setIsGettingLocation] = useState<boolean>(false);
-  const [locationSource, setLocationSource] = useState<'gps' | 'ip' | 'manual' | 'default'>('gps');
+  // Coordinates default to null until GPS permission & lock or manual area is set
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [locationAccuracy, setLocationAccuracy] = useState<number | null>(null);
+  const [userCity, setUserCity] = useState<string>('Detecting Location...');
+  const [subLocation, setSubLocation] = useState<string>('');
+  const [isGettingLocation, setIsGettingLocation] = useState<boolean>(true);
+  const [locationSource, setLocationSource] = useState<'gps' | 'manual' | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [permissionState, setPermissionState] = useState<RadarPermissionState>('LOADING');
+  const [showExplanationPrompt, setShowExplanationPrompt] = useState<boolean>(false);
+  const [locationTimeout, setLocationTimeout] = useState<boolean>(false);
 
   // Manual location search modal states
   const [isSearchModalOpen, setIsSearchModalOpen] = useState<boolean>(false);
@@ -201,40 +211,6 @@ export function LocalNeighborhoodRadar() {
     };
   };
 
-  // Fallback to network IP geolocation
-  const fallbackIpLocation = async () => {
-    try {
-      const res = await fetch('https://ipapi.co/json/', { cache: 'no-store' });
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.latitude && data.longitude) {
-          const lat = parseFloat(data.latitude);
-          const lng = parseFloat(data.longitude);
-          const city = data.city || data.region || 'Kalyan';
-          const full = `Asia, ${city}`;
-
-          setCoords({ lat, lng });
-          setUserCity(full);
-          setSubLocation(data.city || '');
-          setLocationSource('ip');
-          setStatusMessage(`Network location synced: ${full}`);
-
-          localStorage.setItem('tolee_radar_lat', String(lat));
-          localStorage.setItem('tolee_radar_lng', String(lng));
-          localStorage.setItem('tolee_radar_city', full);
-          localStorage.setItem('tolee_radar_source', 'ip');
-
-          try {
-            await updateUserRadarLocation({ lat, lng, locationName: full, subLocation: data.city || '' });
-          } catch (_) {}
-
-          return true;
-        }
-      }
-    } catch (_) {}
-    return false;
-  };
-
   // Fetch db radar posts from backend
   const fetchDbRadarPosts = useCallback(async (lat: number, lng: number, rad: number) => {
     try {
@@ -262,117 +238,149 @@ export function LocalNeighborhoodRadar() {
     }
   }, []);
 
-  // Geolocation locking handler
-  const fetchLocation = useCallback(async (isManualTrigger = false) => {
+  // High-accuracy real-time GPS acquisition
+  const acquireGPS = useCallback(async (isManualTrigger = false) => {
     setIsGettingLocation(true);
-    setStatusMessage('Acquiring real-time GPS signal...');
+    setLocationTimeout(false);
+    setStatusMessage('📍 Detecting your location...');
 
-    // Try Capacitor Geolocation if on mobile
+    // 10-second warning timeout
+    const timer = setTimeout(() => {
+      setLocationTimeout(true);
+    }, 10000);
+
     try {
-      const { Capacitor } = await import('@capacitor/core');
-      if (Capacitor.isNativePlatform()) {
-        const { Geolocation } = await import('@capacitor/geolocation');
-        const perm = await Geolocation.requestPermissions({ permissions: ['location'] });
-        if (perm.location === 'granted' || (perm as any).coarseLocation === 'granted') {
-          const pos = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 10000 });
-          if (pos?.coords) {
-            const lat = pos.coords.latitude;
-            const lng = pos.coords.longitude;
-            const geo = await reverseGeocode(lat, lng);
+      const gps = await getRadarAccurateGPS(12000);
+      clearTimeout(timer);
+      setLocationTimeout(false);
 
-            setCoords({ lat, lng });
-            setUserCity(geo.fullAddress);
-            setSubLocation(geo.sub || geo.city);
-            setLocationSource('gps');
-            setIsGettingLocation(false);
-            setStatusMessage(`GPS locked: ${geo.fullAddress}`);
+      const lat = gps.lat;
+      const lng = gps.lng;
+      const accuracy = gps.accuracy;
 
-            localStorage.setItem('tolee_radar_lat', String(lat));
-            localStorage.setItem('tolee_radar_lng', String(lng));
-            localStorage.setItem('tolee_radar_city', geo.fullAddress);
-            localStorage.setItem('tolee_radar_source', 'gps');
+      setCoords({ lat, lng });
+      setLocationAccuracy(accuracy);
+      setLocationSource('gps');
+      setPermissionState('GRANTED');
+      setShowExplanationPrompt(false);
 
-            try {
-              await updateUserRadarLocation({ lat, lng, locationName: geo.fullAddress, subLocation: geo.sub });
-            } catch (_) {}
-
-            fetchDbRadarPosts(lat, lng, radiusKm);
-            return;
-          }
-        }
-      }
-    } catch (_) {}
-
-    // Web Geolocation
-    if (typeof window !== 'undefined' && 'geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const lat = position.coords.latitude;
-          const lng = position.coords.longitude;
-          const geo = await reverseGeocode(lat, lng);
-
-          setCoords({ lat, lng });
-          setUserCity(geo.fullAddress);
-          setSubLocation(geo.sub || geo.city);
-          setLocationSource('gps');
-          setIsGettingLocation(false);
-          setStatusMessage(`GPS active: ${geo.fullAddress}`);
-
-          localStorage.setItem('tolee_radar_lat', String(lat));
-          localStorage.setItem('tolee_radar_lng', String(lng));
-          localStorage.setItem('tolee_radar_city', geo.fullAddress);
-          localStorage.setItem('tolee_radar_source', 'gps');
-
-          try {
-            await updateUserRadarLocation({ lat, lng, locationName: geo.fullAddress, subLocation: geo.sub });
-          } catch (_) {}
-
-          fetchDbRadarPosts(lat, lng, radiusKm);
-        },
-        async (err) => {
-          console.warn('[Radar] Browser Geolocation error:', err.message);
-          const ipSuccess = await fallbackIpLocation();
-          setIsGettingLocation(false);
-          if (!ipSuccess) {
-            setUserCity('Asia, Kalyan');
-            setLocationSource('default');
-            if (isManualTrigger) {
-              setStatusMessage('GPS signal unavailable. You can search your city manually.');
-              setIsSearchModalOpen(true);
-            }
-          }
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-      );
-    } else {
-      const ipSuccess = await fallbackIpLocation();
+      const geo = await reverseGeocode(lat, lng);
+      setUserCity(geo.fullAddress);
+      setSubLocation(geo.sub || geo.city);
       setIsGettingLocation(false);
-      if (!ipSuccess) {
-        setUserCity('Asia, Kalyan');
-        setLocationSource('default');
+      setStatusMessage(`GPS locked: ${geo.fullAddress}`);
+
+      localStorage.setItem('tolee_radar_lat', String(lat));
+      localStorage.setItem('tolee_radar_lng', String(lng));
+      localStorage.setItem('tolee_radar_city', geo.fullAddress);
+      localStorage.setItem('tolee_radar_source', 'gps');
+
+      try {
+        await updateUserRadarLocation({ lat, lng, locationName: geo.fullAddress, subLocation: geo.sub });
+      } catch (_) {}
+
+      fetchDbRadarPosts(lat, lng, radiusKm);
+    } catch (err: any) {
+      clearTimeout(timer);
+      setIsGettingLocation(false);
+      const perm = await checkRadarLocationPermission();
+      setPermissionState(perm);
+      if (perm === 'GRANTED') {
+        setLocationTimeout(true);
+        setStatusMessage('GPS signal unavailable. You can retry or choose your area manually.');
+      } else if (perm === 'NOT_DETERMINED') {
+        setShowExplanationPrompt(true);
       }
     }
   }, [fetchDbRadarPosts, radiusKm]);
 
-  // Initial load
-  useEffect(() => {
-    const savedLat = localStorage.getItem('tolee_radar_lat');
-    const savedLng = localStorage.getItem('tolee_radar_lng');
-    const savedCity = localStorage.getItem('tolee_radar_city');
-    const savedSource = localStorage.getItem('tolee_radar_source') as any;
+  // Alias for backwards compatibility
+  const fetchLocation = acquireGPS;
 
-    if (savedLat && savedLng && savedCity) {
-      const lat = parseFloat(savedLat);
-      const lng = parseFloat(savedLng);
-      setCoords({ lat, lng });
-      setUserCity(savedCity);
-      setLocationSource(savedSource || 'gps');
-      fetchDbRadarPosts(lat, lng, radiusKm);
+  // Handle User clicking "Allow Location" in Explanation or Permission Card
+  const handleAllowLocationClick = async () => {
+    setIsGettingLocation(true);
+    setShowExplanationPrompt(false);
+    try {
+      const res = await requestRadarLocationPermission();
+      if (res === 'GRANTED') {
+        setPermissionState('GRANTED');
+        acquireGPS(true);
+      } else {
+        acquireGPS(true);
+      }
+    } catch (_) {
+      acquireGPS(true);
     }
+  };
 
-    fetchLocation(false);
+  // Initial Permission Check & Location Flow + App Resume Listeners
+  useEffect(() => {
+    let isMounted = true;
+
+    const initLocation = async () => {
+      const perm = await checkRadarLocationPermission();
+      if (!isMounted) return;
+      setPermissionState(perm);
+
+      if (perm === 'GRANTED') {
+        acquireGPS(false);
+      } else if (perm === 'NOT_DETERMINED') {
+        setIsGettingLocation(false);
+        setShowExplanationPrompt(true);
+      } else {
+        // If user already saved a manual area preference, restore it
+        const savedLat = localStorage.getItem('tolee_radar_lat');
+        const savedLng = localStorage.getItem('tolee_radar_lng');
+        const savedCity = localStorage.getItem('tolee_radar_city');
+        const savedSource = localStorage.getItem('tolee_radar_source');
+
+        if (savedLat && savedLng && savedCity && savedSource === 'manual') {
+          const lat = parseFloat(savedLat);
+          const lng = parseFloat(savedLng);
+          setCoords({ lat, lng });
+          setUserCity(savedCity);
+          setLocationSource('manual');
+          setIsGettingLocation(false);
+          fetchDbRadarPosts(lat, lng, radiusKm);
+        } else {
+          setIsGettingLocation(false);
+        }
+      }
+    };
+
+    initLocation();
     fetchLiveRadarMarkers();
-  }, [fetchLocation, fetchLiveRadarMarkers, fetchDbRadarPosts, radiusKm]);
+
+    // Re-check when app resumes from device settings
+    const handleAppResume = async () => {
+      const currentPerm = await checkRadarLocationPermission();
+      if (!isMounted) return;
+      if (currentPerm === 'GRANTED') {
+        setPermissionState('GRANTED');
+        setShowExplanationPrompt(false);
+        acquireGPS(false);
+      } else {
+        setPermissionState(currentPerm);
+      }
+    };
+
+    (window as any).onAppResume = handleAppResume;
+    window.addEventListener('focus', handleAppResume);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        handleAppResume();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    return () => {
+      isMounted = false;
+      delete (window as any).onAppResume;
+      window.removeEventListener('focus', handleAppResume);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [acquireGPS, fetchLiveRadarMarkers, fetchDbRadarPosts, radiusKm]);
 
   // Helper to format dynamic post time
   const formatPostedTime = (dateStr?: Date | string | null): string => {
@@ -409,6 +417,7 @@ export function LocalNeighborhoodRadar() {
 
   // Combine database posts, baseline posts, and live markers
   const allPosts = useMemo<LocalRadarPost[]>(() => {
+    if (!coords) return [];
     const combined: LocalRadarPost[] = [];
 
     // 1. Real Database Radar Posts
@@ -642,7 +651,7 @@ export function LocalNeighborhoodRadar() {
 
     const setupLeaflet = () => {
       const L = (window as any).L;
-      if (!L || !mapContainerRef.current) return;
+      if (!L || !mapContainerRef.current || !coords) return;
 
       // 1. Initialize map if not yet created
       if (!mapInstanceRef.current) {
@@ -889,21 +898,25 @@ export function LocalNeighborhoodRadar() {
 
   // Open Drop Alert Modal and sync coordinates & defaults
   const openDropAlertModal = () => {
-    const currentLat = coords.lat || 19.2565;
-    const currentLng = coords.lng || 73.1329;
+    const currentLat = coords?.lat || 19.2565;
+    const currentLng = coords?.lng || 73.1329;
     setAlertPinCoords({ lat: currentLat, lng: currentLng });
-    setAlertLocationName(subLocation || userCity.split(',')[0] || 'Current Location');
-    setAlertSubLocation(subLocation || userCity.split(',')[0] || 'Local Area');
+    setAlertLocationName(subLocation || (userCity ? userCity.split(',')[0] : 'Current Location'));
+    setAlertSubLocation(subLocation || (userCity ? userCity.split(',')[0] : 'Local Area'));
     setAlertRadius(radiusKm || 5);
     setIsPostingAlert(true);
   };
 
   // Center pin on current GPS location
   const handleUseCurrentLocationForPin = () => {
+    if (!coords) {
+      acquireGPS(true);
+      return;
+    }
     const currentLat = coords.lat;
     const currentLng = coords.lng;
     setAlertPinCoords({ lat: currentLat, lng: currentLng });
-    setAlertLocationName(subLocation || userCity.split(',')[0] || 'Current Location');
+    setAlertLocationName(subLocation || (userCity ? userCity.split(',')[0] : 'Current Location'));
     if (pinMapInstanceRef.current) {
       pinMapInstanceRef.current.setView([currentLat, currentLng], 15, { animate: true });
     }
@@ -985,8 +998,8 @@ export function LocalNeighborhoodRadar() {
         pinMapInstanceRef.current = null;
       }
 
-      const initialLat = alertPinCoords.lat || coords.lat || 19.2565;
-      const initialLng = alertPinCoords.lng || coords.lng || 73.1329;
+      const initialLat = alertPinCoords.lat || coords?.lat || 19.2565;
+      const initialLng = alertPinCoords.lng || coords?.lng || 73.1329;
 
       const map = L.map(pinMapContainerRef.current, {
         zoomControl: true,
@@ -1106,7 +1119,7 @@ export function LocalNeighborhoodRadar() {
         setAlertMedia([]);
         setHasConfirmedAccuracy(false);
         setIsPostingAlert(false);
-        fetchDbRadarPosts(coords.lat, coords.lng, radiusKm);
+        if (coords) fetchDbRadarPosts(coords.lat, coords.lng, radiusKm);
       } else {
         alert(res.error || 'Failed to post alert. Please try again.');
       }
@@ -1236,18 +1249,57 @@ export function LocalNeighborhoodRadar() {
         {/* Compact GPS Row on Mobile */}
         <div className="pt-2 border-t border-slate-100 dark:border-zinc-800/80 flex items-center justify-between text-[11px] font-bold text-slate-500 dark:text-zinc-400">
           <div className="flex items-center gap-1.5 truncate">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />
-            <span className="text-emerald-600 dark:text-emerald-400 font-extrabold uppercase text-[10px]">
-              {locationSource === 'gps' ? 'GPS Active' : 'Relocated'}
-            </span>
-            <span>•</span>
-            <span className="truncate">{userCity}</span>
+            {isGettingLocation ? (
+              <>
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping flex-shrink-0" />
+                <span className="text-amber-600 dark:text-amber-400 font-extrabold uppercase text-[10px]">
+                  Detecting Location...
+                </span>
+              </>
+            ) : locationSource === 'gps' && coords ? (
+              <>
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />
+                <span className="text-emerald-600 dark:text-emerald-400 font-extrabold uppercase text-[10px]">
+                  GPS Active
+                </span>
+                <span>•</span>
+                <span className="truncate">{userCity}</span>
+                {locationAccuracy && (
+                  <span className="text-[9px] text-slate-400 font-semibold flex-shrink-0">
+                    (±{Math.round(locationAccuracy)}m)
+                  </span>
+                )}
+              </>
+            ) : locationSource === 'manual' && coords ? (
+              <>
+                <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
+                <span className="text-blue-600 dark:text-blue-400 font-extrabold uppercase text-[10px]">
+                  Manual Area
+                </span>
+                <span>•</span>
+                <span className="truncate">{userCity}</span>
+              </>
+            ) : permissionState === 'LOCATION_SERVICES_DISABLED' ? (
+              <>
+                <span className="w-2 h-2 rounded-full bg-rose-500 flex-shrink-0" />
+                <span className="text-rose-600 dark:text-rose-400 font-extrabold uppercase text-[10px]">
+                  Location Services Off
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0" />
+                <span className="text-amber-600 dark:text-amber-400 font-extrabold uppercase text-[10px]">
+                  Location Required
+                </span>
+              </>
+            )}
           </div>
 
           <div className="flex items-center gap-2 flex-shrink-0">
             <button
               type="button"
-              onClick={() => fetchLocation(true)}
+              onClick={() => acquireGPS(true)}
               disabled={isGettingLocation}
               title="Sync GPS Location"
               className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors"
@@ -1317,7 +1369,9 @@ export function LocalNeighborhoodRadar() {
               onClick={() => {
                 const next = radiusKm === 5 ? 10 : radiusKm === 10 ? 25 : 5;
                 setRadiusKm(next);
-                fetchDbRadarPosts(coords.lat, coords.lng, next);
+                if (coords) {
+                  fetchDbRadarPosts(coords.lat, coords.lng, next);
+                }
               }}
               className="bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-700 dark:text-zinc-200 shadow-2xs flex items-center gap-1.5 hover:bg-slate-50 transition-colors"
             >
@@ -1345,7 +1399,7 @@ export function LocalNeighborhoodRadar() {
           <button
             type="button"
             onClick={() => {
-              if (mapInstanceRef.current) {
+              if (coords && mapInstanceRef.current) {
                 mapInstanceRef.current.setView([coords.lat, coords.lng], 15, { animate: true });
               }
             }}
@@ -1389,23 +1443,36 @@ export function LocalNeighborhoodRadar() {
           <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-xl px-3.5 py-2 flex items-center gap-3 shadow-2xs">
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-[10px] font-black tracking-wider text-emerald-600 dark:text-emerald-400 uppercase">
-                  GPS ACTIVE
+                <span className={`w-2 h-2 rounded-full ${
+                  isGettingLocation ? 'bg-amber-500 animate-ping' :
+                  locationSource === 'gps' && coords ? 'bg-emerald-500 animate-pulse' :
+                  locationSource === 'manual' && coords ? 'bg-blue-500' :
+                  permissionState === 'LOCATION_SERVICES_DISABLED' ? 'bg-rose-500' : 'bg-amber-500'
+                }`} />
+                <span className={`text-[10px] font-black tracking-wider uppercase ${
+                  isGettingLocation ? 'text-amber-600 dark:text-amber-400' :
+                  locationSource === 'gps' && coords ? 'text-emerald-600 dark:text-emerald-400' :
+                  locationSource === 'manual' && coords ? 'text-blue-600 dark:text-blue-400' :
+                  permissionState === 'LOCATION_SERVICES_DISABLED' ? 'text-rose-600 dark:text-rose-400' : 'text-amber-600 dark:text-amber-400'
+                }`}>
+                  {isGettingLocation ? 'DETECTING LOCATION' :
+                   locationSource === 'gps' && coords ? 'GPS ACTIVE' :
+                   locationSource === 'manual' && coords ? 'MANUAL AREA' :
+                   permissionState === 'LOCATION_SERVICES_DISABLED' ? 'SERVICES OFF' : 'LOCATION REQUIRED'}
                 </span>
               </div>
               <p className="text-xs font-bold text-slate-800 dark:text-zinc-200 truncate max-w-[130px]">
                 {userCity}
               </p>
               <p className="text-[10px] font-medium text-slate-400 dark:text-zinc-500">
-                {coords.lat.toFixed(4)}° N, {coords.lng.toFixed(4)}° E • ± 8 m accuracy
+                {coords ? `${coords.lat.toFixed(4)}° N, ${coords.lng.toFixed(4)}° E${locationAccuracy ? ` • ± ${Math.round(locationAccuracy)} m accuracy` : ''}` : 'Location pending'}
               </p>
             </div>
 
             <div className="flex items-center gap-1.5 pl-2 border-l border-slate-100 dark:border-zinc-800">
               <button
                 type="button"
-                onClick={() => fetchLocation(true)}
+                onClick={() => acquireGPS(true)}
                 disabled={isGettingLocation}
                 title="Sync GPS Location"
                 className="w-8 h-8 rounded-lg bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center transition-colors"
@@ -1482,6 +1549,43 @@ export function LocalNeighborhoodRadar() {
             {/* The Actual Leaflet Map Canvas */}
             <div ref={mapContainerRef} className="w-full h-full z-0" />
 
+            {/* Map Overlay if Location is pending/required */}
+            {!coords && (
+              <div className="absolute inset-0 z-30 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
+                <div className="bg-white dark:bg-zinc-900 p-6 rounded-3xl shadow-xl max-w-sm text-center space-y-3 border border-slate-200 dark:border-zinc-800">
+                  <div className="w-12 h-12 rounded-2xl bg-teal-50 dark:bg-teal-950/60 text-[#0E9F9A] mx-auto flex items-center justify-center">
+                    <LocateFixed className={`w-6 h-6 ${isGettingLocation ? 'animate-spin' : ''}`} />
+                  </div>
+                  <h4 className="text-sm font-black text-slate-900 dark:text-white">
+                    {isGettingLocation ? 'Detecting Location...' : 'Location Required for Map'}
+                  </h4>
+                  <p className="text-xs text-slate-500 dark:text-zinc-400">
+                    {isGettingLocation
+                      ? 'Acquiring GPS coordinates to display nearby alerts and radar rings on the map.'
+                      : 'Please allow location access or select an area manually to view the radar map.'}
+                  </p>
+                  {!isGettingLocation && (
+                    <div className="flex items-center justify-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={handleAllowLocationClick}
+                        className="px-3.5 py-1.5 rounded-xl bg-[#0E9F9A] text-white text-xs font-bold shadow-xs hover:bg-[#087A76] transition-colors"
+                      >
+                        Allow Location
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsSearchModalOpen(true)}
+                        className="px-3.5 py-1.5 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 text-xs font-semibold hover:bg-slate-50 transition-colors"
+                      >
+                        Choose Area
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* FLOATING OVERLAYS ON TOP OF THE MAP */}
 
             {/* 1. Top-Left: Search this area input */}
@@ -1504,7 +1608,7 @@ export function LocalNeighborhoodRadar() {
               <button
                 type="button"
                 onClick={() => {
-                  if (mapInstanceRef.current) {
+                  if (coords && mapInstanceRef.current) {
                     mapInstanceRef.current.setView([coords.lat, coords.lng], 14, { animate: true });
                   }
                 }}
@@ -1744,7 +1848,216 @@ export function LocalNeighborhoodRadar() {
 
           {/* RADAR FEED STREAM CARDS */}
           <div className={`space-y-3 ${mobileViewMode === 'map' ? 'hidden lg:block' : 'block'}`}>
-            {filteredPosts.length === 0 ? (
+            {/* Informative Manual Area Banner if active */}
+            {locationSource === 'manual' && coords && (
+              <div className="bg-blue-50/90 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-900/50 rounded-2xl px-4 py-2.5 flex items-center justify-between text-xs text-blue-800 dark:text-blue-300 shadow-2xs">
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                  <span>Live GPS is off. Radar is using your selected area: <strong>{userCity}</strong></span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => acquireGPS(true)}
+                  className="text-xs font-bold text-blue-700 dark:text-blue-300 underline hover:no-underline flex-shrink-0 ml-2"
+                >
+                  Turn on Live GPS
+                </button>
+              </div>
+            )}
+
+            {!coords ? (
+              // LOCATION INITIALIZATION & PERMISSION STATE CARDS
+              isGettingLocation && !locationTimeout ? (
+                // 1. Loading state (Requirement 7)
+                <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-3xl p-8 sm:p-12 text-center space-y-4 shadow-2xs">
+                  <div className="w-16 h-16 rounded-2xl bg-teal-50 dark:bg-teal-950/60 text-[#0E9F9A] mx-auto flex items-center justify-center relative shadow-xs">
+                    <div className="absolute inset-0 rounded-2xl border-2 border-[#0E9F9A] border-t-transparent animate-spin" />
+                    <LocateFixed className="w-8 h-8 text-[#0E9F9A]" />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
+                      📍 Detecting your location...
+                    </h3>
+                    <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 max-w-md mx-auto leading-relaxed">
+                      Scanning for real-time GPS signal to discover live local alerts, food spots, and neighborhood updates around you.
+                    </p>
+                  </div>
+                </div>
+              ) : locationTimeout ? (
+                // 2. GPS Timeout state (Requirement 19)
+                <div className="bg-white dark:bg-zinc-900 border border-amber-200/80 dark:border-amber-900/60 rounded-3xl p-8 text-center space-y-4 shadow-2xs">
+                  <div className="w-14 h-14 rounded-2xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 mx-auto flex items-center justify-center">
+                    <Clock className="w-7 h-7 animate-pulse" />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="text-base font-black text-slate-900 dark:text-white">
+                      Still trying to get your location...
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-sm mx-auto">
+                      GPS acquisition is taking longer than usual. You can retry or choose your area manually.
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-center gap-2.5 pt-2 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => acquireGPS(true)}
+                      className="px-4 py-2 rounded-xl bg-[#0E9F9A] hover:bg-[#087A76] text-white text-xs font-black shadow-xs transition-colors flex items-center gap-1.5"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      <span>Retry GPS</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsSearchModalOpen(true)}
+                      className="px-4 py-2 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 hover:bg-slate-50 text-xs font-bold shadow-2xs transition-colors"
+                    >
+                      Choose Area Manually
+                    </button>
+                  </div>
+                </div>
+              ) : showExplanationPrompt || permissionState === 'NOT_DETERMINED' ? (
+                // 3. First Visit Explanation (Requirement 4 & 25)
+                <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-3xl p-6 sm:p-10 text-center space-y-5 shadow-2xs">
+                  <div className="w-16 h-16 rounded-2xl bg-teal-50 dark:bg-teal-950/60 text-[#0E9F9A] mx-auto flex items-center justify-center shadow-xs">
+                    <MapPin className="w-8 h-8 text-[#0E9F9A] animate-bounce" />
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="text-base sm:text-xl font-black text-slate-900 dark:text-white">
+                      📍 Enable Location for Tolee Radar
+                    </h3>
+                    <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 max-w-md mx-auto leading-relaxed">
+                      Tolee Radar uses your current location to show:
+                    </p>
+                    <div className="bg-slate-50 dark:bg-zinc-800/60 rounded-2xl p-4 max-w-sm mx-auto text-left text-xs font-semibold text-slate-700 dark:text-zinc-300 space-y-2">
+                      <div className="flex items-center gap-2"><span>🚨</span><span>Nearby alerts</span></div>
+                      <div className="flex items-center gap-2"><span>📰</span><span>Local news</span></div>
+                      <div className="flex items-center gap-2"><span>🍔</span><span>Secret food spots</span></div>
+                      <div className="flex items-center gap-2"><span>🏷️</span><span>Nearby deals</span></div>
+                      <div className="flex items-center gap-2"><span>👥</span><span>Hyper-local community updates</span></div>
+                    </div>
+                    <p className="text-[11px] text-slate-400 max-w-xs mx-auto pt-1">
+                      Your location is used to calculate nearby Radar results.
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-center gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={handleAllowLocationClick}
+                      className="px-5 py-2.5 rounded-xl bg-[#0E9F9A] hover:bg-[#087A76] text-white text-xs font-black shadow-sm transition-all flex items-center gap-2"
+                    >
+                      <LocateFixed className="w-4 h-4" />
+                      <span>Allow Location</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowExplanationPrompt(false);
+                        setPermissionState('DENIED');
+                      }}
+                      className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 hover:bg-slate-50 text-xs font-bold transition-colors"
+                    >
+                      Not Now
+                    </button>
+                  </div>
+                </div>
+              ) : permissionState === 'LOCATION_SERVICES_DISABLED' ? (
+                // 4. Location Services Off (Requirement 10)
+                <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-3xl p-6 sm:p-10 text-center space-y-4 shadow-2xs">
+                  <div className="w-14 h-14 rounded-2xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 mx-auto flex items-center justify-center">
+                    <AlertTriangle className="w-7 h-7" />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
+                      📍 Location Services Are Off
+                    </h3>
+                    <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 max-w-sm mx-auto">
+                      Turn on Location Services on your device to use Live Radar.
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-center gap-3 pt-2 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => openDeviceLocationSettings()}
+                      className="px-5 py-2.5 rounded-xl bg-[#0E9F9A] hover:bg-[#087A76] text-white text-xs font-black shadow-sm transition-colors flex items-center gap-1.5"
+                    >
+                      <Settings className="w-4 h-4" />
+                      <span>Open Location Settings</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsSearchModalOpen(true)}
+                      className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 hover:bg-slate-50 text-xs font-bold shadow-2xs transition-colors"
+                    >
+                      Choose Area Manually
+                    </button>
+                  </div>
+                </div>
+              ) : permissionState === 'BLOCKED' ? (
+                // 5. Permission Permanently Blocked (Requirement 11)
+                <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-3xl p-6 sm:p-10 text-center space-y-4 shadow-2xs">
+                  <div className="w-14 h-14 rounded-2xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 mx-auto flex items-center justify-center">
+                    <ShieldAlert className="w-7 h-7" />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
+                      📍 Location Access Is Blocked
+                    </h3>
+                    <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 max-w-sm mx-auto">
+                      Please enable location access for Tolee from your device settings.
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-center gap-3 pt-2 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => openDeviceAppSettings()}
+                      className="px-5 py-2.5 rounded-xl bg-[#0E9F9A] hover:bg-[#087A76] text-white text-xs font-black shadow-sm transition-colors flex items-center gap-1.5"
+                    >
+                      <Settings className="w-4 h-4" />
+                      <span>Open App Settings</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsSearchModalOpen(true)}
+                      className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 hover:bg-slate-50 text-xs font-bold shadow-2xs transition-colors"
+                    >
+                      Choose Area Manually
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                // 6. Permission Denied (Requirement 9)
+                <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-3xl p-6 sm:p-10 text-center space-y-4 shadow-2xs">
+                  <div className="w-14 h-14 rounded-2xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 mx-auto flex items-center justify-center">
+                    <MapPinOff className="w-7 h-7" />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
+                      📍 Location Permission Required
+                    </h3>
+                    <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 max-w-sm mx-auto">
+                      Tolee Radar needs your location to show updates happening around you.
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-center gap-3 pt-2 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={handleAllowLocationClick}
+                      className="px-5 py-2.5 rounded-xl bg-[#0E9F9A] hover:bg-[#087A76] text-white text-xs font-black shadow-sm transition-colors flex items-center gap-1.5"
+                    >
+                      <LocateFixed className="w-4 h-4" />
+                      <span>Allow Location</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsSearchModalOpen(true)}
+                      className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 hover:bg-slate-50 text-xs font-bold shadow-2xs transition-colors"
+                    >
+                      Choose Area Manually
+                    </button>
+                  </div>
+                </div>
+              )
+            ) : filteredPosts.length === 0 ? (
               <div className="bg-white dark:bg-zinc-900 border border-dashed border-slate-200 dark:border-zinc-800 rounded-3xl p-10 text-center space-y-4 shadow-2xs">
                 <div className="w-14 h-14 rounded-2xl bg-teal-50 dark:bg-teal-950 text-[#0E9F9A] mx-auto flex items-center justify-center">
                   <Radar className="w-7 h-7 animate-pulse" />
@@ -1763,7 +2076,7 @@ export function LocalNeighborhoodRadar() {
                     onClick={() => {
                       const next = radiusKm < 10 ? 10 : radiusKm < 25 ? 25 : 50;
                       setRadiusKm(next);
-                      fetchDbRadarPosts(coords.lat, coords.lng, next);
+                      if (coords) fetchDbRadarPosts(coords.lat, coords.lng, next);
                     }}
                     className="rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 text-xs font-bold px-4 py-2.5 transition-colors shadow-2xs"
                   >
@@ -2187,7 +2500,7 @@ export function LocalNeighborhoodRadar() {
                   onClick={() => {
                     setRadiusKm(km);
                     setIsCustomRadiusOpen(false);
-                    fetchDbRadarPosts(coords.lat, coords.lng, km);
+                    if (coords) fetchDbRadarPosts(coords.lat, coords.lng, km);
                   }}
                   className={`py-1.5 rounded-lg text-xs font-extrabold transition-all text-center ${
                     radiusKm === km && !isCustomRadiusOpen
@@ -2230,8 +2543,8 @@ export function LocalNeighborhoodRadar() {
                     setCustomRadiusValue(val);
                     setRadiusKm(val);
                   }}
-                  onMouseUp={() => fetchDbRadarPosts(coords.lat, coords.lng, customRadiusValue)}
-                  onTouchEnd={() => fetchDbRadarPosts(coords.lat, coords.lng, customRadiusValue)}
+                  onMouseUp={() => { if (coords) fetchDbRadarPosts(coords.lat, coords.lng, customRadiusValue); }}
+                  onTouchEnd={() => { if (coords) fetchDbRadarPosts(coords.lat, coords.lng, customRadiusValue); }}
                   className="w-full h-1.5 bg-slate-200 dark:bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-[#0E9F9A]"
                 />
               </div>
