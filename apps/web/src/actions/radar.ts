@@ -98,6 +98,15 @@ export async function createRadarPostAction(params: {
   radiusKm?: number;
   isAnonymous?: boolean;
   isAccurateConfirmed?: boolean;
+  isLocationConfirmed?: boolean;
+  // Enhanced Drop Alert fields
+  mediaUrls?: string[];
+  isLive?: boolean;
+  startedAt?: string | Date;
+  expectedUntil?: string | Date;
+  alertType?: string;
+  urgency?: 'NORMAL' | 'IMPORTANT' | 'CRITICAL';
+  isUrgent?: boolean;
 }) {
   try {
     const session = await getServerSession(authOptions);
@@ -118,10 +127,30 @@ export async function createRadarPostAction(params: {
     } = params;
 
     if (!title || !title.trim()) {
-      return { success: false, error: 'Title is required' };
+      return { success: false, error: 'Headline is required.' };
     }
-    if (typeof latitude !== 'number' || typeof longitude !== 'number' || isNaN(latitude) || isNaN(longitude)) {
-      return { success: false, error: 'Valid GPS coordinates are required' };
+    if (title.trim().length > 100) {
+      return { success: false, error: 'Headline must be 100 characters or less.' };
+    }
+    if (!description || !description.trim()) {
+      return { success: false, error: 'Description / Details are required to help neighbors understand what is happening.' };
+    }
+    if (description.trim().length > 500) {
+      return { success: false, error: 'Description must be 500 characters or less.' };
+    }
+
+    // Core Product Rule 3 & 53: Location Mandatory for Location-based / Physical Posts
+    const isPhysicalLocationRequired = category === 'alert' || category === 'food' || category === 'deal' || category === 'event' || !!params.isLive;
+    if (isPhysicalLocationRequired) {
+      if (typeof latitude !== 'number' || typeof longitude !== 'number' || isNaN(latitude) || isNaN(longitude) || (latitude === 0 && longitude === 0)) {
+        return { 
+          success: false, 
+          error: 'Location is required for this Radar post. Please pin or select the location where this is happening.' 
+        };
+      }
+      if (!locationName || !locationName.trim()) {
+        return { success: false, error: 'A specific location address or area name is required.' };
+      }
     }
 
     // A. Rule 9: Check User Posting Restrictions / Strikes
@@ -165,12 +194,12 @@ export async function createRadarPostAction(params: {
     }
 
     const { sanitizeText } = require('@/lib/sanitize');
-    const cleanTitle = sanitizeText(title.trim(), 300);
-    const cleanDesc = description ? sanitizeText(description.trim(), 1000) : null;
+    const cleanTitle = sanitizeText(title.trim(), 100);
+    const cleanDesc = description ? sanitizeText(description.trim(), 500) : null;
     const cleanLocName = sanitizeText(locationName?.trim() || 'Nearby', 150);
     const safeRadius = Math.max(0.5, Math.min(50, Number(radiusKm) || 5.0));
 
-    // C. Rule 16: Duplicate Alert Check (within 1.5 km and last 2 hours)
+    // C. Rule 16 & 38: Duplicate Alert Check (within 1.5 km and last 2 hours)
     const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
     const recentBbox = getBoundingBox(latitude, longitude, 1.5);
     const potentialDuplicates = await prisma.radarPost.findMany({
@@ -191,23 +220,39 @@ export async function createRadarPostAction(params: {
       const dist = calculateDistanceKm(latitude, longitude, dup.latitude, dup.longitude);
       if (dist <= 1.5) {
         const dupTitleLower = dup.title.toLowerCase();
-        // Check for common keyword matches
         if (cleanTitleLower.includes(dupTitleLower) || dupTitleLower.includes(cleanTitleLower) || cleanTitleLower.slice(0, 15) === dupTitleLower.slice(0, 15)) {
           duplicateIncidentCount++;
         }
       }
     }
 
-    // D. Rule 1 & Rule 21: Server-Side Strict Expiration Duration
-    // Emergency / Road / Traffic / Water / Power / Safety Alerts = 24h STRICT
+    // D. Rule 1, 13, 15, 16, 51: Server-Side Strict Expiration Duration
+    // Emergency / Road / Traffic / Water / Power / Safety Alerts = 24h STRICT MAXIMUM
     // Secret Food & Deals = 72h; Local News = 72h
     let defaultHours = 24;
-    if (category === 'food' || category === 'deal') {
-      defaultHours = 72;
-    } else if (category === 'news' || category === 'event') {
+    if (category === 'food' || category === 'deal' || category === 'news' || category === 'event') {
       defaultHours = 72;
     }
-    const expiresAt = new Date(Date.now() + defaultHours * 60 * 60 * 1000);
+    const maxExpiryAt = new Date(Date.now() + defaultHours * 60 * 60 * 1000);
+
+    let finalExpiresAt = maxExpiryAt;
+    let validStartedAt: Date | null = params.startedAt ? new Date(params.startedAt) : (params.isLive ? new Date() : null);
+    let validExpectedUntil: Date | null = params.expectedUntil ? new Date(params.expectedUntil) : null;
+
+    if (validExpectedUntil && !isNaN(validExpectedUntil.getTime())) {
+      // If expectedUntil is within valid range and before max boundary, use it.
+      // If expectedUntil is beyond max boundary, CAP AT MAX BOUNDARY (Live Now is NEVER indefinite).
+      if (validExpectedUntil.getTime() < maxExpiryAt.getTime() && validExpectedUntil.getTime() > Date.now()) {
+        finalExpiresAt = validExpectedUntil;
+      }
+    }
+
+    // Sanitize media URLs (max 5)
+    const cleanMediaUrls = Array.isArray(params.mediaUrls)
+      ? params.mediaUrls.filter((u: any) => typeof u === 'string' && u.startsWith('http')).slice(0, 5)
+      : [];
+
+    const isUrgentPost = !!params.isUrgent || params.urgency === 'CRITICAL';
 
     // E. Create Radar Post in DB with ACTIVE status
     const post = await prisma.radarPost.create({
@@ -226,7 +271,14 @@ export async function createRadarPostAction(params: {
         resolvedVotesCount: 0,
         reportsCount: 0,
         isVerified: false,
-        expiresAt
+        expiresAt: finalExpiresAt,
+        mediaUrls: cleanMediaUrls,
+        isLive: !!params.isLive,
+        startedAt: validStartedAt,
+        expectedUntil: validExpectedUntil,
+        alertType: params.alertType || null,
+        urgency: params.urgency || (isUrgentPost ? 'CRITICAL' : 'NORMAL'),
+        isUrgent: isUrgentPost
       }
     });
 
@@ -546,6 +598,13 @@ export async function getRadarPostsAction(params: {
           hasConfirmedResolved,
           expiresAt: post.expiresAt,
           createdAt: post.createdAt,
+          mediaUrls: post.mediaUrls || [],
+          isLive: post.isLive || false,
+          startedAt: post.startedAt,
+          expectedUntil: post.expectedUntil,
+          alertType: post.alertType || null,
+          urgency: post.urgency || 'NORMAL',
+          isUrgent: post.isUrgent || false,
           link: `/radar/${post.id}`
         };
       })
@@ -645,6 +704,13 @@ export async function getRadarPostByIdAction(id: string, userLat?: number, userL
         hasConfirmedResolved,
         createdAt: post.createdAt,
         expiresAt: post.expiresAt,
+        mediaUrls: post.mediaUrls || [],
+        isLive: post.isLive || false,
+        startedAt: post.startedAt,
+        expectedUntil: post.expectedUntil,
+        alertType: post.alertType || null,
+        urgency: post.urgency || 'NORMAL',
+        isUrgent: post.isUrgent || false,
         distanceKm,
         link: `/radar/${post.id}`
       }

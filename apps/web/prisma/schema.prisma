@@ -2235,15 +2235,26 @@ model RadarPost {
   createdAt           DateTime                @default(now())
   updatedAt           DateTime                @updatedAt
 
+  // Enhanced Drop Alert Fields
+  mediaUrls           String[]                @default([])
+  isLive              Boolean                 @default(false)
+  startedAt           DateTime?
+  expectedUntil       DateTime?
+  alertType           String?                 // "ROAD_BLOCK" | "TRAFFIC" | "ACCIDENT" | "WATER_LOGGING" | "POWER" | "WATER" | "FIRE" | "SAFETY" | "TRANSPORT" | "ROAD_WORK" | "OTHER"
+  urgency             String                  @default("NORMAL") // "NORMAL" | "IMPORTANT" | "CRITICAL"
+  isUrgent            Boolean                 @default(false)
+
   likes               RadarPostLike[]
   confirmations       RadarPostConfirmation[]
   reports             RadarPostReport[]
+  moderationLogs      RadarModerationLog[]
 
   @@index([latitude, longitude])
   @@index([createdAt])
   @@index([category])
   @@index([status])
   @@index([expiresAt])
+  @@index([isLive])
 }
 
 model RadarPostLike {
@@ -2287,8 +2298,9 @@ model RadarPostReport {
 }
 
 model RadarModerationLog {
-  id          String    @id @default(cuid())
+  id          String     @id @default(cuid())
   radarPostId String?
+  radarPost   RadarPost? @relation(fields: [radarPostId], references: [id], onDelete: Cascade)
   adminId     String
   action      String    // "APPROVE" | "HIDE" | "REMOVE" | "RESOLVE" | "VERIFY" | "EXTEND_24H" | "STRIKE_USER"
   reason      String?
