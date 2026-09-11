@@ -150,8 +150,12 @@ model User {
   radarEvents           Boolean           @default(true)
   radarGuptKhabar       Boolean           @default(true)
   radarRadius           Float             @default(5.0)
+  radarStrikes          Int               @default(0)
+  radarRestrictedUntil  DateTime?
   radarPosts            RadarPost[]       @relation("UserRadarPosts")
   radarLikes            RadarPostLike[]
+  radarConfirmations    RadarPostConfirmation[]
+  radarReports          RadarPostReport[]
 
   wallet        Wallet?
   franchise     Franchise?
@@ -2204,29 +2208,42 @@ model WhatsAppShootMessage {
 }
 
 model RadarPost {
-  id              String          @id @default(cuid())
-  category        String          // "alert" | "food" | "news" | "deal" | "event"
-  title           String
-  description     String?
-  latitude        Float
-  longitude       Float
-  locationName    String
-  radiusKm        Float           @default(5.0)
-  isAnonymous     Boolean         @default(false)
-  authorId        String
-  author          User            @relation("UserRadarPosts", fields: [authorId], references: [id], onDelete: Cascade)
-  likesCount      Int             @default(0)
-  viewsCount      Int             @default(0)
-  isDeleted       Boolean         @default(false)
-  expiresAt       DateTime?
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  id                  String                  @id @default(cuid())
+  category            String                  // "alert" | "food" | "news" | "deal" | "event"
+  title               String
+  description         String?
+  latitude            Float
+  longitude           Float
+  locationName        String
+  radiusKm            Float                   @default(5.0)
+  isAnonymous         Boolean                 @default(false)
+  authorId            String
+  author              User                    @relation("UserRadarPosts", fields: [authorId], references: [id], onDelete: Cascade)
+  likesCount          Int                     @default(0)
+  viewsCount          Int                     @default(0)
+  isDeleted           Boolean                 @default(false)
+  status              String                  @default("ACTIVE") // "ACTIVE" | "RESOLVED" | "EXPIRED" | "UNDER_REVIEW" | "REMOVED"
+  confirmationsCount  Int                     @default(0)
+  resolvedVotesCount  Int                     @default(0)
+  reportsCount        Int                     @default(0)
+  isVerified          Boolean                 @default(false)
+  verifiedAt          DateTime?
+  resolvedAt          DateTime?
+  extendedAt          DateTime?
+  extensionCount      Int                     @default(0)
+  expiresAt           DateTime?
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
 
-  likes           RadarPostLike[]
+  likes               RadarPostLike[]
+  confirmations       RadarPostConfirmation[]
+  reports             RadarPostReport[]
 
   @@index([latitude, longitude])
   @@index([createdAt])
   @@index([category])
+  @@index([status])
+  @@index([expiresAt])
 }
 
 model RadarPostLike {
@@ -2238,6 +2255,49 @@ model RadarPostLike {
   createdAt   DateTime  @default(now())
 
   @@unique([radarPostId, userId])
+}
+
+model RadarPostConfirmation {
+  id          String    @id @default(cuid())
+  radarPostId String
+  userId      String
+  type        String    // "STILL_HAPPENING" | "RESOLVED"
+  radarPost   RadarPost @relation(fields: [radarPostId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+
+  @@unique([radarPostId, userId, type])
+  @@index([radarPostId])
+}
+
+model RadarPostReport {
+  id          String    @id @default(cuid())
+  radarPostId String
+  reporterId  String
+  reason      String    // "false_info" | "wrong_location" | "outdated" | "spam" | "misleading" | "inappropriate" | "dangerous" | "other"
+  details     String?
+  status      String    @default("PENDING") // "PENDING" | "REVIEWED" | "DISMISSED" | "ACTION_TAKEN"
+  radarPost   RadarPost @relation(fields: [radarPostId], references: [id], onDelete: Cascade)
+  reporter    User      @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+
+  @@unique([radarPostId, reporterId])
+  @@index([radarPostId])
+  @@index([status])
+}
+
+model RadarModerationLog {
+  id          String    @id @default(cuid())
+  radarPostId String?
+  adminId     String
+  action      String    // "APPROVE" | "HIDE" | "REMOVE" | "RESOLVE" | "VERIFY" | "EXTEND_24H" | "STRIKE_USER"
+  reason      String?
+  details     Json?
+  createdAt   DateTime  @default(now())
+
+  @@index([radarPostId])
+  @@index([adminId])
+  @@index([createdAt])
 }
 
 // =========================================================

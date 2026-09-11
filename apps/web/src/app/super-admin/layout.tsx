@@ -9,6 +9,7 @@ const navItems = [
   { href: '/super-admin/users', label: 'Users', icon: '👥' },
   { href: '/super-admin/groups', label: 'Groups', icon: '🏘️' },
   { href: '/super-admin/content', label: 'Content', icon: '📝' },
+  { href: '/super-admin/radar', label: 'Radar Moderation', icon: '📡' },
   { href: '/super-admin/shoots', label: 'Tolee Shoots', icon: '🚀' },
   { href: '/super-admin/ads', label: 'Ads & Campaigns', icon: '📣' },
   { href: '/super-admin/credit', label: 'Tolee Credit & Revenue', icon: '💰' },

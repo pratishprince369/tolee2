@@ -6,13 +6,16 @@ import {
   MapPin, Radar, Navigation, EyeOff, Send, Radio, Plus, CheckCircle2, ChevronRight,
   MoreVertical, ThumbsUp, SlidersHorizontal, X, Search, RefreshCw,
   LocateFixed, Globe, Loader2, Sun, Heart, Users, Share2, Maximize2,
-  Minimize2, ZoomIn, ZoomOut, AlertCircle, Tag, Utensils, Newspaper, ChevronDown
+  Minimize2, ZoomIn, ZoomOut, AlertCircle, Tag, Utensils, Newspaper, ChevronDown,
+  AlertTriangle, Flag, ShieldCheck, Check, Clock
 } from 'lucide-react';
 import { 
   createRadarPostAction, 
   getRadarPostsAction, 
   updateUserRadarLocation, 
-  toggleRadarPostLikeAction 
+  toggleRadarPostLikeAction,
+  confirmRadarPostAction,
+  reportRadarPostAction
 } from '@/actions/radar';
 import { calculateDistanceKm, formatDistance } from '@/lib/geo-utils';
 
@@ -26,6 +29,7 @@ export interface LocalRadarPost {
   isAnonymous: boolean;
   author: string;
   authorAvatar?: string | null;
+  authorId?: string | null;
   likes: number;
   hasLiked?: boolean;
   latitude: number;
@@ -34,6 +38,15 @@ export interface LocalRadarPost {
   link?: string;
   imageUrl?: string;
   isDbPost?: boolean;
+  expiresAt?: Date | string | null;
+  createdAt?: Date | string | null;
+  status?: string;
+  confirmationsCount?: number;
+  resolvedVotesCount?: number;
+  reportsCount?: number;
+  isVerified?: boolean;
+  hasConfirmedStillHappening?: boolean;
+  hasConfirmedResolved?: boolean;
 }
 
 export function LocalNeighborhoodRadar() {
@@ -80,6 +93,16 @@ export function LocalNeighborhoodRadar() {
   const [alertTitle, setAlertTitle] = useState<string>('');
   const [alertDesc, setAlertDesc] = useState<string>('');
   const [isAnon, setIsAnon] = useState<boolean>(true);
+  const [hasConfirmedAccuracy, setHasConfirmedAccuracy] = useState<boolean>(false);
+
+  // Community Verification & Expiry States
+  const [confirmingPostId, setConfirmingPostId] = useState<string | null>(null);
+
+  // Reporting States
+  const [reportingPost, setReportingPost] = useState<LocalRadarPost | null>(null);
+  const [reportReason, setReportReason] = useState<string>('INACCURATE');
+  const [reportDetails, setReportDetails] = useState<string>('');
+  const [isSubmittingReport, setIsSubmittingReport] = useState<boolean>(false);
 
   // Community & Live Posts State
   const [dbRadarPosts, setDbRadarPosts] = useState<any[]>([]);
@@ -94,76 +117,8 @@ export function LocalNeighborhoodRadar() {
   const markersLayerGroupRef = useRef<any>(null);
   const markerLookupRef = useRef<Record<string, any>>({});
 
-  // Fallback realistic neighborhood updates matching reference image
-  const baseFallbackPosts = useMemo<LocalRadarPost[]>(() => [
-    {
-      id: 'base-1',
-      category: 'alert',
-      title: 'Road blockage near MG Road flyover due to repair work. Take side route!',
-      description: 'Heavy traffic. Diversion is active. Use Kalyan-Shilphata road instead.',
-      timeAgo: '12 min ago',
-      isAnonymous: true,
-      author: 'Anonymous Neighbor',
-      likes: 18,
-      latitude: 19.2590,
-      longitude: 73.1360,
-      locationName: 'MG Road Flyover',
-      distanceKm: 1.3,
-      imageUrl: 'https://images.unsplash.com/photo-1509822929063-6b6cfc9b42f2?auto=format&fit=crop&w=600&q=80',
-      isDbPost: false
-    },
-    {
-      id: 'base-2',
-      category: 'food',
-      title: "Best Pav Bhaji at Sharma's Tapri",
-      description: 'Hidden gem near Kalyan station. Must try their butter pav bhaji!',
-      timeAgo: '28 min ago',
-      isAnonymous: false,
-      author: 'Foodie Neighbor',
-      authorAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80',
-      likes: 24,
-      latitude: 19.2520,
-      longitude: 73.1290,
-      locationName: 'Station West Gate',
-      distanceKm: 0.8,
-      imageUrl: 'https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=600&q=80',
-      isDbPost: false
-    },
-    {
-      id: 'base-3',
-      category: 'news',
-      title: 'New park opening this weekend in Kalyan East',
-      description: 'Family-friendly park with kids play area and walking track.',
-      timeAgo: '1 hour ago',
-      isAnonymous: false,
-      author: 'Local Resident',
-      authorAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=120&q=80',
-      likes: 16,
-      latitude: 19.2680,
-      longitude: 73.1410,
-      locationName: 'Kalyan East Community Sector',
-      distanceKm: 2.1,
-      imageUrl: 'https://images.unsplash.com/photo-1519331379826-f10be5486c6f?auto=format&fit=crop&w=600&q=80',
-      isDbPost: false
-    },
-    {
-      id: 'base-4',
-      category: 'deal',
-      title: 'Flat 50% Off on Branded Shoes',
-      description: 'At Kalyan Metro Mall. Limited period offer!',
-      timeAgo: '2 hours ago',
-      isAnonymous: false,
-      author: 'Shopper',
-      authorAvatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=120&q=80',
-      likes: 9,
-      latitude: 19.2480,
-      longitude: 73.1480,
-      locationName: 'Kalyan Metro Mall',
-      distanceKm: 1.9,
-      imageUrl: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=600&q=80',
-      isDbPost: false
-    }
-  ], []);
+  // Real data only — no mock posts
+  const baseFallbackPosts = useMemo<LocalRadarPost[]>(() => [], []);
 
   // Reverse geocoding helper
   const reverseGeocode = async (lat: number, lng: number): Promise<{ fullAddress: string; city: string; sub: string }> => {
@@ -385,6 +340,39 @@ export function LocalNeighborhoodRadar() {
     fetchLiveRadarMarkers();
   }, [fetchLocation, fetchLiveRadarMarkers, fetchDbRadarPosts, radiusKm]);
 
+  // Helper to format dynamic post time
+  const formatPostedTime = (dateStr?: Date | string | null): string => {
+    if (!dateStr) return 'Recently';
+    const diffMs = Date.now() - new Date(dateStr).getTime();
+    if (diffMs < 60000) return 'Just now';
+    const diffMin = Math.floor(diffMs / 60000);
+    if (diffMin < 60) return `${diffMin} min ago`;
+    const diffHours = Math.floor(diffMin / 60);
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+  };
+
+  // Helper to calculate dynamic alert expiry countdown (Rule 1 & Rule 21)
+  const formatExpiryCountdown = (expiresAt?: Date | string | null): { text: string; isNearing: boolean; isExpired: boolean } => {
+    if (!expiresAt) return { text: 'No expiration', isNearing: false, isExpired: false };
+    const expiryTime = new Date(expiresAt).getTime();
+    const diffMs = expiryTime - Date.now();
+    if (diffMs <= 0) return { text: 'Expired', isNearing: false, isExpired: true };
+    
+    const totalMin = Math.floor(diffMs / 60000);
+    const hours = Math.floor(totalMin / 60);
+    const mins = totalMin % 60;
+    
+    // Nearing expiry if < 6 hours remaining
+    const isNearing = hours < 6;
+    return {
+      text: `Expires in ${hours}h ${mins}m`,
+      isNearing,
+      isExpired: false
+    };
+  };
+
   // Combine database posts, baseline posts, and live markers
   const allPosts = useMemo<LocalRadarPost[]>(() => {
     const combined: LocalRadarPost[] = [];
@@ -398,10 +386,11 @@ export function LocalNeighborhoodRadar() {
         title: post.title,
         description: post.description,
         distanceKm: dist,
-        timeAgo: 'Just now',
+        timeAgo: formatPostedTime(post.createdAt),
         isAnonymous: post.isAnonymous,
         author: post.author,
         authorAvatar: post.authorAvatar,
+        authorId: post.authorId,
         likes: post.likesCount || 0,
         hasLiked: post.hasLiked || !!likedPostIds[post.id],
         latitude: post.latitude,
@@ -414,7 +403,16 @@ export function LocalNeighborhoodRadar() {
           post.category === 'news' ? 'https://images.unsplash.com/photo-1519331379826-f10be5486c6f?auto=format&fit=crop&w=600&q=80' :
           'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=600&q=80'
         ),
-        isDbPost: true
+        isDbPost: true,
+        expiresAt: post.expiresAt,
+        createdAt: post.createdAt,
+        status: post.status,
+        confirmationsCount: post.confirmationsCount || 0,
+        resolvedVotesCount: post.resolvedVotesCount || 0,
+        reportsCount: post.reportsCount || 0,
+        isVerified: post.isVerified,
+        hasConfirmedStillHappening: post.hasConfirmedStillHappening,
+        hasConfirmedResolved: post.hasConfirmedResolved
       });
     });
 
@@ -503,6 +501,66 @@ export function LocalNeighborhoodRadar() {
       try {
         await toggleRadarPostLikeAction(id);
       } catch (_) {}
+    }
+  };
+
+  // Handle Community Verification: Still Happening or Resolved (Rule 3, 4, 5)
+  const handleConfirmPost = async (post: LocalRadarPost, type: 'STILL_HAPPENING' | 'RESOLVED') => {
+    if (confirmingPostId) return;
+    setConfirmingPostId(post.id);
+    try {
+      const res = await confirmRadarPostAction({ postId: post.id, type });
+      if (res.success) {
+        setStatusMessage(res.message || (type === 'STILL_HAPPENING' ? '✓ Alert confirmed as still happening!' : '✓ Alert marked as resolved.'));
+        setDbRadarPosts(prev => prev.map(p => {
+          if (p.id !== post.id) return p;
+          if (type === 'STILL_HAPPENING') {
+            return {
+              ...p,
+              confirmationsCount: (p.confirmationsCount || 0) + 1,
+              hasConfirmedStillHappening: true
+            };
+          } else {
+            return {
+              ...p,
+              resolvedVotesCount: (p.resolvedVotesCount || 0) + 1,
+              hasConfirmedResolved: true,
+              status: (res as any).isResolvedNow ? 'RESOLVED' : p.status
+            };
+          }
+        }));
+      } else {
+        setStatusMessage(res.error || 'Failed to record confirmation.');
+      }
+    } catch (_) {
+      setStatusMessage('Network error while confirming alert.');
+    } finally {
+      setConfirmingPostId(null);
+    }
+  };
+
+  // Handle Report Submission (Rule 6, 7, 8)
+  const handleReportSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reportingPost || isSubmittingReport) return;
+    setIsSubmittingReport(true);
+    try {
+      const res = await reportRadarPostAction({
+        postId: reportingPost.id,
+        reason: reportReason,
+        details: reportDetails
+      });
+      if (res.success) {
+        setStatusMessage(res.message || 'Report submitted for moderation review.');
+        setReportingPost(null);
+        setReportDetails('');
+      } else {
+        alert(res.error || 'Failed to submit report.');
+      }
+    } catch (_) {
+      alert('Network error while reporting alert.');
+    } finally {
+      setIsSubmittingReport(false);
     }
   };
 
@@ -1138,26 +1196,38 @@ export function LocalNeighborhoodRadar() {
           {/* RADAR FEED STREAM CARDS */}
           <div className="space-y-3">
             {filteredPosts.length === 0 ? (
-              <div className="bg-white dark:bg-zinc-900 border border-dashed border-slate-200 dark:border-zinc-800 rounded-2xl p-10 text-center space-y-3">
-                <div className="w-12 h-12 rounded-2xl bg-teal-50 dark:bg-teal-950 text-[#0E9F9A] mx-auto flex items-center justify-center">
-                  <Radar className="w-6 h-6 animate-pulse" />
+              <div className="bg-white dark:bg-zinc-900 border border-dashed border-slate-200 dark:border-zinc-800 rounded-3xl p-10 text-center space-y-4 shadow-2xs">
+                <div className="w-14 h-14 rounded-2xl bg-teal-50 dark:bg-teal-950 text-[#0E9F9A] mx-auto flex items-center justify-center">
+                  <Radar className="w-7 h-7 animate-pulse" />
                 </div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                  No radar updates within {radiusKm} km radius
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-sm mx-auto">
-                  Try expanding your radar radius or drop an anonymous local alert in your area!
-                </p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setRadiusKm(10);
-                    fetchDbRadarPosts(coords.lat, coords.lng, 10);
-                  }}
-                  className="rounded-full bg-[#0E9F9A] hover:bg-[#087A76] text-white text-xs font-bold px-4 py-2"
-                >
-                  Expand Radar to 10 km
-                </button>
+                <div>
+                  <h3 className="text-base font-black text-slate-900 dark:text-white uppercase tracking-wide">
+                    NO RADAR ACTIVITY NEARBY
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-sm mx-auto mt-1">
+                    There are currently no active updates within your selected radius.
+                  </p>
+                </div>
+                <div className="flex items-center justify-center gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = radiusKm < 10 ? 10 : radiusKm < 25 ? 25 : 50;
+                      setRadiusKm(next);
+                      fetchDbRadarPosts(coords.lat, coords.lng, next);
+                    }}
+                    className="rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 text-xs font-bold px-4 py-2.5 transition-colors shadow-2xs"
+                  >
+                    Expand Radius ({radiusKm < 10 ? '10 km' : radiusKm < 25 ? '25 km' : '50 km'})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsPostingAlert(true)}
+                    className="rounded-xl bg-[#0E9F9A] hover:bg-[#087A76] text-white text-xs font-extrabold px-4 py-2.5 shadow-sm transition-colors"
+                  >
+                    Drop Alert
+                  </button>
+                </div>
               </div>
             ) : (
               filteredPosts.map((post) => {
@@ -1167,6 +1237,8 @@ export function LocalNeighborhoodRadar() {
                 const isDeal = post.category === 'deal' || post.category === 'store';
                 const hasLiked = !!likedPostIds[post.id] || post.hasLiked;
                 const likeCount = post.likes + (hasLiked && !post.hasLiked ? 1 : 0);
+                const expiryInfo = formatExpiryCountdown(post.expiresAt);
+                const isNearingExpiry = isAlert && expiryInfo.isNearing && !expiryInfo.isExpired;
 
                 return (
                   <div
@@ -1174,7 +1246,7 @@ export function LocalNeighborhoodRadar() {
                     className="bg-white dark:bg-zinc-900 hover:bg-slate-50/50 dark:hover:bg-zinc-900/50 border border-slate-200/80 dark:border-zinc-800 rounded-2xl p-3.5 sm:p-4 shadow-2xs hover:shadow-xs transition-all flex flex-col sm:flex-row items-start gap-4 group"
                   >
                     {/* Left Thumbnail Image */}
-                    <div className="w-full sm:w-28 sm:h-24 h-44 rounded-xl overflow-hidden bg-slate-100 dark:bg-zinc-800 flex-shrink-0 relative border border-slate-200/60 dark:border-zinc-800">
+                    <div className="w-full sm:w-28 sm:h-28 h-44 rounded-xl overflow-hidden bg-slate-100 dark:bg-zinc-800 flex-shrink-0 relative border border-slate-200/60 dark:border-zinc-800">
                       <img
                         src={post.imageUrl || 'https://images.unsplash.com/photo-1509822929063-6b6cfc9b42f2?auto=format&fit=crop&w=300&q=80'}
                         alt={post.title}
@@ -1184,9 +1256,9 @@ export function LocalNeighborhoodRadar() {
                     </div>
 
                     {/* Middle Content */}
-                    <div className="flex-1 min-w-0 space-y-1.5">
+                    <div className="flex-1 min-w-0 space-y-1.5 w-full">
                       
-                      {/* Badge & Distance Row */}
+                      {/* Badge, Distance & Verification Row */}
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${
                           isAlert ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400' :
@@ -1203,6 +1275,24 @@ export function LocalNeighborhoodRadar() {
                           <LocateFixed className="w-3 h-3" />
                           {formatDistance(post.distanceKm)} away
                         </span>
+
+                        {/* Verified badge or Community Confirmed badge */}
+                        {post.isVerified ? (
+                          <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-black uppercase flex items-center gap-1 border border-emerald-500/20">
+                            <ShieldCheck className="w-3 h-3" />
+                            Verified Alert
+                          </span>
+                        ) : (post.confirmationsCount && post.confirmationsCount >= 3) ? (
+                          <span className="px-2 py-0.5 rounded-md bg-teal-500/10 text-[#0E9F9A] dark:text-teal-400 text-[10px] font-black uppercase flex items-center gap-1 border border-teal-500/20">
+                            ⚡ Community Confirmed ({post.confirmationsCount} neighbors)
+                          </span>
+                        ) : null}
+
+                        {post.status === 'RESOLVED' && (
+                          <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 text-[10px] font-black uppercase">
+                            ✓ Resolved
+                          </span>
+                        )}
                       </div>
 
                       {/* Title */}
@@ -1219,8 +1309,8 @@ export function LocalNeighborhoodRadar() {
                         </p>
                       )}
 
-                      {/* Author & Timestamp Row */}
-                      <div className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-zinc-500 pt-0.5">
+                      {/* Author & Timestamp & Expiry Row */}
+                      <div className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-zinc-500 pt-0.5 flex-wrap">
                         {post.authorAvatar ? (
                           <img src={post.authorAvatar} alt={post.author} className="w-4 h-4 rounded-full object-cover" />
                         ) : (
@@ -1230,13 +1320,58 @@ export function LocalNeighborhoodRadar() {
                         )}
                         <span className="font-semibold text-slate-600 dark:text-zinc-400">{post.author}</span>
                         <span>•</span>
-                        <span>{post.timeAgo}</span>
+                        <span>Posted {post.timeAgo}</span>
+                        {post.expiresAt && (
+                          <>
+                            <span>•</span>
+                            <span className={`inline-flex items-center gap-1 font-semibold ${expiryInfo.isNearing ? 'text-amber-600 dark:text-amber-400' : 'text-slate-400'}`}>
+                              <Clock className="w-3 h-3" />
+                              {expiryInfo.text}
+                            </span>
+                          </>
+                        )}
                       </div>
+
+                      {/* Age warning prompt banner if alert is nearing expiry */}
+                      {isNearingExpiry && post.status !== 'RESOLVED' && (
+                        <div className="bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-900/60 rounded-xl p-2.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mt-2">
+                          <div className="flex items-center gap-1.5 text-xs font-bold text-amber-800 dark:text-amber-300">
+                            <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                            <span>This alert is getting old. Is this still happening?</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleConfirmPost(post, 'STILL_HAPPENING')}
+                              disabled={confirmingPostId === post.id || post.hasConfirmedStillHappening}
+                              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                                post.hasConfirmedStillHappening 
+                                  ? 'bg-emerald-600 text-white' 
+                                  : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200/60'
+                              }`}
+                            >
+                              ✓ Still Happening
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleConfirmPost(post, 'RESOLVED')}
+                              disabled={confirmingPostId === post.id || post.hasConfirmedResolved}
+                              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                                post.hasConfirmedResolved 
+                                  ? 'bg-slate-700 text-white' 
+                                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-zinc-800 dark:text-zinc-300'
+                              }`}
+                            >
+                              ✓ Resolved
+                            </button>
+                          </div>
+                        </div>
+                      )}
 
                     </div>
 
-                    {/* Right Side Buttons: View on Map, Useful & Share */}
-                    <div className="flex sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto gap-3 self-stretch sm:self-auto flex-shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-zinc-800">
+                    {/* Right Side Buttons: View on Map, Useful, Confirmation & Report */}
+                    <div className="flex sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto gap-2.5 self-stretch sm:self-auto flex-shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-zinc-800">
                       
                       {/* Top Action: View on Map */}
                       <button
@@ -1248,8 +1383,42 @@ export function LocalNeighborhoodRadar() {
                         <span>View on Map</span>
                       </button>
 
-                      {/* Bottom Actions: Useful & Share */}
-                      <div className="flex items-center gap-3">
+                      {/* Community verification buttons on Alert cards */}
+                      {isAlert && post.status !== 'RESOLVED' && (
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleConfirmPost(post, 'STILL_HAPPENING')}
+                            disabled={confirmingPostId === post.id || post.hasConfirmedStillHappening}
+                            title="Confirm this alert is still active"
+                            className={`px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition-all ${
+                              post.hasConfirmedStillHappening
+                                ? 'bg-emerald-600 text-white'
+                                : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/40'
+                            }`}
+                          >
+                            <Check className="w-3 h-3" />
+                            <span>Still Happening ({post.confirmationsCount || 0})</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleConfirmPost(post, 'RESOLVED')}
+                            disabled={confirmingPostId === post.id || post.hasConfirmedResolved}
+                            title="Vote that this alert has been cleared"
+                            className={`px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition-all ${
+                              post.hasConfirmedResolved
+                                ? 'bg-slate-700 text-white'
+                                : 'bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-zinc-800 dark:text-zinc-300'
+                            }`}
+                          >
+                            <span>Resolved ({post.resolvedVotesCount || 0})</span>
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Bottom Actions: Useful, Share, Report */}
+                      <div className="flex items-center gap-2.5">
                         <button
                           type="button"
                           onClick={() => toggleLike(post.id, post.isDbPost)}
@@ -1273,6 +1442,20 @@ export function LocalNeighborhoodRadar() {
                         >
                           <Share2 className="w-3.5 h-3.5" />
                           <span>Share</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setReportingPost(post);
+                            setReportReason('INACCURATE');
+                            setReportDetails('');
+                          }}
+                          title="Report inaccurate or inappropriate alert"
+                          className="flex items-center gap-1 text-xs font-bold text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors"
+                        >
+                          <Flag className="w-3.5 h-3.5" />
+                          <span>Report</span>
                         </button>
                       </div>
 
@@ -1666,6 +1849,22 @@ export function LocalNeighborhoodRadar() {
                 />
               </div>
 
+              {/* Rule 10: Accuracy Confirmation Checkbox */}
+              <div className="bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-xl p-3">
+                <label className="flex items-start gap-2 text-xs font-medium text-slate-700 dark:text-zinc-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={hasConfirmedAccuracy}
+                    onChange={(e) => setHasConfirmedAccuracy(e.target.checked)}
+                    className="mt-0.5 rounded text-[#0E9F9A] focus:ring-[#0E9F9A] w-4 h-4 accent-[#0E9F9A]"
+                    required
+                  />
+                  <span>
+                    I confirm this information is accurate to the best of my knowledge. False or malicious alerts may result in an account strike.
+                  </span>
+                </label>
+              </div>
+
               {/* Anonymous switch & Submit */}
               <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-zinc-800">
                 <label className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-zinc-400 cursor-pointer">
@@ -1681,7 +1880,7 @@ export function LocalNeighborhoodRadar() {
 
                 <button
                   type="submit"
-                  disabled={isSubmittingPost || !alertTitle.trim()}
+                  disabled={isSubmittingPost || !alertTitle.trim() || !hasConfirmedAccuracy}
                   className="rounded-xl bg-[#0E9F9A] hover:bg-[#087A76] text-white font-extrabold text-xs px-5 py-2.5 shadow-md flex items-center gap-1.5 transition-all disabled:opacity-50"
                 >
                   {isSubmittingPost ? (
@@ -1844,6 +2043,113 @@ export function LocalNeighborhoodRadar() {
               )}
 
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. MODAL: REPORT RADAR ALERT (Rules 6, 7, 8) */}
+      {reportingPost && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200 dark:border-zinc-800 shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-5 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-rose-50 dark:bg-rose-950 text-rose-600 flex items-center justify-center">
+                  <Flag className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900 dark:text-white">
+                    Report Radar Alert
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-zinc-400 truncate max-w-[240px]">
+                    {reportingPost.title}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setReportingPost(null)}
+                className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleReportSubmit} className="p-5 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 dark:text-zinc-300">
+                  Reason for reporting
+                </label>
+                <div className="space-y-2">
+                  {[
+                    { id: 'INACCURATE', label: 'Inaccurate or Outdated Information' },
+                    { id: 'SPAM', label: 'Spam, Advertising or Promotion' },
+                    { id: 'HARASSMENT', label: 'Abusive or Inappropriate Content' },
+                    { id: 'MISLEADING', label: 'Fake or Fabricated Alert' },
+                    { id: 'OTHER', label: 'Other Issue' },
+                  ].map((r) => (
+                    <label
+                      key={r.id}
+                      className={`flex items-center gap-2.5 p-2.5 rounded-xl border text-xs font-semibold cursor-pointer transition-colors ${
+                        reportReason === r.id
+                          ? 'border-rose-300 bg-rose-50/50 dark:bg-rose-950/20 text-rose-700 dark:text-rose-300'
+                          : 'border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="reportReason"
+                        value={r.id}
+                        checked={reportReason === r.id}
+                        onChange={() => setReportReason(r.id)}
+                        className="text-rose-600 focus:ring-rose-500"
+                      />
+                      <span>{r.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 dark:text-zinc-300">
+                  Additional Details (Optional)
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="Provide context to help moderators verify this..."
+                  value={reportDetails}
+                  onChange={(e) => setReportDetails(e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl p-3 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-zinc-800">
+                <button
+                  type="button"
+                  onClick={() => setReportingPost(null)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingReport}
+                  className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                >
+                  {isSubmittingReport ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Submitting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Flag className="w-3.5 h-3.5" />
+                      <span>Submit Report</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
