@@ -125,6 +125,11 @@ export const writeLimiter = new RateLimiter(
   SECURITY_CONFIG.RATE_LIMITS.WRITE.WINDOW_MS
 );
 
+export const chatLimiter = new RateLimiter(
+  120, // 120 messages per minute per user
+  60 * 1000
+);
+
 export const aiLimiter = new RateLimiter(
   SECURITY_CONFIG.RATE_LIMITS.AI.LIMIT,
   SECURITY_CONFIG.RATE_LIMITS.AI.WINDOW_MS

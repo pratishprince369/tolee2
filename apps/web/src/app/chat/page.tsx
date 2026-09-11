@@ -36,7 +36,7 @@ import {
   EyeOff, Users, ShieldCheck, PlusCircle, MessageCircle, ChevronLeft, X, 
   Image as ImageIcon, AlertCircle, BellOff, LogOut, Clock, Copy, Reply, Trash2, ArrowRight, Layers,
   PhoneOff, VideoOff, Play, Pin, Clapperboard, Newspaper, MapPin, Music, FileText, Download, Loader2,
-  Mic, Pencil, Share2, Forward, SmilePlus, Navigation, User as UserIcon, ExternalLink, Bookmark
+  Mic, Pencil, Share2, Forward, SmilePlus, Navigation, User as UserIcon, ExternalLink, Bookmark, Sparkles
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -793,10 +793,11 @@ export default function ChatPage() {
 
   const queryChatId = searchParams?.get('chatId') || searchParams?.get('id') || '';
   const queryToleeId = searchParams?.get('toleeId') || '';
+  const queryUserId = searchParams?.get('userId') || searchParams?.get('user') || '';
 
   // Synchronize activeChat with query parameters
   useEffect(() => {
-    if (chats.length === 0) return;
+    if (chats.length === 0 && !queryUserId) return;
 
     if (queryToleeId) {
       const matchedChat = chats.find(c => c.toleeId === queryToleeId);
@@ -818,8 +819,28 @@ export default function ChatPage() {
           setActiveSidebarTab('personal');
         }
       }
+    } else if (queryUserId) {
+      const matchedChat = chats.find(c => !c.isGroup && c.otherUserId === queryUserId);
+      if (matchedChat) {
+        if (activeChat !== matchedChat.id) {
+          setActiveChat(matchedChat.id);
+        }
+        if (activeSidebarTab !== 'personal') {
+          setActiveSidebarTab('personal');
+        }
+      } else {
+        // Auto-create or fetch personal chat for target user
+        getOrCreatePersonalChat(queryUserId).then(res => {
+          if (res.success && res.chatId) {
+            fetchChats().then(() => {
+              setActiveChat(res.chatId);
+              setActiveSidebarTab('personal');
+            });
+          }
+        }).catch(() => {});
+      }
     }
-  }, [queryToleeId, queryChatId, chats]);
+  }, [queryToleeId, queryChatId, queryUserId, chats]);
 
   // Handle active chat scrolling in sidebar
   useEffect(() => {
@@ -2188,12 +2209,11 @@ export default function ChatPage() {
 
   const handleSendMessage = async () => {
     if (isSendingRef.current) return;
-    if (!newMessage.trim() && !pendingAttachment) return;
+    if (!newMessage.trim()) return;
     if (!activeChat) return;
 
     const contentToSend = newMessage.trim();
     const parentIdToSend = replyingToMessage?.id;
-    const attachmentToSend = pendingAttachment;
     const tempId = 'temp-' + Date.now();
 
     isSendingRef.current = true;
@@ -2205,8 +2225,8 @@ export default function ChatPage() {
         senderAvatar: session?.user?.image || '/default-user-avatar.svg',
         senderId: currentUserId,
         text: contentToSend,
-        mediaUrl: attachmentToSend?.previewUrl || null,
-        mediaResourceType: attachmentToSend?.kind || null,
+        mediaUrl: null,
+        mediaResourceType: null,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         createdAt: new Date().toISOString(),
         isMe: true,
@@ -2224,16 +2244,13 @@ export default function ChatPage() {
       // Clear composer inputs
       setNewMessage('');
       setReplyingToMessage(null);
-      setPendingAttachment(null);
 
       setMessagesByChat(prev => ({
         ...prev,
         [activeChat]: [...(prev[activeChat] || []), newMsg]
       }));
       
-      const lastMsgDisplay = attachmentToSend 
-        ? `Me: ${attachmentToSend.kind === 'image' ? '📷 Photo' : attachmentToSend.kind === 'video' ? '🎥 Video' : attachmentToSend.kind === 'audio' ? '🎵 Audio' : '📄 Document'} ${contentToSend ? `"${contentToSend}"` : ''}`
-        : `Me: ${contentToSend}`;
+      const lastMsgDisplay = `Me: ${contentToSend}`;
 
       setChats(prev => prev.map(chat => 
         chat.id === activeChat 
@@ -2245,66 +2262,7 @@ export default function ChatPage() {
       emitTyping(activeChat, false);
       scrollToBottom('smooth');
 
-      let uploadedMediaUrl: string | null = null;
-      let uploadedPublicId: string | null = null;
-      let uploadedResourceType: string | null = null;
-
-      if (attachmentToSend) {
-        setIsUploadingAttachment(true);
-        setUploadProgress(15);
-        try {
-          // 1. Direct failover upload to Cloudinary
-          const uploadRes = await uploadFile(attachmentToSend.file, (p) => setUploadProgress(p));
-          uploadedMediaUrl = uploadRes.secure_url;
-          uploadedPublicId = uploadRes.public_id;
-          uploadedResourceType = uploadRes.resource_type;
-        } catch (clientUploadErr) {
-          console.warn("[Upload] Direct upload failed, falling back to server route...", clientUploadErr);
-          // 2. Server route fallback
-          const formData = new FormData();
-          formData.append('file', attachmentToSend.file);
-          const apiRes = await fetch('/api/upload', {
-            method: 'POST',
-            body: formData
-          }).then(r => r.json());
-
-          if (apiRes.success && apiRes.url) {
-            uploadedMediaUrl = apiRes.url;
-            uploadedPublicId = apiRes.publicId;
-            uploadedResourceType = apiRes.resourceType;
-          } else {
-            alert(apiRes.error || "Failed to upload media attachment. Please check file size and try again.");
-            setIsUploadingAttachment(false);
-            if (attachmentToSend?.previewUrl?.startsWith('blob:')) {
-              URL.revokeObjectURL(attachmentToSend.previewUrl);
-            }
-            // Restore composer state so user doesn't lose their input
-            setNewMessage(contentToSend);
-            setPendingAttachment(attachmentToSend);
-            setMessagesByChat(prev => ({
-              ...prev,
-              [activeChat]: (prev[activeChat] || []).filter(m => m.id !== tempId)
-            }));
-            fetchChats();
-            return;
-          }
-        } finally {
-          setIsUploadingAttachment(false);
-          setUploadProgress(0);
-        }
-      }
-
-      if (attachmentToSend?.previewUrl?.startsWith('blob:')) {
-        URL.revokeObjectURL(attachmentToSend.previewUrl);
-      }
-
-      const mediaPayload = uploadedMediaUrl ? {
-        mediaUrl: uploadedMediaUrl,
-        mediaPublicId: uploadedPublicId || undefined,
-        mediaResourceType: uploadedResourceType || attachmentToSend?.kind || undefined
-      } : undefined;
-
-      const res = await sendRealChatMessage(activeChat, contentToSend, parentIdToSend, undefined, mediaPayload);
+      const res = await sendRealChatMessage(activeChat, contentToSend, parentIdToSend, undefined, undefined);
       if (res.success && res.message) {
         setMessagesByChat(prev => {
           const msgs = prev[activeChat] || [];
@@ -2326,8 +2284,8 @@ export default function ChatPage() {
             senderName: session?.user?.name || 'User',
             senderAvatar: session?.user?.image || '/default-user-avatar.svg',
             text: contentToSend,
-            mediaUrl: (res.message as any).mediaUrl || uploadedMediaUrl || null,
-            mediaResourceType: (res.message as any).mediaResourceType || uploadedResourceType || null,
+            mediaUrl: (res.message as any).mediaUrl || null,
+            mediaResourceType: (res.message as any).mediaResourceType || null,
             isGroup: activeChatDetails?.isGroup || false,
             receiverId: activeChatDetails?.otherUserId || null,
             createdAt: (res.message as any).createdAt || new Date().toISOString(),
@@ -2378,7 +2336,6 @@ export default function ChatPage() {
         alert(res?.error || "Failed to send message. Please try again.");
         // Restore message in composer on failure
         setNewMessage(contentToSend);
-        if (attachmentToSend) setPendingAttachment(attachmentToSend);
         setMessagesByChat(prev => ({
           ...prev,
           [activeChat]: (prev[activeChat] || []).filter(m => m.id !== tempId)
@@ -2389,7 +2346,6 @@ export default function ChatPage() {
       console.error("Error in handleSendMessage:", err);
       // Restore message on catch
       setNewMessage(contentToSend);
-      if (attachmentToSend) setPendingAttachment(attachmentToSend);
       setMessagesByChat(prev => ({
         ...prev,
         [activeChat]: (prev[activeChat] || []).filter(m => m.id !== tempId)

@@ -373,9 +373,9 @@ export async function sendRealChatMessage(
       return { success: false, error: 'You are restricted from sending messages.' };
     }
 
-    const { writeLimiter } = require('@/lib/rate-limit');
+    const { chatLimiter } = require('@/lib/rate-limit');
     const userIdentifier = `chat_send:${senderId}`;
-    if (writeLimiter.isRateLimited(userIdentifier)) {
+    if (chatLimiter.isRateLimited(userIdentifier)) {
       return { success: false, error: 'Sending too fast. Please wait a moment.' };
     }
 
@@ -386,10 +386,46 @@ export async function sendRealChatMessage(
       return { success: false, error: 'Message cannot be empty.' };
     }
 
-    const chat = await prisma.chat.findUnique({
-      where: { id: chatId },
+    let targetChatId = chatId;
+    let chat = await prisma.chat.findUnique({
+      where: { id: targetChatId },
       include: { participants: true }
     });
+
+    if (!chat) {
+      // 1. Try finding as a toleeId (group chat)
+      const tolee = await prisma.tolee.findUnique({
+        where: { id: chatId },
+        include: { members: { where: { userId: senderId, status: 'approved' } } }
+      });
+      if (tolee && tolee.members.length > 0) {
+        let groupChat = await prisma.chat.findFirst({
+          where: { name: tolee.name, isGroupChat: true }
+        });
+        if (!groupChat) {
+          groupChat = await prisma.chat.create({
+            data: { name: tolee.name, isGroupChat: true }
+          });
+        }
+        chat = { ...groupChat, participants: [] };
+        targetChatId = groupChat.id;
+      } else {
+        // 2. Try finding as a recipient userId (personal DM)
+        const recipientUser = await prisma.user.findUnique({
+          where: { id: chatId }
+        });
+        if (recipientUser) {
+          const res = await getOrCreatePersonalChat(recipientUser.id);
+          if (res.success && res.chatId) {
+            targetChatId = res.chatId;
+            chat = await prisma.chat.findUnique({
+              where: { id: targetChatId },
+              include: { participants: true }
+            });
+          }
+        }
+      }
+    }
 
     if (!chat) {
       return { success: false, error: 'Chat not found.' };
@@ -405,10 +441,13 @@ export async function sendRealChatMessage(
         return { success: false, error: 'You are not a member of this group.' };
       }
     } else {
-      // Verify sender is a participant of this 1-on-1 DM
+      // Ensure sender is added to participants if missing
       const isParticipant = chat.participants.some(p => p.userId === senderId);
       if (!isParticipant) {
-        return { success: false, error: 'You are not a participant in this conversation.' };
+        await prisma.chatParticipant.create({
+          data: { chatId: targetChatId, userId: senderId }
+        });
+        chat.participants.push({ id: `cp-${Date.now()}`, chatId: targetChatId, userId: senderId } as any);
       }
 
       if (chat.status === 'declined') {
@@ -417,15 +456,15 @@ export async function sendRealChatMessage(
 
       if (chat.status === 'pending') {
         if (!chat.requestSenderId) {
-          // Set the initial sender as requestSenderId
+          // Set initial sender as requestSenderId
           await prisma.chat.update({
-            where: { id: chatId },
+            where: { id: targetChatId },
             data: { requestSenderId: senderId }
           });
         } else if (chat.requestSenderId !== senderId) {
           // Recipient is replying -> automatically activate chat
           await prisma.chat.update({
-            where: { id: chatId },
+            where: { id: targetChatId },
             data: { status: 'accepted' }
           });
         }
@@ -439,7 +478,7 @@ export async function sendRealChatMessage(
         where: { id: parentId },
         select: { id: true, chatId: true }
       });
-      if (parentMsg && parentMsg.chatId === chatId) {
+      if (parentMsg && parentMsg.chatId === targetChatId) {
         validParentId = parentMsg.id;
       }
     }
@@ -451,7 +490,7 @@ export async function sendRealChatMessage(
         mediaPublicId: mediaData?.mediaPublicId || null,
         mediaResourceType: mediaData?.mediaResourceType || null,
         senderId,
-        chatId,
+        chatId: targetChatId,
         parentId: validParentId,
         storyId: storyReplyData?.storyId || null,
         storyType: storyReplyData?.storyType || null,
