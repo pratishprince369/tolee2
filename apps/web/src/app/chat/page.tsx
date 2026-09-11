@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -56,13 +56,19 @@ import {
   MediaAttachmentInfo,
   extractVideoMetadata 
 } from '@/components/chat/MediaAttachmentMessage';
-import { MediaViewerModal } from '@/components/chat/MediaViewerModal';
-import { AttachmentMenu } from '@/components/chat/AttachmentMenu';
+import { MediaViewerModal, ActiveMediaViewerData } from '@/components/chat/MediaViewerModal';
+import { AttachmentMenu, AttachmentOption } from '@/components/chat/AttachmentMenu';
 import { AttachmentPreviewModal, PendingAttachmentItem } from '@/components/chat/AttachmentPreviewModal';
 import { VoiceMessagePlayer, VoiceRecorder } from '@/components/chat/VoiceMessage';
 import { LocationCard, ContactCard } from '@/components/chat/LocationAndContactCards';
 import { ForwardModal, ReactionsBar, ReactionsBadges } from '@/components/chat/ForwardAndReactionModals';
 import { ChatMediaGalleryDrawer } from '@/components/chat/ChatMediaGalleryDrawer';
+import { CameraCaptureModal } from '@/components/chat/CameraCaptureModal';
+import { ContactPickerModal, ContactInfo } from '@/components/chat/ContactPickerModal';
+import { PollCreationModal, PollCard, PollData } from '@/components/chat/PollModalAndCard';
+import { EventCreationModal, EventCard, EventData } from '@/components/chat/EventModalAndCard';
+import { StickerPickerModal } from '@/components/chat/StickerPickerModal';
+import { voteChatMessagePoll, respondToChatMessageEvent } from '@/actions/chat';
 import { uploadFile } from '@/lib/upload';
 import { formatLastSeen, isUserOnline } from '@/lib/presence';
 
@@ -246,6 +252,15 @@ const formatLastMessage = (msgText: string) => {
       }
       if (payload.type === 'shared_product' || payload.type === 'product') {
         return `${sender}🛍 Shared Product`;
+      }
+      if (payload.type === 'poll') {
+        return `${sender}📊 Poll: ${payload.question || 'Poll'}`;
+      }
+      if (payload.type === 'event') {
+        return `${sender}📅 Event: ${payload.title || 'Event'}`;
+      }
+      if (payload.type === 'contact') {
+        return `${sender}👤 Contact: ${payload.name || 'Contact'}`;
       }
       if (payload.type === 'location' || payload.type === 'shared_location') {
         return `${sender}📍 Location`;
@@ -723,6 +738,11 @@ export default function ChatPage() {
   // --- WhatsApp-Style Attachment & Media States ---
   const [showAttachmentModal, setShowAttachmentModal] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [showCameraModal, setShowCameraModal] = useState(false);
+  const [showContactPickerModal, setShowContactPickerModal] = useState(false);
+  const [showPollModal, setShowPollModal] = useState(false);
+  const [showEventModal, setShowEventModal] = useState(false);
+  const [showStickerModal, setShowStickerModal] = useState(false);
   const [pendingAttachments, setPendingAttachments] = useState<PendingAttachmentItem[]>([]);
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -744,12 +764,7 @@ export default function ChatPage() {
   const [aiSummaryModal, setAiSummaryModal] = useState<{ isOpen: boolean; title: string; text: string } | null>(null);
 
   // --- Fullscreen Media Viewer Modal State ---
-  const [activeMediaViewer, setActiveMediaViewer] = useState<{
-    type: 'image' | 'video' | 'pdf' | 'document' | 'audio';
-    url: string;
-    filename?: string;
-    sender?: string;
-  } | null>(null);
+  const [activeMediaViewer, setActiveMediaViewer] = useState<ActiveMediaViewerData | null>(null);
 
   // --- Emoji Picker ---
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -783,6 +798,22 @@ export default function ChatPage() {
   const [showMediaGallery, setShowMediaGallery] = useState(false);
   const [reactionPicker, setReactionPicker] = useState<{ messageId: string; x: number; y: number } | null>(null);
   const [deleteConfirmModal, setDeleteConfirmModal] = useState<{ isOpen: boolean; message: any } | null>(null);
+
+  const availableContacts = useMemo<ContactInfo[]>(() => {
+    const list: ContactInfo[] = [];
+    const seenIds = new Set<string>();
+    chats.forEach((c: any) => {
+      if (!c.isGroup && c.otherUserId && !seenIds.has(c.otherUserId)) {
+        seenIds.add(c.otherUserId);
+        list.push({
+          userId: c.otherUserId,
+          name: c.name || c.username || 'User',
+          avatar: c.avatar || undefined,
+        });
+      }
+    });
+    return list;
+  }, [chats]);
 
   // --- Sync Redirection & Query Parameters ---
   useEffect(() => {
@@ -1674,10 +1705,10 @@ export default function ChatPage() {
     return () => window.removeEventListener('paste', handleWindowPaste);
   }, [activeChat]);
 
-  const handleSelectAttachmentOption = (opt: 'camera' | 'image' | 'video' | 'document' | 'audio' | 'location' | 'contact') => {
+  const handleSelectAttachmentOption = (opt: AttachmentOption) => {
     setShowAttachmentModal(false);
     if (opt === 'camera') {
-      cameraInputRef.current?.click();
+      setShowCameraModal(true);
     } else if (opt === 'image') {
       imageInputRef.current?.click();
     } else if (opt === 'video') {
@@ -1689,7 +1720,204 @@ export default function ChatPage() {
     } else if (opt === 'location') {
       handleShareLocation();
     } else if (opt === 'contact') {
-      handleShareContact();
+      setShowContactPickerModal(true);
+    } else if (opt === 'poll') {
+      setShowPollModal(true);
+    } else if (opt === 'event') {
+      setShowEventModal(true);
+    } else if (opt === 'sticker') {
+      setShowStickerModal(true);
+    }
+  };
+
+  const handleCameraCapture = (file: File, kind: 'image' | 'video') => {
+    addFilesToPending([file], kind);
+  };
+
+  const handleShareLocation = () => {
+    if (!activeChat) return;
+    if (typeof window === 'undefined' || !navigator.geolocation) {
+      alert("Geolocation is not supported by your browser.");
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        const locationData = {
+          lat,
+          lng,
+          name: 'Live GPS Location',
+          address: `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`
+        };
+        await sendSpecialMessage({
+          text: '📍 Location',
+          extraData: { locationData }
+        });
+      },
+      (err) => {
+        console.warn("[Location] Geolocation error:", err);
+        alert("Unable to retrieve location: " + (err.message || 'Permission denied'));
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
+
+  const handleSendContact = async (contact: ContactInfo) => {
+    await sendSpecialMessage({
+      text: `👤 Contact: ${contact.name}`,
+      extraData: { contactData: contact }
+    });
+  };
+
+  const handleSendPoll = async (poll: { question: string; options: string[]; allowMultiple: boolean }) => {
+    const pollPayload = {
+      type: 'poll',
+      id: `poll-${Date.now()}`,
+      question: poll.question,
+      allowMultiple: poll.allowMultiple,
+      options: poll.options.map((opt, i) => ({
+        id: `opt-${i}`,
+        text: opt,
+        votes: []
+      })),
+      creatorId: currentUserId,
+      creatorName: session?.user?.name || 'You'
+    };
+    await sendSpecialMessage({
+      text: `__SHARED_CONTENT__:${JSON.stringify(pollPayload)}`
+    });
+  };
+
+  const handleSendEvent = async (event: { title: string; date: string; time: string; description?: string; location?: string }) => {
+    const eventPayload = {
+      type: 'event',
+      id: `event-${Date.now()}`,
+      title: event.title,
+      date: event.date,
+      time: event.time,
+      description: event.description,
+      location: event.location,
+      responses: { going: [currentUserId], maybe: [], cantGo: [] },
+      creatorId: currentUserId,
+      creatorName: session?.user?.name || 'You'
+    };
+    await sendSpecialMessage({
+      text: `__SHARED_CONTENT__:${JSON.stringify(eventPayload)}`
+    });
+  };
+
+  const handleSendSticker = async (sticker: { url: string; name: string }) => {
+    await sendSpecialMessage({
+      text: `[sticker] ${sticker.name}`,
+      mediaData: {
+        mediaUrl: sticker.url,
+        mediaResourceType: 'sticker'
+      }
+    });
+  };
+
+  const sendSpecialMessage = async ({
+    text,
+    mediaData,
+    extraData
+  }: {
+    text: string;
+    mediaData?: { mediaUrl: string; mediaPublicId?: string; mediaResourceType?: string };
+    extraData?: any;
+  }) => {
+    if (!activeChat) return;
+    const tempId = 'temp-' + Date.now();
+    const optimisticMsg = {
+      id: tempId,
+      sender: 'Me',
+      senderAvatar: session?.user?.image || '/default-user-avatar.svg',
+      senderId: currentUserId,
+      text,
+      mediaUrl: mediaData?.mediaUrl || null,
+      mediaResourceType: mediaData?.mediaResourceType || null,
+      locationData: extraData?.locationData ? (typeof extraData.locationData === 'string' ? extraData.locationData : JSON.stringify(extraData.locationData)) : null,
+      contactData: extraData?.contactData ? (typeof extraData.contactData === 'string' ? extraData.contactData : JSON.stringify(extraData.contactData)) : null,
+      voiceDuration: extraData?.voiceDuration || null,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      createdAt: new Date().toISOString(),
+      isMe: true,
+      replyTo: replyingToMessage ? { ...replyingToMessage } : null
+    };
+
+    setReplyingToMessage(null);
+    setMessagesByChat(prev => ({
+      ...prev,
+      [activeChat]: [...(prev[activeChat] || []), optimisticMsg]
+    }));
+
+    const lastDisplay = text.startsWith('__SHARED_CONTENT__:') ? 'Me: 🔗 Shared Content' : `Me: ${text}`;
+    setChats(prev => prev.map(c => c.id === activeChat ? { ...c, lastMessage: lastDisplay, time: optimisticMsg.time, lastMessageCreatedAt: optimisticMsg.createdAt } : c));
+    scrollToBottom('smooth');
+
+    const res = await sendRealChatMessage(activeChat, text, replyingToMessage?.id, undefined, mediaData, extraData);
+    if (res.success && res.message) {
+      setMessagesByChat(prev => ({
+        ...prev,
+        [activeChat]: (prev[activeChat] || []).map(m => m.id === tempId ? { ...res.message, isMe: true } : m)
+      }));
+      if (socket) {
+        const activeChatDetails = chats.find(c => c.id === activeChat);
+        socket.emit('send-chat-message', {
+          ...res.message,
+          chatId: activeChat,
+          senderId: currentUserId,
+          senderName: session?.user?.name || 'User',
+          senderAvatar: session?.user?.image || '/default-user-avatar.svg',
+          isGroup: activeChatDetails?.isGroup || false,
+          receiverId: activeChatDetails?.otherUserId || null
+        });
+      }
+      fetchChats();
+      scrollToBottom('smooth');
+    } else {
+      alert(res?.error || "Failed to send message.");
+      setMessagesByChat(prev => ({
+        ...prev,
+        [activeChat]: (prev[activeChat] || []).filter(m => m.id !== tempId)
+      }));
+    }
+  };
+
+  const handleVotePoll = async (msgId: string, optionIndex: number) => {
+    if (!activeChat) return;
+    const res = await voteChatMessagePoll(activeChat, msgId, optionIndex);
+    if (res.success && res.message) {
+      setMessagesByChat(prev => ({
+        ...prev,
+        [activeChat]: (prev[activeChat] || []).map(m => m.id === msgId ? { ...m, ...res.message, isMe: m.isMe } : m)
+      }));
+      if (socket) {
+        socket.emit('send-chat-message', {
+          ...res.message,
+          chatId: activeChat,
+          senderId: currentUserId
+        });
+      }
+    }
+  };
+
+  const handleRSVPEvent = async (msgId: string, responseType: 'going' | 'maybe' | 'cantGo') => {
+    if (!activeChat) return;
+    const res = await respondToChatMessageEvent(activeChat, msgId, responseType);
+    if (res.success && res.message) {
+      setMessagesByChat(prev => ({
+        ...prev,
+        [activeChat]: (prev[activeChat] || []).map(m => m.id === msgId ? { ...m, ...res.message, isMe: m.isMe } : m)
+      }));
+      if (socket) {
+        socket.emit('send-chat-message', {
+          ...res.message,
+          chatId: activeChat,
+          senderId: currentUserId
+        });
+      }
     }
   };
 
@@ -2500,7 +2728,7 @@ export default function ChatPage() {
       })
     }));
 
-    const res = await pinChatMessage(msg.id, nextPinnedState);
+    const res = await pinChatMessage(activeChat, msg.id, nextPinnedState);
     if (res.success && socket) {
       socket.emit('send-message-pin', {
         chatId: activeChat,
@@ -2557,6 +2785,7 @@ export default function ChatPage() {
       const res = await sendRealChatMessage(activeChat, '', undefined, undefined, {
         mediaUrl: uploadedMediaUrl,
         mediaResourceType: 'audio',
+      }, {
         voiceDuration: Math.round(durationSec)
       });
 
@@ -2594,91 +2823,6 @@ export default function ChatPage() {
       }));
     } finally {
       setIsRecordingVoice(false);
-    }
-  };
-
-  const handleShareLocation = () => {
-    if (!navigator.geolocation) {
-      alert("Geolocation is not supported by your browser.");
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        if (!activeChat) return;
-        const loc = {
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          name: 'Current Location',
-          address: `${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`
-        };
-        const res = await sendRealChatMessage(activeChat, '📍 Location', undefined, undefined, {
-          locationData: loc
-        });
-        if (res.success && res.message) {
-          setMessagesByChat(prev => ({
-            ...prev,
-            [activeChat]: [...(prev[activeChat] || []), { ...res.message, isMe: true }]
-          }));
-          if (socket) {
-            socket.emit('send-chat-message', {
-              id: res.message.id,
-              messageId: res.message.id,
-              chatId: activeChat,
-              senderId: currentUserId,
-              senderName: session?.user?.name || 'User',
-              senderAvatar: session?.user?.image || '/default-user-avatar.svg',
-              text: '📍 Location',
-              locationData: loc,
-              isGroup: activeChatDetails?.isGroup || false,
-              receiverId: activeChatDetails?.otherUserId || null,
-              createdAt: (res.message as any).createdAt || new Date().toISOString(),
-              time: res.message.time
-            });
-          }
-          fetchChats();
-        }
-      },
-      (err) => {
-        alert("Unable to retrieve location: " + err.message);
-      },
-      { enableHighAccuracy: true }
-    );
-  };
-
-  const handleShareContact = async () => {
-    if (!activeChat) return;
-    const name = prompt("Enter contact name:") || '';
-    if (!name.trim()) return;
-    const phone = prompt("Enter phone number or info:") || '';
-    const contact = {
-      name: name.trim(),
-      phone: phone.trim()
-    };
-    const res = await sendRealChatMessage(activeChat, `👤 Contact: ${contact.name}`, undefined, undefined, {
-      contactData: contact
-    });
-    if (res.success && res.message) {
-      setMessagesByChat(prev => ({
-        ...prev,
-        [activeChat]: [...(prev[activeChat] || []), { ...res.message, isMe: true }]
-      }));
-      if (socket) {
-        socket.emit('send-chat-message', {
-          id: res.message.id,
-          messageId: res.message.id,
-          chatId: activeChat,
-          senderId: currentUserId,
-          senderName: session?.user?.name || 'User',
-          senderAvatar: session?.user?.image || '/default-user-avatar.svg',
-          text: `👤 Contact: ${contact.name}`,
-          contactData: contact,
-          isGroup: activeChatDetails?.isGroup || false,
-          receiverId: activeChatDetails?.otherUserId || null,
-          createdAt: (res.message as any).createdAt || new Date().toISOString(),
-          time: res.message.time
-        });
-      }
-      fetchChats();
     }
   };
 
@@ -3697,8 +3841,11 @@ export default function ChatPage() {
                                 </div>
                               ) : msg.locationData ? (
                                 <div className="space-y-1">
-                                  <LocationCard location={msg.locationData} isMe={msg.isMe} time={msg.time} />
-                                  {msg.text && msg.text !== '📍 Location' && (
+                                  <LocationCard 
+                                    locationData={typeof msg.locationData === 'string' ? JSON.parse(msg.locationData) : msg.locationData} 
+                                    isMe={msg.isMe} 
+                                  />
+                                  {msg.text && msg.text !== '📍 Location' && !msg.text.startsWith('📍') && (
                                     <p className="text-[14px] sm:text-[15px] leading-relaxed whitespace-pre-wrap break-words">{msg.text}</p>
                                   )}
                                   <div className="flex flex-wrap items-end justify-between gap-x-4 min-w-0 w-full">
@@ -3711,9 +3858,9 @@ export default function ChatPage() {
                               ) : msg.contactData ? (
                                 <div className="space-y-1">
                                   <ContactCard 
-                                    contact={msg.contactData} 
+                                    contactData={typeof msg.contactData === 'string' ? JSON.parse(msg.contactData) : msg.contactData} 
                                     isMe={msg.isMe}
-                                    onMessageUser={(userId) => {
+                                    onStartChatWithContact={(userId) => {
                                       if (userId) {
                                         getOrCreatePersonalChat(userId).then(res => {
                                           if (res.success && res.chatId) {
@@ -3731,13 +3878,42 @@ export default function ChatPage() {
                                     </div>
                                   </div>
                                 </div>
+                              ) : (msg.mediaResourceType === 'sticker' || (msg.mediaUrl && msg.mediaUrl.includes('stickers/'))) ? (
+                                <div className="py-1">
+                                  <div className="relative inline-block">
+                                    <img
+                                      src={msg.mediaUrl}
+                                      alt="Sticker"
+                                      className="w-32 h-32 sm:w-40 sm:h-40 object-contain select-none drop-shadow-md pointer-events-none"
+                                      loading="lazy"
+                                    />
+                                  </div>
+                                  <div className="flex flex-wrap items-end justify-between gap-x-4 min-w-0 w-full">
+                                    <div className={`inline-flex items-center gap-1 text-[9px] select-none ml-auto mt-0.5 shrink-0 ${msg.isMe ? 'text-primary-foreground/75' : 'text-gray-400 dark:text-zinc-500'}`}>
+                                      <span>{msg.time}</span>
+                                      {msg.isMe && (
+                                        msg.id.startsWith('temp-') ? (
+                                          <Clock className="w-3.5 h-3.5 text-primary-foreground/75 animate-pulse shrink-0" />
+                                        ) : (
+                                          <CheckCheck 
+                                            className={`w-3.5 h-3.5 shrink-0 ${
+                                              !activeChatDetails?.isGroup && msg.isRead 
+                                                ? 'text-sky-300 dark:text-sky-400' 
+                                                : 'text-primary-foreground/60'
+                                            }`} 
+                                            strokeWidth={2.5} 
+                                          />
+                                        )
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
                               ) : (msg.mediaResourceType === 'audio' || msg.voiceDuration) && msg.mediaUrl ? (
                                 <div className="py-1">
                                   <VoiceMessagePlayer 
                                     audioUrl={msg.mediaUrl}
                                     duration={msg.voiceDuration}
                                     isMe={msg.isMe}
-                                    time={msg.time}
                                   />
                                   <div className="flex flex-wrap items-end justify-between gap-x-4 min-w-0 w-full">
                                     <div className={`inline-flex items-center gap-1 text-[9px] select-none ml-auto mt-0.5 shrink-0 ${msg.isMe ? 'text-primary-foreground/75' : 'text-gray-400 dark:text-zinc-500'}`}>
@@ -3810,6 +3986,40 @@ export default function ChatPage() {
                                   try {
                                     const jsonIdx = msg.text.indexOf('__SHARED_CONTENT__:');
                                     const payload = JSON.parse(msg.text.substring(jsonIdx + 19));
+                                    if (payload.type === 'poll') {
+                                      return (
+                                        <div className="py-1">
+                                          <PollCard 
+                                            pollData={payload} 
+                                            isMe={msg.isMe} 
+                                            currentUserId={currentUserId} 
+                                            onVote={(optIdx: number) => handleVotePoll(msg.id, optIdx)} 
+                                          />
+                                          <div className="flex flex-wrap items-end justify-between gap-x-4 min-w-0 w-full mt-1">
+                                            <div className={`inline-flex items-center gap-1 text-[9px] select-none ml-auto shrink-0 ${msg.isMe ? 'text-primary-foreground/75' : 'text-gray-400 dark:text-zinc-500'}`}>
+                                              <span>{msg.time}</span>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    }
+                                    if (payload.type === 'event') {
+                                      return (
+                                        <div className="py-1">
+                                          <EventCard 
+                                            eventData={payload} 
+                                            isMe={msg.isMe} 
+                                            currentUserId={currentUserId} 
+                                            onRSVP={(status: 'going' | 'maybe' | 'cantGo') => handleRSVPEvent(msg.id, status)} 
+                                          />
+                                          <div className="flex flex-wrap items-end justify-between gap-x-4 min-w-0 w-full mt-1">
+                                            <div className={`inline-flex items-center gap-1 text-[9px] select-none ml-auto shrink-0 ${msg.isMe ? 'text-primary-foreground/75' : 'text-gray-400 dark:text-zinc-500'}`}>
+                                              <span>{msg.time}</span>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    }
                                     return <SharedContentCard payload={payload} />;
                                   } catch (e) {
                                     return (
@@ -3905,7 +4115,7 @@ export default function ChatPage() {
                                 <ReactionsBadges 
                                   reactions={msg.reactions} 
                                   currentUserId={currentUserId} 
-                                  onReact={(emoji) => handleReactToMessage(msg.id, emoji)} 
+                                  onReactToggle={(emoji: string) => handleReactToMessage(msg.id, emoji)} 
                                 />
                               </div>
                             )}
@@ -4838,7 +5048,7 @@ export default function ChatPage() {
         isOpen={showMediaGallery}
         onClose={() => setShowMediaGallery(false)}
         chatId={activeChat}
-        chatTitle={activeChatDetails?.name}
+        chatName={activeChatDetails?.name || 'Chat'}
       />
 
       {/* ── WhatsApp-Style Delete Message Confirmation Dialog ── */}
@@ -4915,6 +5125,52 @@ export default function ChatPage() {
             </div>
           </DialogContent>
         </Dialog>
+      )}
+
+      {/* ── WhatsApp-Style Live Camera Capture Modal (Photo & Video) ── */}
+      {showCameraModal && (
+        <CameraCaptureModal
+          isOpen={showCameraModal}
+          onClose={() => setShowCameraModal(false)}
+          onCaptureComplete={handleCameraCapture}
+        />
+      )}
+
+      {/* ── WhatsApp-Style Contact Picker & Sharing Modal ── */}
+      {showContactPickerModal && (
+        <ContactPickerModal
+          isOpen={showContactPickerModal}
+          onClose={() => setShowContactPickerModal(false)}
+          onSelectContact={handleSendContact}
+          availableContacts={availableContacts}
+        />
+      )}
+
+      {/* ── WhatsApp-Style Poll Creation Modal ── */}
+      {showPollModal && (
+        <PollCreationModal
+          isOpen={showPollModal}
+          onClose={() => setShowPollModal(false)}
+          onCreatePoll={handleSendPoll}
+        />
+      )}
+
+      {/* ── WhatsApp-Style Event Creation Modal ── */}
+      {showEventModal && (
+        <EventCreationModal
+          isOpen={showEventModal}
+          onClose={() => setShowEventModal(false)}
+          onCreateEvent={handleSendEvent}
+        />
+      )}
+
+      {/* ── WhatsApp-Style Sticker Picker Modal ── */}
+      {showStickerModal && (
+        <StickerPickerModal
+          isOpen={showStickerModal}
+          onClose={() => setShowStickerModal(false)}
+          onSelectSticker={handleSendSticker}
+        />
       )}
 
     </div>

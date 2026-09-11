@@ -1294,3 +1294,174 @@ export async function fetchChatMediaGallery(chatId: string) {
   }
 }
 
+// ── Vote in an interactive chat poll ──
+export async function voteChatMessagePoll(chatId: string, messageId: string, optionIndex: number) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !(session.user as any).id) {
+      return { success: false, error: 'Unauthorized' };
+    }
+    const userId = (session.user as any).id;
+
+    const message = await prisma.message.findUnique({
+      where: { id: messageId },
+      include: {
+        sender: true,
+        parent: { include: { sender: true } }
+      }
+    });
+
+    if (!message || message.chatId !== chatId) {
+      return { success: false, error: 'Message not found' };
+    }
+
+    let rawJson = message.content;
+    const prefixMatch = rawJson.match(/^([^:]+):\s*__SHARED_CONTENT__:(.*)$/);
+    if (prefixMatch) {
+      rawJson = prefixMatch[2];
+    } else if (rawJson.startsWith('__SHARED_CONTENT__:')) {
+      rawJson = rawJson.substring(19);
+    }
+
+    let payload: any;
+    try {
+      payload = JSON.parse(rawJson);
+    } catch {
+      return { success: false, error: 'Invalid poll payload' };
+    }
+
+    if (payload.type !== 'poll' || !Array.isArray(payload.options) || !payload.options[optionIndex]) {
+      return { success: false, error: 'Invalid poll option' };
+    }
+
+    const allowMultiple = !!payload.allowMultiple;
+    const targetOption = payload.options[optionIndex];
+    if (!Array.isArray(targetOption.votes)) {
+      targetOption.votes = [];
+    }
+
+    const alreadyVotedTarget = targetOption.votes.includes(userId);
+
+    if (allowMultiple) {
+      // Toggle vote for target option
+      if (alreadyVotedTarget) {
+        targetOption.votes = targetOption.votes.filter((id: string) => id !== userId);
+      } else {
+        targetOption.votes.push(userId);
+      }
+    } else {
+      // Single choice: remove from all options, then toggle or set on target
+      payload.options.forEach((opt: any) => {
+        if (Array.isArray(opt.votes)) {
+          opt.votes = opt.votes.filter((id: string) => id !== userId);
+        }
+      });
+      if (!alreadyVotedTarget) {
+        targetOption.votes.push(userId);
+      }
+    }
+
+    const updatedContent = `__SHARED_CONTENT__:${JSON.stringify(payload)}`;
+    const updatedMessage = await prisma.message.update({
+      where: { id: messageId },
+      data: { content: updatedContent },
+      include: {
+        sender: true,
+        parent: { include: { sender: true } }
+      }
+    });
+
+    return {
+      success: true,
+      message: formatMessageOutput(updatedMessage, userId)
+    };
+  } catch (error) {
+    console.error("Error voting on chat poll:", error);
+    return { success: false, error: 'Failed to record vote' };
+  }
+}
+
+// ── RSVP to an interactive chat event ──
+export async function respondToChatMessageEvent(
+  chatId: string, 
+  messageId: string, 
+  responseType: 'going' | 'maybe' | 'cantGo'
+) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !(session.user as any).id) {
+      return { success: false, error: 'Unauthorized' };
+    }
+    const userId = (session.user as any).id;
+
+    const message = await prisma.message.findUnique({
+      where: { id: messageId },
+      include: {
+        sender: true,
+        parent: { include: { sender: true } }
+      }
+    });
+
+    if (!message || message.chatId !== chatId) {
+      return { success: false, error: 'Message not found' };
+    }
+
+    let rawJson = message.content;
+    const prefixMatch = rawJson.match(/^([^:]+):\s*__SHARED_CONTENT__:(.*)$/);
+    if (prefixMatch) {
+      rawJson = prefixMatch[2];
+    } else if (rawJson.startsWith('__SHARED_CONTENT__:')) {
+      rawJson = rawJson.substring(19);
+    }
+
+    let payload: any;
+    try {
+      payload = JSON.parse(rawJson);
+    } catch {
+      return { success: false, error: 'Invalid event payload' };
+    }
+
+    if (payload.type !== 'event') {
+      return { success: false, error: 'Invalid event payload' };
+    }
+
+    if (!payload.responses) {
+      payload.responses = { going: [], maybe: [], cantGo: [] };
+    }
+    if (!Array.isArray(payload.responses.going)) payload.responses.going = [];
+    if (!Array.isArray(payload.responses.maybe)) payload.responses.maybe = [];
+    if (!Array.isArray(payload.responses.cantGo)) payload.responses.cantGo = [];
+
+    const isCurrentlySelected = payload.responses[responseType]?.includes(userId);
+
+    // Remove from all 3 response lists
+    payload.responses.going = payload.responses.going.filter((id: string) => id !== userId);
+    payload.responses.maybe = payload.responses.maybe.filter((id: string) => id !== userId);
+    payload.responses.cantGo = payload.responses.cantGo.filter((id: string) => id !== userId);
+
+    // If wasn't already selected, add to chosen response
+    if (!isCurrentlySelected) {
+      payload.responses[responseType].push(userId);
+    }
+
+    const updatedContent = `__SHARED_CONTENT__:${JSON.stringify(payload)}`;
+    const updatedMessage = await prisma.message.update({
+      where: { id: messageId },
+      data: { content: updatedContent },
+      include: {
+        sender: true,
+        parent: { include: { sender: true } }
+      }
+    });
+
+    return {
+      success: true,
+      message: formatMessageOutput(updatedMessage, userId)
+    };
+  } catch (error) {
+    console.error("Error responding to chat event:", error);
+    return { success: false, error: 'Failed to record RSVP response' };
+  }
+}
+
+

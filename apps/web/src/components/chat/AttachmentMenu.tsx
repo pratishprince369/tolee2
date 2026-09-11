@@ -1,12 +1,14 @@
 'use client';
 
 import React, { useEffect, useRef } from 'react';
-import { Camera, Image as ImageIcon, Video, FileText, Music, MapPin, User, X } from 'lucide-react';
+import { Camera, Image as ImageIcon, Video, FileText, Music, MapPin, User, BarChart2, Calendar, Smile, X } from 'lucide-react';
+
+export type AttachmentOption = 'camera' | 'image' | 'video' | 'document' | 'audio' | 'location' | 'contact' | 'poll' | 'event' | 'sticker';
 
 interface AttachmentMenuProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelectOption: (option: 'camera' | 'image' | 'video' | 'document' | 'audio' | 'location' | 'contact') => void;
+  onSelectOption: (option: AttachmentOption) => void;
 }
 
 export function AttachmentMenu({ isOpen, onClose, onSelectOption }: AttachmentMenuProps) {
@@ -40,46 +42,32 @@ export function AttachmentMenu({ isOpen, onClose, onSelectOption }: AttachmentMe
 
   const menuOptions = [
     {
+      id: 'document' as const,
+      label: 'Document',
+      icon: FileText,
+      bgGradient: 'from-blue-500 to-indigo-600 text-white shadow-blue-500/25',
+      desc: 'PDF, Word, Excel, PPT, TXT, Zip'
+    },
+    {
+      id: 'image' as const,
+      label: 'Photos & Videos',
+      icon: ImageIcon,
+      bgGradient: 'from-purple-500 to-indigo-600 text-white shadow-purple-500/25',
+      desc: 'Gallery photos & videos'
+    },
+    {
       id: 'camera' as const,
       label: 'Camera',
       icon: Camera,
       bgGradient: 'from-pink-500 to-rose-500 text-white shadow-pink-500/25',
-      desc: 'Take photo / record'
-    },
-    {
-      id: 'image' as const,
-      label: 'Photos',
-      icon: ImageIcon,
-      bgGradient: 'from-purple-500 to-indigo-600 text-white shadow-purple-500/25',
-      desc: 'Gallery images (JPG, PNG, WEBP)'
-    },
-    {
-      id: 'video' as const,
-      label: 'Video',
-      icon: Video,
-      bgGradient: 'from-red-500 to-amber-500 text-white shadow-red-500/25',
-      desc: 'Videos (MP4, MOV, WEBM)'
-    },
-    {
-      id: 'document' as const,
-      label: 'Document',
-      icon: FileText,
-      bgGradient: 'from-blue-500 to-cyan-500 text-white shadow-blue-500/25',
-      desc: 'PDF, Word, Excel, PPT, Zip'
+      desc: 'Capture photo / record clip'
     },
     {
       id: 'audio' as const,
       label: 'Audio',
       icon: Music,
       bgGradient: 'from-teal-500 to-emerald-500 text-white shadow-teal-500/25',
-      desc: 'Audio files & recordings'
-    },
-    {
-      id: 'location' as const,
-      label: 'Location',
-      icon: MapPin,
-      bgGradient: 'from-emerald-500 to-green-600 text-white shadow-emerald-500/25',
-      desc: 'Share current GPS location'
+      desc: 'Audio files & tracks'
     },
     {
       id: 'contact' as const,
@@ -87,6 +75,34 @@ export function AttachmentMenu({ isOpen, onClose, onSelectOption }: AttachmentMe
       icon: User,
       bgGradient: 'from-amber-500 to-orange-500 text-white shadow-amber-500/25',
       desc: 'Share contact card'
+    },
+    {
+      id: 'poll' as const,
+      label: 'Poll',
+      icon: BarChart2,
+      bgGradient: 'from-cyan-500 to-blue-600 text-white shadow-cyan-500/25',
+      desc: 'Create group voting poll'
+    },
+    {
+      id: 'event' as const,
+      label: 'Event',
+      icon: Calendar,
+      bgGradient: 'from-violet-500 to-purple-600 text-white shadow-violet-500/25',
+      desc: 'Schedule meetup & RSVP'
+    },
+    {
+      id: 'sticker' as const,
+      label: 'New Sticker',
+      icon: Smile,
+      bgGradient: 'from-yellow-400 to-amber-500 text-white shadow-yellow-500/25',
+      desc: 'Send fun sticker reaction'
+    },
+    {
+      id: 'location' as const,
+      label: 'Location',
+      icon: MapPin,
+      bgGradient: 'from-emerald-500 to-green-600 text-white shadow-emerald-500/25',
+      desc: 'Share current GPS location'
     }
   ];
 
