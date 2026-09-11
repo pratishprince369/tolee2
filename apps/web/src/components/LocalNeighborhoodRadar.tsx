@@ -82,6 +82,8 @@ export function LocalNeighborhoodRadar() {
   const [sortBy, setSortBy] = useState<'nearest' | 'latest' | 'top'>('nearest');
 
   // Map settings and layers
+  const [mobileViewMode, setMobileViewMode] = useState<'list' | 'map'>('list');
+  const [selectedMapPost, setSelectedMapPost] = useState<LocalRadarPost | null>(null);
   const [mapType, setMapType] = useState<'map' | 'satellite'>('map');
   const [mapSearchInput, setMapSearchInput] = useState<string>('');
   const [isFullscreenMap, setIsFullscreenMap] = useState<boolean>(false);
@@ -618,6 +620,22 @@ export function LocalNeighborhoodRadar() {
     }
   };
 
+  // Switch to mobile map view, center on post, and highlight it
+  const handleViewPostOnMap = (post: LocalRadarPost) => {
+    setSelectedMapPost(post);
+    setMobileViewMode('map');
+    setTimeout(() => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.invalidateSize();
+        mapInstanceRef.current.setView([post.latitude, post.longitude], 15, { animate: true });
+        const marker = markerLookupRef.current[post.id];
+        if (marker) {
+          setTimeout(() => marker.openPopup(), 200);
+        }
+      }
+    }, 150);
+  };
+
   // Initialize and update Leaflet Map
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -786,6 +804,10 @@ export function LocalNeighborhoodRadar() {
           .bindPopup(popupHtml)
           .addTo(markersGroup);
 
+        markerInstance.on('click', () => {
+          setSelectedMapPost(post);
+        });
+
         markerLookupRef.current[post.id] = markerInstance;
       });
     };
@@ -810,7 +832,19 @@ export function LocalNeighborhoodRadar() {
         document.body.appendChild(script);
       }
     }
-  }, [coords, allPosts, radiusKm, mapLayers, mapType, userCity]);
+  }, [coords, allPosts, radiusKm, mapLayers, mapType, userCity, mobileViewMode]);
+
+  // Invalidate and refresh Leaflet map size when switching to map view on mobile
+  useEffect(() => {
+    if (mobileViewMode === 'map') {
+      const timer = setTimeout(() => {
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.invalidateSize();
+        }
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [mobileViewMode]);
 
   // Handle map search input
   const handleMapSearchSubmit = async (e: React.FormEvent) => {
@@ -1127,10 +1161,204 @@ export function LocalNeighborhoodRadar() {
   }, []);
 
   return (
-    <div className="w-full space-y-5">
+    <div className="w-full space-y-3.5 sm:space-y-5 pb-28 lg:pb-0">
       
-      {/* 1. TOP HEADER ROW MATCHING REFERENCE DESIGN */}
-      <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-slate-200/80 dark:border-zinc-800 p-4 sm:p-5 shadow-xs flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4">
+      {/* 0. MOBILE-ONLY COMPACT RADAR HEADER (< lg) MATCHING REFERENCE DESIGN */}
+      <div className="lg:hidden bg-white dark:bg-zinc-900 rounded-2xl border border-slate-200/80 dark:border-zinc-800 p-3.5 shadow-2xs space-y-2.5">
+        <div className="flex items-center justify-between gap-2">
+          
+          {/* Left: Icon + Title + Inline Location & Weather */}
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            <div className="w-10 h-10 rounded-2xl bg-teal-50 dark:bg-teal-950/60 border border-teal-200/60 dark:border-teal-800/60 text-[#0E9F9A] dark:text-teal-400 flex items-center justify-center flex-shrink-0 shadow-2xs">
+              <Radio className="w-5 h-5 animate-pulse" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-black text-slate-900 dark:text-white tracking-tight">
+                  Tolee Radar
+                </span>
+                <span className="px-1.5 py-0.5 rounded-full bg-emerald-500 text-white text-[9px] font-black uppercase tracking-wider shadow-2xs">
+                  LIVE
+                </span>
+              </div>
+              <div className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 flex items-center gap-1.5 truncate mt-0.5">
+                <span className="truncate">{subLocation || userCity.split(',')[0] || 'Asia, Kalyan'}</span>
+                <span>•</span>
+                <span className="inline-flex items-center gap-1 text-amber-500 font-semibold flex-shrink-0">
+                  <Sun className="w-3 h-3 text-amber-500" /> 28° C
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Right: + Drop Alert & Map / List Toggle */}
+          <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+            <button
+              type="button"
+              onClick={() => openDropAlertModal()}
+              className="bg-[#0E9F9A] hover:bg-[#087A76] text-white text-xs font-black px-3 py-1.5 rounded-xl shadow-xs flex items-center gap-1 transition-all active:scale-95"
+            >
+              <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+              <span>Drop Alert</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                const nextMode = mobileViewMode === 'list' ? 'map' : 'list';
+                setMobileViewMode(nextMode);
+                if (nextMode === 'map') {
+                  setTimeout(() => {
+                    if (mapInstanceRef.current) {
+                      mapInstanceRef.current.invalidateSize();
+                    }
+                  }, 150);
+                }
+              }}
+              className="bg-white dark:bg-zinc-800 hover:bg-slate-50 border border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-200 text-xs font-bold px-3 py-1 rounded-xl shadow-2xs flex items-center gap-1.5 transition-all active:scale-95"
+            >
+              {mobileViewMode === 'list' ? (
+                <>
+                  <span className="text-xs">🗺</span>
+                  <span>Map</span>
+                </>
+              ) : (
+                <>
+                  <span className="text-xs">☷</span>
+                  <span>List</span>
+                </>
+              )}
+            </button>
+          </div>
+
+        </div>
+
+        {/* Compact GPS Row on Mobile */}
+        <div className="pt-2 border-t border-slate-100 dark:border-zinc-800/80 flex items-center justify-between text-[11px] font-bold text-slate-500 dark:text-zinc-400">
+          <div className="flex items-center gap-1.5 truncate">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />
+            <span className="text-emerald-600 dark:text-emerald-400 font-extrabold uppercase text-[10px]">
+              {locationSource === 'gps' ? 'GPS Active' : 'Relocated'}
+            </span>
+            <span>•</span>
+            <span className="truncate">{userCity}</span>
+          </div>
+
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              type="button"
+              onClick={() => fetchLocation(true)}
+              disabled={isGettingLocation}
+              title="Sync GPS Location"
+              className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isGettingLocation ? 'animate-spin text-[#0E9F9A]' : ''}`} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsSearchModalOpen(true)}
+              className="text-[#0E9F9A] text-[11px] font-bold hover:underline"
+            >
+              Change Area
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* MOBILE-ONLY HORIZONTAL CATEGORY BAR (< lg) */}
+      <div className="lg:hidden flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
+        {[
+          { id: 'all', label: `All (${counts.total})`, icon: null },
+          { id: 'alert', label: 'Alerts', count: counts.alerts, icon: '🚨' },
+          { id: 'food', label: 'Food', count: counts.food, icon: '🍔' },
+          { id: 'news', label: 'News', count: counts.news, icon: '📰' },
+          { id: 'deal', label: 'Deals', count: counts.deals, icon: '🏷️' }
+        ].map((tab) => {
+          const isActive = selectedFilter === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setSelectedFilter(tab.id)}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-extrabold whitespace-nowrap transition-all flex items-center gap-1.5 flex-shrink-0 ${
+                isActive
+                  ? 'bg-[#0E9F9A] text-white shadow-xs'
+                  : 'bg-white dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 border border-slate-200/80 dark:border-zinc-700'
+              }`}
+            >
+              {tab.icon && <span>{tab.icon}</span>}
+              <span>{tab.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* MOBILE-ONLY SORT & FILTER ROW (LIST VIEW ONLY) */}
+      {mobileViewMode === 'list' && (
+        <div className="lg:hidden flex items-center justify-between gap-2 px-1">
+          {/* Sort Selector */}
+          <div className="relative flex items-center">
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              className="bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-700 dark:text-zinc-200 shadow-2xs focus:outline-none focus:ring-1 focus:ring-[#0E9F9A] appearance-none pr-7 cursor-pointer"
+            >
+              <option value="latest">Sort: Latest</option>
+              <option value="nearest">Sort: Nearest</option>
+              <option value="top">Sort: Most Useful</option>
+            </select>
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 pointer-events-none" />
+          </div>
+
+          {/* Quick Radius Selector */}
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => {
+                const next = radiusKm === 5 ? 10 : radiusKm === 10 ? 25 : 5;
+                setRadiusKm(next);
+                fetchDbRadarPosts(coords.lat, coords.lng, next);
+              }}
+              className="bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-700 dark:text-zinc-200 shadow-2xs flex items-center gap-1.5 hover:bg-slate-50 transition-colors"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5 text-[#0E9F9A]" />
+              <span>{radiusKm} km</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* MOBILE-ONLY MAP SEARCH BAR (MAP VIEW ONLY) */}
+      {mobileViewMode === 'map' && (
+        <div className="lg:hidden flex items-center gap-2">
+          <form onSubmit={handleMapSearchSubmit} className="relative flex items-center flex-1">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search this area (landmark, locality...)"
+              value={mapSearchInput}
+              onChange={(e) => setMapSearchInput(e.target.value)}
+              className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl pl-10 pr-3.5 py-2 text-xs font-bold text-slate-800 dark:text-zinc-200 placeholder:text-slate-400 shadow-2xs focus:outline-none focus:ring-1 focus:ring-[#0E9F9A]"
+            />
+          </form>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (mapInstanceRef.current) {
+                mapInstanceRef.current.setView([coords.lat, coords.lng], 15, { animate: true });
+              }
+            }}
+            title="Locate Me"
+            className="w-9 h-9 rounded-xl bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-200 shadow-2xs flex items-center justify-center flex-shrink-0 hover:text-[#0E9F9A] transition-colors"
+          >
+            <LocateFixed className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* 1. TOP HEADER ROW MATCHING REFERENCE DESIGN (DESKTOP ONLY lg:) */}
+      <div className="hidden lg:flex bg-white dark:bg-zinc-900 rounded-2xl border border-slate-200/80 dark:border-zinc-800 p-4 sm:p-5 shadow-xs flex-col xl:flex-row items-start xl:items-center justify-between gap-4">
         
         {/* Left Section: Icon, Title & Badge */}
         <div className="flex items-center gap-3.5 flex-1 min-w-0">
@@ -1244,7 +1472,11 @@ export function LocalNeighborhoodRadar() {
           {/* HERO INTERACTIVE LEAFLET RADAR MAP CANVAS */}
           <div
             className={`bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200/80 dark:border-zinc-800 shadow-xs overflow-hidden relative ${
-              isFullscreenMap ? 'fixed inset-0 z-50 rounded-none h-screen' : 'h-[390px] sm:h-[420px]'
+              isFullscreenMap
+                ? 'fixed inset-0 z-50 rounded-none h-screen'
+                : mobileViewMode === 'map'
+                ? 'block h-[420px] sm:h-[460px] lg:h-[420px]'
+                : 'hidden lg:block h-[390px] sm:h-[420px]'
             }`}
           >
             {/* The Actual Leaflet Map Canvas */}
@@ -1404,8 +1636,71 @@ export function LocalNeighborhoodRadar() {
 
           </div>
 
-          {/* CATEGORY FILTER TABS & SORT ROW */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-zinc-900 p-2.5 sm:p-3 rounded-2xl border border-slate-200/80 dark:border-zinc-800 shadow-2xs">
+          {/* MOBILE-ONLY SELECTED POST PREVIEW CARD (MAP VIEW ONLY) */}
+          {mobileViewMode === 'map' && (
+            <div className="lg:hidden">
+              {(() => {
+                const activePost = selectedMapPost || filteredPosts[0];
+                if (!activePost) return null;
+                const isAlert = activePost.category === 'alert';
+                const isFood = activePost.category === 'food';
+                const isNews = activePost.category === 'news' || activePost.category === 'event';
+                return (
+                  <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-slate-200/80 dark:border-zinc-800 p-3 shadow-2xs flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                    <div className="w-18 h-18 rounded-xl overflow-hidden bg-slate-100 dark:bg-zinc-800 flex-shrink-0 relative border border-slate-200/60 dark:border-zinc-800">
+                      <img
+                        src={activePost.imageUrl || 'https://images.unsplash.com/photo-1509822929063-6b6cfc9b42f2?auto=format&fit=crop&w=300&q=80'}
+                        alt={activePost.title}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${
+                          isAlert ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400' :
+                          isFood ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400' :
+                          isNews ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400' :
+                          'bg-purple-500/10 text-purple-600 dark:text-purple-400'
+                        }`}>
+                          {activePost.category === 'alert' ? 'ALERT' :
+                           activePost.category === 'food' ? 'FOOD' :
+                           activePost.category === 'news' ? 'NEWS' : 'DEAL'}
+                        </span>
+                        {activePost.isLive && (
+                          <span className="text-[9px] font-black uppercase text-rose-600 dark:text-rose-400 flex items-center gap-1">
+                            🔴 LIVE
+                          </span>
+                        )}
+                        <span className="text-[10px] font-bold text-[#0E9F9A] ml-auto">
+                          📍 {formatDistance(activePost.distanceKm)}
+                        </span>
+                      </div>
+                      <h4 className="text-xs font-black text-slate-900 dark:text-white line-clamp-1 leading-snug">
+                        {activePost.title}
+                      </h4>
+                      {activePost.description && (
+                        <p className="text-[10px] text-slate-500 dark:text-zinc-400 line-clamp-1">
+                          {activePost.description}
+                        </p>
+                      )}
+                      <div className="flex items-center justify-between pt-0.5 text-[10px] text-slate-400">
+                        <span>{activePost.timeAgo}</span>
+                        <Link
+                          href={activePost.link || `/radar/${activePost.id}`}
+                          className="text-[#0E9F9A] font-extrabold hover:underline"
+                        >
+                          View Details →
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* CATEGORY FILTER TABS & SORT ROW (DESKTOP ONLY lg:) */}
+          <div className="hidden lg:flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-zinc-900 p-2.5 sm:p-3 rounded-2xl border border-slate-200/80 dark:border-zinc-800 shadow-2xs">
             
             {/* Filter Pills matching reference layout */}
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 no-scrollbar">
@@ -1448,7 +1743,7 @@ export function LocalNeighborhoodRadar() {
           </div>
 
           {/* RADAR FEED STREAM CARDS */}
-          <div className="space-y-3">
+          <div className={`space-y-3 ${mobileViewMode === 'map' ? 'hidden lg:block' : 'block'}`}>
             {filteredPosts.length === 0 ? (
               <div className="bg-white dark:bg-zinc-900 border border-dashed border-slate-200 dark:border-zinc-800 rounded-3xl p-10 text-center space-y-4 shadow-2xs">
                 <div className="w-14 h-14 rounded-2xl bg-teal-50 dark:bg-teal-950 text-[#0E9F9A] mx-auto flex items-center justify-center">
@@ -1495,10 +1790,131 @@ export function LocalNeighborhoodRadar() {
                 const isNearingExpiry = isAlert && expiryInfo.isNearing && !expiryInfo.isExpired;
 
                 return (
-                  <div
-                    key={post.id}
-                    className="bg-white dark:bg-zinc-900 hover:bg-slate-50/50 dark:hover:bg-zinc-900/50 border border-slate-200/80 dark:border-zinc-800 rounded-2xl p-3.5 sm:p-4 shadow-2xs hover:shadow-xs transition-all flex flex-col sm:flex-row items-start gap-4 group"
-                  >
+                  <React.Fragment key={post.id}>
+                    {/* MOBILE COMPACT RADAR CARD (< lg) MATCHING REFERENCE DESIGN */}
+                    <div className="lg:hidden bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-2xl p-3 shadow-2xs hover:shadow-xs transition-all flex items-start gap-3 group">
+                      
+                      {/* Left Thumbnail Image */}
+                      <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden bg-slate-100 dark:bg-zinc-800 flex-shrink-0 relative border border-slate-200/60 dark:border-zinc-800">
+                        <img
+                          src={post.imageUrl || 'https://images.unsplash.com/photo-1509822929063-6b6cfc9b42f2?auto=format&fit=crop&w=300&q=80'}
+                          alt={post.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          loading="lazy"
+                        />
+                        {post.mediaUrls && post.mediaUrls.length > 1 && (
+                          <div className="absolute bottom-1 right-1 bg-black/75 backdrop-blur-xs text-white text-[8px] font-bold px-1 py-0.5 rounded flex items-center gap-0.5 shadow-xs">
+                            <ImageIcon className="w-2 h-2" />
+                            +{post.mediaUrls.length - 1}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Right Content */}
+                      <div className="flex-1 min-w-0 space-y-1">
+                        
+                        {/* Top: Category Pill + Live Status + Options Menu */}
+                        <div className="flex items-center justify-between gap-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${
+                              isAlert ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400' :
+                              isFood ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400' :
+                              isNews ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400' :
+                              'bg-purple-500/10 text-purple-600 dark:text-purple-400'
+                            }`}>
+                              {post.category === 'alert' ? 'ALERT' :
+                               post.category === 'food' ? 'FOOD' :
+                               post.category === 'news' ? 'NEWS' : 'DEAL'}
+                            </span>
+
+                            {post.isLive && (
+                              <span className="text-[9px] font-black uppercase text-rose-600 dark:text-rose-400 flex items-center gap-1 animate-pulse">
+                                <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                                LIVE NOW
+                              </span>
+                            )}
+
+                            {post.isUrgent && (
+                              <span className="text-[9px] font-black uppercase bg-red-600 text-white px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                                <Zap className="w-2 h-2" /> URGENT
+                              </span>
+                            )}
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => setReportingPost(post)}
+                            className="text-slate-400 hover:text-slate-600 dark:hover:text-white p-0.5"
+                          >
+                            <MoreVertical className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        {/* Title */}
+                        <Link href={post.link || `/radar/${post.id}`} className="block">
+                          <h4 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white leading-snug hover:text-[#0E9F9A] transition-colors line-clamp-2">
+                            {post.title}
+                          </h4>
+                        </Link>
+
+                        {/* Description */}
+                        {post.description && (
+                          <p className="text-[11px] text-slate-500 dark:text-zinc-400 line-clamp-2 leading-relaxed">
+                            {post.description}
+                          </p>
+                        )}
+
+                        {/* Metadata Row */}
+                        <div className="flex items-center gap-1.5 text-[10px] text-slate-400 dark:text-zinc-500 pt-0.5 flex-wrap">
+                          <span className="font-bold text-[#0E9F9A] dark:text-teal-400 flex items-center gap-0.5">
+                            <LocateFixed className="w-2.5 h-2.5" />
+                            {formatDistance(post.distanceKm)}
+                          </span>
+                          <span>•</span>
+                          <span className="flex items-center gap-0.5">
+                            <Clock className="w-2.5 h-2.5" />
+                            {post.timeAgo}
+                          </span>
+                          {post.expiresAt && (
+                            <>
+                              <span>•</span>
+                              <span className={`inline-flex items-center gap-0.5 font-semibold ${expiryInfo.isNearing ? 'text-amber-600 dark:text-amber-400' : 'text-slate-400'}`}>
+                                ⏳ {expiryInfo.text}
+                              </span>
+                            </>
+                          )}
+                        </div>
+
+                        {/* Action Row */}
+                        <div className="flex items-center justify-between pt-1.5 mt-1 border-t border-slate-100 dark:border-zinc-800/80 text-[11px]">
+                          <button
+                            type="button"
+                            onClick={() => handleViewPostOnMap(post)}
+                            className="text-[#0E9F9A] dark:text-teal-400 font-extrabold flex items-center gap-1 hover:underline"
+                          >
+                            <MapPin className="w-3 h-3" />
+                            <span>View on Map</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => toggleLike(post.id, post.isDbPost)}
+                            className={`flex items-center gap-1 text-[11px] font-bold transition-colors ${
+                              hasLiked ? 'text-[#0E9F9A]' : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800'
+                            }`}
+                          >
+                            <ThumbsUp className={`w-3 h-3 ${hasLiked ? 'fill-[#0E9F9A]' : ''}`} />
+                            <span>Useful ({likeCount})</span>
+                          </button>
+                        </div>
+
+                      </div>
+                    </div>
+
+                    {/* DESKTOP RADAR CARD (lg:flex) UNCHANGED */}
+                    <div
+                      className="hidden lg:flex bg-white dark:bg-zinc-900 hover:bg-slate-50/50 dark:hover:bg-zinc-900/50 border border-slate-200/80 dark:border-zinc-800 rounded-2xl p-3.5 sm:p-4 shadow-2xs hover:shadow-xs transition-all flex-col sm:flex-row items-start gap-4 group"
+                    >
                     {/* Left Thumbnail Image */}
                     <div className="w-full sm:w-28 sm:h-28 h-44 rounded-xl overflow-hidden bg-slate-100 dark:bg-zinc-800 flex-shrink-0 relative border border-slate-200/60 dark:border-zinc-800">
                       <img
@@ -1740,17 +2156,17 @@ export function LocalNeighborhoodRadar() {
                       </div>
 
                     </div>
-
                   </div>
-                );
+                </React.Fragment>
+              );
               })
             )}
           </div>
 
         </div>
 
-        {/* RIGHT COLUMN (4 Cols): Radar Insights & Controls */}
-        <div className="lg:col-span-4 space-y-4">
+        {/* RIGHT COLUMN (4 Cols): Radar Insights & Controls (DESKTOP ONLY lg:) */}
+        <div className="hidden lg:block lg:col-span-4 space-y-4">
 
           {/* 1. RADAR RANGE CARD */}
           <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-slate-200/80 dark:border-zinc-800 p-4 shadow-2xs space-y-3">
