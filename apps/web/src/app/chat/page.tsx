@@ -2738,7 +2738,7 @@ export default function ChatPage() {
     }
   };
 
-  const handleSendVoiceNote = async (audioBlob: Blob, durationSec: number) => {
+  const handleSendVoiceNote = async (audioBlob: Blob, durationSec: number, viewOnce = false) => {
     if (!activeChat) return;
     const tempId = `temp-voice-${Date.now()}`;
     const previewUrl = URL.createObjectURL(audioBlob);
@@ -2751,7 +2751,8 @@ export default function ChatPage() {
       text: '',
       mediaUrl: previewUrl,
       mediaResourceType: 'audio',
-      voiceDuration: Math.round(durationSec),
+      voiceDuration: Math.max(1, Math.round(durationSec)),
+      viewOnce,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       createdAt: new Date().toISOString(),
       isMe: true,
@@ -2786,7 +2787,8 @@ export default function ChatPage() {
         mediaUrl: uploadedMediaUrl,
         mediaResourceType: 'audio',
       }, {
-        voiceDuration: Math.round(durationSec)
+        voiceDuration: Math.max(1, Math.round(durationSec)),
+        viewOnce
       });
 
       if (res.success && res.message) {
