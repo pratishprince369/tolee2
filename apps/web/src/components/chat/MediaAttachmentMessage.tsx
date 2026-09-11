@@ -197,7 +197,19 @@ export function detectMediaInfo(
     const displayFilename = parsedMeta.filename || fallbackFilename;
     const extension = (displayFilename.split('.').pop() || fallbackFilename.split('.').pop() || '').toLowerCase();
 
-    // Check by resourceType or extension
+    // 1. Audio check first (voice notes and audio files)
+    if (resourceType === 'audio' || displayFilename.toLowerCase().startsWith('voice_') || extension.match(/^(mp3|wav|ogg|m4a|aac|flac|wma|opus)$/i)) {
+      return {
+        url: cleanUrl,
+        kind: 'audio',
+        filename: displayFilename,
+        extension: extension || 'mp3',
+        caption: cleanCaption(trimmedText),
+        duration: parsedMeta.duration
+      };
+    }
+
+    // 2. Video check
     if (resourceType === 'video' || extension.match(/^(mp4|webm|mov|mkv|m4v|3gp)$/i)) {
       return {
         url: cleanUrl,
@@ -210,17 +222,6 @@ export function detectMediaInfo(
         height: parsedMeta.height,
         isHd: parsedMeta.isHd,
         orientation: parsedMeta.orientation
-      };
-    }
-
-    if (resourceType === 'audio' || extension.match(/^(mp3|wav|ogg|m4a|aac|flac|wma)$/i)) {
-      return {
-        url: cleanUrl,
-        kind: 'audio',
-        filename: displayFilename,
-        extension: extension || 'mp3',
-        caption: cleanCaption(trimmedText),
-        duration: parsedMeta.duration
       };
     }
 

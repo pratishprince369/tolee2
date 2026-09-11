@@ -1,7 +1,10 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Play, Pause, Mic, Trash2, Send } from 'lucide-react';
+
+// Global audio tracker so only one voice note plays at a time
+let currentlyPlayingAudio: HTMLAudioElement | null = null;
 
 interface VoiceMessagePlayerProps {
   audioUrl: string;
@@ -12,37 +15,35 @@ interface VoiceMessagePlayerProps {
 export function VoiceMessagePlayer({ audioUrl, duration, isMe }: VoiceMessagePlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const [totalDuration, setTotalDuration] = useState(duration || 0);
+  const [totalDuration, setTotalDuration] = useState<number>(() => {
+    if (typeof duration === 'number' && duration > 0) return Math.round(duration);
+    return 0;
+  });
   const [playbackRate, setPlaybackRate] = useState<1 | 1.5 | 2>(1);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  // Sync duration if prop updates
+  useEffect(() => {
+    if (typeof duration === 'number' && duration > 0) {
+      setTotalDuration(Math.round(duration));
+    }
+  }, [duration]);
+
+  // Clean up when unmounting
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio) return;
-
-    const onTimeUpdate = () => setCurrentTime(audio.currentTime);
-    const onLoadedMetadata = () => {
-      if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration)) {
-        setTotalDuration(Math.round(audio.duration));
-      }
-    };
-    const onEnded = () => {
-      setIsPlaying(false);
-      setCurrentTime(0);
-    };
-
-    audio.addEventListener('timeupdate', onTimeUpdate);
-    audio.addEventListener('loadedmetadata', onLoadedMetadata);
-    audio.addEventListener('ended', onEnded);
-
     return () => {
-      audio.removeEventListener('timeupdate', onTimeUpdate);
-      audio.removeEventListener('loadedmetadata', onLoadedMetadata);
-      audio.removeEventListener('ended', onEnded);
+      if (audio) {
+        audio.pause();
+        if (currentlyPlayingAudio === audio) {
+          currentlyPlayingAudio = null;
+        }
+      }
     };
   }, []);
 
-  const togglePlay = () => {
+  const togglePlay = (e: React.MouseEvent) => {
+    e.stopPropagation();
     const audio = audioRef.current;
     if (!audio) return;
 
@@ -50,12 +51,36 @@ export function VoiceMessagePlayer({ audioUrl, duration, isMe }: VoiceMessagePla
       audio.pause();
       setIsPlaying(false);
     } else {
+      // Pause any other playing voice message
+      if (currentlyPlayingAudio && currentlyPlayingAudio !== audio) {
+        currentlyPlayingAudio.pause();
+      }
+      currentlyPlayingAudio = audio;
+
+      // If at end or finished, restart from start
+      const dur = totalDuration > 0 ? totalDuration : audio.duration;
+      if (audio.ended || (isFinite(dur) && dur > 0 && audio.currentTime >= dur - 0.2)) {
+        audio.currentTime = 0;
+        setCurrentTime(0);
+      }
+
       audio.playbackRate = playbackRate;
-      audio.play().then(() => setIsPlaying(true)).catch(e => console.error("Audio playback error:", e));
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            setIsPlaying(true);
+          })
+          .catch((err) => {
+            console.warn("[VoicePlayer] Playback error or abort:", err);
+            setIsPlaying(false);
+          });
+      }
     }
   };
 
-  const handleSpeedToggle = () => {
+  const handleSpeedToggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
     const nextRate: 1 | 1.5 | 2 = playbackRate === 1 ? 1.5 : playbackRate === 1.5 ? 2 : 1;
     setPlaybackRate(nextRate);
     if (audioRef.current) {
@@ -64,6 +89,7 @@ export function VoiceMessagePlayer({ audioUrl, duration, isMe }: VoiceMessagePla
   };
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    e.stopPropagation();
     const target = parseFloat(e.target.value);
     setCurrentTime(target);
     if (audioRef.current) {
@@ -72,21 +98,54 @@ export function VoiceMessagePlayer({ audioUrl, duration, isMe }: VoiceMessagePla
   };
 
   const formatTime = (seconds: number) => {
+    if (!seconds || isNaN(seconds) || !isFinite(seconds) || seconds < 0) return '0:00';
     const m = Math.floor(seconds / 60);
     const s = Math.floor(seconds % 60);
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
-  const progressPercent = totalDuration > 0 ? (currentTime / totalDuration) * 100 : 0;
+  const effectiveDuration = totalDuration > 0 ? totalDuration : (audioRef.current?.duration && isFinite(audioRef.current.duration) ? audioRef.current.duration : 0);
+  const progressPercent = effectiveDuration > 0 ? Math.min(100, Math.max(0, (currentTime / effectiveDuration) * 100)) : 0;
 
   return (
     <div className="flex items-center gap-3 py-1 px-1 min-w-[220px] sm:min-w-[260px] max-w-full select-none">
-      <audio ref={audioRef} src={audioUrl} preload="metadata" />
+      <audio
+        ref={audioRef}
+        src={audioUrl}
+        preload="auto"
+        playsInline
+        onPlay={() => setIsPlaying(true)}
+        onPause={() => setIsPlaying(false)}
+        onEnded={() => {
+          setIsPlaying(false);
+          setCurrentTime(0);
+        }}
+        onTimeUpdate={(e) => {
+          const ct = e.currentTarget.currentTime;
+          setCurrentTime(ct);
+        }}
+        onLoadedMetadata={(e) => {
+          const d = e.currentTarget.duration;
+          if (d && !isNaN(d) && isFinite(d) && d > 0) {
+            setTotalDuration(Math.round(d));
+          }
+        }}
+        onDurationChange={(e) => {
+          const d = e.currentTarget.duration;
+          if (d && !isNaN(d) && isFinite(d) && d > 0) {
+            setTotalDuration(Math.round(d));
+          }
+        }}
+        onError={(e) => {
+          console.warn("[VoicePlayer] Audio error event:", e);
+          setIsPlaying(false);
+        }}
+      />
 
       <button
         type="button"
         onClick={togglePlay}
-        className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 shadow-md transition-all active:scale-95 ${
+        className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 shadow-md transition-all active:scale-95 cursor-pointer ${
           isMe 
             ? 'bg-white text-teal-700 hover:bg-white/90' 
             : 'bg-primary text-white hover:bg-primary/90'
@@ -123,7 +182,7 @@ export function VoiceMessagePlayer({ audioUrl, duration, isMe }: VoiceMessagePla
           <input
             type="range"
             min={0}
-            max={totalDuration || 1}
+            max={effectiveDuration || 1}
             step={0.1}
             value={currentTime}
             onChange={handleSeek}
@@ -133,14 +192,14 @@ export function VoiceMessagePlayer({ audioUrl, duration, isMe }: VoiceMessagePla
 
         <div className="flex items-center justify-between text-[11px] leading-none">
           <span className={`font-mono font-medium ${isMe ? 'text-white/80' : 'text-zinc-500 dark:text-zinc-400'}`}>
-            {formatTime(isPlaying ? currentTime : (totalDuration || currentTime))}
+            {formatTime(isPlaying ? currentTime : (effectiveDuration || currentTime))}
           </span>
 
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={handleSpeedToggle}
-              className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-full transition-all ${
+              className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-full transition-all cursor-pointer ${
                 isMe
                   ? 'bg-black/20 text-white hover:bg-black/30'
                   : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200'
