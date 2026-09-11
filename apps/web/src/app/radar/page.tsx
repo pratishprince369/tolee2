@@ -9,8 +9,8 @@ export const metadata: Metadata = {
 
 export default function RadarPage() {
   return (
-    <div className="min-h-screen bg-slate-50/70 dark:bg-black py-6 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-6xl mx-auto">
+    <div className="min-h-screen bg-[#F8FAFC] dark:bg-black py-4 sm:py-6 px-3 sm:px-6 lg:px-8">
+      <div className="max-w-[1440px] mx-auto">
         <LocalNeighborhoodRadar />
       </div>
     </div>
