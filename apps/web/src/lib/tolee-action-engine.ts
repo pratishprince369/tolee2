@@ -7,6 +7,7 @@ export interface ActionExecutionContext {
   userEmail?: string;
   userName?: string;
   command: string;
+  history?: { role: string; content: string }[];
 }
 
 export interface ActionExecutionResult {
@@ -15,9 +16,10 @@ export interface ActionExecutionResult {
   message: string;
   data?: any;
   interactiveAction?: {
-    type: 'NAVIGATE' | 'OPEN_CHAT' | 'OPEN_POST' | 'PREVIEW_IMAGE' | 'CONFIRMATION_REQUIRED';
+    type: 'NAVIGATE' | 'OPEN_CHAT' | 'OPEN_POST' | 'PREVIEW_IMAGE' | 'CONFIRMATION_REQUIRED' | 'PUBLISH_POST';
     label?: string;
     payload?: any;
+    executed?: boolean;
   };
 }
 
@@ -48,7 +50,7 @@ function logAIAction(
 /**
  * 🌐 Live Multi-Source News Engine (Prisma DB NewsPost + GNews + Finnhub + NewsAPI)
  */
-async function fetchLiveNewsForToleeAI(categoryQuery?: string): Promise<{ title: string; source: string; summary?: string; url?: string }[]> {
+export async function fetchLiveNewsForToleeAI(categoryQuery?: string): Promise<{ title: string; source: string; summary?: string; url?: string }[]> {
   const results: { title: string; source: string; summary?: string; url?: string }[] = [];
 
   // 1. Fetch from Tolee Database NewsPost table with pruned select fields
@@ -128,7 +130,7 @@ async function fetchLiveNewsForToleeAI(categoryQuery?: string): Promise<{ title:
 /**
  * 🌐 Helper: Translates & cleans Devanagari / Hinglish concepts into vivid English image prompts using LLM & Festivals Knowledge
  */
-async function cleanAndTranslateImagePrompt(rawCommand: string): Promise<string> {
+export async function cleanAndTranslateImagePrompt(rawCommand: string): Promise<string> {
   const lower = rawCommand.toLowerCase();
   
   // 1. Direct Term Mapping for Indian Festivals, Movie Sets, Business & Popular Themes
@@ -224,7 +226,7 @@ CRITICAL RULES:
  * checks permissions, executes real platform database operations, validates results, and logs audit events.
  */
 export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise<ActionExecutionResult> {
-  const { userId, command } = ctx;
+  const { userId, command, history = [] } = ctx;
   const trimmed = command.trim();
   const lower = trimmed.toLowerCase();
 
@@ -244,28 +246,42 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
 
   const userNameStr = user.name || user.username || 'User';
 
+  // Coding or programmatic question guard (should not enter image generation)
+  const isCodingOrTech = 
+    lower.includes('code') ||
+    lower.includes('coding') ||
+    lower.includes('function') ||
+    lower.includes('react') ||
+    lower.includes('html') ||
+    lower.includes('css') ||
+    lower.includes('python') ||
+    lower.includes('javascript') ||
+    lower.includes('typescript') ||
+    lower.includes('algorithm') ||
+    lower.includes('sql') ||
+    lower.includes('api') ||
+    lower.includes('component');
+
   // ==========================================
   // 1. IMAGE & CREATIVE BANNER GENERATION (Top Priority)
   // ==========================================
   const isImageOrCreativeIntent =
-    lower.includes('creative') ||
+    !isCodingOrTech &&
+    (lower.includes('creative') ||
     lower.includes('banner') ||
     lower.includes('poster') ||
     lower.includes('image') ||
     lower.includes('photo') ||
     lower.includes('pic') ||
     lower.includes('picture') ||
-    lower.includes('generate') ||
+    (lower.includes('generate') && !lower.includes('code') && !lower.includes('text')) ||
     lower.includes('banao') ||
     lower.includes('bana do') ||
     lower.includes('bana de') ||
     lower.includes('bana ke do') ||
-    lower.includes('design') ||
-    lower.includes('visual') ||
     lower.includes('graphic') ||
     lower.includes('flyer') ||
     lower.includes('thumbnail') ||
-    lower.includes('logo') ||
     lower.includes('artwork') ||
     lower.includes('illustration') ||
     lower.includes('wallpaper') ||
@@ -273,16 +289,13 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
     trimmed.includes('जनरेट') ||
     trimmed.includes('फोटो') ||
     trimmed.includes('बनाओ') ||
-    trimmed.includes('बना') ||
-    trimmed.includes('बनाएं') ||
-    trimmed.includes('बनाये') ||
     trimmed.includes('पोस्टर') ||
     trimmed.includes('बैनर') ||
     trimmed.includes('बेनर') ||
     trimmed.includes('तस्वीर') ||
     trimmed.includes('चित्र') ||
     trimmed.includes('डिज़ाइन') ||
-    trimmed.includes('क्रिएटिव');
+    trimmed.includes('क्रिएटिव'));
 
   const isVideoIntent =
     lower.includes('video') ||
@@ -952,12 +965,9 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
   // ==========================================
   try {
     const aiText = await callNvidiaLLM([
-      {
-        role: 'system',
-        content: `You are Tolee AI Manager, the personal AI Assistant and Central Brain of Tolee Platform. User: ${userNameStr}. Answer in helpful, warm conversational Hindi/English. Keep answers natural, intelligent, and concise.`
-      },
+      ...history,
       { role: 'user', content: trimmed }
-    ]);
+    ], `You are Tolee AI Manager, the personal AI Assistant and Central Brain of Tolee Platform. User: ${userNameStr}. Answer in helpful, warm conversational Hindi/English. Keep answers natural, intelligent, and concise.`);
 
     logAIAction(userId, 'AI_CONVERSATION', command, 'SUCCESS', {});
     return {

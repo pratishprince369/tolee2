@@ -19,6 +19,7 @@ import { AIMemorySettings } from '../Settings/AIMemorySettings';
 import { AIFinance } from '../Finance/AIFinance';
 import { AIBirthdays } from '../Personal/AIBirthdays';
 import { OpenWorkAgentWorkspace } from '../Components/OpenWorkAgentWorkspace';
+import { AIMessageRenderer } from '../Components/AIMessageRenderer';
 import { getAIDashboardSummary, processAIPersonalMessage } from '@/actions/ai-manager';
 import { createPost } from '@/actions/post';
 import { Button } from '@/components/ui/button';
@@ -43,6 +44,11 @@ interface Message {
   text: string;
   isAI: boolean;
   time: string;
+  attachment?: {
+    url?: string;
+    type?: string;
+    name?: string;
+  };
   interactiveAction?: {
     type: string;
     label: string;
@@ -141,15 +147,18 @@ export function AIDashboard() {
     }
   };
 
-  const handleSendMessage = async (userText: string) => {
-    if (!userText || !userText.trim()) return;
+  const handleSendMessage = async (userText: string, attachment?: { url?: string; type?: string; name?: string; content?: string }) => {
+    if ((!userText || !userText.trim()) && !attachment) return;
+
+    const textToSend = userText ? userText.trim() : (attachment?.name ? `Please analyze ${attachment.name}` : '');
 
     const userMsg: Message = {
       id: `usr_${Date.now()}`,
       sender: session?.user?.name || 'You',
-      text: userText,
+      text: textToSend,
       isAI: false,
-      time: formatTime()
+      time: formatTime(),
+      attachment: attachment ? { url: attachment.url, type: attachment.type, name: attachment.name } : undefined
     };
 
     setMessages((prev) => [...prev, userMsg]);
@@ -158,7 +167,14 @@ export function AIDashboard() {
     try {
       const clientISO = new Date().toISOString();
       const timeZone = typeof window !== 'undefined' && window.Intl ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'Asia/Kolkata';
-      const result = await processAIPersonalMessage(userText, [], clientISO, timeZone);
+
+      // Keep recent conversation history (last 10 turns) for multi-turn contextual continuity
+      const recentHistory = messages.slice(-10).map((m) => ({
+        role: m.isAI ? 'assistant' : 'user',
+        content: m.text
+      }));
+
+      const result = await processAIPersonalMessage(textToSend, recentHistory, clientISO, timeZone, attachment);
       
       const aiText = (result as any).response || (result as any).reply || 'Command processed successfully.';
 
@@ -325,15 +341,47 @@ export function AIDashboard() {
                         : 'bg-violet-600 text-white font-medium shadow-md shadow-violet-600/20'
                     }`}
                   >
-                    <div className="whitespace-pre-wrap">{msg.text}</div>
+                    {/* User Attachment Preview */}
+                    {msg.attachment?.url && msg.attachment.type?.startsWith('image/') && (
+                      <div className="mb-2.5 rounded-2xl overflow-hidden max-w-sm border border-violet-400/40 shadow-sm">
+                        <img 
+                          src={msg.attachment.url} 
+                          alt={msg.attachment.name || 'User visual'} 
+                          className="w-full max-h-56 object-cover rounded-xl"
+                        />
+                      </div>
+                    )}
+                    {msg.attachment && !msg.attachment.type?.startsWith('image/') && (
+                      <div className="mb-2 flex items-center gap-2 px-3 py-1.5 rounded-xl bg-violet-700/60 text-white text-xs border border-violet-400/40 w-fit">
+                        <span>📄</span>
+                        <span className="font-medium truncate max-w-xs">{msg.attachment.name || 'Attached Document'}</span>
+                      </div>
+                    )}
+
+                    {/* Rich Markdown & Code-Block Formatted Message */}
+                    <AIMessageRenderer content={msg.text} isAI={msg.isAI} />
+
                     {msg.interactiveAction && (
                       <div className="mt-3 p-3.5 bg-slate-50 dark:bg-zinc-950 rounded-2xl border border-violet-200 dark:border-violet-800/80 shadow-sm space-y-3">
                         {msg.interactiveAction.payload?.imageUrl && (
-                          <img 
-                            src={msg.interactiveAction.payload.imageUrl} 
-                            alt="AI Generated Visual" 
-                            className="w-full h-64 sm:h-80 object-cover rounded-xl border border-slate-200 dark:border-zinc-800 shadow-md"
-                          />
+                          <div className="space-y-2">
+                            <img 
+                              src={msg.interactiveAction.payload.imageUrl} 
+                              alt="AI Generated Visual" 
+                              className="w-full h-64 sm:h-80 object-cover rounded-xl border border-slate-200 dark:border-zinc-800 shadow-md"
+                            />
+                            <div className="flex items-center justify-end">
+                              <a
+                                href={msg.interactiveAction.payload.imageUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                download="tolee_ai_creative.png"
+                                className="inline-flex items-center gap-1 text-[11px] font-bold text-violet-600 dark:text-violet-400 hover:underline px-1 py-0.5"
+                              >
+                                <Download className="w-3.5 h-3.5" /> Download HD Visual
+                              </a>
+                            </div>
+                          </div>
                         )}
                         <div className="space-y-1">
                           <label className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-1">
@@ -417,7 +465,7 @@ export function AIDashboard() {
                             : 'bg-violet-600 text-white font-medium shadow-md shadow-violet-600/20'
                         }`}
                       >
-                        <div className="whitespace-pre-wrap">{msg.text}</div>
+                        <AIMessageRenderer content={msg.text} isAI={msg.isAI} />
                       </div>
                     </div>
                   ))}

@@ -147,7 +147,7 @@ class AIGatewayRouter {
                 latencyMs: result.latencyMs,
               },
             })
-            .catch((e) => console.warn('[AIGateway] Usage log notice:', e));
+            .catch((e: any) => console.warn('[AIGateway] Usage log notice:', e));
         }
 
         return result;
@@ -197,7 +197,7 @@ class AIGatewayRouter {
                 latencyMs: result.latencyMs,
               },
             })
-            .catch((e) => console.warn('[AIGateway] Usage log notice:', e));
+            .catch((e: any) => console.warn('[AIGateway] Usage log notice:', e));
         }
 
         return result;

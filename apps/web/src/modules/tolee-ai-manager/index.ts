@@ -16,3 +16,4 @@ export { AITasks } from './Tasks/AITasks';
 export { DailySummaryGrid } from './Components/DailySummaryGrid';
 export { VoiceInputDock } from './Components/VoiceInputDock';
 export { OpenWorkAgentWorkspace } from './Components/OpenWorkAgentWorkspace';
+export { AIMessageRenderer } from './Components/AIMessageRenderer';

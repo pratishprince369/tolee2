@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { unlockMobileAudio } from '../VoiceCompanion/voiceCompanionEngine';
 
 interface VoiceInputDockProps {
-  onSendMessage: (text: string) => void;
+  onSendMessage: (text: string, attachment?: { url?: string; type?: string; name?: string; content?: string }) => void;
   onToggleVoiceCompanion?: () => void;
   isVoiceActive?: boolean;
   isLoading?: boolean;
@@ -16,12 +16,70 @@ interface VoiceInputDockProps {
 export function VoiceInputDock({ onSendMessage, onToggleVoiceCompanion, isVoiceActive = false, isLoading = false }: VoiceInputDockProps) {
   const [input, setInput] = useState('');
   const [isRecording, setIsRecording] = useState(false);
+  const [attachment, setAttachment] = useState<{ url?: string; type?: string; name?: string; content?: string } | null>(null);
+
+  const docInputRef = React.useRef<HTMLInputElement>(null);
+  const cameraInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, isImage: boolean) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const isTextLike = 
+      file.type.startsWith('text/') || 
+      file.name.endsWith('.txt') || 
+      file.name.endsWith('.csv') || 
+      file.name.endsWith('.json') || 
+      file.name.endsWith('.js') || 
+      file.name.endsWith('.ts') || 
+      file.name.endsWith('.py') || 
+      file.name.endsWith('.md') ||
+      file.name.endsWith('.html') ||
+      file.name.endsWith('.css');
+
+    if (isImage || file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setAttachment({
+          url: reader.result as string,
+          type: file.type || 'image/jpeg',
+          name: file.name
+        });
+      };
+      reader.readAsDataURL(file);
+    } else if (isTextLike) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setAttachment({
+          content: reader.result as string,
+          type: file.type || 'text/plain',
+          name: file.name
+        });
+      };
+      reader.readAsText(file);
+    } else {
+      // PDF or other binary doc
+      const reader = new FileReader();
+      reader.onload = () => {
+        setAttachment({
+          url: reader.result as string,
+          type: file.type || 'application/pdf',
+          name: file.name
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // Reset input so re-selecting same file triggers onChange
+    e.target.value = '';
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || isLoading) return;
-    onSendMessage(input.trim());
+    if ((!input.trim() && !attachment) || isLoading) return;
+    onSendMessage(input.trim(), attachment || undefined);
     setInput('');
+    setAttachment(null);
   };
 
   const handleToggleVoice = () => {
@@ -51,7 +109,8 @@ export function VoiceInputDock({ onSendMessage, onToggleVoiceCompanion, isVoiceA
           setIsRecording(false);
           if (transcript && transcript.trim()) {
             setInput('');
-            onSendMessage(transcript.trim());
+            onSendMessage(transcript.trim(), attachment || undefined);
+            setAttachment(null);
           }
         };
         recognition.onerror = () => setIsRecording(false);
@@ -70,6 +129,45 @@ export function VoiceInputDock({ onSendMessage, onToggleVoiceCompanion, isVoiceA
   return (
     <div className="sticky bottom-0 left-0 right-0 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-xl border-t border-slate-200 dark:border-zinc-800 p-2 sm:p-4 z-50 shadow-2xl shrink-0">
       <div className="max-w-4xl mx-auto space-y-2">
+        {/* Hidden File Inputs */}
+        <input 
+          type="file" 
+          ref={docInputRef} 
+          onChange={(e) => handleFileChange(e, false)} 
+          accept=".pdf,.txt,.csv,.json,.md,.js,.ts,.py,.html,.css,.doc,.docx" 
+          className="hidden" 
+        />
+        <input 
+          type="file" 
+          ref={cameraInputRef} 
+          onChange={(e) => handleFileChange(e, true)} 
+          accept="image/*" 
+          className="hidden" 
+        />
+
+        {/* Attachment Preview Chip */}
+        {attachment && (
+          <div className="flex items-center justify-between px-3 py-1.5 bg-violet-50 dark:bg-violet-950/40 border border-violet-200 dark:border-violet-800 rounded-xl text-xs text-violet-900 dark:text-violet-200 animate-in fade-in slide-in-from-bottom-2">
+            <div className="flex items-center gap-2 truncate">
+              {attachment.type?.startsWith('image/') ? (
+                <span className="text-sm">🖼️</span>
+              ) : (
+                <span className="text-sm">📄</span>
+              )}
+              <span className="font-semibold truncate max-w-xs">{attachment.name || 'Attached File'}</span>
+              <span className="text-[10px] text-violet-500 uppercase font-mono">Ready for AI Analysis</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setAttachment(null)}
+              className="p-1 hover:bg-violet-200 dark:hover:bg-violet-800 rounded-full transition-colors ml-2 shrink-0"
+              title="Remove attachment"
+            >
+              <X className="w-3.5 h-3.5 text-violet-700 dark:text-violet-300" />
+            </button>
+          </div>
+        )}
+
         {/* Quick Voice Command Chips */}
         <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 text-xs">
           <button 
@@ -110,8 +208,9 @@ export function VoiceInputDock({ onSendMessage, onToggleVoiceCompanion, isVoiceA
               type="button" 
               variant="outline" 
               size="icon" 
+              onClick={() => docInputRef.current?.click()}
               className="rounded-full w-8 h-8 sm:w-10 sm:h-10 border-slate-200 dark:border-zinc-800 text-slate-500 hover:text-violet-600 shrink-0"
-              title="Upload Document"
+              title="Upload Document (PDF, Code, Data, Text)"
             >
               <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </Button>
@@ -119,8 +218,9 @@ export function VoiceInputDock({ onSendMessage, onToggleVoiceCompanion, isVoiceA
               type="button" 
               variant="outline" 
               size="icon" 
+              onClick={() => cameraInputRef.current?.click()}
               className="rounded-full w-8 h-8 sm:w-10 sm:h-10 border-slate-200 dark:border-zinc-800 text-slate-500 hover:text-violet-600 shrink-0"
-              title="Camera Scan"
+              title="Camera Scan / Image Vision"
             >
               <Camera className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </Button>
@@ -131,7 +231,7 @@ export function VoiceInputDock({ onSendMessage, onToggleVoiceCompanion, isVoiceA
             <Input 
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder={isRecording ? 'Listening... Speak now...' : 'Ask your AI Personal Employee...'}
+              placeholder={isRecording ? 'Listening... Speak now...' : (attachment ? `Ask AI about ${attachment.name}...` : 'Ask your AI Assistant or generate image...')}
               className={`w-full rounded-full pl-3.5 pr-9 py-4 sm:py-5 border-slate-200 dark:border-zinc-800 text-xs sm:text-sm focus-visible:ring-violet-500 ${
                 isRecording ? 'bg-rose-50 dark:bg-rose-950/30 border-rose-400 animate-pulse' : 'bg-slate-50 dark:bg-zinc-900'
               }`}

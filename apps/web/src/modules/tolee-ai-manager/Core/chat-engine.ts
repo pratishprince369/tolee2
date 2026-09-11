@@ -82,36 +82,51 @@ function compressMessagesRTK(messages: { role: string; content: string }[]) {
   }));
 }
 
+export interface ChatEngineMessage {
+  role: string;
+  content: string;
+  mediaUrl?: string;
+  mediaType?: string;
+}
+
 /**
  * ⚡ OmniRoute Universal Multi-Tier Brain Gateway (ChatGPT-4o + Claude 3.5 Sonnet + Google Gemini + DeepSeek-R1)
  */
 export async function callNvidiaLLM(
-  messages: { role: string; content: string }[], 
+  messages: ChatEngineMessage[], 
   systemPrompt?: string,
-  preferredEngine: 'auto' | 'claude' | 'gpt4o' | 'gemini' | 'deepseek' = 'auto'
+  preferredEngine: 'auto' | 'claude' | 'gpt4o' | 'gemini' | 'deepseek' | 'coding' | 'reasoning' | 'vision' = 'auto'
 ): Promise<string | null> {
-  const compressed = compressMessagesRTK(messages);
+  const compressed = compressMessagesRTK(messages as any);
   const fullMessages = [
     { role: "system", content: systemPrompt || SYSTEM_PROMPTS.PERSONAL_EMPLOYEE },
     ...compressed
   ];
 
   // 🌟 Tier 0: Tolee Unified AI Gateway (Gemini Official / Web2API / Resilient Fallback)
-  try {
-    const gatewayRes = await aiGateway.generate({
-      messages: fullMessages as any,
-      temperature: 0.7,
-      maxTokens: 1500,
-    });
-    if (gatewayRes && gatewayRes.text && gatewayRes.text.trim()) {
-      return gatewayRes.text;
+  // Used first for vision/multimodal or general auto routing
+  if (preferredEngine === 'vision' || preferredEngine === 'gemini' || preferredEngine === 'auto') {
+    try {
+      const gatewayRes = await aiGateway.generate({
+        messages: fullMessages as any,
+        temperature: 0.7,
+        maxTokens: 1500,
+        persona: {
+          name: 'Tolee Frontier AI',
+          systemPrompt: systemPrompt || SYSTEM_PROMPTS.PERSONAL_EMPLOYEE,
+          preferredProvider: (preferredEngine === 'vision' || preferredEngine === 'gemini') ? 'gemini_official' : undefined
+        }
+      });
+      if (gatewayRes && gatewayRes.text && gatewayRes.text.trim()) {
+        return gatewayRes.text;
+      }
+    } catch (err) {
+      // Continue to next tier on gateway fallback
     }
-  } catch (err) {
-    // Continue to next tier on gateway fallback
   }
 
   // 🟣 1. Tier 1: Claude 3.5 Sonnet / CLōD Engine (Nuanced Intelligence & Coding)
-  if (preferredEngine === 'claude' || preferredEngine === 'auto') {
+  if (preferredEngine === 'claude' || preferredEngine === 'coding' || preferredEngine === 'auto') {
     const clodModels = [
       "anthropic/claude-3.5-sonnet",
       "deepseek/deepseek-chat",
@@ -122,7 +137,7 @@ export async function callNvidiaLLM(
     for (const model of clodModels) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3500);
+        const timeoutId = setTimeout(() => controller.abort(), 4000);
 
         const res = await fetch("https://api.clod.io/v1/chat/completions", {
           method: "POST",
@@ -133,7 +148,7 @@ export async function callNvidiaLLM(
           signal: controller.signal,
           body: JSON.stringify({
             model,
-            messages: fullMessages,
+            messages: fullMessages.map(m => ({ role: m.role, content: m.content })),
             temperature: 0.7,
             max_tokens: 1500
           })
@@ -152,13 +167,50 @@ export async function callNvidiaLLM(
     }
   }
 
-  // 🟢 2. Tier 2: Official OpenAI GPT-4o-mini / GPT-4o Key Rotation Pool
-  if (preferredEngine === 'gpt4o' || preferredEngine === 'auto') {
+  // 🔵 2. DeepSeek R1 & Frontier Reasoning (Prioritized for 'reasoning' or 'deepseek')
+  if (preferredEngine === 'reasoning' || preferredEngine === 'deepseek') {
+    for (const apiKey of NVIDIA_FRONTIER_KEYS) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4500);
+
+        const res = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey}`,
+            "Accept": "application/json"
+          },
+          signal: controller.signal,
+          body: JSON.stringify({
+            model: "deepseek-ai/deepseek-r1",
+            messages: fullMessages.map(m => ({ role: m.role, content: m.content })),
+            temperature: 0.6,
+            top_p: 0.9,
+            max_tokens: 1500
+          })
+        });
+
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+          const data = await res.json();
+          const content = data.choices?.[0]?.message?.content;
+          if (content && content.trim()) {
+            return content;
+          }
+        }
+      } catch (e) {}
+    }
+  }
+
+  // 🟢 3. Tier 3: Official OpenAI GPT-4o-mini / GPT-4o Key Rotation Pool
+  if (preferredEngine === 'gpt4o' || preferredEngine === 'coding' || preferredEngine === 'auto') {
     const randomKeys = [...OPENAI_API_KEYS].sort(() => Math.random() - 0.5).slice(0, 5);
     for (const apiKey of randomKeys) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000);
+        const timeoutId = setTimeout(() => controller.abort(), 3500);
 
         const res = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
@@ -169,7 +221,7 @@ export async function callNvidiaLLM(
           signal: controller.signal,
           body: JSON.stringify({
             model: "gpt-4o-mini",
-            messages: fullMessages,
+            messages: fullMessages.map(m => ({ role: m.role, content: m.content })),
             temperature: 0.7,
             max_tokens: 1500
           })
@@ -188,7 +240,7 @@ export async function callNvidiaLLM(
     }
   }
 
-  // 🔵 3. Tier 3: Google Gemini 1.5 Pro / Flash & NVIDIA Frontier Cluster (DeepSeek R1 + Llama 3.3)
+  // 🔵 4. Tier 4: NVIDIA Frontier Cluster (DeepSeek R1 + Llama 3.3 + Llama 3.1 405B)
   const frontierModels = [
     "meta/llama-3.3-70b-instruct",
     "deepseek-ai/deepseek-r1",
@@ -212,7 +264,7 @@ export async function callNvidiaLLM(
           signal: controller.signal,
           body: JSON.stringify({
             model,
-            messages: fullMessages,
+            messages: fullMessages.map(m => ({ role: m.role, content: m.content })),
             temperature: 0.6,
             top_p: 0.9,
             max_tokens: 1500
