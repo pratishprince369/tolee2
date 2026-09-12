@@ -1295,7 +1295,8 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
 
           {/* Tolee Navigation Tabs */}
           <div className="flex overflow-x-auto hide-scrollbar border-b border-gray-100 dark:border-gray-800">
-            {['dashboard', 'community', 'about', 'live', 'classroom', 'calendar', 'members', 'leaderboard', 'marketplace'].map((tab) => (
+            {/* ponytail: 'dashboard' (COS Workspace) tab hidden for now; can be re-added when ready */}
+            {['community', 'about', 'live', 'classroom', 'calendar', 'members', 'leaderboard', 'marketplace'].map((tab) => (
               <button 
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -1305,7 +1306,7 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                     : 'border-transparent text-gray-500 hover:text-gray-900 dark:hover:text-white'
                 }`}
               >
-                {tab === 'dashboard' ? 'COS Workspace ⚡' : tab === 'live' ? 'T-Meet 🎓' : tab}
+                {tab === 'live' ? 'T-Meet 🎓' : tab}
               </button>
             ))}
             {(isAdmin || tolee?.ownerId === currentUserId) && (
