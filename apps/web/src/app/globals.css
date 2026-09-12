@@ -74,24 +74,24 @@
   }
 
   .dark {
-    --background: 180 30% 6%; /* Deep tech slate-black */
+    --background: 207 92% 7%; /* Deep navy tech base from brand logo #021c31 */
     --foreground: 180 20% 96%;
-    --card: 180 25% 9%;
+    --card: 207 70% 10%;
     --card-foreground: 180 20% 96%;
-    --popover: 180 25% 8%;
+    --popover: 207 70% 9%;
     --popover-foreground: 180 20% 96%;
-    --primary: 178 84% 40%;
+    --primary: 178 84% 40%; /* #12b8b2 - Vibrant header logo teal */
     --primary-foreground: 0 0% 98%;
-    --secondary: 180 25% 12%;
+    --secondary: 207 40% 14%;
     --secondary-foreground: 180 20% 96%;
-    --muted: 180 20% 12%;
+    --muted: 207 30% 14%;
     --muted-foreground: 180 10% 65.9%;
     --accent: 178 84% 40%;
     --accent-foreground: 0 0% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
-    --border: 180 15% 15%;
-    --input: 180 15% 15%;
+    --border: 207 35% 16%;
+    --input: 207 35% 16%;
     --ring: 178 84% 40%;
   }
 
@@ -105,13 +105,13 @@
 
 /* Custom Utilities for Instagram Vibe */
 .story-ring {
-  background: linear-gradient(135deg, #0d9488 0%, #0ea5e9 50%, #10b981 100%);
+  background: linear-gradient(135deg, #0a7c85 0%, #0E9F9A 50%, #2dd4c4 100%);
   padding: 2px;
   border-radius: 50%;
 }
 
 .story-ring-tolee {
-  background: linear-gradient(135deg, #0d9488 0%, #0ea5e9 50%, #10b981 100%);
+  background: linear-gradient(135deg, #0a7c85 0%, #0E9F9A 50%, #2dd4c4 100%);
   padding: 2px;
   border-radius: 50%;
 }
