@@ -61,15 +61,15 @@ export class NvidiaNIMProvider implements AIProvider {
 
   async generateText(options: AIRequestOptions): Promise<AICompletionResult> {
     const startTime = Date.now();
-    const model = options.model || 'meta/llama-3.3-70b-instruct';
+    const model = options.model || 'nvidia/llama-3.1-nemotron-70b-instruct';
     const keys = this.getKeyPool();
 
     let lastError: any = null;
 
-    for (const apiKey of keys.slice(0, 4)) {
+    for (const apiKey of keys.slice(0, 2)) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 12000);
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
 
         const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
           method: 'POST',
@@ -128,10 +128,10 @@ export class NvidiaNIMProvider implements AIProvider {
     onChunk: (chunk: AIStreamChunk) => void
   ): Promise<AICompletionResult> {
     const startTime = Date.now();
-    const model = options.model || 'meta/llama-3.3-70b-instruct';
+    const model = options.model || 'nvidia/llama-3.1-nemotron-70b-instruct';
     const keys = this.getKeyPool();
 
-    for (const apiKey of keys.slice(0, 3)) {
+    for (const apiKey of keys.slice(0, 2)) {
       try {
         const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
           method: 'POST',

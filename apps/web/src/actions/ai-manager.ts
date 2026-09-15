@@ -12,6 +12,7 @@ import { createPost, deletePostPermanently } from '@/actions/post';
 import { executeToleeAIAction, cleanAndTranslateImagePrompt, fetchLiveNewsForToleeAI } from '@/lib/tolee-action-engine';
 import { classifyIntelligenceIntent } from '@/modules/tolee-ai-manager/Core/ai-router';
 import { generateAndVerifyAIImage } from '@/modules/tolee-ai-manager/Core/image-verification-engine';
+import { CentralAIEngine } from '@/lib/ai-gateway/central-engine';
 
 async function getUserId(): Promise<string> {
   const session = await getServerSession(authOptions);
@@ -527,17 +528,6 @@ export async function processAIPersonalMessage(
     const session = await getServerSession(authOptions);
     const trimmed = (message || '').trim();
 
-    // 🕒 CENTRAL TIME SERVICE RESOLUTION
-    const timeInfo = getUserDeviceTimeInfo(clientLocalISO, timeZone);
-
-    // ⚡ Direct Time Question Handler (0ms instant accurate device time response)
-    if (isTimeOrDateQuery(trimmed)) {
-      return {
-        success: true,
-        response: `🕒 It's currently **${timeInfo.formattedTime}** on **${timeInfo.formattedDate}** (${timeInfo.dayOfWeek}, ${timeInfo.timeZone}).`
-      };
-    }
-
     if (!trimmed && !mediaAttachment?.url && !mediaAttachment?.content) {
       return {
         success: true,
@@ -545,176 +535,22 @@ export async function processAIPersonalMessage(
       };
     }
 
-    // 🧠 Intent Classification with Media Awareness
-    const hasMedia = Boolean(mediaAttachment?.url || mediaAttachment?.content);
-    const mediaType = mediaAttachment?.type || '';
-    const intent = classifyIntelligenceIntent(trimmed, hasMedia, mediaType);
-
-    // 1. Explicit Image / Creative Poster Generation
-    if (intent === 'image_generation') {
-      try {
-        const promptConcept = await cleanAndTranslateImagePrompt(trimmed);
-        const verificationResult = await generateAndVerifyAIImage({
-          originalPrompt: promptConcept
-        });
-
-        const imageUrl = verificationResult.imageUrl || await generateAIImageWithFallback(promptConcept);
-        const caption = `✨ ${trimmed} — Created with Tolee AI Frontier Engine #ToleeAI #Creative`;
-
-        return {
-          success: true,
-          action: 'IMAGE_GENERATION',
-          response: `🎨 **Tolee Creative AI** has created your requested visual!\n\n> *Prompt Concept: "${promptConcept.slice(0, 120)}..."*\n\nYou can review, customize the caption below to publish live to your Tolee Feed, or save the HD visual directly.`,
-          interactiveAction: {
-            type: 'PREVIEW_IMAGE',
-            label: '🚀 Publish to Tolee Feed',
-            payload: {
-              imageUrl,
-              caption
-            }
-          }
-        };
-      } catch (imgErr) {
-        console.warn('[AIManager Image Generation Fallback]', imgErr);
-        const fallbackUrl = await generateAIImageWithFallback(trimmed);
-        return {
-          success: true,
-          action: 'IMAGE_GENERATION',
-          response: `🎨 **Tolee Creative AI** visual is ready:`,
-          interactiveAction: {
-            type: 'PREVIEW_IMAGE',
-            label: '🚀 Publish to Tolee Feed',
-            payload: {
-              imageUrl: fallbackUrl,
-              caption: `✨ ${trimmed}`
-            }
-          }
-        };
-      }
-    }
-
-    // 2. Multimodal Vision Understanding (User attached image)
-    if (intent === 'vision' && mediaAttachment?.url) {
-      const visionPrompt = trimmed || 'Please analyze this image in detail and describe what you see, highlighting any notable objects, text, aesthetics, and context.';
-      const visionResponse = await callNvidiaLLM([
-        ...history.map(h => ({ role: h.role, content: h.content })),
-        {
-          role: 'user',
-          content: visionPrompt,
-          mediaUrl: mediaAttachment.url,
-          mediaType: mediaAttachment.type
-        }
-      ], undefined, 'vision');
-
-      return {
-        success: true,
-        action: 'VISION_ANALYSIS',
-        response: visionResponse || '👁️ I analyzed the image, but could not retrieve details. Please ensure the image is clear and try again.'
-      };
-    }
-
-    // 3. Document / Data / Text File Analysis
-    if (intent === 'document_analysis' || (hasMedia && mediaAttachment?.content)) {
-      const docName = mediaAttachment?.name || 'Uploaded Document';
-      const docContent = (mediaAttachment?.content || '').slice(0, 12000); // 12k char window for high speed & accuracy
-      const docQuestion = trimmed || 'Summarize this document and highlight the key findings, action items, and important takeaways.';
-      
-      const docPrompt = `The user has provided a document named "${docName}".\n\n--- DOCUMENT CONTENT ---\n${docContent}\n--- END DOCUMENT CONTENT ---\n\nUser Question: ${docQuestion}\n\nProvide an insightful, structured, and accurate response based strictly on the document provided.`;
-
-      const docResponse = await callNvidiaLLM([
-        ...history.map(h => ({ role: h.role, content: h.content })),
-        { role: 'user', content: docPrompt }
-      ], undefined, 'auto');
-
-      return {
-        success: true,
-        action: 'DOCUMENT_ANALYSIS',
-        response: docResponse || `📄 Document analysis for "${docName}" completed.`
-      };
-    }
-
-    // 4. Coding & Software Architecture
-    if (intent === 'coding') {
-      const codingSystemPrompt = `${SYSTEM_PROMPTS.PERSONAL_EMPLOYEE}\n\nYou are acting as a Principal Software Engineer and Full-Stack Architect.
-CRITICAL CODING GUIDELINES:
-- Provide clean, modern, well-typed, production-ready code with concise explanations.
-- Wrap all code blocks in triple backticks with the exact language identifier (e.g. \`\`\`typescript, \`\`\`python, \`\`\`jsx, \`\`\`sql).
-- Point out edge cases, time/space complexity, and security considerations where relevant.`;
-
-      const codeResponse = await callNvidiaLLM([
-        ...history.map(h => ({ role: h.role, content: h.content })),
-        { role: 'user', content: trimmed }
-      ], codingSystemPrompt, 'coding');
-
-      return {
-        success: true,
-        action: 'CODING',
-        response: codeResponse || '💻 Let me know the specific function or code you would like to write or debug.'
-      };
-    }
-
-    // 5. Mathematical & Step-by-Step Logic Reasoning
-    if (intent === 'reasoning') {
-      const reasoningSystemPrompt = `${SYSTEM_PROMPTS.PERSONAL_EMPLOYEE}\n\nYou are an elite problem-solving mathematician and logician.
-CRITICAL REASONING GUIDELINES:
-- Break down the problem step-by-step. Show all intermediate formulas, steps, and deductions clearly.
-- State the final conclusion or numerical answer prominently at the end.`;
-
-      const reasoningResponse = await callNvidiaLLM([
-        ...history.map(h => ({ role: h.role, content: h.content })),
-        { role: 'user', content: trimmed }
-      ], reasoningSystemPrompt, 'reasoning');
-
-      return {
-        success: true,
-        action: 'REASONING',
-        response: reasoningResponse || '🔢 Calculation complete.'
-      };
-    }
-
-    // 6. Platform Actions (CRM, Tasks, Calendar, Feed, Marketplace, Ads)
-    if (intent === 'platform_action') {
-      const actionResult = await executeToleeAIAction({
-        userId,
-        userEmail: session?.user?.email || undefined,
-        command: trimmed,
-        history
-      });
-
-      return {
-        success: actionResult.success,
-        response: actionResult.message,
-        action: actionResult.action,
-        data: actionResult.data,
-        interactiveAction: actionResult.interactiveAction
-      };
-    }
-
-    // 7. General Knowledge, Conversation, Writing & Web Lookups
-    const isNewsQuery = trimmed.toLowerCase().includes('news') || trimmed.toLowerCase().includes('samachar') || trimmed.toLowerCase().includes('market');
-    let enrichedSystemPrompt = SYSTEM_PROMPTS.PERSONAL_EMPLOYEE;
-
-    if (isNewsQuery) {
-      try {
-        const liveNews = await fetchLiveNewsForToleeAI();
-        if (liveNews.length > 0) {
-          const newsContext = liveNews.map((n, i) => `${i + 1}. [${n.source}] ${n.title}: ${n.summary || ''}`).join('\n');
-          enrichedSystemPrompt += `\n\nLive Current News Context:\n${newsContext}`;
-        }
-      } catch (newsErr) {}
-    }
-
-    const conversationResponse = await callNvidiaLLM([
-      ...history.map(h => ({ role: h.role, content: h.content })),
-      { role: 'user', content: trimmed }
-    ], enrichedSystemPrompt, 'auto');
+    const result = await CentralAIEngine.execute({
+      message: trimmed,
+      history,
+      userId,
+      userEmail: session?.user?.email || undefined,
+      clientISO: clientLocalISO,
+      timeZone,
+      mediaAttachment,
+    });
 
     return {
-      success: true,
-      action: 'CONVERSATION',
-      response: conversationResponse || `🤖 **Tolee AI Manager**: Main aapki madad karne ke liye tayyar hoon!`
+      success: result.success,
+      response: result.content,
+      action: result.toolUsed || result.metadata.intent.toUpperCase(),
+      interactiveAction: result.interactiveAction,
     };
-
   } catch (error: any) {
     console.error('Error in processAIPersonalMessage:', error);
     return {

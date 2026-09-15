@@ -68,17 +68,23 @@ export function isTimeOrDateQuery(message: string): boolean {
     'what time is it',
     'what time it is',
     'what is time',
-    'what is time now',
+    'what is the time',
+    'time right now',
+    'what time',
     'time now',
     'current time',
     'kya time hua hai',
     'kitne baje hain',
     'kitna time hua',
     'what is the date',
+    'what is today date',
+    'what is today\'s date',
     'today date',
+    'current date',
     'aaj kya date hai',
     'what day is today'
   ];
 
-  return timePatterns.some(pattern => lower.includes(pattern));
+  return timePatterns.some(pattern => lower.includes(pattern)) ||
+         /what('s|\s+is)\s+(the\s+)?(time|date)/i.test(lower);
 }

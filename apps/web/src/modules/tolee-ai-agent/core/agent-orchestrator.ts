@@ -1,5 +1,6 @@
 import { ToolRegistry } from '../tools/registry';
 import { ToolExecutionContext } from '../tools/types';
+import { CentralAIEngine } from '@/lib/ai-gateway/central-engine';
 
 const NVIDIA_API_KEYS = [
   process.env.NVIDIA_API_KEY,
@@ -62,7 +63,7 @@ CORE PERSONALITY & TONE:
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: 'meta/llama-3.3-70b-instruct',
+          model: 'nvidia/llama-3.1-nemotron-70b-instruct',
           messages,
           tools,
           tool_choice: 'auto',
@@ -111,7 +112,7 @@ CORE PERSONALITY & TONE:
             Authorization: `Bearer ${apiKey}`,
           },
           body: JSON.stringify({
-            model: 'meta/llama-3.3-70b-instruct',
+            model: 'nvidia/llama-3.1-nemotron-70b-instruct',
             messages: followUpMessages,
             temperature: 0.4,
             max_tokens: 512,
@@ -140,10 +141,23 @@ CORE PERSONALITY & TONE:
         replyText: message?.content || 'Main aapki kya madad kar sakta hoon?',
       };
     } catch (err: any) {
-      console.error('[AgentOrchestrator] Process error:', err);
-      return {
-        replyText: `Kshama karein, request process karte waqt issue aaya: ${err.message || 'Technical error'}.`,
-      };
+      console.warn('[AgentOrchestrator] Primary provider error, falling back to CentralAIEngine:', err.message);
+      try {
+        const centralResult = await CentralAIEngine.execute({
+          message: userMessage,
+          history: conversationHistory,
+          userId: context.userId,
+        });
+        return {
+          replyText: centralResult.content,
+          executedTool: centralResult.toolUsed || undefined,
+          toolData: undefined,
+        };
+      } catch (centralErr) {
+        return {
+          replyText: `Main aapki madad karne ke liye tayyar hoon. Aapka sawal dobara bhejein.`,
+        };
+      }
     }
   }
 }

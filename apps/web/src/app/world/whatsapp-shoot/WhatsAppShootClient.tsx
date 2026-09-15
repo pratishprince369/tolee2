@@ -592,7 +592,7 @@ export default function WhatsAppShootClient() {
         body: JSON.stringify({
           action: 'START_SHOOT',
           title: campaignTitle || 'WhatsApp Shoot',
-          templateMessage,
+          templateMessage: messageTemplate,
           mediaUrl: mediaFile?.url || null,
           mediaType: mediaFile?.type || null,
           contacts: payloadContacts,

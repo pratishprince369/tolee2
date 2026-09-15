@@ -9,7 +9,7 @@ export class FallbackProvider implements AIProvider {
       return {
         url: 'https://integrate.api.nvidia.com/v1/chat/completions',
         apiKey: process.env.NVIDIA_API_KEY,
-        model: 'meta/llama-3.1-70b-instruct',
+        model: 'nvidia/llama-3.1-nemotron-70b-instruct',
       };
     }
     if (process.env.OPENAI_API_KEY) {

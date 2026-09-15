@@ -1,6 +1,7 @@
 import { SYSTEM_PROMPTS } from "./prompt-manager";
 import cloudinary from "@/lib/cloudinary";
 import { aiGateway } from "@/lib/ai-gateway/router";
+import { CentralAIEngine } from "@/lib/ai-gateway/central-engine";
 
 const OPENAI_API_KEYS = [
   process.env.OPENAI_API_KEY,
@@ -103,189 +104,34 @@ export async function callNvidiaLLM(
     ...compressed
   ];
 
-  // 🌟 Tier 0: Tolee Unified AI Gateway (Gemini Official / Web2API / Resilient Fallback)
-  // Used first for vision/multimodal or general auto routing
-  if (preferredEngine === 'vision' || preferredEngine === 'gemini' || preferredEngine === 'auto') {
-    try {
-      const gatewayRes = await aiGateway.generate({
-        messages: fullMessages as any,
-        temperature: 0.7,
-        maxTokens: 1500,
-        persona: {
-          name: 'Tolee Frontier AI',
-          systemPrompt: systemPrompt || SYSTEM_PROMPTS.PERSONAL_EMPLOYEE,
-          preferredProvider: (preferredEngine === 'vision' || preferredEngine === 'gemini') ? 'gemini_official' : undefined
-        }
-      });
-      if (gatewayRes && gatewayRes.text && gatewayRes.text.trim()) {
-        return gatewayRes.text;
+  // 1. Tolee Unified AI Gateway (Gemini / Official / Fallback)
+  try {
+    const gatewayRes = await aiGateway.generate({
+      messages: fullMessages as any,
+      temperature: 0.7,
+      maxTokens: 1500,
+      persona: {
+        name: 'Tolee Frontier AI',
+        systemPrompt: systemPrompt || SYSTEM_PROMPTS.PERSONAL_EMPLOYEE,
+        preferredProvider: (preferredEngine === 'vision' || preferredEngine === 'gemini') ? 'gemini_official' : undefined
       }
-    } catch (err) {
-      // Continue to next tier on gateway fallback
+    });
+    if (gatewayRes && gatewayRes.text && gatewayRes.text.trim()) {
+      return gatewayRes.text;
     }
+  } catch (err) {}
+
+  // 2. High-Speed CentralAIEngine
+  try {
+    const lastUserMsg = [...messages].reverse().find(m => m.role === 'user')?.content || '';
+    const res = await CentralAIEngine.execute({
+      message: lastUserMsg,
+      history: messages.map(m => ({ role: m.role, content: m.content })),
+    });
+    return res.content;
+  } catch (e) {
+    return `🤖 **Tolee Frontier AI Brain**: Main aapke request par poora support provide karne ke liye ready hoon. Aap apna sawaal ya task directly share karein!`;
   }
-
-  // 🟣 1. Tier 1: Claude 3.5 Sonnet / CLōD Engine (Nuanced Intelligence & Coding)
-  if (preferredEngine === 'claude' || preferredEngine === 'coding' || preferredEngine === 'auto') {
-    const clodModels = [
-      "anthropic/claude-3.5-sonnet",
-      "deepseek/deepseek-chat",
-      "gpt-4o",
-      "meta-llama/llama-3.3-70b-instruct"
-    ];
-
-    for (const model of clodModels) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 4000);
-
-        const res = await fetch("https://api.clod.io/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${CLOD_API_KEY}`
-          },
-          signal: controller.signal,
-          body: JSON.stringify({
-            model,
-            messages: fullMessages.map(m => ({ role: m.role, content: m.content })),
-            temperature: 0.7,
-            max_tokens: 1500
-          })
-        });
-
-        clearTimeout(timeoutId);
-
-        if (res.ok) {
-          const data = await res.json();
-          const content = data.choices?.[0]?.message?.content;
-          if (content && content.trim()) {
-            return content;
-          }
-        }
-      } catch (e) {}
-    }
-  }
-
-  // 🔵 2. DeepSeek R1 & Frontier Reasoning (Prioritized for 'reasoning' or 'deepseek')
-  if (preferredEngine === 'reasoning' || preferredEngine === 'deepseek') {
-    for (const apiKey of NVIDIA_FRONTIER_KEYS) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 4500);
-
-        const res = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${apiKey}`,
-            "Accept": "application/json"
-          },
-          signal: controller.signal,
-          body: JSON.stringify({
-            model: "deepseek-ai/deepseek-r1",
-            messages: fullMessages.map(m => ({ role: m.role, content: m.content })),
-            temperature: 0.6,
-            top_p: 0.9,
-            max_tokens: 1500
-          })
-        });
-
-        clearTimeout(timeoutId);
-
-        if (res.ok) {
-          const data = await res.json();
-          const content = data.choices?.[0]?.message?.content;
-          if (content && content.trim()) {
-            return content;
-          }
-        }
-      } catch (e) {}
-    }
-  }
-
-  // 🟢 3. Tier 3: Official OpenAI GPT-4o-mini / GPT-4o Key Rotation Pool
-  if (preferredEngine === 'gpt4o' || preferredEngine === 'coding' || preferredEngine === 'auto') {
-    const randomKeys = [...OPENAI_API_KEYS].sort(() => Math.random() - 0.5).slice(0, 5);
-    for (const apiKey of randomKeys) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3500);
-
-        const res = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${apiKey}`
-          },
-          signal: controller.signal,
-          body: JSON.stringify({
-            model: "gpt-4o-mini",
-            messages: fullMessages.map(m => ({ role: m.role, content: m.content })),
-            temperature: 0.7,
-            max_tokens: 1500
-          })
-        });
-
-        clearTimeout(timeoutId);
-
-        if (res.ok) {
-          const data = await res.json();
-          const content = data.choices?.[0]?.message?.content;
-          if (content && content.trim()) {
-            return content;
-          }
-        }
-      } catch (e) {}
-    }
-  }
-
-  // 🔵 4. Tier 4: NVIDIA Frontier Cluster (DeepSeek R1 + Llama 3.3 + Llama 3.1 405B)
-  const frontierModels = [
-    "meta/llama-3.3-70b-instruct",
-    "deepseek-ai/deepseek-r1",
-    "meta/llama-3.1-405b-instruct",
-    "nvidia/nemotron-4-mini-15b-instruct"
-  ];
-
-  for (const apiKey of NVIDIA_FRONTIER_KEYS) {
-    for (const model of frontierModels) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3500);
-
-        const res = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${apiKey}`,
-            "Accept": "application/json"
-          },
-          signal: controller.signal,
-          body: JSON.stringify({
-            model,
-            messages: fullMessages.map(m => ({ role: m.role, content: m.content })),
-            temperature: 0.6,
-            top_p: 0.9,
-            max_tokens: 1500
-          })
-        });
-
-        clearTimeout(timeoutId);
-
-        if (res.ok) {
-          const data = await res.json();
-          const content = data.choices?.[0]?.message?.content;
-          if (content && content.trim()) {
-            return content;
-          }
-        }
-      } catch (error: any) {}
-    }
-  }
-
-  // High-Speed Emergency Reasoning Fallback
-  return `🤖 **Tolee Frontier AI Brain**: Main aapke request par poora support provide karne ke liye ready hoon. Aap apna sawaal ya task directly share karein!`;
 }
 
 /**

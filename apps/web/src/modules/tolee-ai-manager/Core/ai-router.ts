@@ -99,13 +99,14 @@ export function classifyIntelligenceIntent(input: string, hasMedia: boolean = fa
     'generate image', 'generate an image', 'create image', 'make image', 'draw',
     'photo banao', 'image banao', 'poster banao', 'banner banao', 'creative banao',
     'generate picture', 'generate photo', 'create poster', 'design banner', 'design poster',
+    'create a logo', 'create logo', 'design logo', 'generate logo', 'logo banao',
     'illustration of', 'wallpaper of', '4k image', 'photorealistic image',
     'फोटो बनाओ', 'इमेज बनाओ', 'पोस्टर बनाओ', 'बैनर बनाओ', 'चित्र बनाओ', 'तस्वीर बनाओ'
   ];
 
   const hasExplicitImageIntent = explicitImageKeywords.some(k => query.includes(k)) ||
-    ((query.includes('banner') || query.includes('poster') || query.includes('flyer') || query.includes('wallpaper')) &&
-     (query.includes('generate') || query.includes('create') || query.includes('design') || query.includes('banao') || query.includes('बनाओ')));
+    ((query.includes('banner') || query.includes('poster') || query.includes('flyer') || query.includes('wallpaper') || query.includes('logo') || query.includes('graphic') || query.includes('illustration')) &&
+     (query.includes('generate') || query.includes('create') || query.includes('design') || query.includes('make') || query.includes('banao') || query.includes('बनाओ')));
 
   if (hasExplicitImageIntent) {
     return 'image_generation';

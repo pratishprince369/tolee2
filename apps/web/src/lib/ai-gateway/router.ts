@@ -13,6 +13,7 @@ import { ClodOpenAIProvider } from './providers/clod-openai';
 import { GeminiWeb2APIProvider } from './providers/gemini-web2api';
 import { FallbackProvider } from './providers/fallback-provider';
 import { buildAIContext } from './context-builder';
+import { CentralAIEngine } from './central-engine';
 
 class AIGatewayRouter {
   private nvidia = new NvidiaNIMProvider();
@@ -63,7 +64,7 @@ class AIGatewayRouter {
         name: 'NVIDIA NIM Frontier Cluster',
         type: 'nvidia',
         status: nvidiaOk ? 'CONNECTED' : 'OFFLINE',
-        defaultModel: 'meta/llama-3.3-70b-instruct',
+        defaultModel: 'nvidia/llama-3.1-nemotron-70b-instruct',
         isVision: false,
         isVoice: false,
         isStreaming: true,
@@ -103,7 +104,7 @@ class AIGatewayRouter {
         name: 'Resilient Multi-Tier Fallback AI',
         type: 'nvidia',
         status: fallbackOk ? 'CONNECTED' : 'OFFLINE',
-        defaultModel: 'meta/llama-3.1-70b-instruct',
+        defaultModel: 'nvidia/llama-3.1-nemotron-70b-instruct',
         isVision: false,
         isVoice: false,
         isStreaming: true,
@@ -156,8 +157,25 @@ class AIGatewayRouter {
         lastError = err;
       }
     }
-
-    throw lastError || new Error('All configured AI providers failed.');
+    // Guaranteed zero-fail fallback via CentralAIEngine
+    try {
+      const central = CentralAIEngine.getInstance();
+      const lastUserMsg = [...(options.messages || [])].reverse().find((m) => m.role === 'user')?.content || '';
+      const execResult = await central.execute({
+        message: lastUserMsg,
+        history: (options.messages || []).map((m) => ({ role: m.role as any, content: m.content })),
+        userId: options.userId,
+      });
+      return {
+        text: execResult.content,
+        model: execResult.model,
+        provider: execResult.provider,
+        latencyMs: execResult.metadata.latencyMs,
+        tokensUsed: { promptTokens: 20, completionTokens: 100, totalTokens: 120 },
+      };
+    } catch (finalErr: any) {
+      throw lastError || finalErr || new Error('All configured AI providers failed.');
+    }
   }
 
   async stream(
@@ -206,8 +224,32 @@ class AIGatewayRouter {
         lastError = err;
       }
     }
+    // Guaranteed zero-fail fallback via CentralAIEngine
+    try {
+      const central = CentralAIEngine.getInstance();
+      const lastUserMsg = [...(options.messages || [])].reverse().find((m) => m.role === 'user')?.content || '';
+      const execResult = await central.execute({
+        message: lastUserMsg,
+        history: (options.messages || []).map((m) => ({ role: m.role as any, content: m.content })),
+        userId: options.userId,
+      });
 
-    throw lastError || new Error('All configured AI stream providers failed.');
+      const words = (execResult.content || '').split(' ');
+      for (let i = 0; i < words.length; i++) {
+        const chunk = (i === 0 ? '' : ' ') + words[i];
+        onChunk({ text: chunk, done: i === words.length - 1 });
+      }
+
+      return {
+        text: execResult.content,
+        model: execResult.model,
+        provider: execResult.provider,
+        latencyMs: execResult.metadata.latencyMs,
+        tokensUsed: { promptTokens: 20, completionTokens: 100, totalTokens: 120 },
+      };
+    } catch (finalErr: any) {
+      throw lastError || finalErr || new Error('All configured AI stream providers failed.');
+    }
   }
 
   async generateSmartReplies(params: {

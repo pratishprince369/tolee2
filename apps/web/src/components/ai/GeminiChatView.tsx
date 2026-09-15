@@ -283,6 +283,31 @@ export default function GeminiChatView({ initialPersona, onOpenLiveVoice }: Gemi
         {lines.map((line, idx) => {
           if (!line.trim()) return <div key={idx} className="h-2" />;
 
+          // Image markdown: ![alt](url)
+          const imgMatch = line.match(/^!\[(.*?)\]\((https?:\/\/[^\s)]+)\)$/);
+          if (imgMatch) {
+            return (
+              <div key={idx} className="my-3 rounded-2xl overflow-hidden border border-teal-800/50 bg-gray-950 p-2 shadow-lg max-w-md">
+                <img
+                  src={imgMatch[2]}
+                  alt={imgMatch[1] || 'AI Generated Visual'}
+                  className="w-full h-auto max-h-80 object-cover rounded-xl"
+                />
+                <div className="flex items-center justify-between mt-2 px-1 text-xs text-teal-400">
+                  <span className="font-medium truncate">{imgMatch[1] || 'AI Visual'}</span>
+                  <a
+                    href={imgMatch[2]}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:underline font-semibold"
+                  >
+                    Open HD Visual ↗
+                  </a>
+                </div>
+              </div>
+            );
+          }
+
           // Headers
           if (line.startsWith('### ')) {
             return (

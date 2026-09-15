@@ -1,8 +1,14 @@
 'use server';
 
 import { prismaAI } from '@/lib/prisma-ai';
+import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
+
+function getWorldToolModel() {
+  if ((prisma as any)?.worldTool) return (prisma as any).worldTool;
+  return (prismaAI as any).worldTool;
+}
 
 export interface WorldToolItem {
   id: string;
@@ -56,34 +62,6 @@ const DEFAULT_TOOLS: Omit<WorldToolItem, 'id'>[] = [
     order: 2,
   },
   {
-    name: 'AI Multi-Platform Social Publisher',
-    slug: 'social-publisher',
-    description: 'Create, optimize & 1-click publish viral posts across Instagram, LinkedIn, Twitter/X, Facebook & WhatsApp with AI caption & hashtag generator.',
-    routeUrl: '/world/social-publisher',
-    icon: 'Share2',
-    category: 'Marketing & Creator Suite',
-    badge: 'NEW 🔥',
-    isVisible: true,
-    accessType: 'TIMED_FREE',
-    priceMonthly: 14.99,
-    freeTrialDays: 7,
-    order: 3,
-  },
-  {
-    name: 'WhatsApp Shoot & Bulk Broadcaster',
-    slug: 'whatsapp-shoot',
-    description: 'AI-powered bulk WhatsApp marketing & broadcast shooter. Send personalized campaigns with {{name}} tags, media attachments & zero-ban sequence automation.',
-    routeUrl: '/world/whatsapp-shoot',
-    icon: 'MessageCircle',
-    category: 'Marketing & Sales Automation',
-    badge: 'HOT 🚀',
-    isVisible: true,
-    accessType: 'TIMED_FREE',
-    priceMonthly: 19.99,
-    freeTrialDays: 7,
-    order: 4,
-  },
-  {
     name: 'Tolee Book & Smart Reader',
     slug: 'book',
     description: 'Digital library & smart e-book reader. Search thousands of free books, track reading progress, take notes, and get AI chapter summaries.',
@@ -95,7 +73,7 @@ const DEFAULT_TOOLS: Omit<WorldToolItem, 'id'>[] = [
     accessType: 'FREE',
     priceMonthly: 0,
     freeTrialDays: null,
-    order: 5,
+    order: 3,
   },
 ];
 
@@ -104,10 +82,16 @@ const DEFAULT_TOOLS: Omit<WorldToolItem, 'id'>[] = [
  */
 export async function getPublicWorldTools(): Promise<{ success: boolean; tools: WorldToolItem[] }> {
   try {
+    const worldToolModel = getWorldToolModel();
     let dbTools: any[] = [];
     try {
-      dbTools = await (prismaAI as any).worldTool.findMany({
-        where: { isVisible: true },
+      // Purge deleted tools if still present in DB
+      await worldToolModel.deleteMany({
+        where: { slug: { in: ['whatsapp-shoot', 'social-publisher'] } }
+      }).catch(() => {});
+
+      dbTools = await worldToolModel.findMany({
+        where: { isVisible: true, slug: { notIn: ['whatsapp-shoot', 'social-publisher'] } },
         orderBy: { order: 'asc' },
       });
     } catch (e) {
@@ -121,7 +105,7 @@ export async function getPublicWorldTools(): Promise<{ success: boolean; tools: 
       const exists = dbTools.some((d: any) => d.slug === t.slug);
       if (!exists) {
         try {
-          const created = await (prismaAI as any).worldTool.upsert({
+          const created = await worldToolModel.upsert({
             where: { slug: t.slug },
             create: {
               name: t.name,
@@ -148,7 +132,8 @@ export async function getPublicWorldTools(): Promise<{ success: boolean; tools: 
       }
     }
 
-    // Sort by order
+    // Filter out deleted tools in case of cache/fallback
+    dbTools = dbTools.filter((t: any) => t.slug !== 'whatsapp-shoot' && t.slug !== 'social-publisher');
     dbTools.sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
 
     const now = new Date();
@@ -211,9 +196,15 @@ export async function getAllWorldToolsAdmin(): Promise<{ success: boolean; tools
     const isSuperAdmin = user?.role === 'SUPER_ADMIN' || user?.isSuperAdmin || user?.email === process.env.SUPER_ADMIN_EMAIL;
 
     // Fetch from database
+    const worldToolModel = getWorldToolModel();
     let dbTools: any[] = [];
     try {
-      dbTools = await (prismaAI as any).worldTool.findMany({
+      await worldToolModel.deleteMany({
+        where: { slug: { in: ['whatsapp-shoot', 'social-publisher'] } }
+      }).catch(() => {});
+
+      dbTools = await worldToolModel.findMany({
+        where: { slug: { notIn: ['whatsapp-shoot', 'social-publisher'] } },
         orderBy: { order: 'asc' },
       });
     } catch {
@@ -227,7 +218,7 @@ export async function getAllWorldToolsAdmin(): Promise<{ success: boolean; tools
       const exists = dbTools.some((d: any) => d.slug === t.slug);
       if (!exists) {
         try {
-          const created = await (prismaAI as any).worldTool.upsert({
+          const created = await worldToolModel.upsert({
             where: { slug: t.slug },
             create: {
               name: t.name,
@@ -254,6 +245,7 @@ export async function getAllWorldToolsAdmin(): Promise<{ success: boolean; tools
       }
     }
 
+    dbTools = dbTools.filter((t: any) => t.slug !== 'whatsapp-shoot' && t.slug !== 'social-publisher');
     dbTools.sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
 
     return {
@@ -301,7 +293,7 @@ export async function createWorldTool(data: {
 }): Promise<{ success: boolean; tool?: WorldToolItem; error?: string }> {
   try {
     const slug = data.slug.toLowerCase().replace(/[^a-z0-9-]/g, '-');
-    const created = await (prismaAI as any).worldTool.create({
+    const created = await getWorldToolModel().create({
       data: {
         name: data.name,
         slug,
@@ -347,7 +339,7 @@ export async function updateWorldTool(
     if (data.freeUntil !== undefined) updateData.freeUntil = data.freeUntil ? new Date(data.freeUntil) : null;
     if (data.order !== undefined) updateData.order = Number(data.order);
 
-    await (prismaAI as any).worldTool.update({
+    await getWorldToolModel().update({
       where: { id },
       data: updateData,
     });
@@ -363,7 +355,7 @@ export async function updateWorldTool(
  */
 export async function deleteWorldTool(id: string): Promise<{ success: boolean; error?: string }> {
   try {
-    await (prismaAI as any).worldTool.delete({
+    await getWorldToolModel().delete({
       where: { id },
     });
     return { success: true };
