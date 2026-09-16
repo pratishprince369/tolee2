@@ -1174,42 +1174,42 @@ export function LocalNeighborhoodRadar() {
   }, []);
 
   return (
-    <div className="w-full space-y-3.5 sm:space-y-5 pb-28 lg:pb-0">
+    <div className="w-full space-y-3.5 sm:space-y-5 pb-44 lg:pb-0">
       
-      {/* 0. MOBILE-ONLY COMPACT RADAR HEADER (< lg) MATCHING REFERENCE DESIGN */}
-      <div className="lg:hidden bg-white dark:bg-zinc-900 rounded-2xl border border-slate-200/80 dark:border-zinc-800 p-3.5 shadow-2xs space-y-2.5">
+      {/* 0. MOBILE-ONLY COMPACT RADAR HEADER (< lg) FIXED ABOVE BOTTOM NAV */}
+      <div className="lg:hidden fixed bottom-[calc(4.2rem+env(safe-area-inset-bottom)+8px)] left-2.5 right-2.5 sm:left-4 sm:right-4 z-40 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md rounded-2xl border border-slate-200/90 dark:border-zinc-800 p-2.5 sm:p-3 shadow-xl space-y-2">
         <div className="flex items-center justify-between gap-2">
           
           {/* Left: Icon + Title + Inline Location & Weather */}
-          <div className="flex items-center gap-2.5 min-w-0 flex-1">
-            <div className="w-10 h-10 rounded-2xl bg-teal-50 dark:bg-teal-950/60 border border-teal-200/60 dark:border-teal-800/60 text-[#0E9F9A] dark:text-teal-400 flex items-center justify-center flex-shrink-0 shadow-2xs">
-              <Radio className="w-5 h-5 animate-pulse" />
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <div className="w-9 h-9 rounded-xl bg-teal-50 dark:bg-teal-950/60 border border-teal-200/60 dark:border-teal-800/60 text-[#0E9F9A] dark:text-teal-400 flex items-center justify-center flex-shrink-0 shadow-2xs">
+              <Radio className="w-4 h-4 animate-pulse" />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
-                <span className="text-sm font-black text-slate-900 dark:text-white tracking-tight">
+                <span className="text-xs sm:text-sm font-black text-slate-900 dark:text-white tracking-tight truncate">
                   Tolee Radar
                 </span>
-                <span className="px-1.5 py-0.5 rounded-full bg-emerald-500 text-white text-[9px] font-black uppercase tracking-wider shadow-2xs">
+                <span className="px-1.5 py-0.5 rounded-full bg-emerald-500 text-white text-[8px] sm:text-[9px] font-black uppercase tracking-wider shadow-2xs flex-shrink-0">
                   LIVE
                 </span>
               </div>
-              <div className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 flex items-center gap-1.5 truncate mt-0.5">
+              <div className="text-[10px] sm:text-[11px] font-bold text-slate-500 dark:text-zinc-400 flex items-center gap-1 truncate mt-0.5">
                 <span className="truncate">{subLocation || userCity.split(',')[0] || 'Asia, Kalyan'}</span>
                 <span>•</span>
                 <span className="inline-flex items-center gap-1 text-amber-500 font-semibold flex-shrink-0">
-                  <Sun className="w-3 h-3 text-amber-500" /> 28° C
+                  <Sun className="w-2.5 h-2.5 text-amber-500" /> 28° C
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Right: + Drop Alert & Map / List Toggle */}
-          <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+          {/* Right: + Drop Alert & Map / List Toggle (Baju Baju me / Side-by-Side) */}
+          <div className="flex items-center gap-1.5 flex-shrink-0">
             <button
               type="button"
               onClick={() => openDropAlertModal()}
-              className="bg-[#0E9F9A] hover:bg-[#087A76] text-white text-xs font-black px-3 py-1.5 rounded-xl shadow-xs flex items-center gap-1 transition-all active:scale-95"
+              className="bg-[#0E9F9A] hover:bg-[#087A76] text-white text-xs font-black px-2.5 sm:px-3 py-1.5 rounded-xl shadow-xs flex items-center gap-1 transition-all active:scale-95"
             >
               <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
               <span>Drop Alert</span>
@@ -1228,7 +1228,7 @@ export function LocalNeighborhoodRadar() {
                   }, 150);
                 }
               }}
-              className="bg-white dark:bg-zinc-800 hover:bg-slate-50 border border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-200 text-xs font-bold px-3 py-1 rounded-xl shadow-2xs flex items-center gap-1.5 transition-all active:scale-95"
+              className="bg-white dark:bg-zinc-800 hover:bg-slate-50 border border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-200 text-xs font-bold px-2.5 sm:px-3 py-1.5 rounded-xl shadow-2xs flex items-center gap-1 transition-all active:scale-95"
             >
               {mobileViewMode === 'list' ? (
                 <>
