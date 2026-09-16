@@ -182,7 +182,7 @@ export function LiveDarshanPlayerModal({
               <p className="text-xs text-zinc-500 max-w-sm">
                 Temple broadcast will resume during scheduled daily Aarti and Darshan timings.
               </p>
-              {temple.officialUrl && (
+              {temple.officialUrl && !temple.officialUrl.includes('livedarshanhub.com') && (
                 <a
                   href={temple.officialUrl}
                   target="_blank"
@@ -212,7 +212,7 @@ export function LiveDarshanPlayerModal({
             <div>
               <div className="flex items-center gap-2">
                 <h4 className="text-base sm:text-lg font-extrabold text-white">{temple.name}</h4>
-                {temple.officialUrl && (
+                {temple.officialUrl && !temple.officialUrl.includes('livedarshanhub.com') && (
                   <a
                     href={temple.officialUrl}
                     target="_blank"

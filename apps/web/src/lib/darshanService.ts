@@ -221,7 +221,6 @@ export const SEED_TEMPLES = [
     "thumbnail": "https://livedarshanhub.com/wp-content/uploads/2026/02/Baba_Baidyanath_Dham-1.jpg",
     "youtubeVideoId": "gMoEnxZtxzg",
     "streamUrl": "https://www.youtube.com/watch?v=gMoEnxZtxzg",
-    "officialUrl": "https://livedarshanhub.com/temple/baidyanath-dham-deoghar/",
     "sortOrder": 11,
     "isFeatured": true
   },
@@ -246,7 +245,6 @@ export const SEED_TEMPLES = [
     "city": "Nageshwar (Dwarka)",
     "state": "Gujarat",
     "thumbnail": "https://livedarshanhub.com/wp-content/uploads/2026/02/nageshwar-jyotirlinga-temple.jpg",
-    "officialUrl": "https://livedarshanhub.com/temple/nageshwar-jyotirlinga-temple/",
     "sortOrder": 12,
     "isFeatured": true
   },
@@ -306,7 +304,6 @@ export const SEED_TEMPLES = [
     "youtubeChannelId": "UC7C_nK8M9z3J2v7L6w4K9eQ",
     "youtubeVideoId": "E-jt944kXUg",
     "streamUrl": "https://www.youtube.com/watch?v=E-jt944kXUg",
-    "officialUrl": "https://livedarshanhub.com/temple/iskcon-vrindavan-sri-sri-krishna-balaram-mandir/",
     "sortOrder": 14,
     "isFeatured": false
   },
@@ -329,7 +326,6 @@ export const SEED_TEMPLES = [
     "city": "Kolkata",
     "state": "West Bengal",
     "thumbnail": "https://livedarshanhub.com/wp-content/uploads/2026/02/Kalighat_Kali_temple.jpg",
-    "officialUrl": "https://livedarshanhub.com/temple/kalighat-kali-temple-shakti-peeth-kolkata/",
     "sortOrder": 15,
     "isFeatured": true
   },
@@ -340,7 +336,6 @@ export const SEED_TEMPLES = [
     "city": "Guwahati",
     "state": "Assam",
     "thumbnail": "https://livedarshanhub.com/wp-content/uploads/2026/02/Kamakhya_temple.jpg",
-    "officialUrl": "https://livedarshanhub.com/temple/kamakhya-temple-shakti-peeth-guwahati/",
     "sortOrder": 16,
     "isFeatured": false
   },
@@ -351,7 +346,6 @@ export const SEED_TEMPLES = [
     "city": "Varanasi",
     "state": "Uttar Pradesh",
     "thumbnail": "https://images.unsplash.com/photo-1609766857041-ed402ea8069a?q=80&w=800",
-    "officialUrl": "https://livedarshanhub.com/temple/vishalakshi-temple-shakti-peeth-varanasi/",
     "sortOrder": 17,
     "isFeatured": false
   },
@@ -362,7 +356,6 @@ export const SEED_TEMPLES = [
     "city": "Brahmapur",
     "state": "Odisha",
     "thumbnail": "https://images.unsplash.com/photo-1609766857041-ed402ea8069a?q=80&w=800",
-    "officialUrl": "https://livedarshanhub.com/temple/taratarini-temple-shakti-peeth-brahmapur/",
     "sortOrder": 18,
     "isFeatured": false
   },
@@ -384,7 +377,6 @@ export const SEED_TEMPLES = [
     "city": "Birbhum",
     "state": "West Bengal",
     "thumbnail": "https://livedarshanhub.com/wp-content/uploads/2026/02/Kankalitala_Temple.jpg",
-    "officialUrl": "https://livedarshanhub.com/temple/kankalitala-temple-shakti-peeth-birbhum/",
     "sortOrder": 20,
     "isFeatured": false
   },
@@ -395,7 +387,6 @@ export const SEED_TEMPLES = [
     "city": "Vani",
     "state": "Maharashtra",
     "thumbnail": "https://livedarshanhub.com/wp-content/uploads/2026/02/IMG-20260219-WA0072.jpg",
-    "officialUrl": "https://livedarshanhub.com/temple/saptashrungi-devi-temple-shakti-peeth-vani-maharastra/",
     "sortOrder": 21,
     "isFeatured": false
   },
@@ -406,7 +397,6 @@ export const SEED_TEMPLES = [
     "city": "Near Midnapore",
     "state": "West Bengal",
     "thumbnail": "https://images.unsplash.com/photo-1609766857041-ed402ea8069a?q=80&w=800",
-    "officialUrl": "https://livedarshanhub.com/temple/shondesh-temple-shakti-peeth-near-midnapore/",
     "sortOrder": 22,
     "isFeatured": false
   },
@@ -417,7 +407,6 @@ export const SEED_TEMPLES = [
     "city": "Kangra",
     "state": "Himachal pradesh",
     "thumbnail": "https://livedarshanhub.com/wp-content/uploads/2026/02/Jwalamukhi-_Temple.jpg",
-    "officialUrl": "https://livedarshanhub.com/temple/jwalamukhi-temple-shakti-peeth-kangra/",
     "sortOrder": 23,
     "isFeatured": false
   },
@@ -428,7 +417,6 @@ export const SEED_TEMPLES = [
     "city": "Lasbela",
     "state": "Balochistan",
     "thumbnail": "https://livedarshanhub.com/wp-content/uploads/2026/02/Hinglaj_Mata_Temple.jpg",
-    "officialUrl": "https://livedarshanhub.com/temple/hinglaj-mata-temple-shakti-peeth-balochistan/",
     "sortOrder": 24,
     "isFeatured": false
   },
@@ -439,7 +427,6 @@ export const SEED_TEMPLES = [
     "city": "Shrinagar",
     "state": "Jammu and Kashmir",
     "thumbnail": "https://images.unsplash.com/photo-1609766857041-ed402ea8069a?q=80&w=800",
-    "officialUrl": "https://livedarshanhub.com/temple/shrinagar-shakti-peeth-shakti-peeth-shrinagar/",
     "sortOrder": 25,
     "isFeatured": false
   },
@@ -450,7 +437,6 @@ export const SEED_TEMPLES = [
     "city": "Bilaspur",
     "state": "Himachal pradesh",
     "thumbnail": "https://livedarshanhub.com/wp-content/uploads/2026/02/Naina-devi.jpg",
-    "officialUrl": "https://livedarshanhub.com/temple/naina-devi-temple-shakti-peeth-bilaspur/",
     "sortOrder": 26,
     "isFeatured": false
   },
@@ -461,7 +447,6 @@ export const SEED_TEMPLES = [
     "city": "Vrindaban",
     "state": "Uttar Pradesh",
     "thumbnail": "https://livedarshanhub.com/wp-content/uploads/2026/02/Katyayani_Temple.jpg",
-    "officialUrl": "https://livedarshanhub.com/temple/katyayani-temple-shakti-peeth-vrindavan/",
     "sortOrder": 27,
     "isFeatured": false
   },
@@ -472,7 +457,6 @@ export const SEED_TEMPLES = [
     "city": "Mysore",
     "state": "Karnataka",
     "thumbnail": "https://livedarshanhub.com/wp-content/uploads/2026/02/IMG-20260219-WA0051.jpg",
-    "officialUrl": "https://livedarshanhub.com/temple/chamundeshwari-temple-shakti-peeth-mysore/",
     "sortOrder": 28,
     "isFeatured": false
   },
@@ -483,7 +467,6 @@ export const SEED_TEMPLES = [
     "city": "Alampur",
     "state": "Telangana",
     "thumbnail": "https://livedarshanhub.com/wp-content/uploads/2026/02/Jogulamba_Temple.jpg",
-    "officialUrl": "https://livedarshanhub.com/temple/jogulamba-temple-shakti-peeth-alampur/",
     "sortOrder": 29,
     "isFeatured": false
   },
@@ -494,7 +477,6 @@ export const SEED_TEMPLES = [
     "city": "Srisailam",
     "state": "Andhra Pradesh",
     "thumbnail": "https://livedarshanhub.com/wp-content/uploads/2026/02/Brahmaramba_Devi.jpg",
-    "officialUrl": "https://livedarshanhub.com/temple/brahmaramba-devi-temple-shakti-peeth-srisailam/",
     "sortOrder": 30,
     "isFeatured": false
   },
@@ -505,7 +487,6 @@ export const SEED_TEMPLES = [
     "city": "Shikarpur",
     "state": "Shikarpur",
     "thumbnail": "https://images.unsplash.com/photo-1609766857041-ed402ea8069a?q=80&w=800",
-    "officialUrl": "https://livedarshanhub.com/temple/sugandha-shaktipeeth-shakti-peeth-shikarpur/",
     "sortOrder": 31,
     "isFeatured": false
   },
@@ -516,7 +497,6 @@ export const SEED_TEMPLES = [
     "city": "Nepal",
     "state": "Nepal",
     "thumbnail": "https://livedarshanhub.com/wp-content/uploads/2026/02/Karatal-shakti-peeth-temple.jpg",
-    "officialUrl": "https://livedarshanhub.com/temple/karatal-shaktipeeth-shakti-peeth-nepal/",
     "sortOrder": 32,
     "isFeatured": false
   },
@@ -527,7 +507,6 @@ export const SEED_TEMPLES = [
     "city": "Ketugram",
     "state": "West Bengal",
     "thumbnail": "https://livedarshanhub.com/wp-content/uploads/2026/02/Bahula_Shaktipeeth.jpg",
-    "officialUrl": "https://livedarshanhub.com/temple/bahula-shaktipeeth-shakti-peeth-ketugram/",
     "sortOrder": 33,
     "isFeatured": false
   },
@@ -538,7 +517,6 @@ export const SEED_TEMPLES = [
     "city": "Amarkantak",
     "state": "Madhya Pradesh",
     "thumbnail": "https://livedarshanhub.com/wp-content/uploads/2026/02/Kalmadhava_Shaktipeeth.jpg",
-    "officialUrl": "https://livedarshanhub.com/temple/kalmadhava-shaktipeeth-shakti-peeth-amarkantak/",
     "sortOrder": 34,
     "isFeatured": false
   },
@@ -549,7 +527,6 @@ export const SEED_TEMPLES = [
     "city": "Karavpur",
     "state": "Maharashtra",
     "thumbnail": "https://images.unsplash.com/photo-1609766857041-ed402ea8069a?q=80&w=800",
-    "officialUrl": "https://livedarshanhub.com/temple/shakti-temple-shakti-peeth-karavpur/",
     "sortOrder": 35,
     "isFeatured": false
   },
@@ -560,7 +537,6 @@ export const SEED_TEMPLES = [
     "city": "Karur",
     "state": "Tamil Nadu",
     "thumbnail": "https://images.unsplash.com/photo-1609766857041-ed402ea8069a?q=80&w=800",
-    "officialUrl": "https://livedarshanhub.com/temple/shrinakshi-shaktipeeth-shakti-peeth-near-karur/",
     "sortOrder": 36,
     "isFeatured": false
   },
@@ -586,7 +562,6 @@ export const SEED_TEMPLES = [
     "thumbnail": "https://livedarshanhub.com/wp-content/uploads/2026/02/Iskon_Bangaluru.jpg",
     "youtubeVideoId": "8lllk7ivf0Y",
     "streamUrl": "https://www.youtube.com/watch?v=8lllk7ivf0Y",
-    "officialUrl": "https://livedarshanhub.com/temple/iskcon-bangalore-sri-radha-krishna-temple/",
     "sortOrder": 42,
     "isFeatured": true
   },
@@ -599,7 +574,6 @@ export const SEED_TEMPLES = [
     "thumbnail": "https://livedarshanhub.com/wp-content/uploads/2026/02/pashupati-nath.jpg",
     "youtubeVideoId": "5OiQmPPEglk",
     "streamUrl": "https://www.youtube.com/watch?v=5OiQmPPEglk",
-    "officialUrl": "https://livedarshanhub.com/temple/pashupati-nath-temple/",
     "sortOrder": 44,
     "isFeatured": true
   },
