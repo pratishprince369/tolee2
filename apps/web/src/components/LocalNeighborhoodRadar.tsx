@@ -396,20 +396,40 @@ export function LocalNeighborhoodRadar() {
   };
 
   // Helper to calculate dynamic alert expiry countdown (Rule 1 & Rule 21)
-  const formatExpiryCountdown = (expiresAt?: Date | string | null): { text: string; isNearing: boolean; isExpired: boolean } => {
-    if (!expiresAt) return { text: 'No expiration', isNearing: false, isExpired: false };
-    const expiryTime = new Date(expiresAt).getTime();
-    const diffMs = expiryTime - Date.now();
+  const formatExpiryCountdown = (
+    expiresAt?: Date | string | null,
+    createdAt?: Date | string | null,
+    category?: string
+  ): { text: string; isNearing: boolean; isExpired: boolean } => {
+    let expDate = expiresAt ? new Date(expiresAt) : null;
+    if (!expDate || isNaN(expDate.getTime())) {
+      const created = createdAt ? new Date(createdAt).getTime() : Date.now();
+      const defaultDuration = (category === 'food' || category === 'deal' || category === 'news' || category === 'event') ? 72 * 3600 * 1000 : 24 * 3600 * 1000;
+      expDate = new Date(created + defaultDuration);
+    }
+
+    const diffMs = expDate.getTime() - Date.now();
     if (diffMs <= 0) return { text: 'Expired', isNearing: false, isExpired: true };
     
     const totalMin = Math.floor(diffMs / 60000);
-    const hours = Math.floor(totalMin / 60);
-    const mins = totalMin % 60;
-    
+    const totalHours = Math.floor(totalMin / 60);
+    const days = Math.floor(totalHours / 24);
+
     // Nearing expiry if < 6 hours remaining
-    const isNearing = hours < 6;
+    const isNearing = totalHours < 6;
+
+    let text = '';
+    if (days >= 1) {
+      text = `Expiring in ${days} day${days > 1 ? 's' : ''}`;
+    } else if (totalHours >= 1) {
+      text = `Expiring in ${totalHours} hour${totalHours > 1 ? 's' : ''}`;
+    } else {
+      const mins = Math.max(1, totalMin % 60);
+      text = `Expiring in ${mins} min${mins > 1 ? 's' : ''}`;
+    }
+
     return {
-      text: `Expires in ${hours}h ${mins}m`,
+      text,
       isNearing,
       isExpired: false
     };
@@ -2099,7 +2119,7 @@ export function LocalNeighborhoodRadar() {
                 const isDeal = post.category === 'deal' || post.category === 'store';
                 const hasLiked = !!likedPostIds[post.id] || post.hasLiked;
                 const likeCount = post.likes + (hasLiked && !post.hasLiked ? 1 : 0);
-                const expiryInfo = formatExpiryCountdown(post.expiresAt);
+                const expiryInfo = formatExpiryCountdown(post.expiresAt, post.createdAt, post.category);
                 const isNearingExpiry = isAlert && expiryInfo.isNearing && !expiryInfo.isExpired;
 
                 return (
@@ -2163,6 +2183,24 @@ export function LocalNeighborhoodRadar() {
                           </button>
                         </div>
 
+                        {/* Post Timing & Expiry Header Row (Above Headline) */}
+                        <div className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-500 dark:text-zinc-400 pt-0.5 flex-wrap">
+                          <span className="inline-flex items-center gap-1 text-slate-500 dark:text-zinc-400">
+                            <Clock className="w-2.5 h-2.5 text-slate-400" />
+                            {post.timeAgo}
+                          </span>
+                          <span>•</span>
+                          <span className={`inline-flex items-center gap-0.5 font-bold ${
+                            expiryInfo.isExpired
+                              ? 'text-rose-600 dark:text-rose-400'
+                              : expiryInfo.isNearing
+                              ? 'text-amber-600 dark:text-amber-400'
+                              : 'text-[#0E9F9A] dark:text-teal-400'
+                          }`}>
+                            ⏳ {expiryInfo.text}
+                          </span>
+                        </div>
+
                         {/* Title */}
                         <Link href={post.link || `/radar/${post.id}`} className="block">
                           <h4 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white leading-snug hover:text-[#0E9F9A] transition-colors line-clamp-2">
@@ -2186,16 +2224,8 @@ export function LocalNeighborhoodRadar() {
                           <span>•</span>
                           <span className="flex items-center gap-0.5">
                             <Clock className="w-2.5 h-2.5" />
-                            {post.timeAgo}
+                            Active on map
                           </span>
-                          {post.expiresAt && (
-                            <>
-                              <span>•</span>
-                              <span className={`inline-flex items-center gap-0.5 font-semibold ${expiryInfo.isNearing ? 'text-amber-600 dark:text-amber-400' : 'text-slate-400'}`}>
-                                ⏳ {expiryInfo.text}
-                              </span>
-                            </>
-                          )}
                         </div>
 
                         {/* Action Row */}
@@ -2302,6 +2332,24 @@ export function LocalNeighborhoodRadar() {
                             ✓ Resolved
                           </span>
                         )}
+                      </div>
+
+                      {/* Post Timing & Expiry Header Row (Above Headline) */}
+                      <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-zinc-400 pt-0.5 flex-wrap">
+                        <span className="inline-flex items-center gap-1 text-slate-500 dark:text-zinc-400">
+                          <Clock className="w-3 h-3 text-slate-400" />
+                          {post.timeAgo}
+                        </span>
+                        <span>•</span>
+                        <span className={`inline-flex items-center gap-1 font-bold ${
+                          expiryInfo.isExpired
+                            ? 'text-rose-600 dark:text-rose-400'
+                            : expiryInfo.isNearing
+                            ? 'text-amber-600 dark:text-amber-400'
+                            : 'text-[#0E9F9A] dark:text-teal-400'
+                        }`}>
+                          ⏳ {expiryInfo.text}
+                        </span>
                       </div>
 
                       {/* Title */}
