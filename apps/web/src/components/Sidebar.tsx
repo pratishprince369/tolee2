@@ -169,8 +169,8 @@ export function Sidebar() {
   }, [isAuthenticated, pathname]);
 
   const mainNav = React.useMemo(() => isAuthenticated ? [
-    { name: 'Feed', href: '/feed', icon: Home },
     { name: 'Tolee Radar', href: '/radar', icon: Radio },
+    { name: 'Feed', href: '/feed', icon: Home },
     { name: 'Discover', href: '/discover', icon: Compass },
     { name: 'Reels', href: '/reels', icon: Film },
     { name: 'Chats', href: '/chat', icon: MessageCircle, badge: data.unreadMessages > 0 ? String(data.unreadMessages) : null },
@@ -186,6 +186,7 @@ export function Sidebar() {
     { name: 'Creator Program', href: '/creator-program', icon: Zap, isCreator: true },
   ] : [
     { name: 'Tolee Radar', href: '/radar', icon: Radio },
+    { name: 'Feed', href: '/feed', icon: Home },
     { name: 'Discover', href: '/discover', icon: Compass },
     { name: 'Live Darshan', href: '/darshan', icon: NamasteIcon },
     { name: 'Tolee News', href: '/news', icon: Newspaper },
