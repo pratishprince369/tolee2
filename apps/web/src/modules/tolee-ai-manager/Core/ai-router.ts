@@ -112,24 +112,28 @@ export function classifyIntelligenceIntent(input: string, hasMedia: boolean = fa
     return 'image_generation';
   }
 
-  // 6. Platform Actions (Calendar, CRM, Tasks, Ads, Notifications)
+  // 6. Platform Actions (Calendar, CRM, Tasks, Ads, Posts, Reminders)
   const isPlatformAction = 
-    query.includes('crm') ||
-    query.includes('lead') ||
-    query.includes('schedule') ||
-    query.includes('kal kya hai') ||
-    query.includes('aaj kya hai') ||
-    query.includes('reminder') ||
-    query.includes('task') ||
-    query.includes('delete post') ||
-    query.includes('like post') ||
-    query.includes('create ad') ||
-    query.includes('marketplace') ||
-    query.includes('notifications') ||
-    query.includes('टास्क') ||
-    query.includes('शेड्यूल') ||
-    query.includes('रिमाइंडर') ||
-    query.includes('लीड');
+    !isCoding && (
+      (query.includes('task') && (query.includes('add') || query.includes('create') || query.includes('new') || query.includes('delete') || query.includes('banao') || query.includes('dalo') || query.includes('likho') || query.includes('list'))) ||
+      (query.includes('reminder') && (query.includes('set') || query.includes('add') || query.includes('create') || query.includes('kal') || query.includes('baje') || query.includes('remind me') || query.includes('yaad'))) ||
+      (query.includes('lead') && (query.includes('add') || query.includes('new') || query.includes('save') || query.includes('status') || query.includes('dikhao') || query.includes('show') || query.includes('client'))) ||
+      (query.includes('post') && (query.includes('create') || query.includes('delete') || query.includes('publish') || query.includes('share') || query.includes('banao') || query.includes('dalo') || query.includes('karo'))) ||
+      (query.includes('schedule') && (query.includes('post') || query.includes('meeting') || query.includes('call') || query.includes('baje') || query.includes('kal') || query.includes('karo'))) ||
+      query.includes('kal kya hai') ||
+      query.includes('aaj kya hai') ||
+      query.includes('delete post') ||
+      query.includes('like post') ||
+      query.includes('create ad') ||
+      query.includes('mere groups') ||
+      query.includes('my groups') ||
+      query.includes('tolee group') ||
+      query.includes('group me share') ||
+      query.includes('टास्क बनाओ') ||
+      query.includes('शेड्यूल करो') ||
+      query.includes('रिमाइंडर लगाओ') ||
+      query.includes('लीड जोड़ो')
+    );
 
   if (isPlatformAction) {
     return 'platform_action';

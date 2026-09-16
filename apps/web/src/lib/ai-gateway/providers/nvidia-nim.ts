@@ -61,66 +61,74 @@ export class NvidiaNIMProvider implements AIProvider {
 
   async generateText(options: AIRequestOptions): Promise<AICompletionResult> {
     const startTime = Date.now();
-    const model = options.model || 'nvidia/llama-3.1-nemotron-70b-instruct';
-    const keys = this.getKeyPool();
+    const candidateModels = [
+      options.model,
+      'meta/llama-3.2-11b-vision-instruct',
+      'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning',
+      'nvidia/nemotron-3-super-120b-a12b',
+      'openai/gpt-oss-20b'
+    ].filter(Boolean) as string[];
 
+    const keys = this.getKeyPool();
     let lastError: any = null;
 
-    for (const apiKey of keys.slice(0, 2)) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000);
+    for (const model of candidateModels) {
+      for (const apiKey of keys.slice(0, 4)) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 20000);
 
-        const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${apiKey}`,
-            Accept: 'application/json',
-          },
-          body: JSON.stringify({
-            model,
-            messages: options.messages.map((m) => ({ role: m.role, content: m.content })),
-            temperature: options.temperature ?? 0.7,
-            top_p: 0.9,
-            max_tokens: options.maxTokens ?? 2048,
-            stream: false,
-          }),
-          signal: options.signal || controller.signal,
-        });
+          const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${apiKey}`,
+              Accept: 'application/json',
+            },
+            body: JSON.stringify({
+              model,
+              messages: options.messages.map((m) => ({ role: m.role, content: m.content })),
+              temperature: options.temperature ?? 0.4,
+              top_p: 0.9,
+              max_tokens: options.maxTokens ?? 2048,
+              stream: false,
+            }),
+            signal: options.signal || controller.signal,
+          });
 
-        clearTimeout(timeoutId);
+          clearTimeout(timeoutId);
 
-        if (!response.ok) {
-          const err = await response.text().catch(() => 'NVIDIA error');
-          lastError = new Error(`NVIDIA NIM (${response.status}): ${err}`);
-          continue;
+          if (!response.ok) {
+            const err = await response.text().catch(() => 'NVIDIA error');
+            lastError = new Error(`NVIDIA NIM (${response.status}): ${err}`);
+            continue;
+          }
+
+          const data = await response.json();
+          const text = data.choices?.[0]?.message?.content || '';
+
+          if (text && text.trim()) {
+            return {
+              text,
+              provider: 'nvidia',
+              model,
+              tokensUsed: data.usage
+                ? {
+                    promptTokens: data.usage.prompt_tokens || 0,
+                    completionTokens: data.usage.completion_tokens || 0,
+                    totalTokens: data.usage.total_tokens || 0,
+                  }
+                : undefined,
+              latencyMs: Date.now() - startTime,
+            };
+          }
+        } catch (err: any) {
+          lastError = err;
         }
-
-        const data = await response.json();
-        const text = data.choices?.[0]?.message?.content || '';
-
-        if (text && text.trim()) {
-          return {
-            text,
-            provider: 'nvidia',
-            model,
-            tokensUsed: data.usage
-              ? {
-                  promptTokens: data.usage.prompt_tokens || 0,
-                  completionTokens: data.usage.completion_tokens || 0,
-                  totalTokens: data.usage.total_tokens || 0,
-                }
-              : undefined,
-            latencyMs: Date.now() - startTime,
-          };
-        }
-      } catch (err: any) {
-        lastError = err;
       }
     }
 
-    throw lastError || new Error('All NVIDIA NIM API keys failed to generate a response.');
+    throw lastError || new Error('All NVIDIA NIM API keys and models failed to generate a response.');
   }
 
   async streamText(
@@ -128,7 +136,7 @@ export class NvidiaNIMProvider implements AIProvider {
     onChunk: (chunk: AIStreamChunk) => void
   ): Promise<AICompletionResult> {
     const startTime = Date.now();
-    const model = options.model || 'nvidia/llama-3.1-nemotron-70b-instruct';
+    const model = options.model || 'meta/llama-3.2-11b-vision-instruct';
     const keys = this.getKeyPool();
 
     for (const apiKey of keys.slice(0, 2)) {

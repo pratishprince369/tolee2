@@ -2,6 +2,8 @@ import { getUserDeviceTimeInfo, isTimeOrDateQuery } from '@/modules/tolee-ai-man
 import { classifyIntelligenceIntent } from '@/modules/tolee-ai-manager/Core/ai-router';
 import { executeToleeAIAction, cleanAndTranslateImagePrompt } from '@/lib/tolee-action-engine';
 import cloudinary from '@/lib/cloudinary';
+import { NvidiaNIMProvider } from './providers/nvidia-nim';
+import { SYSTEM_PROMPTS } from '@/modules/tolee-ai-manager/Core/prompt-manager';
 
 // -------------------------------------------------------------
 // TYPES & INTERFACES
@@ -120,17 +122,16 @@ class ProviderHealthRegistry {
     });
 
     // 5. NVIDIA NIM (valid active models only)
-    const nvidiaKey = process.env.NVIDIA_API_KEY;
     this.providers.set('nvidia', {
       id: 'nvidia',
-      name: 'NVIDIA NIM',
-      enabled: Boolean(nvidiaKey),
-      healthy: false,
+      name: 'NVIDIA NIM Frontier Cluster',
+      enabled: true,
+      healthy: true,
       lastChecked: Date.now(),
       models: [
-        'nvidia/llama-3.1-nemotron-70b-instruct',
-        'mistralai/mistral-large-2-instruct',
-        'meta/llama-3.2-11b-vision-instruct'
+        'meta/llama-3.2-11b-vision-instruct',
+        'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning',
+        'nvidia/nemotron-3-super-120b-a12b'
       ]
     });
   }
@@ -692,12 +693,45 @@ export class CentralAIEngine {
       }
     }
 
-    // 🌐 6. Multi-Provider Cloud AI Router (Gemini / OpenAI / Groq / Anthropic)
+    // 🌐 6. Multi-Provider Cloud AI Router (NVIDIA NIM / Gemini / OpenAI / Groq)
+    // 6a. NVIDIA NIM Frontier Cluster (Active Model: meta/llama-3.2-11b-vision-instruct)
+    try {
+      const nim = new NvidiaNIMProvider();
+      const nimResult = await nim.generateText({
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPTS.PERSONAL_EMPLOYEE },
+          ...history.map(h => ({ role: (h.role === 'assistant' ? 'assistant' : 'user') as 'assistant' | 'user', content: h.content })),
+          { role: 'user', content: rawMessage }
+        ]
+      });
+
+      if (nimResult.text && nimResult.text.trim()) {
+        return {
+          success: true,
+          type: 'text',
+          content: nimResult.text.trim(),
+          model: nimResult.model,
+          provider: 'nvidia-nim',
+          toolUsed: null,
+          image: null,
+          files: [],
+          metadata: {
+            latencyMs: Date.now() - startTime,
+            intent,
+            fallbackUsed: false
+          }
+        };
+      }
+    } catch (nimErr: any) {
+      console.warn('[CentralAIEngine] NVIDIA NIM generation notice:', nimErr?.message);
+    }
+
     const availableProviders = providerRegistry.getAvailableProviders();
     for (const provider of availableProviders) {
       try {
         if (provider.id === 'gemini') {
           const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY || process.env.GOOGLE_API_KEY;
+          if (!geminiKey) continue;
           const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
