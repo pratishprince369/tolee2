@@ -277,8 +277,8 @@ export default function LiveDarshanClient() {
                           LIVE
                         </span>
                       ) : (
-                        <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-black/60 backdrop-blur-md text-zinc-300 border border-white/10">
-                          {temple.liveStatus === 'offline' ? 'Offline' : 'Latest Video'}
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-500/20 backdrop-blur-md text-amber-300 border border-amber-500/30">
+                          <span>✨</span> AI Darshan
                         </span>
                       )}
                     </div>
