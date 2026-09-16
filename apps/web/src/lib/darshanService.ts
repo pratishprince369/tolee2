@@ -29,6 +29,8 @@ export const SEED_TEMPLES = [
     state: 'Maharashtra',
     thumbnail: 'https://images.unsplash.com/photo-1609766857041-ed402ea8069a?q=80&w=800&auto=format&fit=crop',
     youtubeChannelId: 'UCp7Ew69g28c-s9r5d35aYSw',
+    youtubeVideoId: 'ai6Ye9x51cI',
+    streamUrl: 'https://www.youtube.com/watch?v=ai6Ye9x51cI',
     officialUrl: 'https://sai.org.in',
     sortOrder: 1,
     isFeatured: true
