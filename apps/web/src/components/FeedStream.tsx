@@ -51,9 +51,19 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
 
   const [mounted, setMounted] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [showScrollHeader, setShowScrollHeader] = useState(false);
 
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      // Show sticky header only when user scrolls down past 50px
+      setShowScrollHeader(window.scrollY > 50);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   useEffect(() => {
@@ -996,44 +1006,55 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
         </CreatePostModal>
       </div>
       
-      {/* Mobile Header (Sidebar is hidden on mobile) */}
-      <header className="lg:hidden sticky top-0 z-50 w-full bg-white/95 dark:bg-[#0a0a0c]/95 backdrop-blur-md border-b border-zinc-100 dark:border-zinc-900 shadow-[0_2px_15px_rgba(0,0,0,0.02)] h-16 flex items-center justify-between px-3.5 sm:px-5">
-        <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-primary dark:text-white truncate mr-2">
-          Tolee Feed
-        </h1>
+      {/* Mobile Header (Shows smoothly ONLY on scroll) */}
+      <header className={`lg:hidden fixed top-0 left-0 right-0 z-[51] w-full bg-white/95 dark:bg-[#0a0a0c]/95 backdrop-blur-md border-b border-zinc-200/80 dark:border-zinc-800/80 h-16 flex items-center justify-between px-3 sm:px-4 select-none transition-all duration-300 ease-in-out ${
+        showScrollHeader 
+          ? 'translate-y-0 opacity-100 pointer-events-auto shadow-md shadow-zinc-100/10 dark:shadow-black/25' 
+          : '-translate-y-full opacity-0 pointer-events-none'
+      }`}>
+        {/* Brand Logo & Text (Matches Header brand font and style) */}
+        <div className="flex items-center select-none flex-shrink-0">
+          <span className="text-xl sm:text-2xl font-black tracking-tight text-primary dark:text-[#0E9F9A] select-none lowercase">
+            tolee
+          </span>
+          <span className="text-xl sm:text-2xl font-black tracking-tight text-foreground ml-1.5 select-none lowercase">
+            feed
+          </span>
+        </div>
 
-        <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
+        {/* Spacious Icon Shortcuts matching Header navigation style */}
+        <div className="flex items-center justify-end gap-1 xs:gap-1.5 sm:gap-2 flex-shrink-0">
           {/* Search Shortcut */}
           <button
             type="button"
-            onClick={() => router.push('/discover')}
-            className="w-8.5 h-8.5 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-gray-700 dark:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-all active:scale-95"
+            onClick={() => router.push('/search')}
+            className="rounded-full flex items-center justify-center h-8.5 w-8.5 xs:h-9 xs:w-9 flex-shrink-0 transition-all active:scale-95 text-gray-700 dark:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-800"
             aria-label="Search"
             title="Search"
           >
-            <Search className="w-5 h-5 text-gray-700 dark:text-zinc-200" />
+            <Search className="w-4.5 h-4.5 xs:w-5 xs:h-5 text-gray-700 dark:text-zinc-200" />
           </button>
 
           {/* Radar Shortcut */}
           <button
             type="button"
             onClick={() => router.push('/radar')}
-            className="w-8.5 h-8.5 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-gray-700 dark:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-all active:scale-95"
+            className="rounded-full flex items-center justify-center h-8.5 w-8.5 xs:h-9 xs:w-9 flex-shrink-0 transition-all active:scale-95 text-gray-700 dark:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-800"
             aria-label="Tolee Radar"
             title="Tolee Radar"
           >
-            <Radio className="w-5 h-5 text-gray-700 dark:text-zinc-200" />
+            <Radio className="w-4.5 h-4.5 xs:w-5 xs:h-5" />
           </button>
 
           {/* AI Manager Shortcut */}
           <button
             type="button"
             onClick={() => router.push('/ai-manager')}
-            className="w-8.5 h-8.5 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-gray-700 dark:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-all active:scale-95 relative"
+            className="rounded-full flex items-center justify-center h-8.5 w-8.5 xs:h-9 xs:w-9 flex-shrink-0 transition-all active:scale-95 relative text-gray-700 dark:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-800"
             aria-label="AI Manager"
             title="AI Tolee Manager"
           >
-            <Bot className="w-5 h-5 text-gray-700 dark:text-zinc-200" />
+            <Bot className="w-4.5 h-4.5 xs:w-5 xs:h-5" />
             <span className="absolute top-1 right-1 w-2 h-2 bg-emerald-500 rounded-full animate-pulse border border-white dark:border-black" />
           </button>
 
@@ -1041,11 +1062,11 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
           <button
             type="button"
             onClick={() => router.push('/notifications')}
-            className="w-8.5 h-8.5 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-gray-700 dark:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-all active:scale-95 relative"
+            className="rounded-full flex items-center justify-center h-8.5 w-8.5 xs:h-9 xs:w-9 flex-shrink-0 transition-all active:scale-95 relative text-gray-700 dark:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-800"
             aria-label="Notifications"
             title="Notifications"
           >
-            <Bell className="w-5 h-5 text-gray-700 dark:text-zinc-200" />
+            <Bell className="w-4.5 h-4.5 xs:w-5 xs:h-5 text-gray-700 dark:text-zinc-200" />
             {unreadNotifications > 0 && (
               <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 bg-red-500 text-white text-[8px] font-bold flex items-center justify-center rounded-full border border-white dark:border-black">
                 {unreadNotifications > 9 ? '9+' : unreadNotifications}
@@ -1057,10 +1078,10 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
           <button 
             type="button"
             onClick={() => setIsQuickActionOpen(true)}
-            className="w-9 h-9 sm:w-10 sm:h-10 bg-primary dark:bg-white text-white dark:text-primary rounded-[12px] flex items-center justify-center transition-all duration-200 active:scale-95 shadow-[0_4px_14px_rgba(10,124,133,0.22)] dark:shadow-white/10 hover:opacity-90 border border-primary/10 dark:border-white/10 ml-0.5 sm:ml-1"
+            className="h-8.5 w-8.5 xs:h-9 xs:w-9 bg-primary dark:bg-[#0E9F9A] text-white rounded-full flex items-center justify-center transition-all duration-200 active:scale-95 shadow-sm hover:opacity-90 ml-0.5"
             title="Create Post"
           >
-            <Plus className="w-5.5 h-5.5 stroke-[2.5]" />
+            <Plus className="w-4.5 h-4.5 stroke-[2.5]" />
           </button>
         </div>
       </header>
@@ -1881,7 +1902,7 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                     <LiveStreamPostCard
                       key={post.id}
                       post={post}
-                      currentUserId={currentUserId}
+                      currentUserId={(session?.user as any)?.id}
                     />
                   );
                 }
