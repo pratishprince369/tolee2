@@ -80,8 +80,10 @@ export const SEED_TEMPLES = [
     "deity": "Lord Ganesha",
     "city": "Mumbai",
     "state": "Maharashtra",
-    "thumbnail": "https://images.unsplash.com/photo-1598387993441-a364f854c3e1?q=80&w=800&auto=format&fit=crop",
+    "thumbnail": "https://img.youtube.com/vi/kxUBFVdtYh4/maxresdefault.jpg",
     "youtubeChannelId": "UCw8xN1N1h3T24Kj7_88bN9A",
+    "youtubeVideoId": "kxUBFVdtYh4",
+    "streamUrl": "https://www.youtube.com/watch?v=kxUBFVdtYh4",
     "officialUrl": "https://www.lalbaugcharaja.com",
     "sortOrder": 4,
     "isFeatured": true
