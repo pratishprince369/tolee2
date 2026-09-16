@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Search, Bell, MessageCircle, LogOut, User, Settings, Compass, Store, Globe, Heart, Bot, Zap, MessageSquare, Briefcase, Award, FileText, Radio, Wallet } from 'lucide-react';
+import { Search, Bell, MessageCircle, LogOut, User, Settings, Compass, Store, Globe, Heart, Bot, Zap, MessageSquare, Briefcase, Award, FileText, Radio, Wallet, Plus } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -354,6 +354,22 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
                 </span>
               )}
             </Button>
+
+            {/* Mobile Quick Create (+) Button next to Bell & DP Profile */}
+            <button
+              type="button"
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent('tolee_open_quick_actions'));
+                if (pathname !== '/feed' && pathname !== '/') {
+                  router.push('/feed?action=create');
+                }
+              }}
+              className="md:hidden h-8.5 w-8.5 xs:h-9 xs:w-9 bg-primary dark:bg-white text-white dark:text-primary rounded-[12px] flex items-center justify-center transition-all duration-200 active:scale-95 shadow-[0_4px_14px_rgba(10,124,133,0.22)] dark:shadow-white/10 hover:opacity-90 border border-primary/10 dark:border-white/10 flex-shrink-0"
+              aria-label="Create Post"
+              title="Create Post"
+            >
+              <Plus className="w-4.5 h-4.5 xs:w-5 xs:h-5 stroke-[2.5]" />
+            </button>
 
             {/* Unified Avatar Dropdown (Both Mobile & Desktop) */}
             <div className="flex items-center">

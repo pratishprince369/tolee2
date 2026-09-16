@@ -50,29 +50,19 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
   const searchParams = useSearchParams();
 
   const [mounted, setMounted] = useState(false);
-  const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   useEffect(() => {
-    if (!session?.user) return;
-    const updateCounts = () => {
-      getSidebarDataCached().then((res: any) => {
-        if (res?.success) {
-          setUnreadNotifications(res.unreadNotifications || 0);
-        }
-      }).catch(() => {});
-    };
-    updateCounts();
-    const interval = setInterval(updateCounts, 8000);
-    window.addEventListener('tolee_notification_refresh', updateCounts);
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener('tolee_notification_refresh', updateCounts);
-    };
-  }, [session]);
+    const handleOpenQuickActions = () => setIsQuickActionOpen(true);
+    window.addEventListener('tolee_open_quick_actions', handleOpenQuickActions);
+    if (searchParams.get('action') === 'create') {
+      setIsQuickActionOpen(true);
+    }
+    return () => window.removeEventListener('tolee_open_quick_actions', handleOpenQuickActions);
+  }, [searchParams]);
 
   // Stories state
   const [storyGroups, setStoryGroups] = useState<any[]>([]);
@@ -996,81 +986,7 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
         </CreatePostModal>
       </div>
       
-      {/* Mobile Header (Sidebar is hidden on mobile) */}
-      <header className="lg:hidden sticky top-0 z-40 w-full bg-white/95 dark:bg-[#0a0a0c]/95 backdrop-blur-md border-b border-zinc-100 dark:border-zinc-900 shadow-[0_2px_15px_rgba(0,0,0,0.02)] h-16 flex items-center justify-between px-3.5 sm:px-5 select-none">
-        {/* Mobile Header Title: Lighter / Thinner font weight (500) preserving Tolee brand color */}
-        <div className="flex items-center select-none flex-shrink-0 min-w-0 mr-2">
-          <span className="text-xl sm:text-2xl font-medium tracking-tight text-primary dark:text-[#0E9F9A]">
-            Tolee
-          </span>
-          <span className="text-xl sm:text-2xl font-medium tracking-tight text-slate-800 dark:text-zinc-100 ml-1.5">
-            Feed
-          </span>
-        </div>
 
-        {/* Spacious Action Icons with proper, consistent gap and comfortable touch targets */}
-        <div className="flex items-center justify-end gap-2.5 xs:gap-3 sm:gap-3.5 flex-shrink-0">
-          {/* Search Shortcut */}
-          <button
-            type="button"
-            onClick={() => router.push('/search')}
-            className="w-8.5 h-8.5 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-gray-700 dark:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-all active:scale-95 flex-shrink-0"
-            aria-label="Search"
-            title="Search"
-          >
-            <Search className="w-5 h-5 text-gray-700 dark:text-zinc-200" />
-          </button>
-
-          {/* Radar Shortcut */}
-          <button
-            type="button"
-            onClick={() => router.push('/radar')}
-            className="w-8.5 h-8.5 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-gray-700 dark:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-all active:scale-95 flex-shrink-0"
-            aria-label="Tolee Radar"
-            title="Tolee Radar"
-          >
-            <Radio className="w-5 h-5 text-gray-700 dark:text-zinc-200" />
-          </button>
-
-          {/* AI Manager Shortcut */}
-          <button
-            type="button"
-            onClick={() => router.push('/ai-manager')}
-            className="w-8.5 h-8.5 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-gray-700 dark:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-all active:scale-95 relative flex-shrink-0"
-            aria-label="AI Manager"
-            title="AI Tolee Manager"
-          >
-            <Bot className="w-5 h-5 text-gray-700 dark:text-zinc-200" />
-            <span className="absolute top-1 right-1 w-2 h-2 bg-emerald-500 rounded-full animate-pulse border border-white dark:border-black" />
-          </button>
-
-          {/* Notification Bell */}
-          <button
-            type="button"
-            onClick={() => router.push('/notifications')}
-            className="w-8.5 h-8.5 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-gray-700 dark:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-all active:scale-95 relative flex-shrink-0"
-            aria-label="Notifications"
-            title="Notifications"
-          >
-            <Bell className="w-5 h-5 text-gray-700 dark:text-zinc-200" />
-            {unreadNotifications > 0 && (
-              <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 bg-red-500 text-white text-[8px] font-bold flex items-center justify-center rounded-full border border-white dark:border-black">
-                {unreadNotifications > 9 ? '9+' : unreadNotifications}
-              </span>
-            )}
-          </button>
-
-          {/* Restored Previous "+" Create Post Button */}
-          <button 
-            type="button"
-            onClick={() => setIsQuickActionOpen(true)}
-            className="w-9 h-9 sm:w-10 sm:h-10 bg-primary dark:bg-white text-white dark:text-primary rounded-[12px] flex items-center justify-center transition-all duration-200 active:scale-95 shadow-[0_4px_14px_rgba(10,124,133,0.22)] dark:shadow-white/10 hover:opacity-90 border border-primary/10 dark:border-white/10 flex-shrink-0"
-            title="Create Post"
-          >
-            <Plus className="w-5.5 h-5.5 stroke-[2.5]" />
-          </button>
-        </div>
-      </header>
 
       <main className="container mx-auto px-4 lg:px-8 pt-8 pb-24 max-w-3xl">
         
