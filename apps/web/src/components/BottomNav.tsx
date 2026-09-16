@@ -8,6 +8,7 @@ import { useSession, signOut } from 'next-auth/react';
 import { getSidebarDataCached } from '@/lib/sidebar-data';
 import { getDrafts } from '@/lib/draftManager';
 import { MyDraftsModal } from '@/components/MyDraftsModal';
+import { NamasteIcon } from '@/components/NamasteIcon';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -172,7 +173,7 @@ export function BottomNav() {
                   <span>Tolee Screen</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => { setClickedPath('/darshan'); router.push('/darshan'); }} className={getDropdownItemClass('/darshan')}>
-                  <Sparkles className={getDropdownIconClass('/darshan')} />
+                  <NamasteIcon className={getDropdownIconClass('/darshan')} />
                   <span>Live Darshan</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => { setClickedPath('/ai-manager'); router.push('/ai-manager'); }} className={getDropdownItemClass('/ai-manager')}>

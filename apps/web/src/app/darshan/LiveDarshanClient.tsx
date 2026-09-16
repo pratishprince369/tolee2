@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Search, MapPin, Radio, Sparkles, RefreshCw, Eye, ExternalLink, Play, Filter, Flame } from 'lucide-react';
 import { LiveDarshanPlayerModal } from '@/components/LiveDarshanPlayerModal';
+import { NamasteIcon } from '@/components/NamasteIcon';
 
 export interface TempleItem {
   id: string;
@@ -127,8 +128,9 @@ export default function LiveDarshanClient() {
             <span>Sacred Broadcasts • Holy Shrines</span>
           </div>
 
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight bg-gradient-to-r from-amber-600 via-orange-500 to-amber-700 bg-clip-text text-transparent">
-            Live Darshan
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight bg-gradient-to-r from-amber-600 via-orange-500 to-amber-700 bg-clip-text text-transparent flex items-center justify-center gap-3">
+            <NamasteIcon className="w-8 h-8 sm:w-10 sm:h-10 text-amber-500 shrink-0" />
+            <span>Live Darshan</span>
           </h1>
 
           <p className="text-sm sm:text-base text-zinc-600 dark:text-zinc-400 max-w-2xl mx-auto">

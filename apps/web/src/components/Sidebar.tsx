@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { useSession } from 'next-auth/react';
 import { getSidebarDataCached } from '@/lib/sidebar-data';
 import { CreditTermsModal } from '@/modules/tolee-credit/components/CreditTermsModal';
+import { NamasteIcon } from '@/components/NamasteIcon';
 
 interface SidebarNavItemProps {
   name: string;
@@ -173,7 +174,7 @@ export function Sidebar() {
     { name: 'Discover', href: '/discover', icon: Compass },
     { name: 'Reels', href: '/reels', icon: Film },
     { name: 'Chats', href: '/chat', icon: MessageCircle, badge: data.unreadMessages > 0 ? String(data.unreadMessages) : null },
-    { name: 'Live Darshan', href: '/darshan', icon: Sparkles },
+    { name: 'Live Darshan', href: '/darshan', icon: NamasteIcon },
     { name: 'Tolee News', href: '/news', icon: Newspaper },
     { name: 'Tolee Screen', href: '/screen', icon: Tv },
     { name: 'AI Manager', href: '/ai-manager', icon: Bot },
@@ -186,7 +187,7 @@ export function Sidebar() {
   ] : [
     { name: 'Tolee Radar', href: '/radar', icon: Radio },
     { name: 'Discover', href: '/discover', icon: Compass },
-    { name: 'Live Darshan', href: '/darshan', icon: Sparkles },
+    { name: 'Live Darshan', href: '/darshan', icon: NamasteIcon },
     { name: 'Tolee News', href: '/news', icon: Newspaper },
     { name: 'Tolee Screen', href: '/screen', icon: Tv },
     { name: 'Live Map', href: '/map', icon: Map },
