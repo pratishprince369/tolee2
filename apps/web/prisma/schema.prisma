@@ -2500,6 +2500,38 @@ model CreditAuditLog {
   @@index([createdAt])
 }
 
+// ---------------------------------------------------------
+// TOLEE LIVE DARSHAN: MAJOR INDIAN TEMPLES & LIVE STREAMS
+// ---------------------------------------------------------
+model Temple {
+  id               String    @id @default(cuid())
+  name             String
+  slug             String    @unique
+  deity            String?
+  city             String
+  state            String
+  country          String    @default("India")
+  thumbnail        String
+  coverImage       String?
+  description      String?
+  youtubeChannelId String?
+  youtubeVideoId   String?
+  liveStatus       String    @default("offline") // "live", "offline", "unknown"
+  streamUrl        String?
+  officialUrl      String?
+  isActive         Boolean   @default(true)
+  isFeatured       Boolean   @default(false)
+  sortOrder        Int       @default(0)
+  lastCheckedAt    DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([slug])
+  @@index([isActive])
+  @@index([sortOrder])
+  @@index([liveStatus])
+}
+
 
 
 

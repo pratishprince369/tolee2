@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Compass, Film, MessageCircle, Bell, Settings, Store, Bot, Globe, Megaphone, Zap, MessageSquare, Map, Tv, Newspaper, Crown, Plus, Radio } from 'lucide-react';
+import { Home, Compass, Film, MessageCircle, Bell, Settings, Store, Bot, Globe, Megaphone, Zap, MessageSquare, Map, Tv, Newspaper, Crown, Plus, Radio, Sparkles } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { useSession } from 'next-auth/react';
@@ -173,6 +173,7 @@ export function Sidebar() {
     { name: 'Discover', href: '/discover', icon: Compass },
     { name: 'Reels', href: '/reels', icon: Film },
     { name: 'Chats', href: '/chat', icon: MessageCircle, badge: data.unreadMessages > 0 ? String(data.unreadMessages) : null },
+    { name: 'Live Darshan', href: '/darshan', icon: Sparkles },
     { name: 'Tolee News', href: '/news', icon: Newspaper },
     { name: 'Tolee Screen', href: '/screen', icon: Tv },
     { name: 'AI Manager', href: '/ai-manager', icon: Bot },
@@ -185,6 +186,7 @@ export function Sidebar() {
   ] : [
     { name: 'Tolee Radar', href: '/radar', icon: Radio },
     { name: 'Discover', href: '/discover', icon: Compass },
+    { name: 'Live Darshan', href: '/darshan', icon: Sparkles },
     { name: 'Tolee News', href: '/news', icon: Newspaper },
     { name: 'Tolee Screen', href: '/screen', icon: Tv },
     { name: 'Live Map', href: '/map', icon: Map },
