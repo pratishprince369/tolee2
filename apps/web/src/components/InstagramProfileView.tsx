@@ -956,31 +956,30 @@ export function InstagramProfileView({
       <div className="max-w-[935px] w-full mx-auto pb-32 px-0 sm:px-4">
 
         {/* ===== COVER IMAGE ===== */}
-        <div className="relative w-full h-[185px] sm:h-[260px] md:h-[300px] sm:rounded-2xl overflow-hidden shadow-sm sm:mt-4 group z-10">
+        <div className="relative w-full h-[200px] sm:h-[260px] md:h-[300px] sm:rounded-2xl overflow-hidden shadow-sm sm:mt-4 group z-10">
           <img src={getValidCoverUrl(user.coverImage)} alt="Cover" className="w-full h-full object-cover" />
           {/* Gradient fade bottom — pointer-events-none so it never blocks button clicks */}
           <div className="absolute bottom-0 inset-x-0 h-16 bg-gradient-to-t from-[#f5f5f5] to-transparent pointer-events-none" />
-          {/* Back button on other user profiles (Mobile) */}
-          {!isMe && (
-            <button
-              type="button"
-              onClick={() => router.back()}
-              className="absolute top-3 left-3 w-8 h-8 bg-black/30 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-black/50 transition-colors z-20 md:hidden"
-              aria-label="Back"
-            >
-              <ChevronLeft className="w-4.5 h-4.5" />
-            </button>
-          )}
+          {/* Back button (Mobile/Desktop) */}
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="absolute top-3 left-3 w-8 h-8 bg-black/35 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-black/55 transition-colors z-20"
+            aria-label="Back"
+          >
+            <ChevronLeft className="w-4.5 h-4.5" />
+          </button>
 
           {/* Share top right */}
           <button
             onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/u/${user.username || user.id}`); alert('Profile link copied!'); }}
-            className="absolute top-3 right-3 w-8 h-8 bg-black/30 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-black/50 transition-colors z-20"
+            className="absolute top-3 right-3 w-8 h-8 bg-black/35 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-black/55 transition-colors z-20"
+            aria-label="Share"
           >
             <Share2 className="w-4 h-4" />
           </button>
           {/* Username pill */}
-          <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-black/30 backdrop-blur-sm rounded-full px-3 py-1 z-20">
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-black/35 backdrop-blur-sm rounded-full px-3.5 py-1 z-20">
             <span className="text-white text-[13px] font-semibold truncate max-w-[160px]">{user.username || 'user'}</span>
             <ChevronDown className="w-3.5 h-3.5 text-white/80 flex-shrink-0" />
           </div>
@@ -997,8 +996,8 @@ export function InstagramProfileView({
                 disabled={isUploading}
                 style={{
                   position: 'absolute',
-                  top: '12px',
-                  left: '12px',
+                  bottom: '12px',
+                  right: '12px',
                   width: '120px',
                   height: '36px',
                   opacity: 0,
@@ -1011,12 +1010,12 @@ export function InstagramProfileView({
                 htmlFor="cover-file-input"
                 style={{
                   position: 'absolute',
-                  top: '12px',
-                  left: '12px',
+                  bottom: '12px',
+                  right: '12px',
                   zIndex: 45,
                   pointerEvents: 'none',
                 }}
-                className="bg-black/50 text-white backdrop-blur-sm px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-lg border border-white/20 cursor-pointer select-none"
+                className="bg-black/50 text-white backdrop-blur-sm px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-lg border border-white/20 cursor-pointer select-none"
               >
                 <Camera className="w-3.5 h-3.5" />
                 {isUploading ? 'Uploading...' : 'Edit Cover'}
@@ -1029,7 +1028,7 @@ export function InstagramProfileView({
         <div className="max-w-[640px] mx-auto w-full px-4 sm:px-0">
 
           {/* ===== PROFILE DP (overlapping cover bottom) ===== */}
-          <div className="flex justify-center -mt-[50px] mb-3 z-10 relative">
+          <div className="flex justify-center -mt-[54px] sm:-mt-[60px] mb-3 z-10 relative">
             <div className="relative group">
               <div 
                 onClick={() => {
@@ -1039,22 +1038,24 @@ export function InstagramProfileView({
                     setIsDpMenuOpen(true);
                   }
                 }}
-                className={`w-[98px] h-[98px] rounded-full flex items-center justify-center cursor-pointer transition-all duration-200 active:scale-95 select-none ${
+                className={`w-[106px] h-[106px] sm:w-[116px] sm:h-[116px] rounded-full flex items-center justify-center cursor-pointer transition-all duration-200 active:scale-95 select-none ${
                   userActiveStories.length > 0
                     ? hasUnviewedUserStory
                       ? 'bg-gradient-to-tr from-yellow-500 via-pink-500 to-purple-600 p-[3px] shadow-lg'
                       : 'border-2 border-gray-300 dark:border-zinc-700 p-[2px]'
-                    : 'p-[3px] bg-white dark:bg-[#121212] border border-gray-100 dark:border-zinc-800 shadow-xl'
+                    : 'p-[3px] bg-white border-4 border-white shadow-xl'
                 }`}
               >
-                <div className="w-full h-full rounded-full bg-white dark:bg-[#121212] p-[2.5px] overflow-hidden">
+                <div className="w-full h-full rounded-full bg-[#0B1326] overflow-hidden">
                   <img
                     src={getValidAvatarUrl(user.avatar)}
-                    alt={user.name}
+                    alt={user.name || user.username || 'user'}
                     className="w-full h-full object-cover rounded-full"
                   />
                 </div>
               </div>
+              {/* Online status green dot */}
+              <div className="absolute bottom-1 right-1 w-4 h-4 bg-[#22C55E] rounded-full border-2 border-white z-20 pointer-events-none" />
               {isMe && (
                 <>
                   <input
@@ -1068,7 +1069,7 @@ export function InstagramProfileView({
                   <button
                     type="button"
                     onClick={() => setIsDpMenuOpen(true)}
-                    className="absolute bottom-0 right-0 w-7 h-7 bg-primary text-primary-foreground rounded-full flex items-center justify-center border-2 border-[#f5f5f5] dark:border-zinc-950 shadow-md z-30 cursor-pointer select-none hover:scale-105 active:scale-95 transition-all"
+                    className="absolute -bottom-1 -right-1 w-7 h-7 bg-[#0E8B83] text-white rounded-full flex items-center justify-center border-2 border-white shadow-md z-30 cursor-pointer select-none hover:scale-105 active:scale-95 transition-all"
                   >
                     <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
                   </button>
@@ -1079,92 +1080,94 @@ export function InstagramProfileView({
 
           {/* ===== PROFILE INFO ===== */}
           <div className="px-5 flex flex-col items-center text-center mb-4">
-            {/* Username + Verified + Level */}
+            {/* Username / Name + Verified + Level */}
             <div className="flex items-center justify-center gap-2 flex-wrap">
-              <h1 className="font-bold text-[20px] text-gray-900 leading-tight">
-                {user.username || user.name || 'user'}
+              <h1 className="font-bold text-[22px] text-gray-900 leading-tight">
+                {user.name || user.username || 'user'}
               </h1>
               {user.isVerified && (
                 <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0" title="Verified">
                   <svg viewBox="0 0 24 24" className="w-3 h-3 fill-white stroke-white stroke-[3]"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
                 </div>
               )}
-              <span className="inline-flex items-center bg-primary text-primary-foreground text-[10px] font-black px-2 py-0.5 rounded-full tracking-wider uppercase flex-shrink-0">
-                Lvl {user.level || 1}
+              <span className="inline-flex items-center bg-[#0E8B83] text-white text-[11px] font-bold px-2.5 py-0.5 rounded-full tracking-wide uppercase flex-shrink-0">
+                LVL {user.level || 1}
               </span>
             </div>
 
             {/* Category Tag */}
-            <div className="flex items-center gap-1.5 mt-1.5 mb-1">
-              <span className="text-gray-400 text-[12px] font-medium">Artist</span>
-              <span className="text-gray-200">•</span>
-              <span className="text-gray-400 text-[12px] font-medium">Community Member</span>
+            <div className="flex items-center gap-1.5 mt-1.5 mb-1 text-[13px] text-gray-500 font-medium">
+              <span>Artist</span>
+              <span className="text-gray-300">•</span>
+              <span>Community Member</span>
             </div>
 
-            {/* Full Name (if different from username) */}
-            {user.name && user.name !== user.username && (
-              <p className="text-gray-500 text-[13.5px] font-medium mt-0.5">{user.name}</p>
-            )}
+            {/* Subtitle / Location */}
+            <div className="flex items-center gap-1.5 text-[13px] text-gray-500 mt-0.5">
+              <span>@{user.username || 'user'}</span>
+              <span className="text-gray-300">•</span>
+              <span className="inline-flex items-center gap-1">
+                <MapPin className="w-3.5 h-3.5 text-[#0E8B83]" />
+                {user.location || 'Mumbai'}
+              </span>
+            </div>
 
-            {/* Bio */}
-            {user.bio && (
-              <p className="text-gray-700 text-[13.5px] leading-relaxed mt-2 max-w-[320px]">{user.bio}</p>
-            )}
+            {/* Bio (default if not set, or user's custom bio) */}
+            <p className="text-gray-600 text-[13.5px] leading-relaxed mt-2 max-w-[340px] italic">
+              &ldquo;{user.bio ? user.bio : 'Designing the future of community conversations ✨'}&rdquo;
+            </p>
 
-            {/* Location & Website */}
-            <div className="flex flex-col items-center gap-1 mt-2">
-              {user.location && (
-                <div className="flex items-center gap-1 text-gray-400 dark:text-zinc-500 text-[12.5px] font-medium">
-                  <MapPin className="w-3.5 h-3.5 text-primary/75 dark:text-teal-400" />
-                  <span>{user.location}</span>
-                </div>
-              )}
-              {user.website && (
+            {/* Website */}
+            {user.website && (
+              <div className="mt-2">
                 <a
                   href={user.website.startsWith('http') ? user.website : `https://${user.website}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-primary dark:text-teal-400 text-[12.5px] font-semibold flex items-center gap-1 hover:underline"
+                  className="text-[#0E8B83] text-[12.5px] font-semibold flex items-center gap-1 hover:underline"
                 >
                   <LinkIcon className="w-3 h-3 stroke-[2.5]" />
                   <span>{user.website.replace(/^https?:\/\/(www\.)?/, '')}</span>
                 </a>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           {/* ===== STATS ROW ===== */}
           <div className="px-4 mb-4">
-            <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-sm border border-zinc-150 dark:border-zinc-800/80 overflow-hidden">
-              <div className="grid grid-cols-5 divide-x divide-zinc-100 dark:divide-zinc-800/80">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-150 overflow-hidden">
+              <div className="grid grid-cols-5 divide-x divide-gray-100">
                 <div className="flex flex-col items-center justify-center py-3.5 px-2">
-                  <span className="font-bold text-[17px] text-zinc-900 dark:text-zinc-100 leading-none">{posts.length}</span>
-                  <span className="text-[10.5px] text-zinc-500 dark:text-zinc-400 font-medium mt-1 text-center">posts</span>
+                  <span className="font-bold text-[17px] text-gray-900 leading-none">{posts.length}</span>
+                  <span className="text-[11px] text-gray-500 font-medium mt-1 text-center">posts</span>
                 </div>
                 <button
                   onClick={() => setIsFollowersModalOpen(true)}
-                  className="flex flex-col items-center justify-center py-3.5 px-2 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors"
+                  className="flex flex-col items-center justify-center py-3.5 px-2 hover:bg-gray-50 transition-colors"
                 >
-                  <span className="font-bold text-[17px] text-zinc-900 dark:text-zinc-100 leading-none">{followersCount}</span>
-                  <span className="text-[10.5px] text-zinc-500 dark:text-zinc-400 font-medium mt-1 text-center">followers</span>
+                  <span className="font-bold text-[17px] text-gray-900 leading-none">{followersCount}</span>
+                  <span className="text-[11px] text-gray-500 font-medium mt-1 text-center">followers</span>
                 </button>
                 <button
                   onClick={() => setIsFollowingModalOpen(true)}
-                  className="flex flex-col items-center justify-center py-3.5 px-1 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors"
+                  className="flex flex-col items-center justify-center py-3.5 px-1 hover:bg-gray-50 transition-colors"
                 >
-                  <span className="font-bold text-[17px] text-zinc-900 dark:text-zinc-100 leading-none">{followingCount}</span>
-                  <span className="text-[10.5px] text-zinc-500 dark:text-zinc-400 font-medium mt-1 text-center leading-tight">following</span>
+                  <span className="font-bold text-[17px] text-gray-900 leading-none">{followingCount}</span>
+                  <span className="text-[11px] text-gray-500 font-medium mt-1 text-center leading-tight">following</span>
                 </button>
                 <button
-                  onClick={() => setIsFriendsModalOpen(true)}
-                  className="flex flex-col items-center justify-center py-3.5 px-2 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors"
+                  onClick={() => {
+                    setActiveTab('friends');
+                    if (friendsList.length === 0) fetchFriends();
+                  }}
+                  className="flex flex-col items-center justify-center py-3.5 px-2 hover:bg-gray-50 transition-colors"
                 >
-                  <span className="font-bold text-[17px] text-zinc-900 dark:text-zinc-100 leading-none">{friendsCount}</span>
-                  <span className="text-[10.5px] text-zinc-500 dark:text-zinc-400 font-medium mt-1 text-center">friends</span>
+                  <span className="font-bold text-[17px] text-gray-900 leading-none">{friendsCount}</span>
+                  <span className="text-[11px] text-gray-500 font-medium mt-1 text-center">friends</span>
                 </button>
                 <div className="flex flex-col items-center justify-center py-3.5 px-2">
-                  <span className="font-bold text-[17px] text-zinc-900 dark:text-zinc-100 leading-none">{subscriberCount}</span>
-                  <span className="text-[10.5px] text-zinc-500 dark:text-zinc-400 font-medium mt-1 text-center leading-tight">subscribers</span>
+                  <span className="font-bold text-[17px] text-gray-900 leading-none">{subscriberCount}</span>
+                  <span className="text-[11px] text-gray-500 font-medium mt-1 text-center leading-tight">subscribers</span>
                 </div>
               </div>
             </div>
@@ -1175,13 +1178,13 @@ export function InstagramProfileView({
             {isMe ? (
               <div className="grid grid-cols-2 gap-2.5">
                 <EditProfileModal user={user}>
-                  <button className="w-full bg-primary hover:bg-primary/95 text-primary-foreground font-semibold text-[14px] py-2.5 rounded-full transition-all active:scale-95 shadow-sm">
+                  <button className="w-full bg-[#0E8B83] hover:bg-[#0c7871] text-white font-semibold text-[14px] py-2.5 rounded-full transition-all active:scale-95 shadow-sm">
                     Edit Profile
                   </button>
                 </EditProfileModal>
                 <button 
                   onClick={() => setIsArchiveModalOpen(true)}
-                  className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 font-semibold text-[14px] py-2.5 rounded-full transition-all active:scale-95 shadow-sm"
+                  className="w-full bg-white border border-gray-200 hover:bg-gray-50 text-gray-800 font-semibold text-[14px] py-2.5 rounded-full transition-all active:scale-95 shadow-sm"
                 >
                   View Archive
                 </button>
@@ -1191,20 +1194,20 @@ export function InstagramProfileView({
                 {/* Follow */}
                 <button
                   onClick={handleFollowClick}
-                  className={`w-full font-semibold text-[13px] py-2.5 rounded-full transition-all active:scale-95 shadow-sm ${
+                  className={`w-full font-semibold text-[13.5px] py-2.5 rounded-full transition-all active:scale-95 shadow-sm ${
                     followStatus === 'approved'
-                      ? 'bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800'
+                      ? 'bg-white border border-gray-200 text-gray-800 hover:bg-gray-50'
                       : followStatus === 'pending'
-                        ? 'bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-950/30'
-                        : 'bg-primary text-primary-foreground hover:bg-primary/95'
+                        ? 'bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100'
+                        : 'bg-[#0E8B83] hover:bg-[#0c7871] text-white'
                   }`}
                 >
-                  {followStatus === 'approved' ? 'Following' : followStatus === 'pending' ? 'Requested' : 'Follow'}
+                  {followStatus === 'approved' ? 'Following' : followStatus === 'pending' ? 'Requested' : '+ Follow'}
                 </button>
                 {/* Message */}
                 <button
                   onClick={handleMessageClick}
-                  className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 font-semibold text-[13px] py-2.5 rounded-full transition-all active:scale-95 shadow-sm"
+                  className="w-full bg-white border border-[#0E8B83] text-[#0E8B83] hover:bg-teal-50/60 font-semibold text-[13.5px] py-2.5 rounded-full transition-all active:scale-95 shadow-sm"
                 >
                   Message
                 </button>
@@ -1287,27 +1290,39 @@ export function InstagramProfileView({
             {/* Tab Bar */}
             <div className="flex border-b border-gray-100 bg-white">
               {[
-                { key: 'posts', icon: <Grid className="w-[21px] h-[21px] stroke-[1.8]" /> },
-                { key: 'reels', icon: <Film className="w-[21px] h-[21px] stroke-[1.8]" /> },
-                { key: 'reshares', icon: <Repeat className="w-[21px] h-[21px] stroke-[1.8]" /> },
-                { key: 'tolees', icon: <Users className="w-[21px] h-[21px] stroke-[1.8]" /> },
-                ...(newsArticles.length > 0 || isMe ? [{ key: 'news', icon: <Newspaper className="w-[21px] h-[21px] stroke-[1.8]" /> }] : []),
-                ...(isMe ? [{ key: 'saved', icon: <Bookmark className="w-[21px] h-[21px] stroke-[1.8]" /> }] : []),
-                ...(isMe ? [{ key: 'referrals', icon: <UserPlus className="w-[21px] h-[21px] stroke-[1.8]" /> }] : [])
-              ].map(({ key, icon }) => (
-                <button
-                  key={key}
-                  onClick={() => setActiveTab(key)}
-                  className={`flex-1 flex items-center justify-center py-3.5 relative transition-colors ${
-                    activeTab === key ? 'text-gray-900' : 'text-gray-300 hover:text-gray-500'
-                  }`}
-                >
-                  {icon}
-                  {activeTab === key && (
-                    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-5 h-[2.5px] bg-primary rounded-full" />
-                  )}
-                </button>
-              ))}
+                { key: 'posts', label: 'Posts', icon: <Grid className="w-5 h-5 stroke-[1.8]" /> },
+                { key: 'reels', label: 'Reels', icon: <Film className="w-5 h-5 stroke-[1.8]" /> },
+                { key: 'reshares', label: 'Reshare', icon: <Repeat className="w-5 h-5 stroke-[1.8]" /> },
+                { key: 'friends', label: 'Friends', icon: <Users className="w-5 h-5 stroke-[1.8]" /> },
+                ...(tolees.length > 0 || isMe ? [{ key: 'tolees', label: 'Tolees', icon: <Users className="w-5 h-5 stroke-[1.8]" /> }] : []),
+                ...(newsArticles.length > 0 || isMe ? [{ key: 'news', label: 'News', icon: <Newspaper className="w-5 h-5 stroke-[1.8]" /> }] : []),
+                ...(isMe ? [{ key: 'saved', label: 'Saved', icon: <Bookmark className="w-5 h-5 stroke-[1.8]" /> }] : []),
+                ...(isMe ? [{ key: 'referrals', label: 'Referrals', icon: <UserPlus className="w-5 h-5 stroke-[1.8]" /> }] : [])
+              ].map(({ key, label, icon }) => {
+                const isActive = activeTab === key;
+                return (
+                  <button
+                    key={key}
+                    onClick={() => {
+                      setActiveTab(key);
+                      if (key === 'friends' && friendsList.length === 0) {
+                        fetchFriends();
+                      }
+                    }}
+                    className={`flex-1 flex flex-col items-center justify-center pt-3 pb-2.5 relative transition-colors ${
+                      isActive ? 'text-[#0E8B83]' : 'text-gray-400 hover:text-gray-600'
+                    }`}
+                  >
+                    <div className="flex flex-col items-center gap-1">
+                      {icon}
+                      <span className={`text-[11.5px] ${isActive ? 'font-bold' : 'font-medium'}`}>{label}</span>
+                    </div>
+                    {isActive && (
+                      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-12 h-[2.5px] bg-[#0E8B83] rounded-full" />
+                    )}
+                  </button>
+                );
+              })}
             </div>
 
             {/* Posts Panel */}
@@ -1359,11 +1374,16 @@ export function InstagramProfileView({
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center py-20 text-center px-6">
-                    <div className="w-16 h-16 rounded-full border-2 border-gray-100 flex items-center justify-center mb-4 bg-gray-50">
-                      <Grid className="w-7 h-7 text-gray-200 stroke-[1.5]" />
+                    <div className="relative w-20 h-20 mb-4 flex items-center justify-center">
+                      <div className="absolute w-14 h-14 rounded-2xl bg-teal-50 border-2 border-teal-200/70 rotate-6 transform translate-x-1" />
+                      <div className="relative w-14 h-14 rounded-2xl bg-white border-2 border-[#0E8B83] shadow-md flex items-center justify-center -rotate-3">
+                        <Grid className="w-6 h-6 text-[#0E8B83] stroke-[2]" />
+                      </div>
                     </div>
-                    <h3 className="text-[16px] font-bold text-gray-900 mb-1">No Posts Yet</h3>
-                    <p className="text-[12.5px] text-gray-400 max-w-[220px] leading-relaxed">Posts will show up here in a grid.</p>
+                    <h3 className="text-[17px] font-bold text-gray-900 mb-1">No posts yet</h3>
+                    <p className="text-[13px] text-gray-400 max-w-[260px] leading-relaxed">
+                      When {user.name || user.username || 'this user'} shares photos and videos, they will appear here.
+                    </p>
                   </div>
                 )}
               </div>
@@ -1704,6 +1724,62 @@ export function InstagramProfileView({
                     <div className="w-16 h-16 rounded-full border-2 border-gray-100 flex items-center justify-center mb-4 bg-gray-50"><Users className="w-7 h-7 text-gray-200 stroke-[1.5]" /></div>
                     <h3 className="text-[16px] font-bold text-gray-900 mb-1">No Joined Tolees</h3>
                     <p className="text-[12.5px] text-gray-400 max-w-[220px] leading-relaxed">Groups this user joins will be highlighted here.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Friends Panel */}
+            {activeTab === 'friends' && (
+              <div className="animate-in fade-in duration-200 p-4">
+                {isFriendsLoading ? (
+                  <div className="flex items-center justify-center py-16">
+                    <Loader2 className="w-6 h-6 animate-spin text-[#0E8B83]" />
+                  </div>
+                ) : friendsList.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {friendsList.map((friend: any) => (
+                      <div
+                        key={friend.id}
+                        onClick={() => router.push(`/u/${friend.username || friend.id}`)}
+                        className="bg-white border border-gray-100 rounded-2xl p-3 flex items-center justify-between gap-3 cursor-pointer hover:shadow-sm hover:border-gray-200 transition-all"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <img
+                            src={getValidAvatarUrl(friend.avatar)}
+                            alt={friend.name || friend.username || 'friend'}
+                            className="w-11 h-11 rounded-full object-cover border border-gray-100 flex-shrink-0"
+                          />
+                          <div className="min-w-0">
+                            <h4 className="font-bold text-[14px] text-gray-900 truncate">{friend.name || friend.username}</h4>
+                            <p className="text-[12px] text-gray-400 truncate">@{friend.username}</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleFriendFollowToggle(friend.id);
+                          }}
+                          className={`text-xs font-semibold px-3 py-1.5 rounded-full transition-colors flex-shrink-0 ${
+                            friend.isFollowing
+                              ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                              : 'bg-[#0E8B83] text-white hover:bg-[#0c7871]'
+                          }`}
+                        >
+                          {friend.isFollowing ? 'Following' : 'Follow'}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-20 text-center px-6">
+                    <div className="w-16 h-16 rounded-full border-2 border-gray-100 flex items-center justify-center mb-4 bg-teal-50/50">
+                      <Users className="w-7 h-7 text-[#0E8B83] stroke-[1.5]" />
+                    </div>
+                    <h3 className="text-[16px] font-bold text-gray-900 mb-1">No Friends Yet</h3>
+                    <p className="text-[12.5px] text-gray-400 max-w-[240px] leading-relaxed">
+                      Mutual followers will appear as friends here.
+                    </p>
                   </div>
                 )}
               </div>

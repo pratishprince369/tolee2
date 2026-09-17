@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Bell, BellOff, BellRing, Check, ChevronDown } from 'lucide-react';
+import { Bell, BellOff, BellRing, Check, ChevronDown, Crown } from 'lucide-react';
 import { toggleSubscription, updateBellPreference, getSubscriptionStatus } from '@/actions/creator';
 
 interface SubscribeButtonProps {
@@ -165,10 +165,10 @@ export function SubscribeButton({
       <button
         onClick={handleSubscribeToggle}
         disabled={loading}
-        className={`flex items-center justify-center gap-1.5 font-semibold text-[13px] py-2.5 px-5 rounded-full transition-all duration-200 active:scale-95 shadow-sm ${
+        className={`flex items-center justify-center gap-1.5 font-bold text-[13px] py-2.5 px-4 w-full rounded-full transition-all duration-200 active:scale-95 shadow-xs ${
           subscribed
             ? 'bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800'
-            : 'bg-red-500 text-white hover:bg-red-600 shadow-red-500/20'
+            : 'bg-[#FA3E3E] hover:bg-[#E02E2E] text-white shadow-xs'
         }`}
       >
         {loading ? (
@@ -176,7 +176,7 @@ export function SubscribeButton({
         ) : subscribed ? (
           <><Check className="w-4 h-4" /> Subscribed</>
         ) : (
-          'Subscribe'
+          <><Crown className="w-4 h-4" /> Subscribe</>
         )}
       </button>
 
