@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React from 'react';
 import { usePathname } from 'next/navigation';
@@ -34,9 +34,12 @@ export function MainLayoutWrapper({
   const pathname = usePathname();
   const hideMobileHeader = isMobileHeaderHiddenRoute(pathname);
 
+  const isChat = pathname?.startsWith('/chat');
+
   return (
     <div className={cn(
-      "flex flex-1 w-full relative pb-16 lg:pb-0",
+      "flex flex-1 w-full relative",
+      isChat ? "pb-0" : "pb-16 lg:pb-0",
       hideMobileHeader ? "pt-0 md:pt-16" : "pt-16"
     )}>
       {sidebar}

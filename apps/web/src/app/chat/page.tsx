@@ -701,6 +701,60 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
 
+  // --- Mobile Virtual Keyboard & Visual Viewport Handling ---
+  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const updateViewport = () => {
+      if (window.visualViewport) {
+        const vvHeight = window.visualViewport.height;
+        const screenH = window.innerHeight;
+        const keyboardActive = (screenH - vvHeight) > 120;
+        setIsKeyboardOpen(keyboardActive);
+        setViewportHeight(vvHeight);
+      } else {
+        setViewportHeight(window.innerHeight);
+      }
+    };
+
+    updateViewport();
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', updateViewport);
+      window.visualViewport.addEventListener('scroll', updateViewport);
+    } else {
+      window.addEventListener('resize', updateViewport);
+    }
+
+    return () => {
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', updateViewport);
+        window.visualViewport.removeEventListener('scroll', updateViewport);
+      } else {
+        window.removeEventListener('resize', updateViewport);
+      }
+    };
+  }, []);
+
+  // When keyboard opens, ensure window scroll remains at top and scroll latest message into view
+  useEffect(() => {
+    if (isKeyboardOpen && activeChat) {
+      if (typeof window !== 'undefined') {
+        window.scrollTo(0, 0);
+      }
+      const t = setTimeout(() => {
+        if (typeof window !== 'undefined') {
+          window.scrollTo(0, 0);
+        }
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+      return () => clearTimeout(t);
+    }
+  }, [isKeyboardOpen, activeChat]);
+
   const queryTab = searchParams?.get('tab') || 'groups';
   const [activeSidebarTab, setActiveSidebarTab] = useState<'groups' | 'personal'>('groups');
   const [searchQuery, setSearchQuery] = useState('');
@@ -3032,7 +3086,14 @@ export default function ChatPage() {
   const paginatedPersonalChats = personalChatsList.slice(0, visibleChatsLimit);
 
   return (
-    <div className="w-full flex h-[calc(100dvh-4.2rem)] md:h-[calc(100vh-4rem)] bg-white dark:bg-[#0a0a0a] overflow-hidden border-b border-zinc-100 dark:border-gray-800 lg:border-none relative">
+    <div 
+      className={`w-full flex ${
+        isKeyboardOpen && activeChat 
+          ? 'fixed inset-x-0 top-0 z-[60]' 
+          : 'h-[calc(100dvh-4.2rem)] md:h-[calc(100vh-4rem)] relative'
+      } bg-white dark:bg-[#0a0a0a] overflow-hidden border-b border-zinc-100 dark:border-gray-800 lg:border-none`}
+      style={isKeyboardOpen && activeChat && viewportHeight ? { height: `${viewportHeight}px` } : undefined}
+    >
       
       {/* Left Chat List (WhatsApp Left Panel) */}
       <div className={`w-full md:w-[350px] lg:w-[400px] flex-shrink-0 border-r border-zinc-100 dark:border-zinc-900 flex flex-col bg-white dark:bg-[#121212] ${activeChat ? 'hidden md:flex' : 'flex'}`}>
@@ -3375,9 +3436,9 @@ export default function ChatPage() {
         {activeChatDetails ? (
           <>
             {/* Chat Header */}
-            <div className="h-16 shrink-0 flex items-center justify-between px-3 sm:px-4 lg:px-6 bg-[#0E8B83] text-white border-b border-[#0A7C75] z-20 min-w-0 shadow-sm sticky top-0">
+            <div className="h-14 sm:h-16 shrink-0 flex items-center justify-between px-2.5 sm:px-4 lg:px-6 bg-[#0E8B83] text-white border-b border-[#0A7C75] z-20 min-w-0 shadow-sm sticky top-0">
               <div 
-                className="flex items-center gap-2 sm:gap-3 cursor-pointer min-w-0 flex-1"
+                className="flex items-center gap-1.5 sm:gap-3 cursor-pointer min-w-0 flex-1 overflow-hidden"
                 onClick={() => {
                   if (!activeChatDetails.isGroup) {
                     navigateToProfile(activeChatDetails.username, activeChatDetails.otherUserId);
@@ -3394,80 +3455,78 @@ export default function ChatPage() {
                     setActiveChat('');
                     router.push('/chat');
                   }} 
-                  className="md:hidden mr-0.5 rounded-full text-white hover:text-white hover:bg-white/15 active:bg-white/25 flex-shrink-0 h-9 w-9 p-0 flex items-center justify-center"
+                  className="md:hidden -ml-1 mr-0.5 rounded-full text-white hover:text-white hover:bg-white/15 active:bg-white/25 flex-shrink-0 h-8 w-8 sm:h-9 sm:w-9 p-0 flex items-center justify-center"
                 >
-                  <ChevronLeft className="w-6 h-6 stroke-[2.5]" />
+                  <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2.5]" />
                 </Button>
                 
                 {/* Active story ring logic on active header avatar */}
-                <div className={activeChatDetails.hasActiveStories ? 'p-[1.5px] story-ring' : ''}>
+                <div className={activeChatDetails.hasActiveStories ? 'p-[1.5px] story-ring flex-shrink-0' : 'flex-shrink-0'}>
                   <div className={activeChatDetails.hasActiveStories ? 'p-[1.5px] bg-[#0E8B83] rounded-full' : ''}>
-                    <Avatar className="w-10 h-10 border border-white/30 shadow-sm flex-shrink-0 bg-white/20 text-white font-bold">
+                    <Avatar className="w-9 h-9 sm:w-10 sm:h-10 border border-white/30 shadow-xs flex-shrink-0 bg-white/20 text-white font-bold">
                       <AvatarImage src={activeChatDetails.avatar} />
-                      <AvatarFallback className="bg-white/20 text-white font-bold">
+                      <AvatarFallback className="bg-white/20 text-white font-bold text-sm">
                         {activeChatDetails.name ? activeChatDetails.name[0]?.toUpperCase() : 'C'}
                       </AvatarFallback>
                     </Avatar>
                   </div>
                 </div>
 
-                <div className="min-w-0 flex-1 flex flex-col justify-center">
-                  <h2 className="font-bold text-white text-sm sm:text-[15px] truncate flex items-center gap-1.5 min-w-0 hover:underline">
+                <div className="min-w-0 flex-1 flex flex-col justify-center overflow-hidden leading-tight py-0.5">
+                  <h2 className="font-bold text-white text-sm sm:text-[15px] truncate flex items-center gap-1.5 min-w-0 hover:underline leading-snug">
                     <span className="truncate">{activeChatDetails.name}</span>
                   </h2>
-                  <div className="text-[11px] sm:text-xs text-teal-100/90 flex items-center gap-1 sm:gap-1.5 min-w-0 select-none">
+                  <div className="text-[11px] sm:text-xs text-teal-100/90 flex items-center gap-1 sm:gap-1.5 min-w-0 select-none overflow-hidden mt-0.5">
                     {activeChatDetails.isGroup ? (
-                      <>
-                        <span className="truncate">{activeChatDetails.membersCount} members</span>
-                      </>
+                      <span className="truncate whitespace-nowrap">{activeChatDetails.membersCount} members</span>
                     ) : typingUsers.length > 0 ? (
-                      <span className="text-white font-medium flex items-center gap-1">
-                        <span className="relative flex h-2 w-2 items-center justify-center">
+                      <span className="text-white font-medium flex items-center gap-1 truncate whitespace-nowrap">
+                        <span className="relative flex h-2 w-2 items-center justify-center flex-shrink-0">
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
                           <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white"></span>
                         </span>
                         typing...
                       </span>
                     ) : (activeChatDetails.isOnline || activeChatDetails.online === 'Online') ? (
-                      <span className="text-white font-medium text-[11px] sm:text-xs flex items-center gap-1.5 select-none">
-                        <span className="relative flex h-2 w-2 items-center justify-center">
+                      <span className="text-white font-medium text-[11px] sm:text-xs flex items-center gap-1.5 select-none truncate whitespace-nowrap">
+                        <span className="relative flex h-2 w-2 items-center justify-center flex-shrink-0">
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-300 opacity-75"></span>
                           <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-300"></span>
                         </span>
                         Online
                       </span>
                     ) : activeChatDetails.online ? (
-                      <span className="text-teal-100/90 text-[11px] sm:text-xs select-none">
+                      <span className="text-teal-100/90 text-[11px] sm:text-xs select-none truncate whitespace-nowrap">
                         {activeChatDetails.online}
                       </span>
                     ) : null}
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-0.5 sm:gap-1 text-white flex-shrink-0">
-                <Button onClick={() => handleStartCall('video')} variant="ghost" size="icon" className="text-white hover:text-white hover:bg-white/15 active:bg-white/25 rounded-full h-9 w-9 p-0 flex items-center justify-center transition-all duration-200"><Video className="w-5 h-5 stroke-[2]" /></Button>
-                <Button onClick={() => handleStartCall('audio')} variant="ghost" size="icon" className="text-white hover:text-white hover:bg-white/15 active:bg-white/25 rounded-full h-9 w-9 p-0 flex items-center justify-center transition-all duration-200"><Phone className="w-4.5 h-4.5 stroke-[2]" /></Button>
+              <div className="flex items-center gap-0.5 sm:gap-1 text-white flex-shrink-0 ml-1">
+                <Button onClick={() => handleStartCall('video')} variant="ghost" size="icon" className="text-white hover:text-white hover:bg-white/15 active:bg-white/25 rounded-full h-8 w-8 sm:h-9 sm:w-9 p-0 flex items-center justify-center transition-all duration-200"><Video className="w-4.5 h-4.5 stroke-[2]" /></Button>
+                <Button onClick={() => handleStartCall('audio')} variant="ghost" size="icon" className="text-white hover:text-white hover:bg-white/15 active:bg-white/25 rounded-full h-8 w-8 sm:h-9 sm:w-9 p-0 flex items-center justify-center transition-all duration-200"><Phone className="w-4 h-4 stroke-[2]" /></Button>
                 <Button 
                   onClick={() => setIsSearchingInChat(prev => !prev)}
                   variant="ghost" 
                   size="icon" 
-                  className={`text-white hover:text-white hover:bg-white/15 active:bg-white/25 rounded-full h-9 w-9 p-0 flex items-center justify-center transition-all duration-200 ${isSearchingInChat ? 'bg-white/20 text-white font-bold' : ''}`}
+                  className={`text-white hover:text-white hover:bg-white/15 active:bg-white/25 rounded-full h-8 w-8 sm:h-9 sm:w-9 p-0 flex items-center justify-center transition-all duration-200 ${isSearchingInChat ? 'bg-white/20 text-white font-bold' : ''}`}
                 >
-                  <Search className="w-4.5 h-4.5 stroke-[2]" />
+                  <Search className="w-4 h-4 stroke-[2]" />
                 </Button>
                 <Button 
                   onClick={() => setShowMediaGallery(true)}
                   variant="ghost" 
                   size="icon" 
                   title="Media, Links & Docs"
-                  className="text-white hover:text-white hover:bg-white/15 active:bg-white/25 rounded-full h-9 w-9 p-0 flex items-center justify-center transition-all duration-200 hidden sm:flex"
+                  className="text-white hover:text-white hover:bg-white/15 active:bg-white/25 rounded-full h-8 w-8 sm:h-9 sm:w-9 p-0 flex items-center justify-center transition-all duration-200 hidden sm:flex"
                 >
-                  <Layers className="w-4.5 h-4.5 stroke-[2]" />
+                  <Layers className="w-4 h-4 stroke-[2]" />
                 </Button>
                 {activeChatDetails.isGroup ? (
                   <DropdownMenu>
-                    <DropdownMenuTrigger className="text-white hover:text-white hover:bg-white/15 active:bg-white/25 rounded-full h-9 w-9 p-0 flex items-center justify-center transition-all duration-200 focus:outline-none">
-                      <MoreVertical className="w-4.5 h-4.5 stroke-[2]" />
+                    <DropdownMenuTrigger className="text-white hover:text-white hover:bg-white/15 active:bg-white/25 rounded-full h-8 w-8 sm:h-9 sm:w-9 p-0 flex items-center justify-center transition-all duration-200 focus:outline-none">
+                      <MoreVertical className="w-4 h-4 stroke-[2]" />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-lg border-zinc-200/80 dark:border-zinc-900">
                       <DropdownMenuItem onClick={handleGroupDetailsOpen} className="cursor-pointer">
@@ -3517,8 +3576,8 @@ export default function ChatPage() {
                   </DropdownMenu>
                 ) : (
                   <DropdownMenu>
-                    <DropdownMenuTrigger className="text-white hover:text-white hover:bg-white/15 active:bg-white/25 rounded-full h-9 w-9 p-0 flex items-center justify-center transition-all duration-200 focus:outline-none">
-                      <MoreVertical className="w-4.5 h-4.5 stroke-[2]" />
+                    <DropdownMenuTrigger className="text-white hover:text-white hover:bg-white/15 active:bg-white/25 rounded-full h-8 w-8 sm:h-9 sm:w-9 p-0 flex items-center justify-center transition-all duration-200 focus:outline-none">
+                      <MoreVertical className="w-4 h-4 stroke-[2]" />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-lg border-zinc-200/80 dark:border-zinc-900">
                       <DropdownMenuItem onClick={() => navigateToProfile(activeChatDetails.username, activeChatDetails.otherUserId)} className="cursor-pointer">
@@ -4285,7 +4344,7 @@ export default function ChatPage() {
                 )}
               </div>
             ) : (
-              <div className="relative bg-[#F0F2F5] dark:bg-[#111B21] border-t border-zinc-200/80 dark:border-zinc-800 z-10 w-full overflow-visible shrink-0 pb-[calc(12px+env(safe-area-inset-bottom))]">
+              <div className="relative bg-[#efeae2]/95 dark:bg-[#0b141a]/95 backdrop-blur-md border-t border-[#ded8cf] dark:border-zinc-800/80 z-10 w-full overflow-visible shrink-0 pb-1.5 sm:pb-2">
                 
                 {/* Editing Message Banner */}
                 {editingMessage && (
@@ -4423,6 +4482,17 @@ export default function ChatPage() {
                           className="w-full min-w-0 max-h-32 min-h-[36px] bg-transparent border-none focus:ring-0 focus-visible:ring-0 resize-none py-1.5 text-sm sm:text-[15px] text-[#111B21] dark:text-[#E9EDEF] placeholder:text-gray-500 dark:placeholder:text-zinc-400 focus:outline-none leading-relaxed select-text"
                           rows={1}
                           value={newMessage}
+                          onFocus={() => {
+                            if (typeof window !== 'undefined') {
+                              window.scrollTo(0, 0);
+                            }
+                            setTimeout(() => {
+                              if (typeof window !== 'undefined') {
+                                window.scrollTo(0, 0);
+                              }
+                              messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+                            }, 150);
+                          }}
                           onChange={(e) => {
                             setNewMessage(e.target.value);
                             if (activeChat && e.target.value.trim()) {
