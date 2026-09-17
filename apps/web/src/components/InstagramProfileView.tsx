@@ -1080,7 +1080,7 @@ export function InstagramProfileView({
 
           {/* ===== PROFILE INFO ===== */}
           <div className="px-5 flex flex-col items-center text-center mb-4">
-            {/* Username / Name + Verified + Level */}
+            {/* User Name + Level Badge */}
             <div className="flex items-center justify-center gap-2 flex-wrap">
               <h1 className="font-bold text-[22px] text-gray-900 leading-tight">
                 {user.name || user.username || 'user'}
@@ -1096,25 +1096,26 @@ export function InstagramProfileView({
             </div>
 
             {/* Category Tag */}
-            <div className="flex items-center gap-1.5 mt-1.5 mb-1 text-[13px] text-gray-500 font-medium">
+            <div className="flex items-center gap-1.5 mt-1.5 mb-0.5 text-[13px] text-gray-500 font-medium">
               <span>Artist</span>
               <span className="text-gray-300">•</span>
               <span>Community Member</span>
             </div>
 
-            {/* Subtitle / Location */}
-            <div className="flex items-center gap-1.5 text-[13px] text-gray-500 mt-0.5">
-              <span>@{user.username || 'user'}</span>
-              <span className="text-gray-300">•</span>
-              <span className="inline-flex items-center gap-1">
-                <MapPin className="w-3.5 h-3.5 text-[#0E8B83]" />
-                {user.location || 'Mumbai'}
-              </span>
+            {/* Subtitle Name */}
+            <p className="text-gray-500 text-[13.5px] font-medium mt-0.5">
+              {user.name || user.username || 'user'}
+            </p>
+
+            {/* Location */}
+            <div className="flex items-center justify-center gap-1 text-[13px] text-gray-500 mt-0.5">
+              <MapPin className="w-3.5 h-3.5 text-[#0E8B83]" />
+              <span>{user.location || 'Mumbai'}</span>
             </div>
 
-            {/* Bio (default if not set, or user's custom bio) */}
-            <p className="text-gray-600 text-[13.5px] leading-relaxed mt-2 max-w-[340px] italic">
-              &ldquo;{user.bio ? user.bio : 'Designing the future of community conversations ✨'}&rdquo;
+            {/* Quoted Bio */}
+            <p className="text-gray-600 text-[13.5px] leading-relaxed mt-1.5 max-w-[340px]">
+              &ldquo;{user.bio ? user.bio : 'Creating Art, Spreading Positivity ✨'}&rdquo;
             </p>
 
             {/* Website */}
@@ -1194,7 +1195,7 @@ export function InstagramProfileView({
                 {/* Follow */}
                 <button
                   onClick={handleFollowClick}
-                  className={`w-full font-semibold text-[13.5px] py-2.5 rounded-full transition-all active:scale-95 shadow-sm ${
+                  className={`w-full font-semibold text-[13.5px] py-2.5 rounded-full transition-all active:scale-95 shadow-sm flex items-center justify-center gap-1.5 ${
                     followStatus === 'approved'
                       ? 'bg-white border border-gray-200 text-gray-800 hover:bg-gray-50'
                       : followStatus === 'pending'
@@ -1202,14 +1203,16 @@ export function InstagramProfileView({
                         : 'bg-[#0E8B83] hover:bg-[#0c7871] text-white'
                   }`}
                 >
-                  {followStatus === 'approved' ? 'Following' : followStatus === 'pending' ? 'Requested' : '+ Follow'}
+                  <UserPlus className="w-4 h-4 stroke-[2]" />
+                  <span>{followStatus === 'approved' ? 'Following' : followStatus === 'pending' ? 'Requested' : 'Follow'}</span>
                 </button>
                 {/* Message */}
                 <button
                   onClick={handleMessageClick}
-                  className="w-full bg-white border border-[#0E8B83] text-[#0E8B83] hover:bg-teal-50/60 font-semibold text-[13.5px] py-2.5 rounded-full transition-all active:scale-95 shadow-sm"
+                  className="w-full bg-white border border-[#0E8B83] text-[#0E8B83] hover:bg-teal-50/60 font-semibold text-[13.5px] py-2.5 rounded-full transition-all active:scale-95 shadow-sm flex items-center justify-center gap-1.5"
                 >
-                  Message
+                  <MessageCircle className="w-4 h-4 stroke-[2]" />
+                  <span>Message</span>
                 </button>
                 {/* Subscribe */}
                 <SubscribeButton
@@ -1374,15 +1377,21 @@ export function InstagramProfileView({
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center py-20 text-center px-6">
-                    <div className="relative w-20 h-20 mb-4 flex items-center justify-center">
-                      <div className="absolute w-14 h-14 rounded-2xl bg-teal-50 border-2 border-teal-200/70 rotate-6 transform translate-x-1" />
-                      <div className="relative w-14 h-14 rounded-2xl bg-white border-2 border-[#0E8B83] shadow-md flex items-center justify-center -rotate-3">
-                        <Grid className="w-6 h-6 text-[#0E8B83] stroke-[2]" />
-                      </div>
+                    <div className="relative w-24 h-24 mb-4 flex items-center justify-center">
+                      <svg width="88" height="88" viewBox="0 0 88 88" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        {/* Background tilted card */}
+                        <rect x="16" y="22" width="50" height="50" rx="10" transform="rotate(-10 16 22)" fill="#F3F4F6" stroke="#E5E7EB" strokeWidth="2.5" />
+                        {/* Foreground card */}
+                        <rect x="22" y="16" width="52" height="52" rx="10" fill="white" stroke="#E5E7EB" strokeWidth="2.5" />
+                        {/* Sun */}
+                        <circle cx="56" cy="30" r="4.5" fill="#D1D5DB" />
+                        {/* Mountains */}
+                        <path d="M28 56L40 42L49 51L56 45L67 58H28V56Z" fill="#E5E7EB" />
+                      </svg>
                     </div>
                     <h3 className="text-[17px] font-bold text-gray-900 mb-1">No posts yet</h3>
-                    <p className="text-[13px] text-gray-400 max-w-[260px] leading-relaxed">
-                      When {user.name || user.username || 'this user'} shares photos and videos, they will appear here.
+                    <p className="text-[13px] text-gray-500 max-w-[260px] leading-relaxed">
+                      When {user.name || user.username || 'this user'} shares something,<br />it will appear here.
                     </p>
                   </div>
                 )}
