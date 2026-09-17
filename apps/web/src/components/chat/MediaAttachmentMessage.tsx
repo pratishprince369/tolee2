@@ -718,7 +718,7 @@ export function AudioMessage({ mediaInfo, isMe }: AudioMessageProps) {
           disabled={!mediaInfo.url}
           className={`w-10 h-10 rounded-full flex items-center justify-center shadow-md flex-shrink-0 transition-transform active:scale-95 ${
             isMe 
-              ? 'bg-white text-primary hover:bg-white/90 dark:bg-white dark:text-zinc-900' 
+              ? 'bg-[#0E8B83] text-white hover:bg-[#0A7C75]' 
               : 'bg-primary text-white hover:bg-primary/95'
           }`}
         >
@@ -737,17 +737,17 @@ export function AudioMessage({ mediaInfo, isMe }: AudioMessageProps) {
             value={currentTime} 
             onChange={handleSeek}
             disabled={!mediaInfo.url}
-            className="w-full h-1.5 bg-zinc-300 dark:bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-primary dark:accent-teal-400 focus:outline-none"
+            className="w-full h-1.5 bg-zinc-300 dark:bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-teal-600 dark:accent-teal-400 focus:outline-none"
           />
           <div className={`flex items-center justify-between text-[11px] font-semibold ${
-            isMe ? 'text-primary-foreground/90' : 'text-zinc-500 dark:text-zinc-400'
+            isMe ? 'text-gray-600 dark:text-zinc-300' : 'text-zinc-500 dark:text-zinc-400'
           }`}>
             <span>{formatTime(currentTime)}</span>
             <span>{formatTime(duration)}</span>
           </div>
         </div>
 
-        <Music className={`w-5 h-5 flex-shrink-0 opacity-60 ${isMe ? 'text-primary-foreground' : 'text-zinc-500'}`} />
+        <Music className={`w-5 h-5 flex-shrink-0 opacity-60 ${isMe ? 'text-[#0E8B83] dark:text-teal-400' : 'text-zinc-500'}`} />
       </div>
 
       {mediaInfo.caption && (
@@ -895,7 +895,7 @@ export function DocumentMessage({ mediaInfo, isMe, onOpenViewer }: DocumentMessa
         onClick={handleCardClick}
         className={`p-3 rounded-2xl flex items-center justify-between gap-3 border shadow-xs transition-all hover:shadow-md ${mediaInfo.url ? 'cursor-pointer' : 'opacity-90'} ${
           isMe 
-            ? 'bg-black/10 dark:bg-white/10 border-white/15 hover:bg-black/15 dark:hover:bg-white/15' 
+            ? 'bg-black/5 dark:bg-white/10 border-black/10 dark:border-white/15 hover:bg-black/10' 
             : 'bg-white dark:bg-zinc-950 border-zinc-200/80 dark:border-zinc-800 hover:border-teal-500/40'
         }`}
       >
@@ -906,7 +906,7 @@ export function DocumentMessage({ mediaInfo, isMe, onOpenViewer }: DocumentMessa
 
           <div className="min-w-0 flex-1">
             <p className={`text-[13px] font-bold truncate leading-tight ${
-              isMe ? 'text-primary-foreground' : 'text-gray-900 dark:text-white'
+              isMe ? 'text-[#111B21] dark:text-[#E9EDEF]' : 'text-gray-900 dark:text-white'
             }`}>
               {mediaInfo.filename}
             </p>
@@ -915,7 +915,7 @@ export function DocumentMessage({ mediaInfo, isMe, onOpenViewer }: DocumentMessa
                 {docStyle.badge}
               </span>
               <span className={`text-[10px] font-medium ${
-                isMe ? 'text-primary-foreground/75' : 'text-gray-500 dark:text-zinc-400'
+                isMe ? 'text-gray-500 dark:text-zinc-400' : 'text-gray-500 dark:text-zinc-400'
               }`}>
                 {mediaInfo.sizeFormatted || 'Document'}
               </span>
@@ -928,7 +928,7 @@ export function DocumentMessage({ mediaInfo, isMe, onOpenViewer }: DocumentMessa
             <button
               onClick={handleView}
               className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
-                isMe ? 'bg-white/20 text-white hover:bg-white/30' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-teal-50 hover:text-teal-600'
+                isMe ? 'bg-black/10 text-gray-700 hover:bg-black/15 dark:bg-white/20 dark:text-white' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-teal-50 hover:text-teal-600'
               }`}
               title="Preview document"
             >
@@ -940,7 +940,7 @@ export function DocumentMessage({ mediaInfo, isMe, onOpenViewer }: DocumentMessa
               disabled={isDownloading}
               className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
                 isMe 
-                  ? 'bg-white/20 text-white hover:bg-white/30 disabled:opacity-50' 
+                  ? 'bg-black/10 text-gray-700 hover:bg-black/15 dark:bg-white/20 dark:text-white disabled:opacity-50' 
                   : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-teal-50 hover:text-teal-600 dark:hover:bg-teal-950/40 dark:hover:text-teal-400 disabled:opacity-50'
               }`}
               title={isDownloading ? "Downloading..." : "Download file"}
