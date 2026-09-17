@@ -950,13 +950,13 @@ export function InstagramProfileView({
   };
 
   return (
-    <div className="min-h-screen bg-[#f5f5f5] text-gray-900 font-sans antialiased select-none pt-4 sm:pt-6">
+    <div className="min-h-screen bg-[#f5f5f5] text-gray-900 font-sans antialiased select-none pt-0">
 
       {/* ===== PAGE CONTENT ===== */}
-      <div className="max-w-[935px] w-full mx-auto pb-32 px-0 sm:px-4">
+      <div className="max-w-[935px] w-full mx-auto pb-32 px-0">
 
         {/* ===== COVER IMAGE ===== */}
-        <div className="relative w-full h-[200px] sm:h-[260px] md:h-[300px] sm:rounded-2xl overflow-hidden shadow-sm sm:mt-4 group z-10">
+        <div className="relative w-full h-[200px] sm:h-[260px] md:h-[300px] overflow-hidden shadow-sm group z-10">
           <img src={getValidCoverUrl(user.coverImage)} alt="Cover" className="w-full h-full object-cover" />
           {/* Back button (Mobile/Desktop) */}
           <button
