@@ -3022,7 +3022,7 @@ export default function ChatPage() {
   const paginatedPersonalChats = personalChatsList.slice(0, visibleChatsLimit);
 
   return (
-    <div className="w-full flex h-[calc(100dvh-8rem)] md:h-[calc(100vh-4rem)] bg-white dark:bg-[#0a0a0a] overflow-hidden border-b border-zinc-100 dark:border-gray-800 lg:border-none relative">
+    <div className="w-full flex h-[calc(100dvh-4.2rem)] md:h-[calc(100vh-4rem)] bg-white dark:bg-[#0a0a0a] overflow-hidden border-b border-zinc-100 dark:border-gray-800 lg:border-none relative">
       
       {/* Left Chat List (WhatsApp Left Panel) */}
       <div className={`w-full md:w-[350px] lg:w-[400px] flex-shrink-0 border-r border-zinc-100 dark:border-zinc-900 flex flex-col bg-white dark:bg-[#121212] ${activeChat ? 'hidden md:flex' : 'flex'}`}>

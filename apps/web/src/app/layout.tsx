@@ -85,6 +85,7 @@ import { DraftsReminderBanner } from "@/components/DraftsReminderBanner";
 import { OfflineSmartPocketBanner } from "@/components/OfflineSmartPocketBanner";
 import AnalyticsTracker from "@/components/AnalyticsTracker";
 import { RoutePrefetcher } from "@/components/RoutePrefetcher";
+import { MainLayoutWrapper } from "@/components/MainLayoutWrapper";
 import { Suspense } from "react";
 import { prisma } from "@/lib/prisma";
 
@@ -287,15 +288,12 @@ export default async function RootLayout({
           {/* Global Top Navbar */}
           <Header initialBranding={initialBranding} />
           
-          <div className="flex flex-1 w-full relative pb-16 lg:pb-0 pt-16">
-            {/* Global Sidebar - hidden on small screens, fixed on left for large */}
-            {isAuthenticated && <Sidebar />}
-            
-            {/* Main Content Area - padded left on large screens to accommodate fixed sidebar */}
-            <div className={cn("flex-grow w-full min-w-0 overflow-x-clip", isAuthenticated && "lg:pl-64")}>
-              {children}
-            </div>
-          </div>
+          <MainLayoutWrapper
+            isAuthenticated={isAuthenticated}
+            sidebar={isAuthenticated ? <Sidebar /> : null}
+          >
+            {children}
+          </MainLayoutWrapper>
           
           <BottomNav />
         </Providers>

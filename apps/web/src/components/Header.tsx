@@ -11,6 +11,7 @@ import { useSession, signOut } from 'next-auth/react';
 import { getSidebarDataCached } from '@/lib/sidebar-data';
 import { SearchInput } from './SearchInput';
 import { cn } from '@/lib/utils';
+import { isMobileHeaderHiddenRoute } from '@/components/MainLayoutWrapper';
 import { getDrafts } from '@/lib/draftManager';
 import { MyDraftsModal } from '@/components/MyDraftsModal';
 import {
@@ -135,7 +136,7 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
       .catch(() => {});
   }, []);
 
-  const isReels = pathname === '/reels' || pathname?.endsWith('/reels');
+  const isMobileHeaderHidden = isMobileHeaderHiddenRoute(pathname);
   const [scrolled, setScrolled] = React.useState(false);
 
   React.useEffect(() => {
@@ -148,7 +149,10 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
   }, []);
 
   return (
-    <div className={cn("fixed top-0 left-0 right-0 z-50 w-full flex flex-col transition-all duration-300", isReels && "hidden lg:flex")}>
+    <div className={cn(
+      "fixed top-0 left-0 right-0 z-50 w-full flex flex-col transition-all duration-300",
+      isMobileHeaderHidden && "hidden md:flex"
+    )}>
       <GlobalUploadProgress
         task={task}
         retryUpload={retryUpload}

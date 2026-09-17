@@ -960,6 +960,18 @@ export function InstagramProfileView({
           <img src={getValidCoverUrl(user.coverImage)} alt="Cover" className="w-full h-full object-cover" />
           {/* Gradient fade bottom — pointer-events-none so it never blocks button clicks */}
           <div className="absolute bottom-0 inset-x-0 h-16 bg-gradient-to-t from-[#f5f5f5] to-transparent pointer-events-none" />
+          {/* Back button on other user profiles (Mobile) */}
+          {!isMe && (
+            <button
+              type="button"
+              onClick={() => router.back()}
+              className="absolute top-3 left-3 w-8 h-8 bg-black/30 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-black/50 transition-colors z-20 md:hidden"
+              aria-label="Back"
+            >
+              <ChevronLeft className="w-4.5 h-4.5" />
+            </button>
+          )}
+
           {/* Share top right */}
           <button
             onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/u/${user.username || user.id}`); alert('Profile link copied!'); }}
