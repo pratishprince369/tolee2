@@ -77,7 +77,7 @@ public class IncomingCallActivity extends AppCompatActivity {
         // Initialize Signaling Socket
         try {
             android.content.SharedPreferences prefs = getSharedPreferences("tolee_prefs", MODE_PRIVATE);
-            String socketUrl = prefs.getString("socket_url", "https://tolee2.onrender.com");
+            String socketUrl = prefs.getString("socket_url", "https://api.tolee.in");
             socket = IO.socket(socketUrl);
             socket.connect();
             Log.d(TAG, "Socket connecting to: " + socketUrl);

@@ -23,7 +23,7 @@ public class CallActionReceiver extends BroadcastReceiver {
             // 1. Emit decline event to signaling server
             try {
                 android.content.SharedPreferences prefs = context.getSharedPreferences("tolee_prefs", Context.MODE_PRIVATE);
-                String socketUrl = prefs.getString("socket_url", "https://tolee2.onrender.com");
+                String socketUrl = prefs.getString("socket_url", "https://api.tolee.in");
                 Socket socket = IO.socket(socketUrl);
                 socket.connect();
                 JSONObject payload = new JSONObject();

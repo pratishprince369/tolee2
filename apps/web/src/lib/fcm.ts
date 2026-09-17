@@ -104,10 +104,11 @@ export async function sendPushNotification(
     const badgeCount = await getUnreadBadgeCount(userId);
 
     const isCall = data?.type === 'incoming_call';
+    const isCallDismiss = data?.type === 'call_ended' || data?.type === 'call_cancelled';
 
     const message: admin.messaging.MulticastMessage = {
       tokens,
-      ...(isCall ? {} : {
+      ...((isCall || isCallDismiss) ? {} : {
         notification: {
           title,
           body,
@@ -119,8 +120,8 @@ export async function sendPushNotification(
       },
       android: {
         priority: 'high',
-        ttl: 86400 * 1000, // 24 hours
-        ...(isCall ? {} : {
+        ttl: isCall ? 45 * 1000 : 86400 * 1000,
+        ...((isCall || isCallDismiss) ? {} : {
           notification: {
             title,
             body,
@@ -134,9 +135,13 @@ export async function sendPushNotification(
         }),
       },
       apns: {
+        headers: {
+          'apns-priority': '10',
+          'apns-push-type': isCall ? 'voip' : 'alert'
+        },
         payload: {
           aps: {
-            ...(isCall ? {
+            ...((isCall || isCallDismiss) ? {
               'content-available': 1,
             } : {
               alert: {
@@ -149,6 +154,24 @@ export async function sendPushNotification(
           },
         },
       },
+      webpush: {
+        headers: {
+          Urgency: 'high'
+        },
+        notification: isCall ? {
+          title: `📞 Incoming ${data.callType === 'video' ? 'Video' : 'Audio'} Call`,
+          body: `${data.callerName || 'Someone'} is calling you on Tolee...`,
+          icon: data.callerAvatar || '/logo.png',
+          badge: '/logo.png',
+          tag: `call-${data.callId || 'active'}`,
+          requireInteraction: true,
+          renotify: true,
+          actions: [
+            { action: 'answer', title: '📞 Answer' },
+            { action: 'decline', title: '❌ Decline' }
+          ]
+        } : undefined
+      }
     };
 
     const response = await messaging.sendEachForMulticast(message);

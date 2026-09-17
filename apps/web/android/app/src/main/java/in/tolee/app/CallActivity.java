@@ -117,7 +117,7 @@ public class CallActivity extends AppCompatActivity {
     private void connectSignalingServer() {
         try {
             android.content.SharedPreferences prefs = getSharedPreferences("tolee_prefs", MODE_PRIVATE);
-            String socketUrl = prefs.getString("socket_url", "https://tolee2.onrender.com");
+            String socketUrl = prefs.getString("socket_url", "https://api.tolee.in");
             android.util.Log.d("CallActivity", "Connecting to signaling server: " + socketUrl);
 
             IO.Options opts = new IO.Options();

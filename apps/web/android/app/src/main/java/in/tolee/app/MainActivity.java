@@ -508,7 +508,7 @@ public class MainActivity extends BridgeActivity {
                     host.startsWith("172.")) {
                     socketUrl = "http://" + host + ":4000";
                 } else {
-                    socketUrl = "https://tolee2.onrender.com";
+                    socketUrl = "https://api.tolee.in";
                 }
                 
                 android.content.SharedPreferences prefs = getSharedPreferences("tolee_prefs", MODE_PRIVATE);

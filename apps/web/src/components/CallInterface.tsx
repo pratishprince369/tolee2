@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { io, Socket } from 'socket.io-client';
-import { Phone, Video, PhoneOff, Mic, MicOff, VideoOff, Volume2, VolumeX, ShieldAlert, Check, X, Camera, RefreshCw } from 'lucide-react';
+import { Phone, Video, PhoneOff, Mic, MicOff, VideoOff, Volume2, VolumeX, ShieldAlert, Check, X, Camera, RefreshCw, Minimize2, Maximize2 } from 'lucide-react';
 import { getCallLogs } from '@/actions/calls';
 
 interface CallInterfaceProps {
@@ -44,6 +44,7 @@ export function CallInterface({
   const [callType, setCallType] = useState<'audio' | 'video'>('audio');
   const [failureReason, setFailureReason] = useState<'offline' | 'busy' | 'declined' | 'failed' | null>(null);
   const [callDuration, setCallDuration] = useState(0);
+  const [isMinimized, setIsMinimized] = useState(false);
   
   // Call Partner Info
   const [partner, setPartner] = useState<{ id: string; name: string; avatar: string }>({ id: '', name: '', avatar: '' });
@@ -183,10 +184,15 @@ export function CallInterface({
 
     setSocket(s);
 
-    // Global exposed window functions for debug or header triggers
-    (window as any).startOutgoingCall = (type: 'audio' | 'video') => {
+    // Global exposed window functions for navigation or header triggers
+    (window as any).startOutgoingCall = (
+      type: 'audio' | 'video',
+      targetId?: string,
+      targetName?: string,
+      targetAvatar?: string
+    ) => {
       if (latestInitiateCallRef.current) {
-        latestInitiateCallRef.current(type);
+        latestInitiateCallRef.current(type, targetId, targetName, targetAvatar);
       }
     };
 
@@ -196,7 +202,63 @@ export function CallInterface({
       cleanupWebRTC();
       delete (window as any).startOutgoingCall;
     };
-  }, [currentUserId, activeRecipientId]);
+  }, [currentUserId]);
+
+  // Sync incoming/active calls across multiple open browser tabs
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof BroadcastChannel === 'undefined') return;
+    const bc = new BroadcastChannel('tolee_calls');
+
+    bc.onmessage = (event) => {
+      const { type, callId } = event.data || {};
+      if (type === 'CALL_ANSWERED' || type === 'CALL_REJECTED' || type === 'CALL_ENDED') {
+        if (callState === 'incoming' && (!callId || callId === currentCallId)) {
+          stopAudio();
+          resetCall();
+        }
+      }
+    };
+
+    return () => {
+      bc.close();
+    };
+  }, [callState, currentCallId]);
+
+  // Listen for Service Worker incoming call answer signals
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
+
+    const handleSwMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'INCOMING_CALL_ANSWER_SIGNAL') {
+        console.log('[Call Client] Received answer signal from Service Worker');
+        if (latestAcceptCallRef.current) {
+          latestAcceptCallRef.current();
+        }
+      }
+    };
+
+    navigator.serviceWorker.addEventListener('message', handleSwMessage);
+    return () => {
+      navigator.serviceWorker.removeEventListener('message', handleSwMessage);
+    };
+  }, []);
+
+  // Detect incoming call answer from push URL search params
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const callId = params.get('callId');
+    const action = params.get('action');
+    if (callId && action === 'answer' && callState === 'incoming' && currentCallId === callId) {
+      if (latestAcceptCallRef.current) {
+        latestAcceptCallRef.current();
+      }
+      const url = new URL(window.location.href);
+      url.searchParams.delete('callId');
+      url.searchParams.delete('action');
+      window.history.replaceState({}, '', url.pathname + (url.search ? url.search : ''));
+    }
+  }, [callState, currentCallId]);
 
   // Handle call state callbacks
   useEffect(() => {
@@ -379,17 +441,30 @@ export function CallInterface({
   };
 
   // 3. WebRTC Mechanics & Outgoing Setup
-  const initiateCall = async (type: 'audio' | 'video') => {
-    if (!socket || !activeRecipientId) return;
+  const initiateCall = async (
+    type: 'audio' | 'video',
+    targetId?: string,
+    targetName?: string,
+    targetAvatar?: string
+  ) => {
+    const destId = targetId || activeRecipientId;
+    if (!socket || !destId) {
+      console.warn('[Call Client] Cannot initiate call without socket or recipient ID');
+      return;
+    }
+
+    const destName = targetName || activeRecipientName || 'Tolee User';
+    const destAvatar = targetAvatar || activeRecipientAvatar || '/default-user-avatar.svg';
 
     initAudioContext();
     setCallType(type);
     setPartner({
-      id: activeRecipientId,
-      name: activeRecipientName || 'Recipient',
-      avatar: activeRecipientAvatar || '/default-user-avatar.svg'
+      id: destId,
+      name: destName,
+      avatar: destAvatar
     });
     setCallState('calling');
+    setIsMinimized(false);
     playDialTone();
 
     const callId = 'call-' + Math.random().toString(36).substr(2, 9);
@@ -421,7 +496,7 @@ export function CallInterface({
       pc.onicecandidate = (event) => {
         if (event.candidate) {
           socket.emit('ice-candidate', {
-            toUserId: activeRecipientId,
+            toUserId: destId,
             candidate: event.candidate,
             callId
           });
@@ -445,7 +520,7 @@ export function CallInterface({
 
       // Emit Call Initiated Event
       socket.emit('call-user', {
-        toUserId: activeRecipientId,
+        toUserId: destId,
         callerName: currentUserName,
         callerAvatar: currentUserAvatar,
         offer,
@@ -469,6 +544,12 @@ export function CallInterface({
     initAudioContext();
     stopAudio();
     setCallState('connected');
+
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        new BroadcastChannel('tolee_calls').postMessage({ type: 'CALL_ANSWERED', callId: currentCallId });
+      }
+    } catch (_) {}
 
     try {
       const constraints = {
@@ -543,6 +624,13 @@ export function CallInterface({
     if (!socket || !currentCallId) return;
     
     stopAudio();
+
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        new BroadcastChannel('tolee_calls').postMessage({ type: 'CALL_REJECTED', callId: currentCallId });
+      }
+    } catch (_) {}
+
     socket.emit('reject-call', {
       callId: currentCallId,
       reason
@@ -560,6 +648,13 @@ export function CallInterface({
     }
 
     stopAudio();
+
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        new BroadcastChannel('tolee_calls').postMessage({ type: 'CALL_ENDED', callId: currentCallId });
+      }
+    } catch (_) {}
+
     socket.emit('end-call', { callId: currentCallId });
     setCallState('ended');
     playEndTone();
@@ -578,6 +673,7 @@ export function CallInterface({
     setIsMuted(false);
     setIsVideoDisabled(false);
     setIsSpeakerOn(true);
+    setIsMinimized(false);
     iceCandidatesQueueRef.current = [];
   };
 
@@ -634,16 +730,71 @@ export function CallInterface({
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const latestInitiateCallRef = useRef<((type: 'audio' | 'video') => Promise<void>) | null>(null);
+  const latestInitiateCallRef = useRef<((type: 'audio' | 'video', targetId?: string, targetName?: string, targetAvatar?: string) => Promise<void>) | null>(null);
+  const latestAcceptCallRef = useRef<(() => Promise<void>) | null>(null);
   useEffect(() => {
     latestInitiateCallRef.current = initiateCall;
+    latestAcceptCallRef.current = acceptIncomingCall;
   });
 
   if (callState === 'idle') return null;
 
+  // Floating Minimized Call Widget
+  if (isMinimized && callState === 'connected') {
+    return (
+      <div className="fixed bottom-24 right-4 z-[9999] bg-zinc-950 border border-zinc-700 shadow-2xl rounded-2xl p-2.5 flex items-center gap-3 text-white backdrop-blur-md animate-fade-in">
+        <div className="hidden">
+          <video ref={remoteVideoRef} autoPlay playsInline />
+          <video ref={localVideoRef} autoPlay playsInline muted />
+        </div>
+        <div 
+          onClick={() => setIsMinimized(false)}
+          className="flex items-center gap-2.5 cursor-pointer hover:opacity-90 transition-opacity"
+        >
+          <div className="w-9 h-9 rounded-full overflow-hidden border border-emerald-500/50 relative flex-shrink-0">
+            <img src={partner.avatar} alt={partner.name} className="w-full h-full object-cover" />
+          </div>
+          <div className="flex flex-col">
+            <span className="text-xs font-bold truncate max-w-[90px]">{partner.name}</span>
+            <div className="flex items-center gap-1.5 text-[11px] text-emerald-400 font-mono">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+              {formatDuration(callDuration)}
+            </div>
+          </div>
+        </div>
+
+        <button
+          onClick={() => setIsMinimized(false)}
+          className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300"
+          title="Expand Call"
+        >
+          <Maximize2 className="w-4 h-4" />
+        </button>
+        <button
+          onClick={endCall}
+          className="w-8 h-8 rounded-full bg-red-600 hover:bg-red-500 text-white flex items-center justify-center shadow"
+          title="End Call"
+        >
+          <PhoneOff className="w-4 h-4" />
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md animate-fade-in font-sans select-none text-white p-4">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/85 backdrop-blur-md animate-fade-in font-sans select-none text-white p-4">
       <div className="w-full max-w-lg bg-zinc-950 border border-zinc-800 rounded-3xl overflow-hidden shadow-2xl relative flex flex-col h-[85vh] max-h-[750px]">
+        
+        {/* Minimize Button when Connected */}
+        {callState === 'connected' && (
+          <button 
+            onClick={() => setIsMinimized(true)}
+            className="absolute top-4 right-4 z-30 p-2 rounded-full bg-black/50 hover:bg-black/80 text-zinc-200 backdrop-blur-xs transition-colors"
+            title="Minimize Call"
+          >
+            <Minimize2 className="w-5 h-5" />
+          </button>
+        )}
         
         {/* Ringing / Outgoing Calling / Incoming Calling Screens */}
         {(callState === 'calling' || callState === 'ringing' || callState === 'incoming' || callState === 'failed') && (

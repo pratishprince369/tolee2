@@ -181,6 +181,29 @@ async function triggerPushNotification(receiverId, callerId, callerName, callerA
   }
 }
 
+// Helper to dismiss call push notifications on remote devices when call ends or cancels
+async function triggerPushDismissal(receiverId, callId) {
+  try {
+    const webUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://tolee.in';
+    const secret = process.env.INTERNAL_API_SECRET || 'internal-tolee-secret-calling-2026';
+    
+    await fetch(`${webUrl}/api/notifications/send-call-push`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${secret}`
+      },
+      body: JSON.stringify({
+        action: 'dismiss',
+        receiverId,
+        callId
+      })
+    });
+  } catch (err) {
+    console.error('[Signaling] Failed to send push dismissal to receiver:', err);
+  }
+}
+
 // Helper to log a call as a chat message in DB
 async function logCallAsChatMessage(callerId, receiverId, type, status, duration) {
   try {
@@ -475,6 +498,9 @@ io.on('connection', (socket) => {
         // Log missed call in chat messages
         await logCallAsChatMessage(callerId, toUserId, type, 'missed', 0);
 
+        // Dismiss push notification on remote devices
+        await triggerPushDismissal(toUserId, callId);
+
         activeCalls.delete(callId);
       }
     }, 35000);
@@ -558,6 +584,9 @@ io.on('connection', (socket) => {
     // Log call rejection/busy in chat messages
     await logCallAsChatMessage(callInfo.callerId, callInfo.receiverId, callInfo.type, reason === 'busy' ? 'busy' : 'declined', 0);
     
+    // Dismiss push notification on remote devices
+    await triggerPushDismissal(callInfo.receiverId, callId);
+
     activeCalls.delete(callId);
   });
 
@@ -609,6 +638,9 @@ io.on('connection', (socket) => {
       }
     });
 
+    // Dismiss push notification on remote devices
+    await triggerPushDismissal(callInfo.receiverId, callId);
+
     // Log call connected / missed status in chat messages
     if (callInfo.status !== 'connected') {
       await logCallAsChatMessage(callInfo.callerId, callInfo.receiverId, callInfo.type, 'missed', 0);
@@ -617,6 +649,25 @@ io.on('connection', (socket) => {
     }
  
     activeCalls.delete(callId);
+  });
+
+  // 6.5. Check Status of a Call
+  socket.on('check-call-status', async ({ callId }, callback) => {
+    if (!callId) {
+      if (typeof callback === 'function') callback({ status: 'not-found' });
+      return;
+    }
+    const activeCall = activeCalls.get(callId);
+    if (activeCall) {
+      if (typeof callback === 'function') callback({ status: activeCall.status, type: activeCall.type });
+    } else {
+      try {
+        const dbCall = await prisma.call.findUnique({ where: { id: callId } });
+        if (typeof callback === 'function') callback({ status: dbCall ? dbCall.status : 'ended' });
+      } catch (err) {
+        if (typeof callback === 'function') callback({ status: 'ended' });
+      }
+    }
   });
 
   // 7. Check Presence Status of a User

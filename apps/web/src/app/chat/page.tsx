@@ -78,7 +78,6 @@ import {
   incrementShootClick 
 } from '@/actions/shoot';
 import { getCallLogs, deleteCallLog } from '@/actions/calls';
-import { CallInterface } from '@/components/CallInterface';
 import {
   Dialog,
   DialogContent,
@@ -1628,7 +1627,12 @@ export default function ChatPage() {
       return;
     }
     if (typeof window !== 'undefined' && (window as any).startOutgoingCall) {
-      (window as any).startOutgoingCall(type);
+      (window as any).startOutgoingCall(
+        type, 
+        activeChatDetails.otherUserId, 
+        activeChatDetails.name, 
+        activeChatDetails.avatar
+      );
     } else {
       alert("Calling system is initializing. Please try again in a moment.");
     }
@@ -4934,12 +4938,6 @@ export default function ChatPage() {
         />
       )}
 
-      {/* ── Call Interface System ── */}
-      <CallInterface 
-        activeRecipientId={activeChatDetails?.isGroup ? null : activeChatDetails?.otherUserId}
-        activeRecipientName={activeChatDetails?.name}
-        activeRecipientAvatar={activeChatDetails?.avatar}
-      />
 
       {/* ── Call History Logs Modal ── */}
       {showCallLogsModal && (

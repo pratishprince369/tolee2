@@ -10,7 +10,24 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { receiverId, callerId, callerName, callerAvatar, callType, callId } = body;
+    const { action, receiverId, callerId, callerName, callerAvatar, callType, callId } = body;
+
+    // Handle background notification dismissal when call ends or times out
+    if (action === 'dismiss') {
+      if (receiverId && callId) {
+        console.log(`[send-call-push] Sending call dismissal to user: ${receiverId}, callId: ${callId}`);
+        await sendPushNotification(
+          receiverId,
+          '',
+          '',
+          {
+            type: 'call_ended',
+            callId
+          }
+        );
+      }
+      return NextResponse.json({ success: true });
+    }
 
     if (!receiverId || !callerId || !callerName) {
       return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });

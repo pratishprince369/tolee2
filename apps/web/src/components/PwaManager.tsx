@@ -50,7 +50,7 @@ export function PwaManager() {
     const standalone = checkStandalone();
 
     // 2. Register Service Worker in production/development
-    if ('serviceWorker' in navigator && !standalone) {
+    if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js')
         .then((reg) => {
           console.log('[PWA SW] Registered successfully: ', reg.scope);

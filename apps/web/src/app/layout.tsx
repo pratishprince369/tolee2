@@ -81,6 +81,7 @@ import { ApkPromoManager } from "@/components/ApkPromoManager";
 import { PwaManager } from "@/components/PwaManager";
 import { MediaPickerModal } from "@/components/MediaPickerModal";
 import { GlobalAlarmListener } from "@/components/GlobalAlarmListener";
+import { CallInterface } from "@/components/CallInterface";
 import { DraftsReminderBanner } from "@/components/DraftsReminderBanner";
 import { OfflineSmartPocketBanner } from "@/components/OfflineSmartPocketBanner";
 import AnalyticsTracker from "@/components/AnalyticsTracker";
@@ -272,6 +273,7 @@ export default async function RootLayout({
           <RoutePrefetcher />
           <OfflineSmartPocketBanner />
           <GlobalAlarmListener />
+          <CallInterface />
           <OnboardingModal />
           <OnboardingReminder />
           <AdsWalletWelcomeModal />
