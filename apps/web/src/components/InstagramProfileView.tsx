@@ -958,8 +958,6 @@ export function InstagramProfileView({
         {/* ===== COVER IMAGE ===== */}
         <div className="relative w-full h-[200px] sm:h-[260px] md:h-[300px] sm:rounded-2xl overflow-hidden shadow-sm sm:mt-4 group z-10">
           <img src={getValidCoverUrl(user.coverImage)} alt="Cover" className="w-full h-full object-cover" />
-          {/* Gradient fade bottom — pointer-events-none so it never blocks button clicks */}
-          <div className="absolute bottom-0 inset-x-0 h-16 bg-gradient-to-t from-[#f5f5f5] to-transparent pointer-events-none" />
           {/* Back button (Mobile/Desktop) */}
           <button
             type="button"
