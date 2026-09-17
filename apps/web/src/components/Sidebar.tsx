@@ -145,8 +145,9 @@ export function Sidebar() {
     if (!isAuthenticated) return;
 
     const fetchSidebar = () => {
-      getSidebarDataCached(true).then((res: any) => {
-        if (res.success) {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      getSidebarDataCached(false).then((res: any) => {
+        if (res?.success) {
           setData({
             managedTolees: res.managedTolees || [],
             joinedTolees: res.joinedTolees || [],
@@ -155,16 +156,18 @@ export function Sidebar() {
             isVerifiedCreator: res.isVerifiedCreator || false,
           });
         }
-      });
+      }).catch(() => {});
     };
 
     fetchSidebar();
-    const interval = setInterval(fetchSidebar, 5000);
+    const interval = setInterval(fetchSidebar, 30000);
     window.addEventListener('tolee_notification_refresh', fetchSidebar);
+    document.addEventListener('visibilitychange', fetchSidebar);
 
     return () => {
       clearInterval(interval);
       window.removeEventListener('tolee_notification_refresh', fetchSidebar);
+      document.removeEventListener('visibilitychange', fetchSidebar);
     };
   }, [isAuthenticated, pathname]);
 

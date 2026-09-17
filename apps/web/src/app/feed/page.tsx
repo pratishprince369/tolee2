@@ -33,26 +33,47 @@ export default async function GlobalFeedPage() {
   
   const currentUserId = (session?.user as any)?.id;
 
-  // 🛡️ Bandwidth Safeguard: Auto-publish fresh news & videos only if latest AI post is older than 6 hours (Max 10/day)
-  try {
-    const latestAIPost = await prismaAI.post.findFirst({
-      where: { isArchived: false, status: 'published' },
-      orderBy: { createdAt: 'desc' },
-      select: { createdAt: true }
-    });
-    const timeSince = latestAIPost ? Date.now() - new Date(latestAIPost.createdAt).getTime() : Infinity;
-    if (timeSince > 6 * 60 * 60 * 1000) { // 6 hours interval
-      publishDailyNewsBatch(false).catch(() => {});
-      publishYouTubeVideosBatch(false).catch(() => {});
-    }
-  } catch (e) {}
+  // 🛡️ Bandwidth Safeguard: Auto-publish fresh news & videos in background (non-blocking)
+  void (async () => {
+    try {
+      const latestAIPost = await prismaAI.post.findFirst({
+        where: { isArchived: false, status: 'published' },
+        orderBy: { createdAt: 'desc' },
+        select: { createdAt: true }
+      });
+      const timeSince = latestAIPost ? Date.now() - new Date(latestAIPost.createdAt).getTime() : Infinity;
+      if (timeSince > 6 * 60 * 60 * 1000) { // 6 hours interval
+        publishDailyNewsBatch(false).catch(() => {});
+        publishYouTubeVideosBatch(false).catch(() => {});
+      }
+    } catch (e) {}
+  })();
 
-  // Fetch real posts from Main DB
+  // Fetch real posts from Main DB and AI posts from AI DB concurrently
   let dbPosts: any[] = [];
   try {
-    const res = await getPosts();
-    if (res.success && res.posts) {
-      const authorIds = res.posts.map(p => p.author?.id).filter(Boolean);
+    const aiPostsPromise = prismaAI.post.findMany({
+      where: { isArchived: false, status: 'published' },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+      select: {
+        id: true, caption: true, postType: true, mediaUrls: true, mediaTypes: true,
+        visibility: true, createdAt: true, isAnonymous: true, location: true, subLocation: true,
+        title: true, price: true, currency: true, category: true, condition: true, locationText: true,
+        newsRelation: { select: { id: true, headline: true, slug: true, summary: true, category: true, readingTime: true, language: true, sourceUrl: true, viewsCount: true } },
+        author: { select: { id: true, name: true, username: true, avatar: true } },
+        tolees: { select: { tolee: { select: { name: true, slug: true, ownerId: true } } } },
+        _count: { select: { likes: true, comments: true, views: true } },
+      }
+    }).catch((err) => {
+      console.error("Failed to load AI posts from tolee-1", err);
+      return [];
+    });
+
+    const [res, aiPosts] = await Promise.all([getPosts(), aiPostsPromise]);
+
+    if (res?.success && res.posts) {
+      const authorIds = res.posts.map((p: any) => p.author?.id).filter(Boolean);
 
       // Query follow statuses of these authors for the current user
       let followedAuthorIds: string[] = [];
@@ -69,7 +90,7 @@ export default async function GlobalFeedPage() {
         pendingFollowAuthorIds = follows.filter((f: any) => f.status === 'pending').map((f: any) => f.followingId);
       }
 
-      dbPosts = res.posts.map(post => {
+      dbPosts = res.posts.map((post: any) => {
         // Find the first tolee name
         const firstTolee = post.tolees?.[0]?.tolee;
         const likedByMe = currentUserId ? post.likes?.some((like: any) => like.userId === currentUserId) : false;
@@ -135,28 +156,8 @@ export default async function GlobalFeedPage() {
         };
       });
     }
-  } catch (err) {
-    console.error("Failed to load DB posts", err);
-  }
 
-  // 🛡️ Fetch AI news/video posts from tolee-1 AI Database and merge into feed
-  try {
-    const aiPosts = await prismaAI.post.findMany({
-      where: { isArchived: false, status: 'published' },
-      orderBy: { createdAt: 'desc' },
-      take: 20,
-      select: {
-        id: true, caption: true, postType: true, mediaUrls: true, mediaTypes: true,
-        visibility: true, createdAt: true, isAnonymous: true, location: true, subLocation: true,
-        title: true, price: true, currency: true, category: true, condition: true, locationText: true,
-        newsRelation: { select: { id: true, headline: true, slug: true, summary: true, category: true, readingTime: true, language: true, sourceUrl: true, viewsCount: true } },
-        author: { select: { id: true, name: true, username: true, avatar: true } },
-        tolees: { select: { tolee: { select: { name: true, slug: true, ownerId: true } } } },
-        _count: { select: { likes: true, comments: true, views: true } },
-      }
-    });
-
-    const aiPostsMapped = aiPosts.map((post: any) => {
+    const aiPostsMapped = (aiPosts || []).map((post: any) => {
       const firstTolee = post.tolees?.[0]?.tolee;
       return {
         id: post.id,

@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useSession, signOut } from 'next-auth/react';
-import { getSidebarData } from '@/actions/user';
+import { getSidebarDataCached } from '@/lib/sidebar-data';
 import { SearchInput } from './SearchInput';
 import { cn } from '@/lib/utils';
 import { getDrafts } from '@/lib/draftManager';
@@ -50,14 +50,15 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
     if (!session?.user) return;
 
     const fetchCounts = () => {
-      getSidebarData().then(res => {
-        if (res.success) {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      getSidebarDataCached().then((res: any) => {
+        if (res?.success) {
           setCounts({ 
             notifications: res.unreadNotifications || 0, 
             messages: res.unreadMessages || 0 
           });
-          setFranchiseStatus((res as any).franchiseStatus || null);
-          const mod = (res as any).moderation;
+          setFranchiseStatus(res.franchiseStatus || null);
+          const mod = res.moderation;
           if (mod) {
             const hasRest = mod.postingRestricted || 
                            mod.messagingRestricted || 
@@ -68,16 +69,18 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
             setIsRestricted(!!hasRest);
           }
         }
-      });
+      }).catch(() => {});
     };
 
     fetchCounts();
-    const interval = setInterval(fetchCounts, 5000); // 5s realtime notification polling
+    const interval = setInterval(fetchCounts, 30000); // 30s throttled polling
     window.addEventListener('tolee_notification_refresh', fetchCounts);
+    document.addEventListener('visibilitychange', fetchCounts);
 
     return () => {
       clearInterval(interval);
       window.removeEventListener('tolee_notification_refresh', fetchCounts);
+      document.removeEventListener('visibilitychange', fetchCounts);
     };
   }, [session, pathname]);
 
@@ -203,6 +206,8 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
               variant="ghost" 
               size="icon" 
               onClick={() => router.push('/search')}
+              onTouchStart={() => router.prefetch('/search')}
+              onMouseEnter={() => router.prefetch('/search')}
               className={cn(
                 "rounded-full md:hidden flex items-center justify-center h-8.5 w-8.5 xs:h-9 xs:w-9 flex-shrink-0 transition-all active:scale-95",
                 pathname.startsWith('/search') 
@@ -220,6 +225,8 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
               variant="ghost" 
               size="icon" 
               onClick={() => router.push('/radar')}
+              onTouchStart={() => router.prefetch('/radar')}
+              onMouseEnter={() => router.prefetch('/radar')}
               className={cn(
                 "rounded-full md:hidden flex items-center justify-center h-8.5 w-8.5 xs:h-9 xs:w-9 flex-shrink-0 transition-all active:scale-95",
                 pathname.startsWith('/radar') 
@@ -237,6 +244,8 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
               variant="ghost" 
               size="icon" 
               onClick={() => router.push('/ai-manager')}
+              onTouchStart={() => router.prefetch('/ai-manager')}
+              onMouseEnter={() => router.prefetch('/ai-manager')}
               className={cn(
                 "rounded-full md:hidden flex items-center justify-center h-8.5 w-8.5 xs:h-9 xs:w-9 flex-shrink-0 transition-all active:scale-95 relative",
                 pathname.startsWith('/ai-manager') 
@@ -338,6 +347,8 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
               variant="ghost"
               size="icon"
               onClick={() => router.push('/notifications')}
+              onTouchStart={() => router.prefetch('/notifications')}
+              onMouseEnter={() => router.prefetch('/notifications')}
               className={cn(
                 "rounded-full md:hidden flex items-center justify-center h-8.5 w-8.5 xs:h-9 xs:w-9 flex-shrink-0 transition-all active:scale-95 relative",
                 pathname.startsWith('/notifications')
@@ -371,8 +382,8 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
               <Plus className="w-4.5 h-4.5 xs:w-5 xs:h-5 stroke-[2.5]" />
             </button>
 
-            {/* Unified Avatar Dropdown (Both Mobile & Desktop) */}
-            <div className="flex items-center">
+            {/* Unified Avatar Dropdown (Desktop/Tablet Only — on mobile DP is in bottom nav, replaced by + button here) */}
+            <div className="hidden md:flex items-center">
               <DropdownMenu>
                 <DropdownMenuTrigger className="relative h-8 w-8 xs:h-9 xs:w-9 sm:h-10 sm:w-10 rounded-full flex items-center justify-center hover:bg-gray-50 dark:hover:bg-zinc-900/50 transition-colors focus:outline-none">
                   <Avatar className="h-7 w-7 xs:h-8 xs:w-8 sm:h-9 sm:w-9 border border-gray-200 dark:border-zinc-800 hover:border-primary transition-colors cursor-pointer">

@@ -126,7 +126,10 @@ export function GlobalAlarmListener() {
     };
 
     checkAlarmsAndNotifications();
-    const interval = setInterval(checkAlarmsAndNotifications, 4000);
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      checkAlarmsAndNotifications();
+    }, 20000);
     return () => clearInterval(interval);
   }, [session, activeAlarm]);
 

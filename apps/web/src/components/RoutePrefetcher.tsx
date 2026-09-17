@@ -27,20 +27,21 @@ export function RoutePrefetcher() {
       };
 
       // Intelligent Context-based prefetching
+      const coreRoutes = ['/feed', '/discover', '/reels', '/chat', '/u/me', '/radar', '/search', '/notifications', '/marketplace', '/ai-manager'];
+      
       if (pathname === '/feed') {
-        prefetchRoutes(['/discover', '/reels', '/chat']);
+        prefetchRoutes(['/discover', '/reels', '/chat', '/u/me', '/radar']);
       } else if (pathname === '/chat') {
-        prefetchRoutes(['/feed', '/notifications']);
+        prefetchRoutes(['/feed', '/notifications', '/u/me']);
       } else if (pathname === '/reels') {
-        prefetchRoutes(['/feed', '/discover']);
+        prefetchRoutes(['/feed', '/discover', '/u/me']);
       } else {
-        // Fallback prefetching for main pages from other tabs
-        prefetchRoutes(['/feed', '/discover', '/reels', '/chat', '/notifications', '/marketplace', '/ai-manager']);
+        prefetchRoutes(coreRoutes);
       }
     };
 
-    // Delay prefetching slightly on route mount to let the current page finish rendering and animations
-    const timer = setTimeout(runPrefetch, 600);
+    // Prefetch during idle browser time
+    const timer = setTimeout(runPrefetch, 250);
     return () => clearTimeout(timer);
   }, [pathname, router]);
 

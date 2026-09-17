@@ -290,6 +290,7 @@ export function BottomNav() {
           <Link 
             key={item.name} 
             href={item.href} 
+            prefetch={true}
             onClick={() => setClickedPath(item.href)}
             className="relative w-full h-full flex flex-col items-center justify-center tap-feedback select-none"
           >
