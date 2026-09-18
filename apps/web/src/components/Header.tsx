@@ -243,7 +243,7 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
               <img 
                 src="/sports/cricket-icon.png" 
                 alt="Tolee Sports" 
-                className="w-4.5 h-4.5 xs:w-5 xs:h-5 object-contain dark:brightness-0 dark:invert transition-transform" 
+                className="h-5 w-5 xs:h-5.5 xs:w-5.5 object-contain dark:brightness-0 dark:invert transition-transform" 
               />
             </Button>
 
@@ -510,7 +510,7 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
               <img 
                 src="/sports/cricket-icon.png" 
                 alt="Tolee Sports" 
-                className="w-4.5 h-4.5 xs:w-5 xs:h-5 object-contain dark:brightness-0 dark:invert transition-transform" 
+                className="h-5 w-5 xs:h-5.5 xs:w-5.5 object-contain dark:brightness-0 dark:invert transition-transform" 
               />
             </Button>
             <Link href="/auth/signin">
