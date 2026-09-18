@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Search, Bell, MessageCircle, LogOut, User, Settings, Compass, Store, Globe, Heart, Bot, Zap, MessageSquare, Briefcase, Award, FileText, Radio, Wallet, Plus } from 'lucide-react';
+import { Search, Bell, MessageCircle, LogOut, User, Settings, Compass, Store, Globe, Heart, Bot, Zap, MessageSquare, Briefcase, Award, FileText, Radio, Wallet, Plus, Trophy } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -205,6 +205,25 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
           <div className="w-8 h-8 xs:w-9 xs:h-9 sm:w-10 sm:h-10 rounded-full bg-gray-200 dark:bg-gray-800 animate-pulse" />
         ) : session?.user ? (
           <>
+            {/* Mobile Dedicated Sports Icon Button (next to search button) */}
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => router.push('/sports')}
+              onTouchStart={() => router.prefetch('/sports')}
+              onMouseEnter={() => router.prefetch('/sports')}
+              className={cn(
+                "rounded-full md:hidden flex items-center justify-center h-8.5 w-8.5 xs:h-9 xs:w-9 flex-shrink-0 transition-all active:scale-95",
+                pathname.startsWith('/sports') 
+                  ? 'text-primary bg-primary/10 border border-primary/20' 
+                  : 'text-gray-700 dark:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-800'
+              )}
+              aria-label="Tolee Sports"
+              title="Tolee Sports"
+            >
+              <Trophy className="w-4.5 h-4.5 xs:w-5 xs:h-5 text-gray-700 dark:text-zinc-200" />
+            </Button>
+
             {/* Mobile Dedicated Search Icon Button */}
             <Button 
               variant="ghost" 
@@ -439,6 +458,10 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
                       EARNINGS
                     </span>
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => router.push('/sports')} className="cursor-pointer flex w-full items-center">
+                    <Trophy className="mr-2 h-4 w-4 text-teal-600 dark:text-teal-400" />
+                    <span>Tolee Sports</span>
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => router.push('/my-tolees')} className="cursor-pointer flex w-full items-center">
                     <Globe className="mr-2 h-4 w-4" />
                     <span>My Tolees</span>
@@ -460,6 +483,17 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
           </>
         ) : (
           <div className="flex items-center gap-1.5 sm:gap-3">
+            {/* Mobile Sports Button for guests */}
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => router.push('/sports')}
+              className="rounded-full md:hidden flex items-center justify-center h-8.5 w-8.5 xs:h-9 xs:w-9 flex-shrink-0 text-gray-700 dark:text-zinc-200"
+              aria-label="Tolee Sports"
+              title="Tolee Sports"
+            >
+              <Trophy className="w-4.5 h-4.5 xs:w-5 xs:h-5" />
+            </Button>
             {/* Mobile Search Button for guests */}
             <Button 
               variant="ghost" 

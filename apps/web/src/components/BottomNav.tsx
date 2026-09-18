@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Home, Compass, Film, MessageCircle, Menu, User, Settings, Globe, Store, LogOut, MessageSquare, Map, Radio, Briefcase, Award, Newspaper, Tv, Bot, Bell, Megaphone, Zap, HelpCircle, FileText, Wallet, Sparkles } from 'lucide-react';
+import { Home, Compass, Film, MessageCircle, Menu, User, Settings, Globe, Store, LogOut, MessageSquare, Map, Radio, Briefcase, Award, Newspaper, Tv, Bot, Bell, Megaphone, Zap, HelpCircle, FileText, Wallet, Sparkles, Trophy } from 'lucide-react';
 import { useSession, signOut } from 'next-auth/react';
 import { getSidebarDataCached } from '@/lib/sidebar-data';
 import { getDrafts } from '@/lib/draftManager';
@@ -175,6 +175,10 @@ export function BottomNav() {
                 <DropdownMenuItem onClick={() => { setClickedPath('/darshan'); router.push('/darshan'); }} className={getDropdownItemClass('/darshan')}>
                   <NamasteIcon className={getDropdownIconClass('/darshan')} />
                   <span>Live Darshan</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { setClickedPath('/sports'); router.push('/sports'); }} className={getDropdownItemClass('/sports')}>
+                  <Trophy className={getDropdownIconClass('/sports')} />
+                  <span>Tolee Sports</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => { setClickedPath('/ai-manager'); router.push('/ai-manager'); }} className={getDropdownItemClass('/ai-manager')}>
                   <div className="flex items-center justify-between w-full">

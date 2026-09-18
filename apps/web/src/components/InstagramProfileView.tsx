@@ -956,7 +956,7 @@ export function InstagramProfileView({
       <div className="max-w-[935px] w-full mx-auto pb-32 px-0">
 
         {/* ===== COVER IMAGE ===== */}
-        <div className="relative w-full h-[200px] sm:h-[260px] md:h-[300px] overflow-hidden shadow-sm group z-10">
+        <div className="relative w-full h-[200px] sm:h-[260px] md:h-[300px] overflow-hidden shadow-sm group z-20">
           <img src={getValidCoverUrl(user.coverImage)} alt="Cover" className="w-full h-full object-cover" />
           {/* Back button (Mobile/Desktop) */}
           <button
@@ -981,10 +981,9 @@ export function InstagramProfileView({
             <span className="text-white text-[13px] font-semibold truncate max-w-[160px]">{user.username || 'user'}</span>
             <ChevronDown className="w-3.5 h-3.5 text-white/80 flex-shrink-0" />
           </div>
-          {/* Edit Cover — label directly triggers input (works on all mobile/WebView) */}
+          {/* Edit Cover */}
           {isMe && (
             <>
-              {/* File input: opacity-0 but sized/positioned to sit exactly under the label */}
               <input
                 id="cover-file-input"
                 type="file"
@@ -992,32 +991,22 @@ export function InstagramProfileView({
                 ref={coverInputRef}
                 onChange={(e) => handleFileChange(e, 'coverImage')}
                 disabled={isUploading}
-                style={{
-                  position: 'absolute',
-                  bottom: '12px',
-                  right: '12px',
-                  width: '120px',
-                  height: '36px',
-                  opacity: 0,
-                  zIndex: 50,
-                  cursor: 'pointer',
-                }}
+                style={{ display: 'none' }}
               />
-              {/* Visual button — purely decorative, sits behind the transparent input */}
-              <label
-                htmlFor="cover-file-input"
-                style={{
-                  position: 'absolute',
-                  bottom: '12px',
-                  right: '12px',
-                  zIndex: 45,
-                  pointerEvents: 'none',
+              <button
+                type="button"
+                onClick={() => {
+                  if (coverInputRef.current) {
+                    coverInputRef.current.click();
+                  }
                 }}
-                className="bg-black/50 text-white backdrop-blur-sm px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-lg border border-white/20 cursor-pointer select-none"
+                disabled={isUploading}
+                aria-label="Edit Cover"
+                className="absolute bottom-3 right-3 z-30 bg-black/60 hover:bg-black/80 active:scale-95 text-white backdrop-blur-sm px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-lg border border-white/20 cursor-pointer select-none transition-all"
               >
                 <Camera className="w-3.5 h-3.5" />
-                {isUploading ? 'Uploading...' : 'Edit Cover'}
-              </label>
+                <span>{isUploading ? 'Uploading...' : 'Edit Cover'}</span>
+              </button>
             </>
           )}
         </div>
@@ -1026,8 +1015,8 @@ export function InstagramProfileView({
         <div className="max-w-[640px] mx-auto w-full px-4 sm:px-0">
 
           {/* ===== PROFILE DP (overlapping cover bottom) ===== */}
-          <div className="flex justify-center -mt-[54px] sm:-mt-[60px] mb-3 z-10 relative">
-            <div className="relative group">
+          <div className="flex justify-center -mt-[54px] sm:-mt-[60px] mb-3 z-20 relative pointer-events-none">
+            <div className="relative group pointer-events-auto">
               <div 
                 onClick={() => {
                   if (userActiveStories.length > 0) {
