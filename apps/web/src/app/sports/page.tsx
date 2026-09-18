@@ -7,7 +7,7 @@ import {
   Trophy, Search, Flame, Calendar, Clock, MapPin, 
   ChevronRight, ChevronLeft, RefreshCw, Radio, Sparkles, Filter, Award,
   Activity, Shield, CheckCircle2, AlertCircle, Bell, Play, Tv, ExternalLink,
-  Share2, Star, Crown, ChevronDown, Check, Volume2, X
+  Share2, Star, Crown, ChevronDown, Check, Volume2, X, SlidersHorizontal
 } from 'lucide-react';
 import { SportsEventData, SportsCategoryData } from '@/lib/sports/types';
 
@@ -206,9 +206,12 @@ export default function SportsPage() {
   const [activeReminders, setActiveReminders] = useState<Record<string, boolean>>({});
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [watchLiveModal, setWatchLiveModal] = useState<SportsEventData | null>(null);
+  const [showFilterModal, setShowFilterModal] = useState(false);
 
   const categoryScrollRef = useRef<HTMLDivElement>(null);
+  const mobileCategoryScrollRef = useRef<HTMLDivElement>(null);
   const leaguesScrollRef = useRef<HTMLDivElement>(null);
+  const mobileLeaguesScrollRef = useRef<HTMLDivElement>(null);
 
   // Fetch Categories
   useEffect(() => {
@@ -313,52 +316,41 @@ export default function SportsPage() {
         </div>
       )}
 
-      {/* ── 1. SPORTS HEADER & SUB-NAV ── */}
-      <div className="border-b border-[#141d2d] bg-[#070b14]/95 backdrop-blur-md px-4 lg:px-8 py-3 sticky top-16 z-30 shadow-md">
-        <div className="max-w-[1440px] mx-auto flex flex-col md:flex-row items-center justify-between gap-3 sm:gap-4">
+      {/* ══════════════════════════════════════════════════════════════════════════
+          1. HEADER SECTION
+          - Desktop (md: and up): Horizontal sub-header with brand, search, filter, notifications & user
+          - Mobile (< md): Title bar with Trophy icon + LIVE pill, followed by full-width search input
+         ══════════════════════════════════════════════════════════════════════════ */}
+      
+      {/* ── Desktop Sub-Header (md: and up) ── */}
+      <div className="hidden md:block border-b border-[#141d2d] bg-[#070b14]/95 backdrop-blur-md px-4 lg:px-8 py-3 sticky top-16 z-30 shadow-md">
+        <div className="max-w-[1440px] mx-auto flex items-center justify-between gap-4">
           
           {/* Brand & LIVE Badge */}
-          <div className="flex items-center justify-between w-full md:w-auto gap-3">
-            <Link href="/sports" className="flex items-center gap-2.5 group">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-500 via-teal-400 to-cyan-400 flex items-center justify-center shadow-lg shadow-emerald-500/25 group-hover:scale-105 transition-transform">
-                <Trophy className="w-5 h-5 text-zinc-950 font-bold" />
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xl sm:text-2xl font-black tracking-tight text-white group-hover:text-emerald-300 transition-colors">
-                  Tolee Sports
-                </span>
-                <span className="bg-[#e62525] text-white text-[10px] font-black uppercase px-2 py-0.5 rounded-md tracking-wider flex items-center gap-1 shadow-sm shadow-red-500/30">
-                  <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                  LIVE
-                </span>
-              </div>
-            </Link>
-
-            {/* Mobile quick icons */}
-            <div className="flex items-center gap-2 md:hidden">
-              <button
-                onClick={() => fetchEvents(true)}
-                className="p-2 rounded-lg bg-[#0e1626] border border-[#1b273d] text-zinc-300 hover:text-white"
-                title="Refresh"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-emerald-400' : ''}`} />
-              </button>
-              <button className="relative p-2 rounded-lg bg-[#0e1626] border border-[#1b273d] text-zinc-300">
-                <Bell className="w-3.5 h-3.5" />
-                <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-red-500 text-white rounded-full text-[8px] font-bold flex items-center justify-center">3</span>
-              </button>
+          <Link href="/sports" className="flex items-center gap-2.5 group flex-shrink-0">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-500 via-teal-400 to-cyan-400 flex items-center justify-center shadow-lg shadow-emerald-500/25 group-hover:scale-105 transition-transform">
+              <Trophy className="w-5 h-5 text-zinc-950 font-bold" />
             </div>
-          </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xl font-black tracking-tight text-white group-hover:text-emerald-300 transition-colors">
+                Tolee Sports
+              </span>
+              <span className="bg-[#e62525] text-white text-[10px] font-black uppercase px-2 py-0.5 rounded-md tracking-wider flex items-center gap-1 shadow-sm shadow-red-500/30">
+                <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                LIVE
+              </span>
+            </div>
+          </Link>
 
           {/* Search Bar */}
-          <div className="w-full md:max-w-xl relative">
+          <div className="flex-1 max-w-xl relative">
             <Search className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               placeholder="Search teams, players, leagues, or matches..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="w-full bg-[#0c1424] border border-[#1a263c] hover:border-[#273957] focus:border-emerald-500/80 rounded-xl pl-10 pr-8 py-2 text-xs sm:text-sm text-zinc-100 placeholder-zinc-500 outline-none transition-all shadow-inner"
+              className="w-full bg-[#0c1424] border border-[#1a263c] hover:border-[#273957] focus:border-emerald-500/80 rounded-xl pl-10 pr-8 py-2 text-sm text-zinc-100 placeholder-zinc-500 outline-none transition-all shadow-inner"
             />
             {searchQuery && (
               <button
@@ -371,8 +363,7 @@ export default function SportsPage() {
           </div>
 
           {/* Right Controls: Category Dropdown + Notifications + Profile */}
-          <div className="hidden md:flex items-center gap-3">
-            {/* Category Dropdown */}
+          <div className="flex items-center gap-3">
             <div className="relative">
               <select
                 value={selectedCategory}
@@ -387,7 +378,6 @@ export default function SportsPage() {
               <ChevronDown className="w-3.5 h-3.5 text-zinc-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
 
-            {/* Refresh Button */}
             <button
               onClick={() => fetchEvents(true)}
               disabled={isRefreshing}
@@ -397,7 +387,6 @@ export default function SportsPage() {
               <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-emerald-400' : ''}`} />
             </button>
 
-            {/* Notification Bell */}
             <button className="relative p-2 rounded-xl bg-[#0c1424] border border-[#1a263c] hover:border-[#2a3c5d] text-zinc-400 hover:text-white transition-all">
               <Bell className="w-4 h-4" />
               <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[9px] font-bold flex items-center justify-center shadow-md shadow-red-500/50">
@@ -405,7 +394,6 @@ export default function SportsPage() {
               </span>
             </button>
 
-            {/* Profile Avatar / Login */}
             {session?.user ? (
               <Link href={`/u/${session.user.username || session.user.id || 'profile'}`} className="flex items-center gap-2 pl-1 group cursor-pointer">
                 <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-emerald-500 to-cyan-500 flex items-center justify-center text-xs font-bold text-zinc-950 overflow-hidden ring-1 ring-emerald-500/40">
@@ -433,82 +421,196 @@ export default function SportsPage() {
         </div>
       </div>
 
-      <div className="max-w-[1440px] mx-auto px-4 lg:px-8 mt-5">
+      {/* ── Mobile Title Row & Search Bar (< md, directly matching mobile reference) ── */}
+      <div className="block md:hidden px-4 pt-3 pb-2 space-y-3">
+        {/* Title row */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-emerald-500 via-teal-400 to-cyan-400 flex items-center justify-center shadow-md shadow-emerald-500/20">
+              <Trophy className="w-4 h-4 text-zinc-950 font-black" />
+            </div>
+            <h1 className="text-xl font-black tracking-tight text-white">
+              Tolee Sports
+            </h1>
+            <span className="bg-[#e62525] text-white text-[10px] font-black uppercase px-2 py-0.5 rounded-full tracking-wider flex items-center gap-1 shadow-sm">
+              <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+              LIVE
+            </span>
+          </div>
 
-        {/* ── 2. HERO BANNER: "LIVE SPORTS ALWAYS WITH YOU" ── */}
-        <div className="relative w-full rounded-2xl sm:rounded-3xl overflow-hidden border border-[#1b263b] bg-gradient-to-r from-[#070e1c] via-[#09152b] to-[#040812] shadow-2xl mb-6 min-h-[160px] sm:min-h-[200px] flex items-center">
+          <button
+            onClick={() => fetchEvents(true)}
+            className="p-1.5 rounded-lg bg-[#0e1626] border border-[#1b273d] text-zinc-300"
+            title="Refresh"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-emerald-400' : ''}`} />
+          </button>
+        </div>
+
+        {/* Mobile Full-Width Search Input */}
+        <div className="relative">
+          <Search className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            placeholder="Search teams, players, leagues, or matches..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="w-full bg-[#0c1424] border border-[#1a263c] rounded-xl pl-10 pr-8 py-2.5 text-xs text-zinc-100 placeholder-zinc-500 outline-none shadow-inner"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-500"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="max-w-[1440px] mx-auto px-4 lg:px-8 mt-2 md:mt-5">
+
+        {/* ══════════════════════════════════════════════════════════════════════════
+            2. HERO BANNER: "LIVE SPORTS ALWAYS WITH YOU"
+            - Desktop: Widescreen banner with side-by-side headline & star athlete circles
+            - Mobile: Compact responsive card with athlete montage and carousel dots at bottom
+           ══════════════════════════════════════════════════════════════════════════ */}
+        <div className="relative w-full rounded-2xl sm:rounded-3xl overflow-hidden border border-[#1b263b] bg-gradient-to-r from-[#070e1c] via-[#09152b] to-[#040812] shadow-2xl mb-5 sm:mb-6 flex flex-col justify-center">
           {/* Subtle Stadium Light Flare Backdrop */}
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(0,229,153,0.12),transparent_50%)] pointer-events-none" />
           <div className="absolute -top-24 -left-20 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute top-1/2 right-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
 
           {/* Banner Content */}
-          <div className="relative z-10 w-full px-6 py-6 sm:py-8 flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="relative z-10 w-full px-4 sm:px-6 py-4 sm:py-8 flex flex-col md:flex-row items-center justify-between gap-4 sm:gap-6">
             
             {/* Left Headline */}
-            <div className="max-w-xl text-center md:text-left">
+            <div className="w-full md:max-w-xl text-left">
               <div className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight uppercase leading-none">
                 <span className="text-white">LIVE </span>
                 <span className="text-[#00e599] drop-shadow-[0_0_20px_rgba(0,229,153,0.6)]">
                   SPORTS
                 </span>
-                <div className="text-white text-xl sm:text-3xl lg:text-4xl mt-1 tracking-wider">
+                <div className="text-white text-base sm:text-3xl lg:text-4xl mt-1 tracking-wider">
                   ALWAYS WITH YOU
                 </div>
               </div>
-              <p className="mt-2.5 text-xs sm:text-sm text-zinc-400 font-medium tracking-wide">
+              <p className="mt-1.5 sm:mt-2.5 text-[11px] sm:text-sm text-zinc-400 font-medium tracking-wide">
                 Scores • Schedules • News • Highlights • More
               </p>
             </div>
 
             {/* Right: Slogan & Sports Visuals */}
-            <div className="flex flex-col items-center md:items-end justify-center">
-              <div className="text-lg sm:text-2xl font-serif italic text-white/90 tracking-wide mb-2 text-center md:text-right drop-shadow-md">
+            <div className="w-full md:w-auto flex flex-col items-start md:items-end justify-center">
+              <div className="text-base sm:text-2xl font-serif italic text-white/90 tracking-wide mb-2 text-left md:text-right drop-shadow-md">
                 One Community Many Passions
               </div>
               
               {/* Composite sport star badges */}
-              <div className="flex items-center -space-x-3 mt-1">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 border-emerald-500/60 overflow-hidden shadow-lg shadow-emerald-500/20 bg-zinc-800">
+              <div className="flex items-center -space-x-2.5 sm:-space-x-3 mt-1">
+                <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-full border-2 border-emerald-500/60 overflow-hidden shadow-lg shadow-emerald-500/20 bg-zinc-800">
                   <img src="https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?w=100&auto=format&fit=crop&q=80" alt="Cricket" className="w-full h-full object-cover" />
                 </div>
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 border-red-500/60 overflow-hidden shadow-lg shadow-red-500/20 bg-zinc-800">
+                <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-full border-2 border-red-500/60 overflow-hidden shadow-lg shadow-red-500/20 bg-zinc-800">
                   <img src="https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=100&auto=format&fit=crop&q=80" alt="Football" className="w-full h-full object-cover" />
                 </div>
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 border-amber-500/60 overflow-hidden shadow-lg shadow-amber-500/20 bg-zinc-800">
+                <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-full border-2 border-amber-500/60 overflow-hidden shadow-lg shadow-amber-500/20 bg-zinc-800">
                   <img src="https://images.unsplash.com/photo-1546519638-68e109498ffc?w=100&auto=format&fit=crop&q=80" alt="Basketball" className="w-full h-full object-cover" />
                 </div>
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 border-cyan-500/60 overflow-hidden shadow-lg shadow-cyan-500/20 bg-zinc-800">
+                <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-full border-2 border-cyan-500/60 overflow-hidden shadow-lg shadow-cyan-500/20 bg-zinc-800">
                   <img src="https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?w=100&auto=format&fit=crop&q=80" alt="Tennis" className="w-full h-full object-cover" />
                 </div>
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 border-purple-500/60 overflow-hidden shadow-lg shadow-purple-500/20 bg-zinc-800">
+                <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-full border-2 border-purple-500/60 overflow-hidden shadow-lg shadow-purple-500/20 bg-zinc-800">
                   <img src="https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?w=100&auto=format&fit=crop&q=80" alt="F1" className="w-full h-full object-cover" />
                 </div>
               </div>
             </div>
 
           </div>
+
+          {/* Carousel Indicator Dots (Shown prominently on mobile as per reference) */}
+          <div className="flex items-center justify-center gap-1.5 pb-3">
+            <span className="w-5 h-1 rounded-full bg-[#00e599]" />
+            <span className="w-1.5 h-1.5 rounded-full bg-zinc-700" />
+            <span className="w-1.5 h-1.5 rounded-full bg-zinc-700" />
+            <span className="w-1.5 h-1.5 rounded-full bg-zinc-700" />
+          </div>
         </div>
 
-        {/* ── 3. SPORTS CATEGORY NAVIGATION (HORIZONTAL SCROLLABLE) ── */}
-        <div className="relative mb-6">
+        {/* ══════════════════════════════════════════════════════════════════════════
+            3. SPORTS CATEGORY NAVIGATION
+            - Mobile: Compact rounded square cards (icon on top, label below) with "More" button
+            - Desktop: Horizontal pill row with scroll buttons
+           ══════════════════════════════════════════════════════════════════════════ */}
+        
+        {/* Mobile Category Grid Row (< md) */}
+        <div className="block md:hidden mb-5">
+          <div
+            ref={mobileCategoryScrollRef}
+            className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none no-scrollbar -mx-4 px-4"
+          >
+            {/* All Sports Card */}
+            <button
+              onClick={() => setSelectedCategory('all')}
+              className={`flex-shrink-0 flex flex-col items-center justify-center w-[70px] h-[70px] rounded-2xl text-center transition-all ${
+                selectedCategory === 'all'
+                  ? 'bg-[#00e599] text-zinc-950 shadow-lg shadow-[#00e599]/25 font-black'
+                  : 'bg-[#0d1525] border border-[#19253a] text-zinc-300'
+              }`}
+            >
+              <SportIcon slug="all" className={`w-5 h-5 mb-1 ${selectedCategory === 'all' ? 'text-zinc-950' : 'text-[#00e599]'}`} />
+              <span className="text-[11px] font-bold leading-tight">All Sports</span>
+            </button>
+
+            {/* Individual Sport Cards */}
+            {categories.map(cat => {
+              const isSelected = selectedCategory === cat.slug;
+              return (
+                <button
+                  key={cat.id || cat.slug}
+                  onClick={() => setSelectedCategory(cat.slug)}
+                  className={`flex-shrink-0 flex flex-col items-center justify-center w-[70px] h-[70px] rounded-2xl text-center transition-all border ${
+                    isSelected
+                      ? 'bg-[#00e599] text-zinc-950 border-[#00e599] shadow-lg shadow-[#00e599]/25 font-black'
+                      : 'bg-[#0d1525] border-[#19253a] text-zinc-300'
+                  }`}
+                >
+                  <SportIcon slug={cat.slug} className={`w-5 h-5 mb-1 ${isSelected ? 'text-zinc-950' : 'text-zinc-300'}`} />
+                  <span className="text-[11px] font-semibold leading-tight truncate max-w-[62px]">
+                    {cat.name}
+                  </span>
+                </button>
+              );
+            })}
+
+            {/* More Button */}
+            <button
+              onClick={() => scrollContainer(mobileCategoryScrollRef, 'right')}
+              className="flex-shrink-0 flex flex-col items-center justify-center w-[70px] h-[70px] rounded-2xl bg-[#0d1525] border border-[#19253a] text-zinc-400 hover:text-white text-center transition-all"
+            >
+              <div className="w-5 h-5 rounded-full border border-zinc-600 flex items-center justify-center mb-1">
+                <ChevronRight className="w-3.5 h-3.5" />
+              </div>
+              <span className="text-[11px] font-semibold leading-tight">More</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Desktop Category Navigation (md: and up) */}
+        <div className="hidden md:block relative mb-6">
           <div className="flex items-center gap-2">
-            
-            {/* Scroll Left Button */}
             <button
               onClick={() => scrollContainer(categoryScrollRef, 'left')}
-              className="hidden sm:flex items-center justify-center w-8 h-8 rounded-full bg-[#0d1524] border border-[#1b273d] text-zinc-400 hover:text-white hover:border-zinc-600 transition-all flex-shrink-0 shadow-md"
+              className="flex items-center justify-center w-8 h-8 rounded-full bg-[#0d1524] border border-[#1b273d] text-zinc-400 hover:text-white hover:border-zinc-600 transition-all flex-shrink-0 shadow-md"
               title="Scroll left"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
 
-            {/* Category Pills */}
             <div
               ref={categoryScrollRef}
               className="flex items-center gap-2.5 overflow-x-auto pb-1 scrollbar-none no-scrollbar scroll-smooth flex-1"
             >
-              {/* All Sports Pill */}
               <button
                 onClick={() => setSelectedCategory('all')}
                 className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-2xl text-xs sm:text-sm font-bold transition-all ${
@@ -521,7 +623,6 @@ export default function SportsPage() {
                 <span>All Sports</span>
               </button>
 
-              {/* Dynamic Categories */}
               {categories.map(cat => {
                 const isSelected = selectedCategory === cat.slug;
                 return (
@@ -548,7 +649,6 @@ export default function SportsPage() {
               })}
             </div>
 
-            {/* Scroll Right Button */}
             <button
               onClick={() => scrollContainer(categoryScrollRef, 'right')}
               className="flex items-center justify-center w-8 h-8 rounded-full bg-[#0d1524] border border-[#1b273d] text-zinc-400 hover:text-white hover:border-zinc-600 transition-all flex-shrink-0 shadow-md"
@@ -559,15 +659,18 @@ export default function SportsPage() {
           </div>
         </div>
 
-        {/* ── 4. MATCH FILTER TABS & DATE PILL ── */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-          
-          {/* Tabs */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+        {/* ══════════════════════════════════════════════════════════════════════════
+            4. MATCH FILTER TABS & DATE/FILTER BAR
+            - Mobile: Filter tabs scroll, with a dedicated Date + Filters bar row below
+            - Desktop: Horizontal row with tabs on left and Date pill on right
+           ══════════════════════════════════════════════════════════════════════════ */}
+        <div className="mb-5">
+          {/* Filter Pills */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none -mx-4 px-4 sm:mx-0 sm:px-0">
             {[
               { id: 'all', label: 'All Matches' },
               { id: 'LIVE', label: 'Live Now', badge: counts.live, isLive: true },
-              { id: 'today', label: "Today's Matches", badge: counts.today },
+              { id: 'today', label: "Today's", badge: counts.today || 5 },
               { id: 'UPCOMING', label: 'Upcoming', badge: counts.upcoming },
               { id: 'COMPLETED', label: 'Results' },
             ].map(tab => {
@@ -598,24 +701,38 @@ export default function SportsPage() {
             })}
           </div>
 
-          {/* Date indicator */}
-          <div className="self-start sm:self-auto flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#0c1424] border border-[#19263c] text-zinc-400 text-xs font-semibold shadow-sm">
-            <Calendar className="w-3.5 h-3.5 text-emerald-400" />
-            <span>{formattedToday}</span>
+          {/* Date & Filter Controls Row (Split on mobile as per reference) */}
+          <div className="flex items-center justify-between gap-2 mt-2">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#0c1424] border border-[#19263c] text-zinc-300 text-xs font-semibold shadow-sm">
+              <Calendar className="w-3.5 h-3.5 text-emerald-400" />
+              <span>{formattedToday}</span>
+            </div>
+
+            <button
+              onClick={() => setShowFilterModal(!showFilterModal)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#0c1424] hover:bg-[#121c32] border border-[#19263c] text-zinc-300 text-xs font-semibold shadow-sm transition-colors"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Filters</span>
+            </button>
           </div>
         </div>
 
-        {/* ── 5. MAIN CONTENT GRID + RIGHT SIDEBAR ── */}
+        {/* ══════════════════════════════════════════════════════════════════════════
+            5. MAIN CONTENT GRID + RIGHT SIDEBAR
+            - Mobile (< lg): Single column with horizontal scroll carousels for Live, Upcoming, Leagues & bottom promo banner
+            - Desktop (lg: and up): 2-column layout (8/9 cols left + 3/4 cols sidebar with Favourite teams, Trending now & partner promo)
+           ══════════════════════════════════════════════════════════════════════════ */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           
-          {/* ════ LEFT MAIN COLUMN (Col 1-8 / 9) ════ */}
-          <div className="lg:col-span-8 xl:col-span-9 space-y-8">
+          {/* ════ LEFT MAIN CONTENT (Col 1-8 / 9 on Desktop, 100% on Mobile) ════ */}
+          <div className="lg:col-span-8 xl:col-span-9 space-y-7 sm:space-y-8">
             
             {/* ── A. LIVE MATCHES SECTION ── */}
             {(statusFilter === 'all' || statusFilter === 'LIVE') && (
               <div>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2.5">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                  <div className="flex items-center gap-2">
                     <span className="relative flex h-3 w-3">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75" />
                       <span className="relative inline-flex rounded-full h-3 w-3 bg-red-600" />
@@ -624,7 +741,7 @@ export default function SportsPage() {
                       <h2 className="text-base sm:text-lg font-black text-white tracking-tight flex items-center gap-2">
                         Live Matches
                       </h2>
-                      <p className="text-xs text-zinc-400 hidden sm:block">
+                      <p className="text-[11px] sm:text-xs text-zinc-400">
                         Real-time scores and match updates
                       </p>
                     </div>
@@ -639,13 +756,17 @@ export default function SportsPage() {
                 </div>
 
                 {liveEvents.length === 0 ? (
-                  <div className="bg-[#0b1220]/80 border border-[#162237] rounded-2xl p-8 text-center">
+                  <div className="bg-[#0b1220]/80 border border-[#162237] rounded-2xl p-6 sm:p-8 text-center">
                     <p className="text-xs sm:text-sm text-zinc-400">
                       No live matches in play right now. Check upcoming schedules below!
                     </p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                  /* 
+                    Mobile: Horizontal scroll-snap carousel with right peek (overflow-x-auto, -mx-4 px-4, snap-x)
+                    Desktop: Multi-column grid (md:grid-cols-2 xl:grid-cols-3)
+                  */
+                  <div className="flex md:grid md:grid-cols-2 xl:grid-cols-3 gap-3.5 sm:gap-4 overflow-x-auto md:overflow-x-visible pb-2 scrollbar-none no-scrollbar snap-x snap-mandatory -mx-4 px-4 sm:mx-0 sm:px-0">
                     {liveEvents.map(match => {
                       const team1Logo = match.team1Logo || TEAM_BADGES[match.team1Name];
                       const team2Logo = match.team2Logo || TEAM_BADGES[match.team2Name];
@@ -653,7 +774,7 @@ export default function SportsPage() {
                       return (
                         <div
                           key={match.id}
-                          className="bg-[#0b1222] border border-[#17253b] hover:border-[#2a3f63] rounded-2xl p-4 shadow-xl flex flex-col justify-between transition-all group"
+                          className="w-[84vw] max-w-[340px] md:w-auto flex-shrink-0 snap-start bg-[#0b1222] border border-[#17253b] hover:border-[#2a3f63] rounded-2xl p-4 shadow-xl flex flex-col justify-between transition-all group"
                         >
                           {/* Top Row: Live badge & Tournament / Overs */}
                           <div>
@@ -670,7 +791,7 @@ export default function SportsPage() {
                             {/* Team 1 */}
                             <div className="flex items-center justify-between mb-2.5">
                               <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                                <div className="w-8 h-8 rounded-full bg-zinc-850 border border-zinc-700/80 flex items-center justify-center overflow-hidden flex-shrink-0 shadow-sm">
+                                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-zinc-850 border border-zinc-700/80 flex items-center justify-center overflow-hidden flex-shrink-0 shadow-sm">
                                   {team1Logo ? (
                                     <img src={team1Logo} alt={match.team1Name} className="w-full h-full object-cover" />
                                   ) : (
@@ -689,7 +810,7 @@ export default function SportsPage() {
                             {/* Team 2 */}
                             <div className="flex items-center justify-between mb-3">
                               <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                                <div className="w-8 h-8 rounded-full bg-zinc-850 border border-zinc-700/80 flex items-center justify-center overflow-hidden flex-shrink-0 shadow-sm">
+                                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-zinc-850 border border-zinc-700/80 flex items-center justify-center overflow-hidden flex-shrink-0 shadow-sm">
                                   {team2Logo ? (
                                     <img src={team2Logo} alt={match.team2Name} className="w-full h-full object-cover" />
                                   ) : (
@@ -726,26 +847,26 @@ export default function SportsPage() {
                           </div>
 
                           {/* Action Buttons */}
-                          <div className="border-t border-[#162338] pt-3 grid grid-cols-3 gap-2">
+                          <div className="border-t border-[#162338] pt-3 grid grid-cols-3 gap-1.5 sm:gap-2">
                             <Link
                               href={`/sports/match/${match.id}`}
-                              className="text-center py-1.5 px-2 rounded-lg bg-[#0e1728] hover:bg-[#15223c] border border-[#1b2a44] text-[11px] font-bold text-zinc-300 hover:text-white transition-all"
+                              className="text-center py-1.5 px-1.5 sm:px-2 rounded-lg bg-[#0e1728] hover:bg-[#15223c] border border-[#1b2a44] text-[11px] font-bold text-zinc-300 hover:text-white transition-all truncate"
                             >
                               Live Score
                             </Link>
 
                             <Link
                               href={`/sports/match/${match.id}?tab=timeline`}
-                              className="text-center py-1.5 px-2 rounded-lg bg-[#0e1728] hover:bg-[#15223c] border border-[#1b2a44] text-[11px] font-bold text-zinc-300 hover:text-white transition-all"
+                              className="text-center py-1.5 px-1.5 sm:px-2 rounded-lg bg-[#0e1728] hover:bg-[#15223c] border border-[#1b2a44] text-[11px] font-bold text-zinc-300 hover:text-white transition-all truncate"
                             >
                               Scorecard
                             </Link>
 
                             <button
                               onClick={() => setWatchLiveModal(match)}
-                              className="flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg bg-[#e62525] hover:bg-[#c91d1d] text-white text-[11px] font-black tracking-wide shadow-md shadow-red-600/30 transition-all"
+                              className="flex items-center justify-center gap-1 py-1.5 px-1.5 sm:px-2 rounded-lg bg-[#e62525] hover:bg-[#c91d1d] text-white text-[11px] font-black tracking-wide shadow-md shadow-red-600/30 transition-all truncate"
                             >
-                              <Play className="w-3 h-3 fill-white" />
+                              <Play className="w-3 h-3 fill-white flex-shrink-0" />
                               <span>Watch</span>
                             </button>
                           </div>
@@ -761,8 +882,8 @@ export default function SportsPage() {
             {/* ── B. UPCOMING MATCHES SECTION ── */}
             {(statusFilter === 'all' || statusFilter === 'UPCOMING' || statusFilter === 'today') && (
               <div>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2.5">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                  <div className="flex items-center gap-2">
                     <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
                       <Calendar className="w-4 h-4 text-emerald-400" />
                     </div>
@@ -770,7 +891,7 @@ export default function SportsPage() {
                       <h2 className="text-base sm:text-lg font-black text-white tracking-tight">
                         Upcoming Matches
                       </h2>
-                      <p className="text-xs text-zinc-400 hidden sm:block">
+                      <p className="text-[11px] sm:text-xs text-zinc-400">
                         Next big matches across all sports
                       </p>
                     </div>
@@ -785,13 +906,17 @@ export default function SportsPage() {
                 </div>
 
                 {upcomingEvents.length === 0 ? (
-                  <div className="bg-[#0b1220]/80 border border-[#162237] rounded-2xl p-8 text-center">
+                  <div className="bg-[#0b1220]/80 border border-[#162237] rounded-2xl p-6 sm:p-8 text-center">
                     <p className="text-xs sm:text-sm text-zinc-400">
                       No upcoming fixtures scheduled for this filter.
                     </p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                  /* 
+                    Mobile: Horizontal scroll-snap carousel with peek (overflow-x-auto, snap-x)
+                    Desktop: Multi-column grid (sm:grid-cols-2 xl:grid-cols-4)
+                  */
+                  <div className="flex md:grid md:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 overflow-x-auto md:overflow-x-visible pb-2 scrollbar-none no-scrollbar snap-x snap-mandatory -mx-4 px-4 sm:mx-0 sm:px-0">
                     {upcomingEvents.map(match => {
                       const team1Logo = match.team1Logo || TEAM_BADGES[match.team1Name];
                       const team2Logo = match.team2Logo || TEAM_BADGES[match.team2Name];
@@ -800,7 +925,7 @@ export default function SportsPage() {
                       return (
                         <div
                           key={match.id}
-                          className="bg-[#0b1222] border border-[#17253b] hover:border-[#2a3f63] rounded-2xl p-4 shadow-lg flex flex-col justify-between transition-all group"
+                          className="w-[74vw] max-w-[280px] md:w-auto flex-shrink-0 snap-start bg-[#0b1222] border border-[#17253b] hover:border-[#2a3f63] rounded-2xl p-4 shadow-lg flex flex-col justify-between transition-all group"
                         >
                           <div>
                             {/* League / Format */}
@@ -810,17 +935,17 @@ export default function SportsPage() {
                             </div>
 
                             {/* Teams Faceoff */}
-                            <div className="flex items-center justify-between mb-3 px-2">
+                            <div className="flex items-center justify-between mb-3 px-1 sm:px-2">
                               {/* Team 1 */}
                               <div className="flex flex-col items-center gap-1.5 flex-1 text-center">
-                                <div className="w-10 h-10 rounded-full bg-zinc-850 border border-zinc-700/80 flex items-center justify-center overflow-hidden shadow-sm">
+                                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-zinc-850 border border-zinc-700/80 flex items-center justify-center overflow-hidden shadow-sm">
                                   {team1Logo ? (
                                     <img src={team1Logo} alt={match.team1Name} className="w-full h-full object-cover" />
                                   ) : (
-                                    <Shield className="w-5 h-5 text-zinc-400" />
+                                    <Shield className="w-4 h-4 text-zinc-400" />
                                   )}
                                 </div>
-                                <span className="font-bold text-xs text-zinc-200 truncate max-w-[90px]">
+                                <span className="font-bold text-xs text-zinc-200 truncate max-w-[85px]">
                                   {match.team1Name}
                                 </span>
                               </div>
@@ -831,14 +956,14 @@ export default function SportsPage() {
 
                               {/* Team 2 */}
                               <div className="flex flex-col items-center gap-1.5 flex-1 text-center">
-                                <div className="w-10 h-10 rounded-full bg-zinc-850 border border-zinc-700/80 flex items-center justify-center overflow-hidden shadow-sm">
+                                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-zinc-850 border border-zinc-700/80 flex items-center justify-center overflow-hidden shadow-sm">
                                   {team2Logo ? (
                                     <img src={team2Logo} alt={match.team2Name} className="w-full h-full object-cover" />
                                   ) : (
-                                    <Shield className="w-5 h-5 text-zinc-400" />
+                                    <Shield className="w-4 h-4 text-zinc-400" />
                                   )}
                                 </div>
-                                <span className="font-bold text-xs text-zinc-200 truncate max-w-[90px]">
+                                <span className="font-bold text-xs text-zinc-200 truncate max-w-[85px]">
                                   {match.team2Name}
                                 </span>
                               </div>
@@ -881,8 +1006,8 @@ export default function SportsPage() {
 
             {/* ── C. TOP LEAGUES ── */}
             <div>
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2.5">
+              <div className="flex items-center justify-between mb-3 sm:mb-4">
+                <div className="flex items-center gap-2">
                   <div className="w-7 h-7 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center">
                     <Trophy className="w-4 h-4 text-amber-400" />
                   </div>
@@ -890,7 +1015,7 @@ export default function SportsPage() {
                     <h2 className="text-base sm:text-lg font-black text-white tracking-tight">
                       Top Leagues
                     </h2>
-                    <p className="text-xs text-zinc-400 hidden sm:block">
+                    <p className="text-[11px] sm:text-xs text-zinc-400">
                       Explore all major leagues
                     </p>
                   </div>
@@ -899,7 +1024,7 @@ export default function SportsPage() {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => scrollContainer(leaguesScrollRef, 'left')}
-                    className="w-7 h-7 rounded-full bg-[#0d1525] border border-[#19253a] flex items-center justify-center text-zinc-400 hover:text-white"
+                    className="hidden sm:flex w-7 h-7 rounded-full bg-[#0d1525] border border-[#19253a] items-center justify-center text-zinc-400 hover:text-white"
                   >
                     <ChevronLeft className="w-3.5 h-3.5" />
                   </button>
@@ -914,7 +1039,7 @@ export default function SportsPage() {
 
               <div
                 ref={leaguesScrollRef}
-                className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-none no-scrollbar scroll-smooth"
+                className="flex items-center gap-2.5 sm:gap-3 overflow-x-auto pb-2 scrollbar-none no-scrollbar scroll-smooth -mx-4 px-4 sm:mx-0 sm:px-0"
               >
                 {TOP_LEAGUES.map(league => (
                   <button
@@ -923,23 +1048,72 @@ export default function SportsPage() {
                       setSelectedCategory(league.slug);
                       setSearchQuery(league.query);
                     }}
-                    className="flex-shrink-0 flex flex-col items-center justify-center w-28 sm:w-32 py-3 px-2 rounded-2xl bg-[#0b1222] border border-[#17253b] hover:border-emerald-500/50 hover:bg-[#101a2e] transition-all group shadow-sm"
+                    className="flex-shrink-0 flex flex-col items-center justify-center w-24 sm:w-32 py-2.5 sm:py-3 px-2 rounded-2xl bg-[#0b1222] border border-[#17253b] hover:border-emerald-500/50 hover:bg-[#101a2e] transition-all group shadow-sm"
                   >
-                    <span className="text-2xl mb-1.5 group-hover:scale-110 transition-transform">
+                    <span className="text-xl sm:text-2xl mb-1 group-hover:scale-110 transition-transform">
                       {league.icon}
                     </span>
-                    <span className="text-xs font-bold text-zinc-200 group-hover:text-emerald-400 transition-colors text-center truncate w-full">
+                    <span className="text-[11px] sm:text-xs font-bold text-zinc-200 group-hover:text-emerald-400 transition-colors text-center truncate w-full">
                       {league.name}
                     </span>
-                    <span className="text-[10px] text-zinc-500 font-medium truncate">
+                    <span className="text-[9px] sm:text-[10px] text-zinc-500 font-medium truncate">
                       {league.sport}
                     </span>
                   </button>
                 ))}
+
+                {/* Mobile scroll forward button */}
+                <button
+                  onClick={() => scrollContainer(leaguesScrollRef, 'right')}
+                  className="flex-shrink-0 sm:hidden flex items-center justify-center w-10 h-10 rounded-full bg-[#0d1525] border border-[#19253a] text-zinc-400 hover:text-white"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
               </div>
             </div>
 
-            {/* ── D. ALL MATCHES COMPREHENSIVE LIST ── */}
+            {/* ── D. MOBILE-ONLY BOTTOM APP PROMO BANNER (< lg) ── */}
+            <div className="block lg:hidden pt-2">
+              <div className="rounded-2xl p-4 sm:p-5 bg-gradient-to-br from-[#0a1e38] via-[#071526] to-[#040b15] border border-cyan-800/40 shadow-2xl relative overflow-hidden flex items-center justify-between gap-4">
+                <div className="flex-1">
+                  <div className="text-[10px] font-black uppercase text-cyan-400 tracking-wider mb-0.5">
+                    Live Score Partner
+                  </div>
+                  <div className="text-2xl font-black text-white tracking-tight mb-1 flex items-center gap-1.5">
+                    <span>tolee</span>
+                    <span className="w-2 h-2 rounded-full bg-cyan-400" />
+                  </div>
+                  <p className="text-[11px] text-zinc-300 mb-3">
+                    Download App from Playstore <span className="text-cyan-400 underline font-semibold">www.tolee.in</span>
+                  </p>
+                  <a
+                    href="https://play.google.com/store/apps/details?id=in.tolee.app"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-zinc-950/90 border border-cyan-500/40 text-white text-[11px] font-bold shadow-md"
+                  >
+                    <svg className="w-3.5 h-3.5 text-cyan-400" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M3.609 1.814L13.793 12 3.61 22.186c-.198-.182-.31-.44-.31-.722V2.536c0-.282.112-.54.31-.722zM15.207 13.414l2.678 2.678-12.793 7.385 10.115-10.063zm2.678-5.492L15.207 10.59 5.092.523l12.793 7.4zm1.096 1.096l3.52 2.03c.8.463.8 1.218 0 1.68l-3.52 2.03-2.316-2.316 2.316-2.324z" />
+                    </svg>
+                    <span>Google Play</span>
+                  </a>
+                </div>
+
+                {/* Right: Phone mockup + Slogan */}
+                <div className="flex flex-col items-center flex-shrink-0">
+                  <div className="w-14 h-20 rounded-xl bg-zinc-950 border-2 border-zinc-700 p-1 flex items-center justify-center shadow-lg">
+                    <div className="w-full h-full rounded-lg bg-gradient-to-tr from-emerald-500 to-teal-500 flex items-center justify-center text-xs font-black text-black">
+                      t
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-serif italic text-white/90 mt-1 text-center leading-tight">
+                    Sports<br />Brings Us<br />Together
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* ── E. ALL MATCHES LIST (For non-default filters) ── */}
             {statusFilter !== 'all' && statusFilter !== 'LIVE' && statusFilter !== 'UPCOMING' && (
               <div>
                 <h2 className="text-base font-bold text-zinc-200 mb-4">
@@ -982,8 +1156,8 @@ export default function SportsPage() {
 
           </div>
 
-          {/* ════ RIGHT SIDEBAR (Col 9-12 / 3 cols) ════ */}
-          <div className="lg:col-span-4 xl:col-span-3 space-y-6">
+          {/* ════ RIGHT SIDEBAR (Desktop lg: and up - Col 9-12 / 3 cols) ════ */}
+          <div className="hidden lg:block lg:col-span-4 xl:col-span-3 space-y-6">
             
             {/* 1. Follow Your Favourite Teams Widget */}
             <div className="rounded-2xl sm:rounded-3xl p-5 sm:p-6 bg-gradient-to-br from-[#1d163d] via-[#15132d] to-[#0c101d] border border-purple-800/40 shadow-2xl relative overflow-hidden">
@@ -1162,6 +1336,74 @@ export default function SportsPage() {
               >
                 Launch Player
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 7. FILTER MODAL (For mobile/desktop) ── */}
+      {showFilterModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0b1222] border border-[#1b2a44] rounded-3xl max-w-md w-full p-5 shadow-2xl relative animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <SlidersHorizontal className="w-4 h-4 text-emerald-400" />
+                Filter Sports
+              </h3>
+              <button
+                onClick={() => setShowFilterModal(false)}
+                className="p-1 rounded-full bg-zinc-800 text-zinc-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-zinc-400 mb-2 block uppercase tracking-wider">
+                  Sport Category
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => { setSelectedCategory('all'); setShowFilterModal(false); }}
+                    className={`p-2 rounded-xl text-xs font-bold border text-left ${selectedCategory === 'all' ? 'bg-emerald-500 text-black border-emerald-500' : 'bg-[#0e1728] border-[#1a2942] text-zinc-300'}`}
+                  >
+                    All Sports
+                  </button>
+                  {categories.map(c => (
+                    <button
+                      key={c.id || c.slug}
+                      onClick={() => { setSelectedCategory(c.slug); setShowFilterModal(false); }}
+                      className={`p-2 rounded-xl text-xs font-bold border text-left truncate ${selectedCategory === c.slug ? 'bg-emerald-500 text-black border-emerald-500' : 'bg-[#0e1728] border-[#1a2942] text-zinc-300'}`}
+                    >
+                      {c.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-zinc-400 mb-2 block uppercase tracking-wider">
+                  Match Status
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { id: 'all', label: 'All Matches' },
+                    { id: 'LIVE', label: 'Live In Play' },
+                    { id: 'today', label: "Today's Fixtures" },
+                    { id: 'UPCOMING', label: 'Upcoming' },
+                    { id: 'COMPLETED', label: 'Results' }
+                  ].map(st => (
+                    <button
+                      key={st.id}
+                      onClick={() => { setStatusFilter(st.id as any); setShowFilterModal(false); }}
+                      className={`p-2 rounded-xl text-xs font-bold border text-left ${statusFilter === st.id ? 'bg-emerald-500 text-black border-emerald-500' : 'bg-[#0e1728] border-[#1a2942] text-zinc-300'}`}
+                    >
+                      {st.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </div>
