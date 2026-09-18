@@ -156,6 +156,8 @@ model User {
   radarLikes            RadarPostLike[]
   radarConfirmations    RadarPostConfirmation[]
   radarReports          RadarPostReport[]
+  radarComments         RadarPostComment[]
+  radarReshares         RadarPostReshare[]
 
   wallet        Wallet?
   franchise     Franchise?
@@ -2273,9 +2275,14 @@ model RadarPost {
   isUrgent            Boolean                 @default(false)
 
   likes               RadarPostLike[]
+  comments            RadarPostComment[]
+  reshares            RadarPostReshare[]
   confirmations       RadarPostConfirmation[]
   reports             RadarPostReport[]
   moderationLogs      RadarModerationLog[]
+  commentsCount       Int                     @default(0)
+  resharesCount       Int                     @default(0)
+  shareCount          Int                     @default(0)
 
   @@index([latitude, longitude])
   @@index([createdAt])
@@ -2294,6 +2301,37 @@ model RadarPostLike {
   createdAt   DateTime  @default(now())
 
   @@unique([radarPostId, userId])
+}
+
+model RadarPostComment {
+  id          String             @id @default(cuid())
+  content     String
+  createdAt   DateTime           @default(now())
+  authorId    String
+  radarPostId String
+  parentId    String?
+  author      User               @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  radarPost   RadarPost          @relation(fields: [radarPostId], references: [id], onDelete: Cascade)
+  replies     RadarPostComment[] @relation("RadarCommentReplies")
+  parent      RadarPostComment?  @relation("RadarCommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+
+  @@index([radarPostId])
+  @@index([authorId])
+  @@index([parentId])
+  @@index([createdAt])
+}
+
+model RadarPostReshare {
+  id          String    @id @default(cuid())
+  radarPostId String
+  userId      String
+  createdAt   DateTime  @default(now())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  radarPost   RadarPost @relation(fields: [radarPostId], references: [id], onDelete: Cascade)
+
+  @@unique([radarPostId, userId])
+  @@index([radarPostId])
+  @@index([userId])
 }
 
 model RadarPostConfirmation {

@@ -546,6 +546,9 @@ export async function getRadarPostsAction(params: {
         likes: {
           select: { userId: true }
         },
+        reshares: {
+          select: { userId: true }
+        },
         confirmations: {
           select: { userId: true, type: true }
         }
@@ -562,6 +565,7 @@ export async function getRadarPostsAction(params: {
       .map((post: any) => {
         const dist = calculateDistanceKm(lat, lng, post.latitude, post.longitude);
         const hasLiked = currentUserId ? post.likes.some((l: any) => l.userId === currentUserId) : false;
+        const hasReshared = currentUserId ? post.reshares?.some((r: any) => r.userId === currentUserId) : false;
         const hasConfirmedStillHappening = currentUserId 
           ? post.confirmations.some((c: any) => c.userId === currentUserId && c.type === 'STILL_HAPPENING')
           : false;
@@ -588,12 +592,17 @@ export async function getRadarPostsAction(params: {
           authorAvatar: post.isAnonymous ? null : post.author.avatar,
           authorId: post.isAnonymous ? null : post.author.id,
           likesCount: post.likesCount || post.likes.length,
+          commentsCount: post.commentsCount || 0,
+          resharesCount: post.resharesCount || 0,
+          shareCount: post.shareCount || 0,
+          viewsCount: post.viewsCount || 0,
           confirmationsCount: post.confirmationsCount,
           resolvedVotesCount: post.resolvedVotesCount,
           reportsCount: post.reportsCount,
           status: post.status,
           isVerified: post.isVerified,
           hasLiked,
+          hasReshared,
           hasConfirmedStillHappening,
           hasConfirmedResolved,
           expiresAt: post.expiresAt,
@@ -1200,5 +1209,179 @@ export async function updateRadarNotificationPreferencesAction(data: {
   } catch (error) {
     console.error('[Radar] Error updating radar preferences:', error);
     return { success: false, error: 'Failed to update preferences' };
+  }
+}
+
+/**
+ * Add comment to a Radar post
+ */
+export async function addRadarCommentAction(radarPostId: string, content: string, parentId?: string) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !(session.user as any).id) {
+      return { success: false, error: 'You must be logged in to comment.' };
+    }
+    const userId = (session.user as any).id;
+
+    const { sanitizeText } = require('@/lib/sanitize');
+    const safeContent = sanitizeText(content || '', 2000);
+    if (!safeContent || !safeContent.trim()) {
+      return { success: false, error: 'Comment cannot be empty.' };
+    }
+
+    const comment = await prisma.radarPostComment.create({
+      data: {
+        content: safeContent.trim(),
+        radarPostId,
+        authorId: userId,
+        parentId: parentId || null,
+      },
+      include: {
+        author: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+            avatar: true,
+          }
+        }
+      }
+    });
+
+    // Increment commentsCount
+    await prisma.radarPost.update({
+      where: { id: radarPostId },
+      data: { commentsCount: { increment: 1 } }
+    }).catch(() => {});
+
+    safeRevalidatePath(`/radar`);
+    safeRevalidatePath(`/radar/${radarPostId}`);
+
+    return { success: true, comment };
+  } catch (error) {
+    console.error('[Radar] Error adding comment:', error);
+    return { success: false, error: 'Failed to post comment.' };
+  }
+}
+
+/**
+ * Fetch comments for a Radar post
+ */
+export async function getRadarCommentsAction(radarPostId: string) {
+  try {
+    const comments = await prisma.radarPostComment.findMany({
+      where: {
+        radarPostId,
+        parentId: null,
+      },
+      include: {
+        author: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+            avatar: true,
+          }
+        },
+        replies: {
+          include: {
+            author: {
+              select: {
+                id: true,
+                name: true,
+                username: true,
+                avatar: true,
+              }
+            }
+          },
+          orderBy: { createdAt: 'asc' }
+        }
+      },
+      orderBy: { createdAt: 'asc' },
+      take: 100
+    });
+
+    return { success: true, comments };
+  } catch (error) {
+    console.error('[Radar] Error fetching comments:', error);
+    return { success: false, error: 'Failed to fetch comments', comments: [] };
+  }
+}
+
+/**
+ * Toggle Reshare for a Radar post
+ */
+export async function toggleRadarReshareAction(radarPostId: string) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !(session.user as any).id) {
+      return { success: false, error: 'You must be logged in to reshare.' };
+    }
+    const userId = (session.user as any).id;
+
+    const existing = await prisma.radarPostReshare.findUnique({
+      where: {
+        radarPostId_userId: { radarPostId, userId }
+      }
+    });
+
+    if (existing) {
+      await prisma.radarPostReshare.delete({
+        where: { id: existing.id }
+      });
+      const updated = await prisma.radarPost.update({
+        where: { id: radarPostId },
+        data: { resharesCount: { decrement: 1 } },
+        select: { resharesCount: true }
+      });
+      safeRevalidatePath(`/radar`);
+      return { success: true, hasReshared: false, resharesCount: Math.max(0, updated.resharesCount) };
+    } else {
+      await prisma.radarPostReshare.create({
+        data: { radarPostId, userId }
+      });
+      const updated = await prisma.radarPost.update({
+        where: { id: radarPostId },
+        data: { resharesCount: { increment: 1 } },
+        select: { resharesCount: true }
+      });
+      safeRevalidatePath(`/radar`);
+      return { success: true, hasReshared: true, resharesCount: updated.resharesCount };
+    }
+  } catch (error) {
+    console.error('[Radar] Error toggling reshare:', error);
+    return { success: false, error: 'Failed to reshare' };
+  }
+}
+
+/**
+ * Record a Share for a Radar post
+ */
+export async function recordRadarShareAction(radarPostId: string) {
+  try {
+    const updated = await prisma.radarPost.update({
+      where: { id: radarPostId },
+      data: { shareCount: { increment: 1 } },
+      select: { shareCount: true }
+    });
+    return { success: true, shareCount: updated.shareCount };
+  } catch (error) {
+    return { success: false };
+  }
+}
+
+/**
+ * Record a View for a Radar post
+ */
+export async function recordRadarViewAction(radarPostId: string) {
+  try {
+    const updated = await prisma.radarPost.update({
+      where: { id: radarPostId },
+      data: { viewsCount: { increment: 1 } },
+      select: { viewsCount: true }
+    });
+    return { success: true, viewsCount: updated.viewsCount };
+  } catch (error) {
+    return { success: false };
   }
 }

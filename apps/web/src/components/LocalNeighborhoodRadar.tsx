@@ -2,13 +2,14 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
+import { useSession } from 'next-auth/react';
 import { 
   MapPin, Radar, Navigation, EyeOff, Send, Radio, Plus, CheckCircle2, ChevronRight,
   MoreVertical, ThumbsUp, SlidersHorizontal, X, Search, RefreshCw,
   LocateFixed, Globe, Loader2, Sun, Heart, Users, Share2, Maximize2,
   Minimize2, ZoomIn, ZoomOut, AlertCircle, Tag, Utensils, Newspaper, ChevronDown,
   AlertTriangle, Flag, ShieldCheck, Check, Clock, Image as ImageIcon, Video, Play, Zap, Info, ShieldAlert,
-  MapPinOff, Settings
+  MapPinOff, Settings, MessageCircle, Repeat, Eye, CornerDownRight
 } from 'lucide-react';
 import { 
   createRadarPostAction, 
@@ -16,9 +17,15 @@ import {
   updateUserRadarLocation, 
   toggleRadarPostLikeAction,
   confirmRadarPostAction,
-  reportRadarPostAction
+  reportRadarPostAction,
+  addRadarCommentAction,
+  getRadarCommentsAction,
+  toggleRadarReshareAction,
+  recordRadarShareAction,
+  recordRadarViewAction
 } from '@/actions/radar';
 import { calculateDistanceKm, formatDistance } from '@/lib/geo-utils';
+import { formatViewCount } from '@/lib/utils';
 import {
   RadarPermissionState,
   checkRadarLocationPermission,
@@ -41,6 +48,11 @@ export interface LocalRadarPost {
   authorId?: string | null;
   likes: number;
   hasLiked?: boolean;
+  commentsCount?: number;
+  resharesCount?: number;
+  shareCount?: number;
+  viewsCount?: number;
+  hasReshared?: boolean;
   latitude: number;
   longitude: number;
   locationName: string;
@@ -66,6 +78,17 @@ export interface LocalRadarPost {
 }
 
 export function LocalNeighborhoodRadar() {
+  const { data: session } = useSession();
+
+  // Radar Comments & Social States
+  const [activeCommentRadarPost, setActiveCommentRadarPost] = useState<LocalRadarPost | null>(null);
+  const [radarComments, setRadarComments] = useState<any[]>([]);
+  const [isLoadingRadarComments, setIsLoadingRadarComments] = useState<boolean>(false);
+  const [newRadarComment, setNewRadarComment] = useState<string>('');
+  const [isSubmittingRadarComment, setIsSubmittingRadarComment] = useState<boolean>(false);
+  const [replyToCommentId, setReplyToCommentId] = useState<string | null>(null);
+  const [replyToAuthorName, setReplyToAuthorName] = useState<string | null>(null);
+
   // Coordinates default to null until GPS permission & lock or manual area is set
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [locationAccuracy, setLocationAccuracy] = useState<number | null>(null);
@@ -456,6 +479,11 @@ export function LocalNeighborhoodRadar() {
         authorId: post.authorId,
         likes: post.likesCount || 0,
         hasLiked: post.hasLiked || !!likedPostIds[post.id],
+        commentsCount: post.commentsCount || 0,
+        resharesCount: post.resharesCount || 0,
+        shareCount: post.shareCount || 0,
+        viewsCount: post.viewsCount || 0,
+        hasReshared: post.hasReshared || false,
         latitude: post.latitude,
         longitude: post.longitude,
         locationName: post.locationName,
@@ -571,6 +599,123 @@ export function LocalNeighborhoodRadar() {
       try {
         await toggleRadarPostLikeAction(id);
       } catch (_) {}
+    }
+  };
+
+  // Open Radar Comments Modal
+  const handleOpenComments = async (post: LocalRadarPost) => {
+    setActiveCommentRadarPost(post);
+    setIsLoadingRadarComments(true);
+    setNewRadarComment('');
+    setReplyToCommentId(null);
+    setReplyToAuthorName(null);
+    try {
+      const res = await getRadarCommentsAction(post.id);
+      if (res.success && Array.isArray(res.comments)) {
+        setRadarComments(res.comments);
+      } else {
+        setRadarComments([]);
+      }
+    } catch (_) {
+      setRadarComments([]);
+    } finally {
+      setIsLoadingRadarComments(false);
+    }
+  };
+
+  // Submit Radar Comment
+  const handleAddComment = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!activeCommentRadarPost || !newRadarComment.trim() || isSubmittingRadarComment) return;
+
+    if (!session?.user) {
+      alert('Please log in to post comments.');
+      return;
+    }
+
+    setIsSubmittingRadarComment(true);
+    try {
+      const res = await addRadarCommentAction(
+        activeCommentRadarPost.id, 
+        newRadarComment.trim(), 
+        replyToCommentId || undefined
+      );
+
+      if (res.success && res.comment) {
+        setNewRadarComment('');
+        setReplyToCommentId(null);
+        setReplyToAuthorName(null);
+
+        // Refresh comments list
+        const updated = await getRadarCommentsAction(activeCommentRadarPost.id);
+        if (updated.success && Array.isArray(updated.comments)) {
+          setRadarComments(updated.comments);
+        }
+
+        // Increment local post commentsCount
+        setDbRadarPosts(prev => prev.map(p => {
+          if (p.id === activeCommentRadarPost.id) {
+            return { ...p, commentsCount: (p.commentsCount || 0) + 1 };
+          }
+          return p;
+        }));
+        setActiveCommentRadarPost(prev => prev ? { ...prev, commentsCount: (prev.commentsCount || 0) + 1 } : null);
+      } else if (res.error) {
+        alert(res.error);
+      }
+    } catch (err) {
+      console.error('[Radar] Error adding comment:', err);
+    } finally {
+      setIsSubmittingRadarComment(false);
+    }
+  };
+
+  // Toggle Radar Post Reshare
+  const handleToggleReshare = async (post: LocalRadarPost) => {
+    if (!session?.user) {
+      alert('Please log in to reshare.');
+      return;
+    }
+
+    try {
+      const res = await toggleRadarReshareAction(post.id);
+      if (res.success) {
+        setDbRadarPosts(prev => prev.map(p => {
+          if (p.id !== post.id) return p;
+          return {
+            ...p,
+            hasReshared: res.hasReshared,
+            resharesCount: res.resharesCount
+          };
+        }));
+        setStatusMessage(res.hasReshared ? '🔁 Alert reshared to your network!' : 'Reshare removed.');
+      } else if (res.error) {
+        setStatusMessage(res.error);
+      }
+    } catch (_) {}
+  };
+
+  // Share Radar Post (Native Share or Clipboard)
+  const handleShareRadarPost = async (post: LocalRadarPost) => {
+    const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/radar/${post.id}` : '';
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share({
+          title: `Tolee Radar: ${post.title}`,
+          text: `${post.title} — ${post.locationName}`,
+          url: shareUrl
+        });
+        await recordRadarShareAction(post.id);
+        setDbRadarPosts(prev => prev.map(p => p.id === post.id ? { ...p, shareCount: (p.shareCount || 0) + 1 } : p));
+        return;
+      } catch (_) {}
+    }
+
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(shareUrl);
+      await recordRadarShareAction(post.id);
+      setDbRadarPosts(prev => prev.map(p => p.id === post.id ? { ...p, shareCount: (p.shareCount || 0) + 1 } : p));
+      setStatusMessage('Alert link copied to clipboard! 🔗');
     }
   };
 
@@ -2228,27 +2373,82 @@ export function LocalNeighborhoodRadar() {
                           </span>
                         </div>
 
-                        {/* Action Row */}
-                        <div className="flex items-center justify-between pt-1.5 mt-1 border-t border-slate-100 dark:border-zinc-800/80 text-[11px]">
-                          <button
-                            type="button"
-                            onClick={() => handleViewPostOnMap(post)}
-                            className="text-[#0E9F9A] dark:text-teal-400 font-extrabold flex items-center gap-1 hover:underline"
-                          >
-                            <MapPin className="w-3 h-3" />
-                            <span>View on Map</span>
-                          </button>
+                        {/* Social Action Bar (Like, Comment, Reshare, Share, Views) */}
+                        <div className="pt-2 mt-1 border-t border-slate-100 dark:border-zinc-800/80">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3.5 sm:gap-4">
+                              {/* Like */}
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); toggleLike(post.id, post.isDbPost); }}
+                                className={`flex items-center gap-1 text-[11px] font-semibold transition-transform active:scale-125 ${
+                                  hasLiked ? 'text-rose-500 font-bold' : 'text-slate-600 dark:text-zinc-400 hover:text-rose-500'
+                                }`}
+                              >
+                                <Heart className={`w-[17px] h-[17px] transition-colors ${hasLiked ? 'fill-rose-500 text-rose-500' : ''}`} />
+                                <span>{formatViewCount(likeCount)}</span>
+                              </button>
 
-                          <button
-                            type="button"
-                            onClick={() => toggleLike(post.id, post.isDbPost)}
-                            className={`flex items-center gap-1 text-[11px] font-bold transition-colors ${
-                              hasLiked ? 'text-[#0E9F9A]' : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800'
-                            }`}
+                              {/* Comment */}
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); handleOpenComments(post); }}
+                                className="flex items-center gap-1 text-[11px] font-semibold text-slate-600 dark:text-zinc-400 hover:text-primary dark:hover:text-teal-400 transition-transform active:scale-110"
+                              >
+                                <MessageCircle className="w-[17px] h-[17px]" />
+                                <span>{formatViewCount(post.commentsCount || 0)}</span>
+                              </button>
+
+                              {/* Reshare */}
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); handleToggleReshare(post); }}
+                                className={`flex items-center gap-1 text-[11px] font-semibold transition-transform active:scale-110 ${
+                                  post.hasReshared ? 'text-emerald-500 font-bold' : 'text-slate-600 dark:text-zinc-400 hover:text-emerald-500'
+                                }`}
+                              >
+                                <Repeat className={`w-[17px] h-[17px] ${post.hasReshared ? 'text-emerald-500' : ''}`} />
+                                <span>{formatViewCount(post.resharesCount || 0)}</span>
+                              </button>
+
+                              {/* Share (Paper Airplane) */}
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); handleShareRadarPost(post); }}
+                                className="flex items-center gap-1 text-[11px] font-semibold text-slate-600 dark:text-zinc-400 hover:text-sky-500 transition-transform active:scale-110"
+                              >
+                                <Send className="w-[17px] h-[17px]" />
+                                <span>{formatViewCount(post.shareCount || 0)}</span>
+                              </button>
+                            </div>
+
+                            {/* Right side: Views + View on Map */}
+                            <div className="flex items-center gap-2.5">
+                              <span className="flex items-center gap-1 text-[11px] font-medium text-slate-400 dark:text-zinc-500">
+                                <Eye className="w-3.5 h-3.5" />
+                                <span>{formatViewCount(post.viewsCount || 0)}</span>
+                              </span>
+
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); handleViewPostOnMap(post); }}
+                                className="text-[#0E9F9A] dark:text-teal-400 font-bold flex items-center gap-0.5 text-[11px] hover:underline ml-1"
+                              >
+                                <MapPin className="w-3 h-3" />
+                                <span>Map</span>
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* View all comments link */}
+                          <div
+                            className="text-[11px] text-slate-400 dark:text-zinc-500 font-medium hover:underline cursor-pointer pt-1"
+                            onClick={(e) => { e.stopPropagation(); handleOpenComments(post); }}
                           >
-                            <ThumbsUp className={`w-3 h-3 ${hasLiked ? 'fill-[#0E9F9A]' : ''}`} />
-                            <span>Useful ({likeCount})</span>
-                          </button>
+                            {(post.commentsCount || 0) > 0 
+                              ? `View all ${(post.commentsCount || 0).toLocaleString()} comments` 
+                              : 'Add a comment...'}
+                          </div>
                         </div>
 
                       </div>
@@ -2474,46 +2674,97 @@ export function LocalNeighborhoodRadar() {
                         </div>
                       )}
 
-                      {/* Bottom Actions: Useful, Share, Report */}
-                      <div className="flex items-center gap-2.5">
-                        <button
-                          type="button"
-                          onClick={() => toggleLike(post.id, post.isDbPost)}
-                          className={`flex items-center gap-1 text-xs font-bold transition-colors ${
-                            hasLiked ? 'text-[#0E9F9A]' : 'text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
-                          }`}
-                        >
-                          <ThumbsUp className={`w-3.5 h-3.5 ${hasLiked ? 'fill-current' : ''}`} />
-                          <span>Useful ({likeCount})</span>
-                        </button>
+                      {/* Social Action Bar (Like, Comment, Reshare, Share, Views) */}
+                      <div className="pt-2 mt-auto border-t border-slate-100 dark:border-zinc-800/80 w-full">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-5">
+                            {/* Like */}
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); toggleLike(post.id, post.isDbPost); }}
+                              className={`flex items-center gap-1.5 text-xs font-semibold transition-transform active:scale-125 ${
+                                hasLiked ? 'text-rose-500 font-bold' : 'text-slate-600 dark:text-zinc-400 hover:text-rose-500'
+                              }`}
+                            >
+                              <Heart className={`w-4 h-4 transition-colors ${hasLiked ? 'fill-rose-500 text-rose-500' : ''}`} />
+                              <span>{formatViewCount(likeCount)}</span>
+                            </button>
 
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (typeof navigator !== 'undefined' && navigator.clipboard) {
-                              navigator.clipboard.writeText(`${window.location.origin}/radar/${post.id}`);
-                              setStatusMessage('Post link copied to clipboard! 🔗');
-                            }
-                          }}
-                          className="flex items-center gap-1 text-xs font-bold text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white transition-colors"
-                        >
-                          <Share2 className="w-3.5 h-3.5" />
-                          <span>Share</span>
-                        </button>
+                            {/* Comment */}
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); handleOpenComments(post); }}
+                              className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-zinc-400 hover:text-primary dark:hover:text-teal-400 transition-transform active:scale-110"
+                            >
+                              <MessageCircle className="w-4 h-4" />
+                              <span>{formatViewCount(post.commentsCount || 0)}</span>
+                            </button>
 
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setReportingPost(post);
-                            setReportReason('INACCURATE');
-                            setReportDetails('');
-                          }}
-                          title="Report inaccurate or inappropriate alert"
-                          className="flex items-center gap-1 text-xs font-bold text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors"
+                            {/* Reshare */}
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); handleToggleReshare(post); }}
+                              className={`flex items-center gap-1.5 text-xs font-semibold transition-transform active:scale-110 ${
+                                post.hasReshared ? 'text-emerald-500 font-bold' : 'text-slate-600 dark:text-zinc-400 hover:text-emerald-500'
+                              }`}
+                            >
+                              <Repeat className={`w-4 h-4 ${post.hasReshared ? 'text-emerald-500' : ''}`} />
+                              <span>{formatViewCount(post.resharesCount || 0)}</span>
+                            </button>
+
+                            {/* Share */}
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); handleShareRadarPost(post); }}
+                              className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-zinc-400 hover:text-sky-500 transition-transform active:scale-110"
+                            >
+                              <Send className="w-4 h-4" />
+                              <span>{formatViewCount(post.shareCount || 0)}</span>
+                            </button>
+                          </div>
+
+                          {/* Right: Views & View on Map & Report */}
+                          <div className="flex items-center gap-3">
+                            <span className="flex items-center gap-1 text-xs font-medium text-slate-400 dark:text-zinc-500">
+                              <Eye className="w-4 h-4" />
+                              <span>{formatViewCount(post.viewsCount || 0)}</span>
+                            </span>
+
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); handleViewPostOnMap(post); }}
+                              className="text-[#0E9F9A] dark:text-teal-400 font-bold flex items-center gap-1 text-xs hover:underline"
+                            >
+                              <MapPin className="w-3.5 h-3.5" />
+                              <span>View on Map</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setReportingPost(post);
+                                setReportReason('INACCURATE');
+                                setReportDetails('');
+                              }}
+                              title="Report inaccurate or inappropriate alert"
+                              className="flex items-center gap-1 text-xs font-bold text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors"
+                            >
+                              <Flag className="w-3.5 h-3.5" />
+                              <span>Report</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* View all comments link */}
+                        <div
+                          className="text-xs text-slate-400 dark:text-zinc-500 font-medium hover:underline cursor-pointer pt-1.5"
+                          onClick={(e) => { e.stopPropagation(); handleOpenComments(post); }}
                         >
-                          <Flag className="w-3.5 h-3.5" />
-                          <span>Report</span>
-                        </button>
+                          {(post.commentsCount || 0) > 0 
+                            ? `View all ${(post.commentsCount || 0).toLocaleString()} comments` 
+                            : 'Add a comment...'}
+                        </div>
                       </div>
 
                     </div>
@@ -3597,6 +3848,173 @@ export function LocalNeighborhoodRadar() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 5. MODAL: RADAR COMMENTS */}
+      {activeCommentRadarPost && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200 dark:border-zinc-800 shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="p-4 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between shrink-0 bg-slate-50/50 dark:bg-zinc-900/50">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-teal-50 dark:bg-teal-950 text-[#0E9F9A] flex items-center justify-center">
+                  <MessageCircle className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900 dark:text-white">
+                    Comments
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-zinc-400 truncate max-w-[260px] sm:max-w-[340px]">
+                    {activeCommentRadarPost.title}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveCommentRadarPost(null);
+                  setRadarComments([]);
+                  setReplyToCommentId(null);
+                  setReplyToAuthorName(null);
+                }}
+                className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-white rounded-full hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Comments List */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+              {isLoadingRadarComments ? (
+                <div className="flex flex-col items-center justify-center py-10 text-slate-400 gap-2">
+                  <Loader2 className="w-6 h-6 animate-spin text-[#0E9F9A]" />
+                  <span className="text-xs">Loading comments...</span>
+                </div>
+              ) : radarComments.length === 0 ? (
+                <div className="text-center py-12 text-slate-400 dark:text-zinc-500 space-y-2">
+                  <MessageCircle className="w-10 h-10 mx-auto text-slate-300 dark:text-zinc-700 stroke-1" />
+                  <p className="text-xs font-semibold">No comments yet</p>
+                  <p className="text-[11px]">Be the first to share an update or question about this alert!</p>
+                </div>
+              ) : (
+                radarComments.map((c: any) => (
+                  <div key={c.id} className="space-y-2 group">
+                    <div className="flex items-start gap-2.5">
+                      <div className="w-7 h-7 rounded-full overflow-hidden bg-slate-100 dark:bg-zinc-800 shrink-0 mt-0.5 border border-slate-200 dark:border-zinc-700">
+                        <img
+                          src={c.author?.avatar || '/default-user-avatar.svg'}
+                          alt={c.author?.name || 'User'}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="bg-slate-50 dark:bg-zinc-800/60 rounded-2xl p-2.5 border border-slate-100 dark:border-zinc-800/80">
+                          <div className="flex items-center justify-between gap-1 mb-0.5">
+                            <span className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                              {c.author?.username ? `@${c.author.username}` : c.author?.name || 'Neighbor'}
+                            </span>
+                            <span className="text-[10px] text-slate-400 shrink-0">
+                              {formatPostedTime(c.createdAt)}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-700 dark:text-zinc-300 whitespace-pre-wrap leading-relaxed">
+                            {c.content}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3 mt-1 ml-2 text-[10px]">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setReplyToCommentId(c.id);
+                              setReplyToAuthorName(c.author?.username || c.author?.name || 'Neighbor');
+                            }}
+                            className="font-bold text-slate-500 dark:text-zinc-400 hover:text-[#0E9F9A] dark:hover:text-teal-400 transition-colors"
+                          >
+                            Reply
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Replies */}
+                    {c.replies && c.replies.length > 0 && (
+                      <div className="pl-9 space-y-2 border-l-2 border-slate-100 dark:border-zinc-800 ml-3.5">
+                        {c.replies.map((reply: any) => (
+                          <div key={reply.id} className="flex items-start gap-2">
+                            <div className="w-5 h-5 rounded-full overflow-hidden bg-slate-100 dark:bg-zinc-800 shrink-0 mt-0.5 border border-slate-200 dark:border-zinc-700">
+                              <img
+                                src={reply.author?.avatar || '/default-user-avatar.svg'}
+                                alt={reply.author?.name || 'User'}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                            <div className="flex-1 min-w-0 bg-slate-50 dark:bg-zinc-800/40 rounded-xl p-2 border border-slate-100 dark:border-zinc-800/60">
+                              <div className="flex items-center justify-between gap-1 mb-0.5">
+                                <span className="text-[11px] font-bold text-slate-900 dark:text-white truncate">
+                                  {reply.author?.username ? `@${reply.author.username}` : reply.author?.name || 'Neighbor'}
+                                </span>
+                                <span className="text-[9px] text-slate-400 shrink-0">
+                                  {formatPostedTime(reply.createdAt)}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-700 dark:text-zinc-300 whitespace-pre-wrap leading-relaxed">
+                                {reply.content}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Bottom Comment Input */}
+            <div className="p-3 border-t border-slate-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 shrink-0">
+              {replyToCommentId && (
+                <div className="flex items-center justify-between text-[11px] bg-slate-100 dark:bg-zinc-800 px-3 py-1 rounded-lg mb-2 text-slate-600 dark:text-zinc-300">
+                  <div className="flex items-center gap-1">
+                    <CornerDownRight className="w-3 h-3 text-[#0E9F9A]" />
+                    <span>Replying to <span className="font-bold text-[#0E9F9A]">@{replyToAuthorName}</span></span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReplyToCommentId(null);
+                      setReplyToAuthorName(null);
+                    }}
+                    className="text-slate-400 hover:text-slate-600 dark:hover:text-white"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+
+              <form onSubmit={handleAddComment} className="flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder={replyToCommentId ? `Reply to @${replyToAuthorName}...` : "Write a comment..."}
+                  value={newRadarComment}
+                  onChange={(e) => setNewRadarComment(e.target.value)}
+                  className="flex-1 bg-slate-100 dark:bg-zinc-800 border-none rounded-2xl px-3.5 py-2.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0E9F9A]"
+                />
+                <button
+                  type="submit"
+                  disabled={!newRadarComment.trim() || isSubmittingRadarComment}
+                  className="p-2.5 rounded-2xl bg-[#0E9F9A] hover:bg-[#0c8a86] text-white disabled:opacity-40 transition-colors shrink-0 shadow-sm"
+                >
+                  {isSubmittingRadarComment ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4" />
+                  )}
+                </button>
+              </form>
+            </div>
           </div>
         </div>
       )}
