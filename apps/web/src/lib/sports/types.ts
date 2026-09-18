@@ -111,6 +111,8 @@ export interface SportsEventData {
   isManual: boolean;
   externalApiId?: string | null;
   apiSource?: string | null;
+  categorySlug?: string;
+  tournamentName?: string;
 }
 
 export interface SportsCategoryData {
