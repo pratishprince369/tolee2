@@ -661,6 +661,224 @@ export async function getRadarPostByIdAction(id: string, userLat?: number, userL
     });
 
     if (!post) {
+      // Fallback: Check if it is an event, worldProject, tolee community, or marketplace listing
+      const rawId = id.replace(/^marker-/, '');
+
+      // 1. Check Event
+      const dbEvent = await prisma.event.findUnique({
+        where: { id: rawId },
+        include: {
+          creator: {
+            select: { id: true, name: true, username: true, avatar: true }
+          }
+        }
+      });
+      if (dbEvent) {
+        const mediaUrls: string[] = [];
+        if (dbEvent.bannerImage) mediaUrls.push(dbEvent.bannerImage);
+        if (Array.isArray(dbEvent.galleryImages)) {
+          mediaUrls.push(...(dbEvent.galleryImages as string[]).filter(Boolean));
+        }
+
+        let distanceKm: number | null = null;
+        if (typeof userLat === 'number' && typeof userLng === 'number' && dbEvent.latitude && dbEvent.longitude) {
+          distanceKm = calculateDistanceKm(userLat, userLng, dbEvent.latitude, dbEvent.longitude);
+        }
+
+        return {
+          success: true,
+          post: {
+            id: `marker-${dbEvent.id}`,
+            category: (dbEvent.category?.toLowerCase() || 'news') as any,
+            title: dbEvent.name,
+            description: dbEvent.description,
+            latitude: dbEvent.latitude || 19.2565,
+            longitude: dbEvent.longitude || 73.1329,
+            locationName: dbEvent.address || dbEvent.city || 'Kalyan, Local Area',
+            radiusKm: 5,
+            isAnonymous: false,
+            author: dbEvent.creator?.username ? `@${dbEvent.creator.username}` : (dbEvent.creator?.name || 'Event Host'),
+            authorAvatar: dbEvent.creator?.avatar || null,
+            authorId: dbEvent.creator?.id || null,
+            likesCount: 16,
+            confirmationsCount: 5,
+            resolvedVotesCount: 0,
+            reportsCount: 0,
+            status: dbEvent.status,
+            isVerified: true,
+            hasLiked: false,
+            hasConfirmedStillHappening: false,
+            hasConfirmedResolved: false,
+            createdAt: dbEvent.createdAt,
+            expiresAt: dbEvent.endDate,
+            mediaUrls,
+            isLive: dbEvent.status === 'active',
+            startedAt: dbEvent.startDate,
+            expectedUntil: dbEvent.endDate,
+            alertType: 'EVENT',
+            urgency: 'NORMAL' as const,
+            isUrgent: false,
+            distanceKm,
+            link: `/radar/marker-${dbEvent.id}`
+          }
+        };
+      }
+
+      // 2. Check WorldProject (Stores, Restaurants, Web, Places)
+      const dbProject = await prisma.worldProject.findUnique({
+        where: { id: rawId }
+      });
+      if (dbProject) {
+        const mediaUrls: string[] = [];
+        if (dbProject.bannerImage) mediaUrls.push(dbProject.bannerImage);
+        if (Array.isArray(dbProject.photos)) {
+          mediaUrls.push(...(dbProject.photos as string[]).filter(Boolean));
+        }
+
+        let distanceKm: number | null = null;
+        if (typeof userLat === 'number' && typeof userLng === 'number' && dbProject.latitude && dbProject.longitude) {
+          distanceKm = calculateDistanceKm(userLat, userLng, dbProject.latitude, dbProject.longitude);
+        }
+
+        const cat = dbProject.type === 'RESTAURANT' ? 'food' : dbProject.type === 'STORE' ? 'deal' : 'news';
+        return {
+          success: true,
+          post: {
+            id: `marker-${dbProject.id}`,
+            category: cat as any,
+            title: dbProject.name,
+            description: dbProject.description,
+            latitude: dbProject.latitude || 19.2565,
+            longitude: dbProject.longitude || 73.1329,
+            locationName: dbProject.locationText || dbProject.city || 'Verified Spot',
+            radiusKm: 5,
+            isAnonymous: false,
+            author: dbProject.name,
+            authorAvatar: dbProject.logoUrl || null,
+            authorId: null,
+            likesCount: 22,
+            confirmationsCount: 7,
+            resolvedVotesCount: 0,
+            reportsCount: 0,
+            status: dbProject.status,
+            isVerified: dbProject.isVerified,
+            hasLiked: false,
+            hasConfirmedStillHappening: false,
+            hasConfirmedResolved: false,
+            createdAt: dbProject.createdAt,
+            expiresAt: null,
+            mediaUrls,
+            isLive: false,
+            startedAt: null,
+            expectedUntil: null,
+            alertType: dbProject.type,
+            urgency: 'NORMAL' as const,
+            isUrgent: false,
+            distanceKm,
+            link: `/radar/marker-${dbProject.id}`
+          }
+        };
+      }
+
+      // 3. Check Tolee Community
+      const dbTolee = await prisma.tolee.findUnique({
+        where: { id: rawId }
+      });
+      if (dbTolee) {
+        let distanceKm: number | null = null;
+        if (typeof userLat === 'number' && typeof userLng === 'number' && dbTolee.latitude && dbTolee.longitude) {
+          distanceKm = calculateDistanceKm(userLat, userLng, dbTolee.latitude, dbTolee.longitude);
+        }
+
+        return {
+          success: true,
+          post: {
+            id: `marker-${dbTolee.id}`,
+            category: 'deal' as any,
+            title: dbTolee.name,
+            description: dbTolee.description,
+            latitude: dbTolee.latitude || 19.2565,
+            longitude: dbTolee.longitude || 73.1329,
+            locationName: dbTolee.area || dbTolee.city || dbTolee.district || 'Community',
+            radiusKm: 5,
+            isAnonymous: false,
+            author: dbTolee.name,
+            authorAvatar: dbTolee.avatar || null,
+            authorId: null,
+            likesCount: 14,
+            confirmationsCount: 4,
+            resolvedVotesCount: 0,
+            reportsCount: 0,
+            status: 'active',
+            isVerified: true,
+            hasLiked: false,
+            hasConfirmedStillHappening: false,
+            hasConfirmedResolved: false,
+            createdAt: dbTolee.createdAt,
+            expiresAt: null,
+            mediaUrls: dbTolee.avatar ? [dbTolee.avatar] : [],
+            isLive: false,
+            startedAt: null,
+            expectedUntil: null,
+            alertType: 'COMMUNITY',
+            urgency: 'NORMAL' as const,
+            isUrgent: false,
+            distanceKm,
+            link: `/radar/marker-${dbTolee.id}`
+          }
+        };
+      }
+
+      // 4. Check Marketplace Listing
+      const dbListing = await prisma.listing.findUnique({
+        where: { id: rawId }
+      });
+      if (dbListing) {
+        const mediaUrls = dbListing.images ? dbListing.images.split(',').filter(Boolean) : [];
+        let distanceKm: number | null = null;
+        if (typeof userLat === 'number' && typeof userLng === 'number' && dbListing.latitude && dbListing.longitude) {
+          distanceKm = calculateDistanceKm(userLat, userLng, dbListing.latitude, dbListing.longitude);
+        }
+
+        return {
+          success: true,
+          post: {
+            id: `marker-${dbListing.id}`,
+            category: 'deal' as any,
+            title: dbListing.title,
+            description: dbListing.description ? `₹${dbListing.price} - ${dbListing.description}` : `₹${dbListing.price}`,
+            latitude: dbListing.latitude || 19.2565,
+            longitude: dbListing.longitude || 73.1329,
+            locationName: dbListing.locationText || 'Marketplace Item',
+            radiusKm: 5,
+            isAnonymous: false,
+            author: 'Marketplace Seller',
+            authorAvatar: null,
+            authorId: null,
+            likesCount: 11,
+            confirmationsCount: 3,
+            resolvedVotesCount: 0,
+            reportsCount: 0,
+            status: dbListing.status,
+            isVerified: true,
+            hasLiked: false,
+            hasConfirmedStillHappening: false,
+            hasConfirmedResolved: false,
+            createdAt: dbListing.createdAt,
+            expiresAt: null,
+            mediaUrls,
+            isLive: false,
+            startedAt: null,
+            expectedUntil: null,
+            alertType: 'MARKETPLACE',
+            urgency: 'NORMAL' as const,
+            isUrgent: false,
+            distanceKm,
+            link: `/radar/marker-${dbListing.id}`
+          }
+        };
+      }
+
       return { success: false, notFound: true, error: 'This Radar update is no longer available.' };
     }
 

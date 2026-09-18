@@ -548,7 +548,7 @@ export function LocalNeighborhoodRadar() {
         latitude: marker.latitude,
         longitude: marker.longitude,
         locationName: marker.locationText || marker.city || 'Near you',
-        link: marker.link || `/map?lat=${marker.latitude}&lng=${marker.longitude}`,
+        link: `/radar/marker-${marker.id}`,
         imageUrl: marker.image || (
           cat === 'food' ? 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=600&q=80' :
           cat === 'news' ? 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=600&q=80' :
@@ -2273,7 +2273,10 @@ export function LocalNeighborhoodRadar() {
                     <div className="lg:hidden bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-2xl p-3 shadow-2xs hover:shadow-xs transition-all flex items-start gap-3 group">
                       
                       {/* Left Thumbnail Image */}
-                      <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden bg-slate-100 dark:bg-zinc-800 flex-shrink-0 relative border border-slate-200/60 dark:border-zinc-800">
+                      <Link
+                        href={post.link || `/radar/${post.id}`}
+                        className="block w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden bg-slate-100 dark:bg-zinc-800 flex-shrink-0 relative border border-slate-200/60 dark:border-zinc-800 cursor-pointer"
+                      >
                         <img
                           src={post.imageUrl || 'https://images.unsplash.com/photo-1509822929063-6b6cfc9b42f2?auto=format&fit=crop&w=300&q=80'}
                           alt={post.title}
@@ -2286,7 +2289,7 @@ export function LocalNeighborhoodRadar() {
                             +{post.mediaUrls.length - 1}
                           </div>
                         )}
-                      </div>
+                      </Link>
 
                       {/* Right Content */}
                       <div className="flex-1 min-w-0 space-y-1">
@@ -2459,7 +2462,10 @@ export function LocalNeighborhoodRadar() {
                       className="hidden lg:flex bg-white dark:bg-zinc-900 hover:bg-slate-50/50 dark:hover:bg-zinc-900/50 border border-slate-200/80 dark:border-zinc-800 rounded-2xl p-3.5 sm:p-4 shadow-2xs hover:shadow-xs transition-all flex-col sm:flex-row items-start gap-4 group"
                     >
                     {/* Left Thumbnail Image */}
-                    <div className="w-full sm:w-28 sm:h-28 h-44 rounded-xl overflow-hidden bg-slate-100 dark:bg-zinc-800 flex-shrink-0 relative border border-slate-200/60 dark:border-zinc-800">
+                    <Link
+                      href={post.link || `/radar/${post.id}`}
+                      className="block w-full sm:w-28 sm:h-28 h-44 rounded-xl overflow-hidden bg-slate-100 dark:bg-zinc-800 flex-shrink-0 relative border border-slate-200/60 dark:border-zinc-800 cursor-pointer"
+                    >
                       <img
                         src={post.imageUrl || 'https://images.unsplash.com/photo-1509822929063-6b6cfc9b42f2?auto=format&fit=crop&w=300&q=80'}
                         alt={post.title}
@@ -2472,7 +2478,7 @@ export function LocalNeighborhoodRadar() {
                           +{post.mediaUrls.length - 1}
                         </div>
                       )}
-                    </div>
+                    </Link>
 
                     {/* Middle Content */}
                     <div className="flex-1 min-w-0 space-y-1.5 w-full">
