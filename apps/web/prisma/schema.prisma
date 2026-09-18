@@ -258,6 +258,10 @@ model Tolee {
   chats                Chat[]
   joinRequests         ToleeJoinRequest[]
   creditConfig         GroupCreditConfig?
+
+  @@index([ownerId])
+  @@index([category])
+  @@index([createdAt])
 }
 
 model ToleeMember {
@@ -282,6 +286,7 @@ model ToleeMember {
   tolee     Tolee    @relation(fields: [toleeId], references: [id])
 
   @@unique([userId, toleeId])
+  @@index([toleeId])
 }
 
 model ToleeJoinRequest {
@@ -350,6 +355,11 @@ model Post {
   isSimulation   Boolean       @default(false)
   storyAnalytics PostStoryAnalytics?
   newsRelation   NewsPost?
+
+  @@index([authorId])
+  @@index([createdAt])
+  @@index([status])
+  @@index([worldProjectId])
 }
 
 model NewsPost {
@@ -396,6 +406,7 @@ model PostTolee {
   tolee     Tolee  @relation(fields: [toleeId], references: [id])
 
   @@id([postId, toleeId])
+  @@index([toleeId])
 }
 
 // ---------------------------------------------------------
@@ -544,6 +555,7 @@ model Follow {
 
   @@id([followerId, followingId])
   @@index([sourcePostId])
+  @@index([followingId])
 }
 
 model Like {
@@ -554,6 +566,7 @@ model Like {
   post      Post @relation(fields: [postId], references: [id])
 
   @@id([userId, postId])
+  @@index([postId])
 }
 
 model Comment {
@@ -569,6 +582,10 @@ model Comment {
   parent    Comment?  @relation("Replies", fields: [parentId], references: [id])
 
   isSimulation Boolean @default(false)
+
+  @@index([postId])
+  @@index([authorId])
+  @@index([parentId])
 }
 
 model Story {
@@ -606,6 +623,9 @@ model Notification {
   createdAt DateTime @default(now())
   userId    String
   user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId, isRead])
+  @@index([createdAt])
 }
 
 model Message {
@@ -646,6 +666,9 @@ model Message {
   voiceDuration       Int?
   viewOnce            Boolean   @default(false)
   viewedAt            DateTime?
+
+  @@index([chatId, createdAt])
+  @@index([senderId])
 }
 
 model Chat {
@@ -677,6 +700,7 @@ model SavedPost {
   post      Post @relation(fields: [postId], references: [id])
 
   @@id([userId, postId])
+  @@index([postId])
 }
 
 model Account {
@@ -696,6 +720,7 @@ model Account {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
+  @@index([userId])
 }
 
 model Session {
@@ -704,6 +729,8 @@ model Session {
   userId       String
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model VerificationToken {
@@ -754,6 +781,7 @@ model View {
   @@index([postId])
   @@index([screenVideoId])
   @@index([viewer_user_id])
+  @@index([viewer_user_id, createdAt])
   @@index([device_fingerprint])
 }
 

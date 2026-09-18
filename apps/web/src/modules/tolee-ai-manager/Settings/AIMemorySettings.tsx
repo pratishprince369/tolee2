@@ -5,7 +5,7 @@ import { Shield, Brain, Trash2, Plus, Lock, BellOff, CheckCircle2, Globe, Sparkl
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { getAIMemories, saveAIMemory, deleteAIMemory, dismissAllAIReminders } from '@/actions/ai-manager';
-import { stopRingtoneAlarm } from '@/modules/ai-manager/Core/alarm-engine';
+import { stopRingtoneAlarm } from '@/modules/tolee-ai-manager/Core/alarm-engine';
 
 const SUPPORTED_LANGUAGES = [
   { code: 'hi-IN', label: 'Hindi (हिंदी)', announcement: 'Aapka Tolee Voice AI Manager ON ho chuka hai. Ab aap mujhe voice mein operate kar sakte hain.' },

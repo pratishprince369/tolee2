@@ -16,7 +16,7 @@ import {
   dismissAIReminder,
   dismissAllAIReminders 
 } from '@/actions/ai-manager';
-import { stopRingtoneAlarm } from '@/modules/ai-manager/Core/alarm-engine';
+import { stopRingtoneAlarm } from '@/modules/tolee-ai-manager/Core/alarm-engine';
 
 export function AITasks() {
   const [tasks, setTasks] = useState<any[]>([]);

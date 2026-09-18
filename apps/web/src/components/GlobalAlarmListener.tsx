@@ -15,7 +15,7 @@ import {
   stopRingtoneAlarm, 
   speakAlarmVoice, 
   triggerSystemNotification 
-} from '@/modules/ai-manager/Core/alarm-engine';
+} from '@/modules/tolee-ai-manager/Core/alarm-engine';
 
 interface ActiveAlarm {
   id: string;

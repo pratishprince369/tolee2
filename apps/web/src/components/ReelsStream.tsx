@@ -25,18 +25,20 @@ import {
   getFreshPexelsVideoUrl
 } from '@/actions/post';
 import { toggleFollow } from '@/actions/user';
+import dynamic from 'next/dynamic';
 import { HLSVideo, getSoundPreference, setSoundPreference, getDeviceNetworkStats } from '@/components/HLSVideo';
 import { useNetworkConfig } from '@/hooks/useNetworkConfig';
 import { videoMetadataCache } from '@/lib/videoCache';
 import { formatViewCount } from '@/lib/utils';
-import { ReShareModal } from '@/components/ReShareModal';
-import { ShareModal } from '@/components/ShareModal';
-import { QuickBoostModal } from '@/components/QuickBoostModal';
 import { AdTracker } from '@/components/AdTracker';
 import { fetchEligibleAds } from '@/actions/ads';
 import { isVideoUrl, getMediaThumbnail, getPosterUrl } from '@/lib/media';
 import { YouTubeReelPlayer } from '@/components/YouTubeReelPlayer';
 import { extractYouTubeVideoId, decodeHtmlEntities } from '@/lib/youtube';
+
+const ReShareModal = dynamic(() => import('@/components/ReShareModal').then(m => m.ReShareModal), { ssr: false });
+const ShareModal = dynamic(() => import('@/components/ShareModal').then(m => m.ShareModal), { ssr: false });
+const QuickBoostModal = dynamic(() => import('@/components/QuickBoostModal').then(m => m.QuickBoostModal), { ssr: false });
 
 const getValidAvatarUrl = (url: string | null | undefined): string => {
   if (!url || url === 'null' || url === 'undefined' || url.trim() === '') {
