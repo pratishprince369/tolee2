@@ -10,38 +10,10 @@ import {
   Share2, Star, Crown, ChevronDown, Check, Volume2, X, SlidersHorizontal
 } from 'lucide-react';
 import { SportsEventData, SportsCategoryData, TEAM_BADGES } from '@/lib/sports/types';
+import { TeamBadge } from '@/components/TeamBadge';
 
-// Resilient Team Logo component with automatic fallback & error handling
-function TeamLogo({ logo, name, className = 'w-full h-full object-contain p-0.5' }: { logo?: string | null; name: string; className?: string }) {
-  const [hasError, setHasError] = React.useState(false);
-  const resolvedLogo = !hasError ? (logo || TEAM_BADGES[name] || TEAM_BADGES[name?.trim()]) : null;
-
-  if (!resolvedLogo) {
-    const initials = (name || '?')
-      .split(' ')
-      .filter(Boolean)
-      .map(w => w[0])
-      .slice(0, 2)
-      .join('')
-      .toUpperCase();
-
-    return (
-      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-zinc-700 to-zinc-900 text-zinc-200 text-[10px] font-black select-none">
-        {initials}
-      </div>
-    );
-  }
-
-  return (
-    <img
-      src={resolvedLogo}
-      alt={name}
-      className={className}
-      onError={() => setHasError(true)}
-      loading="lazy"
-    />
-  );
-}
+// Alias TeamLogo to TeamBadge
+const TeamLogo = TeamBadge;
 
 // Sports SVG Icons
 function SportIcon({ slug, className = 'w-4 h-4' }: { slug: string; className?: string }) {

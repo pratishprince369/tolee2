@@ -8,37 +8,10 @@ import {
   Calendar, RefreshCw, Award, Activity, AlertCircle, Share2
 } from 'lucide-react';
 import { SportsEventData, CricketScoreDetails, FootballScoreDetails, TEAM_BADGES } from '@/lib/sports/types';
+import { TeamBadge } from '@/components/TeamBadge';
 
-function TeamLogo({ logo, name, className = 'w-full h-full object-contain' }: { logo?: string | null; name: string; className?: string }) {
-  const [hasError, setHasError] = useState(false);
-  const resolvedLogo = !hasError ? (logo || TEAM_BADGES[name] || TEAM_BADGES[name?.trim()]) : null;
-
-  if (!resolvedLogo) {
-    const initials = (name || '?')
-      .split(' ')
-      .filter(Boolean)
-      .map(w => w[0])
-      .slice(0, 2)
-      .join('')
-      .toUpperCase();
-
-    return (
-      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-zinc-700 to-zinc-900 text-zinc-200 text-sm font-black select-none">
-        {initials}
-      </div>
-    );
-  }
-
-  return (
-    <img
-      src={resolvedLogo}
-      alt={name}
-      className={className}
-      onError={() => setHasError(true)}
-      loading="lazy"
-    />
-  );
-}
+// Alias TeamLogo to TeamBadge
+const TeamLogo = TeamBadge;
 
 export default function MatchDetailPage() {
   const params = useParams();
