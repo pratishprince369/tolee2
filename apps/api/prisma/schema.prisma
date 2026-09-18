@@ -1412,5 +1412,139 @@ model ScreenVideoPlaylist {
   updatedAt   DateTime      @updatedAt
 }
 
+// ---------------------------------------------------------
+// TOLEE SPORTS & LIVE EVENTS SYSTEM
+// ---------------------------------------------------------
+
+model SportsCategory {
+  id           String             @id @default(cuid())
+  name         String
+  slug         String             @unique
+  icon         String?            // Icon name (lucide/emoji) or image URL
+  description  String?
+  isActive     Boolean            @default(true)
+  displayOrder Int                @default(0)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  tournaments  SportsTournament[]
+  teams        SportsTeam[]
+  events       SportsEvent[]
+
+  @@index([slug])
+  @@index([isActive])
+  @@index([displayOrder])
+}
+
+model SportsTournament {
+  id          String         @id @default(cuid())
+  name        String
+  slug        String
+  categoryId  String
+  category    SportsCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  season      String?
+  country     String?
+  logo        String?
+  description String?
+  isActive    Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  events      SportsEvent[]
+
+  @@unique([categoryId, slug])
+  @@index([categoryId])
+  @@index([isActive])
+}
+
+model SportsTeam {
+  id         String         @id @default(cuid())
+  name       String
+  shortName  String?
+  slug       String
+  categoryId String
+  category   SportsCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  logo       String?
+  country    String?
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  homeEvents SportsEvent[]  @relation("HomeTeam")
+  awayEvents SportsEvent[]  @relation("AwayTeam")
+
+  @@unique([categoryId, slug])
+  @@index([categoryId])
+}
+
+model SportsEvent {
+  id                String            @id @default(cuid())
+  title             String            // e.g. "India vs Australia" or "Arsenal vs Chelsea"
+  categoryId        String
+  category          SportsCategory    @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  tournamentId      String?
+  tournament        SportsTournament? @relation(fields: [tournamentId], references: [id], onDelete: SetNull)
+
+  homeTeamId        String?
+  homeTeam          SportsTeam?       @relation("HomeTeam", fields: [homeTeamId], references: [id], onDelete: SetNull)
+  awayTeamId        String?
+  awayTeam          SportsTeam?       @relation("AwayTeam", fields: [awayTeamId], references: [id], onDelete: SetNull)
+
+  team1Name         String
+  team1Logo         String?
+  team2Name         String
+  team2Logo         String?
+
+  status            String            @default("UPCOMING") // "UPCOMING" | "LIVE" | "COMPLETED" | "POSTPONED" | "CANCELLED"
+  eventDate         DateTime
+  startTime         String?
+  venue             String?
+  city              String?
+  country           String?
+
+  // Live Score overview
+  homeScore         String?           // e.g. "287/4" (Cricket) or "2" (Football)
+  awayScore         String?           // e.g. "284" (Cricket) or "1" (Football)
+  currentStatusText String?           // e.g. "Live - Over 42.1", "78'", "Half Time", "Match Ended - India won by 6 wkts"
+
+  // Deep sport-specific breakdown: innings, overs, wickets, batsmen, bowlers, goalscorers, cards
+  scoreDetails      Json?
+
+  // Match timeline events: minute, player, event type, description
+  timeline          Json?
+
+  // Detailed statistics: possession, shots, fouls, etc.
+  stats             Json?
+
+  description       String?
+  isFeatured        Boolean           @default(false)
+  isManual          Boolean           @default(true) // true if created/managed by admin, false if synced from API
+  externalApiId     String?           @unique        // for deduplication across API syncs
+  apiSource         String?                          // e.g. "thesportsdb", "cricapi", "manual"
+  lastApiSyncAt     DateTime?
+
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@index([categoryId])
+  @@index([tournamentId])
+  @@index([status])
+  @@index([eventDate])
+  @@index([isFeatured])
+  @@index([isManual])
+}
+
+model SportsApiConfig {
+  id                      String    @id @default(cuid())
+  provider                String    @unique // e.g. "thesportsdb", "cricapi"
+  apiKey                  String?
+  isEnabled               Boolean   @default(true)
+  autoSyncIntervalMinutes Int       @default(15)
+  lastSyncAt              DateTime?
+  config                  Json?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+}
+
+
 
 
