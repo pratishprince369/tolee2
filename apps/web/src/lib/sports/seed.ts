@@ -14,8 +14,9 @@ export const DEFAULT_SPORTS_CATEGORIES = [
   { name: 'Volleyball', slug: 'volleyball', icon: 'circle-dot', displayOrder: 11, description: 'FIVB World League, Prime Volleyball League' },
   { name: 'Golf', slug: 'golf', icon: 'award', displayOrder: 12, description: 'PGA Tour, Masters, The Open Championship' },
   { name: 'Baseball', slug: 'baseball', icon: 'baseball', displayOrder: 13, description: 'MLB Major League Baseball, World Baseball Classic' },
-  { name: 'Esports', slug: 'esports', icon: 'gamepad-2', displayOrder: 14, description: 'BGMI, Valorant, CS2, League of Legends' },
-  { name: 'Other Sports', slug: 'other-sports', icon: 'activity', displayOrder: 15, description: 'Athletics, Swimming, Chess, Table Tennis, and Regional sports' },
+  { name: 'Rugby', slug: 'rugby', icon: 'shield', displayOrder: 14, description: 'Rugby World Cup, Six Nations, Super Rugby' },
+  { name: 'Esports', slug: 'esports', icon: 'gamepad-2', displayOrder: 15, description: 'BGMI, Valorant, CS2, League of Legends' },
+  { name: 'Other Sports', slug: 'other-sports', icon: 'activity', displayOrder: 16, description: 'Athletics, Swimming, Chess, Table Tennis, and Regional sports' },
 ];
 
 export async function ensureDefaultSportsCategories() {
@@ -182,6 +183,92 @@ export async function ensureDefaultSportsCategories() {
             currentStatusText: 'Full Time • Jaipur won by 4 points',
             isFeatured: false,
             isManual: true,
+          }
+        });
+      }
+
+      // Basketball - Lakers vs Celtics
+      const basketball = await prisma.sportsCategory.findUnique({ where: { slug: 'basketball' } });
+      if (basketball) {
+        await prisma.sportsEvent.create({
+          data: {
+            title: 'Los Angeles Lakers vs Boston Celtics',
+            categoryId: basketball.id,
+            team1Name: 'Lakers',
+            team2Name: 'Celtics',
+            status: 'LIVE',
+            eventDate: now,
+            startTime: '04:12',
+            venue: 'Crypto.com Arena',
+            city: 'Los Angeles',
+            country: 'USA',
+            homeScore: '78',
+            awayScore: '71',
+            currentStatusText: 'Quarter 3 - 04:12',
+            isFeatured: true,
+            isManual: true,
+          }
+        });
+      }
+
+      // Upcoming Fixtures
+      const tennis = await prisma.sportsCategory.findUnique({ where: { slug: 'tennis' } });
+      if (cricket) {
+        await prisma.sportsEvent.create({
+          data: {
+            title: 'India vs Bangladesh',
+            categoryId: cricket.id,
+            team1Name: 'India',
+            team2Name: 'Bangladesh',
+            status: 'UPCOMING',
+            eventDate: now,
+            startTime: '19:00',
+            venue: 'Dubai International Stadium',
+            city: 'Dubai',
+            country: 'UAE',
+            isFeatured: true,
+            isManual: true,
+            description: 'T20 Super Clash at Dubai International Stadium.'
+          }
+        });
+      }
+
+      if (football) {
+        await prisma.sportsEvent.create({
+          data: {
+            title: 'Real Madrid vs Bayern Munich',
+            categoryId: football.id,
+            team1Name: 'Real Madrid',
+            team2Name: 'Bayern Munich',
+            status: 'UPCOMING',
+            eventDate: now,
+            startTime: '00:30',
+            venue: 'Santiago Bernabéu',
+            city: 'Madrid',
+            country: 'Spain',
+            isFeatured: true,
+            isManual: true,
+            description: 'UEFA Champions League Semi-Final.'
+          }
+        });
+      }
+
+      if (tennis) {
+        await prisma.sportsEvent.create({
+          data: {
+            title: 'Carlos Alcaraz vs Jannik Sinner',
+            categoryId: tennis.id,
+            team1Name: 'Alcaraz',
+            team2Name: 'Sinner',
+            status: 'UPCOMING',
+            eventDate: new Date(now.getTime() + 86400000),
+            startTime: '16:30',
+            venue: 'Centre Court',
+            city: 'London',
+            country: 'United Kingdom',
+            isFeatured: true,
+            isManual: true,
+            description: 'Wimbledon Men\'s Championship.'
           }
         });
       }
