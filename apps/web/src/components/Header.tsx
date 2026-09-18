@@ -205,26 +205,7 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
           <div className="w-8 h-8 xs:w-9 xs:h-9 sm:w-10 sm:h-10 rounded-full bg-gray-200 dark:bg-gray-800 animate-pulse" />
         ) : session?.user ? (
           <>
-            {/* Mobile Dedicated Sports Icon Button (next to search button) */}
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => router.push('/sports')}
-              onTouchStart={() => router.prefetch('/sports')}
-              onMouseEnter={() => router.prefetch('/sports')}
-              className={cn(
-                "rounded-full md:hidden flex items-center justify-center h-8.5 w-8.5 xs:h-9 xs:w-9 flex-shrink-0 transition-all active:scale-95",
-                pathname.startsWith('/sports') 
-                  ? 'text-primary bg-primary/10 border border-primary/20' 
-                  : 'text-gray-700 dark:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-800'
-              )}
-              aria-label="Tolee Sports"
-              title="Tolee Sports"
-            >
-              <Trophy className="w-4.5 h-4.5 xs:w-5 xs:h-5 text-gray-700 dark:text-zinc-200" />
-            </Button>
-
-            {/* Mobile Dedicated Search Icon Button */}
+            {/* Mobile Dedicated Search Icon Button (1st position) */}
             <Button 
               variant="ghost" 
               size="icon" 
@@ -241,6 +222,29 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
               title="Search"
             >
               <Search className="w-4.5 h-4.5 xs:w-5 xs:h-5 text-gray-700 dark:text-zinc-200" />
+            </Button>
+
+            {/* Mobile Dedicated Sports Icon Button (2nd position) */}
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => router.push('/sports')}
+              onTouchStart={() => router.prefetch('/sports')}
+              onMouseEnter={() => router.prefetch('/sports')}
+              className={cn(
+                "rounded-full md:hidden flex items-center justify-center h-8.5 w-8.5 xs:h-9 xs:w-9 flex-shrink-0 transition-all active:scale-95",
+                pathname.startsWith('/sports') 
+                  ? 'text-primary bg-primary/10 border border-primary/20' 
+                  : 'text-gray-700 dark:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-800'
+              )}
+              aria-label="Tolee Sports"
+              title="Tolee Sports"
+            >
+              <img 
+                src="/sports/cricket-icon.png" 
+                alt="Tolee Sports" 
+                className="w-4.5 h-4.5 xs:w-5 xs:h-5 object-contain dark:brightness-0 dark:invert transition-transform" 
+              />
             </Button>
 
             {/* Mobile Radar Shortcut */}
@@ -483,18 +487,7 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
           </>
         ) : (
           <div className="flex items-center gap-1.5 sm:gap-3">
-            {/* Mobile Sports Button for guests */}
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => router.push('/sports')}
-              className="rounded-full md:hidden flex items-center justify-center h-8.5 w-8.5 xs:h-9 xs:w-9 flex-shrink-0 text-gray-700 dark:text-zinc-200"
-              aria-label="Tolee Sports"
-              title="Tolee Sports"
-            >
-              <Trophy className="w-4.5 h-4.5 xs:w-5 xs:h-5" />
-            </Button>
-            {/* Mobile Search Button for guests */}
+            {/* Mobile Search Button for guests (1st position) */}
             <Button 
               variant="ghost" 
               size="icon" 
@@ -504,6 +497,21 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
               title="Search"
             >
               <Search className="w-4.5 h-4.5 xs:w-5 xs:h-5" />
+            </Button>
+            {/* Mobile Sports Button for guests (2nd position) */}
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => router.push('/sports')}
+              className="rounded-full md:hidden flex items-center justify-center h-8.5 w-8.5 xs:h-9 xs:w-9 flex-shrink-0 text-gray-700 dark:text-zinc-200"
+              aria-label="Tolee Sports"
+              title="Tolee Sports"
+            >
+              <img 
+                src="/sports/cricket-icon.png" 
+                alt="Tolee Sports" 
+                className="w-4.5 h-4.5 xs:w-5 xs:h-5 object-contain dark:brightness-0 dark:invert transition-transform" 
+              />
             </Button>
             <Link href="/auth/signin">
               <Button 
