@@ -9,30 +9,39 @@ import {
   Activity, Shield, CheckCircle2, AlertCircle, Bell, Play, Tv, ExternalLink,
   Share2, Star, Crown, ChevronDown, Check, Volume2, X, SlidersHorizontal
 } from 'lucide-react';
-import { SportsEventData, SportsCategoryData } from '@/lib/sports/types';
+import { SportsEventData, SportsCategoryData, TEAM_BADGES } from '@/lib/sports/types';
 
-// Fallback high quality team badges
-const TEAM_BADGES: Record<string, string> = {
-  'India': 'https://flagcdn.com/w80/in.png',
-  'Australia': 'https://flagcdn.com/w80/au.png',
-  'Arsenal': 'https://media.thesportsdb.com/images/media/team/badge/uyhbfe1612467038.png',
-  'Manchester City': 'https://media.thesportsdb.com/images/media/team/badge/vwpvry1467462651.png',
-  'Lakers': 'https://media.thesportsdb.com/images/media/team/badge/spa1361543851578.png',
-  'Celtics': 'https://media.thesportsdb.com/images/media/team/badge/wsqwtv1420756770.png',
-  'Real Madrid': 'https://media.thesportsdb.com/images/media/team/badge/wspvvr1420650965.png',
-  'Bayern Munich': 'https://media.thesportsdb.com/images/media/team/badge/q25gf71587747805.png',
-  'Bangladesh': 'https://flagcdn.com/w80/bd.png',
-  'Chiefs': 'https://media.thesportsdb.com/images/media/team/badge/vwtrup1448810237.png',
-  'Bills': 'https://media.thesportsdb.com/images/media/team/badge/xvtqvv1421434947.png',
-  'Alcaraz': 'https://flagcdn.com/w80/es.png',
-  'Sinner': 'https://flagcdn.com/w80/it.png',
-  'Chennai Super Kings': 'https://media.thesportsdb.com/images/media/team/badge/csk_badge.png',
-  'Mumbai Indians': 'https://media.thesportsdb.com/images/media/team/badge/mi_badge.png',
-  'Jaipur Pink Panthers': 'https://media.thesportsdb.com/images/media/team/badge/jaipur_pink.png',
-  'Puneri Paltan': 'https://media.thesportsdb.com/images/media/team/badge/puneri.png',
-  'Vindhya Celebrities': '/sports/vcpl-season-2.jpg',
-  'Royal Stars XI': '/sports/vcpl-season-2.jpg',
-};
+// Resilient Team Logo component with automatic fallback & error handling
+function TeamLogo({ logo, name, className = 'w-full h-full object-contain p-0.5' }: { logo?: string | null; name: string; className?: string }) {
+  const [hasError, setHasError] = React.useState(false);
+  const resolvedLogo = !hasError ? (logo || TEAM_BADGES[name] || TEAM_BADGES[name?.trim()]) : null;
+
+  if (!resolvedLogo) {
+    const initials = (name || '?')
+      .split(' ')
+      .filter(Boolean)
+      .map(w => w[0])
+      .slice(0, 2)
+      .join('')
+      .toUpperCase();
+
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-zinc-700 to-zinc-900 text-zinc-200 text-[10px] font-black select-none">
+        {initials}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={resolvedLogo}
+      alt={name}
+      className={className}
+      onError={() => setHasError(true)}
+      loading="lazy"
+    />
+  );
+}
 
 // Sports SVG Icons
 function SportIcon({ slug, className = 'w-4 h-4' }: { slug: string; className?: string }) {
@@ -795,11 +804,7 @@ export default function SportsPage() {
                             <div className="flex items-center justify-between mb-2.5">
                               <div className="flex items-center gap-2.5 min-w-0 pr-2">
                                 <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-zinc-850 border border-zinc-700/80 flex items-center justify-center overflow-hidden flex-shrink-0 shadow-sm">
-                                  {team1Logo ? (
-                                    <img src={team1Logo} alt={match.team1Name} className="w-full h-full object-cover" />
-                                  ) : (
-                                    <Shield className="w-4 h-4 text-zinc-400" />
-                                  )}
+                                  <TeamLogo logo={team1Logo} name={match.team1Name} className="w-full h-full object-contain p-0.5" />
                                 </div>
                                 <span className="font-extrabold text-sm text-zinc-100 truncate group-hover:text-emerald-300 transition-colors">
                                   {match.team1Name}
@@ -814,11 +819,7 @@ export default function SportsPage() {
                             <div className="flex items-center justify-between mb-3">
                               <div className="flex items-center gap-2.5 min-w-0 pr-2">
                                 <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-zinc-850 border border-zinc-700/80 flex items-center justify-center overflow-hidden flex-shrink-0 shadow-sm">
-                                  {team2Logo ? (
-                                    <img src={team2Logo} alt={match.team2Name} className="w-full h-full object-cover" />
-                                  ) : (
-                                    <Shield className="w-4 h-4 text-zinc-400" />
-                                  )}
+                                  <TeamLogo logo={team2Logo} name={match.team2Name} className="w-full h-full object-contain p-0.5" />
                                 </div>
                                 <span className="font-extrabold text-sm text-zinc-100 truncate group-hover:text-emerald-300 transition-colors">
                                   {match.team2Name}
@@ -964,11 +965,7 @@ export default function SportsPage() {
                               <div className="flex items-center justify-between mb-3 px-1 sm:px-2">
                                 <div className="flex flex-col items-center gap-1.5 flex-1 text-center">
                                   <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-zinc-850 border border-zinc-700/80 flex items-center justify-center overflow-hidden shadow-sm">
-                                    {team1Logo ? (
-                                      <img src={team1Logo} alt={match.team1Name} className="w-full h-full object-cover" />
-                                    ) : (
-                                      <Shield className="w-4 h-4 text-zinc-400" />
-                                    )}
+                                    <TeamLogo logo={team1Logo} name={match.team1Name} className="w-full h-full object-contain p-1" />
                                   </div>
                                   <span className="font-bold text-xs text-zinc-200 truncate max-w-[85px]">
                                     {match.team1Name}
@@ -981,11 +978,7 @@ export default function SportsPage() {
 
                                 <div className="flex flex-col items-center gap-1.5 flex-1 text-center">
                                   <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-zinc-850 border border-zinc-700/80 flex items-center justify-center overflow-hidden shadow-sm">
-                                    {team2Logo ? (
-                                      <img src={team2Logo} alt={match.team2Name} className="w-full h-full object-cover" />
-                                    ) : (
-                                      <Shield className="w-4 h-4 text-zinc-400" />
-                                    )}
+                                    <TeamLogo logo={team2Logo} name={match.team2Name} className="w-full h-full object-contain p-1" />
                                   </div>
                                   <span className="font-bold text-xs text-zinc-200 truncate max-w-[85px]">
                                     {match.team2Name}

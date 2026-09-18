@@ -125,3 +125,34 @@ export interface SportsCategoryData {
   displayOrder: number;
   eventsCount?: number;
 }
+
+export const TEAM_BADGES: Record<string, string> = {
+  'India': '/sports/teams/india.png',
+  'Australia': '/sports/teams/australia.png',
+  'Arsenal': '/sports/teams/arsenal.png',
+  'Manchester City': '/sports/teams/man-city.png',
+  'Lakers': '/sports/teams/lakers.png',
+  'Los Angeles Lakers': '/sports/teams/lakers.png',
+  'Celtics': '/sports/teams/celtics.png',
+  'Boston Celtics': '/sports/teams/celtics.png',
+  'Real Madrid': '/sports/teams/real-madrid.png',
+  'Bayern Munich': '/sports/teams/bayern-munich.png',
+  'Bangladesh': '/sports/teams/bangladesh.png',
+  'Chiefs': '/sports/teams/chiefs.png',
+  'Kansas City Chiefs': '/sports/teams/chiefs.png',
+  'Bills': '/sports/teams/bills.png',
+  'Buffalo Bills': '/sports/teams/bills.png',
+  'Alcaraz': '/sports/teams/spain.png',
+  'Carlos Alcaraz': '/sports/teams/spain.png',
+  'Sinner': '/sports/teams/italy.png',
+  'Jannik Sinner': '/sports/teams/italy.png',
+  'Chennai Super Kings': '/sports/teams/csk.png',
+  'CSK': '/sports/teams/csk.png',
+  'Mumbai Indians': '/sports/teams/mi.png',
+  'MI': '/sports/teams/mi.png',
+  'Jaipur Pink Panthers': '/sports/teams/jaipur-pink-panthers.png',
+  'Puneri Paltan': '/sports/teams/puneri-paltan.png',
+  'Vindhya Celebrities': '/sports/vcpl-season-2.jpg',
+  'Royal Stars XI': '/sports/vcpl-season-2.jpg',
+};
+

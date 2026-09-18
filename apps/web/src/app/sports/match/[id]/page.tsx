@@ -7,7 +7,38 @@ import {
   ArrowLeft, Trophy, Clock, MapPin, Shield, Flame, 
   Calendar, RefreshCw, Award, Activity, AlertCircle, Share2
 } from 'lucide-react';
-import { SportsEventData, CricketScoreDetails, FootballScoreDetails } from '@/lib/sports/types';
+import { SportsEventData, CricketScoreDetails, FootballScoreDetails, TEAM_BADGES } from '@/lib/sports/types';
+
+function TeamLogo({ logo, name, className = 'w-full h-full object-contain' }: { logo?: string | null; name: string; className?: string }) {
+  const [hasError, setHasError] = useState(false);
+  const resolvedLogo = !hasError ? (logo || TEAM_BADGES[name] || TEAM_BADGES[name?.trim()]) : null;
+
+  if (!resolvedLogo) {
+    const initials = (name || '?')
+      .split(' ')
+      .filter(Boolean)
+      .map(w => w[0])
+      .slice(0, 2)
+      .join('')
+      .toUpperCase();
+
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-zinc-700 to-zinc-900 text-zinc-200 text-sm font-black select-none">
+        {initials}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={resolvedLogo}
+      alt={name}
+      className={className}
+      onError={() => setHasError(true)}
+      loading="lazy"
+    />
+  );
+}
 
 export default function MatchDetailPage() {
   const params = useParams();
@@ -172,11 +203,7 @@ export default function MatchDetailPage() {
             {/* Team 1 */}
             <div className="flex flex-col items-center">
               <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-zinc-800 border border-zinc-700/80 p-2 flex items-center justify-center shadow-lg mb-2.5 overflow-hidden">
-                {match.team1Logo ? (
-                  <img src={match.team1Logo} alt={match.team1Name} className="w-full h-full object-contain" />
-                ) : (
-                  <Shield className="w-8 h-8 text-zinc-500" />
-                )}
+                <TeamLogo logo={match.team1Logo} name={match.team1Name} className="w-full h-full object-contain" />
               </div>
               <h2 className="text-sm sm:text-base font-black text-white text-center leading-tight">
                 {match.team1Name}
@@ -205,11 +232,7 @@ export default function MatchDetailPage() {
             {/* Team 2 */}
             <div className="flex flex-col items-center">
               <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-zinc-800 border border-zinc-700/80 p-2 flex items-center justify-center shadow-lg mb-2.5 overflow-hidden">
-                {match.team2Logo ? (
-                  <img src={match.team2Logo} alt={match.team2Name} className="w-full h-full object-contain" />
-                ) : (
-                  <Shield className="w-8 h-8 text-zinc-500" />
-                )}
+                <TeamLogo logo={match.team2Logo} name={match.team2Name} className="w-full h-full object-contain" />
               </div>
               <h2 className="text-sm sm:text-base font-black text-white text-center leading-tight">
                 {match.team2Name}
