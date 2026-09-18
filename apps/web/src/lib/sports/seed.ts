@@ -273,6 +273,55 @@ export async function ensureDefaultSportsCategories() {
         });
       }
 
+      // VCPL T10 - Vindhya Celebrity Premier League Season 2
+      if (cricket) {
+        const vcplTournament = await prisma.sportsTournament.upsert({
+          where: { categoryId_slug: { categoryId: cricket.id, slug: 'vcpl-season-2' } },
+          update: { logo: '/uploads/vcpl-season-2.jpg' },
+          create: {
+            name: 'VCPL - T10 Season 2',
+            slug: 'vcpl-season-2',
+            categoryId: cricket.id,
+            season: 'Season 2',
+            country: 'India',
+            logo: '/sports/vcpl-season-2.jpg',
+            description: 'SNEHA EVENTS AND MANAGEMENT PRESENTS VCPL - T10 - Vindhya Celebrity Premier League Season 2. 27 Dec 2026 to 1 Jan 2027.',
+            isActive: true,
+          }
+        });
+
+        await prisma.sportsEvent.create({
+          data: {
+            title: 'VCPL - T10 - Vindhya Celebrity Premier League Season 2',
+            categoryId: cricket.id,
+            tournamentId: vcplTournament.id,
+            externalApiId: 'vcpl-season-2-inaugural',
+            eventDate: new Date('2026-12-27T10:00:00.000Z'),
+            startTime: '10:00 AM',
+            venue: 'Vindhya Cricket Stadium',
+            city: 'Rewa, Vindhya',
+            country: 'India',
+            team1Name: 'Vindhya Celebrities',
+            team1Logo: '/sports/vcpl-season-2.jpg',
+            team2Name: 'Royal Stars XI',
+            team2Logo: '/sports/vcpl-season-2.jpg',
+            status: 'UPCOMING',
+            isFeatured: true,
+            isManual: true,
+            description: 'SNEHA EVENTS AND MANAGEMENT PRESENTS VCPL - T10 - Vindhya Celebrity Premier League Season 2. Bigger, Faster, Tougher, More Stars. A League of Stars. Cricket Beyond Limits. Dates: 27 December 2026 to 1 January 2027.',
+            scoreDetails: {
+              posterUrl: '/sports/vcpl-season-2.jpg',
+              format: 'T10',
+              season: 'Season 2',
+              startDate: '27 Dec 2026',
+              endDate: '1 Jan 2027',
+              organizer: 'Sneha Events and Management',
+              tagline: 'Cricket Beyond Limits'
+            }
+          }
+        });
+      }
+
       console.log('[Sports Seed] Initial sample events seeded successfully.');
     }
   } catch (error) {

@@ -136,6 +136,17 @@ export default function MatchDetailPage() {
       <div className="bg-gradient-to-b from-zinc-900 via-zinc-900/60 to-zinc-950 border-b border-zinc-800/80 px-4 py-8">
         <div className="max-w-4xl mx-auto text-center">
 
+          {/* Tournament Poster Display (if present) */}
+          {(match.scoreDetails as any)?.posterUrl && (
+            <div className="mb-6 max-w-sm mx-auto rounded-2xl overflow-hidden border border-amber-500/40 shadow-2xl bg-zinc-950">
+              <img
+                src={(match.scoreDetails as any).posterUrl}
+                alt={match.title}
+                className="w-full h-auto object-cover"
+              />
+            </div>
+          )}
+
           {/* Tournament & Status Tags */}
           <div className="flex items-center justify-center gap-2 mb-4 flex-wrap">
             <span className="px-2.5 py-0.5 rounded-full bg-zinc-800 text-zinc-300 text-xs font-semibold">

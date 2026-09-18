@@ -30,6 +30,8 @@ const TEAM_BADGES: Record<string, string> = {
   'Mumbai Indians': 'https://media.thesportsdb.com/images/media/team/badge/mi_badge.png',
   'Jaipur Pink Panthers': 'https://media.thesportsdb.com/images/media/team/badge/jaipur_pink.png',
   'Puneri Paltan': 'https://media.thesportsdb.com/images/media/team/badge/puneri.png',
+  'Vindhya Celebrities': '/sports/vcpl-season-2.jpg',
+  'Royal Stars XI': '/sports/vcpl-season-2.jpg',
 };
 
 // Sports SVG Icons
@@ -130,6 +132,7 @@ function SportIcon({ slug, className = 'w-4 h-4' }: { slug: string; className?: 
 
 // Top Leagues Data
 const TOP_LEAGUES = [
+  { id: 'vcpl', name: 'VCPL T10', sport: 'Cricket', icon: '🏏', slug: 'cricket', query: 'VCPL' },
   { id: 'ipl', name: 'IPL', sport: 'Cricket', icon: '🏏', slug: 'cricket', query: 'IPL' },
   { id: 'pl', name: 'Premier League', sport: 'Football', icon: '⚽', slug: 'football', query: 'Premier League' },
   { id: 'nba', name: 'NBA', sport: 'Basketball', icon: '🏀', slug: 'basketball', query: 'NBA' },
@@ -921,60 +924,84 @@ export default function SportsPage() {
                       const team1Logo = match.team1Logo || TEAM_BADGES[match.team1Name];
                       const team2Logo = match.team2Logo || TEAM_BADGES[match.team2Name];
                       const hasReminder = !!activeReminders[match.id];
+                      const details = match.scoreDetails as any;
+                      const posterUrl = details?.posterUrl || (match.team1Logo?.includes('vcpl') ? match.team1Logo : null);
+                      const isMultiDay = !!details?.startDate && !!details?.endDate;
 
                       return (
                         <div
                           key={match.id}
-                          className="w-[74vw] max-w-[280px] md:w-auto flex-shrink-0 snap-start bg-[#0b1222] border border-[#17253b] hover:border-[#2a3f63] rounded-2xl p-4 shadow-lg flex flex-col justify-between transition-all group"
+                          className="w-[74vw] max-w-[280px] md:w-auto flex-shrink-0 snap-start bg-[#0b1222] border border-[#17253b] hover:border-[#2a3f63] rounded-2xl p-4 shadow-lg flex flex-col justify-between transition-all group overflow-hidden"
                         >
                           <div>
                             {/* League / Format */}
-                            <div className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-3 truncate flex items-center gap-1.5">
+                            <div className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-2.5 truncate flex items-center gap-1.5">
                               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                               {match.category?.name || 'Tournament'} {match.tournament?.name ? `• ${match.tournament.name}` : ''}
                             </div>
 
-                            {/* Teams Faceoff */}
-                            <div className="flex items-center justify-between mb-3 px-1 sm:px-2">
-                              {/* Team 1 */}
-                              <div className="flex flex-col items-center gap-1.5 flex-1 text-center">
-                                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-zinc-850 border border-zinc-700/80 flex items-center justify-center overflow-hidden shadow-sm">
-                                  {team1Logo ? (
-                                    <img src={team1Logo} alt={match.team1Name} className="w-full h-full object-cover" />
-                                  ) : (
-                                    <Shield className="w-4 h-4 text-zinc-400" />
-                                  )}
+                            {posterUrl ? (
+                              /* Poster Presentation */
+                              <Link href={`/sports/match/${match.id}`} className="block group/poster mb-2.5">
+                                <div className="relative rounded-xl overflow-hidden aspect-[4/3] bg-zinc-950 border border-amber-500/30 shadow-md">
+                                  <img
+                                    src={posterUrl}
+                                    alt={match.title}
+                                    className="w-full h-full object-cover group-hover/poster:scale-105 transition-transform duration-300"
+                                  />
+                                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex items-end p-2">
+                                    <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-amber-500 text-black shadow-sm">
+                                      {details?.format || 'T10'} • {details?.season || 'Season 2'}
+                                    </span>
+                                  </div>
                                 </div>
-                                <span className="font-bold text-xs text-zinc-200 truncate max-w-[85px]">
-                                  {match.team1Name}
-                                </span>
-                              </div>
-
-                              <span className="text-xs font-black text-zinc-500 font-mono px-2">
-                                VS
-                              </span>
-
-                              {/* Team 2 */}
-                              <div className="flex flex-col items-center gap-1.5 flex-1 text-center">
-                                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-zinc-850 border border-zinc-700/80 flex items-center justify-center overflow-hidden shadow-sm">
-                                  {team2Logo ? (
-                                    <img src={team2Logo} alt={match.team2Name} className="w-full h-full object-cover" />
-                                  ) : (
-                                    <Shield className="w-4 h-4 text-zinc-400" />
-                                  )}
+                                <h3 className="font-extrabold text-xs text-white group-hover/poster:text-emerald-300 transition-colors mt-2 line-clamp-2 leading-tight">
+                                  {match.title}
+                                </h3>
+                              </Link>
+                            ) : (
+                              /* Standard Teams Faceoff */
+                              <div className="flex items-center justify-between mb-3 px-1 sm:px-2">
+                                <div className="flex flex-col items-center gap-1.5 flex-1 text-center">
+                                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-zinc-850 border border-zinc-700/80 flex items-center justify-center overflow-hidden shadow-sm">
+                                    {team1Logo ? (
+                                      <img src={team1Logo} alt={match.team1Name} className="w-full h-full object-cover" />
+                                    ) : (
+                                      <Shield className="w-4 h-4 text-zinc-400" />
+                                    )}
+                                  </div>
+                                  <span className="font-bold text-xs text-zinc-200 truncate max-w-[85px]">
+                                    {match.team1Name}
+                                  </span>
                                 </div>
-                                <span className="font-bold text-xs text-zinc-200 truncate max-w-[85px]">
-                                  {match.team2Name}
+
+                                <span className="text-xs font-black text-zinc-500 font-mono px-2">
+                                  VS
                                 </span>
+
+                                <div className="flex flex-col items-center gap-1.5 flex-1 text-center">
+                                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-zinc-850 border border-zinc-700/80 flex items-center justify-center overflow-hidden shadow-sm">
+                                    {team2Logo ? (
+                                      <img src={team2Logo} alt={match.team2Name} className="w-full h-full object-cover" />
+                                    ) : (
+                                      <Shield className="w-4 h-4 text-zinc-400" />
+                                    )}
+                                  </div>
+                                  <span className="font-bold text-xs text-zinc-200 truncate max-w-[85px]">
+                                    {match.team2Name}
+                                  </span>
+                                </div>
                               </div>
-                            </div>
+                            )}
 
                             {/* Schedule & Venue */}
                             <div className="text-center mb-3">
-                              <div className="text-xs font-bold text-zinc-200">
-                                {new Date(match.eventDate).toDateString() === new Date().toDateString()
+                              <div className="text-xs font-bold text-emerald-400">
+                                {isMultiDay
+                                  ? `${details.startDate} - ${details.endDate}`
+                                  : new Date(match.eventDate).toDateString() === new Date().toDateString()
                                   ? `Today, ${match.startTime || '7:00 PM'}`
-                                  : `Tomorrow, ${match.startTime || '6:30 AM'}`}
+                                  : `${new Date(match.eventDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, ${match.startTime || '6:30 AM'}`}
                               </div>
                               <div className="text-[11px] text-zinc-400 flex items-center justify-center gap-1 mt-0.5 truncate">
                                 <MapPin className="w-3 h-3 text-zinc-500 flex-shrink-0" />
