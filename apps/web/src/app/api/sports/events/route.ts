@@ -1,12 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { ensureDefaultSportsCategories } from '@/lib/sports/seed';
+import { SportsSyncService } from '@/lib/sports/provider';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   try {
     await ensureDefaultSportsCategories();
+
+    // Auto-sync real live matches from external sports API if DB has no external matches or cache is stale
+    try {
+      const nonManualCount = await prisma.sportsEvent.count({ where: { isManual: false } });
+      const lastSyncConfig = await prisma.sportsApiConfig.findFirst({
+        where: { provider: 'thesportsdb' },
+        select: { lastSyncAt: true }
+      });
+
+      const isStale = !lastSyncConfig?.lastSyncAt || (Date.now() - new Date(lastSyncConfig.lastSyncAt).getTime() > 3 * 60 * 1000);
+
+      if (nonManualCount === 0) {
+        await SportsSyncService.syncExternalSports();
+      } else if (isStale) {
+        SportsSyncService.syncExternalSports().catch((err) => {
+          console.warn('[API Sports Events] Background sync error:', err);
+        });
+      }
+    } catch (syncErr) {
+      console.warn('[API Sports Events] Sync check error:', syncErr);
+    }
 
     const { searchParams } = new URL(req.url);
     const categorySlug = searchParams.get('category');

@@ -125,55 +125,6 @@ const TOP_LEAGUES = [
   { id: 'pkl', name: 'Pro Kabaddi', sport: 'Kabaddi', icon: '🏆', slug: 'kabaddi', query: 'Pro Kabaddi' },
 ];
 
-// Trending Sports Topics
-const TRENDING_TOPICS = [
-  {
-    id: '1',
-    rank: 1,
-    title: 'India vs Australia',
-    subtitle: 'Thrilling Finish in Mumbai!',
-    views: '124K views',
-    image: 'https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?w=150&auto=format&fit=crop&q=80',
-    query: 'India',
-  },
-  {
-    id: '2',
-    rank: 2,
-    title: 'Arsenal Take Lead',
-    subtitle: "Saka Scores in 74'",
-    views: '98K views',
-    image: 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=150&auto=format&fit=crop&q=80',
-    query: 'Arsenal',
-  },
-  {
-    id: '3',
-    rank: 3,
-    title: 'Lakers Dominate Q3',
-    subtitle: 'LeBron on Fire',
-    views: '76K views',
-    image: 'https://images.unsplash.com/photo-1546519638-68e109498ffc?w=150&auto=format&fit=crop&q=80',
-    query: 'Lakers',
-  },
-  {
-    id: '4',
-    rank: 4,
-    title: 'Djokovic into Semi Final',
-    subtitle: 'US Open 2026',
-    views: '65K views',
-    image: 'https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?w=150&auto=format&fit=crop&q=80',
-    query: 'Djokovic',
-  },
-  {
-    id: '5',
-    rank: 5,
-    title: 'F1 Singapore GP',
-    subtitle: 'Practice Results',
-    views: '48K views',
-    image: 'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?w=150&auto=format&fit=crop&q=80',
-    query: 'F1',
-  },
-];
-
 export default function SportsPage() {
   const { data: session } = useSession();
 
@@ -1193,7 +1144,7 @@ export default function SportsPage() {
                   </h3>
                 </div>
                 <button
-                  onClick={() => setSearchQuery('India')}
+                  onClick={() => setSearchQuery('')}
                   className="text-xs font-bold text-zinc-400 hover:text-emerald-400 transition-colors"
                 >
                   View All &gt;
@@ -1201,30 +1152,41 @@ export default function SportsPage() {
               </div>
 
               <div className="space-y-3.5">
-                {TRENDING_TOPICS.map(item => (
-                  <button
-                    key={item.id}
-                    onClick={() => setSearchQuery(item.query)}
+                {events.slice(0, 5).map((match, idx) => (
+                  <Link
+                    key={match.id}
+                    href={`/sports/match/${match.id}`}
                     className="w-full flex items-center gap-3 text-left group hover:bg-[#101a2f] p-1.5 -mx-1.5 rounded-xl transition-colors"
                   >
                     <div className="w-6 h-6 rounded-full bg-[#16233a] text-zinc-300 font-black text-xs flex items-center justify-center flex-shrink-0 group-hover:bg-emerald-500 group-hover:text-black transition-colors">
-                      {item.rank}
+                      {idx + 1}
                     </div>
 
-                    <div className="w-10 h-10 rounded-xl overflow-hidden flex-shrink-0 bg-zinc-800 border border-zinc-700/60 shadow-sm">
-                      <img src={item.image} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                    <div className="w-10 h-10 rounded-xl overflow-hidden flex-shrink-0 bg-zinc-800 border border-zinc-700/60 shadow-sm flex items-center justify-center p-1">
+                      <TeamBadge
+                        name={match.team1Name}
+                        logo={match.team1Logo}
+                        className="w-full h-full object-contain group-hover:scale-105 transition-transform"
+                      />
                     </div>
 
                     <div className="flex-1 min-w-0">
                       <h4 className="text-xs font-bold text-zinc-100 group-hover:text-emerald-400 transition-colors truncate">
-                        {item.title}
+                        {match.team1Name} vs {match.team2Name}
                       </h4>
                       <p className="text-[11px] text-zinc-400 truncate">
-                        {item.subtitle} • <span className="text-zinc-500">{item.views}</span>
+                        {match.status === 'LIVE' ? (
+                          <span className="text-emerald-400 font-semibold">🔴 Live • {match.homeScore || '0'} - {match.awayScore || '0'}</span>
+                        ) : (
+                          <span>{match.status} • {match.category?.name || 'Match'}</span>
+                        )}
                       </p>
                     </div>
-                  </button>
+                  </Link>
                 ))}
+                {events.length === 0 && (
+                  <p className="text-xs text-zinc-500 text-center py-2">Syncing live sports...</p>
+                )}
               </div>
             </div>
 

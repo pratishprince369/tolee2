@@ -1,5 +1,4 @@
 import { prisma } from '@/lib/prisma';
-import { TEAM_BADGES } from './types';
 
 export const DEFAULT_SPORTS_CATEGORIES = [
   { name: 'Cricket', slug: 'cricket', icon: 'cricket', displayOrder: 1, description: 'International & Domestic Cricket, IPL, World Cups' },
@@ -42,269 +41,29 @@ export async function ensureDefaultSportsCategories() {
       console.log('[Sports Seed] Default sports categories seeded successfully.');
     }
 
-    // If no events exist, seed initial sample matches
-    const eventCount = await prisma.sportsEvent.count();
-    if (eventCount === 0) {
-      const cricket = await prisma.sportsCategory.findUnique({ where: { slug: 'cricket' } });
-      const football = await prisma.sportsCategory.findUnique({ where: { slug: 'football' } });
-      const kabaddi = await prisma.sportsCategory.findUnique({ where: { slug: 'kabaddi' } });
+    // Ensure VCPL event exists (User-configured real tournament)
+    const cricket = await prisma.sportsCategory.findUnique({ where: { slug: 'cricket' } });
+    if (cricket) {
+      const vcplTournament = await prisma.sportsTournament.upsert({
+        where: { slug: 'vcpl-season-2' },
+        update: { logo: '/uploads/vcpl-season-2.jpg' },
+        create: {
+          name: 'VCPL - T10 Season 2',
+          slug: 'vcpl-season-2',
+          categoryId: cricket.id,
+          season: 'Season 2',
+          country: 'India',
+          logo: '/sports/vcpl-season-2.jpg',
+          description: 'SNEHA EVENTS AND MANAGEMENT PRESENTS VCPL - T10 - Vindhya Celebrity Premier League Season 2. 27 Dec 2026 to 1 Jan 2027.',
+          isActive: true,
+        }
+      });
 
-      const now = new Date();
+      const existingVcpl = await prisma.sportsEvent.findUnique({
+        where: { externalApiId: 'vcpl-season-2-inaugural' }
+      });
 
-      if (cricket) {
-        await prisma.sportsEvent.create({
-          data: {
-            title: 'India vs Australia - 3rd T20I',
-            categoryId: cricket.id,
-            team1Name: 'India',
-            team1Logo: TEAM_BADGES['India'],
-            team2Name: 'Australia',
-            team2Logo: TEAM_BADGES['Australia'],
-            status: 'LIVE',
-            eventDate: now,
-            startTime: '19:00',
-            venue: 'Wankhede Stadium',
-            city: 'Mumbai',
-            country: 'India',
-            homeScore: '184/3',
-            awayScore: '180/7',
-            currentStatusText: 'Live: Over 18.4 • India need 12 runs in 8 balls',
-            isFeatured: true,
-            isManual: true,
-            scoreDetails: {
-              format: 'T20',
-              innings: [
-                {
-                  teamName: 'Australia',
-                  inningsNumber: 1,
-                  runs: 180,
-                  wickets: 7,
-                  overs: 20.0,
-                  batsmen: [
-                    { name: 'David Warner', runs: 58, balls: 38, fours: 6, sixes: 2, strikeRate: 152.6, dismissalInfo: 'c Rohit b Bumrah' },
-                    { name: 'Travis Head', runs: 42, balls: 24, fours: 5, sixes: 2, strikeRate: 175.0, dismissalInfo: 'b Kuldeep' },
-                    { name: 'Glenn Maxwell', runs: 31, balls: 16, fours: 2, sixes: 3, strikeRate: 193.7, dismissalInfo: 'c Pant b Siraj' }
-                  ],
-                  bowlers: [
-                    { name: 'Jasprit Bumrah', overs: 4, maidens: 0, runs: 24, wickets: 3, economy: 6.00 },
-                    { name: 'Kuldeep Yadav', overs: 4, maidens: 0, runs: 32, wickets: 2, economy: 8.00 },
-                    { name: 'Mohammed Siraj', overs: 4, maidens: 0, runs: 38, wickets: 1, economy: 9.50 }
-                  ]
-                },
-                {
-                  teamName: 'India',
-                  inningsNumber: 2,
-                  runs: 184,
-                  wickets: 3,
-                  overs: 18.4,
-                  batsmen: [
-                    { name: 'Rohit Sharma (c)', runs: 64, balls: 41, fours: 7, sixes: 3, strikeRate: 156.1, dismissalInfo: 'c Starc b Zampa' },
-                    { name: 'Virat Kohli', runs: 52, balls: 35, fours: 4, sixes: 1, strikeRate: 148.5, dismissalInfo: 'not out' },
-                    { name: 'Suryakumar Yadav', runs: 46, balls: 22, fours: 4, sixes: 3, strikeRate: 209.0, dismissalInfo: 'not out' }
-                  ],
-                  bowlers: [
-                    { name: 'Mitchell Starc', overs: 3.4, maidens: 0, runs: 36, wickets: 1, economy: 9.81 },
-                    { name: 'Pat Cummins', overs: 4, maidens: 0, runs: 34, wickets: 1, economy: 8.50 },
-                    { name: 'Adam Zampa', overs: 4, maidens: 0, runs: 38, wickets: 1, economy: 9.50 }
-                  ]
-                }
-              ]
-            },
-            timeline: [
-              { minute: '18.4 ov', title: 'FOUR! Suryakumar Yadav slices it past point', description: 'What a shot! Brings the target within single digits.', type: 'boundary' },
-              { minute: '17.2 ov', title: 'FIFTY for Virat Kohli', description: 'Kohli reaches his 39th T20I half-century with a calm single.', type: 'general' },
-              { minute: '11.5 ov', title: 'WICKET! Rohit Sharma caught at long-on', description: 'Zampa breaks the 90-run partnership.', type: 'wicket' }
-            ]
-          }
-        });
-
-        // Upcoming match
-        const tomorrow = new Date(now.getTime() + 86400000);
-        await prisma.sportsEvent.create({
-          data: {
-            title: 'Chennai Super Kings vs Mumbai Indians',
-            categoryId: cricket.id,
-            team1Name: 'Chennai Super Kings',
-            team1Logo: TEAM_BADGES['Chennai Super Kings'],
-            team2Name: 'Mumbai Indians',
-            team2Logo: TEAM_BADGES['Mumbai Indians'],
-            status: 'UPCOMING',
-            eventDate: tomorrow,
-            startTime: '19:30',
-            venue: 'M. A. Chidambaram Stadium',
-            city: 'Chennai',
-            country: 'India',
-            isFeatured: true,
-            isManual: true,
-            description: 'El Clásico of the Indian Premier League. High-octane clash at Chepauk.'
-          }
-        });
-      }
-
-      if (football) {
-        await prisma.sportsEvent.create({
-          data: {
-            title: 'Arsenal vs Manchester City',
-            categoryId: football.id,
-            team1Name: 'Arsenal',
-            team1Logo: TEAM_BADGES['Arsenal'],
-            team2Name: 'Manchester City',
-            team2Logo: TEAM_BADGES['Manchester City'],
-            status: 'LIVE',
-            eventDate: now,
-            startTime: '21:00',
-            venue: 'Emirates Stadium',
-            city: 'London',
-            country: 'United Kingdom',
-            homeScore: '2',
-            awayScore: '1',
-            currentStatusText: '74\' • Second Half',
-            isFeatured: true,
-            isManual: true,
-            timeline: [
-              { minute: '68\'', title: 'GOAL! Bukayo Saka scores with a curling strike', description: 'Arsenal take the lead at the Emirates!', type: 'goal' },
-              { minute: '41\'', title: 'GOAL! Erling Haaland equalizes', description: 'Clinical finish into the bottom left corner.', type: 'goal' },
-              { minute: '14\'', title: 'GOAL! Martin Odegaard opens scoring', description: 'Stunning 25-yard drive.', type: 'goal' }
-            ]
-          }
-        });
-      }
-
-      if (kabaddi) {
-        await prisma.sportsEvent.create({
-          data: {
-            title: 'Jaipur Pink Panthers vs Puneri Paltan',
-            categoryId: kabaddi.id,
-            team1Name: 'Jaipur Pink Panthers',
-            team1Logo: TEAM_BADGES['Jaipur Pink Panthers'],
-            team2Name: 'Puneri Paltan',
-            team2Logo: TEAM_BADGES['Puneri Paltan'],
-            status: 'COMPLETED',
-            eventDate: new Date(now.getTime() - 86400000),
-            startTime: '20:00',
-            venue: 'Thyagaraj Indoor Stadium',
-            city: 'Delhi',
-            country: 'India',
-            homeScore: '38',
-            awayScore: '34',
-            currentStatusText: 'Full Time • Jaipur won by 4 points',
-            isFeatured: false,
-            isManual: true,
-          }
-        });
-      }
-
-      // Basketball - Lakers vs Celtics
-      const basketball = await prisma.sportsCategory.findUnique({ where: { slug: 'basketball' } });
-      if (basketball) {
-        await prisma.sportsEvent.create({
-          data: {
-            title: 'Los Angeles Lakers vs Boston Celtics',
-            categoryId: basketball.id,
-            team1Name: 'Lakers',
-            team1Logo: TEAM_BADGES['Lakers'],
-            team2Name: 'Celtics',
-            team2Logo: TEAM_BADGES['Celtics'],
-            status: 'LIVE',
-            eventDate: now,
-            startTime: '04:12',
-            venue: 'Crypto.com Arena',
-            city: 'Los Angeles',
-            country: 'USA',
-            homeScore: '78',
-            awayScore: '71',
-            currentStatusText: 'Quarter 3 - 04:12',
-            isFeatured: true,
-            isManual: true,
-          }
-        });
-      }
-
-      // Upcoming Fixtures
-      const tennis = await prisma.sportsCategory.findUnique({ where: { slug: 'tennis' } });
-      if (cricket) {
-        await prisma.sportsEvent.create({
-          data: {
-            title: 'India vs Bangladesh',
-            categoryId: cricket.id,
-            team1Name: 'India',
-            team1Logo: TEAM_BADGES['India'],
-            team2Name: 'Bangladesh',
-            team2Logo: TEAM_BADGES['Bangladesh'],
-            status: 'UPCOMING',
-            eventDate: now,
-            startTime: '19:00',
-            venue: 'Dubai International Stadium',
-            city: 'Dubai',
-            country: 'UAE',
-            isFeatured: true,
-            isManual: true,
-            description: 'T20 Super Clash at Dubai International Stadium.'
-          }
-        });
-      }
-
-      if (football) {
-        await prisma.sportsEvent.create({
-          data: {
-            title: 'Real Madrid vs Bayern Munich',
-            categoryId: football.id,
-            team1Name: 'Real Madrid',
-            team1Logo: TEAM_BADGES['Real Madrid'],
-            team2Name: 'Bayern Munich',
-            team2Logo: TEAM_BADGES['Bayern Munich'],
-            status: 'UPCOMING',
-            eventDate: now,
-            startTime: '00:30',
-            venue: 'Santiago Bernabéu',
-            city: 'Madrid',
-            country: 'Spain',
-            isFeatured: true,
-            isManual: true,
-            description: 'UEFA Champions League Semi-Final.'
-          }
-        });
-      }
-
-      if (tennis) {
-        await prisma.sportsEvent.create({
-          data: {
-            title: 'Carlos Alcaraz vs Jannik Sinner',
-            categoryId: tennis.id,
-            team1Name: 'Alcaraz',
-            team1Logo: TEAM_BADGES['Alcaraz'],
-            team2Name: 'Sinner',
-            team2Logo: TEAM_BADGES['Sinner'],
-            status: 'UPCOMING',
-            eventDate: new Date(now.getTime() + 86400000),
-            startTime: '16:30',
-            venue: 'Centre Court',
-            city: 'London',
-            country: 'United Kingdom',
-            isFeatured: true,
-            isManual: true,
-            description: 'Wimbledon Men\'s Championship.'
-          }
-        });
-      }
-
-      // VCPL T10 - Vindhya Celebrity Premier League Season 2
-      if (cricket) {
-        const vcplTournament = await prisma.sportsTournament.upsert({
-          where: { categoryId_slug: { categoryId: cricket.id, slug: 'vcpl-season-2' } },
-          update: { logo: '/uploads/vcpl-season-2.jpg' },
-          create: {
-            name: 'VCPL - T10 Season 2',
-            slug: 'vcpl-season-2',
-            categoryId: cricket.id,
-            season: 'Season 2',
-            country: 'India',
-            logo: '/sports/vcpl-season-2.jpg',
-            description: 'SNEHA EVENTS AND MANAGEMENT PRESENTS VCPL - T10 - Vindhya Celebrity Premier League Season 2. 27 Dec 2026 to 1 Jan 2027.',
-            isActive: true,
-          }
-        });
-
+      if (!existingVcpl) {
         await prisma.sportsEvent.create({
           data: {
             title: 'VCPL - T10 - Vindhya Celebrity Premier League Season 2',
@@ -335,9 +94,8 @@ export async function ensureDefaultSportsCategories() {
             }
           }
         });
+        console.log('[Sports Seed] Seeded VCPL Season 2 fixture.');
       }
-
-      console.log('[Sports Seed] Initial sample events seeded successfully.');
     }
   } catch (error) {
     console.error('[Sports Seed] Error seeding sports categories and events:', error);
