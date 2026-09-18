@@ -2,9 +2,11 @@ import { prisma } from '@/lib/prisma';
 import { SportsEventData, MatchStatus } from './types';
 import { ensureDefaultSportsCategories } from './seed';
 
-// TheSportsDB Free API URL (official free key 123 per https://www.thesportsdb.com/free_sports_api)
-const DEFAULT_API_KEY = process.env.THESPORTSDB_API_KEY || '123';
-const THESPORTSDB_BASE = `https://www.thesportsdb.com/api/v1/json/${DEFAULT_API_KEY}`;
+// ---------------------------------------------------------------------------
+// 1. TheSportsDB Free API Provider (Base: https://www.thesportsdb.com/free_sports_api)
+// ---------------------------------------------------------------------------
+const DEFAULT_SPORTSDB_KEY = process.env.THESPORTSDB_API_KEY || '123';
+const THESPORTSDB_BASE = `https://www.thesportsdb.com/api/v1/json/${DEFAULT_SPORTSDB_KEY}`;
 
 export interface SportsDataProvider {
   name: string;
@@ -13,7 +15,6 @@ export interface SportsDataProvider {
   fetchPastMatches(): Promise<Partial<SportsEventData>[]>;
 }
 
-// Resilient public sports API provider using TheSportsDB free tier
 export class TheSportsDBProvider implements SportsDataProvider {
   name = 'thesportsdb';
 
@@ -32,7 +33,7 @@ export class TheSportsDBProvider implements SportsDataProvider {
   }
 
   async fetchLiveMatches(): Promise<Partial<SportsEventData>[]> {
-    // TheSportsDB livescore endpoint returns live and current fixtures
+    // TheSportsDB livescore endpoint
     const data = await this.fetchJson('/livescore.php');
     if (!data) return [];
 
@@ -52,9 +53,10 @@ export class TheSportsDBProvider implements SportsDataProvider {
       allMatches.push(...dayData.events.map((e: any) => this.mapStandardEvent(e, 'UPCOMING')));
     }
 
-    // 2. Fetch upcoming matches across major world leagues
-    // 4328: Premier League, 4335: La Liga, 4332: Serie A, 4331: Bundesliga, 4480: Champions League, 4387: NBA, 4370: Formula 1, 4460: Cricket
-    const leagueIds = [4328, 4335, 4332, 4331, 4480, 4387, 4370, 4460];
+    // 2. Fetch upcoming matches across major world leagues + Cricket leagues
+    // 4328: Premier League, 4335: La Liga, 4332: Serie A, 4331: Bundesliga, 4480: Champions League,
+    // 4387: NBA, 4370: Formula 1, 4460: IPL, 4479: T20 World Cup, 4483: Big Bash League
+    const leagueIds = [4328, 4335, 4332, 4331, 4480, 4387, 4370, 4460, 4479, 4483];
 
     for (const lid of leagueIds) {
       const data = await this.fetchJson(`/eventsnextleague.php?id=${lid}`);
@@ -67,7 +69,7 @@ export class TheSportsDBProvider implements SportsDataProvider {
   }
 
   async fetchPastMatches(): Promise<Partial<SportsEventData>[]> {
-    const leagueIds = [4328, 4335, 4332, 4331, 4480, 4387, 4370];
+    const leagueIds = [4328, 4335, 4332, 4331, 4480, 4387, 4370, 4460, 4479];
     const allMatches: Partial<SportsEventData>[] = [];
 
     for (const lid of leagueIds) {
@@ -112,7 +114,6 @@ export class TheSportsDBProvider implements SportsDataProvider {
     return defaultStatus;
   }
 
-  // Parse event date safely
   private parseEventDate(dateStr?: string, timeStr?: string, timestamp?: string): Date {
     if (timestamp) {
       const d = new Date(timestamp);
@@ -126,7 +127,6 @@ export class TheSportsDBProvider implements SportsDataProvider {
     return new Date();
   }
 
-  // Map item from livescore.php
   private mapLiveScoreEvent(e: any): Partial<SportsEventData> {
     const status = this.mapStatus(e.strStatus, e.strProgress ? 'LIVE' : 'UPCOMING');
     const categorySlug = this.mapSportCategory(e.strSport);
@@ -154,7 +154,6 @@ export class TheSportsDBProvider implements SportsDataProvider {
     };
   }
 
-  // Map item from standard events (eventsnextleague, eventsday, eventspastleague)
   private mapStandardEvent(e: any, defaultStatus: MatchStatus): Partial<SportsEventData> {
     const status = this.mapStatus(e.strStatus, defaultStatus);
     const categorySlug = this.mapSportCategory(e.strSport);
@@ -187,11 +186,212 @@ export class TheSportsDBProvider implements SportsDataProvider {
   }
 }
 
-// Master Sports Sync Service
-export class SportsSyncService {
-  private static provider: SportsDataProvider = new TheSportsDBProvider();
+// ---------------------------------------------------------------------------
+// 2. CricketData.org API Provider (https://cricketdata.org / api.cricapi.com)
+// ---------------------------------------------------------------------------
+export class CricketDataProvider implements SportsDataProvider {
+  name = 'cricketdata';
 
-  public static async syncExternalSports(): Promise<{ success: boolean; syncedCount: number; message?: string }> {
+  private async getApiKey(): Promise<string | null> {
+    if (process.env.CRICKETDATA_API_KEY && process.env.CRICKETDATA_API_KEY.trim()) {
+      return process.env.CRICKETDATA_API_KEY.trim();
+    }
+    try {
+      const config = await prisma.sportsApiConfig.findUnique({
+        where: { provider: 'cricketdata' }
+      });
+      return config?.apiKey?.trim() || null;
+    } catch {
+      return null;
+    }
+  }
+
+  private async fetchJson(endpoint: string) {
+    const apiKey = await this.getApiKey();
+    if (!apiKey) return null;
+
+    try {
+      const url = `https://api.cricapi.com/v1${endpoint}${endpoint.includes('?') ? '&' : '?'}apikey=${encodeURIComponent(apiKey)}`;
+      const res = await fetch(url, {
+        next: { revalidate: 60 },
+        headers: { 'Accept': 'application/json' },
+      });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch (err) {
+      console.warn(`[CricketData] Network error fetching ${endpoint}:`, err);
+      return null;
+    }
+  }
+
+  async fetchLiveMatches(): Promise<Partial<SportsEventData>[]> {
+    const allMatches: Partial<SportsEventData>[] = [];
+
+    // 1. Try cricScore endpoint
+    const cricScoreData = await this.fetchJson('/cricScore');
+    if (cricScoreData && cricScoreData.status === 'success' && Array.isArray(cricScoreData.data)) {
+      const liveItems = cricScoreData.data.filter((m: any) => m.ms === 'live');
+      allMatches.push(...liveItems.map((m: any) => this.mapCricScoreEvent(m, 'LIVE')));
+    }
+
+    // 2. Fallback to currentMatches
+    const currentMatchesData = await this.fetchJson('/currentMatches?offset=0');
+    if (currentMatchesData && currentMatchesData.status === 'success' && Array.isArray(currentMatchesData.data)) {
+      const liveItems = currentMatchesData.data.filter((m: any) => m.matchStarted && !m.matchEnded);
+      for (const m of liveItems) {
+        if (!allMatches.some(x => x.externalApiId === `cricdata-${m.id}`)) {
+          allMatches.push(this.mapCurrentMatchEvent(m, 'LIVE'));
+        }
+      }
+    }
+
+    return allMatches;
+  }
+
+  async fetchUpcomingMatches(): Promise<Partial<SportsEventData>[]> {
+    const allMatches: Partial<SportsEventData>[] = [];
+
+    const cricScoreData = await this.fetchJson('/cricScore');
+    if (cricScoreData && cricScoreData.status === 'success' && Array.isArray(cricScoreData.data)) {
+      const upcomingItems = cricScoreData.data.filter((m: any) => m.ms === 'fixture');
+      allMatches.push(...upcomingItems.map((m: any) => this.mapCricScoreEvent(m, 'UPCOMING')));
+    }
+
+    const currentMatchesData = await this.fetchJson('/currentMatches?offset=0');
+    if (currentMatchesData && currentMatchesData.status === 'success' && Array.isArray(currentMatchesData.data)) {
+      const upcomingItems = currentMatchesData.data.filter((m: any) => !m.matchStarted);
+      for (const m of upcomingItems) {
+        if (!allMatches.some(x => x.externalApiId === `cricdata-${m.id}`)) {
+          allMatches.push(this.mapCurrentMatchEvent(m, 'UPCOMING'));
+        }
+      }
+    }
+
+    return allMatches;
+  }
+
+  async fetchPastMatches(): Promise<Partial<SportsEventData>[]> {
+    const allMatches: Partial<SportsEventData>[] = [];
+
+    const cricScoreData = await this.fetchJson('/cricScore');
+    if (cricScoreData && cricScoreData.status === 'success' && Array.isArray(cricScoreData.data)) {
+      const pastItems = cricScoreData.data.filter((m: any) => m.ms === 'result');
+      allMatches.push(...pastItems.map((m: any) => this.mapCricScoreEvent(m, 'COMPLETED')));
+    }
+
+    const currentMatchesData = await this.fetchJson('/currentMatches?offset=0');
+    if (currentMatchesData && currentMatchesData.status === 'success' && Array.isArray(currentMatchesData.data)) {
+      const endedItems = currentMatchesData.data.filter((m: any) => m.matchEnded);
+      for (const m of endedItems) {
+        if (!allMatches.some(x => x.externalApiId === `cricdata-${m.id}`)) {
+          allMatches.push(this.mapCurrentMatchEvent(m, 'COMPLETED'));
+        }
+      }
+    }
+
+    return allMatches;
+  }
+
+  private mapCricScoreEvent(m: any, defaultStatus: MatchStatus): Partial<SportsEventData> {
+    let status: MatchStatus = defaultStatus;
+    if (m.ms === 'live') status = 'LIVE';
+    else if (m.ms === 'result') status = 'COMPLETED';
+    else if (m.ms === 'fixture') status = 'UPCOMING';
+
+    const eventDate = m.dateTimeGMT ? new Date(m.dateTimeGMT) : new Date();
+
+    return {
+      title: `${m.t1 || 'Team 1'} vs ${m.t2 || 'Team 2'}`,
+      team1Name: m.t1 || 'Team 1',
+      team1Logo: m.t1img || null,
+      team2Name: m.t2 || 'Team 2',
+      team2Logo: m.t2img || null,
+      homeScore: m.t1s || null, // e.g. "180/4 (18.2)"
+      awayScore: m.t2s || null,
+      currentStatusText: m.status || (status === 'LIVE' ? 'Live' : (status === 'COMPLETED' ? 'Match Ended' : '')),
+      eventDate,
+      startTime: m.dateTimeGMT ? m.dateTimeGMT.substring(11, 16) : null,
+      status,
+      categorySlug: 'cricket',
+      tournamentName: m.series || (m.matchType ? `${m.matchType.toUpperCase()} Series` : 'Cricket Match'),
+      externalApiId: `cricdata-${m.id}`,
+      apiSource: 'cricketdata',
+    };
+  }
+
+  private mapCurrentMatchEvent(m: any, defaultStatus: MatchStatus): Partial<SportsEventData> {
+    let status: MatchStatus = defaultStatus;
+    if (m.matchStarted && !m.matchEnded) status = 'LIVE';
+    else if (m.matchEnded) status = 'COMPLETED';
+    else if (!m.matchStarted) status = 'UPCOMING';
+
+    const teams = m.teams || [];
+    const team1Name = (m.teamInfo && m.teamInfo[0]?.name) || teams[0] || 'Team 1';
+    const team2Name = (m.teamInfo && m.teamInfo[1]?.name) || teams[1] || 'Team 2';
+    const team1Logo = (m.teamInfo && m.teamInfo[0]?.img) || null;
+    const team2Logo = (m.teamInfo && m.teamInfo[1]?.img) || null;
+
+    let homeScore: string | null = null;
+    let awayScore: string | null = null;
+    const inningsList: any[] = [];
+
+    if (Array.isArray(m.score)) {
+      m.score.forEach((sc: any, idx: number) => {
+        const scoreStr = `${sc.r}/${sc.w} (${sc.o})`;
+        if (idx === 0) homeScore = scoreStr;
+        else if (idx === 1) awayScore = scoreStr;
+
+        inningsList.push({
+          teamName: sc.inning || (idx === 0 ? team1Name : team2Name),
+          inningsNumber: idx + 1,
+          runs: sc.r,
+          wickets: sc.w,
+          overs: sc.o,
+        });
+      });
+    }
+
+    const eventDate = m.dateTimeGMT ? new Date(m.dateTimeGMT) : (m.date ? new Date(m.date) : new Date());
+
+    return {
+      title: m.name || `${team1Name} vs ${team2Name}`,
+      team1Name,
+      team1Logo,
+      team2Name,
+      team2Logo,
+      homeScore,
+      awayScore,
+      currentStatusText: m.status || (status === 'LIVE' ? 'Live' : ''),
+      eventDate,
+      startTime: m.dateTimeGMT ? m.dateTimeGMT.substring(11, 16) : null,
+      venue: m.venue || null,
+      status,
+      categorySlug: 'cricket',
+      tournamentName: m.matchType ? `${m.matchType.toUpperCase()} Match` : 'Cricket Match',
+      scoreDetails: {
+        format: (m.matchType || '').toUpperCase(),
+        innings: inningsList,
+      },
+      externalApiId: `cricdata-${m.id}`,
+      apiSource: 'cricketdata',
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 3. Unified Sports Sync Service
+// ---------------------------------------------------------------------------
+export class SportsSyncService {
+  private static theSportsDbProvider: SportsDataProvider = new TheSportsDBProvider();
+  private static cricketDataProvider: SportsDataProvider = new CricketDataProvider();
+
+  public static async syncExternalSports(): Promise<{
+    success: boolean;
+    syncedCount: number;
+    thesportsdbCount: number;
+    cricketdataCount: number;
+    message?: string;
+  }> {
     await ensureDefaultSportsCategories();
 
     try {
@@ -201,19 +401,30 @@ export class SportsSyncService {
       const defaultCatId = catMap.get('other-sports') || catMap.get('football') || categories[0]?.id;
 
       if (!defaultCatId) {
-        return { success: false, syncedCount: 0, message: 'No sports categories found' };
+        return { success: false, syncedCount: 0, thesportsdbCount: 0, cricketdataCount: 0, message: 'No sports categories found' };
       }
 
-      // 2. Fetch live, upcoming & past matches from provider
-      const [liveMatches, upcomingMatches, pastMatches] = await Promise.all([
-        this.provider.fetchLiveMatches().catch(() => []),
-        this.provider.fetchUpcomingMatches().catch(() => []),
-        this.provider.fetchPastMatches().catch(() => []),
+      // 2. Fetch matches concurrently from both TheSportsDB and CricketData.org
+      const [
+        tsdbLive, tsdbUpcoming, tsdbPast,
+        cricLive, cricUpcoming, cricPast
+      ] = await Promise.all([
+        this.theSportsDbProvider.fetchLiveMatches().catch(() => []),
+        this.theSportsDbProvider.fetchUpcomingMatches().catch(() => []),
+        this.theSportsDbProvider.fetchPastMatches().catch(() => []),
+        this.cricketDataProvider.fetchLiveMatches().catch(() => []),
+        this.cricketDataProvider.fetchUpcomingMatches().catch(() => []),
+        this.cricketDataProvider.fetchPastMatches().catch(() => []),
       ]);
 
-      const allFetched = [...liveMatches, ...upcomingMatches, ...pastMatches];
+      const tsdbFetched = [...tsdbLive, ...tsdbUpcoming, ...tsdbPast];
+      const cricFetched = [...cricLive, ...cricUpcoming, ...cricPast];
+      const allFetched = [...tsdbFetched, ...cricFetched];
+
       const seenIds = new Set<string>();
       let syncedCount = 0;
+      let thesportsdbCount = 0;
+      let cricketdataCount = 0;
 
       for (const item of allFetched) {
         if (!item.externalApiId || !item.team1Name || !item.team2Name) continue;
@@ -262,11 +473,14 @@ export class SportsSyncService {
               homeScore: item.homeScore !== undefined ? item.homeScore : existing.homeScore,
               awayScore: item.awayScore !== undefined ? item.awayScore : existing.awayScore,
               currentStatusText: item.currentStatusText || existing.currentStatusText,
+              scoreDetails: item.scoreDetails || existing.scoreDetails,
               tournamentId: tournamentId || existing.tournamentId,
               lastApiSyncAt: new Date(),
             }
           });
           syncedCount++;
+          if (item.apiSource === 'cricketdata') cricketdataCount++;
+          else thesportsdbCount++;
         } else {
           // Insert new fixture
           await prisma.sportsEvent.create({
@@ -287,6 +501,7 @@ export class SportsSyncService {
               homeScore: item.homeScore,
               awayScore: item.awayScore,
               currentStatusText: item.currentStatusText,
+              scoreDetails: item.scoreDetails,
               isManual: false,
               externalApiId: item.externalApiId,
               apiSource: item.apiSource || 'thesportsdb',
@@ -294,24 +509,37 @@ export class SportsSyncService {
             }
           });
           syncedCount++;
+          if (item.apiSource === 'cricketdata') cricketdataCount++;
+          else thesportsdbCount++;
         }
       }
 
-      // Update SportsApiConfig record
-      await prisma.sportsApiConfig.upsert({
-        where: { provider: 'thesportsdb' },
-        update: { lastSyncAt: new Date() },
-        create: {
-          provider: 'thesportsdb',
-          isEnabled: true,
-          lastSyncAt: new Date(),
-        }
-      });
+      // Update last sync records in SportsApiConfig
+      await Promise.all([
+        prisma.sportsApiConfig.upsert({
+          where: { provider: 'thesportsdb' },
+          update: { lastSyncAt: new Date() },
+          create: {
+            provider: 'thesportsdb',
+            isEnabled: true,
+            lastSyncAt: new Date(),
+          }
+        }),
+        prisma.sportsApiConfig.upsert({
+          where: { provider: 'cricketdata' },
+          update: { lastSyncAt: new Date() },
+          create: {
+            provider: 'cricketdata',
+            isEnabled: true,
+            lastSyncAt: new Date(),
+          }
+        })
+      ]);
 
-      return { success: true, syncedCount };
+      return { success: true, syncedCount, thesportsdbCount, cricketdataCount };
     } catch (err: any) {
       console.error('[SportsSyncService] Error during sync:', err);
-      return { success: false, syncedCount: 0, message: err.message };
+      return { success: false, syncedCount: 0, thesportsdbCount: 0, cricketdataCount: 0, message: err.message };
     }
   }
 }

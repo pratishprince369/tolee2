@@ -48,6 +48,10 @@ export default function SuperAdminSportsPage() {
   const [events, setEvents] = useState<SportsEvent[]>([]);
   const [stats, setStats] = useState({ totalEvents: 0, liveEvents: 0, manualEvents: 0, totalCategories: 0 });
   const [apiConfig, setApiConfig] = useState<any>(null);
+  const [apiConfigs, setApiConfigs] = useState<{ thesportsdb?: any; cricketdata?: any }>({});
+  const [cricketApiKey, setCricketApiKey] = useState('');
+  const [isSavingKey, setIsSavingKey] = useState(false);
+  const [saveKeySuccess, setSaveKeySuccess] = useState('');
   const [loading, setLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -105,6 +109,12 @@ export default function SuperAdminSportsPage() {
           setEvents(data.events || []);
           setStats(data.stats || { totalEvents: 0, liveEvents: 0, manualEvents: 0, totalCategories: 0 });
           setApiConfig(data.apiConfig || null);
+          if (data.apiConfigs) {
+            setApiConfigs(data.apiConfigs);
+            if (data.apiConfigs.cricketdata?.apiKey) {
+              setCricketApiKey(data.apiConfigs.cricketdata.apiKey);
+            }
+          }
           if (data.categories?.length > 0 && !eventForm.categoryId) {
             setEventForm(prev => ({ ...prev, categoryId: data.categories[0].id }));
           }
@@ -246,6 +256,37 @@ export default function SuperAdminSportsPage() {
     }
   };
 
+  const handleSaveCricketApiKey = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingKey(true);
+    setSaveKeySuccess('');
+    try {
+      const res = await fetch('/api/super-admin/sports', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'save_api_config',
+          provider: 'cricketdata',
+          apiKey: cricketApiKey,
+          isEnabled: true,
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSaveKeySuccess('CricketData.org API Key saved successfully!');
+        setTimeout(() => setSaveKeySuccess(''), 4000);
+        await fetchData();
+      } else {
+        alert(data.error || 'Failed to save CricketData API key');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error saving API key');
+    } finally {
+      setIsSavingKey(false);
+    }
+  };
+
   const handleSyncApi = async () => {
     setIsSyncing(true);
     try {
@@ -256,7 +297,7 @@ export default function SuperAdminSportsPage() {
       });
       const data = await res.json();
       if (data.success) {
-        alert(`API Sync completed! Synced/updated ${data.syncedCount || 0} matches.`);
+        alert(`API Sync completed! Synced ${data.syncedCount || 0} matches (${data.thesportsdbCount || 0} from TheSportsDB, ${data.cricketdataCount || 0} from CricketData.org).`);
         fetchData();
       } else {
         alert(`API Sync error: ${data.message || 'Unknown error'}`);
@@ -679,43 +720,119 @@ export default function SuperAdminSportsPage() {
 
       {/* TAB 4: API SYNC SETTINGS */}
       {activeTab === 'api' && (
-        <div style={{ background: '#121214', border: '1px solid #1f1f23', borderRadius: 12, padding: 24, maxWidth: 640 }}>
-          <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Zap style={{ color: '#00c298', width: 20, height: 20 }} />
-            Sports Data Integration (TheSportsDB & Open APIs)
-          </h3>
-          <p style={{ color: '#a1a1aa', fontSize: 13, marginBottom: 20, lineHeight: 1.5 }}>
-            Tolee Sports uses a decoupled sports API layer. The default provider syncs live fixtures, scores, and upcoming schedules for major leagues without overwriting custom admin-created events.
-          </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 680 }}>
+          {/* 1. TheSportsDB Card */}
+          <div style={{ background: '#121214', border: '1px solid #1f1f23', borderRadius: 12, padding: 24 }}>
+            <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Zap style={{ color: '#00c298', width: 20, height: 20 }} />
+              TheSportsDB Free API (Multi-Sport Live Scores)
+            </h3>
+            <p style={{ color: '#a1a1aa', fontSize: 13, marginBottom: 16, lineHeight: 1.5 }}>
+              Syncs live fixtures, goals, and upcoming schedules for Football, Basketball, Formula 1, Tennis, Hockey, and world leagues without overwriting manual admin events.
+            </p>
 
-          <div style={{ background: '#18181b', padding: 16, borderRadius: 8, border: '1px solid #27272a', marginBottom: 20 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13 }}>
-              <span style={{ color: '#a1a1aa' }}>Provider:</span>
-              <span style={{ fontWeight: 700, color: '#fff' }}>TheSportsDB (V3 Public Live + Leagues)</span>
+            <div style={{ background: '#18181b', padding: 14, borderRadius: 8, border: '1px solid #27272a', marginBottom: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13 }}>
+                <span style={{ color: '#a1a1aa' }}>Provider:</span>
+                <span style={{ fontWeight: 700, color: '#fff' }}>TheSportsDB (Free Tier / Key 123)</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13 }}>
+                <span style={{ color: '#a1a1aa' }}>Official Docs:</span>
+                <a href="https://www.thesportsdb.com/free_sports_api" target="_blank" rel="noreferrer" style={{ color: '#00c298', textDecoration: 'underline', fontSize: 12 }}>
+                  thesportsdb.com/free_sports_api ↗
+                </a>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                <span style={{ color: '#a1a1aa' }}>Last Synchronized:</span>
+                <span style={{ color: '#fff' }}>
+                  {apiConfigs?.thesportsdb?.lastSyncAt ? new Date(apiConfigs.thesportsdb.lastSyncAt).toLocaleString() : (apiConfig?.lastSyncAt ? new Date(apiConfig.lastSyncAt).toLocaleString() : 'Not yet synced')}
+                </span>
+              </div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13 }}>
-              <span style={{ color: '#a1a1aa' }}>Status:</span>
-              <span style={{ color: '#34d399', fontWeight: 700 }}>Operational</span>
+          </div>
+
+          {/* 2. CricketData.org Card */}
+          <div style={{ background: '#121214', border: '1px solid #1f1f23', borderRadius: 12, padding: 24 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Trophy style={{ color: '#fbbf24', width: 20, height: 20 }} />
+                CricketData.org (Live Cricket Scores & Scorecards)
+              </h3>
+              <span style={{
+                background: cricketApiKey || apiConfigs?.cricketdata?.apiKey ? '#064e3b' : '#3f1515',
+                color: cricketApiKey || apiConfigs?.cricketdata?.apiKey ? '#34d399' : '#f87171',
+                fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4
+              }}>
+                {cricketApiKey || apiConfigs?.cricketdata?.apiKey ? 'KEY CONFIGURED' : 'KEY REQUIRED'}
+              </span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-              <span style={{ color: '#a1a1aa' }}>Last Synchronized:</span>
+            <p style={{ color: '#a1a1aa', fontSize: 13, marginBottom: 14, lineHeight: 1.5 }}>
+              Supplies real-time live cricket scores, overs, wickets, and full batting/bowling scorecards for international and domestic matches not covered by TheSportsDB.
+            </p>
+
+            <form onSubmit={handleSaveCricketApiKey} style={{ display: 'flex', flexDirection: 'column', gap: 10, background: '#18181b', padding: 16, borderRadius: 8, border: '1px solid #27272a', marginBottom: 14 }}>
+              <div>
+                <label style={{ fontSize: 12, color: '#a1a1aa', display: 'block', marginBottom: 4, fontWeight: 600 }}>
+                  CricketData.org API Key (UUID)
+                </label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    type="text"
+                    value={cricketApiKey}
+                    onChange={e => setCricketApiKey(e.target.value)}
+                    placeholder="e.g. xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                    style={{ flex: 1, background: '#121214', border: '1px solid #27272a', borderRadius: 6, padding: '8px 12px', color: '#fff', fontFamily: 'monospace', fontSize: 13 }}
+                  />
+                  <button
+                    type="submit"
+                    disabled={isSavingKey}
+                    style={{
+                      background: '#fbbf24', color: '#09090b', border: 'none', padding: '8px 16px', borderRadius: 6,
+                      fontWeight: 700, fontSize: 12, cursor: isSavingKey ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    {isSavingKey ? 'Saving...' : 'Save Key'}
+                  </button>
+                </div>
+              </div>
+
+              {saveKeySuccess && (
+                <div style={{ color: '#34d399', fontSize: 12, fontWeight: 600 }}>
+                  ✓ {saveKeySuccess}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, color: '#71717a', marginTop: 4 }}>
+                <span>Free Tier: 100 requests/day</span>
+                <a href="https://cricketdata.org/" target="_blank" rel="noreferrer" style={{ color: '#00c298', textDecoration: 'underline' }}>
+                  Get Free API Key on CricketData.org ↗
+                </a>
+              </div>
+            </form>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#a1a1aa' }}>
+              <span>Last Cricket Synchronized:</span>
               <span style={{ color: '#fff' }}>
-                {apiConfig?.lastSyncAt ? new Date(apiConfig.lastSyncAt).toLocaleString() : 'Not yet synced'}
+                {apiConfigs?.cricketdata?.lastSyncAt ? new Date(apiConfigs.cricketdata.lastSyncAt).toLocaleString() : 'Not yet synced'}
               </span>
             </div>
           </div>
 
-          <button
-            onClick={handleSyncApi}
-            disabled={isSyncing}
-            style={{
-              background: '#00c298', color: '#09090b', border: 'none', padding: '10px 20px', borderRadius: 8,
-              fontWeight: 700, fontSize: 13, cursor: isSyncing ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 8
-            }}
-          >
-            <RefreshCw style={{ width: 16, height: 16, animation: isSyncing ? 'spin 1s linear infinite' : 'none' }} />
-            {isSyncing ? 'Synchronizing Fixtures...' : 'Run Immediate Sync Now'}
-          </button>
+          {/* Unified Sync Button */}
+          <div style={{ background: '#121214', border: '1px solid #1f1f23', borderRadius: 12, padding: 20 }}>
+            <button
+              onClick={handleSyncApi}
+              disabled={isSyncing}
+              style={{
+                width: '100%',
+                background: '#00c298', color: '#09090b', border: 'none', padding: '12px 24px', borderRadius: 8,
+                fontWeight: 800, fontSize: 14, cursor: isSyncing ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
+              }}
+            >
+              <RefreshCw style={{ width: 18, height: 18, animation: isSyncing ? 'spin 1s linear infinite' : 'none' }} />
+              {isSyncing ? 'Synchronizing All Sports & Cricket Matches...' : 'Sync All Sports & Cricket Matches Now'}
+            </button>
+          </div>
         </div>
       )}
 

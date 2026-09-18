@@ -34,9 +34,7 @@ export async function GET(req: NextRequest) {
           tournament: { select: { id: true, name: true } }
         }
       }),
-      prisma.sportsApiConfig.findFirst({
-        where: { provider: 'thesportsdb' }
-      }),
+      prisma.sportsApiConfig.findMany(),
       Promise.all([
         prisma.sportsEvent.count(),
         prisma.sportsEvent.count({ where: { status: 'LIVE' } }),
@@ -45,6 +43,10 @@ export async function GET(req: NextRequest) {
       ])
     ]);
 
+    const apiConfigsList = apiConfig as any[] || [];
+    const thesportsdbConfig = apiConfigsList.find(c => c.provider === 'thesportsdb') || null;
+    const cricketdataConfig = apiConfigsList.find(c => c.provider === 'cricketdata') || null;
+
     return NextResponse.json({
       success: true,
       categories: categories.map(c => ({
@@ -52,7 +54,11 @@ export async function GET(req: NextRequest) {
         eventsCount: c._count.events
       })),
       events,
-      apiConfig,
+      apiConfig: thesportsdbConfig,
+      apiConfigs: {
+        thesportsdb: thesportsdbConfig,
+        cricketdata: cricketdataConfig,
+      },
       stats: {
         totalEvents: stats[0],
         liveEvents: stats[1],
@@ -258,7 +264,29 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true });
     }
 
-    // 3. Trigger External Sports Sync
+    // 3. Save API Config (TheSportsDB or CricketData)
+    if (action === 'save_api_config') {
+      const { provider, apiKey, isEnabled, autoSyncIntervalMinutes } = body;
+      if (!provider) return NextResponse.json({ success: false, error: 'Provider is required' }, { status: 400 });
+
+      const config = await prisma.sportsApiConfig.upsert({
+        where: { provider },
+        update: {
+          apiKey: apiKey !== undefined ? apiKey.trim() : undefined,
+          isEnabled: isEnabled !== undefined ? Boolean(isEnabled) : undefined,
+          autoSyncIntervalMinutes: autoSyncIntervalMinutes ? parseInt(autoSyncIntervalMinutes, 10) : undefined,
+        },
+        create: {
+          provider,
+          apiKey: apiKey ? apiKey.trim() : null,
+          isEnabled: isEnabled !== undefined ? Boolean(isEnabled) : true,
+          autoSyncIntervalMinutes: autoSyncIntervalMinutes ? parseInt(autoSyncIntervalMinutes, 10) : 15,
+        }
+      });
+      return NextResponse.json({ success: true, config });
+    }
+
+    // 4. Trigger External Sports Sync
     if (action === 'sync_api') {
       const result = await SportsSyncService.syncExternalSports();
       return NextResponse.json(result);
