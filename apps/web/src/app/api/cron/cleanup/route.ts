@@ -160,13 +160,38 @@ export async function GET(req: NextRequest) {
       cleanedMeetingsCount = cleanResults.filter(r => r.success).length;
     }
 
+    // --- 3. Radar Post Expiry Cleanup (2-hour grace, then mark EXPIRED) ---
+    const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+    const expiredRadarResult = await prisma.radarPost.updateMany({
+      where: {
+        status: 'ACTIVE',
+        isDeleted: false,
+        expiresAt: { lte: twoHoursAgo }
+      },
+      data: { status: 'EXPIRED' }
+    });
+    console.log(`[Cron Cleanup] Marked ${expiredRadarResult.count} radar posts as EXPIRED (2h past expiry).`);
+
+    // --- 4. Activate Upcoming Radar Posts (scheduledFor <= now → ACTIVE) ---
+    const activatedRadarResult = await prisma.radarPost.updateMany({
+      where: {
+        status: 'UPCOMING',
+        isDeleted: false,
+        scheduledFor: { lte: now }
+      },
+      data: { status: 'ACTIVE', isLive: false }
+    });
+    console.log(`[Cron Cleanup] Activated ${activatedRadarResult.count} upcoming radar posts.`);
+
     return NextResponse.json({
       success: true,
-      message: `Cleaned up ${cleanedMeetingsCount} zombie meetings. Processed ${activeEvents.length} events (updated ${updatedEventsCount}, notified ${notificationsSentCount}).`,
+      message: `Cleaned up ${cleanedMeetingsCount} zombie meetings. Processed ${activeEvents.length} events (updated ${updatedEventsCount}, notified ${notificationsSentCount}). Expired ${expiredRadarResult.count} radar posts. Activated ${activatedRadarResult.count} upcoming radar posts.`,
       zombieMeetingsResults: results,
       eventsProcessed: activeEvents.length,
       eventsUpdated: updatedEventsCount,
-      notificationsSent: notificationsSentCount
+      notificationsSent: notificationsSentCount,
+      radarExpired: expiredRadarResult.count,
+      radarActivated: activatedRadarResult.count
     });
   } catch (error: any) {
     console.error('[Cron Cleanup Fatal Error]:', error);

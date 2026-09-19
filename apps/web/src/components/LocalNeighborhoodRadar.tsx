@@ -22,7 +22,9 @@ import {
   getRadarCommentsAction,
   toggleRadarReshareAction,
   recordRadarShareAction,
-  recordRadarViewAction
+  recordRadarViewAction,
+  getMyExpiredRadarPostsAction,
+  getUpcomingRadarPostsAction
 } from '@/actions/radar';
 import { calculateDistanceKm, formatDistance } from '@/lib/geo-utils';
 import { formatViewCount } from '@/lib/utils';
@@ -113,6 +115,10 @@ export function LocalNeighborhoodRadar() {
   const [customRadiusValue, setCustomRadiusValue] = useState<number>(5);
   const [selectedFilter, setSelectedFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'nearest' | 'latest' | 'top'>('nearest');
+  const [upcomingPosts, setUpcomingPosts] = useState<any[]>([]);
+  const [myExpiredPosts, setMyExpiredPosts] = useState<any[]>([]);
+  const [loadingUpcoming, setLoadingUpcoming] = useState(false);
+  const [loadingExpired, setLoadingExpired] = useState(false);
 
   // Map settings and layers
   const [mobileViewMode, setMobileViewMode] = useState<'list' | 'map'>('list');
@@ -131,7 +137,7 @@ export function LocalNeighborhoodRadar() {
   // Post Alert Modal states
   const [isPostingAlert, setIsPostingAlert] = useState<boolean>(false);
   const [isSubmittingPost, setIsSubmittingPost] = useState<boolean>(false);
-  const [alertCategory, setAlertCategory] = useState<'alert' | 'food' | 'news' | 'deal'>('alert');
+  const [alertCategory, setAlertCategory] = useState<'alert' | 'food' | 'news' | 'deal' | 'event'>('alert');
   const [alertTitle, setAlertTitle] = useState<string>('');
   const [alertDesc, setAlertDesc] = useState<string>('');
   const [isAnon, setIsAnon] = useState<boolean>(true);
@@ -150,11 +156,12 @@ export function LocalNeighborhoodRadar() {
   const [alertSubLocation, setAlertSubLocation] = useState<string>('Kalyan');
   const [alertRadius, setAlertRadius] = useState<number>(5);
 
-  // Live Status & Expiry Context
+  // Live Status, Schedule & Expiry Context
   const [isLiveNow, setIsLiveNow] = useState<boolean>(true);
   const [startedAtTime, setStartedAtTime] = useState<string>('Now');
   const [expectedUntilDuration, setExpectedUntilDuration] = useState<string>('unknown'); // '1h' | '3h' | '6h' | '12h' | '24h' | 'unknown'
   const [alertType, setAlertType] = useState<string>('ROAD_BLOCK');
+  const [alertScheduledDate, setAlertScheduledDate] = useState<string>('');
 
   // Interactive Pin Map refs
   const pinMapContainerRef = useRef<HTMLDivElement>(null);
@@ -563,6 +570,10 @@ export function LocalNeighborhoodRadar() {
 
   // Filter & Sort Posts
   const filteredPosts = useMemo(() => {
+    // Upcoming and myExpired are handled separately
+    if (selectedFilter === 'upcoming') return upcomingPosts;
+    if (selectedFilter === 'myExpired') return myExpiredPosts;
+
     return allPosts
       .filter((p) => {
         if (p.distanceKm > radiusKm) return false;
@@ -574,11 +585,30 @@ export function LocalNeighborhoodRadar() {
         return true;
       })
       .sort((a, b) => {
+        // ponytail: expired posts always sink to bottom
+        if (a.isExpired && !b.isExpired) return 1;
+        if (!a.isExpired && b.isExpired) return -1;
         if (sortBy === 'nearest') return a.distanceKm - b.distanceKm;
         if (sortBy === 'top') return b.likes - a.likes;
         return 0; // latest
       });
-  }, [allPosts, radiusKm, selectedFilter, sortBy]);
+  }, [allPosts, radiusKm, selectedFilter, sortBy, upcomingPosts, myExpiredPosts]);
+
+  // Fetch upcoming/expired on tab selection
+  useEffect(() => {
+    if (selectedFilter === 'upcoming' && upcomingPosts.length === 0 && coords) {
+      setLoadingUpcoming(true);
+      getUpcomingRadarPostsAction({ lat: coords.lat, lng: coords.lng, radiusKm })
+        .then(res => { if (res.success) setUpcomingPosts(res.posts); })
+        .finally(() => setLoadingUpcoming(false));
+    }
+    if (selectedFilter === 'myExpired' && myExpiredPosts.length === 0) {
+      setLoadingExpired(true);
+      getMyExpiredRadarPostsAction()
+        .then(res => { if (res.success) setMyExpiredPosts(res.posts); })
+        .finally(() => setLoadingExpired(false));
+    }
+  }, [selectedFilter, coords, radiusKm]);
 
   // Counts for widgets
   const counts = useMemo(() => {
@@ -1280,7 +1310,8 @@ export function LocalNeighborhoodRadar() {
         expectedUntil: expectedUntilDate,
         alertType: alertCategory === 'alert' ? alertType : undefined,
         urgency: isUrgent ? 'CRITICAL' : 'NORMAL',
-        isUrgent
+        isUrgent,
+        scheduledFor: alertScheduledDate ? new Date(alertScheduledDate) : undefined
       });
 
       if (res.success && res.post) {
@@ -1288,6 +1319,7 @@ export function LocalNeighborhoodRadar() {
         setAlertTitle('');
         setAlertDesc('');
         setAlertMedia([]);
+        setAlertScheduledDate('');
         setHasConfirmedAccuracy(false);
         setIsPostingAlert(false);
         if (coords) fetchDbRadarPosts(coords.lat, coords.lng, radiusKm);
@@ -1495,7 +1527,9 @@ export function LocalNeighborhoodRadar() {
           { id: 'alert', label: 'Alerts', count: counts.alerts, icon: '🚨' },
           { id: 'food', label: 'Food', count: counts.food, icon: '🍔' },
           { id: 'news', label: 'News', count: counts.news, icon: '📰' },
-          { id: 'deal', label: 'Deals', count: counts.deals, icon: '🏷️' }
+          { id: 'deal', label: 'Deals', count: counts.deals, icon: '🏷️' },
+          { id: 'upcoming', label: `Upcoming${upcomingPosts.length > 0 ? ` (${upcomingPosts.length})` : ''}`, icon: '🗓️' },
+          { id: 'myExpired', label: `My Expired${myExpiredPosts.length > 0 ? ` (${myExpiredPosts.length})` : ''}`, icon: '⏳' }
         ].map((tab) => {
           const isActive = selectedFilter === tab.id;
           return (
@@ -1984,7 +2018,9 @@ export function LocalNeighborhoodRadar() {
                 { id: 'alert', label: `Alerts (${counts.alerts})`, icon: '🚨' },
                 { id: 'food', label: `Secret Food (${counts.food})`, icon: '🍔' },
                 { id: 'news', label: `Local News (${counts.news})`, icon: '📰' },
-                { id: 'deal', label: `Deals & Offers (${counts.deals})`, icon: '🏷️' }
+                { id: 'deal', label: `Deals & Offers (${counts.deals})`, icon: '🏷️' },
+                { id: 'upcoming', label: `Upcoming Events${upcomingPosts.length > 0 ? ` (${upcomingPosts.length})` : ''}`, icon: '🗓️' },
+                { id: 'myExpired', label: `My Expired${myExpiredPosts.length > 0 ? ` (${myExpiredPosts.length})` : ''}`, icon: '⏳' }
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -2228,6 +2264,13 @@ export function LocalNeighborhoodRadar() {
                   </div>
                 </div>
               )
+            ) : (loadingUpcoming || loadingExpired) ? (
+              <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-10 text-center space-y-3 shadow-2xs">
+                <Loader2 className="w-8 h-8 text-[#0E9F9A] animate-spin mx-auto" />
+                <p className="text-xs text-slate-500 dark:text-zinc-400">
+                  Loading {selectedFilter === 'upcoming' ? 'upcoming events & alerts' : 'your lifetime expired listings'}...
+                </p>
+              </div>
             ) : filteredPosts.length === 0 ? (
               <div className="bg-white dark:bg-zinc-900 border border-dashed border-slate-200 dark:border-zinc-800 rounded-3xl p-10 text-center space-y-4 shadow-2xs">
                 <div className="w-14 h-14 rounded-2xl bg-teal-50 dark:bg-teal-950 text-[#0E9F9A] mx-auto flex items-center justify-center">
@@ -2235,31 +2278,43 @@ export function LocalNeighborhoodRadar() {
                 </div>
                 <div>
                   <h3 className="text-base font-black text-slate-900 dark:text-white uppercase tracking-wide">
-                    NO RADAR ACTIVITY NEARBY
+                    {selectedFilter === 'upcoming'
+                      ? 'NO UPCOMING EVENTS SCHEDULED'
+                      : selectedFilter === 'myExpired'
+                      ? 'NO EXPIRED LISTINGS'
+                      : 'NO RADAR ACTIVITY NEARBY'}
                   </h3>
                   <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-sm mx-auto mt-1">
-                    There are currently no active updates within your selected radius.
+                    {selectedFilter === 'upcoming'
+                      ? 'No future shop launches, openings, or offers have been scheduled in this area yet. Be the first to announce one!'
+                      : selectedFilter === 'myExpired'
+                      ? 'You do not have any past expired radar listings.'
+                      : 'There are currently no active updates within your selected radius.'}
                   </p>
                 </div>
                 <div className="flex items-center justify-center gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const next = radiusKm < 10 ? 10 : radiusKm < 25 ? 25 : 50;
-                      setRadiusKm(next);
-                      if (coords) fetchDbRadarPosts(coords.lat, coords.lng, next);
-                    }}
-                    className="rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 text-xs font-bold px-4 py-2.5 transition-colors shadow-2xs"
-                  >
-                    Expand Radius ({radiusKm < 10 ? '10 km' : radiusKm < 25 ? '25 km' : '50 km'})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => openDropAlertModal()}
-                    className="rounded-xl bg-[#0E9F9A] hover:bg-[#087A76] text-white text-xs font-extrabold px-4 py-2.5 shadow-sm transition-colors"
-                  >
-                    Drop Alert
-                  </button>
+                  {selectedFilter === 'myExpired' ? null : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const next = radiusKm < 10 ? 10 : radiusKm < 25 ? 25 : 50;
+                          setRadiusKm(next);
+                          if (coords) fetchDbRadarPosts(coords.lat, coords.lng, next);
+                        }}
+                        className="rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 text-xs font-bold px-4 py-2.5 transition-colors shadow-2xs"
+                      >
+                        Expand Radius ({radiusKm < 10 ? '10 km' : radiusKm < 25 ? '25 km' : '50 km'})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openDropAlertModal()}
+                        className="rounded-xl bg-[#0E9F9A] hover:bg-[#087A76] text-white text-xs font-extrabold px-4 py-2.5 shadow-sm transition-colors"
+                      >
+                        {selectedFilter === 'upcoming' ? 'Schedule Event' : 'Drop Alert'}
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             ) : (
@@ -2272,11 +2327,17 @@ export function LocalNeighborhoodRadar() {
                 const likeCount = post.likes + (hasLiked && !post.hasLiked ? 1 : 0);
                 const expiryInfo = formatExpiryCountdown(post.expiresAt, post.createdAt, post.category);
                 const isNearingExpiry = isAlert && expiryInfo.isNearing && !expiryInfo.isExpired;
+                const isExpired = !!(post.isExpired || expiryInfo.isExpired);
+                const isUpcoming = post.status === 'UPCOMING' || !!(post.scheduledFor && new Date(post.scheduledFor).getTime() > Date.now());
 
                 return (
                   <React.Fragment key={post.id}>
                     {/* MOBILE COMPACT RADAR CARD (< lg) MATCHING REFERENCE DESIGN */}
-                    <div className="lg:hidden bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-2xl p-3 shadow-2xs hover:shadow-xs transition-all flex items-start gap-3 group">
+                    <div className={`lg:hidden border rounded-2xl p-3 shadow-2xs hover:shadow-xs transition-all flex items-start gap-3 group ${
+                      isExpired
+                        ? 'bg-slate-100/90 dark:bg-zinc-950/90 border-slate-300 dark:border-zinc-700 grayscale contrast-75 opacity-75'
+                        : 'bg-white dark:bg-zinc-900 border-slate-200/80 dark:border-zinc-800'
+                    }`}>
                       
                       {/* Left Thumbnail Image */}
                       <Link
@@ -2304,6 +2365,7 @@ export function LocalNeighborhoodRadar() {
                         <div className="flex items-center justify-between gap-1">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${
+                              isExpired ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300' :
                               isAlert ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400' :
                               isFood ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400' :
                               isNews ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400' :
@@ -2311,17 +2373,30 @@ export function LocalNeighborhoodRadar() {
                             }`}>
                               {post.category === 'alert' ? 'ALERT' :
                                post.category === 'food' ? 'FOOD' :
-                               post.category === 'news' ? 'NEWS' : 'DEAL'}
+                               post.category === 'news' ? 'NEWS' :
+                               post.category === 'event' ? 'EVENT' : 'DEAL'}
                             </span>
 
-                            {post.isLive && (
+                            {isExpired && (
+                              <span className="text-[9px] font-black uppercase bg-zinc-700 text-white px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                                EXPIRED
+                              </span>
+                            )}
+
+                            {isUpcoming && (
+                              <span className="text-[9px] font-black uppercase bg-blue-600 text-white px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                                UPCOMING
+                              </span>
+                            )}
+
+                            {post.isLive && !isExpired && (
                               <span className="text-[9px] font-black uppercase text-rose-600 dark:text-rose-400 flex items-center gap-1 animate-pulse">
                                 <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
                                 LIVE NOW
                               </span>
                             )}
 
-                            {post.isUrgent && (
+                            {post.isUrgent && !isExpired && (
                               <span className="text-[9px] font-black uppercase bg-red-600 text-white px-1.5 py-0.5 rounded flex items-center gap-0.5">
                                 <Zap className="w-2 h-2" /> URGENT
                               </span>
@@ -2344,15 +2419,23 @@ export function LocalNeighborhoodRadar() {
                             {post.timeAgo}
                           </span>
                           <span>•</span>
-                          <span className={`inline-flex items-center gap-0.5 font-bold ${
-                            expiryInfo.isExpired
-                              ? 'text-rose-600 dark:text-rose-400'
-                              : expiryInfo.isNearing
-                              ? 'text-amber-600 dark:text-amber-400'
-                              : 'text-[#0E9F9A] dark:text-teal-400'
-                          }`}>
-                            ⏳ {expiryInfo.text}
-                          </span>
+                          {isUpcoming ? (
+                            <span className="inline-flex items-center gap-0.5 font-bold text-blue-600 dark:text-blue-400">
+                              🗓️ Starts {post.scheduledFor ? new Date(post.scheduledFor).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Soon'}
+                            </span>
+                          ) : isExpired ? (
+                            <span className="inline-flex items-center gap-0.5 font-bold text-slate-500 dark:text-zinc-400">
+                              ⏳ Expired {post.createdAt ? `• Posted ${new Date(post.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}
+                            </span>
+                          ) : (
+                            <span className={`inline-flex items-center gap-0.5 font-bold ${
+                              expiryInfo.isNearing
+                                ? 'text-amber-600 dark:text-amber-400'
+                                : 'text-[#0E9F9A] dark:text-teal-400'
+                            }`}>
+                              ⏳ {expiryInfo.text}
+                            </span>
+                          )}
                         </div>
 
                         {/* Title */}
@@ -2463,9 +2546,13 @@ export function LocalNeighborhoodRadar() {
                       </div>
                     </div>
 
-                    {/* DESKTOP RADAR CARD (lg:flex) UNCHANGED */}
+                    {/* DESKTOP RADAR CARD (lg:flex) */}
                     <div
-                      className="hidden lg:flex bg-white dark:bg-zinc-900 hover:bg-slate-50/50 dark:hover:bg-zinc-900/50 border border-slate-200/80 dark:border-zinc-800 rounded-2xl p-3.5 sm:p-4 shadow-2xs hover:shadow-xs transition-all flex-col sm:flex-row items-start gap-4 group"
+                      className={`hidden lg:flex border rounded-2xl p-3.5 sm:p-4 shadow-2xs hover:shadow-xs transition-all flex-col sm:flex-row items-start gap-4 group ${
+                        isExpired
+                          ? 'bg-slate-100/90 dark:bg-zinc-950/90 border-slate-300 dark:border-zinc-700 grayscale contrast-75 opacity-75'
+                          : 'bg-white dark:bg-zinc-900 hover:bg-slate-50/50 dark:hover:bg-zinc-900/50 border-slate-200/80 dark:border-zinc-800'
+                      }`}
                     >
                     {/* Left Thumbnail Image */}
                     <Link
@@ -2491,14 +2578,26 @@ export function LocalNeighborhoodRadar() {
                       
                       {/* Badge, Distance & Verification Row */}
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        {post.isLive && (
+                        {isExpired && (
+                          <span className="px-2 py-0.5 rounded-md bg-zinc-700 text-white text-[10px] font-black uppercase flex items-center gap-1 shadow-xs">
+                            EXPIRED
+                          </span>
+                        )}
+
+                        {isUpcoming && (
+                          <span className="px-2 py-0.5 rounded-md bg-blue-600 text-white text-[10px] font-black uppercase flex items-center gap-1 shadow-xs">
+                            UPCOMING
+                          </span>
+                        )}
+
+                        {post.isLive && !isExpired && (
                           <span className="px-2 py-0.5 rounded-md bg-rose-500 text-white text-[10px] font-black uppercase flex items-center gap-1 shadow-xs animate-pulse">
                             <span className="w-1.5 h-1.5 rounded-full bg-white"></span>
                             LIVE NOW
                           </span>
                         )}
 
-                        {post.isUrgent && (
+                        {post.isUrgent && !isExpired && (
                           <span className="px-2 py-0.5 rounded-md bg-red-600 text-white text-[10px] font-black uppercase flex items-center gap-1">
                             <Zap className="w-2.5 h-2.5" />
                             CRITICAL
@@ -2506,6 +2605,7 @@ export function LocalNeighborhoodRadar() {
                         )}
 
                         <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${
+                          isExpired ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300' :
                           isAlert ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400' :
                           isFood ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400' :
                           isNews ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400' :
@@ -2513,7 +2613,8 @@ export function LocalNeighborhoodRadar() {
                         }`}>
                           {post.category === 'alert' ? 'ALERT' :
                            post.category === 'food' ? 'SECRET FOOD' :
-                           post.category === 'news' ? 'LOCAL NEWS' : 'DEAL'}
+                           post.category === 'news' ? 'LOCAL NEWS' :
+                           post.category === 'event' ? 'UPCOMING EVENT' : 'DEAL'}
                         </span>
 
                         {post.alertType && (
@@ -2553,15 +2654,23 @@ export function LocalNeighborhoodRadar() {
                           {post.timeAgo}
                         </span>
                         <span>•</span>
-                        <span className={`inline-flex items-center gap-1 font-bold ${
-                          expiryInfo.isExpired
-                            ? 'text-rose-600 dark:text-rose-400'
-                            : expiryInfo.isNearing
-                            ? 'text-amber-600 dark:text-amber-400'
-                            : 'text-[#0E9F9A] dark:text-teal-400'
-                        }`}>
-                          ⏳ {expiryInfo.text}
-                        </span>
+                        {isUpcoming ? (
+                          <span className="inline-flex items-center gap-1 font-bold text-blue-600 dark:text-blue-400">
+                            🗓️ Starts {post.scheduledFor ? new Date(post.scheduledFor).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Soon'}
+                          </span>
+                        ) : isExpired ? (
+                          <span className="inline-flex items-center gap-1 font-bold text-slate-500 dark:text-zinc-400">
+                            ⏳ Expired {post.createdAt ? `• Posted ${new Date(post.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}
+                          </span>
+                        ) : (
+                          <span className={`inline-flex items-center gap-1 font-bold ${
+                            expiryInfo.isNearing
+                              ? 'text-amber-600 dark:text-amber-400'
+                              : 'text-[#0E9F9A] dark:text-teal-400'
+                          }`}>
+                            ⏳ {expiryInfo.text}
+                          </span>
+                        )}
                       </div>
 
                       {/* Title */}
@@ -3136,12 +3245,13 @@ export function LocalNeighborhoodRadar() {
                     </label>
                     <span className="text-[11px] text-slate-400 font-medium">Choose incident type</span>
                   </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                     {[
                       { id: 'alert', label: 'Alert', emoji: '🚨', desc: 'Hazards & Traffic', color: 'border-rose-400 text-rose-600 bg-rose-50/70 dark:bg-rose-950/40' },
                       { id: 'food', label: 'Food', emoji: '🍔', desc: 'Local Specials', color: 'border-amber-400 text-amber-600 bg-amber-50/70 dark:bg-amber-950/40' },
                       { id: 'news', label: 'News', emoji: '📰', desc: 'Civic & Notices', color: 'border-blue-400 text-blue-600 bg-blue-50/70 dark:bg-blue-950/40' },
                       { id: 'deal', label: 'Deal', emoji: '🏷️', desc: 'Offers & Discounts', color: 'border-purple-400 text-purple-600 bg-purple-50/70 dark:bg-purple-950/40' },
+                      { id: 'event', label: 'Event', emoji: '🗓️', desc: 'Launch & Openings', color: 'border-emerald-400 text-emerald-600 bg-emerald-50/70 dark:bg-emerald-950/40' },
                     ].map((c) => (
                       <button
                         key={c.id}
@@ -3421,6 +3531,33 @@ export function LocalNeighborhoodRadar() {
                     </div>
                     <p className="text-[10px] text-rose-700/80 dark:text-rose-300/80 pt-1">
                       Rule: Live Now ≠ Active Forever. Alerts strictly expire after 24 hours max to eliminate stale rumors.
+                    </p>
+                  </div>
+                </div>
+
+                {/* 7b. Upcoming Event / Launch Date Scheduler */}
+                <div className="bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200/70 dark:border-blue-900/50 rounded-2xl p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-xs font-black text-blue-900 dark:text-blue-200 flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-blue-600" />
+                        Schedule as Upcoming Event / Launch (Optional)
+                      </div>
+                      <div className="text-[11px] text-blue-700 dark:text-blue-300">
+                        Future shop launch, opening date, or special offer starting soon
+                      </div>
+                    </div>
+                  </div>
+                  <div className="pt-1">
+                    <input
+                      type="date"
+                      min={new Date().toISOString().split('T')[0]}
+                      value={alertScheduledDate}
+                      onChange={(e) => setAlertScheduledDate(e.target.value)}
+                      className="w-full bg-white dark:bg-zinc-800 border border-blue-200 dark:border-blue-800 rounded-xl p-2.5 text-xs font-bold text-slate-800 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <p className="text-[10px] text-blue-600/80 dark:text-blue-400/80 pt-1">
+                      Listing will appear under "Upcoming Events" on the radar so neighbors can plan ahead.
                     </p>
                   </div>
                 </div>

@@ -2252,7 +2252,7 @@ model RadarPost {
   likesCount          Int                     @default(0)
   viewsCount          Int                     @default(0)
   isDeleted           Boolean                 @default(false)
-  status              String                  @default("ACTIVE") // "ACTIVE" | "RESOLVED" | "EXPIRED" | "UNDER_REVIEW" | "REMOVED"
+  status              String                  @default("ACTIVE") // "ACTIVE" | "RESOLVED" | "EXPIRED" | "UPCOMING" | "UNDER_REVIEW" | "REMOVED"
   confirmationsCount  Int                     @default(0)
   resolvedVotesCount  Int                     @default(0)
   reportsCount        Int                     @default(0)
@@ -2262,6 +2262,7 @@ model RadarPost {
   extendedAt          DateTime?
   extensionCount      Int                     @default(0)
   expiresAt           DateTime?
+  scheduledFor        DateTime?               // Future date for upcoming events/alerts
   createdAt           DateTime                @default(now())
   updatedAt           DateTime                @updatedAt
 
@@ -2290,6 +2291,7 @@ model RadarPost {
   @@index([status])
   @@index([expiresAt])
   @@index([isLive])
+  @@index([scheduledFor])
 }
 
 model RadarPostLike {

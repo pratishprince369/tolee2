@@ -107,6 +107,7 @@ export async function createRadarPostAction(params: {
   alertType?: string;
   urgency?: 'NORMAL' | 'IMPORTANT' | 'CRITICAL';
   isUrgent?: boolean;
+  scheduledFor?: string | Date; // Future date for upcoming events
 }) {
   try {
     const session = await getServerSession(authOptions);
@@ -247,6 +248,20 @@ export async function createRadarPostAction(params: {
       }
     }
 
+    // Handle upcoming/scheduled posts (max 90 days ahead)
+    let validScheduledFor: Date | null = params.scheduledFor ? new Date(params.scheduledFor) : null;
+    let postStatus = 'ACTIVE';
+    const MAX_SCHEDULE_DAYS = 90;
+    if (validScheduledFor && !isNaN(validScheduledFor.getTime()) && validScheduledFor.getTime() > Date.now()) {
+      const maxSchedule = new Date(Date.now() + MAX_SCHEDULE_DAYS * 24 * 60 * 60 * 1000);
+      if (validScheduledFor.getTime() > maxSchedule.getTime()) {
+        validScheduledFor = maxSchedule;
+      }
+      postStatus = 'UPCOMING';
+      // Expiry calculated from scheduledFor, not from now
+      finalExpiresAt = new Date(validScheduledFor.getTime() + defaultHours * 60 * 60 * 1000);
+    }
+
     // Sanitize media URLs (max 5)
     const cleanMediaUrls = Array.isArray(params.mediaUrls)
       ? params.mediaUrls.filter((u: any) => typeof u === 'string' && u.startsWith('http')).slice(0, 5)
@@ -254,7 +269,7 @@ export async function createRadarPostAction(params: {
 
     const isUrgentPost = !!params.isUrgent || params.urgency === 'CRITICAL';
 
-    // E. Create Radar Post in DB with ACTIVE status
+    // E. Create Radar Post in DB
     const post = await prisma.radarPost.create({
       data: {
         category,
@@ -266,14 +281,15 @@ export async function createRadarPostAction(params: {
         radiusKm: safeRadius,
         isAnonymous,
         authorId: currentUserId,
-        status: 'ACTIVE',
+        status: postStatus,
         confirmationsCount: 1, // Author confirms
         resolvedVotesCount: 0,
         reportsCount: 0,
         isVerified: false,
         expiresAt: finalExpiresAt,
+        scheduledFor: validScheduledFor,
         mediaUrls: cleanMediaUrls,
-        isLive: !!params.isLive,
+        isLive: postStatus === 'UPCOMING' ? false : !!params.isLive,
         startedAt: validStartedAt,
         expectedUntil: validExpectedUntil,
         alertType: params.alertType || null,
@@ -521,6 +537,7 @@ export async function getRadarPostsAction(params: {
 
     const bbox = getBoundingBox(lat, lng, radiusKm);
     const now = new Date();
+    const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
 
     const dbPosts = await prisma.radarPost.findMany({
       where: {
@@ -531,7 +548,8 @@ export async function getRadarPostsAction(params: {
         ...(category && category !== 'all' ? { category } : {}),
         OR: [
           { expiresAt: null },
-          { expiresAt: { gt: now } }
+          { expiresAt: { gt: now } },
+          { expiresAt: { gt: twoHoursAgo, lte: now } } // ponytail: 2h grace period, expired but still visible as grayscale
         ]
       },
       include: {
@@ -606,6 +624,8 @@ export async function getRadarPostsAction(params: {
           hasConfirmedStillHappening,
           hasConfirmedResolved,
           expiresAt: post.expiresAt,
+          isExpired: !!(post.expiresAt && new Date(post.expiresAt).getTime() <= now.getTime()),
+          scheduledFor: post.scheduledFor,
           createdAt: post.createdAt,
           mediaUrls: post.mediaUrls || [],
           isLive: post.isLive || false,
@@ -1601,5 +1621,110 @@ export async function recordRadarViewAction(radarPostId: string) {
     return { success: true, viewsCount: updated.viewsCount };
   } catch (error) {
     return { success: false };
+  }
+}
+
+/**
+ * Fetch current user's expired radar posts (lifetime history).
+ */
+export async function getMyExpiredRadarPostsAction() {
+  try {
+    const session = await getServerSession(authOptions);
+    const currentUserId = (session?.user as any)?.id;
+    if (!currentUserId) return { success: false, error: 'Not authenticated', posts: [] };
+
+    const posts = await prisma.radarPost.findMany({
+      where: {
+        authorId: currentUserId,
+        OR: [
+          { status: 'EXPIRED' },
+          { expiresAt: { lte: new Date() }, status: 'ACTIVE', isDeleted: false }
+        ]
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+      select: {
+        id: true, category: true, title: true, description: true,
+        locationName: true, createdAt: true, expiresAt: true,
+        likesCount: true, commentsCount: true, viewsCount: true,
+        mediaUrls: true, latitude: true, longitude: true,
+        scheduledFor: true
+      }
+    });
+
+    return {
+      success: true,
+      posts: posts.map((p: any) => ({
+        ...p,
+        isExpired: true,
+        link: `/radar/${p.id}`
+      }))
+    };
+  } catch (error) {
+    console.error('[Radar] Error fetching expired posts:', error);
+    return { success: false, error: 'Failed to fetch expired posts', posts: [] };
+  }
+}
+
+/**
+ * Fetch upcoming/scheduled radar posts within a geographic radius.
+ */
+export async function getUpcomingRadarPostsAction(params: {
+  lat: number;
+  lng: number;
+  radiusKm?: number;
+}) {
+  try {
+    const { lat, lng, radiusKm = 10 } = params;
+    if (typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || isNaN(lng)) {
+      return { success: false, error: 'Valid coordinates are required', posts: [] };
+    }
+
+    const bbox = getBoundingBox(lat, lng, radiusKm);
+    const now = new Date();
+
+    const dbPosts = await prisma.radarPost.findMany({
+      where: {
+        isDeleted: false,
+        status: 'UPCOMING',
+        scheduledFor: { gt: now },
+        latitude: { gte: bbox.minLat, lte: bbox.maxLat },
+        longitude: { gte: bbox.minLng, lte: bbox.maxLng }
+      },
+      include: {
+        author: { select: { id: true, name: true, username: true, avatar: true } }
+      },
+      orderBy: { scheduledFor: 'asc' },
+      take: 50
+    });
+
+    const posts = dbPosts
+      .map((post: any) => {
+        const dist = calculateDistanceKm(lat, lng, post.latitude, post.longitude);
+        const authorDisplay = post.isAnonymous
+          ? 'Anonymous Neighbor'
+          : (post.author.username ? `@${post.author.username}` : post.author.name);
+        return {
+          id: post.id, category: post.category, title: post.title,
+          description: post.description, distanceKm: dist,
+          latitude: post.latitude, longitude: post.longitude,
+          locationName: post.locationName, radiusKm: post.radiusKm,
+          isAnonymous: post.isAnonymous, author: authorDisplay,
+          authorAvatar: post.isAnonymous ? null : post.author.avatar,
+          authorId: post.isAnonymous ? null : post.author.id,
+          likesCount: post.likesCount, commentsCount: post.commentsCount || 0,
+          viewsCount: post.viewsCount || 0,
+          scheduledFor: post.scheduledFor, expiresAt: post.expiresAt,
+          createdAt: post.createdAt, mediaUrls: post.mediaUrls || [],
+          isExpired: false, status: 'UPCOMING',
+          link: `/radar/${post.id}`
+        };
+      })
+      .filter((p: any) => p.distanceKm <= radiusKm);
+
+    return { success: true, posts };
+  } catch (error) {
+    console.error('[Radar] Error fetching upcoming posts:', error);
+    return { success: false, error: 'Failed to fetch upcoming posts', posts: [] };
   }
 }
