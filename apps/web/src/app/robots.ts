@@ -23,6 +23,8 @@ export default function robots(): MetadataRoute.Robots {
     '/world/*',
     '/radar',
     '/radar/*',
+    '/sports',
+    '/sports/*',
     '/map',
     '/creator-program',
     '/about',

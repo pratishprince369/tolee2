@@ -364,9 +364,9 @@ export default function SportsPage() {
             <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-emerald-500 via-teal-400 to-cyan-400 flex items-center justify-center shadow-md shadow-emerald-500/20">
               <Trophy className="w-4 h-4 text-zinc-950 font-black" />
             </div>
-            <h1 className="text-xl font-black tracking-tight text-white">
+            <span className="text-lg font-black tracking-tight text-white">
               Tolee Sports
-            </h1>
+            </span>
             <span className="bg-[#e62525] text-white text-[10px] font-black uppercase px-2 py-0.5 rounded-full tracking-wider flex items-center gap-1 shadow-sm">
               <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
               LIVE
@@ -405,8 +405,15 @@ export default function SportsPage() {
 
       <div className="max-w-[1440px] mx-auto px-4 lg:px-8 mt-2 md:mt-5">
 
+        {/* Breadcrumb Navigation */}
+        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs font-medium text-zinc-400 mb-2.5">
+          <Link href="/" className="hover:text-emerald-400 transition-colors">Home</Link>
+          <ChevronRight className="w-3.5 h-3.5 text-zinc-600" />
+          <span className="text-zinc-200 font-bold" aria-current="page">Sports</span>
+        </nav>
+
         {/* ══════════════════════════════════════════════════════════════════════════
-            2. HERO BANNER: "LIVE SPORTS ALWAYS WITH YOU"
+            2. HERO BANNER: "LIVE SPORTS SCORES & MATCH UPDATES"
             - Desktop: Widescreen banner with side-by-side headline & star athlete circles
             - Mobile: Compact responsive card with athlete montage and carousel dots at bottom
            ══════════════════════════════════════════════════════════════════════════ */}
@@ -419,19 +426,19 @@ export default function SportsPage() {
           {/* Banner Content */}
           <div className="relative z-10 w-full px-4 sm:px-6 py-4 sm:py-8 flex flex-col md:flex-row items-center justify-between gap-4 sm:gap-6">
             
-            {/* Left Headline */}
+            {/* Primary H1 Headline */}
             <div className="w-full md:max-w-xl text-left">
-              <div className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight uppercase leading-none">
+              <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight uppercase leading-none">
                 <span className="text-white">LIVE </span>
                 <span className="text-[#00e599] drop-shadow-[0_0_20px_rgba(0,229,153,0.6)]">
-                  SPORTS
+                  SPORTS SCORES
                 </span>
-                <div className="text-white text-base sm:text-3xl lg:text-4xl mt-1 tracking-wider">
-                  ALWAYS WITH YOU
-                </div>
-              </div>
-              <p className="mt-1.5 sm:mt-2.5 text-[11px] sm:text-sm text-zinc-400 font-medium tracking-wide">
-                Scores • Schedules • News • Highlights • More
+                <span className="block text-white text-base sm:text-2xl lg:text-3xl mt-1 tracking-normal font-extrabold normal-case text-zinc-100">
+                  & Match Updates
+                </span>
+              </h1>
+              <p className="mt-2 sm:mt-2.5 text-xs sm:text-sm text-zinc-300 font-medium tracking-wide">
+                Real-time live cricket scores, football fixtures, basketball, tennis & today&apos;s match results across world leagues.
               </p>
             </div>
 
@@ -444,19 +451,19 @@ export default function SportsPage() {
               {/* Composite sport star badges */}
               <div className="flex items-center -space-x-2.5 sm:-space-x-3 mt-1">
                 <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-full border-2 border-emerald-500/60 overflow-hidden shadow-lg shadow-emerald-500/20 bg-zinc-800">
-                  <img src="https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?w=100&auto=format&fit=crop&q=80" alt="Cricket" className="w-full h-full object-cover" />
+                  <img src="https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?w=100&auto=format&fit=crop&q=80" alt="Live Cricket Score and Match Updates" className="w-full h-full object-cover" width="48" height="48" loading="lazy" />
                 </div>
                 <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-full border-2 border-red-500/60 overflow-hidden shadow-lg shadow-red-500/20 bg-zinc-800">
-                  <img src="https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=100&auto=format&fit=crop&q=80" alt="Football" className="w-full h-full object-cover" />
+                  <img src="https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=100&auto=format&fit=crop&q=80" alt="Football Live Score and League Fixtures" className="w-full h-full object-cover" width="48" height="48" loading="lazy" />
                 </div>
                 <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-full border-2 border-amber-500/60 overflow-hidden shadow-lg shadow-amber-500/20 bg-zinc-800">
-                  <img src="https://images.unsplash.com/photo-1546519638-68e109498ffc?w=100&auto=format&fit=crop&q=80" alt="Basketball" className="w-full h-full object-cover" />
+                  <img src="https://images.unsplash.com/photo-1546519638-68e109498ffc?w=100&auto=format&fit=crop&q=80" alt="Basketball Live Score and Tournament Updates" className="w-full h-full object-cover" width="48" height="48" loading="lazy" />
                 </div>
                 <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-full border-2 border-cyan-500/60 overflow-hidden shadow-lg shadow-cyan-500/20 bg-zinc-800">
-                  <img src="https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?w=100&auto=format&fit=crop&q=80" alt="Tennis" className="w-full h-full object-cover" />
+                  <img src="https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?w=100&auto=format&fit=crop&q=80" alt="Tennis Live Score and Grand Slam Results" className="w-full h-full object-cover" width="48" height="48" loading="lazy" />
                 </div>
                 <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-full border-2 border-purple-500/60 overflow-hidden shadow-lg shadow-purple-500/20 bg-zinc-800">
-                  <img src="https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?w=100&auto=format&fit=crop&q=80" alt="F1" className="w-full h-full object-cover" />
+                  <img src="https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?w=100&auto=format&fit=crop&q=80" alt="Formula 1 Grand Prix Standings and Race Results" className="w-full h-full object-cover" width="48" height="48" loading="lazy" />
                 </div>
               </div>
             </div>
@@ -674,10 +681,10 @@ export default function SportsPage() {
                     </span>
                     <div>
                       <h2 className="text-base sm:text-lg font-black text-white tracking-tight flex items-center gap-2">
-                        Live Matches
+                        Live Sports Scores & Ongoing Matches
                       </h2>
                       <p className="text-[11px] sm:text-xs text-zinc-400">
-                        Real-time scores and match updates
+                        Real-time scores, cricket overs, football goals & live match updates
                       </p>
                     </div>
                   </div>
@@ -816,10 +823,10 @@ export default function SportsPage() {
                     </div>
                     <div>
                       <h2 className="text-base sm:text-lg font-black text-white tracking-tight">
-                        Upcoming Matches
+                        Upcoming Sports Fixtures & Match Schedule
                       </h2>
                       <p className="text-[11px] sm:text-xs text-zinc-400">
-                        Next big matches across all sports
+                        Today&apos;s match schedule, start times, venues & sports fixtures
                       </p>
                     </div>
                   </div>
@@ -956,10 +963,10 @@ export default function SportsPage() {
                   </div>
                   <div>
                     <h2 className="text-base sm:text-lg font-black text-white tracking-tight">
-                      Top Leagues
+                      Top Sports Leagues & Tournaments
                     </h2>
                     <p className="text-[11px] sm:text-xs text-zinc-400">
-                      Explore all major leagues
+                      IPL, VCPL T10, Premier League, Champions League, NBA & Grand Slams
                     </p>
                   </div>
                 </div>
@@ -1060,7 +1067,7 @@ export default function SportsPage() {
             {statusFilter !== 'all' && statusFilter !== 'LIVE' && statusFilter !== 'UPCOMING' && (
               <div>
                 <h2 className="text-base font-bold text-zinc-200 mb-4">
-                  Match Schedules & Results
+                  Today&apos;s Match Scores & Sports Results
                 </h2>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -1097,6 +1104,37 @@ export default function SportsPage() {
               </div>
             )}
 
+            {/* ── F. SEO KNOWLEDGE & QUICK SPORTS GUIDE ── */}
+            <section aria-labelledby="sports-seo-overview" className="mt-8 pt-6 border-t border-[#16233a] space-y-4">
+              <div className="bg-[#0a1324] border border-[#16253c] rounded-2xl p-5 sm:p-6">
+                <h2 id="sports-seo-overview" className="text-sm sm:text-base font-bold text-white mb-2 flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-emerald-400" />
+                  Real-Time Live Sports Scores & Match Coverage on Tolee Sports
+                </h2>
+                <p className="text-xs text-zinc-400 leading-relaxed mb-4">
+                  Tolee Sports delivers live sports scores, cricket commentary, today&apos;s match results, and comprehensive sports fixtures across major world leagues. Stay updated with ball-by-ball cricket scores, football goal alerts, basketball quarters, and tennis sets.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs text-zinc-300">
+                  <div className="bg-[#060c18] border border-[#141f32] rounded-xl p-3">
+                    <span className="font-bold text-emerald-400 block mb-0.5">🏏 Live Cricket Score</span>
+                    <span className="text-[11px] text-zinc-400">IPL, VCPL T10, ICC World Cups, Test & T20 matches</span>
+                  </div>
+                  <div className="bg-[#060c18] border border-[#141f32] rounded-xl p-3">
+                    <span className="font-bold text-emerald-400 block mb-0.5">⚽ Football Live Score</span>
+                    <span className="text-[11px] text-zinc-400">Premier League, UEFA Champions League, La Liga & ISL</span>
+                  </div>
+                  <div className="bg-[#060c18] border border-[#141f32] rounded-xl p-3">
+                    <span className="font-bold text-emerald-400 block mb-0.5">🏀 Basketball & Tennis</span>
+                    <span className="text-[11px] text-zinc-400">NBA, EuroLeague, ATP, WTA & Grand Slam tournament scores</span>
+                  </div>
+                  <div className="bg-[#060c18] border border-[#141f32] rounded-xl p-3">
+                    <span className="font-bold text-emerald-400 block mb-0.5">📅 Today&apos;s Match Score</span>
+                    <span className="text-[11px] text-zinc-400">Match schedule, timing, stadium venues & final results</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+
           </div>
 
           {/* ════ RIGHT SIDEBAR (Desktop lg: and up - Col 9-12 / 3 cols) ════ */}
@@ -1109,7 +1147,7 @@ export default function SportsPage() {
               <div className="flex items-center gap-2 mb-2">
                 <Crown className="w-5 h-5 text-amber-400 fill-amber-400" />
                 <h3 className="font-extrabold text-sm sm:text-base text-white tracking-tight">
-                  Follow Your Favourite Teams
+                  Popular Sports Teams
                 </h3>
               </div>
 
@@ -1140,7 +1178,7 @@ export default function SportsPage() {
                 <div className="flex items-center gap-1.5">
                   <Flame className="w-4 h-4 text-orange-500 fill-orange-500" />
                   <h3 className="font-black text-sm sm:text-base text-white tracking-tight">
-                    Trending Now
+                    Trending Sports Matches
                   </h3>
                 </div>
                 <button

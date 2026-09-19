@@ -168,7 +168,7 @@ export function TeamBadge({ name, logo, className = 'w-full h-full object-contai
     return (
       <img
         src="/sports/vcpl-season-2.jpg"
-        alt={name}
+        alt={`${name} team logo`}
         className="w-full h-full object-cover"
         loading="lazy"
       />
@@ -209,7 +209,7 @@ export function TeamBadge({ name, logo, className = 'w-full h-full object-contai
   return (
     <img
       src={currentSrc}
-      alt={name}
+      alt={`${name} team logo`}
       className={className}
       onError={() => {
         if (!useBackup && CDN_BACKUPS[cleanName]) {
