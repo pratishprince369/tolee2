@@ -822,24 +822,28 @@ export function LocalNeighborhoodRadar() {
       if (!mapInstanceRef.current) {
         const map = L.map(mapContainerRef.current, {
           zoomControl: false,
-          attributionControl: false
+          attributionControl: false,
+          maxZoom: 20
         }).setView([coords.lat, coords.lng], 14);
 
         mapInstanceRef.current = map;
         circlesLayerGroupRef.current = L.layerGroup().addTo(map);
         markersLayerGroupRef.current = L.layerGroup().addTo(map);
 
-        // Tile layer
+        // Real Google Maps tile layer (roadmap & satellite hybrid)
         const tileUrl = mapType === 'satellite'
-          ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
-          : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+          ? 'https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}'
+          : 'https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}';
 
-        tileLayerRef.current = L.tileLayer(tileUrl, { maxZoom: 19 }).addTo(map);
+        tileLayerRef.current = L.tileLayer(tileUrl, {
+          maxZoom: 20,
+          subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
+        }).addTo(map);
       } else {
         // Update tile layer if changed
         const currentTileUrl = mapType === 'satellite'
-          ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
-          : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+          ? 'https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}'
+          : 'https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}';
 
         if (tileLayerRef.current) {
           tileLayerRef.current.setUrl(currentTileUrl);
@@ -1168,13 +1172,15 @@ export function LocalNeighborhoodRadar() {
 
       const map = L.map(pinMapContainerRef.current, {
         zoomControl: true,
-        attributionControl: false
+        attributionControl: false,
+        maxZoom: 20
       }).setView([initialLat, initialLng], 15);
 
       pinMapInstanceRef.current = map;
 
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19
+      L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+        maxZoom: 20,
+        subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
       }).addTo(map);
 
       // Custom Draggable Pin Icon
