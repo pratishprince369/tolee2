@@ -58,7 +58,10 @@ export function getBoundingBox(
 /**
  * Formats a distance in kilometers into user-friendly text (e.g. "0.8 km away" or "450 m away").
  */
-export function formatDistance(distanceKm: number): string {
+export function formatDistance(distanceKm?: number | null): string {
+  if (typeof distanceKm !== 'number' || isNaN(distanceKm)) {
+    return 'Nearby';
+  }
   if (distanceKm < 0.1) {
     return 'Just nearby';
   }

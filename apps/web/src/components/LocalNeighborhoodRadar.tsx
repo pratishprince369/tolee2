@@ -599,13 +599,15 @@ export function LocalNeighborhoodRadar() {
     if (selectedFilter === 'upcoming' && upcomingPosts.length === 0 && coords) {
       setLoadingUpcoming(true);
       getUpcomingRadarPostsAction({ lat: coords.lat, lng: coords.lng, radiusKm })
-        .then(res => { if (res.success) setUpcomingPosts(res.posts); })
+        .then(res => { if (res.success && Array.isArray(res.posts)) setUpcomingPosts(res.posts); })
+        .catch(err => { console.error('[Radar] Error fetching upcoming posts:', err); })
         .finally(() => setLoadingUpcoming(false));
     }
     if (selectedFilter === 'myExpired' && myExpiredPosts.length === 0) {
       setLoadingExpired(true);
-      getMyExpiredRadarPostsAction()
-        .then(res => { if (res.success) setMyExpiredPosts(res.posts); })
+      getMyExpiredRadarPostsAction({ lat: coords?.lat, lng: coords?.lng })
+        .then(res => { if (res.success && Array.isArray(res.posts)) setMyExpiredPosts(res.posts); })
+        .catch(err => { console.error('[Radar] Error fetching expired posts:', err); })
         .finally(() => setLoadingExpired(false));
     }
   }, [selectedFilter, coords, radiusKm]);
@@ -2324,7 +2326,7 @@ export function LocalNeighborhoodRadar() {
                 const isNews = post.category === 'news' || post.category === 'event';
                 const isDeal = post.category === 'deal' || post.category === 'store';
                 const hasLiked = !!likedPostIds[post.id] || post.hasLiked;
-                const likeCount = post.likes + (hasLiked && !post.hasLiked ? 1 : 0);
+                const likeCount = (post.likes ?? post.likesCount ?? 0) + (hasLiked && !post.hasLiked ? 1 : 0);
                 const expiryInfo = formatExpiryCountdown(post.expiresAt, post.createdAt, post.category);
                 const isNearingExpiry = isAlert && expiryInfo.isNearing && !expiryInfo.isExpired;
                 const isExpired = !!(post.isExpired || expiryInfo.isExpired);
@@ -2416,7 +2418,7 @@ export function LocalNeighborhoodRadar() {
                         <div className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-500 dark:text-zinc-400 pt-0.5 flex-wrap">
                           <span className="inline-flex items-center gap-1 text-slate-500 dark:text-zinc-400">
                             <Clock className="w-2.5 h-2.5 text-slate-400" />
-                            {post.timeAgo}
+                            {post.timeAgo || (post.createdAt ? formatPostedTime(post.createdAt) : 'Recently')}
                           </span>
                           <span>•</span>
                           {isUpcoming ? (
@@ -2698,7 +2700,7 @@ export function LocalNeighborhoodRadar() {
                         )}
                         <span className="font-semibold text-slate-600 dark:text-zinc-400">{post.author}</span>
                         <span>•</span>
-                        <span>Posted {post.timeAgo}</span>
+                        <span>Posted {post.timeAgo || (post.createdAt ? formatPostedTime(post.createdAt) : 'Recently')}</span>
                         {post.expiresAt && (
                           <>
                             <span>•</span>

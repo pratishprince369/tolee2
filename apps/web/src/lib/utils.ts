@@ -5,7 +5,10 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function formatViewCount(views: number): string {
+export function formatViewCount(views?: number | null): string {
+  if (typeof views !== 'number' || isNaN(views)) {
+    return '0';
+  }
   if (views >= 1000000) {
     return (views / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
   }

@@ -1627,7 +1627,7 @@ export async function recordRadarViewAction(radarPostId: string) {
 /**
  * Fetch current user's expired radar posts (lifetime history).
  */
-export async function getMyExpiredRadarPostsAction() {
+export async function getMyExpiredRadarPostsAction(params?: { lat?: number; lng?: number }) {
   try {
     const session = await getServerSession(authOptions);
     const currentUserId = (session?.user as any)?.id;
@@ -1641,24 +1641,50 @@ export async function getMyExpiredRadarPostsAction() {
           { expiresAt: { lte: new Date() }, status: 'ACTIVE', isDeleted: false }
         ]
       },
+      include: {
+        author: { select: { id: true, name: true, username: true, avatar: true } }
+      },
       orderBy: { createdAt: 'desc' },
-      take: 100,
-      select: {
-        id: true, category: true, title: true, description: true,
-        locationName: true, createdAt: true, expiresAt: true,
-        likesCount: true, commentsCount: true, viewsCount: true,
-        mediaUrls: true, latitude: true, longitude: true,
-        scheduledFor: true
-      }
+      take: 100
     });
 
     return {
       success: true,
-      posts: posts.map((p: any) => ({
-        ...p,
-        isExpired: true,
-        link: `/radar/${p.id}`
-      }))
+      posts: posts.map((p: any) => {
+        const dist = (params?.lat && params?.lng && p.latitude && p.longitude)
+          ? calculateDistanceKm(params.lat, params.lng, p.latitude, p.longitude)
+          : 0;
+        const authorDisplay = p.isAnonymous
+          ? 'Anonymous Neighbor'
+          : (p.author?.username ? `@${p.author.username}` : p.author?.name || 'You');
+
+        return {
+          id: p.id,
+          category: p.category,
+          title: p.title,
+          description: p.description,
+          locationName: p.locationName,
+          createdAt: p.createdAt,
+          expiresAt: p.expiresAt,
+          scheduledFor: p.scheduledFor,
+          distanceKm: dist,
+          likes: p.likesCount || 0,
+          likesCount: p.likesCount || 0,
+          commentsCount: p.commentsCount || 0,
+          viewsCount: p.viewsCount || 0,
+          mediaUrls: p.mediaUrls || [],
+          imageUrl: (p.mediaUrls && p.mediaUrls.length > 0 ? p.mediaUrls[0] : null),
+          latitude: p.latitude,
+          longitude: p.longitude,
+          isAnonymous: p.isAnonymous,
+          author: authorDisplay,
+          authorAvatar: p.isAnonymous ? null : p.author?.avatar,
+          authorId: p.authorId,
+          isExpired: true,
+          status: 'EXPIRED',
+          link: `/radar/${p.id}`
+        };
+      })
     };
   } catch (error) {
     console.error('[Radar] Error fetching expired posts:', error);
@@ -1705,18 +1731,30 @@ export async function getUpcomingRadarPostsAction(params: {
           ? 'Anonymous Neighbor'
           : (post.author.username ? `@${post.author.username}` : post.author.name);
         return {
-          id: post.id, category: post.category, title: post.title,
-          description: post.description, distanceKm: dist,
-          latitude: post.latitude, longitude: post.longitude,
-          locationName: post.locationName, radiusKm: post.radiusKm,
-          isAnonymous: post.isAnonymous, author: authorDisplay,
+          id: post.id,
+          category: post.category,
+          title: post.title,
+          description: post.description,
+          distanceKm: dist,
+          latitude: post.latitude,
+          longitude: post.longitude,
+          locationName: post.locationName,
+          radiusKm: post.radiusKm,
+          isAnonymous: post.isAnonymous,
+          author: authorDisplay,
           authorAvatar: post.isAnonymous ? null : post.author.avatar,
           authorId: post.isAnonymous ? null : post.author.id,
-          likesCount: post.likesCount, commentsCount: post.commentsCount || 0,
+          likes: post.likesCount || 0,
+          likesCount: post.likesCount || 0,
+          commentsCount: post.commentsCount || 0,
           viewsCount: post.viewsCount || 0,
-          scheduledFor: post.scheduledFor, expiresAt: post.expiresAt,
-          createdAt: post.createdAt, mediaUrls: post.mediaUrls || [],
-          isExpired: false, status: 'UPCOMING',
+          scheduledFor: post.scheduledFor,
+          expiresAt: post.expiresAt,
+          createdAt: post.createdAt,
+          mediaUrls: post.mediaUrls || [],
+          imageUrl: (post.mediaUrls && post.mediaUrls.length > 0 ? post.mediaUrls[0] : null),
+          isExpired: false,
+          status: 'UPCOMING',
           link: `/radar/${post.id}`
         };
       })
