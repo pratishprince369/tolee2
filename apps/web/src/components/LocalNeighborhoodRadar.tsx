@@ -2011,27 +2011,27 @@ export function LocalNeighborhoodRadar() {
           )}
 
           {/* CATEGORY FILTER TABS & SORT ROW (DESKTOP ONLY lg:) */}
-          <div className="hidden lg:flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-zinc-900 p-2.5 sm:p-3 rounded-2xl border border-slate-200/80 dark:border-zinc-800 shadow-2xs">
+          <div className="hidden lg:flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-white dark:bg-zinc-900 p-2.5 sm:p-3 rounded-2xl border border-slate-200/80 dark:border-zinc-800 shadow-2xs">
             
-            {/* Filter Pills matching reference layout */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 no-scrollbar">
+            {/* Filter Pills with wrap so NO tab ever gets cut off */}
+            <div className="flex items-center gap-1.5 flex-wrap flex-1 min-w-0">
               {[
                 { id: 'all', label: `All Updates (${counts.total})`, icon: null },
                 { id: 'alert', label: `Alerts (${counts.alerts})`, icon: '🚨' },
-                { id: 'food', label: `Secret Food (${counts.food})`, icon: '🍔' },
-                { id: 'news', label: `Local News (${counts.news})`, icon: '📰' },
-                { id: 'deal', label: `Deals & Offers (${counts.deals})`, icon: '🏷️' },
-                { id: 'upcoming', label: `Upcoming Events${upcomingPosts.length > 0 ? ` (${upcomingPosts.length})` : ''}`, icon: '🗓️' },
+                { id: 'food', label: `Food (${counts.food})`, icon: '🍔' },
+                { id: 'news', label: `News (${counts.news})`, icon: '📰' },
+                { id: 'deal', label: `Deals (${counts.deals})`, icon: '🏷️' },
+                { id: 'upcoming', label: `Upcoming${upcomingPosts.length > 0 ? ` (${upcomingPosts.length})` : ''}`, icon: '🗓️' },
                 { id: 'myExpired', label: `My Expired${myExpiredPosts.length > 0 ? ` (${myExpiredPosts.length})` : ''}`, icon: '⏳' }
               ].map((tab) => (
                 <button
                   key={tab.id}
                   type="button"
                   onClick={() => setSelectedFilter(tab.id)}
-                  className={`px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 ${
+                  className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 ${
                     selectedFilter === tab.id
                       ? 'bg-[#0E9F9A] text-white shadow-xs'
-                      : 'bg-transparent text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800'
+                      : 'bg-slate-50 dark:bg-zinc-800/80 text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800 border border-slate-200/60 dark:border-zinc-700/60'
                   }`}
                 >
                   {tab.icon && <span>{tab.icon}</span>}
@@ -2041,8 +2041,8 @@ export function LocalNeighborhoodRadar() {
             </div>
 
             {/* Sort Selector */}
-            <div className="flex items-center gap-2 self-end sm:self-auto flex-shrink-0 px-2">
-              <span className="text-xs font-medium text-slate-400 dark:text-zinc-500">Sort by:</span>
+            <div className="flex items-center gap-2 self-end sm:self-auto flex-shrink-0 px-1">
+              <span className="text-xs font-medium text-slate-400 dark:text-zinc-500">Sort:</span>
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as any)}
@@ -2997,8 +2997,8 @@ export function LocalNeighborhoodRadar() {
               </span>
             </div>
 
-            {/* 4-Item Grid */}
-            <div className="grid grid-cols-4 gap-2 text-center">
+            {/* Quick Category Grid */}
+            <div className="grid grid-cols-3 gap-2 text-center">
               
               {/* Alert */}
               <button
@@ -3033,7 +3033,7 @@ export function LocalNeighborhoodRadar() {
                   {counts.food}
                 </span>
                 <span className="text-[10px] font-bold text-slate-700 dark:text-zinc-300">
-                  Secret Food
+                  Food
                 </span>
                 <span className="text-[8px] font-medium text-slate-400">
                   Hidden gems
@@ -3053,7 +3053,7 @@ export function LocalNeighborhoodRadar() {
                   {counts.news}
                 </span>
                 <span className="text-[10px] font-bold text-slate-700 dark:text-zinc-300">
-                  Local News
+                  News
                 </span>
                 <span className="text-[8px] font-medium text-slate-400">
                   Stay informed
@@ -3073,10 +3073,50 @@ export function LocalNeighborhoodRadar() {
                   {counts.deals}
                 </span>
                 <span className="text-[10px] font-bold text-slate-700 dark:text-zinc-300">
-                  Deals & Offers
+                  Deals
                 </span>
                 <span className="text-[8px] font-medium text-slate-400">
                   Save nearby
+                </span>
+              </button>
+
+              {/* Upcoming */}
+              <button
+                type="button"
+                onClick={() => setSelectedFilter('upcoming')}
+                className="bg-teal-50/60 dark:bg-teal-950/30 border border-teal-100 dark:border-teal-900/40 rounded-xl p-2.5 flex flex-col items-center justify-center hover:bg-teal-100/60 transition-colors group"
+              >
+                <div className="w-7 h-7 rounded-lg bg-[#0E9F9A] text-white flex items-center justify-center text-xs mb-1">
+                  🗓️
+                </div>
+                <span className="text-base font-black text-slate-900 dark:text-white">
+                  {upcomingPosts.length}
+                </span>
+                <span className="text-[10px] font-bold text-slate-700 dark:text-zinc-300">
+                  Upcoming
+                </span>
+                <span className="text-[8px] font-medium text-slate-400">
+                  Launches
+                </span>
+              </button>
+
+              {/* My Expired */}
+              <button
+                type="button"
+                onClick={() => setSelectedFilter('myExpired')}
+                className="bg-zinc-100/60 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700/60 rounded-xl p-2.5 flex flex-col items-center justify-center hover:bg-zinc-200/60 transition-colors group"
+              >
+                <div className="w-7 h-7 rounded-lg bg-zinc-600 text-white flex items-center justify-center text-xs mb-1">
+                  ⏳
+                </div>
+                <span className="text-base font-black text-slate-900 dark:text-white">
+                  {myExpiredPosts.length}
+                </span>
+                <span className="text-[10px] font-bold text-slate-700 dark:text-zinc-300">
+                  My Expired
+                </span>
+                <span className="text-[8px] font-medium text-slate-400">
+                  History
                 </span>
               </button>
 
