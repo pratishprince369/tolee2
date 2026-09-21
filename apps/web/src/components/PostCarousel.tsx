@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Volume2, VolumeX, Play, Loader2, AlertCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Volume2, VolumeX, Play, Loader2, AlertCircle, Music } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
   HLSVideo,
@@ -289,16 +289,47 @@ export function PostCarousel({ mediaUrls, mediaTypes, postId }: PostCarouselProp
   const urls = mediaUrls ? mediaUrls.split(/,(?=(?:https?:\/\/|blob:))/i).map(url => url.trim()).filter(Boolean) : [];
   const rawTypes = mediaTypes ? mediaTypes.split(',').map(t => t.trim().toLowerCase()) : [];
   
-  const items = urls.map((url, idx) => ({
+  const allParsed = urls.map((url, idx) => ({
     url,
-    type: rawTypes[idx] || (url.includes('.mp4') || url.includes('video') ? 'video' : 'image')
+    type: rawTypes[idx] || (url.includes('.mp4') || url.includes('video') ? 'video' : (url.match(/\.(mp3|wav|ogg|m4a|aac)(\?.*)?$/i) ? 'audio' : 'image'))
   }));
 
-  const firstItem = items[0];
+  const items = allParsed.filter(item => item.type !== 'audio');
+  const postAudioTrack = allParsed.find(item => item.type === 'audio');
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const audioElRef = useRef<HTMLAudioElement | null>(null);
+
+  const togglePostAudio = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!audioElRef.current && postAudioTrack) {
+      const audio = new Audio(postAudioTrack.url);
+      audio.loop = true;
+      audioElRef.current = audio;
+    }
+    if (audioElRef.current) {
+      if (isPlayingAudio) {
+        audioElRef.current.pause();
+        setIsPlayingAudio(false);
+      } else {
+        audioElRef.current.play().catch(() => {});
+        setIsPlayingAudio(true);
+      }
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (audioElRef.current) {
+        audioElRef.current.pause();
+      }
+    };
+  }, []);
+
+  const firstItem = items[0] || allParsed[0];
   const detectedRatio = useMediaAspectRatio(firstItem?.url, firstItem?.type);
   const displayRatio = detectedRatio || 4/5;
 
-  if (items.length === 0) return null;
+  if (items.length === 0 && !postAudioTrack) return null;
 
   const handlePrev = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -434,6 +465,23 @@ export function PostCarousel({ mediaUrls, mediaTypes, postId }: PostCarouselProp
             />
           ))}
         </div>
+      )}
+      {/* Audio Track Pill */}
+      {postAudioTrack && (
+        <button
+          onClick={togglePostAudio}
+          className="absolute bottom-3 left-3 z-30 flex items-center gap-1.5 px-3 py-1 bg-black/60 hover:bg-black/80 backdrop-blur-md rounded-full text-white text-xs font-semibold shadow-md transition-all active:scale-95 cursor-pointer"
+          title="Toggle background music"
+        >
+          {isPlayingAudio ? (
+            <Volume2 className="w-3.5 h-3.5 text-teal-400 animate-pulse" />
+          ) : (
+            <VolumeX className="w-3.5 h-3.5 text-zinc-300" />
+          )}
+          <span className="text-[11px] max-w-[130px] truncate">
+            {isPlayingAudio ? 'Playing Sound' : 'Play Sound'}
+          </span>
+        </button>
       )}
     </div>
   );

@@ -15,6 +15,7 @@ import { getSidebarDataCached } from '@/lib/sidebar-data';
 import { getContentPermanentUrl, copyContentUrl } from '@/lib/shareService';
 import { CreatePostModal } from '@/components/CreatePostModal';
 import { CreateRequirementModal } from '@/components/CreateRequirementModal';
+import { UnifiedCreatePostModal } from '@/components/UnifiedCreatePostModal';
 import { OptimisticPostCard } from '@/components/OptimisticPostCard';
 import { uploadFile } from '@/lib/upload';
 import { createPost, toggleLike, addComment, getLikes, getComments, toggleSavePost, toggleRepost, getReposts, updatePostVisibility, deletePostPermanently, editPostCaption, archivePost, incrementStoryEngagement, getPostStoryAnalytics } from '@/actions/post';
@@ -58,10 +59,14 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
   }, []);
 
   useEffect(() => {
-    const handleOpenQuickActions = () => setIsQuickActionOpen(true);
+    const handleOpenQuickActions = () => {
+      setUnifiedModalInitialMode('default');
+      setIsUnifiedModalOpen(true);
+    };
     window.addEventListener('tolee_open_quick_actions', handleOpenQuickActions);
     if (searchParams.get('action') === 'create') {
-      setIsQuickActionOpen(true);
+      setUnifiedModalInitialMode('default');
+      setIsUnifiedModalOpen(true);
     }
     return () => window.removeEventListener('tolee_open_quick_actions', handleOpenQuickActions);
   }, [searchParams]);
@@ -303,6 +308,8 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
     }
   };
   const [isQuickActionOpen, setIsQuickActionOpen] = useState(false);
+  const [isUnifiedModalOpen, setIsUnifiedModalOpen] = useState(false);
+  const [unifiedModalInitialMode, setUnifiedModalInitialMode] = useState<'default' | 'requirement' | 'regular' | 'reel' | 'news'>('default');
 
   // Ads and Boost State
   const [sponsoredAds, setSponsoredAds] = useState<any[]>([]);
@@ -988,6 +995,13 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
         </CreatePostModal>
       </div>
       
+      {/* Unified Instagram-Style AI Post Creator */}
+      <UnifiedCreatePostModal
+        isOpen={isUnifiedModalOpen}
+        onClose={() => setIsUnifiedModalOpen(false)}
+        onPost={handleNewPost}
+        initialMode={unifiedModalInitialMode}
+      />
 
 
       <main className="container mx-auto px-4 lg:px-8 pt-8 pb-24 max-w-3xl">
@@ -1109,7 +1123,10 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
             <div className="hidden sm:grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
               {/* Box 1: Post Your Requirement */}
               <div 
-                onClick={() => document.getElementById('trigger-requirement')?.click()}
+                onClick={() => {
+                  setUnifiedModalInitialMode('requirement');
+                  setIsUnifiedModalOpen(true);
+                }}
                 className="group relative flex flex-col items-center text-center p-5 rounded-2xl border border-rose-100 dark:border-rose-950/20 bg-rose-50/10 dark:bg-rose-950/5 hover:bg-rose-50/40 dark:hover:bg-rose-950/15 hover:border-rose-300 dark:hover:border-rose-800/80 cursor-pointer shadow-sm hover:shadow-md hover:-translate-y-1 hover:scale-[1.02] transition-all duration-300 active:scale-[0.98]"
               >
                 <div className="w-11 h-11 rounded-2xl bg-rose-500 flex items-center justify-center text-white shadow-md shadow-rose-500/20 group-hover:scale-105 transition-transform duration-300">
@@ -1125,7 +1142,10 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
 
               {/* Box 2: Create Normal Post */}
               <div 
-                onClick={() => document.getElementById('trigger-normal-post')?.click()}
+                onClick={() => {
+                  setUnifiedModalInitialMode('regular');
+                  setIsUnifiedModalOpen(true);
+                }}
                 className="group relative flex flex-col items-center text-center p-5 rounded-2xl border border-teal-100 dark:border-teal-950/20 bg-teal-50/10 dark:bg-teal-950/5 hover:bg-teal-50/40 dark:hover:bg-teal-950/15 hover:border-teal-300 dark:hover:border-teal-800/80 cursor-pointer shadow-sm hover:shadow-md hover:-translate-y-1 hover:scale-[1.02] transition-all duration-300 active:scale-[0.98]"
               >
                 <div className="w-11 h-11 rounded-2xl bg-primary dark:bg-zinc-800 flex items-center justify-center text-white shadow-md shadow-primary/10 dark:shadow-black/20 group-hover:scale-105 transition-transform duration-300">
@@ -1141,7 +1161,10 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
 
               {/* Box 3: Post Reel */}
               <div 
-                onClick={() => document.getElementById('trigger-reel-post')?.click()}
+                onClick={() => {
+                  setUnifiedModalInitialMode('reel');
+                  setIsUnifiedModalOpen(true);
+                }}
                 className="group relative flex flex-col items-center text-center p-5 rounded-2xl border border-amber-100 dark:border-amber-950/20 bg-amber-50/10 dark:bg-amber-950/5 hover:bg-amber-50/40 dark:hover:bg-amber-950/15 hover:border-amber-300 dark:hover:border-amber-800/80 cursor-pointer shadow-sm hover:shadow-md hover:-translate-y-1 hover:scale-[1.02] transition-all duration-300 active:scale-[0.98]"
               >
                 <div className="w-11 h-11 rounded-2xl bg-amber-500 flex items-center justify-center text-white shadow-md shadow-amber-500/20 group-hover:scale-105 transition-transform duration-300">
@@ -1157,7 +1180,10 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
 
               {/* Box 4: Post News */}
               <div 
-                onClick={() => document.getElementById('trigger-news-post')?.click()}
+                onClick={() => {
+                  setUnifiedModalInitialMode('news');
+                  setIsUnifiedModalOpen(true);
+                }}
                 className="group relative flex flex-col items-center text-center p-5 rounded-2xl border border-indigo-100 dark:border-indigo-950/20 bg-indigo-50/10 dark:bg-indigo-950/5 hover:bg-indigo-50/40 dark:hover:bg-indigo-950/15 hover:border-indigo-300 dark:hover:border-indigo-800/80 cursor-pointer shadow-sm hover:shadow-md hover:-translate-y-1 hover:scale-[1.02] transition-all duration-300 active:scale-[0.98]"
               >
                 <div className="w-11 h-11 rounded-2xl bg-indigo-500 flex items-center justify-center text-white shadow-md shadow-indigo-500/20 group-hover:scale-105 transition-transform duration-300">
@@ -3219,9 +3245,8 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
             <div 
               onClick={() => {
                 setIsQuickActionOpen(false);
-                setTimeout(() => {
-                  document.getElementById('trigger-requirement')?.click();
-                }, 150);
+                setUnifiedModalInitialMode('requirement');
+                setIsUnifiedModalOpen(true);
               }}
               className="group flex items-start gap-3.5 p-3.5 sm:p-4 rounded-2xl border border-rose-100 dark:border-rose-950/30 bg-rose-50/20 dark:bg-rose-950/10 hover:bg-rose-50/50 dark:hover:bg-rose-950/20 hover:border-rose-200 cursor-pointer transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0"
             >
@@ -3242,9 +3267,8 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
             <div 
               onClick={() => {
                 setIsQuickActionOpen(false);
-                setTimeout(() => {
-                  document.getElementById('trigger-normal-post')?.click();
-                }, 150);
+                setUnifiedModalInitialMode('regular');
+                setIsUnifiedModalOpen(true);
               }}
               className="group flex items-start gap-3.5 p-3.5 sm:p-4 rounded-2xl border border-primary/10 dark:border-zinc-800 bg-primary/5 dark:bg-zinc-900/40 hover:bg-primary/10 dark:hover:bg-zinc-900/70 hover:border-primary/20 cursor-pointer transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0"
             >
@@ -3265,9 +3289,8 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
             <div 
               onClick={() => {
                 setIsQuickActionOpen(false);
-                setTimeout(() => {
-                  document.getElementById('trigger-reel-post')?.click();
-                }, 150);
+                setUnifiedModalInitialMode('reel');
+                setIsUnifiedModalOpen(true);
               }}
               className="group flex items-start gap-3.5 p-3.5 sm:p-4 rounded-2xl border border-amber-100 dark:border-amber-950/30 bg-amber-50/20 dark:bg-amber-950/10 hover:bg-amber-50/50 dark:hover:bg-amber-950/20 hover:border-amber-200 cursor-pointer transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0"
             >
@@ -3288,9 +3311,8 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
             <div 
               onClick={() => {
                 setIsQuickActionOpen(false);
-                setTimeout(() => {
-                  document.getElementById('trigger-news-post')?.click();
-                }, 150);
+                setUnifiedModalInitialMode('news');
+                setIsUnifiedModalOpen(true);
               }}
               className="group flex items-start gap-3.5 p-3.5 sm:p-4 rounded-2xl border border-indigo-100 dark:border-indigo-950/30 bg-indigo-50/20 dark:bg-indigo-950/10 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/20 hover:border-indigo-200 cursor-pointer transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0"
             >
