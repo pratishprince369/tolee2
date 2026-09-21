@@ -254,8 +254,24 @@ export function UnifiedCreatePostModal({
     else if (step === 2) setStep(1);
   };
 
-  const handlePublish = () => {
-    const finalCategory = manualCategory || detectedResult?.category || 'regular';
+  const handlePublish = async () => {
+    let finalCategory = manualCategory || detectedResult?.category;
+    if (!finalCategory) {
+      const hasVideo = mediaList.some((m) => m.type === 'video');
+      const hasImages = mediaList.some((m) => m.type === 'image');
+      try {
+        const res = await detectPostCategoryAction({
+          caption,
+          hasVideo,
+          hasImages,
+          fileName: mediaList[0]?.file?.name,
+        });
+        finalCategory = res.category;
+      } catch {
+        finalCategory = hasVideo ? 'reel' : 'regular';
+      }
+    }
+    finalCategory = finalCategory || 'regular';
     const firstSelectedTolee = joinedTolees.find((t) => t.id === selectedTolees[0]);
 
     // Format media list: attach custom audio file if provided
@@ -875,73 +891,15 @@ export function UnifiedCreatePostModal({
             </div>
           )}
 
-          {/* STEP 5: Smart AI Classification & Final Live Preview */}
+          {/* STEP 5: Smart AI Review & Final Live Preview */}
           {step === 5 && (
-            <div className="flex-1 p-5 sm:p-6 space-y-5 overflow-y-auto">
-              
-              {/* NVIDIA AI Auto-Detection Card */}
-              <div className="p-4 rounded-2xl bg-gradient-to-br from-teal-50 via-cyan-50 to-emerald-50 dark:from-teal-950/40 dark:via-zinc-900 dark:to-emerald-950/30 border border-teal-200 dark:border-teal-800/60 shadow-sm">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <div className="p-1.5 rounded-lg bg-[#0a7c85] text-white shadow-xs">
-                      <Sparkles className="w-4 h-4" />
-                    </div>
-                    <span className="font-extrabold text-xs sm:text-sm text-teal-900 dark:text-teal-200">
-                      NVIDIA AI Auto Category Detection
-                    </span>
-                  </div>
-                  {isAnalyzingAI ? (
-                    <div className="flex items-center gap-1.5 text-xs text-[#0a7c85] font-bold">
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>Analyzing...</span>
-                    </div>
-                  ) : (
-                    <div className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-teal-500/20 text-[#0a7c85]">
-                      {Math.round((detectedResult?.confidence || 0.9) * 100)}% Match
-                    </div>
-                  )}
-                </div>
-
-                {/* Detected Badge & Explanation */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-black/40 p-3.5 rounded-xl border border-teal-100 dark:border-teal-900/40">
-                  <div>
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
-                      Target Destination
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <span className="font-black text-sm text-gray-900 dark:text-white capitalize">
-                        {activeCategory === 'requirement' && '🎯 Post Your Requirement'}
-                        {activeCategory === 'reel' && '🎬 Tolee Reel (Feed + Reels Tab)'}
-                        {activeCategory === 'news' && '📰 Tolee News Post'}
-                        {activeCategory === 'regular' && '📝 Normal Community Post'}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-gray-500 dark:text-zinc-400 mt-1">
-                      {detectedResult?.reason || 'Automatically classified by content context.'}
-                    </p>
-                  </div>
-
-                  {/* Category Switcher Dropdown (Manual Override) */}
-                  <div className="shrink-0">
-                    <select
-                      value={activeCategory}
-                      onChange={(e) => setManualCategory(e.target.value as PostCategoryType)}
-                      className="text-xs font-bold px-3 py-2 rounded-xl bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 text-gray-800 dark:text-zinc-200 cursor-pointer focus:outline-none"
-                    >
-                      <option value="requirement">Requirement</option>
-                      <option value="regular">Normal Post</option>
-                      <option value="reel">Reel</option>
-                      <option value="news">Tolee News</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {/* Live Card Preview */}
-              <div>
-                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-2.5">
+            <div className="flex-1 p-4 sm:p-6 overflow-y-auto max-w-xl mx-auto w-full">
+              {/* Live Post Preview */}
+              <div className="mb-2.5">
+                <span className="text-xs font-bold text-gray-500 uppercase tracking-wider block">
                   Live Post Preview
-                </label>
+                </span>
+              </div>
 
                 <div className="border border-gray-200 dark:border-zinc-800 rounded-2xl p-4 bg-white dark:bg-[#181818] shadow-sm max-w-lg mx-auto">
                   {/* Author Header */}
@@ -978,7 +936,7 @@ export function UnifiedCreatePostModal({
                       className="rounded-xl overflow-hidden bg-black flex items-center justify-center relative mb-3"
                       style={{
                         aspectRatio: selectedRatio,
-                        maxHeight: '260px',
+                        maxHeight: '340px',
                         filter: selectedFilter,
                       }}
                     >
@@ -1000,8 +958,6 @@ export function UnifiedCreatePostModal({
                     </div>
                   )}
                 </div>
-              </div>
-
             </div>
           )}
 
@@ -1025,7 +981,7 @@ export function UnifiedCreatePostModal({
           ) : (
             <Button
               onClick={handlePublish}
-              disabled={isAnalyzingAI || (!caption.trim() && mediaList.length === 0)}
+              disabled={!caption.trim() && mediaList.length === 0}
               className="w-full h-14 rounded-full bg-gradient-to-r from-[#0a7c85] to-teal-500 hover:opacity-95 text-white font-extrabold text-base flex items-center justify-center gap-2 shadow-lg cursor-pointer active:scale-[0.99]"
             >
               <span>Share Now</span>
