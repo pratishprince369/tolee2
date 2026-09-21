@@ -22,6 +22,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { createRadarPostAction } from '@/actions/radar';
+import { getRadarAccurateGPS } from '@/lib/radar-native-location';
 
 export interface DropAlertWizardModalProps {
   isOpen: boolean;
@@ -150,9 +151,11 @@ export function DropAlertWizardModal({
   // Submitting
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  // Reset or Sync when modal opens
+  // Reset or Sync ONLY when modal transitions from closed to open
+  const prevIsOpenRef = useRef(false);
+
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !prevIsOpenRef.current) {
       setCurrentStepIndex(0);
       setStepError(null);
       const initialLat = coords?.lat || 19.2565;
@@ -162,7 +165,8 @@ export function DropAlertWizardModal({
       setAlertSubLocation(subLocation || 'Local Area');
       setAlertRadius(defaultRadius || 5);
     }
-  }, [isOpen, coords, userCity, subLocation, defaultRadius]);
+    prevIsOpenRef.current = isOpen;
+  }, [isOpen]);
 
   // Compute dynamic steps based on alertCategory
   // Live alerts / Incidents do not require scheduling. Events do.
@@ -336,7 +340,7 @@ export function DropAlertWizardModal({
         pinMapInstanceRef.current = null;
       }
     };
-  }, [isOpen, activeStep.key, alertRadius, alertPinCoords.lat, alertPinCoords.lng, coords?.lat, coords?.lng, reverseGeocodePin]);
+  }, [isOpen, activeStep.key]);
 
   // Sync radius circle on radius step or change
   useEffect(() => {
@@ -349,21 +353,33 @@ export function DropAlertWizardModal({
   const handleUseCurrentGPS = async () => {
     setIsLocatingGPS(true);
     try {
+      let targetLat = coords?.lat;
+      let targetLng = coords?.lng;
+
+      try {
+        const gps = await getRadarAccurateGPS(8000);
+        if (gps && gps.lat && gps.lng) {
+          targetLat = gps.lat;
+          targetLng = gps.lng;
+        }
+      } catch (_) {}
+
       if (acquireGPS) {
-        await acquireGPS(true);
+        acquireGPS(true).catch(() => {});
       }
-      if (coords) {
-        setAlertPinCoords({ lat: coords.lat, lng: coords.lng });
+
+      if (targetLat && targetLng) {
+        setAlertPinCoords({ lat: targetLat, lng: targetLng });
         if (pinMapInstanceRef.current) {
-          pinMapInstanceRef.current.setView([coords.lat, coords.lng], 15, { animate: true });
+          pinMapInstanceRef.current.setView([targetLat, targetLng], 15, { animate: true });
         }
         if (pinMarkerRef.current) {
-          pinMarkerRef.current.setLatLng([coords.lat, coords.lng]);
+          pinMarkerRef.current.setLatLng([targetLat, targetLng]);
         }
         if (pinCircleRef.current) {
-          pinCircleRef.current.setLatLng([coords.lat, coords.lng]);
+          pinCircleRef.current.setLatLng([targetLat, targetLng]);
         }
-        await reverseGeocodePin(coords.lat, coords.lng);
+        await reverseGeocodePin(targetLat, targetLng);
       }
     } catch (_) {
     } finally {
