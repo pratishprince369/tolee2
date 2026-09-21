@@ -617,8 +617,8 @@ export function DropAlertWizardModal({
   const progressPercent = Math.round(((currentStepIndex + 1) / wizardSteps.length) * 100);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-0 sm:p-4 overflow-hidden select-none">
-      <div className="bg-white dark:bg-[#121212] rounded-none sm:rounded-3xl border-none sm:border border-slate-200 dark:border-zinc-800 shadow-2xl w-full max-w-4xl h-[100dvh] sm:h-auto sm:max-h-[92vh] flex flex-col overflow-hidden relative animate-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-xs flex items-center justify-center p-0 sm:p-4 overflow-hidden select-none">
+      <div className="bg-white dark:bg-[#121212] rounded-none sm:rounded-3xl border-none sm:border border-slate-200 dark:border-zinc-800 shadow-2xl w-full max-w-4xl h-full sm:h-auto h-[100dvh] max-h-[100dvh] sm:max-h-[92vh] flex flex-col overflow-hidden relative animate-in zoom-in-95 duration-200">
         
         {/* Ambient Pastel Mint / Teal Accent */}
         <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full bg-teal-50 dark:bg-teal-950/20 blur-3xl pointer-events-none -z-10" />
@@ -626,14 +626,16 @@ export function DropAlertWizardModal({
         {/* Modal Header Bar with Step Progress */}
         <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-zinc-800/80 bg-white/90 dark:bg-[#121212]/90 backdrop-blur-md flex items-center justify-between shrink-0 z-20">
           <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={isFirstStep ? onClose : handleBack}
-              className="p-1.5 -ml-1 rounded-full text-slate-700 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
-              title={isFirstStep ? 'Close' : 'Back'}
-            >
-              {isFirstStep ? <X className="w-5 h-5" /> : <ArrowLeft className="w-5 h-5 stroke-[2.5]" />}
-            </button>
+            {!isFirstStep && (
+              <button
+                type="button"
+                onClick={handleBack}
+                className="p-1.5 -ml-1 rounded-full text-slate-700 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                title="Back"
+              >
+                <ArrowLeft className="w-5 h-5 stroke-[2.5]" />
+              </button>
+            )}
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white leading-tight">
@@ -1234,7 +1236,7 @@ export function DropAlertWizardModal({
         </div>
 
         {/* Modal Bottom Sticky Navigation Bar */}
-        <div className="p-4 sm:p-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] bg-white/95 dark:bg-[#121212]/95 backdrop-blur-md border-t border-slate-100 dark:border-zinc-800 flex items-center justify-between gap-3 shrink-0 z-20">
+        <div className="p-4 sm:p-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] bg-white dark:bg-[#121212] border-t border-slate-100 dark:border-zinc-800 flex items-center justify-between gap-3 shrink-0 z-30 sticky bottom-0 shadow-[0_-4px_12px_rgba(0,0,0,0.05)]">
           <button
             type="button"
             onClick={isFirstStep ? onClose : handleBack}
