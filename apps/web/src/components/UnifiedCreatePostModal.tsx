@@ -274,16 +274,36 @@ export function UnifiedCreatePostModal({
   };
 
   const handlePublish = async () => {
+    let currentMedia = [...mediaList];
+
+    // If text-only post, ensure visual text card image is generated
+    if (isTextOnly && caption.trim() && currentMedia.length === 0) {
+      try {
+        setIsGeneratingCard(true);
+        const { file, url } = await renderTextCardToBlob(
+          caption,
+          selectedBgStyle,
+          session?.user?.name || undefined
+        );
+        currentMedia = [{ type: 'image', url, file }];
+        setMediaList(currentMedia);
+      } catch (err) {
+        console.error('Failed to generate visual text card:', err);
+      } finally {
+        setIsGeneratingCard(false);
+      }
+    }
+
     let finalCategory = manualCategory || detectedResult?.category;
     if (!finalCategory) {
-      const hasVideo = mediaList.some((m) => m.type === 'video');
-      const hasImages = mediaList.some((m) => m.type === 'image');
+      const hasVideo = currentMedia.some((m) => m.type === 'video');
+      const hasImages = currentMedia.some((m) => m.type === 'image');
       try {
         const res = await detectPostCategoryAction({
           caption,
           hasVideo,
           hasImages,
-          fileName: mediaList[0]?.file?.name,
+          fileName: currentMedia[0]?.file?.name,
         });
         finalCategory = res.category;
       } catch {
@@ -294,7 +314,7 @@ export function UnifiedCreatePostModal({
     const firstSelectedTolee = joinedTolees.find((t) => t.id === selectedTolees[0]);
 
     // Format media list: attach custom audio file if provided
-    const payloadMedia: MediaItem[] = [...mediaList];
+    const payloadMedia: MediaItem[] = [...currentMedia];
     if (customAudioFile && selectedAudio) {
       payloadMedia.push({
         type: 'video' as any, // upload provider handles audio file similarly
@@ -353,7 +373,7 @@ export function UnifiedCreatePostModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="w-full max-w-full sm:max-w-[700px] h-[100dvh] sm:h-[680px] p-0 bg-white dark:bg-[#121212] rounded-none sm:rounded-3xl border-none sm:border border-gray-100 dark:border-zinc-800 flex flex-col overflow-hidden shadow-2xl relative select-none">
+      <DialogContent className="w-full max-w-full sm:max-w-[700px] h-[100dvh] sm:h-[680px] max-h-[100dvh] sm:max-h-[90vh] p-0 gap-0 bg-white dark:bg-[#121212] rounded-none sm:rounded-3xl border-none sm:border border-gray-100 dark:border-zinc-800 flex flex-col overflow-hidden shadow-2xl relative select-none">
         
         {/* Ambient Pastel Mint Accents matching mockup */}
         <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full bg-[#EAF7F6] dark:bg-teal-950/20 blur-2xl pointer-events-none -z-10" />
@@ -370,13 +390,19 @@ export function UnifiedCreatePostModal({
               <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2.2]" />
             </button>
             <div>
-              <h2 className="text-lg sm:text-xl font-black text-[#101828] dark:text-white leading-tight">
-                {step === 1 && 'Create New Post'}
-                {step === 2 && 'Edit & Enhance'}
-                {step === 3 && 'Add Music & Sound'}
-                {step === 4 && (isTextOnly ? 'Create Visual Post' : 'Add Caption & Details')}
-                {step === 5 && 'Smart AI Review'}
-              </h2>
+              <h3 className="font-black text-base sm:text-lg text-[#101828] dark:text-white leading-tight">
+                {step === 1
+                  ? 'Create New Post'
+                  : step === 4 && isTextOnly
+                  ? 'Create Visual Post'
+                  : step === 2
+                  ? 'Edit & Enhance'
+                  : step === 3
+                  ? 'Add Music'
+                  : step === 4
+                  ? 'Post Details'
+                  : 'Smart AI Review'}
+              </h3>
               <p className="text-[11px] sm:text-xs text-[#667085] dark:text-zinc-400 mt-0.5">
                 {step === 1
                   ? 'Share with your Tolee community'
@@ -397,7 +423,7 @@ export function UnifiedCreatePostModal({
         </div>
 
         {/* Modal Body Wizard Screens */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col">
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden flex flex-col">
           
           {/* STEP 1: THREE VERTICAL SELECTION BOXES */}
           {step === 1 && (
@@ -776,7 +802,7 @@ export function UnifiedCreatePostModal({
 
           {/* STEP 4: Caption, Tolees & Details */}
           {step === 4 && (
-            <div className="flex-1 p-5 sm:p-6 space-y-4 overflow-y-auto">
+            <div className="w-full p-4 sm:p-6 space-y-4 max-w-xl mx-auto pb-6">
               
               {/* User Avatar + Group Selector */}
               <div className="flex items-center gap-3">
@@ -1054,19 +1080,41 @@ export function UnifiedCreatePostModal({
         </div>
 
         {/* Bottom Sticky Action Button matching user mockup */}
-        <div className="p-4 sm:p-5 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] bg-white/95 dark:bg-[#121212]/95 backdrop-blur-md border-t border-gray-100 dark:border-zinc-800 shrink-0 w-full max-w-xl mx-auto">
-          {step < 5 ? (
+        <div className="p-4 sm:p-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] bg-white/95 dark:bg-[#121212]/95 backdrop-blur-md border-t border-gray-100 dark:border-zinc-800 shrink-0 w-full max-w-xl mx-auto z-20">
+          {step === 4 && isTextOnly ? (
+            <Button
+              onClick={handlePublish}
+              disabled={isGeneratingCard || !caption.trim()}
+              className={`w-full h-14 rounded-full font-extrabold text-base flex items-center justify-center gap-2 transition-all duration-200 shadow-lg cursor-pointer active:scale-[0.99] ${
+                isGeneratingCard || !caption.trim()
+                  ? 'bg-[#8ec5c5] hover:bg-[#8ec5c5] text-white opacity-90 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-[#0a7c85] to-teal-500 hover:opacity-95 text-white'
+              }`}
+            >
+              {isGeneratingCard ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>Publishing...</span>
+                </>
+              ) : (
+                <>
+                  <span>Publish Now</span>
+                  <Check className="w-5 h-5 stroke-[3]" />
+                </>
+              )}
+            </Button>
+          ) : step < 5 ? (
             <Button
               onClick={handleNextStep}
               disabled={
                 isGeneratingCard ||
                 (step === 1 && mediaList.length === 0 && !isTextOnly) ||
-                (step === 4 && isTextOnly && !caption.trim())
+                (step === 4 && !caption.trim())
               }
               className={`w-full h-14 rounded-full font-bold text-base flex items-center justify-center gap-2 transition-all duration-200 shadow-md ${
                 isGeneratingCard ||
                 (step === 1 && mediaList.length === 0 && !isTextOnly) ||
-                (step === 4 && isTextOnly && !caption.trim())
+                (step === 4 && !caption.trim())
                   ? 'bg-[#8ec5c5] hover:bg-[#8ec5c5] text-white opacity-90 cursor-not-allowed'
                   : 'bg-[#0a7c85] hover:bg-[#086970] text-white cursor-pointer active:scale-[0.99]'
               }`}
@@ -1089,7 +1137,7 @@ export function UnifiedCreatePostModal({
               disabled={!caption.trim() && mediaList.length === 0}
               className="w-full h-14 rounded-full bg-gradient-to-r from-[#0a7c85] to-teal-500 hover:opacity-95 text-white font-extrabold text-base flex items-center justify-center gap-2 shadow-lg cursor-pointer active:scale-[0.99]"
             >
-              <span>Share Now</span>
+              <span>Publish Now</span>
               <Check className="w-5 h-5 stroke-[3]" />
             </Button>
           )}
