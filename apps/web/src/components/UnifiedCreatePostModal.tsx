@@ -9,7 +9,7 @@ import {
   X, ArrowLeft, ArrowRight, Image as ImageIcon, Video, Music,
   Sparkles, Check, Play, Pause, Volume2, VolumeX, MapPin,
   Shield, CheckCircle2, Sliders, ChevronDown, Wand2, Newspaper,
-  Film, HelpCircle, Loader2, Plus, Tag, RefreshCw
+  Film, HelpCircle, Loader2, Plus, Tag, RefreshCw, FileText, ChevronRight
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { getSidebarData } from '@/actions/user';
@@ -315,85 +315,51 @@ export function UnifiedCreatePostModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="w-[calc(100vw-1rem)] sm:w-full sm:max-w-[700px] h-[92vh] sm:h-[620px] p-0 bg-white dark:bg-[#121212] rounded-3xl border border-gray-100 dark:border-zinc-800 flex flex-col overflow-hidden shadow-2xl gap-0">
+      <DialogContent className="w-full max-w-full sm:max-w-[700px] h-[100dvh] sm:h-[680px] p-0 bg-white dark:bg-[#121212] rounded-none sm:rounded-3xl border-none sm:border border-gray-100 dark:border-zinc-800 flex flex-col overflow-hidden shadow-2xl relative select-none">
         
-        {/* Top Header Bar */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 dark:border-zinc-800/80 shrink-0">
-          <div className="flex items-center gap-2">
-            {step > 1 ? (
-              <button
-                onClick={handlePrevStep}
-                className="p-1.5 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full text-gray-700 dark:text-zinc-200 transition-colors"
-                title="Back"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </button>
-            ) : (
-              <div className="w-8" />
-            )}
-            <h3 className="text-sm font-extrabold text-gray-900 dark:text-zinc-100 flex items-center gap-1.5">
-              <span>
+        {/* Ambient Pastel Mint Accents matching mockup */}
+        <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full bg-[#EAF7F6] dark:bg-teal-950/20 blur-2xl pointer-events-none -z-10" />
+        <div className="absolute -bottom-24 -left-24 w-80 h-80 rounded-full bg-[#EAF7F6] dark:bg-teal-950/20 blur-2xl pointer-events-none -z-10" />
+
+        {/* Top Header Bar matching user mockup */}
+        <div className="flex items-center justify-between px-5 pt-[max(1rem,env(safe-area-inset-top))] pb-3.5 border-b border-gray-100/80 dark:border-zinc-800/80 shrink-0 bg-white/90 dark:bg-[#121212]/90 backdrop-blur-md z-10">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={step > 1 ? handlePrevStep : onClose}
+              className="p-1.5 -ml-1.5 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full text-gray-800 dark:text-zinc-200 transition-colors cursor-pointer"
+              title="Back"
+            >
+              <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2.2]" />
+            </button>
+            <div>
+              <h2 className="text-lg sm:text-xl font-black text-[#101828] dark:text-white leading-tight">
                 {step === 1 && 'Create New Post'}
                 {step === 2 && 'Edit & Enhance'}
                 {step === 3 && 'Add Music & Sound'}
                 {step === 4 && 'Add Caption & Details'}
                 {step === 5 && 'Smart AI Review'}
-              </span>
-            </h3>
+              </h2>
+              <p className="text-[11px] sm:text-xs text-[#667085] dark:text-zinc-400 mt-0.5">
+                {step === 1 ? 'Share with your Tolee community' : `Step ${step} of 5`}
+              </p>
+            </div>
           </div>
 
-          {/* Stepper Dots */}
-          <div className="hidden sm:flex items-center gap-1.5">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div
-                key={i}
-                className={`h-1.5 rounded-full transition-all duration-300 ${
-                  step === i
-                    ? 'w-6 bg-[#0a7c85]'
-                    : step > i
-                    ? 'w-2 bg-[#0a7c85]/40'
-                    : 'w-1.5 bg-gray-200 dark:bg-zinc-800'
-                }`}
-              />
-            ))}
-          </div>
-
-          <div className="flex items-center gap-2">
-            {step < 5 ? (
-              <Button
-                size="sm"
-                onClick={handleNextStep}
-                disabled={step === 1 && mediaList.length === 0 && !isTextOnly}
-                className="rounded-full bg-[#0a7c85] hover:bg-[#086a71] text-white font-bold text-xs px-4 h-8"
-              >
-                Next
-                <ArrowRight className="w-3.5 h-3.5 ml-1" />
-              </Button>
-            ) : (
-              <Button
-                size="sm"
-                onClick={handlePublish}
-                disabled={isAnalyzingAI || (!caption.trim() && mediaList.length === 0)}
-                className="rounded-full bg-gradient-to-r from-[#0a7c85] to-teal-500 hover:opacity-95 text-white font-extrabold text-xs px-5 h-8 shadow-md"
-              >
-                Share Now
-              </Button>
-            )}
-            <button
-              onClick={onClose}
-              className="p-1.5 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-zinc-200 transition-colors ml-1"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full text-gray-400 hover:text-gray-700 dark:hover:text-zinc-200 transition-colors cursor-pointer"
+            title="Close"
+          >
+            <X className="w-5 h-5 sm:w-6 sm:h-6" />
+          </button>
         </div>
 
         {/* Modal Body Wizard Screens */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col">
           
-          {/* STEP 1: Media Selection */}
+          {/* STEP 1: THREE VERTICAL SELECTION BOXES */}
           {step === 1 && (
-            <div className="flex-1 flex flex-col items-center justify-center p-6 sm:p-10 text-center">
+            <div className="flex-1 flex flex-col justify-between p-4 sm:p-6 overflow-y-auto max-w-xl mx-auto w-full">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -403,76 +369,109 @@ export function UnifiedCreatePostModal({
               />
 
               {mediaList.length === 0 ? (
-                <div className="max-w-md flex flex-col items-center">
-                  <div className="w-20 h-20 rounded-3xl bg-teal-50 dark:bg-teal-950/30 text-[#0a7c85] flex items-center justify-center mb-6 shadow-inner">
-                    <ImageIcon className="w-10 h-10 stroke-[1.5]" />
-                  </div>
-                  <h2 className="text-xl font-black text-gray-900 dark:text-zinc-100 mb-2">
-                    Drag photos and videos here
-                  </h2>
-                  <p className="text-xs text-gray-500 dark:text-zinc-400 mb-6 max-w-sm">
-                    Upload high quality photos, vertical reels, or write a community requirement.
-                  </p>
-
-                  <div className="flex flex-col sm:flex-row gap-3 w-full max-w-xs">
-                    <Button
-                      onClick={() => triggerFileInput()}
-                      className="rounded-full bg-[#0a7c85] hover:bg-[#086a71] text-white font-bold h-11 text-xs sm:text-sm flex-1 shadow-md"
-                    >
-                      Select From Device
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setIsTextOnly(true);
-                        setStep(4);
-                      }}
-                      className="rounded-full border-gray-200 dark:border-zinc-800 text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-900 font-bold h-11 text-xs sm:text-sm flex-1"
-                    >
-                      Write Text Only
-                    </Button>
+                <div className="space-y-4 my-auto py-2">
+                  {/* BOX 1: SELECT PHOTOS */}
+                  <div
+                    onClick={() => triggerFileInput('image/*')}
+                    className="group relative flex items-start gap-4 p-5 rounded-[26px] bg-white dark:bg-[#181818] border border-[#DCF1EE] dark:border-zinc-800 hover:border-[#0a7c85]/50 hover:shadow-lg transition-all duration-200 cursor-pointer active:scale-[0.99] shadow-xs"
+                  >
+                    <div className="w-16 h-16 rounded-[22px] bg-[#EAF7F5] dark:bg-teal-950/40 text-[#0a7c85] flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform duration-200">
+                      <ImageIcon className="w-8 h-8 stroke-[2.2]" />
+                    </div>
+                    <div className="flex-1 min-w-0 pr-1">
+                      <h3 className="text-[17px] font-black text-[#101828] dark:text-white group-hover:text-[#0a7c85] transition-colors">
+                        Select Photos
+                      </h3>
+                      <p className="text-xs text-[#667085] dark:text-zinc-400 mt-1 leading-relaxed">
+                        Choose photos from your device to share with the community.
+                      </p>
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#E2F7F5] dark:bg-teal-950/60 text-[#0a7c85] text-[11px] font-bold mt-3">
+                        <ImageIcon className="w-3.5 h-3.5" />
+                        <span>JPG, PNG, WEBP (Max 100MB)</span>
+                      </div>
+                    </div>
+                    <div className="w-10 h-10 rounded-full bg-[#EAF7F6] dark:bg-zinc-800 text-[#0a7c85] flex items-center justify-center flex-shrink-0 group-hover:bg-[#0a7c85] group-hover:text-white transition-all duration-200 self-center">
+                      <ChevronRight className="w-5 h-5 stroke-[2.5]" />
+                    </div>
                   </div>
 
-                  {/* Direct Selection Chips: Mix / Photos / Videos */}
-                  <div className="flex items-center justify-center gap-2 mt-4 flex-wrap">
-                    <button
-                      type="button"
-                      onClick={() => triggerFileInput('*/*')}
-                      className="px-3 py-1.5 rounded-full bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-800/60 text-[#0a7c85] hover:bg-teal-100 text-xs font-bold transition-all flex items-center gap-1 shadow-xs active:scale-95"
-                    >
-                      📁 All Media (Mix)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => triggerFileInput('image/*')}
-                      className="px-3 py-1.5 rounded-full bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-zinc-700 text-gray-700 dark:text-zinc-300 text-xs font-bold transition-all flex items-center gap-1 active:scale-95"
-                    >
-                      🖼️ Photos
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => triggerFileInput('video/*')}
-                      className="px-3 py-1.5 rounded-full bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-zinc-700 text-gray-700 dark:text-zinc-300 text-xs font-bold transition-all flex items-center gap-1 active:scale-95"
-                    >
-                      🎬 Videos
-                    </button>
+                  {/* BOX 2: SELECT VIDEOS */}
+                  <div
+                    onClick={() => triggerFileInput('video/*')}
+                    className="group relative flex items-start gap-4 p-5 rounded-[26px] bg-white dark:bg-[#181818] border border-[#DCF1EE] dark:border-zinc-800 hover:border-[#0a7c85]/50 hover:shadow-lg transition-all duration-200 cursor-pointer active:scale-[0.99] shadow-xs"
+                  >
+                    <div className="w-16 h-16 rounded-[22px] bg-[#EAF7F5] dark:bg-teal-950/40 text-[#0a7c85] flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform duration-200">
+                      <Video className="w-8 h-8 stroke-[2.2]" />
+                    </div>
+                    <div className="flex-1 min-w-0 pr-1">
+                      <h3 className="text-[17px] font-black text-[#101828] dark:text-white group-hover:text-[#0a7c85] transition-colors">
+                        Select Videos
+                      </h3>
+                      <p className="text-xs text-[#667085] dark:text-zinc-400 mt-1 leading-relaxed">
+                        Choose videos from your device to share with the community.
+                      </p>
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#E2F7F5] dark:bg-teal-950/60 text-[#0a7c85] text-[11px] font-bold mt-3">
+                        <Video className="w-3.5 h-3.5" />
+                        <span>MP4, MOV, WEBM (Max 100MB)</span>
+                      </div>
+                    </div>
+                    <div className="w-10 h-10 rounded-full bg-[#EAF7F6] dark:bg-zinc-800 text-[#0a7c85] flex items-center justify-center flex-shrink-0 group-hover:bg-[#0a7c85] group-hover:text-white transition-all duration-200 self-center">
+                      <ChevronRight className="w-5 h-5 stroke-[2.5]" />
+                    </div>
+                  </div>
+
+                  {/* BOX 3: POST WITH TEXT ONLY */}
+                  <div
+                    onClick={() => {
+                      setIsTextOnly(true);
+                      setStep(4);
+                    }}
+                    className="group relative flex items-start gap-4 p-5 rounded-[26px] bg-white dark:bg-[#181818] border border-[#DCF1EE] dark:border-zinc-800 hover:border-[#0a7c85]/50 hover:shadow-lg transition-all duration-200 cursor-pointer active:scale-[0.99] shadow-xs"
+                  >
+                    <div className="w-16 h-16 rounded-[22px] bg-[#EAF7F5] dark:bg-teal-950/40 text-[#0a7c85] flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform duration-200">
+                      <FileText className="w-8 h-8 stroke-[2.2]" />
+                    </div>
+                    <div className="flex-1 min-w-0 pr-1">
+                      <h3 className="text-[17px] font-black text-[#101828] dark:text-white group-hover:text-[#0a7c85] transition-colors">
+                        Post with Text Only
+                      </h3>
+                      <p className="text-xs text-[#667085] dark:text-zinc-400 mt-1 leading-relaxed">
+                        Share your thoughts, updates or ask something from the community.
+                      </p>
+                    </div>
+                    <div className="w-10 h-10 rounded-full bg-[#EAF7F6] dark:bg-zinc-800 text-[#0a7c85] flex items-center justify-center flex-shrink-0 group-hover:bg-[#0a7c85] group-hover:text-white transition-all duration-200 self-center">
+                      <ChevronRight className="w-5 h-5 stroke-[2.5]" />
+                    </div>
                   </div>
                 </div>
               ) : (
-                <div className="w-full h-full flex flex-col">
-                  {/* Selected Media Grid Preview */}
-                  <div className="flex-1 flex items-center justify-center bg-gray-50 dark:bg-zinc-950 rounded-2xl p-4 overflow-hidden relative">
+                /* Selected Media Preview */
+                <div className="w-full h-full flex flex-col justify-between py-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-extrabold text-[#101828] dark:text-white">
+                      Selected Media ({mediaList.length})
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setMediaList([])}
+                      className="text-xs font-bold text-rose-500 hover:underline"
+                    >
+                      Change / Clear
+                    </button>
+                  </div>
+
+                  <div className="flex-1 flex items-center justify-center bg-gray-50 dark:bg-zinc-950 rounded-3xl p-4 overflow-hidden relative">
                     {mediaList[activeMediaIndex]?.type === 'video' ? (
                       <video
                         src={mediaList[activeMediaIndex].url}
                         controls
-                        className="max-h-[340px] max-w-full rounded-xl object-contain shadow-lg"
+                        className="max-h-[340px] max-w-full rounded-2xl object-contain shadow-lg"
                       />
                     ) : (
                       <img
                         src={mediaList[activeMediaIndex]?.url}
                         alt="Selected"
-                        className="max-h-[340px] max-w-full rounded-xl object-contain shadow-lg"
+                        className="max-h-[340px] max-w-full rounded-2xl object-contain shadow-lg"
                       />
                     )}
                   </div>
@@ -1006,6 +1005,33 @@ export function UnifiedCreatePostModal({
             </div>
           )}
 
+        </div>
+
+        {/* Bottom Sticky Action Button matching user mockup */}
+        <div className="p-4 sm:p-5 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] bg-white/95 dark:bg-[#121212]/95 backdrop-blur-md border-t border-gray-100 dark:border-zinc-800 shrink-0 w-full max-w-xl mx-auto">
+          {step < 5 ? (
+            <Button
+              onClick={handleNextStep}
+              disabled={step === 1 && mediaList.length === 0 && !isTextOnly}
+              className={`w-full h-14 rounded-full font-bold text-base flex items-center justify-center gap-2 transition-all duration-200 shadow-md ${
+                step === 1 && mediaList.length === 0 && !isTextOnly
+                  ? 'bg-[#8ec5c5] hover:bg-[#8ec5c5] text-white opacity-90 cursor-not-allowed'
+                  : 'bg-[#0a7c85] hover:bg-[#086970] text-white cursor-pointer active:scale-[0.99]'
+              }`}
+            >
+              <span>Next</span>
+              <ArrowRight className="w-5 h-5 stroke-[2.5]" />
+            </Button>
+          ) : (
+            <Button
+              onClick={handlePublish}
+              disabled={isAnalyzingAI || (!caption.trim() && mediaList.length === 0)}
+              className="w-full h-14 rounded-full bg-gradient-to-r from-[#0a7c85] to-teal-500 hover:opacity-95 text-white font-extrabold text-base flex items-center justify-center gap-2 shadow-lg cursor-pointer active:scale-[0.99]"
+            >
+              <span>Share Now</span>
+              <Check className="w-5 h-5 stroke-[3]" />
+            </Button>
+          )}
         </div>
       </DialogContent>
     </Dialog>
