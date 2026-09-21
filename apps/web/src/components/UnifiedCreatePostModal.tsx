@@ -349,6 +349,7 @@ export function UnifiedCreatePostModal({
   };
 
   const activeCategory = manualCategory || detectedResult?.category || 'regular';
+  const userFirstName = session?.user?.name ? session.user.name.trim().split(' ')[0] : 'there';
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -822,7 +823,7 @@ export function UnifiedCreatePostModal({
                     <textarea
                       value={caption}
                       onChange={(e) => setCaption(e.target.value)}
-                      placeholder="Looking for 2 bhk in kalyan west..."
+                      placeholder={`What's on your mind, ${userFirstName}?`}
                       rows={4}
                       className={`w-full bg-transparent border-none outline-none text-center resize-none placeholder:opacity-60 placeholder:text-current font-extrabold leading-snug tracking-tight focus:ring-0 ${
                         caption.length > 180
@@ -879,7 +880,7 @@ export function UnifiedCreatePostModal({
                     placeholder={
                       manualCategory === 'requirement'
                         ? 'Describe what you are looking for (e.g. 2BHK flatmate in Koramangala, budget 15k)...'
-                        : 'Write a caption, mention @friends or use #hashtags...'
+                        : `What's on your mind, ${userFirstName}?`
                     }
                     rows={4}
                     className="w-full p-3.5 rounded-2xl bg-gray-50 dark:bg-zinc-900/50 border border-gray-200 dark:border-zinc-800 text-sm text-gray-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#0a7c85] resize-none"
