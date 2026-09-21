@@ -16,6 +16,7 @@ import { getSidebarData } from '@/actions/user';
 import { useUpload, MediaItem } from './UploadContext';
 import { detectPostCategoryAction, CategoryDetectionResult, PostCategoryType } from '@/actions/aiPostClassifier';
 import { CURATED_AUDIO_LIBRARY, AudioTrack, formatDuration } from '@/lib/audioLibrary';
+import { TEXT_CARD_BACKGROUNDS, BackgroundStyle, renderTextCardToBlob } from '@/lib/renderTextCard';
 
 const FILTER_PRESETS = [
   { name: 'Normal', filter: 'none' },
@@ -59,6 +60,8 @@ export function UnifiedCreatePostModal({
   const [mediaList, setMediaList] = useState<MediaItem[]>([]);
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
   const [isTextOnly, setIsTextOnly] = useState(false);
+  const [selectedBgStyle, setSelectedBgStyle] = useState<BackgroundStyle>(TEXT_CARD_BACKGROUNDS[0]);
+  const [isGeneratingCard, setIsGeneratingCard] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Edit state
@@ -242,6 +245,22 @@ export function UnifiedCreatePostModal({
     } else if (step === 3) {
       setStep(4);
     } else if (step === 4) {
+      if (isTextOnly && caption.trim()) {
+        try {
+          setIsGeneratingCard(true);
+          const { file, url } = await renderTextCardToBlob(
+            caption,
+            selectedBgStyle,
+            session?.user?.name || undefined
+          );
+          setMediaList([{ type: 'image', url, file }]);
+          setSelectedRatio('1 / 1');
+        } catch (err) {
+          console.error('Failed to generate visual text card:', err);
+        } finally {
+          setIsGeneratingCard(false);
+        }
+      }
       setStep(5);
       await runAIClassification();
     }
@@ -315,6 +334,8 @@ export function UnifiedCreatePostModal({
     setMediaList([]);
     setActiveMediaIndex(0);
     setIsTextOnly(false);
+    setSelectedBgStyle(TEXT_CARD_BACKGROUNDS[0]);
+    setIsGeneratingCard(false);
     setSelectedRatio('4 / 5');
     setSelectedFilter('none');
     setSelectedAudio(null);
@@ -352,11 +373,15 @@ export function UnifiedCreatePostModal({
                 {step === 1 && 'Create New Post'}
                 {step === 2 && 'Edit & Enhance'}
                 {step === 3 && 'Add Music & Sound'}
-                {step === 4 && 'Add Caption & Details'}
+                {step === 4 && (isTextOnly ? 'Create Visual Post' : 'Add Caption & Details')}
                 {step === 5 && 'Smart AI Review'}
               </h2>
               <p className="text-[11px] sm:text-xs text-[#667085] dark:text-zinc-400 mt-0.5">
-                {step === 1 ? 'Share with your Tolee community' : `Step ${step} of 5`}
+                {step === 1
+                  ? 'Share with your Tolee community'
+                  : step === 4 && isTextOnly
+                  ? 'Choose background & write your post'
+                  : `Step ${step} of 5`}
               </p>
             </div>
           </div>
@@ -783,38 +808,102 @@ export function UnifiedCreatePostModal({
                 </div>
               )}
 
-              {/* Main Caption Box */}
-              <div>
-                <textarea
-                  value={caption}
-                  onChange={(e) => setCaption(e.target.value)}
-                  placeholder={
-                    manualCategory === 'requirement'
-                      ? 'Describe what you are looking for (e.g. 2BHK flatmate in Koramangala, budget 15k)...'
-                      : 'Write a caption, mention @friends or use #hashtags...'
-                  }
-                  rows={4}
-                  className="w-full p-3.5 rounded-2xl bg-gray-50 dark:bg-zinc-900/50 border border-gray-200 dark:border-zinc-800 text-sm text-gray-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#0a7c85] resize-none"
-                />
-                <div className="flex items-center justify-between text-[11px] text-gray-400 mt-1 px-1">
-                  <span>Hashtags & keywords help AI match your post</span>
-                  <span>{caption.length}/2000</span>
-                </div>
-              </div>
-
-              {/* Hashtag Quick Suggestions */}
-              <div className="flex flex-wrap gap-1.5">
-                {['#requirement', '#bangalore', '#reels', '#urgent', '#tech', '#trending'].map((tag) => (
-                  <button
-                    key={tag}
-                    type="button"
-                    onClick={() => setCaption((prev) => `${prev.trim()} ${tag} `)}
-                    className="px-2.5 py-1 bg-gray-100 dark:bg-zinc-800 hover:bg-teal-50 dark:hover:bg-teal-950/30 text-gray-600 dark:text-zinc-300 text-[11px] font-semibold rounded-full transition-colors"
+              {/* Visual Text Card Canvas or Standard Caption Box */}
+              {isTextOnly ? (
+                <div className="space-y-3.5">
+                  {/* Visual Text Card Canvas matching screenshot */}
+                  <div
+                    className="w-full aspect-[4/3] sm:aspect-square max-h-[300px] sm:max-h-[340px] rounded-3xl p-6 flex flex-col items-center justify-center relative overflow-hidden shadow-sm transition-all duration-300 border border-black/5 dark:border-white/10"
+                    style={{
+                      background: selectedBgStyle.bgCss,
+                      color: selectedBgStyle.textColor,
+                    }}
                   >
-                    {tag}
-                  </button>
-                ))}
-              </div>
+                    <textarea
+                      value={caption}
+                      onChange={(e) => setCaption(e.target.value)}
+                      placeholder="Looking for 2 bhk in kalyan west..."
+                      rows={4}
+                      className={`w-full bg-transparent border-none outline-none text-center resize-none placeholder:opacity-60 placeholder:text-current font-extrabold leading-snug tracking-tight focus:ring-0 ${
+                        caption.length > 180
+                          ? 'text-sm sm:text-base'
+                          : caption.length > 90
+                          ? 'text-base sm:text-lg'
+                          : 'text-xl sm:text-2xl'
+                      }`}
+                      style={{ color: selectedBgStyle.textColor }}
+                    />
+
+                    {/* Subtle footer watermark */}
+                    <div
+                      className="absolute bottom-3 text-[10px] font-bold tracking-wider opacity-40 select-none pointer-events-none"
+                      style={{ color: selectedBgStyle.textColor }}
+                    >
+                      tolee.in
+                    </div>
+                  </div>
+
+                  {/* Horizontal Background Swatches (Facebook/Instagram Style) */}
+                  <div>
+                    <div className="flex items-center justify-between text-xs font-bold text-gray-500 dark:text-zinc-400 mb-2 px-1">
+                      <span>Choose Background</span>
+                      <span className="text-[11px] text-[#0a7c85] font-semibold">{selectedBgStyle.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2.5 overflow-x-auto py-1 px-1 scrollbar-none">
+                      {TEXT_CARD_BACKGROUNDS.map((bg) => {
+                        const isSelected = selectedBgStyle.id === bg.id;
+                        return (
+                          <button
+                            key={bg.id}
+                            type="button"
+                            onClick={() => setSelectedBgStyle(bg)}
+                            className={`w-10 h-10 rounded-2xl shrink-0 transition-all duration-150 active:scale-90 border-2 cursor-pointer shadow-xs ${
+                              isSelected
+                                ? 'scale-110 border-white ring-2 ring-[#0a7c85] shadow-md'
+                                : 'border-black/10 dark:border-white/20 opacity-85 hover:opacity-100'
+                            }`}
+                            style={{ background: bg.bgCss }}
+                            title={bg.name}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* Standard Caption Box for Photo/Video Posts */
+                <div>
+                  <textarea
+                    value={caption}
+                    onChange={(e) => setCaption(e.target.value)}
+                    placeholder={
+                      manualCategory === 'requirement'
+                        ? 'Describe what you are looking for (e.g. 2BHK flatmate in Koramangala, budget 15k)...'
+                        : 'Write a caption, mention @friends or use #hashtags...'
+                    }
+                    rows={4}
+                    className="w-full p-3.5 rounded-2xl bg-gray-50 dark:bg-zinc-900/50 border border-gray-200 dark:border-zinc-800 text-sm text-gray-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#0a7c85] resize-none"
+                  />
+                  <div className="flex items-center justify-between text-[11px] text-gray-400 mt-1 px-1">
+                    <span>Hashtags & keywords help AI match your post</span>
+                    <span>{caption.length}/2000</span>
+                  </div>
+
+                  {/* Hashtag Quick Suggestions */}
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {['#requirement', '#bangalore', '#reels', '#urgent', '#tech', '#trending'].map((tag) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => setCaption((prev) => `${prev.trim()} ${tag} `)}
+                        className="px-2.5 py-1 bg-gray-100 dark:bg-zinc-800 hover:bg-teal-50 dark:hover:bg-teal-950/30 text-gray-600 dark:text-zinc-300 text-[11px] font-semibold rounded-full transition-colors"
+                      >
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Tolee Groups Selection Pill Grid */}
               <div>
@@ -968,15 +1057,30 @@ export function UnifiedCreatePostModal({
           {step < 5 ? (
             <Button
               onClick={handleNextStep}
-              disabled={step === 1 && mediaList.length === 0 && !isTextOnly}
+              disabled={
+                isGeneratingCard ||
+                (step === 1 && mediaList.length === 0 && !isTextOnly) ||
+                (step === 4 && isTextOnly && !caption.trim())
+              }
               className={`w-full h-14 rounded-full font-bold text-base flex items-center justify-center gap-2 transition-all duration-200 shadow-md ${
-                step === 1 && mediaList.length === 0 && !isTextOnly
+                isGeneratingCard ||
+                (step === 1 && mediaList.length === 0 && !isTextOnly) ||
+                (step === 4 && isTextOnly && !caption.trim())
                   ? 'bg-[#8ec5c5] hover:bg-[#8ec5c5] text-white opacity-90 cursor-not-allowed'
                   : 'bg-[#0a7c85] hover:bg-[#086970] text-white cursor-pointer active:scale-[0.99]'
               }`}
             >
-              <span>Next</span>
-              <ArrowRight className="w-5 h-5 stroke-[2.5]" />
+              {isGeneratingCard ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>Preparing Visual Card...</span>
+                </>
+              ) : (
+                <>
+                  <span>Next</span>
+                  <ArrowRight className="w-5 h-5 stroke-[2.5]" />
+                </>
+              )}
             </Button>
           ) : (
             <Button
