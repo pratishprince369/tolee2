@@ -150,22 +150,48 @@ export function UnifiedCreatePostModal({
     }
   };
 
+  const triggerFileInput = (customAccept?: string) => {
+    if (fileInputRef.current) {
+      if (customAccept !== undefined) {
+        fileInputRef.current.accept = customAccept;
+      } else {
+        const isAndroid = typeof navigator !== 'undefined' && /android/i.test(navigator.userAgent);
+        // On Android, accept="*/*" prevents ColorOS / Realme from auto-selecting the [Videos] filter chip,
+        // allowing all photos and videos to be displayed mixed together in Recents.
+        fileInputRef.current.accept = isAndroid ? '*/*' : 'image/*,video/*';
+      }
+      fileInputRef.current.click();
+    }
+  };
+
   const handleMediaSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
       const newItems: MediaItem[] = [];
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const isVideo = file.type.startsWith('video/');
+        const isVideo = file.type.startsWith('video/') || /\.(mp4|mov|avi|mkv|webm|3gp|m4v)$/i.test(file.name);
+        const isImage = file.type.startsWith('image/') || /\.(jpg|jpeg|png|webp|gif|bmp|heic|heif|svg)$/i.test(file.name);
+
+        if (!isVideo && !isImage) {
+          continue;
+        }
+
         newItems.push({
           type: isVideo ? 'video' : 'image',
           url: URL.createObjectURL(file),
           file,
         });
       }
+
+      if (newItems.length === 0) {
+        alert('Please select valid photos or videos.');
+        return;
+      }
+
       setMediaList((prev) => [...prev, ...newItems]);
       setIsTextOnly(false);
-      if (files[0].type.startsWith('video/')) {
+      if (newItems[0]?.type === 'video') {
         setSelectedRatio('9 / 16');
       }
     }
@@ -372,7 +398,6 @@ export function UnifiedCreatePostModal({
                 ref={fileInputRef}
                 type="file"
                 multiple
-                accept="image/*,video/*"
                 className="hidden"
                 onChange={handleMediaSelect}
               />
@@ -391,7 +416,7 @@ export function UnifiedCreatePostModal({
 
                   <div className="flex flex-col sm:flex-row gap-3 w-full max-w-xs">
                     <Button
-                      onClick={() => fileInputRef.current?.click()}
+                      onClick={() => triggerFileInput()}
                       className="rounded-full bg-[#0a7c85] hover:bg-[#086a71] text-white font-bold h-11 text-xs sm:text-sm flex-1 shadow-md"
                     >
                       Select From Device
@@ -406,6 +431,31 @@ export function UnifiedCreatePostModal({
                     >
                       Write Text Only
                     </Button>
+                  </div>
+
+                  {/* Direct Selection Chips: Mix / Photos / Videos */}
+                  <div className="flex items-center justify-center gap-2 mt-4 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => triggerFileInput('*/*')}
+                      className="px-3 py-1.5 rounded-full bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-800/60 text-[#0a7c85] hover:bg-teal-100 text-xs font-bold transition-all flex items-center gap-1 shadow-xs active:scale-95"
+                    >
+                      📁 All Media (Mix)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => triggerFileInput('image/*')}
+                      className="px-3 py-1.5 rounded-full bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-zinc-700 text-gray-700 dark:text-zinc-300 text-xs font-bold transition-all flex items-center gap-1 active:scale-95"
+                    >
+                      🖼️ Photos
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => triggerFileInput('video/*')}
+                      className="px-3 py-1.5 rounded-full bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-zinc-700 text-gray-700 dark:text-zinc-300 text-xs font-bold transition-all flex items-center gap-1 active:scale-95"
+                    >
+                      🎬 Videos
+                    </button>
                   </div>
                 </div>
               ) : (
@@ -459,7 +509,7 @@ export function UnifiedCreatePostModal({
                       </div>
                     ))}
                     <button
-                      onClick={() => fileInputRef.current?.click()}
+                      onClick={() => triggerFileInput()}
                       className="w-16 h-16 rounded-xl border-2 border-dashed border-gray-300 dark:border-zinc-700 hover:border-[#0a7c85] flex flex-col items-center justify-center text-gray-400 hover:text-[#0a7c85] transition-colors shrink-0"
                     >
                       <Plus className="w-5 h-5" />
