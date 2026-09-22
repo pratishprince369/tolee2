@@ -594,7 +594,7 @@ export async function createQuickBoostAction(
           name,
           objective: options.goal || 'engagement',
           type: 'boost',
-          status: isFreeBoostEligible ? 'approved' : 'pending',
+          status: isFreeBoostEligible ? 'running' : 'pending',
           postBoostId: type === 'post' ? targetId : null,
           reelBoostId: type === 'reel' ? targetId : null,
           listingBoostId: type === 'listing' ? targetId : null,
@@ -1357,12 +1357,11 @@ export async function fetchEligibleAds(params: {
       where: {
         adSet: {
           campaign: {
-            status: 'running',
-            user: {
-              wallet: {
-                balance: { gt: 0 }
-              }
-            }
+            status: { in: ['running', 'approved'] },
+            OR: [
+              { type: 'boost' },
+              { user: { wallet: { balance: { gt: 0 } } } }
+            ]
           }
         }
       },
