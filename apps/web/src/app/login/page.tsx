@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Metadata } from 'next';
-import SigninPage from '@/app/auth/signin/page';
+import { ToleeLandingHome } from '@/components/landing/ToleeLandingHome';
 import { buildPageMetadata } from '@/lib/seo';
 
 export const dynamic = 'force-dynamic';
@@ -13,5 +13,5 @@ export const metadata: Metadata = buildPageMetadata({
 });
 
 export default function LoginPage() {
-  return <SigninPage />;
+  return <ToleeLandingHome />;
 }

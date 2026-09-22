@@ -104,6 +104,11 @@ export function BottomNav() {
     { name: 'Profile', href: '/u/me', isAvatar: true },
   ];
 
+  // Hide bottom nav for guests on landing page and auth pages
+  if (!isAuthenticated && (pathname === '/' || pathname?.startsWith('/auth') || pathname === '/login' || pathname === '/signup')) {
+    return null;
+  }
+
   return (
     <>
     <div className={`fixed bottom-0 left-0 right-0 w-full h-[calc(4.2rem+env(safe-area-inset-bottom))] flex items-center justify-around z-50 lg:hidden border-t px-3 pb-[env(safe-area-inset-bottom)] transition-all duration-300 backdrop-blur-md ${activePath === '/reels' ? 'bg-black/95 border-zinc-800/50 shadow-black/40' : 'bg-white/95 dark:bg-zinc-950/95 border-zinc-200/80 dark:border-zinc-900 shadow-zinc-200/40 dark:shadow-black/60'}`}>
