@@ -1188,6 +1188,35 @@ export async function toggleCampaignStatus(campaignId: string, pause: boolean) {
 }
 
 /**
+ * Deletes a campaign and cascades deletion to adSets, ads, and analytics.
+ */
+export async function deleteCampaignAction(campaignId: string) {
+  try {
+    const userId = await getUserId();
+    if (!userId) return { success: false, error: 'Unauthorized' };
+
+    const campaign = await prisma.campaign.findUnique({
+      where: { id: campaignId, userId },
+      select: { id: true, name: true }
+    });
+
+    if (!campaign) {
+      return { success: false, error: 'Campaign not found or access denied.' };
+    }
+
+    await prisma.campaign.delete({
+      where: { id: campaignId }
+    });
+
+    revalidatePath('/ads-manager');
+    return { success: true };
+  } catch (error: any) {
+    console.error('Delete campaign error:', error);
+    return { success: false, error: error.message || 'Failed to delete campaign' };
+  }
+}
+
+/**
  * Super Admin: Retrieves all campaigns inside the system.
  */
 export async function superAdminGetCampaigns() {

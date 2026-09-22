@@ -7,7 +7,7 @@ import {
   Settings, UserCheck, ShieldAlert, BarChart3, Layers, Target, 
   Image as ImageIcon, Video, HelpCircle, Check, ArrowRight, ArrowLeft, 
   Play, Pause, Info, Copy, CheckCircle2, ChevronRight, X, AlertTriangle,
-  ArrowLeftRight, Search, ShieldCheck, RefreshCw, Edit
+  ArrowLeftRight, Search, ShieldCheck, RefreshCw, Edit, Trash2
 } from 'lucide-react';
 import { 
   getUserWallet, 
@@ -17,7 +17,8 @@ import {
   searchUsersForTransfer,
   transferWalletCreditsAction,
   setTransferPinAction,
-  updateCampaignAction
+  updateCampaignAction,
+  deleteCampaignAction
 } from '@/actions/ads';
 import { QuickBoostModal } from '@/components/QuickBoostModal';
 
@@ -293,6 +294,29 @@ export default function AdsManagerPage() {
     } catch (err: any) {
       setErrorMsg(err.message || 'An error occurred');
       setTimeout(() => setErrorMsg(''), 4000);
+    }
+  };
+
+  const handleDeleteCampaign = async (id: string, name: string) => {
+    if (!window.confirm(`Are you sure you want to delete campaign "${name}"? This action cannot be undone.`)) {
+      return;
+    }
+    try {
+      setActionLoading(true);
+      const res = await deleteCampaignAction(id);
+      if (res.success) {
+        setSuccessMsg(`Campaign "${name}" deleted successfully.`);
+        loadData();
+        setTimeout(() => setSuccessMsg(''), 3000);
+      } else {
+        setErrorMsg(res.error || 'Failed to delete campaign');
+        setTimeout(() => setErrorMsg(''), 4000);
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || 'An error occurred while deleting');
+      setTimeout(() => setErrorMsg(''), 4000);
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -805,17 +829,18 @@ export default function AdsManagerPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-sm">
                 <thead>
-                  <tr className="border-b border-gray-100 text-zinc-400 text-[10px] font-bold uppercase tracking-wider">
-                    <th className="pb-3 pr-4">Campaign Name</th>
-                    <th className="pb-3 px-4 text-center">Status</th>
-                    <th className="pb-3 px-4">Objective</th>
-                    <th className="pb-3 px-4">Type</th>
-                    <th className="pb-3 px-4 text-right">Spend</th>
-                    <th className="pb-3 px-4 text-center">Clicks / CTR</th>
-                    <th className="pb-3 pl-4 text-right">Action</th>
+                  <tr className="border-b border-gray-100 dark:border-zinc-800 text-zinc-400 text-[10px] font-bold uppercase tracking-wider">
+                    <th className="pb-3 pl-3 pr-2 w-14">Off / On</th>
+                    <th className="pb-3 px-3">Campaign Name</th>
+                    <th className="pb-3 px-3">Delivery</th>
+                    <th className="pb-3 px-3">Objective</th>
+                    <th className="pb-3 px-3">Type</th>
+                    <th className="pb-3 px-3 text-right">Spend</th>
+                    <th className="pb-3 px-3 text-center">Clicks / CTR</th>
+                    <th className="pb-3 pl-3 pr-2 text-right">Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50">
+                <tbody className="divide-y divide-gray-50 dark:divide-zinc-800/60">
                   {dashboardData.campaigns.map((camp: any) => {
                     // Compute basic analytics for this campaign
                     let spent = 0;
@@ -833,62 +858,136 @@ export default function AdsManagerPage() {
                     });
 
                     const campaignCtr = impressions > 0 ? (clicks / impressions) * 100 : 0;
-
-                    // Get status colors
-                    let statusBg = 'bg-zinc-50 text-zinc-500 border-zinc-200';
-                    if (camp.status === 'running') statusBg = 'bg-[#e6f4ea] text-[#137333] border-[#ceead6]';
-                    if (camp.status === 'pending') statusBg = 'bg-[#fef7e0] text-[#b06000] border-[#feebc8]';
-                    if (camp.status === 'paused') statusBg = 'bg-[#e8f0fe] text-[#1a73e8] border-[#d2e3fc]';
-                    if (camp.status === 'rejected') statusBg = 'bg-[#fce8e6] text-[#c5221f] border-[#fad2cf]';
+                    const isLive = camp.status === 'running' || camp.status === 'approved';
+                    const isPaused = camp.status === 'paused';
+                    const isPending = camp.status === 'pending';
+                    const isRejected = camp.status === 'rejected';
 
                     return (
-                      <tr key={camp.id} className="group hover:bg-gray-50/50 transition-colors">
-                        <td className="py-4 pr-4 font-semibold text-[#0a1530]">
+                      <tr key={camp.id} className="group hover:bg-gray-50/60 dark:hover:bg-zinc-850/40 transition-colors">
+                        {/* 1. Meta-Style Off / On Toggle Switch */}
+                        <td className="py-4 pl-3 pr-2 align-middle">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleStatus(camp.id, camp.status)}
+                            disabled={isPending || isRejected}
+                            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                              isLive
+                                ? 'bg-blue-600 dark:bg-blue-500'
+                                : 'bg-zinc-300 dark:bg-zinc-700'
+                            } disabled:opacity-40 disabled:cursor-not-allowed`}
+                            title={
+                              isPending
+                                ? 'Under Review — cannot toggle yet'
+                                : isRejected
+                                ? 'Campaign rejected'
+                                : isLive
+                                ? 'Turn Off / Pause'
+                                : 'Turn On / Activate'
+                            }
+                          >
+                            <span
+                              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                                isLive ? 'translate-x-5' : 'translate-x-0'
+                              }`}
+                            />
+                          </button>
+                        </td>
+
+                        {/* 2. Campaign Name */}
+                        <td className="py-4 px-3 font-semibold text-[#0a1530] dark:text-zinc-100 align-middle">
                           <div>
-                            <p>{camp.name}</p>
-                            {camp.status === 'rejected' && camp.rejectionReason && (
+                            <p className="font-bold text-xs sm:text-sm text-zinc-900 dark:text-white line-clamp-1">{camp.name}</p>
+                            {isRejected && camp.rejectionReason && (
                               <p className="text-[11px] text-rose-500 font-semibold mt-0.5">Rejection reason: {camp.rejectionReason}</p>
                             )}
                           </div>
                         </td>
-                        <td className="py-4 px-4 text-center">
-                          <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border ${statusBg}`}>
-                            {camp.status}
-                          </span>
+
+                        {/* 3. Delivery / Status Column (Meta Style Indicators) */}
+                        <td className="py-4 px-3 align-middle whitespace-nowrap">
+                          {isLive && (
+                            <div className="flex items-center gap-2">
+                              <span className="relative flex h-2.5 w-2.5 shrink-0">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                              </span>
+                              <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
+                                Active (Live)
+                              </span>
+                            </div>
+                          )}
+
+                          {isPaused && (
+                            <div className="flex items-center gap-2">
+                              <span className="inline-flex rounded-full h-2.5 w-2.5 bg-zinc-400 shrink-0"></span>
+                              <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+                                Off (Paused)
+                              </span>
+                            </div>
+                          )}
+
+                          {isPending && (
+                            <div className="flex items-center gap-2">
+                              <span className="inline-flex rounded-full h-2.5 w-2.5 bg-amber-400 animate-pulse shrink-0"></span>
+                              <span className="text-xs font-bold text-amber-600 dark:text-amber-400">
+                                In Review
+                              </span>
+                            </div>
+                          )}
+
+                          {isRejected && (
+                            <div className="flex items-center gap-2">
+                              <span className="inline-flex rounded-full h-2.5 w-2.5 bg-rose-500 shrink-0"></span>
+                              <span className="text-xs font-bold text-rose-600 dark:text-rose-400">
+                                Rejected
+                              </span>
+                            </div>
+                          )}
                         </td>
-                        <td className="py-4 px-4 text-zinc-500 font-medium capitalize">{camp.objective.replace('_', ' ')}</td>
-                        <td className="py-4 px-4">
-                          <span className="text-xs bg-zinc-50 border border-gray-150 px-2.5 py-0.5 rounded-lg text-zinc-600 font-bold capitalize">
+
+                        {/* 4. Objective */}
+                        <td className="py-4 px-3 text-zinc-500 dark:text-zinc-400 font-medium capitalize text-xs align-middle">
+                          {camp.objective.replace('_', ' ')}
+                        </td>
+
+                        {/* 5. Type */}
+                        <td className="py-4 px-3 align-middle">
+                          <span className="text-[11px] bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-2 py-0.5 rounded-lg text-zinc-700 dark:text-zinc-300 font-bold capitalize">
                             {camp.type}
                           </span>
                         </td>
-                        <td className="py-4 px-4 text-right font-bold text-[#00ba88]">₹{spent.toFixed(2)}</td>
-                        <td className="py-4 px-4 text-center font-medium">
+
+                        {/* 6. Spend */}
+                        <td className="py-4 px-3 text-right font-bold text-emerald-600 dark:text-emerald-400 text-xs sm:text-sm align-middle whitespace-nowrap">
+                          ₹{spent.toFixed(2)}
+                        </td>
+
+                        {/* 7. Results (Clicks / CTR) */}
+                        <td className="py-4 px-3 text-center font-medium align-middle">
                           <div>
-                            <p className="text-[#0a1530] font-semibold">{clicks} clicks</p>
-                            <p className="text-[10px] text-zinc-400">{campaignCtr.toFixed(2)}% CTR</p>
+                            <p className="text-zinc-900 dark:text-zinc-100 font-bold text-xs">{clicks} clicks</p>
+                            <p className="text-[10px] text-zinc-400 font-semibold">{campaignCtr.toFixed(2)}% CTR</p>
                           </div>
                         </td>
-                        <td className="py-4 pl-4 text-right">
-                          <div className="flex items-center justify-end gap-2">
+
+                        {/* 8. Actions (Edit & Delete) */}
+                        <td className="py-4 pl-3 pr-2 text-right align-middle whitespace-nowrap">
+                          <div className="flex items-center justify-end gap-1.5">
                             <button
                               onClick={() => handleEditCampaign(camp)}
-                              className="p-2 rounded-xl border bg-zinc-50 hover:bg-zinc-100 text-zinc-600 border-zinc-200 transition-all shadow-sm"
+                              className="p-2 rounded-xl border bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 transition-all shadow-xs"
                               title="Edit Campaign"
                             >
                               <Edit className="h-4 w-4" />
                             </button>
+
                             <button
-                              onClick={() => handleToggleStatus(camp.id, camp.status)}
-                              disabled={camp.status === 'pending' || camp.status === 'rejected'}
-                              className={`p-2 rounded-xl border transition-all ${
-                                camp.status === 'running' 
-                                  ? 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200' 
-                                  : 'bg-[#e8f7f2] hover:bg-[#d5f2e8] text-[#00ba88] border-[#00ba88]/20'
-                              } disabled:opacity-30 disabled:cursor-not-allowed`}
-                              title={camp.status === 'running' ? 'Pause Campaign' : 'Resume Campaign'}
+                              onClick={() => handleDeleteCampaign(camp.id, camp.name)}
+                              className="p-2 rounded-xl border bg-white dark:bg-zinc-900 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 border-zinc-200 dark:border-zinc-700 hover:border-rose-200 dark:hover:border-rose-900/50 transition-all shadow-xs"
+                              title="Delete Campaign"
                             >
-                              {camp.status === 'running' ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                              <Trash2 className="h-4 w-4" />
                             </button>
                           </div>
                         </td>
