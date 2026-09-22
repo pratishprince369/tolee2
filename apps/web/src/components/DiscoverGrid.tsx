@@ -87,16 +87,18 @@ export function DiscoverGrid({ initialTolees, tolees: propTolees, isAuthenticate
     }
   };
 
-  const filteredTolees = tolees.filter((tolee: any) => {
-    const matchesSearch =
-      tolee.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (tolee.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (tolee.location || '').toLowerCase().includes(searchQuery.toLowerCase());
+  const filteredTolees = tolees
+    .filter((tolee: any) => {
+      const matchesSearch =
+        tolee.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (tolee.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (tolee.location || '').toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesCategory = selectedCategory === 'All' || tolee.category === selectedCategory;
+      const matchesCategory = selectedCategory === 'All' || tolee.category === selectedCategory;
 
-    return matchesSearch && matchesCategory;
-  });
+      return matchesSearch && matchesCategory;
+    })
+    .sort((a: any, b: any) => (b.members || 0) - (a.members || 0));
 
   return (
     <div className="min-h-screen bg-gray-50/50 dark:bg-[#0a0a0a] font-sans text-gray-900 dark:text-gray-100 py-10 md:py-16">

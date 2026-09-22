@@ -109,6 +109,12 @@ export default async function DiscoverPage() {
         isPendingByMe: isPending
       };
     });
+
+    // Sort groups so highest member count appears at top, lower members shifted below
+    tolees.sort((a, b) => (b.members || 0) - (a.members || 0));
+    tolees.forEach((t, index) => {
+      t.rank = index + 1;
+    });
   } catch (error) {
     console.error("Error loading Discover Page Tolees:", error);
   }
