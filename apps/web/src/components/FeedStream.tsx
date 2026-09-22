@@ -2361,28 +2361,6 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                             <span>{formatViewCount(post.views || 0)}</span>
                           </span>
 
-                          {/* Boost button (owner only) */}
-                          {(() => {
-                            const isOwner = session?.user && (
-                              (session.user as any).id === post.authorId ||
-                              (session.user as any).username === post.author
-                            );
-                            if (!isOwner) return null;
-                            return (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setQuickBoostType(post.postType === 'listing' ? 'listing' : post.postType === 'reel' ? 'reel' : 'post');
-                                  setQuickBoostTargetId(post.id);
-                                  setIsQuickBoostOpen(true);
-                                }}
-                                className="flex items-center gap-1 bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700 text-[10px] font-extrabold text-white px-2.5 py-1.5 rounded-lg shadow-sm active:scale-95 transition-all"
-                              >
-                                <Rocket className="w-3.5 h-3.5 animate-pulse" />
-                                <span>Boost</span>
-                              </button>
-                            );
-                          })()}
 
                           {/* Bookmark */}
                           <button
