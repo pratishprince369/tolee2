@@ -1175,7 +1175,14 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm font-medium text-gray-600 dark:text-gray-400">
                 <span className="flex items-center gap-1.5">
                   <ShieldCheck className="w-4 h-4 text-primary" /> 
-                  Created by {tolee.admin?.name || 'Admin'}
+                  <span>Created by</span>
+                  {tolee.admin?.username ? (
+                    <Link href={`/u/${tolee.admin.username}`} className="hover:underline font-bold text-gray-900 dark:text-white">
+                      {tolee.admin.username}
+                    </Link>
+                  ) : (
+                    <span className="font-bold text-gray-900 dark:text-white">{tolee.admin?.name || 'Admin'}</span>
+                  )}
                 </span>
                 <span className="hidden sm:inline text-gray-400">•</span>
                 <span className="flex items-center gap-1.5"><Users className="w-4 h-4" /> {formatViewCount(tolee.membersCount || 0)} Members</span>
