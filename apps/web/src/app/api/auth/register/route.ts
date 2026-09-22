@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
 import { sendOtp } from "@/lib/email";
 import { checkBotStatus } from "@/lib/botDetection";
+import { autoJoinDefaultTolees } from "@/lib/autoJoinTolees";
 
 export async function POST(req: Request) {
   try {
@@ -83,13 +84,20 @@ export async function POST(req: Request) {
       }
     });
 
+    // Automatically join new user to 5 default top groups so they can post immediately
+    try {
+      await autoJoinDefaultTolees(user.id, 5);
+    } catch (joinErr) {
+      console.error("[Register] Auto-join default tolees failed:", joinErr);
+    }
+
     // Create welcome onboarding notification
     await prisma.notification.create({
       data: {
         userId: user.id,
         type: 'welcome',
-        message: 'To start sharing posts, reels, news and videos, you must first join one or more Tolees (Groups). Join communities that match your interests and start sharing with people around you.',
-        link: '/discover'
+        message: 'Welcome to Tolee! We have automatically joined you to 5 top communities so you can immediately create and share posts, reels, and updates.',
+        link: '/feed'
       }
     });
 

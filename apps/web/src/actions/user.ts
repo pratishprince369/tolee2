@@ -7,6 +7,7 @@ import { authOptions } from '@/lib/auth';
 import bcrypt from 'bcryptjs';
 import { extractPublicIdFromUrl, extractResourceTypeFromUrl, destroyAsset } from '@/lib/cloudinary-cleanup';
 import { createSystemNotification } from '@/lib/notification-service';
+import { autoJoinDefaultTolees } from '@/lib/autoJoinTolees';
 
 function safeRevalidatePath(path: string, type?: 'layout' | 'page') {
   try {
@@ -416,7 +417,7 @@ export async function getSidebarData() {
     });
 
     // Fetch Tolees user has joined (but doesn't own)
-    const joinedTolees = await prisma.toleeMember.findMany({
+    let joinedTolees = await prisma.toleeMember.findMany({
       where: { 
         userId,
         status: 'approved',
@@ -430,6 +431,29 @@ export async function getSidebarData() {
         }
       }
     });
+
+    // If user has no managed tolees and no joined tolees, automatically join 5 top communities
+    if (managedTolees.length === 0 && joinedTolees.length === 0) {
+      try {
+        await autoJoinDefaultTolees(userId, 5);
+        joinedTolees = await prisma.toleeMember.findMany({
+          where: { 
+            userId,
+            status: 'approved',
+            tolee: {
+              ownerId: { not: userId }
+            }
+          },
+          include: {
+            tolee: {
+              select: { id: true, name: true, slug: true, avatar: true }
+            }
+          }
+        });
+      } catch (autoErr) {
+        console.warn("[getUserTolees] Auto-join fallback failed:", autoErr);
+      }
+    }
 
     // Fetch unread notification count (excluding chat notifications)
     const unreadNotifications = await prisma.notification.count({

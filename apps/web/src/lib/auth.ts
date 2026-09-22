@@ -5,6 +5,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "./prisma";
 import bcrypt from "bcryptjs";
 import { cookies, headers } from "next/headers";
+import { autoJoinDefaultTolees } from "./autoJoinTolees";
 
 
 // Ensure prisma is defined before passing to adapter
@@ -71,13 +72,20 @@ export const authOptions: NextAuthOptions = {
                 }
               });
 
+              // Automatically join new user to 5 default top groups so they can post immediately
+              try {
+                await autoJoinDefaultTolees(user.id, 5);
+              } catch (joinErr) {
+                console.error("[Auth] Auto-join default tolees failed:", joinErr);
+              }
+
               // Create welcome onboarding notification
               await prisma.notification.create({
                 data: {
                   userId: user.id,
                   type: 'welcome',
-                  message: 'To start sharing posts, reels, news and videos, you must first join one or more Tolees (Groups). Join communities that match your interests and start sharing with people around you.',
-                  link: '/discover'
+                  message: 'Welcome to Tolee! We have automatically joined you to 5 top communities so you can immediately create and share posts, reels, and updates.',
+                  link: '/feed'
                 }
               });
             }
@@ -196,6 +204,8 @@ export const authOptions: NextAuthOptions = {
   events: {
     async createUser({ user }) {
       try {
+        await autoJoinDefaultTolees(user.id, 5);
+
         const welcomeNotif = await prisma.notification.findFirst({
           where: { userId: user.id, type: 'welcome' }
         });
@@ -204,13 +214,13 @@ export const authOptions: NextAuthOptions = {
             data: {
               userId: user.id,
               type: 'welcome',
-              message: 'To start sharing posts, reels, news and videos, you must first join one or more Tolees (Groups). Join communities that match your interests and start sharing with people around you.',
-              link: '/discover'
+              message: 'Welcome to Tolee! We have automatically joined you to 5 top communities so you can immediately create and share posts, reels, and updates.',
+              link: '/feed'
             }
           });
         }
       } catch (err) {
-        console.error("Error creating welcome notification in createUser event:", err);
+        console.error("Error auto-joining and creating welcome notification in createUser event:", err);
       }
     }
   },
