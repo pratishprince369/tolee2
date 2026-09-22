@@ -75,6 +75,7 @@ export function QuickBoostModal({
     avatar: string;
     caption: string;
     mediaUrl: string;
+    mediaType?: string;
   } | null>(null);
   
   const [loading, setLoading] = useState(false);
@@ -776,13 +777,22 @@ export function QuickBoostModal({
               </div>
 
               {/* Media Preview Box */}
-              <div className="aspect-video bg-zinc-100 border-y border-zinc-100 flex items-center justify-center overflow-hidden">
+              <div className="aspect-video bg-zinc-100 border-y border-zinc-100 flex items-center justify-center overflow-hidden relative">
                 {previewData?.mediaUrl ? (
-                  <img 
-                    src={previewData.mediaUrl} 
-                    alt="Creative preview" 
-                    className="w-full h-full object-cover" 
-                  />
+                  previewData.mediaType === 'video' || previewData.mediaUrl.match(/\.(mp4|mov|webm)$/i) || previewData.mediaUrl.includes('/video/upload/') ? (
+                    <video 
+                      src={previewData.mediaUrl} 
+                      className="w-full h-full object-cover" 
+                      controls 
+                      playsInline
+                    />
+                  ) : (
+                    <img 
+                      src={previewData.mediaUrl} 
+                      alt="Creative preview" 
+                      className="w-full h-full object-cover" 
+                    />
+                  )
                 ) : (
                   <div className="flex flex-col items-center justify-center text-zinc-400 py-12">
                     <Sparkles className="w-8 h-8 opacity-25 animate-pulse" />

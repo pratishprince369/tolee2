@@ -14,6 +14,14 @@ async function getUserId() {
 }
 
 /**
+ * Safely parses comma-separated media URLs without breaking URLs containing internal commas (e.g. Cloudinary transformations).
+ */
+function parseMediaUrls(urlsString?: string | null): string[] {
+  if (!urlsString) return [];
+  return urlsString.split(/,(?=https?:\/\/|\/uploads\/)/).map(u => u.trim()).filter(Boolean);
+}
+
+/**
  * Lazy initializes a user's promotional wallet with ₹2,500 credit.
  * Credits referral bonuses if referredBy is provided.
  */
@@ -451,7 +459,7 @@ export async function createQuickBoostAction(
         select: { caption: true, mediaUrls: true, mediaTypes: true }
       });
       if (!post) return { success: false, error: 'Post not found' };
-      mediaUrls = post.mediaUrls ? post.mediaUrls.split(',').map(u => u.trim()).filter(Boolean) : [];
+      mediaUrls = parseMediaUrls(post.mediaUrls);
       primaryText = post.caption || '';
       name = `Boost Post: ${primaryText.slice(0, 20)}...`;
 
@@ -465,7 +473,7 @@ export async function createQuickBoostAction(
         select: { caption: true, mediaUrls: true, postType: true, mediaTypes: true }
       });
       if (!post) return { success: false, error: 'Reel not found' };
-      mediaUrls = post.mediaUrls ? post.mediaUrls.split(',').map(u => u.trim()).filter(Boolean) : [];
+      mediaUrls = parseMediaUrls(post.mediaUrls);
       primaryText = post.caption || '';
       name = `Boost Reel: ${primaryText.slice(0, 20)}...`;
     } else if (type === 'listing') {
@@ -474,7 +482,7 @@ export async function createQuickBoostAction(
         select: { title: true, images: true, description: true }
       });
       if (!listing) return { success: false, error: 'Marketplace listing not found' };
-      mediaUrls = listing.images ? listing.images.split(',').map(u => u.trim()).filter(Boolean) : [];
+      mediaUrls = parseMediaUrls(listing.images);
       primaryText = listing.description || '';
       name = `Boost Listing: ${listing.title}`;
     }
@@ -1100,7 +1108,7 @@ export async function superAdminGetCampaigns() {
     const mappedCampaigns = campaigns.map(camp => {
       const adSets = camp.adSets.map(adSet => {
         const ads = adSet.ads.map(ad => {
-          const mediaList = ad.mediaUrls ? ad.mediaUrls.split(',').map((u: string) => u.trim()).filter(Boolean) : [];
+          const mediaList = parseMediaUrls(ad.mediaUrls);
           const displayMedia = mediaList[0] || null;
           const isVideo = isVideoUrl(displayMedia);
           return {
@@ -1238,7 +1246,7 @@ export async function fetchEligibleAds(params: {
     });
 
     const mapAd = (ad: any) => {
-      const mediaList = ad.mediaUrls ? ad.mediaUrls.split(',').map((u: string) => u.trim()).filter(Boolean) : [];
+      const mediaList = parseMediaUrls(ad.mediaUrls);
       const displayMedia = mediaList[0] || null;
       const isVideo = isVideoUrl(displayMedia);
       return {
@@ -1570,6 +1578,7 @@ export async function getBoostPreviewDataAction(
       avatar: '',
       caption: '',
       mediaUrl: '',
+      mediaType: 'image',
       type: type,
       targetId: targetId
     };
@@ -1580,6 +1589,7 @@ export async function getBoostPreviewDataAction(
         select: { 
           caption: true, 
           mediaUrls: true, 
+          mediaTypes: true,
           author: { 
             select: { name: true, username: true, avatar: true, image: true } 
           } 
@@ -1590,8 +1600,14 @@ export async function getBoostPreviewDataAction(
         preview.username = post.author.username || '';
         preview.avatar = post.author.avatar || post.author.image || '/default-user-avatar.svg';
         preview.caption = post.caption || '';
-        const mediaUrls = post.mediaUrls ? post.mediaUrls.split(',').map(u => u.trim()).filter(Boolean) : [];
+        const mediaUrls = parseMediaUrls(post.mediaUrls);
         preview.mediaUrl = mediaUrls[0] || '';
+        
+        const firstType = post.mediaTypes ? post.mediaTypes.split(',')[0]?.trim().toLowerCase() : '';
+        const isVideo = firstType.startsWith('video') || 
+                        preview.mediaUrl.match(/\.(mp4|mov|webm)$/i) !== null || 
+                        preview.mediaUrl.includes('/video/upload/');
+        preview.mediaType = isVideo ? 'video' : 'image';
       }
     } else if (type === 'listing') {
       const listing = await prisma.listing.findUnique({
@@ -1610,8 +1626,9 @@ export async function getBoostPreviewDataAction(
         preview.username = listing.seller.username || '';
         preview.avatar = listing.seller.avatar || listing.seller.image || '/default-user-avatar.svg';
         preview.caption = listing.description || '';
-        const images = listing.images ? listing.images.split(',').map(u => u.trim()).filter(Boolean) : [];
+        const images = parseMediaUrls(listing.images);
         preview.mediaUrl = images[0] || '';
+        preview.mediaType = 'image';
       }
     }
 
