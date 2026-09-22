@@ -101,6 +101,22 @@ export async function POST(req: Request) {
       }
     });
 
+    // Send 6-Month Free Boosting notification 2 seconds after registration
+    setTimeout(async () => {
+      try {
+        await prisma.notification.create({
+          data: {
+            userId: user.id,
+            type: 'promotion',
+            message: '🎉 Congratulations! You have unlocked 6 Months of FREE Post Boosting on Tolee! Boost any of your posts with zero charges.',
+            link: '/ads-manager'
+          }
+        });
+      } catch (err) {
+        console.error('[Register] Failed to send 6-month free boost notification:', err);
+      }
+    }, 2000);
+
     // --- FRANCHISE REFERRAL TRACKING ---
     const cookieStore = cookies();
     const referralCode = ref || cookieStore.get("tolee_referral_code")?.value;

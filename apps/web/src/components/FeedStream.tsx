@@ -41,6 +41,7 @@ import { UserHovercard } from '@/components/UserHovercard';
 
 const ReShareModal = dynamic(() => import('@/components/ReShareModal').then(m => m.ReShareModal), { ssr: false });
 const QuickBoostModal = dynamic(() => import('@/components/QuickBoostModal').then(m => m.QuickBoostModal), { ssr: false });
+const PostInsightsModal = dynamic(() => import('@/components/PostInsightsModal').then(m => m.PostInsightsModal), { ssr: false });
 const ShareModal = dynamic(() => import('@/components/ShareModal').then(m => m.ShareModal), { ssr: false });
 const StoryViewer = dynamic(() => import('@/components/StoryViewer').then(m => m.StoryViewer), { ssr: false });
 const StoryEditor = dynamic(() => import('@/components/StoryEditor').then(m => m.StoryEditor), { ssr: false });
@@ -316,6 +317,8 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
   const [isQuickBoostOpen, setIsQuickBoostOpen] = useState(false);
   const [quickBoostType, setQuickBoostType] = useState<'post' | 'reel' | 'listing'>('post');
   const [quickBoostTargetId, setQuickBoostTargetId] = useState('');
+  const [isInsightsOpen, setIsInsightsOpen] = useState(false);
+  const [insightsPostId, setInsightsPostId] = useState('');
 
   // Fetch sponsored ads on mount
   useEffect(() => {
@@ -2260,6 +2263,41 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                         </div>
                       )}
                     </CardContent>
+
+                    {/* Instagram Author Action Strip: View insights + Boost post */}
+                    {(() => {
+                      const isOwner = mounted && session?.user && (
+                        (session.user as any).id === post.authorId ||
+                        (session.user as any).username === post.author
+                      );
+                      if (!isOwner) return null;
+                      return (
+                        <div className="w-full px-5 py-2.5 flex items-center justify-between border-y border-zinc-150 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900/40">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setInsightsPostId(post.id);
+                              setIsInsightsOpen(true);
+                            }}
+                            className="text-[13px] font-semibold text-zinc-900 dark:text-zinc-100 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer"
+                          >
+                            View insights
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setQuickBoostType(post.postType === 'listing' ? 'listing' : post.postType === 'reel' ? 'reel' : 'post');
+                              setQuickBoostTargetId(post.id);
+                              setIsQuickBoostOpen(true);
+                            }}
+                            className="px-4 py-1.5 rounded-lg bg-[#0095f6] hover:bg-[#1877f2] text-white text-xs font-bold transition-all shadow-xs active:scale-95 cursor-pointer"
+                          >
+                            Boost post
+                          </button>
+                        </div>
+                      );
+                    })()}
+
                     <CardFooter className="px-5 pb-5 pt-0 flex flex-col gap-3">
                       {(!post.mediaTypes?.includes('video') && !post.video) && (
                         <ViewTracker contentId={post.id} contentType="post" />
@@ -3342,6 +3380,18 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
         onClose={() => setIsQuickBoostOpen(false)} 
         type={quickBoostType} 
         targetId={quickBoostTargetId} 
+      />
+
+      {/* Post Insights Modal */}
+      <PostInsightsModal
+        isOpen={isInsightsOpen}
+        onClose={() => setIsInsightsOpen(false)}
+        postId={insightsPostId}
+        onOpenBoost={() => {
+          setQuickBoostType('post');
+          setQuickBoostTargetId(insightsPostId);
+          setIsQuickBoostOpen(true);
+        }}
       />
 
       {/* Story Viewer Dialog */}

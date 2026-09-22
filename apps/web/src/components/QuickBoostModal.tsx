@@ -65,6 +65,8 @@ export function QuickBoostModal({
   // Placements & Payment
   const [advantagePlacements, setAdvantagePlacements] = useState(true);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const [freeBoostEligible, setFreeBoostEligible] = useState(false);
+  const [freeBoostDays, setFreeBoostDays] = useState(0);
 
   // Preview Details fetched from server
   const [previewData, setPreviewData] = useState<{
@@ -91,8 +93,14 @@ export function QuickBoostModal({
         getBoostPreviewDataAction(type, targetId),
         campaignId ? getCampaignDetailsAction(campaignId) : Promise.resolve(null)
       ]).then(([walletRes, previewRes, campaignRes]) => {
-        if (walletRes.success && walletRes.wallet) {
-          setWalletBalance(walletRes.wallet.balance);
+        if (walletRes.success) {
+          if (walletRes.wallet) {
+            setWalletBalance(walletRes.wallet.balance);
+          }
+          if (walletRes.freeBoost) {
+            setFreeBoostEligible(walletRes.freeBoost.isEligible);
+            setFreeBoostDays(walletRes.freeBoost.daysRemaining);
+          }
         }
         if (previewRes.success && previewRes.preview) {
           setPreviewData(previewRes.preview);
@@ -667,15 +675,27 @@ export function QuickBoostModal({
               </div>
 
               {/* Payment Details */}
-              <div className="rounded-2xl border border-zinc-200/80 p-4.5 bg-zinc-50/50 shadow-sm flex items-center justify-between text-xs font-semibold text-zinc-700">
-                <div className="flex items-center gap-2">
-                  <Wallet className="h-4 w-4 text-zinc-500" />
-                  <span>Available Ads Wallet Balance:</span>
+              {freeBoostEligible ? (
+                <div className="rounded-2xl border border-emerald-300 p-4 bg-emerald-50/70 shadow-sm flex items-center justify-between text-xs font-semibold text-emerald-800">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-emerald-600" />
+                    <span>Special Offer: 6 Months Free Post Boosting</span>
+                  </div>
+                  <span className="font-extrabold text-emerald-700 px-2 py-0.5 rounded-full bg-emerald-200/60">
+                    ₹0.00 (Zero Charges)
+                  </span>
                 </div>
-                <span className="font-extrabold text-zinc-900">
-                  ₹{walletBalance?.toLocaleString('en-IN') ?? '0.00'}
-                </span>
-              </div>
+              ) : (
+                <div className="rounded-2xl border border-zinc-200/80 p-4.5 bg-zinc-50/50 shadow-sm flex items-center justify-between text-xs font-semibold text-zinc-700">
+                  <div className="flex items-center gap-2">
+                    <Wallet className="h-4 w-4 text-zinc-500" />
+                    <span>Available Ads Wallet Balance:</span>
+                  </div>
+                  <span className="font-extrabold text-zinc-900">
+                    ₹{walletBalance?.toLocaleString('en-IN') ?? '0.00'}
+                  </span>
+                </div>
+              )}
             </form>
           )}
 
@@ -693,10 +713,16 @@ export function QuickBoostModal({
               type="button"
               onClick={handlePublish}
               disabled={submitLoading || loading}
-              className="bg-blue-600 hover:bg-blue-700 text-xs font-bold text-white px-6 py-2.5 rounded-xl shadow-md transition-all disabled:opacity-50 flex items-center gap-2"
+              className={`${
+                freeBoostEligible 
+                  ? 'bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700' 
+                  : 'bg-blue-600 hover:bg-blue-700'
+              } text-xs font-bold text-white px-6 py-2.5 rounded-xl shadow-md transition-all disabled:opacity-50 flex items-center gap-2 cursor-pointer active:scale-95`}
             >
               {submitLoading ? (
                 <>Submitting...</>
+              ) : freeBoostEligible ? (
+                <>Boost Post for Free 🚀</>
               ) : (
                 <>{campaignId ? 'Save & Re-publish' : 'Publish Ad'}</>
               )}
@@ -828,11 +854,19 @@ export function QuickBoostModal({
                   </div>
                   <div className="flex justify-between items-center">
                     <span>Estimated GST (18%)</span>
-                    <span className="font-bold text-zinc-950">₹{gstAmount.toFixed(2)} INR</span>
+                    <span className="font-bold text-zinc-950">{freeBoostEligible ? '₹0.00 INR' : `₹${gstAmount.toFixed(2)} INR`}</span>
                   </div>
+                  {freeBoostEligible && (
+                    <div className="flex justify-between items-center text-emerald-600 font-bold">
+                      <span>6-Month Free Offer</span>
+                      <span>-₹{(budget + gstAmount).toFixed(2)} INR</span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center border-t border-zinc-100 pt-2 text-sm font-bold text-zinc-900">
-                    <span>Daily total budget</span>
-                    <span className="font-extrabold text-blue-600">₹{totalDailyCost.toFixed(2)} INR</span>
+                    <span>Daily total cost</span>
+                    <span className={`font-extrabold ${freeBoostEligible ? 'text-emerald-600' : 'text-blue-600'}`}>
+                      {freeBoostEligible ? '₹0.00 INR (Free)' : `₹${totalDailyCost.toFixed(2)} INR`}
+                    </span>
                   </div>
                 </div>
               </div>

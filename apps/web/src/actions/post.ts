@@ -2915,6 +2915,149 @@ export async function getPostStoryAnalytics(postId: string) {
   }
 }
 
+/**
+ * Returns real Instagram-style post insights and boost campaign performance metrics.
+ * No simulated data - all values are direct database counts and real tracking events.
+ */
+export async function getPostInsightsAction(postId: string) {
+  try {
+    const session = await auth();
+    const userId = (session?.user as any)?.id;
+    if (!userId) {
+      return { success: false, error: 'Unauthorized' };
+    }
+
+    const post = await prisma.post.findUnique({
+      where: { id: postId },
+      select: {
+        id: true,
+        authorId: true,
+        caption: true,
+        mediaUrls: true,
+        views: true,
+        shareCount: true,
+        createdAt: true,
+        _count: {
+          select: {
+            likes: true,
+            comments: true,
+            reposts: true,
+            savedBy: true
+          }
+        }
+      }
+    });
+
+    if (!post) {
+      return { success: false, error: 'Post not found' };
+    }
+
+    // Check user's 6-month free boost eligibility
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { createdAt: true }
+    });
+
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    const userJoinDate = user?.createdAt ? new Date(user.createdAt) : new Date();
+    const isFreeBoostEligible = userJoinDate > sixMonthsAgo;
+    
+    // Calculate days remaining in 6-month free period
+    const sixMonthsAfterJoin = new Date(userJoinDate);
+    sixMonthsAfterJoin.setMonth(sixMonthsAfterJoin.getMonth() + 6);
+    const msRemaining = Math.max(0, sixMonthsAfterJoin.getTime() - Date.now());
+    const daysRemaining = Math.ceil(msRemaining / (1000 * 60 * 60 * 24));
+
+    // Find any Boost Campaign linked to this post
+    const boostCampaign = await prisma.campaign.findFirst({
+      where: {
+        postBoostId: postId
+      },
+      include: {
+        adSets: {
+          include: {
+            ads: {
+              select: {
+                id: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    let boostMetrics = null;
+    if (boostCampaign) {
+      const adIds = boostCampaign.adSets.flatMap(adSet => adSet.ads.map(a => a.id));
+      
+      // Real ad analytics counts from tracking table
+      const [realImpressions, realClicks] = await Promise.all([
+        prisma.adAnalytics.count({
+          where: {
+            adId: { in: adIds },
+            type: 'impression'
+          }
+        }),
+        prisma.adAnalytics.count({
+          where: {
+            adId: { in: adIds },
+            type: 'click'
+          }
+        })
+      ]);
+
+      const primaryAdSet = boostCampaign.adSets[0];
+
+      boostMetrics = {
+        campaignId: boostCampaign.id,
+        campaignName: boostCampaign.name,
+        status: boostCampaign.status,
+        startDate: primaryAdSet?.startDate || boostCampaign.createdAt,
+        endDate: primaryAdSet?.endDate || null,
+        budgetAmount: primaryAdSet?.budgetAmount || 0,
+        isFreeBoost: true,
+        impressions: realImpressions,
+        clicks: realClicks
+      };
+    }
+
+    // Real engagement total
+    const likes = post._count.likes;
+    const comments = post._count.comments;
+    const shares = (post.shareCount || 0) + post._count.reposts;
+    const saves = post._count.savedBy;
+    const totalInteractions = likes + comments + shares + saves;
+
+    return {
+      success: true,
+      insights: {
+        postId: post.id,
+        createdAt: post.createdAt,
+        reach: Math.max(post.views, boostMetrics?.impressions || 0),
+        views: post.views,
+        interactions: {
+          likes,
+          comments,
+          shares,
+          saves,
+          total: totalInteractions
+        },
+        boostMetrics,
+        freeBoost: {
+          isEligible: isFreeBoostEligible,
+          daysRemaining,
+          joinDate: userJoinDate
+        }
+      }
+    };
+  } catch (error: any) {
+    console.error('Error fetching post insights:', error);
+    return { success: false, error: error.message || 'Failed to load insights' };
+  }
+}
+
 let pexelsCache: string[] = [];
 
 export async function getFreshPexelsVideoUrl(category = 'nature'): Promise<string | null> {

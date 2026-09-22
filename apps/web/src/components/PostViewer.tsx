@@ -26,6 +26,8 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toggleLike, addComment, toggleSavePost, toggleRepost } from '@/actions/post';
 import { ShareModal } from '@/components/ShareModal';
+import { QuickBoostModal } from '@/components/QuickBoostModal';
+import { PostInsightsModal } from '@/components/PostInsightsModal';
 import { HLSVideo } from '@/components/HLSVideo';
 import { extractYouTubeVideoId, getYouTubeEmbedUrl, getYouTubeWatchUrl } from '@/lib/youtube';
 import Link from 'next/link';
@@ -124,6 +126,8 @@ export default function PostViewer({ post }: PostViewerProps) {
   const [muted, setMuted] = useState(true);
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [authPromptOpen, setAuthPromptOpen] = useState(false);
+  const [isQuickBoostOpen, setIsQuickBoostOpen] = useState(false);
+  const [isInsightsOpen, setIsInsightsOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -514,6 +518,31 @@ export default function PostViewer({ post }: PostViewerProps) {
             )}
           </div>
 
+          {/* Instagram Author Action Strip: View insights + Boost post */}
+          {(() => {
+            const isOwner = mounted && session?.user && (
+              (session.user as any).id === post.authorId ||
+              (session.user as any).username === post.author
+            );
+            if (!isOwner) return null;
+            return (
+              <div className="w-full px-5 py-2.5 flex items-center justify-between border-y border-zinc-150 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900/40">
+                <button
+                  onClick={() => setIsInsightsOpen(true)}
+                  className="text-[13px] font-semibold text-zinc-900 dark:text-zinc-100 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer"
+                >
+                  View insights
+                </button>
+                <button
+                  onClick={() => setIsQuickBoostOpen(true)}
+                  className="px-4 py-1.5 rounded-lg bg-[#0095f6] hover:bg-[#1877f2] text-white text-xs font-bold transition-all shadow-xs active:scale-95 cursor-pointer"
+                >
+                  Boost post
+                </button>
+              </div>
+            );
+          })()}
+
           {/* Social Action Bar (Tolee Feed Style) */}
           <div className="px-5 pb-4 pt-3 flex flex-col gap-3">
             <div className="flex items-center justify-between w-full pt-1 border-t border-zinc-100 dark:border-zinc-900/60">
@@ -719,6 +748,24 @@ export default function PostViewer({ post }: PostViewerProps) {
           </div>
         </div>
       )}
+
+      {/* Quick Boost Modal */}
+      {isQuickBoostOpen && (
+        <QuickBoostModal
+          isOpen={isQuickBoostOpen}
+          onClose={() => setIsQuickBoostOpen(false)}
+          type={post.postType === 'listing' ? 'listing' : post.postType === 'reel' ? 'reel' : 'post'}
+          targetId={post.id}
+        />
+      )}
+
+      {/* Post Insights Modal */}
+      <PostInsightsModal
+        isOpen={isInsightsOpen}
+        onClose={() => setIsInsightsOpen(false)}
+        postId={post.id}
+        onOpenBoost={() => setIsQuickBoostOpen(true)}
+      />
     </div>
   );
 }

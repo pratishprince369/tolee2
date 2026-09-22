@@ -21,6 +21,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { ReShareModal } from '@/components/ReShareModal';
 import { ShareModal } from '@/components/ShareModal';
 import { QuickBoostModal } from '@/components/QuickBoostModal';
+import { PostInsightsModal } from '@/components/PostInsightsModal';
 import { getOrCreatePersonalChat } from '@/actions/chat';
 import { editPostCaption, deletePostPermanently, updatePostVisibility, archivePost, incrementStoryEngagement, getPostStoryAnalytics } from '@/actions/post';
 import { formatViewCount } from '@/lib/utils';
@@ -175,6 +176,8 @@ export function ProfileFeedView({
   const [isQuickBoostOpen, setIsQuickBoostOpen] = useState(false);
   const [quickBoostType, setQuickBoostType] = useState<'post' | 'reel' | 'listing'>('post');
   const [quickBoostTargetId, setQuickBoostTargetId] = useState('');
+  const [isInsightsOpen, setIsInsightsOpen] = useState(false);
+  const [insightsPostId, setInsightsPostId] = useState('');
 
   // Scroll target post into view on load
   useEffect(() => {
@@ -501,6 +504,38 @@ export function ProfileFeedView({
                       </div>
                     )}
                   </CardContent>
+
+                  {/* Instagram Author Action Strip: View insights + Boost post */}
+                  {(() => {
+                    const isOwner = isMe || (session?.user && (
+                      (session.user as any).id === post.authorId ||
+                      (session.user as any).username === post.author
+                    ));
+                    if (!isOwner) return null;
+                    return (
+                      <div className="w-full px-5 py-2.5 flex items-center justify-between border-t border-zinc-150 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900/40">
+                        <button
+                          onClick={() => {
+                            setInsightsPostId(post.id);
+                            setIsInsightsOpen(true);
+                          }}
+                          className="text-[13px] font-semibold text-zinc-900 dark:text-zinc-100 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer"
+                        >
+                          View insights
+                        </button>
+                        <button
+                          onClick={() => {
+                            setQuickBoostType(post.postType === 'listing' ? 'listing' : 'post');
+                            setQuickBoostTargetId(post.id);
+                            setIsQuickBoostOpen(true);
+                          }}
+                          className="px-4 py-1.5 rounded-lg bg-[#0095f6] hover:bg-[#1877f2] text-white text-xs font-bold transition-all shadow-xs active:scale-95 cursor-pointer"
+                        >
+                          Boost post
+                        </button>
+                      </div>
+                    );
+                  })()}
 
                   {/* Footer icon interactions */}
                   <CardFooter className="px-5 pb-5 pt-0 flex flex-col gap-3">
@@ -1049,6 +1084,18 @@ export function ProfileFeedView({
           targetId={quickBoostTargetId}
         />
       )}
+
+      {/* ===== POST INSIGHTS MODAL ===== */}
+      <PostInsightsModal
+        isOpen={isInsightsOpen}
+        onClose={() => setIsInsightsOpen(false)}
+        postId={insightsPostId}
+        onOpenBoost={() => {
+          setQuickBoostType('post');
+          setQuickBoostTargetId(insightsPostId);
+          setIsQuickBoostOpen(true);
+        }}
+      />
     </div>
   );
 }

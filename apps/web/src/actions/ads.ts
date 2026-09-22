@@ -245,6 +245,20 @@ export async function getUserWallet() {
     const referralCode = user?.username || userId;
     const referralLink = `https://www.tolee.in/ref/${referralCode}`;
 
+    // 6-Month Free Boosting eligibility calculation
+    const userRecord = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { createdAt: true }
+    });
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    const userJoinDate = userRecord?.createdAt ? new Date(userRecord.createdAt) : new Date();
+    const isFreeBoostEligible = userJoinDate > sixMonthsAgo;
+
+    const sixMonthsAfterJoin = new Date(userJoinDate);
+    sixMonthsAfterJoin.setMonth(sixMonthsAfterJoin.getMonth() + 6);
+    const freeBoostDaysRemaining = Math.max(0, Math.ceil((sixMonthsAfterJoin.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+
     return {
       success: true,
       wallet,
@@ -253,6 +267,12 @@ export async function getUserWallet() {
       referralCode,
       hasTransferPin: !!user?.transferPin,
       hasPassword: !!user?.passwordHash,
+      freeBoost: {
+        isEligible: isFreeBoostEligible,
+        daysRemaining: freeBoostDaysRemaining,
+        joinDate: userJoinDate,
+        expiresAt: sixMonthsAfterJoin
+      },
       referralStats: {
         clicks: clicksCount,
         installs: appInstalls,
@@ -388,20 +408,34 @@ export async function createQuickBoostAction(
   options: {
     budgetAmount: number;
     durationDays: number;
+    startDate?: string | Date;
+    endDate?: string | Date;
     targetingToleeIds?: string;
     targetingLocations?: string;
     targetingInterests?: string;
+    ctaButton?: string;
   }
 ) {
   try {
     const userId = await getUserId();
     if (!userId) return { success: false, error: 'Unauthorized' };
 
+    // Check 6 months free boost eligibility from join date
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { createdAt: true }
+    });
+
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    const userCreatedAt = user?.createdAt ? new Date(user.createdAt) : new Date();
+    const isFreeBoostEligible = userCreatedAt > sixMonthsAgo;
+
     const wallet = await prisma.wallet.findUnique({
       where: { userId }
     });
 
-    if (!wallet || wallet.balance <= 0) {
+    if (!isFreeBoostEligible && (!wallet || wallet.balance <= 0)) {
       return { success: false, error: 'Insufficient wallet balance. Earn ₹500 per friend referred!' };
     }
 
@@ -445,9 +479,14 @@ export async function createQuickBoostAction(
       name = `Boost Listing: ${listing.title}`;
     }
 
-    const startDate = new Date();
-    const endDate = new Date();
-    endDate.setDate(startDate.getDate() + options.durationDays);
+    const start = options.startDate ? new Date(options.startDate) : new Date();
+    let end: Date;
+    if (options.endDate) {
+      end = new Date(options.endDate);
+    } else {
+      end = new Date(start);
+      end.setDate(end.getDate() + (options.durationDays || 7));
+    }
 
     const campaign = await prisma.campaign.create({
       data: {
@@ -455,7 +494,7 @@ export async function createQuickBoostAction(
         name,
         objective: 'engagement',
         type: 'boost',
-        status: 'pending',
+        status: isFreeBoostEligible ? 'approved' : 'pending',
         postBoostId: type === 'post' ? targetId : null,
         reelBoostId: type === 'reel' ? targetId : null,
         listingBoostId: type === 'listing' ? targetId : null,
@@ -463,9 +502,9 @@ export async function createQuickBoostAction(
           create: {
             name: `${name} - Ad Set`,
             budgetType: 'lifetime',
-            budgetAmount: Number(options.budgetAmount),
-            startDate,
-            endDate,
+            budgetAmount: isFreeBoostEligible ? 0 : Number(options.budgetAmount || 200),
+            startDate: start,
+            endDate: end,
             targetingToleeIds: options.targetingToleeIds,
             targetingCities: options.targetingLocations,
             targetingInterests: options.targetingInterests,
@@ -477,7 +516,7 @@ export async function createQuickBoostAction(
                 mediaUrls: mediaUrls.join(','),
                 primaryText,
                 headline: name,
-                ctaButton: type === 'listing' ? 'learn_more' : 'send_message',
+                ctaButton: options.ctaButton || (type === 'listing' ? 'learn_more' : 'send_message'),
                 destinationUrl: type === 'listing' 
                   ? `/marketplace/listing/${targetId}` 
                   : type === 'reel' 
@@ -494,13 +533,15 @@ export async function createQuickBoostAction(
       data: {
         userId,
         type: 'campaign_review',
-        message: `🚀 Boost request submitted for review! Check Ads Manager for status.`,
+        message: isFreeBoostEligible
+          ? `🚀 Your post boost is ACTIVE (6-Month Free Boosting Offer)! Real impressions and clicks are now live.`
+          : `🚀 Boost request submitted for review! Check Ads Manager for status.`,
         link: '/ads-manager'
       }
     });
 
     revalidatePath('/ads-manager');
-    return { success: true, campaignId: campaign.id };
+    return { success: true, campaignId: campaign.id, isFreeBoost: isFreeBoostEligible };
   } catch (error: any) {
     console.error('Quick Boost creation error:', error);
     return { success: false, error: error.message || 'Failed to request boost' };
