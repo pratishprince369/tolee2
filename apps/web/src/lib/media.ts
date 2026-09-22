@@ -3,6 +3,17 @@
  */
 
 /**
+ * Safely parses comma-separated media URLs without breaking URLs containing internal commas (e.g. Cloudinary transformations like q_auto,f_auto).
+ */
+export function parseMediaUrls(urlsString?: string | null): string[] {
+  if (!urlsString) return [];
+  return urlsString
+    .split(/,(?=https?:\/\/|\/uploads\/|blob:)/i)
+    .map(u => u.trim())
+    .filter(Boolean);
+}
+
+/**
  * Checks if a given media URL refers to a video file or stream.
  */
 export function isVideoUrl(url: string | null | undefined): boolean {

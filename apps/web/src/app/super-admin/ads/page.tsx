@@ -8,7 +8,7 @@ import {
   AlertTriangle, Check, X, Search, Wallet, ArrowLeftRight
 } from 'lucide-react';
 import { superAdminGetCampaigns, superAdminModerateCampaign, superAdminGetWalletTransactions } from '@/actions/ads';
-import { getMediaThumbnail, isVideoUrl } from '@/lib/media';
+import { getMediaThumbnail, isVideoUrl, parseMediaUrls } from '@/lib/media';
 
 export default function SuperAdminAdsPage() {
   const { data: session } = useSession();
@@ -398,9 +398,9 @@ export default function SuperAdminAdsPage() {
                       {/* Creative Preview */}
                       {ad && (
                         <div className="rounded-xl border border-white/5 bg-slate-950 p-4 flex flex-col sm:flex-row gap-4 items-start">
-                          {ad.mediaUrls && ad.mediaUrls.split(',').map((u: string) => u.trim()).filter(Boolean)[0] ? (
+                          {ad.mediaUrls && parseMediaUrls(ad.mediaUrls)[0] ? (
                             (() => {
-                              const displayMedia = ad.mediaUrls.split(',').map((u: string) => u.trim()).filter(Boolean)[0];
+                              const displayMedia = parseMediaUrls(ad.mediaUrls)[0];
                               const isVideo = isVideoUrl(displayMedia);
                               return (
                                 <div className="h-20 w-20 rounded-lg overflow-hidden shrink-0 border border-white/10 bg-slate-900 relative flex items-center justify-center">

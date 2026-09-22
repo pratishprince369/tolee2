@@ -17,7 +17,7 @@ import { deleteListing, updateListingStatus } from '@/actions/marketplace';
 import { fetchEligibleAds } from '@/actions/ads';
 import { QuickBoostModal } from './QuickBoostModal';
 import { AdTracker } from './AdTracker';
-import { getMediaThumbnail } from '@/lib/media';
+import { getMediaThumbnail, parseMediaUrls } from '@/lib/media';
 import { getOrCreatePersonalChat } from '@/actions/chat';
 
 const getValidAvatarUrl = (url: string | null | undefined): string => {
@@ -346,8 +346,8 @@ export function MarketplaceView({ initialListings }: { initialListings: any[] })
                   const ad = item.data;
                   const advertiserName = ad.adSet?.campaign?.user?.name || 'Tolee Sponsor';
                   const advertiserAvatar = ad.adSet?.campaign?.user?.avatar || ad.adSet?.campaign?.user?.image || '';
-                  const mediaList = ad.mediaUrls ? ad.mediaUrls.split(/,(?=https?:\/\/)/).map((u: string) => u.trim()).filter(Boolean) : [];
-                  const displayMedia = mediaList[0] || `https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=600&q=80`;
+                  const mediaList = parseMediaUrls(ad.mediaUrls);
+                  const displayMedia = mediaList[0] || ad.imageUrl || ad.image || ad.video || `https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=600&q=80`;
                   const headline = ad.headline || 'Sponsored Ad';
                   const ctaText = ad.ctaButton === 'send_message' ? 'Send Message' : ad.ctaButton === 'shop_now' ? 'Shop Now' : ad.ctaButton === 'sign_up' ? 'Sign Up' : 'Learn More';
 

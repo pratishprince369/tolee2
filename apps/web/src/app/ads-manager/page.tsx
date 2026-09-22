@@ -21,6 +21,7 @@ import {
   deleteCampaignAction
 } from '@/actions/ads';
 import { QuickBoostModal } from '@/components/QuickBoostModal';
+import { parseMediaUrls } from '@/lib/media';
 
 export default function AdsManagerPage() {
   const { data: session } = useSession();
@@ -366,7 +367,7 @@ export default function AdsManagerPage() {
         placements: adSet?.placements ? adSet.placements.split(',') : ['feed', 'reels'],
         adName: ad?.name || '',
         format: (ad?.format || 'single_image') as any,
-        mediaUrls: ad?.mediaUrls ? ad.mediaUrls.split(',') : [''],
+        mediaUrls: ad?.mediaUrls ? parseMediaUrls(ad.mediaUrls) : [''],
         primaryText: ad?.primaryText || '',
         headline: ad?.headline || '',
         description: ad?.description || '',

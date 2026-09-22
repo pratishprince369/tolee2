@@ -32,7 +32,7 @@ import { videoMetadataCache } from '@/lib/videoCache';
 import { formatViewCount } from '@/lib/utils';
 import { AdTracker } from '@/components/AdTracker';
 import { fetchEligibleAds } from '@/actions/ads';
-import { isVideoUrl, getMediaThumbnail, getPosterUrl } from '@/lib/media';
+import { isVideoUrl, getMediaThumbnail, getPosterUrl, parseMediaUrls } from '@/lib/media';
 import { YouTubeReelPlayer } from '@/components/YouTubeReelPlayer';
 import { extractYouTubeVideoId, decodeHtmlEntities } from '@/lib/youtube';
 
@@ -1397,8 +1397,8 @@ const AdReelSlide = memo(function AdReelSlide({
 
   const advertiserName = ad.adSet?.campaign?.user?.name || 'Tolee Sponsor';
   const advertiserAvatar = getValidAvatarUrl(ad.adSet?.campaign?.user?.avatar || ad.adSet?.campaign?.user?.image);
-  const mediaList = ad.mediaUrls ? ad.mediaUrls.split(/,(?=https?:\/\/)/).map((u: string) => u.trim()).filter(Boolean) : [];
-  const displayMedia = mediaList[0] || null;
+  const mediaList = parseMediaUrls(ad.mediaUrls);
+  const displayMedia = mediaList[0] || ad.video || ad.imageUrl || ad.image || null;
   const isVideo = displayMedia ? isVideoUrl(displayMedia) : false;
 
   return (

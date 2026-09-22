@@ -32,7 +32,7 @@ import { getOrCreatePersonalChat } from '@/actions/chat';
 import { HLSVideo } from '@/components/HLSVideo';
 import { AutoplayVideo } from '@/components/AutoplayVideo';
 import { YouTubeAutoplayVideo } from '@/components/YouTubeAutoplayVideo';
-import { isVideoUrl, getMediaThumbnail, getPosterUrl } from '@/lib/media';
+import { isVideoUrl, getMediaThumbnail, getPosterUrl, parseMediaUrls } from '@/lib/media';
 import { fetchFeedStories } from '@/actions/story';
 import { createTestStory } from '@/actions/highlight';
 import { PostCarousel } from '@/components/PostCarousel';
@@ -1224,8 +1224,9 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                   const ad = item.data;
                   const advertiserName = ad.adSet?.campaign?.user?.name || 'Tolee Sponsor';
                   const advertiserAvatar = ad.adSet?.campaign?.user?.avatar || ad.adSet?.campaign?.user?.image || '';
-                  const mediaList = ad.mediaUrls ? ad.mediaUrls.split(',').map((u: string) => u.trim()).filter(Boolean) : [];
-                  const displayMedia = mediaList[0] || null;
+                  const mediaList = parseMediaUrls(ad.mediaUrls);
+                  const displayMedia = mediaList[0] || ad.imageUrl || ad.image || ad.video || null;
+                  const isAdVideo = displayMedia ? (isVideoUrl(displayMedia) || ad.format === 'single_video') : false;
 
                   // Find preceding post details in itemsToRender to attribute revenue correctly
                   let precedingPostId: string | undefined = undefined;
@@ -1304,7 +1305,7 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                           >
                             <div onClick={(e) => handleAdClick(e, ad)}>
                               <div className="relative overflow-hidden rounded-2xl border border-zinc-100 dark:border-zinc-900 bg-zinc-50 dark:bg-zinc-900 shadow-sm mx-0.5 group/ad-media">
-                                {isVideoUrl(displayMedia) ? (
+                                {isAdVideo ? (
                                   <HLSVideo
                                     src={displayMedia}
                                     className="w-full h-auto max-h-[450px] object-cover mx-auto rounded-2xl"
@@ -1320,6 +1321,10 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                                   <img
                                     src={displayMedia}
                                     alt={ad.headline || 'Sponsored Ad'}
+                                    loading="lazy"
+                                    onError={(e) => {
+                                      (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80';
+                                    }}
                                     className="w-full h-auto max-h-[450px] object-cover mx-auto rounded-2xl transition-transform duration-500 group-hover/ad-media:scale-[1.02]"
                                   />
                                 )}
