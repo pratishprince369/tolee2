@@ -416,11 +416,20 @@ export async function createQuickBoostAction(
   options: {
     budgetAmount: number;
     durationDays: number;
+    budgetType?: 'daily' | 'lifetime';
     startDate?: string | Date;
     endDate?: string | Date;
+    goal?: string; // reach, profile_visits, website_visitors, messages, leads, post_engagement
+    audienceType?: 'automatic' | 'custom';
+    audienceName?: string;
+    radiusKm?: number;
+    ageRange?: string;
+    gender?: string;
     targetingToleeIds?: string;
     targetingLocations?: string;
     targetingInterests?: string;
+    placements?: string;
+    destinationUrl?: string;
     ctaButton?: string;
   }
 ) {
@@ -439,26 +448,22 @@ export async function createQuickBoostAction(
     const userCreatedAt = user?.createdAt ? new Date(user.createdAt) : new Date();
     const isFreeBoostEligible = userCreatedAt > sixMonthsAgo;
 
-    const wallet = await prisma.wallet.findUnique({
-      where: { userId }
-    });
-
-    if (!isFreeBoostEligible && (!wallet || wallet.balance <= 0)) {
-      return { success: false, error: 'Insufficient wallet balance. Earn ₹500 per friend referred!' };
-    }
-
     let mediaUrls: string[] = [];
     let primaryText = '';
-    let name = `Quick Boost - ${type.toUpperCase()}`;
+    let name = `Boost ${type.toUpperCase()}`;
     let isVideoPost = false;
 
-    // Load original post, reel, or listing to get basic content
+    // Load original post, reel, or listing to verify ownership, content eligibility, and moderation status
     if (type === 'post') {
       const post = await prisma.post.findUnique({
         where: { id: targetId },
-        select: { caption: true, mediaUrls: true, mediaTypes: true }
+        select: { caption: true, mediaUrls: true, mediaTypes: true, status: true, isArchived: true, authorId: true }
       });
       if (!post) return { success: false, error: 'Post not found' };
+      if (post.authorId !== userId) return { success: false, error: 'You can only boost your own posts.' };
+      if (post.status === 'rejected' || post.status === 'flagged_ai' || post.isArchived) {
+        return { success: false, error: 'This content is restricted by moderation rules and cannot be boosted.' };
+      }
       mediaUrls = parseMediaUrls(post.mediaUrls);
       primaryText = post.caption || '';
       name = `Boost Post: ${primaryText.slice(0, 20)}...`;
@@ -470,18 +475,24 @@ export async function createQuickBoostAction(
     } else if (type === 'reel') {
       const post = await prisma.post.findUnique({
         where: { id: targetId },
-        select: { caption: true, mediaUrls: true, postType: true, mediaTypes: true }
+        select: { caption: true, mediaUrls: true, postType: true, mediaTypes: true, status: true, isArchived: true, authorId: true }
       });
       if (!post) return { success: false, error: 'Reel not found' };
+      if (post.authorId !== userId) return { success: false, error: 'You can only boost your own reels.' };
+      if (post.status === 'rejected' || post.status === 'flagged_ai' || post.isArchived) {
+        return { success: false, error: 'This reel is restricted by moderation rules and cannot be boosted.' };
+      }
       mediaUrls = parseMediaUrls(post.mediaUrls);
       primaryText = post.caption || '';
       name = `Boost Reel: ${primaryText.slice(0, 20)}...`;
+      isVideoPost = true;
     } else if (type === 'listing') {
       const listing = await prisma.listing.findUnique({
         where: { id: targetId },
-        select: { title: true, images: true, description: true }
+        select: { title: true, images: true, description: true, sellerId: true }
       });
       if (!listing) return { success: false, error: 'Marketplace listing not found' };
+      if (listing.sellerId !== userId) return { success: false, error: 'You can only boost your own listings.' };
       mediaUrls = parseMediaUrls(listing.images);
       primaryText = listing.description || '';
       name = `Boost Listing: ${listing.title}`;
@@ -496,45 +507,117 @@ export async function createQuickBoostAction(
       end.setDate(end.getDate() + (options.durationDays || 7));
     }
 
-    const campaign = await prisma.campaign.create({
-      data: {
-        userId,
-        name,
-        objective: 'engagement',
-        type: 'boost',
-        status: isFreeBoostEligible ? 'approved' : 'pending',
-        postBoostId: type === 'post' ? targetId : null,
-        reelBoostId: type === 'reel' ? targetId : null,
-        listingBoostId: type === 'listing' ? targetId : null,
-        adSets: {
-          create: {
-            name: `${name} - Ad Set`,
-            budgetType: 'lifetime',
-            budgetAmount: isFreeBoostEligible ? 0 : Number(options.budgetAmount || 200),
-            startDate: start,
-            endDate: end,
-            targetingToleeIds: options.targetingToleeIds,
-            targetingCities: options.targetingLocations,
-            targetingInterests: options.targetingInterests,
-            placements: type === 'reel' ? 'reels' : type === 'listing' ? 'marketplace' : 'feed,reels,marketplace',
-            ads: {
-              create: {
-                name: `${name} - Creative`,
-                format: type === 'reel' ? 'single_video' : isVideoPost ? 'single_video' : 'single_image',
-                mediaUrls: mediaUrls.join(','),
-                primaryText,
-                headline: name,
-                ctaButton: options.ctaButton || (type === 'listing' ? 'learn_more' : 'send_message'),
-                destinationUrl: type === 'listing' 
-                  ? `/marketplace/listing/${targetId}` 
-                  : type === 'reel' 
-                    ? `/reels?id=${targetId}` 
-                    : `/feed?postId=${targetId}`
+    const duration = Math.max(1, options.durationDays || 7);
+    const dailyBudget = Math.max(10, Number(options.budgetAmount || 200));
+    const isLifetime = options.budgetType === 'lifetime';
+    const totalRequiredBudget = isFreeBoostEligible 
+      ? 0 
+      : isLifetime 
+        ? dailyBudget 
+        : dailyBudget * duration;
+
+    // Idempotent atomic execution with wallet deduction
+    const campaign = await prisma.$transaction(async (tx) => {
+      // 1. Check and deduct wallet if not free boost
+      if (!isFreeBoostEligible && totalRequiredBudget > 0) {
+        const wallet = await tx.wallet.findUnique({
+          where: { userId }
+        });
+
+        if (!wallet || wallet.balance < totalRequiredBudget) {
+          throw new Error(`Insufficient wallet balance (₹${wallet?.balance || 0}). Required: ₹${totalRequiredBudget.toFixed(2)}. Please recharge your Ads Wallet.`);
+        }
+
+        await tx.wallet.update({
+          where: { userId },
+          data: {
+            balance: { decrement: totalRequiredBudget },
+            totalSpent: { increment: totalRequiredBudget }
+          }
+        });
+      }
+
+      // Determine default CTA based on goal
+      let defaultCta = 'learn_more';
+      if (options.goal === 'profile_visits') defaultCta = 'view_profile';
+      else if (options.goal === 'messages') defaultCta = 'send_message';
+      else if (options.goal === 'leads') defaultCta = 'contact_us';
+      else if (options.goal === 'website_visitors') defaultCta = 'visit_website';
+      else if (type === 'listing') defaultCta = 'shop_now';
+
+      // Determine destination URL
+      let destinationUrl = options.destinationUrl;
+      if (!destinationUrl) {
+        if (options.goal === 'profile_visits') {
+          destinationUrl = `/u/${user?.createdAt ? userId : 'me'}`;
+        } else if (options.goal === 'messages') {
+          destinationUrl = `/chat?targetUser=${userId}`;
+        } else if (type === 'listing') {
+          destinationUrl = `/marketplace/listing/${targetId}`;
+        } else if (type === 'reel') {
+          destinationUrl = `/reels?id=${targetId}`;
+        } else {
+          destinationUrl = `/feed?postId=${targetId}`;
+        }
+      }
+
+      // 2. Create Campaign & AdSet & Ad
+      const newCampaign = await tx.campaign.create({
+        data: {
+          userId,
+          name,
+          objective: options.goal || 'engagement',
+          type: 'boost',
+          status: isFreeBoostEligible ? 'approved' : 'pending',
+          postBoostId: type === 'post' ? targetId : null,
+          reelBoostId: type === 'reel' ? targetId : null,
+          listingBoostId: type === 'listing' ? targetId : null,
+          adSets: {
+            create: {
+              name: `${name} - Ad Set`,
+              budgetType: options.budgetType || 'daily',
+              budgetAmount: isFreeBoostEligible ? 0 : dailyBudget,
+              startDate: start,
+              endDate: end,
+              targetingToleeIds: options.targetingToleeIds,
+              targetingCities: options.targetingLocations || 'All India',
+              targetingInterests: options.targetingInterests || 'General',
+              targetingDemographics: options.gender || 'all',
+              targetingBehaviors: options.ageRange || '18-65+',
+              placements: options.placements || (type === 'reel' ? 'reels' : type === 'listing' ? 'marketplace' : 'feed,reels,marketplace'),
+              ads: {
+                create: {
+                  name: `${name} - Creative`,
+                  format: type === 'reel' ? 'single_video' : isVideoPost ? 'single_video' : 'single_image',
+                  mediaUrls: mediaUrls.join(','),
+                  primaryText,
+                  headline: name,
+                  ctaButton: options.ctaButton || defaultCta,
+                  destinationUrl
+                }
               }
             }
           }
         }
+      });
+
+      // 3. Record Wallet Transaction if paid
+      if (!isFreeBoostEligible && totalRequiredBudget > 0) {
+        const userWallet = await tx.wallet.findUnique({ where: { userId } });
+        if (userWallet) {
+          await tx.walletTransaction.create({
+            data: {
+              walletId: userWallet.id,
+              amount: -totalRequiredBudget,
+              type: 'spend',
+              description: `Paid Boost Post (${duration} days): ${primaryText.slice(0, 25)}`,
+              campaignId: newCampaign.id
+            }
+          });
+        }
       }
+
+      return newCampaign;
     });
 
     await prisma.notification.create({
@@ -542,8 +625,8 @@ export async function createQuickBoostAction(
         userId,
         type: 'campaign_review',
         message: isFreeBoostEligible
-          ? `🚀 Your post boost is ACTIVE (6-Month Free Boosting Offer)! Real impressions and clicks are now live.`
-          : `🚀 Boost request submitted for review! Check Ads Manager for status.`,
+          ? `🚀 Your post boost is ACTIVE (6-Month Free Offer applied)! Check Ads Manager for real metrics.`
+          : `🚀 Boost request of ₹${totalRequiredBudget.toFixed(2)} submitted for review! Check Ads Manager for status.`,
         link: '/ads-manager'
       }
     });
@@ -1163,6 +1246,37 @@ export async function superAdminModerateCampaign(campaignId: string, status: 'ap
       }
     });
 
+    // If campaign is rejected, automatically refund any deducted wallet balance
+    if (status === 'rejected') {
+      const spendTx = await prisma.walletTransaction.findFirst({
+        where: { campaignId: campaign.id, type: 'spend' }
+      });
+      if (spendTx && spendTx.amount < 0) {
+        const refundAmount = Math.abs(spendTx.amount);
+        const wallet = await prisma.wallet.findUnique({
+          where: { userId: campaign.userId }
+        });
+        if (wallet) {
+          await prisma.wallet.update({
+            where: { id: wallet.id },
+            data: {
+              balance: { increment: refundAmount },
+              totalSpent: { decrement: refundAmount }
+            }
+          });
+          await prisma.walletTransaction.create({
+            data: {
+              walletId: wallet.id,
+              amount: refundAmount,
+              type: 'refund',
+              description: `Refund for rejected boost campaign: ${campaign.name}`,
+              campaignId: campaign.id
+            }
+          });
+        }
+      }
+    }
+
     // Notify user
     await prisma.notification.create({
       data: {
@@ -1170,7 +1284,7 @@ export async function superAdminModerateCampaign(campaignId: string, status: 'ap
         type: finalStatus === 'running' ? 'campaign_approved' : 'campaign_rejected',
         message: finalStatus === 'running'
           ? `🎉 Your campaign "${campaign.name}" has been approved and is now running!`
-          : `❌ Your campaign "${campaign.name}" was rejected. Reason: ${reason || 'Inappropriate content'}`,
+          : `❌ Your campaign "${campaign.name}" was rejected and any deducted wallet balance has been refunded. Reason: ${reason || 'Content guidelines violation'}`,
         link: '/ads-manager'
       }
     });

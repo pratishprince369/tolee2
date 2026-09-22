@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { 
   X, Sparkles, Wallet, Rocket, Calendar, MapPin, Target, 
   Users, CheckCircle2, AlertTriangle, TrendingUp, Edit2, 
   Check, Eye, ThumbsUp, MessageSquare, Share2, HelpCircle, 
-  MessageCircle, ExternalLink, ShieldCheck, Laptop
+  MessageCircle, ExternalLink, ShieldCheck, Laptop, ArrowRight,
+  ArrowLeft, Globe, UserCheck, Heart, Send, Layers, Compass
 } from 'lucide-react';
 import { 
   createQuickBoostAction, 
@@ -15,6 +16,7 @@ import {
   getCampaignDetailsAction, 
   updateCampaignAction 
 } from '@/actions/ads';
+import Link from 'next/link';
 
 interface QuickBoostModalProps {
   isOpen: boolean;
@@ -22,7 +24,7 @@ interface QuickBoostModalProps {
   type: 'post' | 'reel' | 'listing';
   targetId: string;
   onSuccess?: () => void;
-  campaignId?: string; // Present when editing an existing campaign
+  campaignId?: string;
 }
 
 export function QuickBoostModal({ 
@@ -35,40 +37,46 @@ export function QuickBoostModal({
 }: QuickBoostModalProps) {
   const { data: session } = useSession();
   
-  // Base State for options (Facebook layout)
-  const [goal, setGoal] = useState<'engagement' | 'website_visitors' | 'messages' | 'leads' | 'calls'>('engagement');
-  const [showGoalChange, setShowGoalChange] = useState(false);
-  const [advantageCreative, setAdvantageCreative] = useState(true);
-  const [buttonLabel, setButtonLabel] = useState<string>('send_message');
-  const [specialCategory, setSpecialCategory] = useState(false);
-  
-  // Targeting
-  const [audienceType, setAudienceType] = useState<'advantage' | 'targeting'>('advantage');
-  const [targetTolees, setTargetTolees] = useState('');
-  const [locations, setLocations] = useState('India');
-  const [interests, setInterests] = useState('small business');
-  const [ageRange, setAgeRange] = useState('18 - 65+');
-  const [isSecuritiesAd, setIsSecuritiesAd] = useState(false);
-  const [showTargetingEdit, setShowTargetingEdit] = useState(false);
-  
-  // Duration & Budget
-  const [runContinuously, setRunContinuously] = useState(true);
+  // Multi-step workflow state: 1: Goal, 2: Audience, 3: Placement, 4: Budget, 5: Review
+  const [currentStep, setCurrentStep] = useState<number>(1);
+
+  // STEP 1: GOAL
+  const [goal, setGoal] = useState<'reach' | 'profile_visits' | 'website_visitors' | 'messages' | 'leads' | 'post_engagement'>('reach');
+  const [websiteUrl, setWebsiteUrl] = useState('');
+  const [ctaButton, setCtaButton] = useState('learn_more');
+
+  // STEP 2: AUDIENCE
+  const [audienceType, setAudienceType] = useState<'automatic' | 'custom'>('automatic');
+  const [audienceName, setAudienceName] = useState('Custom Audience');
+  const [locations, setLocations] = useState('All India');
+  const [radiusKm, setRadiusKm] = useState(25);
+  const [ageRange, setAgeRange] = useState('18-65+');
+  const [gender, setGender] = useState<'all' | 'men' | 'women'>('all');
+  const [interests, setInterests] = useState<string[]>(['Technology', 'Business', 'Shopping']);
+
+  // STEP 3: PLACEMENTS
+  const [placementFeed, setPlacementFeed] = useState(true);
+  const [placementReels, setPlacementReels] = useState(true);
+  const [placementDiscovery, setPlacementDiscovery] = useState(true);
+  const [placementCommunities, setPlacementCommunities] = useState(true);
+
+  // STEP 4: BUDGET & DURATION
+  const [budgetType, setBudgetType] = useState<'daily' | 'lifetime'>('daily');
+  const [dailyBudget, setDailyBudget] = useState(150); // Daily INR
   const [durationDays, setDurationDays] = useState(7);
+  const [startDate, setStartDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState<string>(() => {
     const d = new Date();
     d.setDate(d.getDate() + 7);
     return d.toISOString().split('T')[0];
   });
-  const [budget, setBudget] = useState(200); // Daily budget
-  const [showBudgetEdit, setShowBudgetEdit] = useState(false);
-  
-  // Placements & Payment
-  const [advantagePlacements, setAdvantagePlacements] = useState(true);
-  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+
+  // STEP 5: WALLET & 6-MONTH FREE OFFER
+  const [walletBalance, setWalletBalance] = useState<number>(0);
   const [freeBoostEligible, setFreeBoostEligible] = useState(false);
   const [freeBoostDays, setFreeBoostDays] = useState(0);
 
-  // Preview Details fetched from server
+  // PREVIEW DATA
   const [previewData, setPreviewData] = useState<{
     name: string;
     username: string;
@@ -77,17 +85,18 @@ export function QuickBoostModal({
     mediaUrl: string;
     mediaType?: string;
   } | null>(null);
-  
+
   const [loading, setLoading] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Fetch Preview data and Wallet Balance
+  // Fetch Preview data and Wallet Balance on open
   useEffect(() => {
     if (isOpen && session) {
       setLoading(true);
       setErrorMsg('');
+      setCurrentStep(1);
       
       Promise.all([
         getUserWallet(),
@@ -109,7 +118,7 @@ export function QuickBoostModal({
           setErrorMsg(previewRes.error || 'Failed to fetch preview content');
         }
 
-        // If in edit mode, pre-fill settings from campaign
+        // If in edit mode, pre-fill settings from existing campaign
         if (campaignRes?.success && campaignRes.campaign) {
           const camp = campaignRes.campaign;
           const adSet = camp.adSets?.[0];
@@ -118,30 +127,22 @@ export function QuickBoostModal({
           if (camp.objective) {
             setGoal(camp.objective as any);
           }
-          setAdvantageCreative(camp.abTestingEnabled || false);
           if (ad?.ctaButton) {
-            setButtonLabel(ad.ctaButton);
+            setCtaButton(ad.ctaButton);
           }
-          setSpecialCategory(camp.specialAdCategory !== 'none');
-          
+          if (ad?.destinationUrl) {
+            setWebsiteUrl(ad.destinationUrl);
+          }
           if (adSet) {
-            setBudget(adSet.budgetAmount || 200);
-            setAdvantagePlacements(adSet.placements ? adSet.placements.includes('feed') : true);
-            
+            setDailyBudget(adSet.budgetAmount || 150);
             if (adSet.targetingCities) setLocations(adSet.targetingCities);
-            if (adSet.targetingInterests) setInterests(adSet.targetingInterests);
-            if (adSet.targetingToleeIds) setTargetTolees(adSet.targetingToleeIds);
-            
-            if (adSet.endDate) {
-              setRunContinuously(false);
-              setEndDate(new Date(adSet.endDate).toISOString().split('T')[0]);
-              
-              // Calculate duration difference
-              const diffTime = Math.abs(new Date(adSet.endDate).getTime() - new Date(adSet.startDate).getTime());
-              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-              setDurationDays(diffDays || 7);
-            } else {
-              setRunContinuously(true);
+            if (adSet.targetingInterests) {
+              setInterests(adSet.targetingInterests.split(',').map((s: string) => s.trim()).filter(Boolean));
+            }
+            if (adSet.placements) {
+              setPlacementFeed(adSet.placements.includes('feed'));
+              setPlacementReels(adSet.placements.includes('reels'));
+              setPlacementDiscovery(adSet.placements.includes('marketplace') || adSet.placements.includes('discovery'));
             }
           }
         }
@@ -154,84 +155,85 @@ export function QuickBoostModal({
     }
   }, [isOpen, session, type, targetId, campaignId]);
 
+  // Recalculate end date on duration change
+  useEffect(() => {
+    const s = new Date(startDate);
+    s.setDate(s.getDate() + durationDays);
+    setEndDate(s.toISOString().split('T')[0]);
+  }, [startDate, durationDays]);
+
   if (!isOpen) return null;
 
-  // Approximate impressions based on Facebook screenshot (₹200 budget yields 7.4K - 13.7K impressions per day)
-  const estMinReach = Math.round(budget * 37);
-  const estMaxReach = Math.round(budget * 68.5);
+  // Pricing calculations
+  const totalBudgetAmount = budgetType === 'daily' ? dailyBudget * durationDays : dailyBudget;
+  const gstAmount = Math.round(totalBudgetAmount * 0.18);
+  const totalAmountToPay = freeBoostEligible ? 0 : totalBudgetAmount + gstAmount;
+  const remainingBalanceAfterPay = Math.max(0, walletBalance - totalAmountToPay);
+  const isBalanceSufficient = freeBoostEligible || walletBalance >= totalAmountToPay;
 
-  const gstAmount = Math.round(budget * 0.18);
-  const totalDailyCost = budget + gstAmount;
+  // Estimated impressions based on empirical benchmarks (~37 to 68.5 views per rupee)
+  const estMinReach = Math.round(dailyBudget * 37);
+  const estMaxReach = Math.round(dailyBudget * 68.5);
+  const totalEstMinReach = estMinReach * durationDays;
+  const totalEstMaxReach = estMaxReach * durationDays;
 
-  // Render friendly Goal name
-  const getGoalLabel = (g: string) => {
-    switch (g) {
-      case 'engagement': return 'Automatic - Get more engagement';
-      case 'website_visitors': return 'Get more website visitors';
-      case 'messages': return 'Get more messages';
-      case 'leads': return 'Get more leads';
-      case 'calls': return 'Get more calls';
-      default: return 'Automatic - Get more engagement';
+  // Active placements string
+  const activePlacementsList: string[] = [];
+  if (placementFeed) activePlacementsList.push('feed');
+  if (placementReels) activePlacementsList.push('reels');
+  if (placementDiscovery) activePlacementsList.push('marketplace');
+  if (placementCommunities) activePlacementsList.push('chats');
+  const placementsString = activePlacementsList.join(',') || 'feed';
+
+  // Toggle interest tags
+  const toggleInterest = (interest: string) => {
+    if (interests.includes(interest)) {
+      setInterests(interests.filter(i => i !== interest));
+    } else {
+      setInterests([...interests, interest]);
     }
   };
 
-  // Render button label text
-  const getCTAText = (b: string) => {
-    switch (b) {
-      case 'no_button': return '';
-      case 'learn_more': return 'Learn more';
-      case 'send_message': return 'Send message';
-      case 'sign_up': return 'Sign up';
-      case 'book_now': return 'Book now';
-      case 'call_now': return 'Call now';
-      case 'shop_now': return 'Shop now';
-      case 'contact_us': return 'Contact us';
-      default: return 'Send message';
-    }
-  };
-
-  const handlePublish = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (walletBalance !== null && walletBalance < budget) {
-      setErrorMsg('Insufficient ad credits in your wallet. Invite friends to get ₹500 credits per signup!');
-      return;
-    }
+  // Submission handler
+  const handlePublish = async () => {
+    setErrorMsg('');
+    setSubmitLoading(true);
 
     try {
-      setSubmitLoading(true);
-      setErrorMsg('');
-
-      const targeting = {
-        budgetAmount: budget,
-        durationDays: runContinuously ? 30 : durationDays, // If continuous, default to 30 days review cycle
-        targetingToleeIds: targetTolees || undefined,
-        targetingLocations: locations || undefined,
-        targetingInterests: interests || undefined,
-        ctaButton: buttonLabel,
-        objective: goal,
-        specialAdCategory: specialCategory ? 'social_issues' : 'none',
-        endDate: runContinuously ? null : endDate
+      const options = {
+        budgetAmount: dailyBudget,
+        durationDays,
+        budgetType,
+        startDate,
+        endDate,
+        goal,
+        audienceType,
+        audienceName,
+        radiusKm,
+        ageRange,
+        gender,
+        targetingLocations: locations,
+        targetingInterests: interests.join(','),
+        placements: placementsString,
+        destinationUrl: websiteUrl || undefined,
+        ctaButton
       };
 
       let res;
       if (campaignId) {
-        // Edit and Re-publish mode
         res = await updateCampaignAction(campaignId, {
           name: `Boost ${type.toUpperCase()}: ${previewData?.caption.slice(0, 20) || 'Creative'}`,
           objective: goal,
-          specialAdCategory: specialCategory ? 'social_issues' : 'none',
           adSetName: `Boost ${type.toUpperCase()} - Ad Set`,
-          budgetAmount: budget,
-          endDate: runContinuously ? undefined : endDate,
-          targetingToleeIds: targetTolees,
+          budgetAmount: dailyBudget,
+          endDate,
           targetingCities: locations,
-          targetingInterests: interests,
-          ctaButton: buttonLabel,
-          status: 'pending' // Re-submits for admin review
+          targetingInterests: interests.join(','),
+          ctaButton,
+          status: 'pending'
         });
       } else {
-        // New Boost mode
-        res = await createQuickBoostAction(type, targetId, targeting);
+        res = await createQuickBoostAction(type, targetId, options);
       }
 
       if (res.success) {
@@ -240,9 +242,9 @@ export function QuickBoostModal({
           setSuccess(false);
           onClose();
           if (onSuccess) onSuccess();
-        }, 3000);
+        }, 2500);
       } else {
-        setErrorMsg(res.error || 'Failed to request boost campaign');
+        setErrorMsg(res.error || 'Failed to launch promotion campaign');
       }
     } catch (err: any) {
       setErrorMsg(err.message || 'An error occurred during submission');
@@ -251,499 +253,776 @@ export function QuickBoostModal({
     }
   };
 
+  const stepsList = [
+    { num: 1, label: 'Goal' },
+    { num: 2, label: 'Audience' },
+    { num: 3, label: 'Placement' },
+    { num: 4, label: 'Budget' },
+    { num: 5, label: 'Review & Pay' }
+  ];
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
-      <div className="relative w-full max-w-5xl bg-white rounded-3xl border border-zinc-200 text-zinc-900 shadow-2xl overflow-hidden flex flex-col md:grid md:grid-cols-5 animate-in zoom-in-95 duration-200 max-h-[92vh]">
-        
-        {/* Left Column - Form controls (3 cols) */}
-        <div className="md:col-span-3 flex flex-col justify-between border-r border-zinc-200 max-h-[85vh]">
-          {/* Header */}
-          <div className="flex items-center justify-between border-b border-zinc-150 px-6 py-4.5 bg-zinc-50/50">
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 shadow-sm text-white">
-                <Rocket className="h-5 w-5" />
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/70 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto"
+      onClick={onClose}
+    >
+      <div 
+        className="relative w-full max-w-4xl bg-white dark:bg-zinc-950 rounded-3xl border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xl overflow-hidden flex flex-col md:grid md:grid-cols-5 animate-in zoom-in-95 duration-200 max-h-[92vh]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Left Column: Multi-Step Form Controls (3 cols) */}
+        <div className="md:col-span-3 flex flex-col justify-between border-b md:border-b-0 md:border-r border-zinc-100 dark:border-zinc-900 max-h-[85vh] overflow-y-auto">
+          
+          {/* Header & Step Tracker */}
+          <div>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100 dark:border-zinc-900 bg-zinc-50/60 dark:bg-zinc-900/40">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 shadow-sm text-white">
+                  <Rocket className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-zinc-900 dark:text-white leading-none">
+                    {campaignId ? 'Edit Promotion' : 'Boost Post'}
+                  </h3>
+                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                    Step {currentStep} of 5: {stepsList[currentStep - 1].label}
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-base font-extrabold text-zinc-900 leading-none">
-                  {campaignId ? 'Edit Boosted Post' : 'Boost Post'}
-                </h3>
-                <p className="text-[10px] text-zinc-500 font-medium mt-1">Configure options to sponsor your content</p>
-              </div>
+
+              <button 
+                onClick={onClose} 
+                className="p-1 rounded-full text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
-            <button 
-              onClick={onClose}
-              className="rounded-full p-2 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 transition-colors"
-            >
-              <X className="h-5 w-5" />
-            </button>
+
+            {/* Stepper Progress Bar */}
+            <div className="px-6 py-3 bg-zinc-50/30 dark:bg-zinc-900/20 border-b border-zinc-100 dark:border-zinc-900/80 flex items-center justify-between">
+              {stepsList.map((step, idx) => (
+                <div key={step.num} className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => {
+                      if (step.num < currentStep) setCurrentStep(step.num);
+                    }}
+                    disabled={step.num > currentStep}
+                    className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold transition-all ${
+                      currentStep === step.num
+                        ? 'bg-blue-600 text-white shadow-xs scale-105'
+                        : currentStep > step.num
+                        ? 'bg-emerald-600 text-white cursor-pointer hover:bg-emerald-700'
+                        : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 cursor-not-allowed'
+                    }`}
+                  >
+                    {currentStep > step.num ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : step.num}
+                  </button>
+                  <span className={`text-[11px] font-semibold hidden sm:inline ${
+                    currentStep === step.num 
+                      ? 'text-blue-600 dark:text-blue-400 font-bold' 
+                      : currentStep > step.num 
+                      ? 'text-zinc-700 dark:text-zinc-300' 
+                      : 'text-zinc-400'
+                  }`}>
+                    {step.label}
+                  </span>
+                  {idx < stepsList.length - 1 && (
+                    <div className="w-4 sm:w-6 h-[2px] bg-zinc-200 dark:bg-zinc-800 mx-1" />
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
 
-          {loading ? (
-            <div className="flex flex-col items-center justify-center flex-1 p-12 min-h-[300px]">
-              <div className="h-9 w-9 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
-              <p className="text-xs font-semibold text-zinc-500 mt-3 animate-pulse">Loading boost setup...</p>
-            </div>
-          ) : (
-            <form onSubmit={handlePublish} className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-none text-zinc-800">
-              {errorMsg && (
-                <div className="flex items-start gap-2.5 rounded-xl border border-rose-200 bg-rose-50 p-3.5 text-rose-800 text-xs font-semibold">
-                  <AlertTriangle className="h-4.5 w-4.5 text-rose-600 shrink-0 mt-0.5" />
-                  <span>{errorMsg}</span>
-                </div>
-              )}
+          {/* Form Content Area */}
+          <div className="p-6 space-y-5 overflow-y-auto">
+            {errorMsg && (
+              <div className="p-3.5 rounded-2xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 text-xs font-semibold flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>{errorMsg}</span>
+              </div>
+            )}
 
-              {/* Goal Card */}
-              <div className="rounded-2xl border border-zinc-200/80 p-4.5 bg-white shadow-sm space-y-3.5">
-                <div className="flex justify-between items-center">
+            {success && (
+              <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-sm font-bold flex items-center gap-2.5">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                <span>🎉 Promotion launched successfully! Tracking live in Ads Manager.</span>
+              </div>
+            )}
+
+            {/* 6-Month Free Offer Banner */}
+            {freeBoostEligible && (
+              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-500/15 via-teal-500/15 to-blue-500/15 border border-emerald-500/30 flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2.5">
+                  <Sparkles className="w-5 h-5 text-emerald-600 animate-bounce" />
                   <div>
-                    <h4 className="text-xs font-extrabold uppercase tracking-wider text-zinc-400">Goal</h4>
-                    <p className="text-sm font-bold text-zinc-900 mt-1">{getGoalLabel(goal)}</p>
+                    <p className="font-extrabold text-emerald-900 dark:text-emerald-300">
+                      6 Months Free Boost Active!
+                    </p>
+                    <p className="text-emerald-700/90 dark:text-emerald-400/90 text-[11px]">
+                      Zero charges from your wallet for {freeBoostDays} more days.
+                    </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowGoalChange(!showGoalChange)}
-                    className="text-xs font-bold text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-lg border border-zinc-200 hover:border-blue-200 transition-all shadow-sm"
-                  >
-                    Change
-                  </button>
+                </div>
+                <span className="font-black px-2.5 py-1 rounded-full bg-emerald-600 text-white text-[11px] shadow-xs">
+                  ₹0 COST
+                </span>
+              </div>
+            )}
+
+            {/* ==================== STEP 1: SELECT GOAL ==================== */}
+            {currentStep === 1 && (
+              <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-200">
+                <div>
+                  <h4 className="text-base font-extrabold text-zinc-900 dark:text-white">What is your goal?</h4>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                    Select how you want people to interact with your boosted post.
+                  </p>
                 </div>
 
-                {showGoalChange && (
-                  <div className="pt-3 border-t border-zinc-150 space-y-2 animate-in slide-in-from-top-2 duration-150">
-                    {[
-                      { id: 'engagement', label: 'Get more engagement (Recommended)', desc: 'Show your post to people likely to like, share, and comment.' },
-                      { id: 'website_visitors', label: 'Get more website visitors', desc: 'Direct people to a landing page or store URL.' },
-                      { id: 'messages', label: 'Get more messages', desc: 'Encourage users to message you on Tolee Chat.' },
-                      { id: 'leads', label: 'Get more leads', desc: 'Gain signups, contacts, or inquiry forms.' },
-                      { id: 'calls', label: 'Get more calls', desc: 'Encourage direct business call leads.' }
-                    ].map((item) => (
-                      <label 
+                <div className="space-y-2.5">
+                  {[
+                    {
+                      id: 'reach',
+                      title: 'Get More Reach',
+                      desc: 'Show your post to thousands of active users across India.',
+                      icon: Rocket,
+                      cta: 'learn_more'
+                    },
+                    {
+                      id: 'profile_visits',
+                      title: 'More Profile Visits',
+                      desc: 'Drive traffic to your profile to gain new followers and brand awareness.',
+                      icon: UserCheck,
+                      cta: 'view_profile'
+                    },
+                    {
+                      id: 'website_visitors',
+                      title: 'More Website Visits',
+                      desc: 'Send interested users directly to your external website or landing page.',
+                      icon: Globe,
+                      cta: 'visit_website'
+                    },
+                    {
+                      id: 'messages',
+                      title: 'More Messages',
+                      desc: 'Encourage users to send direct messages to start conversations.',
+                      icon: MessageCircle,
+                      cta: 'send_message'
+                    },
+                    {
+                      id: 'leads',
+                      title: 'More Leads',
+                      desc: 'Collect phone numbers and inquiries for your business or service.',
+                      icon: Target,
+                      cta: 'contact_us'
+                    },
+                    {
+                      id: 'post_engagement',
+                      title: 'More Post Engagement',
+                      desc: 'Maximize likes, comments, and shares to boost algorithmic ranking.',
+                      icon: Heart,
+                      cta: 'learn_more'
+                    }
+                  ].map((item) => {
+                    const Icon = item.icon;
+                    const isSelected = goal === item.id;
+                    return (
+                      <div
                         key={item.id}
                         onClick={() => {
                           setGoal(item.id as any);
-                          setShowGoalChange(false);
+                          setCtaButton(item.cta);
                         }}
-                        className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all hover:bg-zinc-50 ${
-                          goal === item.id ? 'border-blue-600 bg-blue-50/10' : 'border-zinc-200'
+                        className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
+                          isSelected
+                            ? 'border-blue-600 dark:border-blue-500 bg-blue-50/60 dark:bg-blue-950/30 shadow-xs'
+                            : 'border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900/60'
                         }`}
                       >
-                        <input 
-                          type="radio" 
-                          name="goal_select" 
-                          checked={goal === item.id}
-                          readOnly
-                          className="mt-0.5 accent-blue-600" 
-                        />
-                        <div>
-                          <p className="text-xs font-bold text-zinc-900">{item.label}</p>
-                          <p className="text-[10px] text-zinc-500 mt-0.5">{item.desc}</p>
+                        <div className="flex items-center gap-3">
+                          <div className={`p-2 rounded-xl shrink-0 ${
+                            isSelected 
+                              ? 'bg-blue-600 text-white' 
+                              : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'
+                          }`}>
+                            <Icon className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <h5 className="text-sm font-bold text-zinc-900 dark:text-white leading-tight">
+                              {item.title}
+                            </h5>
+                            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                              {item.desc}
+                            </p>
+                          </div>
                         </div>
-                      </label>
-                    ))}
+                        <div className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${
+                          isSelected 
+                            ? 'border-blue-600 bg-blue-600 text-white' 
+                            : 'border-zinc-300 dark:border-zinc-700'
+                        }`}>
+                          {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Additional URL Input for Website Visits */}
+                {goal === 'website_visitors' && (
+                  <div className="p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 space-y-2 animate-in fade-in duration-150">
+                    <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
+                      Destination Website URL:
+                    </label>
+                    <input
+                      type="url"
+                      value={websiteUrl}
+                      onChange={(e) => setWebsiteUrl(e.target.value)}
+                      placeholder="https://example.com/landing-page"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
                   </div>
                 )}
               </div>
+            )}
 
-              {/* Advantage+ Creative Toggle */}
-              <div className="flex items-start justify-between rounded-2xl border border-zinc-200/80 p-4.5 bg-white shadow-sm">
-                <div className="space-y-1 pr-6">
-                  <h4 className="text-sm font-extrabold text-zinc-900">Advantage+ creative</h4>
-                  <p className="text-xs text-zinc-500 leading-relaxed">
-                    Let us optimize your ad creative by testing a mix of headlines, images, videos and buttons to show people the version they're most likely to respond to.
+            {/* ==================== STEP 2: CHOOSE AUDIENCE ==================== */}
+            {currentStep === 2 && (
+              <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-200">
+                <div>
+                  <h4 className="text-base font-extrabold text-zinc-900 dark:text-white">Choose Your Audience</h4>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                    Target who should see your boosted post.
                   </p>
                 </div>
-                
-                {/* Custom Toggle Switch */}
-                <button
-                  type="button"
-                  onClick={() => setAdvantageCreative(!advantageCreative)}
-                  className={`w-11 h-6 rounded-full flex items-center p-0.5 transition-colors duration-200 shrink-0 ${
-                    advantageCreative ? 'bg-blue-600' : 'bg-zinc-300'
-                  }`}
-                >
-                  <div className={`bg-white w-5 h-5 rounded-full shadow-md transform transition-transform duration-200 ${
-                    advantageCreative ? 'translate-x-5' : 'translate-x-0'
-                  }`} />
-                </button>
-              </div>
 
-              {/* Button Selection */}
-              <div className="rounded-2xl border border-zinc-200/80 p-4.5 bg-white shadow-sm space-y-2">
-                <label className="text-xs font-extrabold uppercase tracking-wider text-zinc-400 block">
-                  Button Label
-                </label>
-                <select
-                  value={buttonLabel}
-                  onChange={(e) => setButtonLabel(e.target.value)}
-                  className="w-full bg-white border border-zinc-250 rounded-xl px-4 py-3 text-sm text-zinc-900 font-bold focus:outline-none focus:border-blue-600 shadow-sm"
-                >
-                  <option value="no_button">No button</option>
-                  <option value="learn_more">Learn more</option>
-                  <option value="send_message">Send message</option>
-                  <option value="sign_up">Sign up</option>
-                  <option value="book_now">Book now</option>
-                  <option value="call_now">Call now</option>
-                  <option value="shop_now">Shop now</option>
-                  <option value="contact_us">Contact us</option>
-                </select>
-              </div>
-
-              {/* Special Ad Category */}
-              <div className="flex items-start justify-between rounded-2xl border border-zinc-200/80 p-4.5 bg-white shadow-sm">
-                <div className="space-y-1 pr-6">
-                  <h4 className="text-sm font-extrabold text-zinc-900">Special Ad Category</h4>
-                  <p className="text-xs text-zinc-500 leading-relaxed">
-                    Ads about financial products and services, employment, housing, or social issues, elections or politics.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setSpecialCategory(!specialCategory)}
-                  className={`w-11 h-6 rounded-full flex items-center p-0.5 transition-colors duration-200 shrink-0 ${
-                    specialCategory ? 'bg-blue-600' : 'bg-zinc-300'
-                  }`}
-                >
-                  <div className={`bg-white w-5 h-5 rounded-full shadow-md transform transition-transform duration-200 ${
-                    specialCategory ? 'translate-x-5' : 'translate-x-0'
-                  }`} />
-                </button>
-              </div>
-
-              {/* Audience Targeting */}
-              <div className="rounded-2xl border border-zinc-200/80 p-4.5 bg-white shadow-sm space-y-4">
-                <h4 className="text-xs font-extrabold uppercase tracking-wider text-zinc-400">Audience</h4>
-                
-                <div className="space-y-3">
-                  <label className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-all hover:bg-zinc-50 ${
-                    audienceType === 'advantage' ? 'border-blue-600 bg-blue-50/5' : 'border-zinc-200'
-                  }`}>
-                    <input 
-                      type="radio" 
-                      name="audience_type" 
-                      checked={audienceType === 'advantage'}
-                      onChange={() => setAudienceType('advantage')}
-                      className="mt-0.5 accent-blue-600" 
-                    />
-                    <div>
-                      <p className="text-xs font-bold text-zinc-900">Advantage+ audience</p>
-                      <p className="text-[10px] text-zinc-500 mt-0.5">Let us automatically find your audience to reach more people interested in your ad.</p>
-                    </div>
-                  </label>
-
-                  <label className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-all hover:bg-zinc-50 ${
-                    audienceType === 'targeting' ? 'border-blue-600 bg-blue-50/5' : 'border-zinc-200'
-                  }`}>
-                    <input 
-                      type="radio" 
-                      name="audience_type" 
-                      checked={audienceType === 'targeting'}
-                      onChange={() => setAudienceType('targeting')}
-                      className="mt-0.5 accent-blue-600" 
-                    />
-                    <div>
-                      <p className="text-xs font-bold text-zinc-900">People you choose through targeting</p>
-                      <p className="text-[10px] text-zinc-500 mt-0.5">Configure precise locations, tolees, and interests.</p>
-                    </div>
-                  </label>
-                </div>
-
-                {/* Audience details */}
-                <div className="bg-zinc-50/60 rounded-xl border border-zinc-200/60 p-4 space-y-3.5">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h5 className="text-xs font-bold text-zinc-900">Audience details</h5>
-                      <div className="text-[11px] text-zinc-500 mt-1.5 space-y-1 font-medium">
-                        <p><span className="font-bold">Location:</span> {locations}</p>
-                        <p><span className="font-bold">Age limit:</span> {ageRange}</p>
-                        <p><span className="font-bold">Interests:</span> {interests}</p>
-                        {targetTolees && <p><span className="font-bold">Target Groups:</span> {targetTolees}</p>}
+                <div className="grid grid-cols-2 gap-3">
+                  <div
+                    onClick={() => setAudienceType('automatic')}
+                    className={`p-4 rounded-2xl border cursor-pointer transition-all ${
+                      audienceType === 'automatic'
+                        ? 'border-blue-600 dark:border-blue-500 bg-blue-50/50 dark:bg-blue-950/20 shadow-xs'
+                        : 'border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900/40'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <Sparkles className="w-5 h-5 text-blue-600" />
+                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                        audienceType === 'automatic' ? 'border-blue-600 bg-blue-600 text-white' : 'border-zinc-300 dark:border-zinc-700'
+                      }`}>
+                        {audienceType === 'automatic' && <Check className="w-2.5 h-2.5 stroke-[3]" />}
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setShowTargetingEdit(!showTargetingEdit)}
-                      className="p-2 bg-white border border-zinc-200 rounded-lg text-zinc-500 hover:bg-zinc-50 shadow-sm"
-                    >
-                      <Edit2 className="h-3.5 w-3.5" />
-                    </button>
+                    <h5 className="text-xs font-bold text-zinc-900 dark:text-white">Automatic</h5>
+                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">
+                      Tolee targets people like your existing followers and community.
+                    </p>
                   </div>
 
-                  {showTargetingEdit && (
-                    <div className="pt-3 border-t border-zinc-200 space-y-3 animate-in slide-in-from-top-2 duration-150 text-xs">
+                  <div
+                    onClick={() => setAudienceType('custom')}
+                    className={`p-4 rounded-2xl border cursor-pointer transition-all ${
+                      audienceType === 'custom'
+                        ? 'border-blue-600 dark:border-blue-500 bg-blue-50/50 dark:bg-blue-950/20 shadow-xs'
+                        : 'border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900/40'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <Target className="w-5 h-5 text-emerald-600" />
+                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                        audienceType === 'custom' ? 'border-blue-600 bg-blue-600 text-white' : 'border-zinc-300 dark:border-zinc-700'
+                      }`}>
+                        {audienceType === 'custom' && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                      </div>
+                    </div>
+                    <h5 className="text-xs font-bold text-zinc-900 dark:text-white">Create Custom</h5>
+                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">
+                      Manually select location, radius, age, gender, and categories.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Custom Audience Configuration */}
+                {audienceType === 'custom' && (
+                  <div className="p-4.5 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30 space-y-4 animate-in fade-in duration-150">
+                    <div>
+                      <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300 block mb-1">
+                        Audience Name:
+                      </label>
+                      <input
+                        type="text"
+                        value={audienceName}
+                        onChange={(e) => setAudienceName(e.target.value)}
+                        placeholder="e.g. Mumbai Food Lovers"
+                        className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-xs font-medium focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="font-bold text-zinc-600 block mb-1">Target Locations</label>
-                        <input 
-                          type="text" 
+                        <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300 block mb-1">
+                          Location (City/State):
+                        </label>
+                        <input
+                          type="text"
                           value={locations}
                           onChange={(e) => setLocations(e.target.value)}
-                          placeholder="E.g., Chennai, Mumbai, India"
-                          className="w-full bg-white border border-zinc-200 rounded-lg p-2 text-xs focus:outline-none"
+                          placeholder="Mumbai, Delhi, Bangalore"
+                          className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-xs font-medium focus:ring-2 focus:ring-blue-500"
                         />
                       </div>
                       <div>
-                        <label className="font-bold text-zinc-600 block mb-1">Target Interests</label>
-                        <input 
-                          type="text" 
-                          value={interests}
-                          onChange={(e) => setInterests(e.target.value)}
-                          placeholder="E.g., small business, real estate"
-                          className="w-full bg-white border border-zinc-200 rounded-lg p-2 text-xs focus:outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="font-bold text-zinc-600 block mb-1">Target Tolee Group Slugs (Optional)</label>
-                        <input 
-                          type="text" 
-                          value={targetTolees}
-                          onChange={(e) => setTargetTolees(e.target.value)}
-                          placeholder="E.g., tech-tolee, design-zone"
-                          className="w-full bg-white border border-zinc-200 rounded-lg p-2 text-xs focus:outline-none"
+                        <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300 block mb-1">
+                          Radius: {radiusKm} km
+                        </label>
+                        <input
+                          type="range"
+                          min="5"
+                          max="100"
+                          step="5"
+                          value={radiusKm}
+                          onChange={(e) => setRadiusKm(Number(e.target.value))}
+                          className="w-full accent-blue-600 mt-2"
                         />
                       </div>
                     </div>
-                  )}
 
-                  {/* Securities verification checkbox */}
-                  <label className="flex items-start gap-2.5 pt-2 border-t border-zinc-200/60 cursor-pointer select-none">
-                    <input 
-                      type="checkbox" 
-                      checked={isSecuritiesAd}
-                      onChange={(e) => setIsSecuritiesAd(e.target.checked)}
-                      className="mt-0.5 accent-blue-600" 
-                    />
-                    <div className="text-[10px] text-zinc-500 font-medium leading-relaxed">
-                      <p className="font-bold text-zinc-700">Is this ad about securities and investments with audiences in India?</p>
-                      <p className="mt-0.5">To run an ad with investment audiences in India, you must declare it in the securities declaration.</p>
-                    </div>
-                  </label>
-                </div>
-              </div>
-
-              {/* Duration & Scheduling */}
-              <div className="rounded-2xl border border-zinc-200/80 p-4.5 bg-white shadow-sm space-y-4">
-                <h4 className="text-xs font-extrabold uppercase tracking-wider text-zinc-400">Duration</h4>
-                
-                <div className="space-y-3">
-                  <label className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-all hover:bg-zinc-50 ${
-                    runContinuously ? 'border-blue-600 bg-blue-50/5' : 'border-zinc-200'
-                  }`}>
-                    <input 
-                      type="radio" 
-                      name="duration_type" 
-                      checked={runContinuously}
-                      onChange={() => setRunContinuously(true)}
-                      className="mt-0.5 accent-blue-600" 
-                    />
+                    {/* Gender Selection */}
                     <div>
-                      <p className="text-xs font-bold text-zinc-900">Run continuously</p>
-                      <p className="text-[10px] text-zinc-500 mt-0.5">Your ad will run indefinitely on a daily budget. Pause anytime.</p>
+                      <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300 block mb-1.5">
+                        Gender:
+                      </label>
+                      <div className="flex gap-2">
+                        {(['all', 'men', 'women'] as const).map((g) => (
+                          <button
+                            key={g}
+                            type="button"
+                            onClick={() => setGender(g)}
+                            className={`flex-1 py-1.5 rounded-xl text-xs font-bold uppercase transition-all ${
+                              gender === g
+                                ? 'bg-blue-600 text-white shadow-xs'
+                                : 'bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300'
+                            }`}
+                          >
+                            {g}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </label>
 
-                  <div className={`p-3.5 rounded-xl border transition-all ${
-                    !runContinuously ? 'border-blue-600 bg-blue-50/5' : 'border-zinc-200'
-                  }`}>
-                    <label className="flex items-start gap-3 cursor-pointer hover:bg-zinc-50">
-                      <input 
-                        type="radio" 
-                        name="duration_type" 
-                        checked={!runContinuously}
-                        onChange={() => setRunContinuously(false)}
-                        className="mt-0.5 accent-blue-600" 
-                      />
-                      <div>
-                        <p className="text-xs font-bold text-zinc-900">Choose end date</p>
-                        <p className="text-[10px] text-zinc-500 mt-0.5">Specify when the sponsored campaign should automatically turn off.</p>
+                    {/* Interests Chips */}
+                    <div>
+                      <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300 block mb-1.5">
+                        Target Interests:
+                      </label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {['Technology', 'Business', 'Real Estate', 'Food & Dining', 'Fashion', 'Health & Fitness', 'Education', 'Entertainment', 'Shopping'].map((tag) => {
+                          const isTagSelected = interests.includes(tag);
+                          return (
+                            <button
+                              key={tag}
+                              type="button"
+                              onClick={() => toggleInterest(tag)}
+                              className={`px-3 py-1 rounded-full text-[11px] font-semibold transition-all ${
+                                isTagSelected
+                                  ? 'bg-blue-600 text-white shadow-2xs'
+                                  : 'bg-zinc-200/70 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-300 dark:hover:bg-zinc-700'
+                              }`}
+                            >
+                              {tag} {isTagSelected && '✓'}
+                            </button>
+                          );
+                        })}
                       </div>
-                    </label>
-
-                    {!runContinuously && (
-                      <div className="mt-3.5 flex gap-3 items-center animate-in slide-in-from-top-2 duration-150 text-xs">
-                        <div className="flex-1">
-                          <label className="font-bold text-zinc-500 block mb-1">Days to Run</label>
-                          <input 
-                            type="number" 
-                            min="1"
-                            max="30"
-                            value={durationDays}
-                            onChange={(e) => {
-                              const days = Math.max(1, Number(e.target.value));
-                              setDurationDays(days);
-                              const d = new Date();
-                              d.setDate(d.getDate() + days);
-                              setEndDate(d.toISOString().split('T')[0]);
-                            }}
-                            className="w-full bg-white border border-zinc-200 rounded-lg p-2 text-xs focus:outline-none"
-                          />
-                        </div>
-                        <div className="flex-1">
-                          <label className="font-bold text-zinc-500 block mb-1">End Date</label>
-                          <input 
-                            type="date" 
-                            value={endDate}
-                            onChange={(e) => setEndDate(e.target.value)}
-                            className="w-full bg-white border border-zinc-200 rounded-lg p-2 text-xs focus:outline-none"
-                          />
-                        </div>
-                      </div>
-                    )}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
+            )}
 
-              {/* Daily Budget Slider */}
-              <div className="rounded-2xl border border-zinc-200/80 p-4.5 bg-white shadow-sm space-y-4">
-                <div className="flex justify-between items-center">
-                  <h4 className="text-xs font-extrabold uppercase tracking-wider text-zinc-400">Daily budget</h4>
-                  
-                  {/* Budget input with Edit Button */}
-                  <div className="flex items-center gap-1.5 bg-zinc-50 border border-zinc-200 px-3 py-1.5 rounded-xl">
-                    <span className="text-zinc-500 font-extrabold text-xs">₹</span>
-                    {showBudgetEdit ? (
-                      <input 
-                        type="number"
-                        min="97"
-                        max="5000"
-                        value={budget}
-                        onChange={(e) => setBudget(Number(e.target.value))}
-                        onBlur={() => setShowBudgetEdit(false)}
-                        className="bg-transparent font-black text-sm text-zinc-900 w-16 focus:outline-none border-b border-blue-600 px-1"
-                        autoFocus
-                      />
-                    ) : (
-                      <span className="font-black text-sm text-zinc-900">{budget.toFixed(2)}</span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setShowBudgetEdit(!showBudgetEdit)}
-                      className="p-1 hover:bg-zinc-200 rounded-md transition-colors"
-                    >
-                      <Edit2 className="h-3 w-3 text-zinc-500" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Slider */}
+            {/* ==================== STEP 3: SELECT PLACEMENT ==================== */}
+            {currentStep === 3 && (
+              <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-200">
                 <div>
-                  <input 
-                    type="range" 
-                    min="97" 
-                    max="5000" 
-                    step="50"
-                    value={budget} 
-                    onChange={(e) => setBudget(Number(e.target.value))}
-                    className="w-full accent-blue-600 bg-zinc-200 h-1.5 rounded-lg cursor-pointer"
-                  />
-                  <div className="flex justify-between text-[10px] text-zinc-400 font-bold mt-1">
-                    <span>₹97.00 (Min)</span>
-                    <span>₹5,000.00 (Max)</span>
-                  </div>
-                </div>
-
-                {/* Estimated Daily Reach Info Banner */}
-                <div className="rounded-xl bg-blue-50/40 border border-blue-100 p-3.5 space-y-1.5 text-xs text-blue-800">
-                  <div className="flex justify-between items-center font-bold">
-                    <span className="flex items-center gap-1.5">
-                      <TrendingUp className="h-4 w-4 text-blue-600 animate-pulse" />
-                      Estimated daily results
-                    </span>
-                    <span className="text-blue-900 font-black">
-                      {(estMinReach / 1000).toFixed(1)}K - {(estMaxReach / 1000).toFixed(1)}K views / day
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Placements */}
-              <div className="flex items-start justify-between rounded-2xl border border-zinc-200/80 p-4.5 bg-white shadow-sm">
-                <div className="space-y-1 pr-6">
-                  <h4 className="text-sm font-extrabold text-zinc-900">Advantage+ placements</h4>
-                  <p className="text-xs text-zinc-500 leading-relaxed">
-                    Reach more people at a lower cost by letting us show your ad on Facebook, Messenger, Instagram, and Audience Network.
+                  <h4 className="text-base font-extrabold text-zinc-900 dark:text-white">Where Should Your Promotion Appear?</h4>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                    Select the Tolee placements where your promoted post will be delivered.
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setAdvantagePlacements(!advantagePlacements)}
-                  className={`w-11 h-6 rounded-full flex items-center p-0.5 transition-colors duration-200 shrink-0 ${
-                    advantagePlacements ? 'bg-blue-600' : 'bg-zinc-300'
-                  }`}
-                >
-                  <div className={`bg-white w-5 h-5 rounded-full shadow-md transform transition-transform duration-200 ${
-                    advantagePlacements ? 'translate-x-5' : 'translate-x-0'
-                  }`} />
-                </button>
+
+                <div className="space-y-2.5">
+                  <div 
+                    onClick={() => setPlacementFeed(!placementFeed)}
+                    className="p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900/40 cursor-pointer flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                        <Layers className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h5 className="text-xs font-bold text-zinc-900 dark:text-white">Tolee Main Feed</h5>
+                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                          Appears between organic updates on desktop and mobile feeds.
+                        </p>
+                      </div>
+                    </div>
+                    <input 
+                      type="checkbox" 
+                      checked={placementFeed} 
+                      onChange={() => {}} 
+                      className="w-4 h-4 rounded text-blue-600 accent-blue-600" 
+                    />
+                  </div>
+
+                  <div 
+                    onClick={() => setPlacementReels(!placementReels)}
+                    className="p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900/40 cursor-pointer flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400">
+                        <Rocket className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h5 className="text-xs font-bold text-zinc-900 dark:text-white">Tolee Reels (Video Stream)</h5>
+                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                          High-converting vertical video stream for maximum engagement.
+                        </p>
+                      </div>
+                    </div>
+                    <input 
+                      type="checkbox" 
+                      checked={placementReels} 
+                      onChange={() => {}} 
+                      className="w-4 h-4 rounded text-blue-600 accent-blue-600" 
+                    />
+                  </div>
+
+                  <div 
+                    onClick={() => setPlacementDiscovery(!placementDiscovery)}
+                    className="p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900/40 cursor-pointer flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                        <Compass className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h5 className="text-xs font-bold text-zinc-900 dark:text-white">Tolee Local Discovery & Radar</h5>
+                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                          Showcases content to users searching for neighborhood & local updates.
+                        </p>
+                      </div>
+                    </div>
+                    <input 
+                      type="checkbox" 
+                      checked={placementDiscovery} 
+                      onChange={() => {}} 
+                      className="w-4 h-4 rounded text-blue-600 accent-blue-600" 
+                    />
+                  </div>
+
+                  <div 
+                    onClick={() => setPlacementCommunities(!placementCommunities)}
+                    className="p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900/40 cursor-pointer flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                        <Users className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h5 className="text-xs font-bold text-zinc-900 dark:text-white">Community & Group Hubs</h5>
+                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                          Targets relevant niche communities and interest groups.
+                        </p>
+                      </div>
+                    </div>
+                    <input 
+                      type="checkbox" 
+                      checked={placementCommunities} 
+                      onChange={() => {}} 
+                      className="w-4 h-4 rounded text-blue-600 accent-blue-600" 
+                    />
+                  </div>
+                </div>
               </div>
+            )}
 
-              {/* Payment Details */}
-              {freeBoostEligible ? (
-                <div className="rounded-2xl border border-emerald-300 p-4 bg-emerald-50/70 shadow-sm flex items-center justify-between text-xs font-semibold text-emerald-800">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-emerald-600" />
-                    <span>Special Offer: 6 Months Free Post Boosting</span>
-                  </div>
-                  <span className="font-extrabold text-emerald-700 px-2 py-0.5 rounded-full bg-emerald-200/60">
-                    ₹0.00 (Zero Charges)
-                  </span>
+            {/* ==================== STEP 4: BUDGET & DURATION ==================== */}
+            {currentStep === 4 && (
+              <div className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-200">
+                <div>
+                  <h4 className="text-base font-extrabold text-zinc-900 dark:text-white">Set Your Budget & Duration</h4>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                    Control how much you want to spend and how long the promotion runs.
+                  </p>
                 </div>
-              ) : (
-                <div className="rounded-2xl border border-zinc-200/80 p-4.5 bg-zinc-50/50 shadow-sm flex items-center justify-between text-xs font-semibold text-zinc-700">
-                  <div className="flex items-center gap-2">
-                    <Wallet className="h-4 w-4 text-zinc-500" />
-                    <span>Available Ads Wallet Balance:</span>
-                  </div>
-                  <span className="font-extrabold text-zinc-900">
-                    ₹{walletBalance?.toLocaleString('en-IN') ?? '0.00'}
-                  </span>
-                </div>
-              )}
-            </form>
-          )}
 
-          {/* Footer Buttons */}
-          <div className="flex items-center justify-between border-t border-zinc-150 px-6 py-4 bg-zinc-50/60">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 rounded-xl border border-zinc-200 hover:bg-zinc-100 text-xs font-bold text-zinc-600 transition-colors"
-            >
-              Cancel
-            </button>
-            
-            <button
-              type="button"
-              onClick={handlePublish}
-              disabled={submitLoading || loading}
-              className={`${
-                freeBoostEligible 
-                  ? 'bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700' 
-                  : 'bg-blue-600 hover:bg-blue-700'
-              } text-xs font-bold text-white px-6 py-2.5 rounded-xl shadow-md transition-all disabled:opacity-50 flex items-center gap-2 cursor-pointer active:scale-95`}
-            >
-              {submitLoading ? (
-                <>Submitting...</>
-              ) : freeBoostEligible ? (
-                <>Boost Post for Free 🚀</>
-              ) : (
-                <>{campaignId ? 'Save & Re-publish' : 'Publish Ad'}</>
-              )}
-            </button>
+                {/* Daily Budget Slider */}
+                <div className="p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">Daily Budget</span>
+                    <span className="text-lg font-black text-blue-600 dark:text-blue-400">
+                      ₹{dailyBudget.toLocaleString('en-IN')} / day
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="50"
+                    max="3000"
+                    step="50"
+                    value={dailyBudget}
+                    onChange={(e) => setDailyBudget(Number(e.target.value))}
+                    className="w-full accent-blue-600 cursor-pointer"
+                  />
+                  <div className="flex justify-between text-[11px] font-semibold text-zinc-400">
+                    <span>₹50 (Min)</span>
+                    <span>₹1,500</span>
+                    <span>₹3,000 (Max)</span>
+                  </div>
+                </div>
+
+                {/* Duration Slider */}
+                <div className="p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">Duration</span>
+                    <span className="text-sm font-black text-zinc-900 dark:text-white">
+                      {durationDays} Days ({startDate} to {endDate})
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="1"
+                    max="30"
+                    step="1"
+                    value={durationDays}
+                    onChange={(e) => setDurationDays(Number(e.target.value))}
+                    className="w-full accent-blue-600 cursor-pointer"
+                  />
+                  <div className="flex justify-between text-[11px] font-semibold text-zinc-400">
+                    <span>1 Day</span>
+                    <span>7 Days</span>
+                    <span>30 Days</span>
+                  </div>
+                </div>
+
+                {/* Estimated Daily & Total Results */}
+                <div className="p-4 rounded-2xl bg-blue-50/60 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/50 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-blue-800 dark:text-blue-300 flex items-center gap-1.5">
+                      <TrendingUp className="w-4 h-4 text-blue-600" />
+                      Estimated Daily Reach:
+                    </span>
+                    <span className="font-extrabold text-blue-950 dark:text-blue-200">
+                      {(estMinReach / 1000).toFixed(1)}K - {(estMaxReach / 1000).toFixed(1)}K accounts
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs border-t border-blue-200/50 dark:border-blue-900/40 pt-2">
+                    <span className="font-bold text-blue-800 dark:text-blue-300">
+                      Total Campaign Reach:
+                    </span>
+                    <span className="font-black text-blue-600 dark:text-blue-400">
+                      {(totalEstMinReach / 1000).toFixed(1)}K - {(totalEstMaxReach / 1000).toFixed(1)}K views
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ==================== STEP 5: REVIEW & PAYMENT ==================== */}
+            {currentStep === 5 && (
+              <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-200">
+                <div>
+                  <h4 className="text-base font-extrabold text-zinc-900 dark:text-white">Review Your Promotion</h4>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                    Confirm your campaign details before publishing.
+                  </p>
+                </div>
+
+                {/* Campaign Summary List */}
+                <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 divide-y divide-zinc-100 dark:divide-zinc-850 text-xs">
+                  <div className="p-3.5 flex justify-between items-center">
+                    <span className="text-zinc-500 font-medium">Goal</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+                        {goal.replace('_', ' ')}
+                      </span>
+                      <button onClick={() => setCurrentStep(1)} className="text-[11px] text-zinc-400 hover:text-blue-600">
+                        Edit
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 flex justify-between items-center">
+                    <span className="text-zinc-500 font-medium">Audience</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-zinc-900 dark:text-zinc-100">
+                        {audienceType === 'automatic' ? 'Automatic (Smart AI)' : audienceName}
+                      </span>
+                      <button onClick={() => setCurrentStep(2)} className="text-[11px] text-zinc-400 hover:text-blue-600">
+                        Edit
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 flex justify-between items-center">
+                    <span className="text-zinc-500 font-medium">Placements</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-zinc-900 dark:text-zinc-100">
+                        {activePlacementsList.join(', ')}
+                      </span>
+                      <button onClick={() => setCurrentStep(3)} className="text-[11px] text-zinc-400 hover:text-blue-600">
+                        Edit
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 flex justify-between items-center">
+                    <span className="text-zinc-500 font-medium">Duration & Schedule</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-zinc-900 dark:text-zinc-100">
+                        {durationDays} Days ({startDate} - {endDate})
+                      </span>
+                      <button onClick={() => setCurrentStep(4)} className="text-[11px] text-zinc-400 hover:text-blue-600">
+                        Edit
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Payment Breakdown Card */}
+                <div className="p-4.5 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/40 space-y-3">
+                  <h5 className="text-xs font-bold text-zinc-900 dark:text-white uppercase tracking-wider">
+                    Payment & Budget Breakdown
+                  </h5>
+
+                  <div className="space-y-1.5 text-xs">
+                    <div className="flex justify-between text-zinc-600 dark:text-zinc-400">
+                      <span>Base Budget (₹{dailyBudget} × {durationDays} days):</span>
+                      <span className="font-semibold text-zinc-900 dark:text-white">
+                        ₹{totalBudgetAmount.toFixed(2)}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between text-zinc-600 dark:text-zinc-400">
+                      <span>Estimated GST (18%):</span>
+                      <span className="font-semibold text-zinc-900 dark:text-white">
+                        {freeBoostEligible ? '₹0.00' : `₹${gstAmount.toFixed(2)}`}
+                      </span>
+                    </div>
+
+                    {freeBoostEligible && (
+                      <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-bold">
+                        <span>6-Month Free Boost Discount:</span>
+                        <span>-₹{(totalBudgetAmount + gstAmount).toFixed(2)}</span>
+                      </div>
+                    )}
+
+                    <div className="flex justify-between items-center border-t border-zinc-200 dark:border-zinc-800 pt-2 text-sm font-bold">
+                      <span className="text-zinc-900 dark:text-white">Total Amount to Deduct:</span>
+                      <span className={`text-base font-black ${freeBoostEligible ? 'text-emerald-600' : 'text-blue-600'}`}>
+                        {freeBoostEligible ? '₹0.00 (Free)' : `₹${totalAmountToPay.toFixed(2)} INR`}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Wallet Balance Verification */}
+                  <div className="mt-3 p-3 rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2">
+                      <Wallet className="w-4 h-4 text-zinc-500" />
+                      <span>Available Ads Wallet Balance:</span>
+                    </div>
+                    <span className="font-bold text-zinc-900 dark:text-white">
+                      ₹{walletBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+
+                  {!isBalanceSufficient && (
+                    <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 text-xs font-semibold flex items-center justify-between">
+                      <span>Insufficient wallet balance.</span>
+                      <Link 
+                        href="/ads-manager" 
+                        onClick={onClose}
+                        className="underline font-bold text-red-700 dark:text-red-300"
+                      >
+                        Recharge Wallet
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Bottom Action Footer with Next / Back Controls */}
+          <div className="p-4 sm:p-5 border-t border-zinc-100 dark:border-zinc-900 bg-zinc-50/80 dark:bg-zinc-900/40 flex items-center justify-between gap-3">
+            {currentStep > 1 ? (
+              <button
+                type="button"
+                onClick={() => setCurrentStep(currentStep - 1)}
+                className="px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-bold text-zinc-700 dark:text-zinc-300 transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <ArrowLeft className="w-4 h-4" /> Back
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-bold text-zinc-600 dark:text-zinc-400 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+            )}
+
+            {currentStep < 5 ? (
+              <button
+                type="button"
+                onClick={() => setCurrentStep(currentStep + 1)}
+                className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-md flex items-center gap-1.5 cursor-pointer active:scale-95"
+              >
+                Next <ArrowRight className="w-4 h-4" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handlePublish}
+                disabled={submitLoading || loading || !isBalanceSufficient}
+                className={`${
+                  freeBoostEligible 
+                    ? 'bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700' 
+                    : 'bg-blue-600 hover:bg-blue-700'
+                } text-xs font-bold text-white px-6 py-2.5 rounded-xl shadow-md transition-all disabled:opacity-50 flex items-center gap-2 cursor-pointer active:scale-95`}
+              >
+                {submitLoading ? (
+                  <>Launching...</>
+                ) : freeBoostEligible ? (
+                  <>Boost Post for Free 🚀</>
+                ) : (
+                  <>Confirm Payment & Promote 🚀</>
+                )}
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Right Column - Live Preview and payment breakdown (2 cols) */}
-        <div className="md:col-span-2 bg-zinc-50 p-6 flex flex-col justify-between overflow-y-auto max-h-[85vh] text-zinc-800">
-          
-          <div className="space-y-6">
-            <h4 className="text-xs font-extrabold uppercase tracking-wider text-zinc-400">Ad preview</h4>
+        {/* Right Column: Live Instagram Ad Mock Card Preview (2 cols) */}
+        <div className="md:col-span-2 bg-zinc-50 dark:bg-zinc-900/60 p-5 sm:p-6 flex flex-col justify-between overflow-y-auto max-h-[85vh] text-zinc-800 dark:text-zinc-200">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-extrabold uppercase tracking-wider text-zinc-400">
+                Ad preview
+              </h4>
+              <span className="text-[10px] font-bold text-blue-600 bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 rounded-full">
+                Live
+              </span>
+            </div>
 
-            {/* Ad Mock Card (Facebook style) */}
-            <div className="bg-white rounded-2xl border border-zinc-250/70 shadow-md overflow-hidden text-zinc-900 select-none animate-in fade-in zoom-in-95 duration-200">
+            {/* Instagram Style Preview Card */}
+            <div className="bg-white dark:bg-zinc-950 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-md overflow-hidden text-zinc-900 dark:text-white select-none animate-in fade-in duration-150">
               
               {/* Ad Header */}
-              <div className="p-3.5 flex items-center justify-between border-b border-zinc-100">
+              <div className="p-3.5 flex items-center justify-between border-b border-zinc-100 dark:border-zinc-900">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-full bg-zinc-150 border border-zinc-200 overflow-hidden shrink-0 flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-full bg-zinc-150 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 overflow-hidden shrink-0 flex items-center justify-center">
                     <img 
                       src={previewData?.avatar || '/default-user-avatar.svg'} 
                       alt="User avatar"
@@ -752,32 +1031,29 @@ export function QuickBoostModal({
                   </div>
                   <div className="min-w-0">
                     <div className="flex items-center gap-1">
-                      <span className="font-extrabold text-xs text-zinc-900 truncate max-w-[130px]">
-                        {previewData?.name || session?.user?.name || 'Advertiser'}
+                      <span className="font-extrabold text-xs text-zinc-900 dark:text-zinc-100 truncate max-w-[120px]">
+                        {previewData?.name || session?.user?.name || 'Creator'}
                       </span>
                       <ShieldCheck className="w-3.5 h-3.5 text-blue-600 shrink-0 fill-blue-600/10" />
                     </div>
-                    <p className="text-[10px] text-zinc-400 font-bold mt-0.5 tracking-wide uppercase flex items-center gap-1">
+                    <p className="text-[9px] text-zinc-400 font-bold uppercase tracking-wide flex items-center gap-1">
                       <span>Sponsored</span>
                       <span>•</span>
                       <Laptop className="w-3 h-3 text-zinc-400" />
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-1.5 text-zinc-400 shrink-0">
-                  <span className="font-bold text-lg select-none cursor-pointer p-1 hover:text-zinc-600">•••</span>
-                  <X className="w-4 h-4 cursor-pointer hover:text-zinc-600" />
-                </div>
+                <div className="text-zinc-400 text-xs">•••</div>
               </div>
 
               {/* Text Caption */}
-              <div className="px-3.5 pt-3 pb-2 text-[11px] text-zinc-700 leading-relaxed break-words font-medium">
-                <p className="text-[10px] text-blue-600 font-bold mb-1 uppercase tracking-wide">start on tolee.in</p>
-                {previewData?.caption || 'Loading ad caption text details...'}
+              <div className="px-3.5 pt-2.5 pb-2 text-[11px] text-zinc-700 dark:text-zinc-300 leading-snug break-words">
+                <p className="text-[10px] text-blue-600 font-bold mb-0.5 uppercase tracking-wide">start on tolee.in</p>
+                {previewData?.caption || 'Check out this post on Tolee!'}
               </div>
 
               {/* Media Preview Box */}
-              <div className="aspect-video bg-zinc-100 border-y border-zinc-100 flex items-center justify-center overflow-hidden relative">
+              <div className="aspect-video bg-zinc-100 dark:bg-zinc-900 border-y border-zinc-100 dark:border-zinc-900 flex items-center justify-center overflow-hidden relative">
                 {previewData?.mediaUrl ? (
                   previewData.mediaType === 'video' || previewData.mediaUrl.match(/\.(mp4|mov|webm)$/i) || previewData.mediaUrl.includes('/video/upload/') ? (
                     <video 
@@ -794,99 +1070,69 @@ export function QuickBoostModal({
                     />
                   )
                 ) : (
-                  <div className="flex flex-col items-center justify-center text-zinc-400 py-12">
+                  <div className="flex flex-col items-center justify-center text-zinc-400 py-10">
                     <Sparkles className="w-8 h-8 opacity-25 animate-pulse" />
-                    <span className="text-[10px] mt-2 font-bold tracking-wider">CREATIVE MEDIA BOX</span>
+                    <span className="text-[10px] mt-2 font-bold tracking-wider">CREATIVE MEDIA</span>
                   </div>
                 )}
               </div>
 
-              {/* Destination Bar (CTA section) */}
-              <div className="px-3.5 py-3 bg-zinc-50 flex items-center justify-between border-b border-zinc-100">
-                <div className="min-w-0 pr-4">
+              {/* Destination CTA Bar */}
+              <div className="px-3.5 py-2.5 bg-zinc-50 dark:bg-zinc-900/50 flex items-center justify-between border-b border-zinc-100 dark:border-zinc-900">
+                <div className="min-w-0 pr-2">
                   <p className="text-[9px] uppercase tracking-wider text-zinc-400 font-black">TOLEE.IN</p>
-                  <h4 className="text-xs font-bold text-zinc-900 truncate mt-0.5">
-                    {previewData?.caption ? previewData.caption.slice(0, 30) + '...' : 'Sponsored Content'}
+                  <h4 className="text-xs font-bold text-zinc-900 dark:text-white truncate">
+                    {previewData?.caption ? previewData.caption.slice(0, 25) + '...' : 'Sponsored Post'}
                   </h4>
                 </div>
-                {buttonLabel !== 'no_button' && (
-                  <button
-                    type="button"
-                    className="bg-white border border-zinc-250 hover:bg-zinc-100 text-zinc-800 text-[11px] font-bold px-3 py-1.5 rounded-lg shrink-0 shadow-sm flex items-center gap-1"
-                  >
-                    <span>{getCTAText(buttonLabel)}</span>
-                    {buttonLabel === 'send_message' ? (
-                      <MessageCircle className="w-3.5 h-3.5 text-zinc-500 fill-zinc-50" />
-                    ) : (
-                      <ExternalLink className="w-3 h-3 text-zinc-400" />
-                    )}
-                  </button>
-                )}
+                <button
+                  type="button"
+                  className="bg-blue-600 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg shrink-0 shadow-xs flex items-center gap-1 uppercase tracking-wide"
+                >
+                  {ctaButton.replace('_', ' ')}
+                </button>
               </div>
 
-              {/* Actions Mock */}
-              <div className="px-3.5 py-2 flex items-center justify-between text-zinc-500 text-xs font-bold font-medium select-none bg-white">
-                <div className="flex items-center gap-1 hover:text-zinc-800 cursor-pointer">
-                  <ThumbsUp className="w-4 h-4" />
+              {/* Social Actions Mock */}
+              <div className="px-3.5 py-2 flex items-center justify-between text-zinc-500 text-xs font-semibold bg-white dark:bg-zinc-950">
+                <div className="flex items-center gap-1">
+                  <ThumbsUp className="w-3.5 h-3.5" />
                   <span>Like</span>
                 </div>
-                <div className="flex items-center gap-1 hover:text-zinc-800 cursor-pointer">
-                  <MessageSquare className="w-4 h-4" />
+                <div className="flex items-center gap-1">
+                  <MessageSquare className="w-3.5 h-3.5" />
                   <span>Comment</span>
                 </div>
-                <div className="flex items-center gap-1 hover:text-zinc-800 cursor-pointer">
-                  <Share2 className="w-4 h-4" />
+                <div className="flex items-center gap-1">
+                  <Share2 className="w-3.5 h-3.5" />
                   <span>Share</span>
                 </div>
               </div>
-
             </div>
 
-            {/* Daily results summary */}
-            <div className="rounded-2xl border border-zinc-200 bg-white p-4.5 shadow-sm space-y-3.5">
-              <h5 className="text-xs font-extrabold text-zinc-900">Estimated daily results</h5>
-              
-              <div className="flex justify-between items-center text-xs border-b border-zinc-100 pb-2.5 font-semibold text-zinc-600">
-                <span>Impressions</span>
-                <span className="font-extrabold text-zinc-950">
-                  {(estMinReach / 1000).toFixed(1)}K - {(estMaxReach / 1000).toFixed(1)}K views
+            {/* Live Campaign Insights Preview */}
+            <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-3.5 space-y-2 text-xs">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-zinc-400 block">
+                Estimated Delivery
+              </span>
+              <div className="flex justify-between items-center font-bold">
+                <span className="text-zinc-600 dark:text-zinc-400">Target Reach:</span>
+                <span className="text-zinc-950 dark:text-white font-extrabold">
+                  {(totalEstMinReach / 1000).toFixed(1)}K - {(totalEstMaxReach / 1000).toFixed(1)}K
                 </span>
               </div>
-
-              <div className="space-y-2 pt-1.5">
-                <h5 className="text-xs font-extrabold text-zinc-900">Payment summary</h5>
-                <p className="text-[10px] text-zinc-400 font-semibold leading-none">Your ad will run continuously.</p>
-
-                <div className="space-y-2 text-xs font-semibold text-zinc-600 pt-2">
-                  <div className="flex justify-between items-center">
-                    <span>Budget</span>
-                    <span className="font-bold text-zinc-950">₹{budget.toFixed(2)} INR</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span>Estimated GST (18%)</span>
-                    <span className="font-bold text-zinc-950">{freeBoostEligible ? '₹0.00 INR' : `₹${gstAmount.toFixed(2)} INR`}</span>
-                  </div>
-                  {freeBoostEligible && (
-                    <div className="flex justify-between items-center text-emerald-600 font-bold">
-                      <span>6-Month Free Offer</span>
-                      <span>-₹{(budget + gstAmount).toFixed(2)} INR</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between items-center border-t border-zinc-100 pt-2 text-sm font-bold text-zinc-900">
-                    <span>Daily total cost</span>
-                    <span className={`font-extrabold ${freeBoostEligible ? 'text-emerald-600' : 'text-blue-600'}`}>
-                      {freeBoostEligible ? '₹0.00 INR (Free)' : `₹${totalDailyCost.toFixed(2)} INR`}
-                    </span>
-                  </div>
-                </div>
+              <div className="flex justify-between items-center font-bold">
+                <span className="text-zinc-600 dark:text-zinc-400">Total Budget:</span>
+                <span className="text-blue-600 dark:text-blue-400 font-extrabold">
+                  ₹{totalBudgetAmount.toFixed(2)} INR
+                </span>
               </div>
             </div>
-
           </div>
 
-          {/* Legal Acknowledgement */}
-          <div className="text-[9px] text-zinc-400 font-semibold leading-relaxed mt-6 border-t border-zinc-200 pt-4">
-            By clicking {campaignId ? 'Save & Re-publish' : 'Publish Ad'}, you agree to Meta's Advertising Policies and verify the coordinates target. Tolee Wallet system will automatically debit credits per interaction according to CPC rules.
+          {/* Privacy & Legal Policies */}
+          <div className="text-[9px] text-zinc-400 leading-relaxed mt-4 border-t border-zinc-200 dark:border-zinc-800 pt-3">
+            By promoting, you agree to Tolee's Advertising Guidelines and Moderation Policies. All campaigns undergo verification before delivery.
           </div>
         </div>
 
