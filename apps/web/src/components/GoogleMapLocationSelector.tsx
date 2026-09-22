@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type * as React from 'react';
 import { 
   MapPin, Search, Loader2, Navigation, 
-  RotateCcw, Sliders, ChevronDown, ChevronUp, AlertCircle, Info, Check
+  RotateCcw, Sliders, ChevronDown, ChevronUp, AlertCircle, Plus, Minus
 } from 'lucide-react';
 
 export interface SelectedLocationData {
@@ -23,12 +23,9 @@ interface GoogleMapLocationSelectorProps {
   onRadiusChange: (newRadius: number) => void;
 }
 
-declare const process: any;
-
 declare global {
   interface Window {
-    google?: any;
-    initGoogleMapsCallback?: () => void;
+    L?: any;
   }
 }
 
@@ -39,7 +36,7 @@ export function GoogleMapLocationSelector({
   onRadiusChange,
 }: GoogleMapLocationSelectorProps) {
   // Search query & suggestion states
-  const [query, setQuery] = useState(initialLocation?.name || '');
+  const [query, setQuery] = useState(initialLocation?.name || 'Kalyan West');
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [searching, setSearching] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -49,7 +46,7 @@ export function GoogleMapLocationSelector({
 
   // Active confirmed location (Default to Kalyan West if none provided)
   const [selectedLocation, setSelectedLocation] = useState<SelectedLocationData>({
-    placeId: initialLocation?.placeId || 'default_kalyan_west',
+    placeId: initialLocation?.placeId || 'loc_kalyan_west',
     name: initialLocation?.name || 'Kalyan West',
     formattedAddress: initialLocation?.formattedAddress || 'Kalyan West, Maharashtra, India',
     lat: initialLocation?.lat || 19.2437,
@@ -57,10 +54,9 @@ export function GoogleMapLocationSelector({
     radiusKm: radiusKm || 10,
   });
 
-  const [isMapLoaded, setIsMapLoaded] = useState(false);
-  const [mapError, setMapError] = useState(false);
+  const [isMapReady, setIsMapReady] = useState(false);
 
-  // Map DOM and Google Maps instances
+  // Map DOM and Leaflet instances (matching Tolee Live Map page: /app/map/page.tsx)
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<any>(null);
   const markerInstanceRef = useRef<any>(null);
@@ -68,133 +64,165 @@ export function GoogleMapLocationSelector({
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const searchTimeoutRef = useRef<any>(null);
 
-  // Load Google Maps Script
+  // Load Leaflet CSS & JS (same as /app/map/page.tsx)
   useEffect(() => {
-    const apiKey = typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY : undefined;
+    if (typeof window === 'undefined') return;
 
-    if (window.google?.maps) {
-      setIsMapLoaded(true);
+    if (window.L) {
+      initGoogleTilesMap();
       return;
     }
 
-    if (!apiKey) {
-      // Graceful fallback mode if API key not injected
-      setMapError(false);
-      setIsMapLoaded(false);
-      return;
+    // 1. Load Leaflet CSS
+    if (!document.getElementById('leaflet-css')) {
+      const link = document.createElement('link');
+      link.id = 'leaflet-css';
+      link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(link);
     }
 
-    const scriptId = 'google-maps-js-sdk';
-    if (!document.getElementById(scriptId)) {
+    // 2. Load Leaflet Script
+    if (!document.getElementById('leaflet-script')) {
       const script = document.createElement('script');
-      script.id = scriptId;
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geometry&callback=initGoogleMapsCallback`;
+      script.id = 'leaflet-script';
+      script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
       script.async = true;
-      script.defer = true;
-      script.onerror = () => {
-        setMapError(true);
+      script.onload = () => {
+        initGoogleTilesMap();
       };
-
-      window.initGoogleMapsCallback = () => {
-        setIsMapLoaded(true);
-      };
-
-      document.head.appendChild(script);
+      document.body.appendChild(script);
     } else {
-      setIsMapLoaded(true);
+      const checkInterval = setInterval(() => {
+        if (window.L) {
+          clearInterval(checkInterval);
+          initGoogleTilesMap();
+        }
+      }, 100);
+      return () => clearInterval(checkInterval);
     }
   }, []);
 
-  // Initialize or re-center Google Map
-  useEffect(() => {
-    if (!isMapLoaded || !window.google?.maps || !mapContainerRef.current) return;
+  // Initialize Map with Google Street Tiles (Exact tile layer as Tolee live map page)
+  const initGoogleTilesMap = () => {
+    const L = window.L;
+    if (!L || !mapContainerRef.current) return;
+
+    // Destroy existing instance if any
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.remove();
+      mapInstanceRef.current = null;
+    }
 
     try {
-      const google = window.google;
-      const center = { lat: selectedLocation.lat, lng: selectedLocation.lng };
+      const lat = selectedLocation.lat;
+      const lng = selectedLocation.lng;
 
-      if (!mapInstanceRef.current) {
-        // Create new Map instance
-        const map = new google.maps.Map(mapContainerRef.current, {
-          center,
-          zoom: getOptimalZoom(radiusKm),
-          disableDefaultUI: true,
-          zoomControl: true,
-          gestureHandling: 'cooperative',
-          styles: [
-            {
-              featureType: 'poi',
-              elementType: 'labels',
-              stylers: [{ visibility: 'off' }],
-            },
-          ],
-        });
-        mapInstanceRef.current = map;
+      // Create map container
+      const map = L.map(mapContainerRef.current, {
+        zoomControl: false,
+        attributionControl: false,
+        scrollWheelZoom: true,
+      }).setView([lat, lng], 13);
 
-        // Custom Marker
-        const marker = new google.maps.Marker({
-          position: center,
-          map,
-          title: selectedLocation.name,
-          animation: google.maps.Animation.DROP,
-        });
-        markerInstanceRef.current = marker;
+      mapInstanceRef.current = map;
 
-        // Radius Circle
-        const circle = new google.maps.Circle({
-          strokeColor: '#2563eb',
-          strokeOpacity: 0.85,
-          strokeWeight: 2,
-          fillColor: '#3b82f6',
-          fillOpacity: 0.18,
-          map,
-          center,
-          radius: radiusKm * 1000, // in meters
-        });
-        circleInstanceRef.current = circle;
-      } else {
-        // Update existing instances
-        const map = mapInstanceRef.current;
-        map.setCenter(center);
-        map.setZoom(getOptimalZoom(radiusKm));
+      // Add Official Google Maps Tile Layer (used across Tolee Map page)
+      L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+        maxZoom: 20,
+        subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
+      }).addTo(map);
 
-        if (markerInstanceRef.current) {
-          markerInstanceRef.current.setPosition(center);
-          markerInstanceRef.current.setTitle(selectedLocation.name);
-        }
+      // Custom Tolee Location Pin
+      const customPin = L.divIcon({
+        className: 'tolee-custom-map-pin',
+        html: `
+          <div style="position: relative; transform: translate(-50%, -100%); display: flex; flex-direction: column; align-items: center;">
+            <div style="background: #2563eb; color: white; width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 14px rgba(37,99,235,0.6); border: 2.5px solid white;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+              </svg>
+            </div>
+            <div style="width: 8px; height: 4px; background: rgba(0,0,0,0.35); border-radius: 50%; filter: blur(1px); margin-top: 1px;"></div>
+          </div>
+        `,
+        iconSize: [34, 42],
+        iconAnchor: [17, 42]
+      });
 
-        if (circleInstanceRef.current) {
-          circleInstanceRef.current.setCenter(center);
-          circleInstanceRef.current.setRadius(radiusKm * 1000);
-        }
-      }
+      const marker = L.marker([lat, lng], { icon: customPin }).addTo(map);
+      markerInstanceRef.current = marker;
+
+      // Radius Targeting Circle
+      const circle = L.circle([lat, lng], {
+        radius: radiusKm * 1000,
+        color: '#2563eb',
+        weight: 2.5,
+        fillColor: '#3b82f6',
+        fillOpacity: 0.22,
+      }).addTo(map);
+      circleInstanceRef.current = circle;
+
+      // Fit bounds to display circle with nice padding
+      map.fitBounds(circle.getBounds(), { padding: [25, 25], maxZoom: 15 });
+
+      setIsMapReady(true);
     } catch (err) {
-      console.error('Error initializing Google Maps:', err);
-      setMapError(true);
+      console.error('Error initializing Google tiles map:', err);
     }
-  }, [isMapLoaded, selectedLocation.lat, selectedLocation.lng]);
+  };
 
-  // Update circle radius when radius slider changes
+  // Re-center map and update overlays when selectedLocation changes
   useEffect(() => {
-    if (circleInstanceRef.current) {
-      circleInstanceRef.current.setRadius(radiusKm * 1000);
+    const map = mapInstanceRef.current;
+    const marker = markerInstanceRef.current;
+    const circle = circleInstanceRef.current;
+
+    if (!map || !marker || !circle) {
+      if (window.L && mapContainerRef.current && !mapInstanceRef.current) {
+        initGoogleTilesMap();
+      }
+      return;
     }
-    if (mapInstanceRef.current) {
-      mapInstanceRef.current.setZoom(getOptimalZoom(radiusKm));
+
+    const latlng = [selectedLocation.lat, selectedLocation.lng];
+    marker.setLatLng(latlng);
+    circle.setLatLng(latlng);
+    circle.setRadius(radiusKm * 1000);
+    map.fitBounds(circle.getBounds(), { padding: [25, 25], maxZoom: 15 });
+  }, [selectedLocation.lat, selectedLocation.lng]);
+
+  // Update circle radius dynamically when slider changes
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    const circle = circleInstanceRef.current;
+
+    if (circle) {
+      circle.setRadius(radiusKm * 1000);
+      if (map) {
+        map.fitBounds(circle.getBounds(), { padding: [25, 25], maxZoom: 15 });
+      }
     }
   }, [radiusKm]);
 
-  // Optimal zoom level calculation for radius in km
-  function getOptimalZoom(km: number): number {
-    if (km <= 2) return 14;
-    if (km <= 5) return 13;
-    if (km <= 10) return 12;
-    if (km <= 25) return 11;
-    if (km <= 50) return 10;
-    return 9;
-  }
+  // Recenter button click
+  const handleRecenter = () => {
+    const map = mapInstanceRef.current;
+    const circle = circleInstanceRef.current;
+    if (map && circle) {
+      map.fitBounds(circle.getBounds(), { padding: [25, 25], maxZoom: 15 });
+    }
+  };
 
-  // Debounced search for places
+  // Zoom In / Out handlers
+  const handleZoomIn = () => {
+    if (mapInstanceRef.current) mapInstanceRef.current.zoomIn();
+  };
+  const handleZoomOut = () => {
+    if (mapInstanceRef.current) mapInstanceRef.current.zoomOut();
+  };
+
+  // Debounced search for places (World & Indian cities)
   const handleSearchInput = (val: string) => {
     setQuery(val);
     setErrorMsg(null);
@@ -230,7 +258,7 @@ export function GoogleMapLocationSelector({
       } finally {
         setSearching(false);
       }
-    }, 300);
+    }, 200);
   };
 
   // Keyboard navigation inside suggestions list
@@ -260,7 +288,26 @@ export function GoogleMapLocationSelector({
     setErrorMsg(null);
 
     try {
-      const res = await fetch(`/api/maps/places?action=details&place_id=${encodeURIComponent(item.placeId)}`);
+      // If item already contains lat/lng from backend autocomplete
+      if (item.lat !== undefined && item.lng !== undefined) {
+        const newLocation: SelectedLocationData = {
+          placeId: item.placeId,
+          name: item.mainText,
+          formattedAddress: item.secondaryText || item.description || item.mainText,
+          lat: item.lat,
+          lng: item.lng,
+          radiusKm,
+        };
+
+        setSelectedLocation(newLocation);
+        setQuery(newLocation.name);
+        onLocationChange(newLocation);
+        setSearching(false);
+        return;
+      }
+
+      // Fetch place details
+      const res = await fetch(`/api/maps/places?action=details&place_id=${encodeURIComponent(item.placeId)}&name=${encodeURIComponent(item.mainText)}&address=${encodeURIComponent(item.description || item.secondaryText || '')}`);
       const data = await res.json();
 
       if (data.success && data.place) {
@@ -355,7 +402,7 @@ export function GoogleMapLocationSelector({
               ) : (
                 !searching && (
                   <div className="p-3 text-center text-xs text-zinc-500 dark:text-zinc-400">
-                    No matching locations found. Try typing a major city or district.
+                    No matching locations found. Try searching another city or locality.
                   </div>
                 )
               )}
@@ -371,76 +418,56 @@ export function GoogleMapLocationSelector({
         )}
       </div>
 
-      {/* 2. GOOGLE MAP / INTERACTIVE MAP PREVIEW */}
+      {/* 2. GOOGLE MAPS PREVIEW (Exact Google Vector Street Tiles from /app/map/page.tsx) */}
       <div className="relative rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden bg-zinc-100 dark:bg-zinc-950 shadow-xs">
-        {/* Real Google Maps Container */}
+        {/* Leaflet Google Map Container */}
         <div 
           ref={mapContainerRef} 
-          className={`w-full h-52 sm:h-60 transition-opacity duration-300 ${
-            isMapLoaded && !mapError ? 'opacity-100' : 'hidden'
-          }`} 
+          className="w-full h-56 sm:h-64 z-0"
         />
 
-        {/* High-Fidelity Interactive Map Fallback (Active when Google Maps API key is not present or offline) */}
-        {(!isMapLoaded || mapError) && (
-          <div className="relative w-full h-52 sm:h-60 bg-gradient-to-br from-blue-950/20 via-zinc-900 to-zinc-950 flex flex-col items-center justify-center p-4 overflow-hidden select-none">
-            {/* Map Grid Pattern */}
-            <div 
-              className="absolute inset-0 opacity-20"
-              style={{
-                backgroundImage: `radial-gradient(circle at 1px 1px, #3b82f6 1px, transparent 0)`,
-                backgroundSize: '24px 24px',
-              }}
-            />
+        {/* Top Header Overlay: Center Location Badge */}
+        <div className="absolute top-2.5 left-3 right-3 flex items-center justify-between text-[11px] pointer-events-none z-10">
+          <span className="px-2.5 py-1 rounded-lg bg-zinc-900/90 backdrop-blur-md text-white border border-zinc-700/60 font-semibold shadow-xs flex items-center gap-1.5">
+            <Navigation className="w-3 h-3 text-blue-400" />
+            Center: {selectedLocation.name}
+          </span>
+          <span className="px-2 py-0.5 rounded-md bg-blue-600 text-white font-bold text-[10px] shadow-xs">
+            GOOGLE MAPS
+          </span>
+        </div>
 
-            {/* Simulated Geographic Road Network Lines */}
-            <svg className="absolute inset-0 w-full h-full opacity-25 pointer-events-none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M -50 40 Q 150 120 400 90 T 800 150" stroke="#60a5fa" strokeWidth="2" fill="none" />
-              <path d="M 120 -20 Q 160 140 240 300" stroke="#93c5fd" strokeWidth="1.5" fill="none" />
-              <path d="M 0 180 Q 220 160 450 250" stroke="#60a5fa" strokeWidth="1" fill="none" />
-            </svg>
+        {/* Floating Map Zoom & Recenter Controls */}
+        <div className="absolute bottom-3 right-3 flex flex-col gap-1.5 z-10">
+          <button
+            type="button"
+            onClick={handleZoomIn}
+            className="w-7 h-7 rounded-lg bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 shadow-md flex items-center justify-center hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+            title="Zoom In"
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={handleZoomOut}
+            className="w-7 h-7 rounded-lg bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 shadow-md flex items-center justify-center hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+            title="Zoom Out"
+          >
+            <Minus className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={handleRecenter}
+            className="w-7 h-7 rounded-lg bg-white dark:bg-zinc-900 text-blue-600 dark:text-blue-400 border border-zinc-200 dark:border-zinc-700 shadow-md flex items-center justify-center hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+            title="Recenter Map"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+          </button>
+        </div>
 
-            {/* Dynamic Targeting Radius Circle */}
-            <div 
-              className="relative flex items-center justify-center transition-all duration-300 ease-out"
-              style={{
-                width: `${Math.min(220, Math.max(70, radiusKm * 2.2))}px`,
-                height: `${Math.min(220, Math.max(70, radiusKm * 2.2))}px`,
-              }}
-            >
-              {/* Outer Pulse */}
-              <div className="absolute inset-0 rounded-full bg-blue-500/15 border-2 border-blue-500/80 animate-pulse" />
-              
-              {/* Radius Distance Badge on Circle Rim */}
-              <span className="absolute -top-3 px-2 py-0.5 rounded-full bg-blue-600 text-[10px] font-black text-white shadow-md">
-                {radiusKm} km radius
-              </span>
-
-              {/* Center Pin Marker */}
-              <div className="relative z-10 flex flex-col items-center -mt-4">
-                <div className="p-2 rounded-full bg-blue-600 text-white shadow-lg ring-4 ring-blue-500/30 animate-bounce">
-                  <MapPin className="w-4 h-4 fill-white" />
-                </div>
-                <div className="w-2 h-1 bg-black/40 rounded-full blur-[1px] mt-0.5" />
-              </div>
-            </div>
-
-            {/* Map Header Status Overlay */}
-            <div className="absolute top-2.5 left-3 right-3 flex items-center justify-between text-[11px] pointer-events-none">
-              <span className="px-2.5 py-1 rounded-lg bg-zinc-900/90 backdrop-blur-md text-zinc-300 border border-zinc-700/60 font-semibold shadow-xs flex items-center gap-1.5">
-                <Navigation className="w-3 h-3 text-blue-400" />
-                Targeting Center: {selectedLocation.name}
-              </span>
-              <span className="px-2 py-0.5 rounded-md bg-blue-600/90 text-white font-bold text-[10px]">
-                LIVE RADAR
-              </span>
-            </div>
-          </div>
-        )}
-
-        {/* Quick Map Controls Badge */}
-        <div className="absolute bottom-2.5 right-2.5 flex items-center gap-1.5 z-10">
-          <span className="px-2 py-1 rounded-md bg-zinc-900/80 backdrop-blur-md text-white text-[10px] font-mono border border-zinc-700/50 shadow-xs">
+        {/* GPS Coordinates Overlay */}
+        <div className="absolute bottom-2.5 left-2.5 pointer-events-none z-10">
+          <span className="px-2 py-1 rounded-md bg-zinc-900/85 backdrop-blur-md text-white text-[10px] font-mono border border-zinc-700/50 shadow-xs">
             {selectedLocation.lat.toFixed(4)}° N, {selectedLocation.lng.toFixed(4)}° E
           </span>
         </div>
