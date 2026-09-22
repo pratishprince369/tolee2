@@ -17,6 +17,7 @@ import {
   updateCampaignAction 
 } from '@/actions/ads';
 import Link from 'next/link';
+import { GoogleMapLocationSelector, SelectedLocationData } from '@/components/GoogleMapLocationSelector';
 
 interface QuickBoostModalProps {
   isOpen: boolean;
@@ -48,8 +49,16 @@ export function QuickBoostModal({
   // STEP 2: AUDIENCE
   const [audienceType, setAudienceType] = useState<'automatic' | 'custom'>('automatic');
   const [audienceName, setAudienceName] = useState('Custom Audience');
-  const [locations, setLocations] = useState('All India');
-  const [radiusKm, setRadiusKm] = useState(25);
+  const [locations, setLocations] = useState('Kalyan West, Maharashtra, India');
+  const [radiusKm, setRadiusKm] = useState(10);
+  const [selectedGeoLocation, setSelectedGeoLocation] = useState<SelectedLocationData>({
+    placeId: 'default_kalyan_west',
+    name: 'Kalyan West',
+    formattedAddress: 'Kalyan West, Maharashtra, India',
+    lat: 19.2437,
+    lng: 73.1355,
+    radiusKm: 10,
+  });
   const [ageRange, setAgeRange] = useState('18-65+');
   const [gender, setGender] = useState<'all' | 'men' | 'women'>('all');
   const [interests, setInterests] = useState<string[]>(['Technology', 'Business', 'Shopping']);
@@ -135,7 +144,18 @@ export function QuickBoostModal({
           }
           if (adSet) {
             setDailyBudget(adSet.budgetAmount || 150);
+            if (adSet.radiusKm) setRadiusKm(adSet.radiusKm);
             if (adSet.targetingCities) setLocations(adSet.targetingCities);
+            if (adSet.latitude && adSet.longitude) {
+              setSelectedGeoLocation({
+                placeId: adSet.placeId || 'saved_location',
+                name: adSet.targetingCities || 'Targeted Location',
+                formattedAddress: adSet.formattedAddress || adSet.targetingCities || '',
+                lat: adSet.latitude,
+                lng: adSet.longitude,
+                radiusKm: adSet.radiusKm || 10,
+              });
+            }
             if (adSet.targetingInterests) {
               setInterests(adSet.targetingInterests.split(',').map((s: string) => s.trim()).filter(Boolean));
             }
@@ -210,9 +230,14 @@ export function QuickBoostModal({
         audienceType,
         audienceName,
         radiusKm,
+        latitude: audienceType === 'custom' ? selectedGeoLocation.lat : undefined,
+        longitude: audienceType === 'custom' ? selectedGeoLocation.lng : undefined,
+        placeId: audienceType === 'custom' ? selectedGeoLocation.placeId : undefined,
+        formattedAddress: audienceType === 'custom' ? selectedGeoLocation.formattedAddress : undefined,
+        locationDetails: audienceType === 'custom' ? selectedGeoLocation : undefined,
         ageRange,
         gender,
-        targetingLocations: locations,
+        targetingLocations: audienceType === 'custom' ? (selectedGeoLocation.formattedAddress || selectedGeoLocation.name || locations) : 'All India',
         targetingInterests: interests.join(','),
         placements: placementsString,
         destinationUrl: websiteUrl || undefined,
@@ -227,7 +252,12 @@ export function QuickBoostModal({
           adSetName: `Boost ${type.toUpperCase()} - Ad Set`,
           budgetAmount: dailyBudget,
           endDate,
-          targetingCities: locations,
+          targetingCities: audienceType === 'custom' ? (selectedGeoLocation.formattedAddress || selectedGeoLocation.name || locations) : 'All India',
+          radiusKm: audienceType === 'custom' ? radiusKm : undefined,
+          latitude: audienceType === 'custom' ? selectedGeoLocation.lat : undefined,
+          longitude: audienceType === 'custom' ? selectedGeoLocation.lng : undefined,
+          placeId: audienceType === 'custom' ? selectedGeoLocation.placeId : undefined,
+          formattedAddress: audienceType === 'custom' ? selectedGeoLocation.formattedAddress : undefined,
           targetingInterests: interests.join(','),
           ctaButton,
           status: 'pending'
@@ -559,34 +589,19 @@ export function QuickBoostModal({
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300 block mb-1">
-                          Location (City/State):
-                        </label>
-                        <input
-                          type="text"
-                          value={locations}
-                          onChange={(e) => setLocations(e.target.value)}
-                          placeholder="Mumbai, Delhi, Bangalore"
-                          className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-xs font-medium focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300 block mb-1">
-                          Radius: {radiusKm} km
-                        </label>
-                        <input
-                          type="range"
-                          min="5"
-                          max="100"
-                          step="5"
-                          value={radiusKm}
-                          onChange={(e) => setRadiusKm(Number(e.target.value))}
-                          className="w-full accent-blue-600 mt-2"
-                        />
-                      </div>
-                    </div>
+                    {/* Google Maps Location Search, Interactive Preview & Radius Targeting */}
+                    <GoogleMapLocationSelector
+                      initialLocation={selectedGeoLocation}
+                      onLocationChange={(newLoc) => {
+                        setSelectedGeoLocation(newLoc);
+                        setLocations(newLoc.formattedAddress || newLoc.name);
+                      }}
+                      radiusKm={radiusKm}
+                      onRadiusChange={(newRadius) => {
+                        setRadiusKm(newRadius);
+                        setSelectedGeoLocation((prev) => ({ ...prev, radiusKm: newRadius }));
+                      }}
+                    />
 
                     {/* Gender Selection */}
                     <div>
@@ -856,7 +871,9 @@ export function QuickBoostModal({
                     <span className="text-zinc-500 font-medium">Audience</span>
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-zinc-900 dark:text-zinc-100">
-                        {audienceType === 'automatic' ? 'Automatic (Smart AI)' : audienceName}
+                        {audienceType === 'automatic' 
+                          ? 'Automatic (Smart AI)' 
+                          : `${selectedGeoLocation.name} • ${radiusKm} km radius`}
                       </span>
                       <button onClick={() => setCurrentStep(2)} className="text-[11px] text-zinc-400 hover:text-blue-600">
                         Edit

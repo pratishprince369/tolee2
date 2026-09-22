@@ -1152,6 +1152,11 @@ model AdSet {
   targetingDemographics String?
   targetingFollowers    Boolean  @default(false)
   targetingEngagedUsers Boolean  @default(false)
+  radiusKm              Float?
+  latitude              Float?
+  longitude             Float?
+  placeId               String?
+  formattedAddress      String?
   
   placements            String?  // comma-separated: feed, reels, stories, marketplace, discover, chats
   ads                   Ad[]

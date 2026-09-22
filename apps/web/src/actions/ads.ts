@@ -423,6 +423,18 @@ export async function createQuickBoostAction(
     audienceType?: 'automatic' | 'custom';
     audienceName?: string;
     radiusKm?: number;
+    latitude?: number;
+    longitude?: number;
+    placeId?: string;
+    formattedAddress?: string;
+    locationDetails?: {
+      placeId?: string;
+      name?: string;
+      formattedAddress?: string;
+      lat?: number;
+      lng?: number;
+      radiusKm?: number;
+    };
     ageRange?: string;
     gender?: string;
     targetingToleeIds?: string;
@@ -436,6 +448,20 @@ export async function createQuickBoostAction(
   try {
     const userId = await getUserId();
     if (!userId) return { success: false, error: 'Unauthorized' };
+
+    // Validate coordinates & radius if provided
+    const finalRadiusKm = Math.min(100, Math.max(1, Number(options.radiusKm ?? options.locationDetails?.radiusKm ?? 10)));
+    const finalLat = options.latitude ?? options.locationDetails?.lat;
+    const finalLng = options.longitude ?? options.locationDetails?.lng;
+    const finalPlaceId = options.placeId ?? options.locationDetails?.placeId;
+    const finalFormattedAddress = options.formattedAddress ?? options.locationDetails?.formattedAddress;
+
+    if (finalLat !== undefined && finalLat !== null && (finalLat < -90 || finalLat > 90)) {
+      return { success: false, error: 'Invalid latitude coordinate' };
+    }
+    if (finalLng !== undefined && finalLng !== null && (finalLng < -180 || finalLng > 180)) {
+      return { success: false, error: 'Invalid longitude coordinate' };
+    }
 
     // Check 6 months free boost eligibility from join date
     const user = await prisma.user.findUnique({
@@ -580,7 +606,12 @@ export async function createQuickBoostAction(
               startDate: start,
               endDate: end,
               targetingToleeIds: options.targetingToleeIds,
-              targetingCities: options.targetingLocations || 'All India',
+              targetingCities: options.targetingLocations || finalFormattedAddress || options.locationDetails?.name || 'All India',
+              radiusKm: finalRadiusKm,
+              latitude: finalLat !== undefined ? finalLat : null,
+              longitude: finalLng !== undefined ? finalLng : null,
+              placeId: finalPlaceId || null,
+              formattedAddress: finalFormattedAddress || null,
               targetingInterests: options.targetingInterests || 'General',
               targetingDemographics: options.gender || 'all',
               targetingBehaviors: options.ageRange || '18-65+',
@@ -1296,13 +1327,28 @@ export async function superAdminModerateCampaign(campaignId: string, status: 'ap
   }
 }
 
+// Helper to calculate Haversine distance in km between two coordinate points
+function getDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // Earth's radius in km
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
 /**
- * Fetches matching active ads based on audience targeting criteria (Tolee groups, location, interests).
+ * Fetches matching active ads based on audience targeting criteria (Tolee groups, location, interests, GPS radius).
  * Used for dynamic sponsored injection into Feed streams.
  */
 export async function fetchEligibleAds(params: {
   toleeId?: string;
   location?: string;
+  latitude?: number;
+  longitude?: number;
   interest?: string;
   limit?: number;
 }) {
@@ -1350,9 +1396,28 @@ export async function fetchEligibleAds(params: {
       if (params.toleeId && targetTolees.length > 0 && !targetTolees.includes(params.toleeId)) {
         return false;
       }
-      if (params.location && targetCities.length > 0 && !targetCities.some(c => params.location?.toLowerCase().includes(c.toLowerCase()))) {
-        return false;
+
+      // 1. Precise GPS Radius targeting
+      if (
+        params.latitude !== undefined &&
+        params.longitude !== undefined &&
+        ad.adSet.latitude !== null &&
+        ad.adSet.longitude !== null &&
+        ad.adSet.radiusKm
+      ) {
+        const dist = getDistanceKm(params.latitude, params.longitude, ad.adSet.latitude, ad.adSet.longitude);
+        if (dist > ad.adSet.radiusKm) {
+          return false;
+        }
+      } 
+      // 2. Fallback text location match
+      else if (params.location && targetCities.length > 0) {
+        const isAllIndia = targetCities.some(c => c.toLowerCase() === 'all india');
+        if (!isAllIndia && !targetCities.some(c => params.location?.toLowerCase().includes(c.toLowerCase()) || c.toLowerCase().includes(params.location?.toLowerCase()))) {
+          return false;
+        }
       }
+
       if (params.interest && targetInterests.length > 0 && !targetInterests.some(i => params.interest?.toLowerCase().includes(i.toLowerCase()))) {
         return false;
       }
@@ -1779,6 +1844,11 @@ export async function updateCampaignAction(
     targetingStates?: string;
     targetingCities?: string;
     targetingPincodes?: string;
+    radiusKm?: number;
+    latitude?: number;
+    longitude?: number;
+    placeId?: string;
+    formattedAddress?: string;
     targetingToleeIds?: string;
     targetingInterests?: string;
     targetingFollowers?: boolean;
@@ -1845,6 +1915,11 @@ export async function updateCampaignAction(
             targetingStates: data.targetingStates ?? adSet.targetingStates,
             targetingCities: data.targetingCities ?? adSet.targetingCities,
             targetingPincodes: data.targetingPincodes ?? adSet.targetingPincodes,
+            radiusKm: data.radiusKm !== undefined ? data.radiusKm : adSet.radiusKm,
+            latitude: data.latitude !== undefined ? data.latitude : adSet.latitude,
+            longitude: data.longitude !== undefined ? data.longitude : adSet.longitude,
+            placeId: data.placeId !== undefined ? data.placeId : adSet.placeId,
+            formattedAddress: data.formattedAddress !== undefined ? data.formattedAddress : adSet.formattedAddress,
             targetingToleeIds: data.targetingToleeIds ?? adSet.targetingToleeIds,
             targetingInterests: data.targetingInterests ?? adSet.targetingInterests,
             targetingFollowers: data.targetingFollowers ?? adSet.targetingFollowers,
