@@ -64,8 +64,7 @@ export async function checkAndInitializeWallet(referredBy?: string) {
           data: {
             userId,
             type: 'system',
-            title: '🎉 ₹2,500 Promotional Credits Added!',
-            content: 'Congratulations! Your Tolee Ads Wallet has been credited with ₹2,500 promotional credits to boost posts and promote reels.',
+            message: '🎉 Congratulations! Your Tolee Ads Wallet has been credited with ₹2,500 promotional credits to boost posts and promote reels.',
             link: '/ads-manager'
           }
         });

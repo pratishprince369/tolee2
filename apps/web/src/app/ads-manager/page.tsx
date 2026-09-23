@@ -29,6 +29,7 @@ export default function AdsManagerPage() {
   
   // Dashboard & Wallet States
   const [walletInfo, setWalletInfo] = useState<any>(null);
+  const wallet = walletInfo?.wallet;
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -448,7 +449,6 @@ export default function AdsManagerPage() {
     );
   }
 
-  const wallet = walletInfo?.wallet;
   const stats = dashboardData?.stats || {
     totalSpend: 0,
     totalImpressions: 0,
