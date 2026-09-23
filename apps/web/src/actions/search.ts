@@ -423,7 +423,7 @@ export async function performSearch(
           title: t.name,
           subtitle: `${simulatedCount.toLocaleString()} members`,
           description: t.description,
-          mediaUrl: t.avatar || '/images/default-tolee.png',
+          mediaUrl: t.avatar || '/default-tolee-avatar.svg',
           location: t.location,
           category: t.category,
           createdAt: t.createdAt,
@@ -564,7 +564,7 @@ export async function getSearchSuggestions(query: string): Promise<any[]> {
         type: 'group',
         text: t.name,
         subtitle: `Tolee Group • ${t.category || 'General'}`,
-        avatar: t.avatar || '/images/default-tolee.png'
+        avatar: t.avatar || '/default-tolee-avatar.svg'
       });
     }
 

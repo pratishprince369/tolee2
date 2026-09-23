@@ -426,7 +426,7 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
   if (dbReels.length === 0) {
     dbReels = [
       {
-        id: 1,
+        id: 'mock-1',
         video: 'https://videos.pexels.com/video-files/7823396/7823396-hd_1080_1920_30fps.mp4',
         toleeName: 'AI Automation Society',
         toleeSlug: 'ai-automation-society',
@@ -440,7 +440,7 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
         isVerified: true
       },
       {
-        id: 2,
+        id: 'mock-2',
         video: 'https://videos.pexels.com/video-files/10395606/10395606-hd_1080_1920_24fps.mp4',
         toleeName: 'That Pickleball Tolee',
         toleeSlug: 'pickleball',

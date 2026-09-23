@@ -149,8 +149,8 @@ export async function fetchRealChatData() {
           type: 'chat',
           isRead: false,
           OR: [
-            { link: `/chat?chatId=${chat.id}` },
-            { link: `/chat?id=${chat.id}` }
+            { link: { startsWith: `/chat?chatId=${chat.id}` } },
+            { link: { startsWith: `/chat?id=${chat.id}` } }
           ]
         }
       });
@@ -227,7 +227,10 @@ export async function fetchRealChatData() {
           userId,
           type: 'chat',
           isRead: false,
-          link: `/chat?id=${dm.id}`
+          OR: [
+            { link: { startsWith: `/chat?id=${dm.id}` } },
+            { link: { startsWith: `/chat?chatId=${dm.id}` } }
+          ]
         }
       });
 
@@ -312,8 +315,8 @@ export async function markChatNotificationsAsRead(chatId?: string) {
           type: 'chat',
           isRead: false,
           OR: [
-            { link: `/chat?chatId=${chatId}` },
-            { link: `/chat?id=${chatId}` },
+            { link: { startsWith: `/chat?chatId=${chatId}` } },
+            { link: { startsWith: `/chat?id=${chatId}` } },
             { link: '/chat' }
           ]
         },

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
+import { verifySuperAdminToken, SUPER_ADMIN_COOKIE } from '@/lib/superAdminAuth';
 import {
   getAdminCreditOverview,
   getAdminSystemConfig,
@@ -11,9 +12,29 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(req: NextRequest) {
+async function checkIsSuperAdmin(req: NextRequest): Promise<{ isSuperAdmin: boolean; adminId?: string }> {
+  const token = req.cookies.get(SUPER_ADMIN_COOKIE)?.value;
+  if (token && verifySuperAdminToken(token)) {
+    return { isSuperAdmin: true, adminId: 'super-admin' };
+  }
+
   const session = await getServerSession(authOptions);
-  if (!session?.user) {
+  if (!session?.user) return { isSuperAdmin: false };
+
+  const email = (session.user as any).email;
+  const role = (session.user as any).role;
+  const superAdminEmail = process.env.SUPER_ADMIN_EMAIL;
+
+  if ((superAdminEmail && email && email.toLowerCase() === superAdminEmail.toLowerCase()) || role === 'SUPER_ADMIN' || role === 'admin') {
+    return { isSuperAdmin: true, adminId: (session.user as any).id };
+  }
+
+  return { isSuperAdmin: false };
+}
+
+export async function GET(req: NextRequest) {
+  const auth = await checkIsSuperAdmin(req);
+  if (!auth.isSuperAdmin) {
     return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -44,12 +65,12 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
+  const auth = await checkIsSuperAdmin(req);
+  if (!auth.isSuperAdmin) {
     return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
   }
 
-  const adminId = (session.user as any).id;
+  const adminId = auth.adminId || 'super-admin';
   try {
     const body = await req.json();
     const { action, configData, withdrawalId, withdrawalAction, options } = body;

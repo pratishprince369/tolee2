@@ -35,6 +35,25 @@ async function getAuthenticatedUser() {
   };
 }
 
+async function checkIsSuperAdmin(user: { id: string; email: string; role: string } | null): Promise<boolean> {
+  try {
+    const { cookies } = require('next/headers');
+    const { verifySuperAdminToken, SUPER_ADMIN_COOKIE } = require('@/lib/superAdminAuth');
+    const cookieStore = cookies();
+    const saToken = cookieStore.get(SUPER_ADMIN_COOKIE)?.value;
+    if (saToken && verifySuperAdminToken(saToken)) {
+      return true;
+    }
+  } catch (_) {}
+
+  if (!user) return false;
+  const superAdminEmail = process.env.SUPER_ADMIN_EMAIL;
+  if (superAdminEmail && user.email && user.email.toLowerCase() === superAdminEmail.toLowerCase()) {
+    return true;
+  }
+  return user.role === 'SUPER_ADMIN' || user.role === 'admin';
+}
+
 export async function getUserCreditDashboardAction() {
   const user = await getAuthenticatedUser();
   if (!user) {
@@ -148,7 +167,7 @@ export async function runSettlementCycleAction() {
 
 export async function getAdminCreditDashboardAction() {
   const user = await getAuthenticatedUser();
-  if (!user) return { success: false, error: 'Unauthorized.' };
+  if (!(await checkIsSuperAdmin(user))) return { success: false, error: 'Unauthorized.' };
 
   try {
     const [overview, config, withdrawals] = await Promise.all([
@@ -170,7 +189,7 @@ export async function getAdminCreditDashboardAction() {
 
 export async function updateAdminCreditConfigAction(input: Partial<CreditSystemConfigDto>) {
   const user = await getAuthenticatedUser();
-  if (!user) return { success: false, error: 'Unauthorized.' };
+  if (!user || !(await checkIsSuperAdmin(user))) return { success: false, error: 'Unauthorized.' };
 
   try {
     const updated = await updateAdminSystemConfig(input, user.id);
@@ -188,7 +207,7 @@ export async function processAdminWithdrawalAction(
   options?: { payoutReference?: string; reason?: string; adminNotes?: string }
 ) {
   const user = await getAuthenticatedUser();
-  if (!user) return { success: false, error: 'Unauthorized.' };
+  if (!user || !(await checkIsSuperAdmin(user))) return { success: false, error: 'Unauthorized.' };
 
   try {
     const res = await processAdminWithdrawal(withdrawalId, action, user.id, options);

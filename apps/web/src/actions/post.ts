@@ -105,7 +105,7 @@ export async function createPost(data: {
     }
 
     // CRITICAL: Reject blob URLs
-    if (data.media?.url.startsWith('blob:')) {
+    if (data.media?.url?.startsWith('blob:')) {
       return { success: false, error: 'Internal Error: Temporary media URL detected. Upload failed.' };
     }
 
@@ -1056,7 +1056,13 @@ export async function toggleLike(postId: string) {
 
       return { success: true, liked: true };
     }
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.code === 'P2002') {
+      return { success: true, liked: true };
+    }
+    if (error?.code === 'P2025') {
+      return { success: true, liked: false };
+    }
     console.error("Error toggling like:", error);
     return { success: false, error: 'Failed to toggle like' };
   }
