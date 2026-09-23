@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import {
   Heart,
@@ -127,11 +127,42 @@ export default function PostViewer({ post }: PostViewerProps) {
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [authPromptOpen, setAuthPromptOpen] = useState(false);
   const [isQuickBoostOpen, setIsQuickBoostOpen] = useState(false);
-  const [isInsightsOpen, setIsInsightsOpen] = useState(false);
+  const searchParams = useSearchParams();
+  const targetCommentId = searchParams?.get('commentId') || '';
+  const targetReplyId = searchParams?.get('replyId') || '';
+  const highlightMode = searchParams?.get('highlight') || '';
+  const [highlightedCommentId, setHighlightedCommentId] = useState<string | null>(null);
+  const [isPostHighlighted, setIsPostHighlighted] = useState<boolean>(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Post like notification highlight flash
+  useEffect(() => {
+    if (highlightMode === 'like') {
+      setIsPostHighlighted(true);
+      const timer = setTimeout(() => setIsPostHighlighted(false), 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [highlightMode]);
+
+  // Comment / reply notification auto-scroll and highlight
+  useEffect(() => {
+    const focusId = targetReplyId || targetCommentId;
+    if (!focusId) return;
+
+    const timer = setTimeout(() => {
+      const el = document.getElementById(`comment-${focusId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setHighlightedCommentId(focusId);
+        setTimeout(() => setHighlightedCommentId(null), 2500);
+      }
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [targetCommentId, targetReplyId, comments]);
 
   // Compute media list safely without hook overhead
   let allMediaUrls: string[] = [];
@@ -309,7 +340,14 @@ export default function PostViewer({ post }: PostViewerProps) {
 
       {/* Main Container - Centered Feed Post Card */}
       <main className="flex-1 w-full max-w-[620px] mx-auto py-3 sm:py-6 px-0 sm:px-4">
-        <div className="bg-white dark:bg-[#000000] border border-gray-200/80 dark:border-zinc-800/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.25)] rounded-none sm:rounded-3xl overflow-hidden transition-all duration-300">
+        <div 
+          id={`post-${post.id}`}
+          className={`bg-white dark:bg-[#000000] border shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.25)] rounded-none sm:rounded-3xl overflow-hidden transition-all duration-500 ${
+            isPostHighlighted 
+              ? 'ring-4 ring-rose-500/50 border-rose-500' 
+              : 'border-gray-200/80 dark:border-zinc-800/80'
+          }`}
+        >
           
           {/* Tolee/Group Header if post belongs to a community */}
           {post.toleeName && (
@@ -647,7 +685,15 @@ export default function PostViewer({ post }: PostViewerProps) {
                     const commentAuthorAvatar = comment.author?.avatar || '/default-user-avatar.svg';
 
                     return (
-                      <div key={comment.id} className="flex gap-2.5 text-xs group">
+                      <div 
+                        key={comment.id} 
+                        id={`comment-${comment.id}`}
+                        className={`flex gap-2.5 text-xs group p-1.5 rounded-2xl transition-all duration-500 ${
+                          highlightedCommentId === comment.id 
+                            ? 'bg-amber-500/20 dark:bg-amber-500/30 ring-2 ring-amber-400' 
+                            : ''
+                        }`}
+                      >
                         <Avatar className="w-7 h-7 shrink-0 mt-0.5 border border-zinc-200 dark:border-[#1b2b48]">
                           <AvatarImage src={commentAuthorAvatar} />
                           <AvatarFallback className="bg-zinc-200 dark:bg-zinc-800 text-zinc-800 dark:text-white text-[9px] font-bold">

@@ -888,6 +888,8 @@ export default function ChatPage() {
   const queryChatId = searchParams?.get('chatId') || searchParams?.get('id') || '';
   const queryToleeId = searchParams?.get('toleeId') || '';
   const queryUserId = searchParams?.get('userId') || searchParams?.get('user') || '';
+  const queryMsgId = searchParams?.get('msgId') || searchParams?.get('messageId') || '';
+  const handledMsgIdRef = useRef<string | null>(null);
 
   // Synchronize activeChat with query parameters
   useEffect(() => {
@@ -909,8 +911,13 @@ export default function ChatPage() {
         if (activeChat !== queryChatId) {
           setActiveChat(queryChatId);
         }
-        if (activeSidebarTab !== 'personal') {
-          setActiveSidebarTab('personal');
+        const targetTab = matchedChat.isGroup ? 'groups' : 'personal';
+        if (activeSidebarTab !== targetTab) {
+          setActiveSidebarTab(targetTab);
+        }
+      } else {
+        if (activeChat !== queryChatId) {
+          setActiveChat(queryChatId);
         }
       }
     } else if (queryUserId) {
@@ -935,6 +942,22 @@ export default function ChatPage() {
       }
     }
   }, [queryToleeId, queryChatId, queryUserId, chats]);
+
+  // Deep link automatic scroll & highlight for target notification message
+  useEffect(() => {
+    if (!queryMsgId || !activeChat) return;
+    if (handledMsgIdRef.current === queryMsgId) return;
+
+    const msgs = messagesByChat[activeChat];
+    if (!msgs || msgs.length === 0) return;
+
+    handledMsgIdRef.current = queryMsgId;
+    const timer = setTimeout(() => {
+      scrollToMessageId(queryMsgId);
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [queryMsgId, activeChat, messagesByChat]);
 
   // Handle active chat scrolling in sidebar
   useEffect(() => {
@@ -2415,7 +2438,7 @@ export default function ChatPage() {
     let oldestId = currentMsgs[0]?.id;
     let attempts = 0;
 
-    while (!element && attempts < 6) {
+    while (!element && attempts < 8) {
       attempts++;
       const res = await fetchChatMessages(activeChat, oldestId, 40);
       if (!res.success || !res.messages || res.messages.length === 0) {
@@ -2434,7 +2457,7 @@ export default function ChatPage() {
       });
 
       // Wait a tick for React to render new messages in DOM
-      await new Promise(r => setTimeout(r, 80));
+      await new Promise(r => setTimeout(r, 100));
       element = document.getElementById(`msg-${msgId}`);
       if (!res.hasMore) break;
     }
@@ -2444,7 +2467,9 @@ export default function ChatPage() {
       element.classList.add('animate-highlight-flash');
       setTimeout(() => {
         element?.classList.remove('animate-highlight-flash');
-      }, 1800);
+      }, 2500);
+    } else {
+      console.log(`[Chat Navigation] Target message msg-${msgId} not found in loaded history or was deleted.`);
     }
   };
 

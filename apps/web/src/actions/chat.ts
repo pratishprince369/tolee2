@@ -539,7 +539,15 @@ export async function sendRealChatMessage(
             userId,
             type: 'chat',
             message: `${senderName} sent ${safeContent ? `a message in ${tolee.name}: ${previewText}` : `${previewText} in ${tolee.name}`}`,
-            link: `/chat?chatId=${chatId}`
+            link: `/chat?chatId=${chatId}&msgId=${message.id}`,
+            data: {
+              type: 'chat',
+              target_type: 'message',
+              target_id: message.id,
+              chat_id: chatId,
+              group_id: chatId,
+              message_id: message.id
+            }
           }));
 
           await createSystemNotificationsMany(notifications, { groupName: tolee.name });
@@ -560,7 +568,14 @@ export async function sendRealChatMessage(
           userId: otherParticipant.userId,
           type: 'chat',
           message: `${senderName} sent you ${safeContent ? `a message: ${previewText}` : previewText}`,
-          link: `/chat?id=${chatId}`
+          link: `/chat?chatId=${chatId}&msgId=${message.id}`,
+          data: {
+            type: 'chat',
+            target_type: 'message',
+            target_id: message.id,
+            chat_id: chatId,
+            message_id: message.id
+          }
         });
       }
     }

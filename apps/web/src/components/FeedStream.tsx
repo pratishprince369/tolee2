@@ -228,6 +228,25 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
   const [feedPosts, setFeedPosts] = useState(initialPosts);
   const [isPosting, setIsPosting] = useState(false);
 
+  // Handle deep-link scrolling to target post from notification
+  useEffect(() => {
+    const targetPostId = searchParams.get('post') || searchParams.get('postId');
+    if (!targetPostId) return;
+
+    const timer = setTimeout(() => {
+      const el = document.getElementById(`post-${targetPostId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add('ring-4', 'ring-[#0a7c85]', 'ring-offset-2', 'transition-all', 'duration-500');
+        setTimeout(() => {
+          el.classList.remove('ring-4', 'ring-[#0a7c85]', 'ring-offset-2');
+        }, 3000);
+      }
+    }, 450);
+
+    return () => clearTimeout(timer);
+  }, [searchParams, feedPosts]);
+
   // Follow/Following status state keyed by authorId
   const [followStates, setFollowStates] = useState<Record<string, { isFollowing: boolean; status: 'approved' | 'pending' | null; isPrivate: boolean }>>(() => {
     const initialStates: Record<string, { isFollowing: boolean; status: 'approved' | 'pending' | null; isPrivate: boolean }> = {};

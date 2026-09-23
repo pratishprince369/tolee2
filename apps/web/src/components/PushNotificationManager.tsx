@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { updateUserLocation, updateNotificationSettings, syncContacts, toggleFollow } from '@/actions/user';
+import { getNotificationNavigationUrl, savePendingNotificationUrl, getAndClearPendingNotificationUrl } from '@/lib/notificationRouting';
 import { 
   Bell, MapPin, Users, Image as ImageIcon, CheckCircle, 
   Smartphone, ArrowRight, ShieldCheck, HelpCircle, 
@@ -218,6 +219,14 @@ export function PushNotificationManager() {
   // database is instantly updated with the correct, active FCM push token!
   useEffect(() => {
     if (!session?.user) return;
+
+    // Check if there is a pending notification url from cold-start or unauthenticated click
+    const pendingUrl = getAndClearPendingNotificationUrl();
+    if (pendingUrl) {
+      setTimeout(() => {
+        router.push(pendingUrl);
+      }, 150);
+    }
     
     const syncTokenOnLogin = async () => {
       try {
@@ -439,9 +448,15 @@ export function PushNotificationManager() {
 
       // Deep link tap action handler
       await PushNotifications.addListener('pushNotificationActionPerformed', (action: any) => {
-        const data = action.notification.data;
-        if (data?.url) {
-          router.push(data.url);
+        const data = action.notification?.data;
+        const targetUrl = getNotificationNavigationUrl(data);
+        if (targetUrl) {
+          if (session?.user) {
+            router.push(targetUrl);
+          } else {
+            savePendingNotificationUrl(targetUrl);
+            router.push(`/auth/signin?callbackUrl=${encodeURIComponent(targetUrl)}`);
+          }
         }
       });
     } catch (err) {

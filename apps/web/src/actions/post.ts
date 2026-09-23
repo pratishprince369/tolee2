@@ -1044,7 +1044,13 @@ export async function toggleLike(postId: string) {
           userId: post.authorId,
           type: 'like',
           message: `${user.username || user.name} liked your post.`,
-          link: `/post/${postId}`
+          link: `/post/${postId}?highlight=like`,
+          data: {
+            type: 'like',
+            target_type: 'post',
+            target_id: postId,
+            post_id: postId,
+          }
         });
       }
 
@@ -1125,7 +1131,14 @@ export async function addComment(postId: string, content: string, parentId?: str
           userId: post.authorId,
           type: 'comment',
           message: `${comment.author.username || comment.author.name} commented on your ${itemType}: "${safeContent.substring(0, 20)}${safeContent.length > 20 ? '...' : ''}"`,
-          link: linkUrl
+          link: linkUrl,
+          data: {
+            type: 'comment',
+            target_type: 'comment',
+            target_id: comment.id,
+            post_id: postId,
+            comment_id: comment.id
+          }
         });
       }
 
@@ -1143,7 +1156,15 @@ export async function addComment(postId: string, content: string, parentId?: str
               userId: parentComment.authorId,
               type: 'reply',
               message: `${comment.author.username || comment.author.name} replied to your comment: "${safeContent.substring(0, 20)}${safeContent.length > 20 ? '...' : ''}"`,
-              link: linkUrl
+              link: linkUrl,
+              data: {
+                type: 'reply',
+                target_type: 'reply',
+                target_id: comment.id,
+                post_id: postId,
+                comment_id: parentId,
+                reply_id: comment.id
+              }
             });
           }
 
@@ -1163,7 +1184,15 @@ export async function addComment(postId: string, content: string, parentId?: str
               userId: otherUserId,
               type: 'reply',
               message: `${comment.author.username || comment.author.name} replied in a thread you participated in.`,
-              link: linkUrl
+              link: linkUrl,
+              data: {
+                type: 'reply',
+                target_type: 'reply',
+                target_id: comment.id,
+                post_id: postId,
+                comment_id: parentId,
+                reply_id: comment.id
+              }
             });
           }
         }
@@ -2316,7 +2345,7 @@ export async function sharePostToFriends(
       }
 
       // 3. Create the message
-      await prisma.message.create({
+      const createdSharedMsg = await prisma.message.create({
         data: {
           content: msgContent,
           senderId: currentUserId,
@@ -2329,7 +2358,14 @@ export async function sharePostToFriends(
         userId: friendId,
         type: 'chat',
         message: `${senderName} shared a post with you: "${previewText.substring(0, 30)}${previewText.length > 30 ? '...' : ''}"`,
-        link: `/chat?id=${chatId}`
+        link: `/chat?chatId=${chatId}&msgId=${createdSharedMsg.id}`,
+        data: {
+          type: 'chat',
+          target_type: 'message',
+          target_id: createdSharedMsg.id,
+          chat_id: chatId,
+          message_id: createdSharedMsg.id
+        }
       });
     }
 

@@ -1,11 +1,12 @@
 import { prisma } from '@/lib/prisma';
 import { sendPushNotification } from '@/lib/fcm';
 
-interface CreateNotificationParams {
+export interface CreateNotificationParams {
   userId: string;
   type: string;
   message: string;
   link?: string;
+  data?: Record<string, string>;
 }
 
 /**
@@ -106,6 +107,8 @@ export async function createSystemNotification(params: CreateNotificationParams,
             url: params.link || '',
             channelId,
             type: params.type,
+            notification_id: notif.id,
+            ...(params.data || {}),
           }
         );
       } else {
@@ -177,6 +180,7 @@ export async function createSystemNotificationsMany(
                 url: n.link || '',
                 channelId,
                 type: n.type,
+                ...(n.data || {}),
               }
             );
           } else {
