@@ -22,8 +22,10 @@ import {
   AlertTriangle,
   Smartphone,
   Check,
-  MapPin
+  MapPin,
+  Clock
 } from 'lucide-react';
+import { getUserTimezone, setUserTimezone } from '@/lib/chatTime';
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -55,6 +57,7 @@ export default function SettingsPage() {
   // Field states
   const [email, setEmail] = useState('');
   const [preferredLanguage, setPreferredLanguage] = useState('English (US)');
+  const [currentTimezone, setCurrentTimezone] = useState('Asia/Kolkata');
   const [name, setName] = useState('');
   const [bio, setBio] = useState('');
   const [location, setLocation] = useState('');
@@ -119,6 +122,7 @@ export default function SettingsPage() {
           const s = res.settings;
           setEmail(s.email || '');
           setPreferredLanguage(s.preferredLanguage || 'English (US)');
+          setCurrentTimezone(getUserTimezone());
           
           setName(s.name || '');
           setBio(s.bio || '');
@@ -272,6 +276,9 @@ export default function SettingsPage() {
   // Account Tab Saves
   const handleSaveAccount = async () => {
     setIsSubmitting(true);
+    if (currentTimezone) {
+      setUserTimezone(currentTimezone);
+    }
     const res = await updateAccountSettings({ preferredLanguage });
     setIsSubmitting(false);
     if (res.success) {
@@ -614,6 +621,43 @@ export default function SettingsPage() {
                       </select>
                       <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
                         Select your platform language preference. Saved preferences load automatically.
+                      </p>
+                    </div>
+
+                    {/* Timezone selector */}
+                    <div className="space-y-2">
+                      <Label htmlFor="timezone" className="font-semibold text-gray-800 dark:text-zinc-200 flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-zinc-500" /> Timezone
+                      </Label>
+                      <select 
+                        id="timezone" 
+                        value={currentTimezone}
+                        onChange={(e) => {
+                          const tz = e.target.value;
+                          setCurrentTimezone(tz);
+                          setUserTimezone(tz);
+                        }}
+                        className="w-full h-11 px-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-sm font-medium text-gray-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-primary transition"
+                      >
+                        <option value="Asia/Kolkata">India Standard Time (IST - Asia/Kolkata)</option>
+                        <option value="Asia/Dubai">Dubai / UAE (GST - Asia/Dubai)</option>
+                        <option value="America/New_York">US Eastern Time (EST/EDT - New York)</option>
+                        <option value="America/Chicago">US Central Time (CST/CDT - Chicago)</option>
+                        <option value="America/Denver">US Mountain Time (MST/MDT - Denver)</option>
+                        <option value="America/Los_Angeles">US Pacific Time (PST/PDT - Los Angeles)</option>
+                        <option value="America/Toronto">Canada Eastern Time (Toronto)</option>
+                        <option value="America/Vancouver">Canada Pacific Time (Vancouver)</option>
+                        <option value="Europe/London">UK / London (GMT/BST)</option>
+                        <option value="Europe/Paris">Central European Time (Paris, Berlin)</option>
+                        <option value="Asia/Singapore">Singapore / Malaysia (SGT - Singapore)</option>
+                        <option value="Asia/Tokyo">Japan Standard Time (JST - Tokyo)</option>
+                        <option value="Australia/Sydney">Australia Eastern Time (Sydney)</option>
+                        <option value="Australia/Melbourne">Australia Eastern Time (Melbourne)</option>
+                        <option value="Australia/Perth">Australia Western Time (Perth)</option>
+                        <option value="UTC">UTC (Coordinated Universal Time)</option>
+                      </select>
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                        Chat timestamps and Last Seen timings will automatically display in this timezone.
                       </p>
                     </div>
  

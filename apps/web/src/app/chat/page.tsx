@@ -71,7 +71,15 @@ import { EventCreationModal, EventCard, EventData } from '@/components/chat/Even
 import { StickerPickerModal } from '@/components/chat/StickerPickerModal';
 import { voteChatMessagePoll, respondToChatMessageEvent } from '@/actions/chat';
 import { uploadFile } from '@/lib/upload';
-import { formatLastSeen, isUserOnline } from '@/lib/presence';
+import { 
+  formatLastSeen, 
+  isUserOnline, 
+  formatMessageTime, 
+  formatMessageDateSeparator, 
+  getDateKeyInTimezone, 
+  formatChatListTime, 
+  getUserTimezone 
+} from '@/lib/chatTime';
 
 import { 
   getUserPromotionPreferences, 
@@ -324,26 +332,6 @@ const formatLastMessage = (msgText: string) => {
   return msgText;
 };
 
-// WhatsApp-style date formatter for group separators
-function formatMessageDateSeparator(dateVal: string | Date) {
-  const date = new Date(dateVal);
-  const today = new Date();
-  const yesterday = new Date();
-  yesterday.setDate(today.getDate() - 1);
-
-  const isSameDay = (d1: Date, d2: Date) =>
-    d1.getFullYear() === d2.getFullYear() &&
-    d1.getMonth() === d2.getMonth() &&
-    d1.getDate() === d2.getDate();
-
-  if (isSameDay(date, today)) {
-    return 'Today';
-  } else if (isSameDay(date, yesterday)) {
-    return 'Yesterday';
-  } else {
-    return date.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
-  }
-}
 
 interface SharedContentCardProps {
   payload: {
@@ -692,6 +680,18 @@ export default function ChatPage() {
   useEffect(() => {
     activeChatRef.current = activeChat;
   }, [activeChat]);
+
+  // User IANA Timezone State
+  const [userTimezone, setUserTimezoneState] = useState<string>(() => getUserTimezone());
+
+  useEffect(() => {
+    setUserTimezoneState(getUserTimezone());
+    const handleTzChange = (e: any) => {
+      if (e.detail?.timezone) setUserTimezoneState(e.detail.timezone);
+    };
+    window.addEventListener('tolee_timezone_changed', handleTzChange);
+    return () => window.removeEventListener('tolee_timezone_changed', handleTzChange);
+  }, []);
 
   const [nonMemberGroup, setNonMemberGroup] = useState<any | null>(null);
   const [isJoiningGroup, setIsJoiningGroup] = useState(false);
@@ -2523,7 +2523,7 @@ export default function ChatPage() {
         text: contentToSend,
         mediaUrl: null,
         mediaResourceType: null,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        time: formatMessageTime(new Date(), userTimezone),
         createdAt: new Date().toISOString(),
         isMe: true,
         replyTo: replyingToMessage ? {
@@ -2550,7 +2550,7 @@ export default function ChatPage() {
 
       setChats(prev => prev.map(chat => 
         chat.id === activeChat 
-          ? { ...chat, lastMessage: lastMsgDisplay, time: newMsg.time, lastMessageCreatedAt: new Date().toISOString() }
+          ? { ...chat, lastMessage: lastMsgDisplay, time: formatChatListTime(new Date(), userTimezone), lastMessageCreatedAt: new Date().toISOString() }
           : chat
       ));
 
@@ -3256,7 +3256,7 @@ export default function ChatPage() {
 
                     <div className="flex flex-col items-end gap-1.5 ml-2 flex-shrink-0">
                       <span className={`text-xs whitespace-nowrap ${chat.unread > 0 ? 'text-emerald-500 dark:text-teal-400 font-bold' : 'text-gray-500'}`}>
-                        {chat.time}
+                        {formatChatListTime(chat.lastMessageCreatedAt || chat.time, userTimezone)}
                       </span>
                       <div className="flex items-center gap-1.5 min-h-[20px]">
                         {pinnedChatIds.includes(chat.id) && (
@@ -3388,7 +3388,7 @@ export default function ChatPage() {
 
                     <div className="flex flex-col items-end gap-1.5 ml-2 flex-shrink-0">
                       <span className={`text-xs whitespace-nowrap ${chat.unread > 0 ? 'text-emerald-500 dark:text-teal-400 font-bold' : 'text-gray-500'}`}>
-                        {chat.time}
+                        {formatChatListTime(chat.lastMessageCreatedAt || chat.time, userTimezone)}
                       </span>
                       <div className="flex items-center gap-1.5 min-h-[20px]">
                         {pinnedChatIds.includes(chat.id) && (
@@ -3491,19 +3491,41 @@ export default function ChatPage() {
                         </span>
                         typing...
                       </span>
-                    ) : (activeChatDetails.isOnline || activeChatDetails.online === 'Online') ? (
-                      <span className="text-white font-medium text-[11px] sm:text-xs flex items-center gap-1.5 select-none truncate whitespace-nowrap">
-                        <span className="relative flex h-2 w-2 items-center justify-center flex-shrink-0">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-300 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-300"></span>
-                        </span>
-                        Online
-                      </span>
-                    ) : activeChatDetails.online ? (
-                      <span className="text-teal-100/90 text-[11px] sm:text-xs select-none truncate whitespace-nowrap">
-                        {activeChatDetails.online}
-                      </span>
-                    ) : null}
+                    ) : (() => {
+                      const isOnline = isUserOnline(
+                        activeChatDetails.lastActiveAt,
+                        activeChatDetails.isOnline || activeChatDetails.online === 'Online',
+                        activeChatDetails.showActivityStatus !== false
+                      );
+                      const lastSeenDisplay = formatLastSeen(
+                        activeChatDetails.lastActiveAt,
+                        isOnline,
+                        activeChatDetails.showActivityStatus !== false,
+                        userTimezone
+                      );
+
+                      if (isOnline) {
+                        return (
+                          <span className="text-white font-medium text-[11px] sm:text-xs flex items-center gap-1.5 select-none truncate whitespace-nowrap">
+                            <span className="relative flex h-2 w-2 items-center justify-center flex-shrink-0">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-300 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-300"></span>
+                            </span>
+                            Online
+                          </span>
+                        );
+                      }
+
+                      if (lastSeenDisplay) {
+                        return (
+                          <span className="text-teal-100/90 text-[11px] sm:text-xs select-none truncate whitespace-nowrap">
+                            {lastSeenDisplay}
+                          </span>
+                        );
+                      }
+
+                      return null;
+                    })()}
                   </div>
                 </div>
               </div>
@@ -3739,16 +3761,16 @@ export default function ChatPage() {
 
                 {/* Render Messages with Date Separators */}
                 {(() => {
-                  let lastDateStr = '';
+                  let lastDateKey = '';
                   return messages.map((msg) => {
-                    const msgDate = new Date(msg.createdAt || Date.now());
-                    const dateStr = msgDate.toDateString();
+                    const dateKey = getDateKeyInTimezone(msg.createdAt, userTimezone);
                     let showSeparator = false;
-                    if (dateStr !== lastDateStr) {
+                    if (dateKey !== lastDateKey) {
                       showSeparator = true;
-                      lastDateStr = dateStr;
+                      lastDateKey = dateKey;
                     }
-                    const separatorText = showSeparator ? formatMessageDateSeparator(msg.createdAt || new Date()) : '';
+                    const separatorText = showSeparator ? formatMessageDateSeparator(msg.createdAt || new Date(), userTimezone) : '';
+                    const msgDisplayTime = formatMessageTime(msg.createdAt || msg.time, userTimezone);
 
                     return (
                       <div 
@@ -3912,7 +3934,7 @@ export default function ChatPage() {
                                 <div className="flex items-center gap-1.5 py-1 px-1 italic text-xs text-zinc-400 dark:text-zinc-500 select-none">
                                   <span>🚫</span>
                                   <span>This message was deleted</span>
-                                  <span className="text-[9px] ml-2 not-italic text-zinc-400">{msg.time}</span>
+                                  <span className="text-[9px] ml-2 not-italic text-zinc-400">{msgDisplayTime}</span>
                                 </div>
                               ) : msg.locationData ? (
                                 <div className="space-y-1">
@@ -3926,7 +3948,7 @@ export default function ChatPage() {
                                   <div className="flex flex-wrap items-end justify-between gap-x-4 min-w-0 w-full">
                                     <div className={`inline-flex items-center gap-1 text-[10px] select-none ml-auto mt-0.5 shrink-0 ${msg.isMe ? 'text-gray-500 dark:text-zinc-400' : 'text-gray-400 dark:text-zinc-500'}`}>
                                       {msg.isEdited && <span className="italic text-[8px] opacity-80">(edited)</span>}
-                                      <span>{msg.time}</span>
+                                      <span>{msgDisplayTime}</span>
                                     </div>
                                   </div>
                                 </div>
@@ -3949,7 +3971,7 @@ export default function ChatPage() {
                                   <div className="flex flex-wrap items-end justify-between gap-x-4 min-w-0 w-full">
                                     <div className={`inline-flex items-center gap-1 text-[10px] select-none ml-auto mt-0.5 shrink-0 ${msg.isMe ? 'text-gray-500 dark:text-zinc-400' : 'text-gray-400 dark:text-zinc-500'}`}>
                                       {msg.isEdited && <span className="italic text-[8px] opacity-80">(edited)</span>}
-                                      <span>{msg.time}</span>
+                                      <span>{msgDisplayTime}</span>
                                     </div>
                                   </div>
                                 </div>
@@ -3965,7 +3987,7 @@ export default function ChatPage() {
                                   </div>
                                   <div className="flex flex-wrap items-end justify-between gap-x-4 min-w-0 w-full">
                                     <div className={`inline-flex items-center gap-1 text-[10px] select-none ml-auto mt-0.5 shrink-0 ${msg.isMe ? 'text-gray-500 dark:text-zinc-400' : 'text-gray-400 dark:text-zinc-500'}`}>
-                                      <span>{msg.time}</span>
+                                      <span>{msgDisplayTime}</span>
                                       {msg.isMe && (
                                         msg.id.startsWith('temp-') ? (
                                           <Clock className="w-3.5 h-3.5 text-gray-400 animate-pulse shrink-0" />
@@ -3993,7 +4015,7 @@ export default function ChatPage() {
                                   <div className="flex flex-wrap items-end justify-between gap-x-4 min-w-0 w-full">
                                     <div className={`inline-flex items-center gap-1 text-[10px] select-none ml-auto mt-0.5 shrink-0 ${msg.isMe ? 'text-gray-500 dark:text-zinc-400' : 'text-gray-400 dark:text-zinc-500'}`}>
                                       {msg.isEdited && <span className="italic text-[8px] opacity-80">(edited)</span>}
-                                      <span>{msg.time}</span>
+                                      <span>{msgDisplayTime}</span>
                                       {msg.isMe && (
                                         msg.id.startsWith('temp-') ? (
                                           <Clock className="w-3.5 h-3.5 text-gray-400 animate-pulse shrink-0" />
@@ -4072,7 +4094,7 @@ export default function ChatPage() {
                                           />
                                           <div className="flex flex-wrap items-end justify-between gap-x-4 min-w-0 w-full mt-1">
                                             <div className={`inline-flex items-center gap-1 text-[10px] select-none ml-auto shrink-0 ${msg.isMe ? 'text-gray-500 dark:text-zinc-400' : 'text-gray-400 dark:text-zinc-500'}`}>
-                                              <span>{msg.time}</span>
+                                              <span>{msgDisplayTime}</span>
                                             </div>
                                           </div>
                                         </div>
@@ -4089,7 +4111,7 @@ export default function ChatPage() {
                                           />
                                           <div className="flex flex-wrap items-end justify-between gap-x-4 min-w-0 w-full mt-1">
                                             <div className={`inline-flex items-center gap-1 text-[10px] select-none ml-auto shrink-0 ${msg.isMe ? 'text-gray-500 dark:text-zinc-400' : 'text-gray-400 dark:text-zinc-500'}`}>
-                                              <span>{msg.time}</span>
+                                              <span>{msgDisplayTime}</span>
                                             </div>
                                           </div>
                                         </div>
@@ -4114,14 +4136,14 @@ export default function ChatPage() {
                                       <MediaAttachmentMessage
                                         mediaInfo={mediaInfo}
                                         isMe={msg.isMe}
-                                        time={msg.time}
+                                        time={msgDisplayTime}
                                         isRead={!activeChatDetails?.isGroup && msg.isRead}
                                         isTemp={msg.id.startsWith('temp-')}
                                         senderName={msg.sender || (msg.isMe ? 'You' : undefined)}
                                         onOpenMediaViewer={(m) => setActiveMediaViewer({ 
                                           ...m, 
                                           sender: m.sender || msg.sender || (msg.isMe ? 'You' : undefined),
-                                          time: m.time || msg.time,
+                                          time: m.time || msgDisplayTime,
                                           duration: m.duration
                                         })}
                                         uploadStatus={msg.uploadStatus}
@@ -4133,7 +4155,7 @@ export default function ChatPage() {
                                         <div className="flex flex-wrap items-end justify-between gap-x-4 min-w-0 w-full">
                                           <div className={`inline-flex items-center gap-1 text-[10px] select-none ml-auto mt-0.5 shrink-0 ${msg.isMe ? 'text-gray-500 dark:text-zinc-400' : 'text-gray-400 dark:text-zinc-500'}`}>
                                             {msg.isEdited && <span className="italic text-[8px] opacity-80">(edited)</span>}
-                                            <span>{msg.time}</span>
+                                            <span>{msgDisplayTime}</span>
                                             {msg.isMe && (
                                               msg.id.startsWith('temp-') ? (
                                                 <Clock className="w-3.5 h-3.5 text-gray-400 animate-pulse shrink-0" />
@@ -4162,7 +4184,7 @@ export default function ChatPage() {
                                     <div className="flex flex-wrap items-end justify-between gap-x-4 min-w-0 w-full">
                                       <div className={`inline-flex items-center gap-1 text-[10px] select-none ml-auto mt-0.5 shrink-0 ${msg.isMe ? 'text-gray-500 dark:text-zinc-400' : 'text-gray-400 dark:text-zinc-500'}`}>
                                         {msg.isEdited && <span className="italic text-[8px] opacity-80">(edited)</span>}
-                                        <span>{msg.time}</span>
+                                        <span>{msgDisplayTime}</span>
                                         {msg.isMe && (
                                           msg.id.startsWith('temp-') ? (
                                             <Clock className="w-3.5 h-3.5 text-gray-400 animate-pulse shrink-0" />
@@ -4661,13 +4683,14 @@ export default function ChatPage() {
                                       {member.name} {member.id === currentUserId && "(You)"}
                                     </p>
                                     <p className="text-[10px] text-gray-400 truncate">
-                                      {member.isOnline ? (
-                                        <span className="text-emerald-500 font-semibold">Online</span>
-                                      ) : member.lastSeenText ? (
-                                        <span>{member.lastSeenText}</span>
-                                      ) : (
-                                        <span>@{member.username}</span>
-                                      )}
+                                      {(() => {
+                                        const online = isUserOnline(member.lastActiveAt, member.isOnline, member.showActivityStatus !== false);
+                                        if (online) return <span className="text-emerald-500 font-semibold">Online</span>;
+                                        if (member.lastActiveAt && member.showActivityStatus !== false) {
+                                          return <span>{formatLastSeen(member.lastActiveAt, false, true, userTimezone)}</span>;
+                                        }
+                                        return <span>{member.lastSeenText || `@${member.username}`}</span>;
+                                      })()}
                                     </p>
                                   </div>
                                 </div>
@@ -5077,13 +5100,14 @@ export default function ChatPage() {
                           {member.name} {member.id === currentUserId && "(You)"}
                         </p>
                         <p className="text-[10px] text-zinc-400 truncate">
-                          {member.isOnline ? (
-                            <span className="text-emerald-400 font-semibold">Online</span>
-                          ) : member.lastSeenText ? (
-                            <span>{member.lastSeenText}</span>
-                          ) : (
-                            <span>@{member.username}</span>
-                          )}
+                          {(() => {
+                            const online = isUserOnline(member.lastActiveAt, member.isOnline, member.showActivityStatus !== false);
+                            if (online) return <span className="text-emerald-400 font-semibold">Online</span>;
+                            if (member.lastActiveAt && member.showActivityStatus !== false) {
+                              return <span>{formatLastSeen(member.lastActiveAt, false, true, userTimezone)}</span>;
+                            }
+                            return <span>{member.lastSeenText || `@${member.username}`}</span>;
+                          })()}
                         </p>
                       </div>
                     </div>
