@@ -21,19 +21,7 @@ export async function POST(req: Request) {
 
     const cleanEmail = email.toLowerCase().trim();
 
-    // Generate 6-digit verification OTP immediately
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-
-    // Send verification email via Resend (ALWAYS, no conditions)
-    try {
-      await sendOtp(cleanEmail, otp);
-    } catch (err) {
-      console.error('[Email Service] Failed to send verification email:', err);
-      // Don't block signup if email fails, user can request a resend later
-    }
-
-    // NOW perform validation checks (bot name check, etc.)
+    // Perform validation checks (bot name check, etc.)
     if (checkBotStatus(cleanEmail, name)) {
       return NextResponse.json({ message: "Registration disabled for automated/bot accounts." }, { status: 403 });
     }
@@ -42,6 +30,18 @@ export async function POST(req: Request) {
     const existing = await prisma.user.findUnique({ where: { email: cleanEmail } });
     if (existing) {
       return NextResponse.json({ message: "Email already taken" }, { status: 400 });
+    }
+
+    // Generate 6-digit verification OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    // Send verification email via Resend
+    try {
+      await sendOtp(cleanEmail, otp);
+    } catch (err) {
+      console.error('[Email Service] Failed to send verification email:', err);
+      // Don't block signup if email fails, user can request a resend later
     }
 
 

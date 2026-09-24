@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
 import { aiGateway } from '@/lib/ai-gateway/router';
 import { GroupAIActionRequest } from '@/lib/ai-gateway/types';
 
@@ -6,6 +8,11 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body: GroupAIActionRequest = await req.json();
 
     if (!body.action) {
