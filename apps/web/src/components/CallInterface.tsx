@@ -73,9 +73,19 @@ export function CallInterface({
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
   const [isReconnecting, setIsReconnecting] = useState(false);
 
-  // State refs for duplicate prevention & async callbacks
+  // State & callback refs for duplicate prevention & stable async socket callbacks
   const currentCallIdRef = useRef<string | null>(null);
   const callStateRef = useRef<string>('idle');
+  const socketRef = useRef<Socket | null>(null);
+  const latestInitiateCallRef = useRef<any>(null);
+  const latestStartRingtoneRef = useRef<any>(null);
+  const latestStopAudioRef = useRef<any>(null);
+  const latestPlayBusyToneRef = useRef<any>(null);
+  const latestPlayEndToneRef = useRef<any>(null);
+  const latestResetCallRef = useRef<any>(null);
+  const latestCleanupWebRTCRef = useRef<any>(null);
+  const latestAcceptCallRef = useRef<any>(null);
+
   useEffect(() => {
     currentCallIdRef.current = currentCallId;
     callStateRef.current = callState;
@@ -92,7 +102,7 @@ export function CallInterface({
     ]
   };
 
-  // 1. Web Audio API Init & Unlock on User Gestures
+  // 1. Web Audio API Init & Safe Unlock on User Gestures
   const initAudioContext = useCallback(() => {
     if (typeof window === 'undefined') return;
     try {
@@ -108,16 +118,11 @@ export function CallInterface({
     } catch (_) {}
   }, []);
 
-  // Unlock AudioContext and request notification permission on first user click/touch
+  // Unlock AudioContext safely on first user gesture without blocking or hijacking clicks
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const unlock = () => {
       initAudioContext();
-      if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
-        try {
-          Notification.requestPermission().catch(() => {});
-        } catch (_) {}
-      }
       window.removeEventListener('click', unlock);
       window.removeEventListener('touchstart', unlock);
     };
@@ -410,40 +415,43 @@ export function CallInterface({
   // 5. End Active Call
   const endCall = useCallback(() => {
     const id = currentCallIdRef.current;
-    if (socket && id) {
+    const s = socketRef.current || socket;
+    if (s && id) {
       try {
         if (typeof BroadcastChannel !== 'undefined') {
           new BroadcastChannel('tolee_calls').postMessage({ type: 'CALL_ENDED', callId: id });
         }
       } catch (_) {}
-      socket.emit('end-call', { callId: id });
+      s.emit('end-call', { callId: id });
     }
     stopAudioAndVibration();
     setCallState('ended');
     playEndTone();
     setTimeout(() => resetCall(), 1200);
-  }, [socket, stopAudioAndVibration, playEndTone, resetCall]);
+  }, [stopAudioAndVibration, playEndTone, resetCall]);
 
   // 6. Reject Incoming Call
   const rejectIncomingCall = useCallback((reason: 'declined' | 'busy' | 'failed' = 'declined') => {
     const id = currentCallIdRef.current;
-    if (socket && id) {
+    const s = socketRef.current || socket;
+    if (s && id) {
       try {
         if (typeof BroadcastChannel !== 'undefined') {
           new BroadcastChannel('tolee_calls').postMessage({ type: 'CALL_REJECTED', callId: id });
         }
       } catch (_) {}
-      socket.emit('reject-call', { callId: id, reason });
+      s.emit('reject-call', { callId: id, reason });
     }
     stopAudioAndVibration();
     setCallState('idle');
     resetCall();
-  }, [socket, stopAudioAndVibration, resetCall]);
+  }, [stopAudioAndVibration, resetCall]);
 
   // 7. Accept Incoming Call
   const acceptIncomingCall = useCallback(async () => {
     const id = currentCallIdRef.current;
-    if (!socket || !id) return;
+    const s = socketRef.current || socket;
+    if (!s || !id) return;
 
     stopAudioAndVibration();
     setCallState('connecting');
@@ -503,8 +511,8 @@ export function CallInterface({
 
       // Handle ICE candidates
       pc.onicecandidate = (event) => {
-        if (event.candidate) {
-          socket.emit('ice-candidate', {
+        if (event.candidate && s) {
+          s.emit('ice-candidate', {
             toUserId: partner.id,
             candidate: event.candidate,
             callId: id
@@ -530,10 +538,12 @@ export function CallInterface({
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
 
-        socket.emit('accept-call', {
-          callId: id,
-          answer
-        });
+        if (s) {
+          s.emit('accept-call', {
+            callId: id,
+            answer
+          });
+        }
 
         await processIceQueue();
       }
@@ -544,7 +554,7 @@ export function CallInterface({
       console.error('[Call Client] Failed to accept incoming call:', err);
       rejectIncomingCall('failed');
     }
-  }, [socket, callType, partner.id, rejectIncomingCall, stopAudioAndVibration]);
+  }, [callType, partner.id, rejectIncomingCall, stopAudioAndVibration]);
 
   // 8. Outgoing Call Setup
   const initiateCall = useCallback(async (
@@ -554,7 +564,8 @@ export function CallInterface({
     targetAvatar?: string
   ) => {
     const destId = targetId || activeRecipientId;
-    if (!socket || !destId) {
+    const s = socketRef.current || socket;
+    if (!s || !destId) {
       console.warn('[Call Client] Cannot initiate call without socket or recipient ID');
       return;
     }
@@ -629,8 +640,8 @@ export function CallInterface({
       });
 
       pc.onicecandidate = (event) => {
-        if (event.candidate) {
-          socket.emit('ice-candidate', {
+        if (event.candidate && s) {
+          s.emit('ice-candidate', {
             toUserId: destId,
             candidate: event.candidate,
             callId
@@ -651,7 +662,7 @@ export function CallInterface({
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
 
-      socket.emit('call-user', {
+      s.emit('call-user', {
         toUserId: destId,
         callerName: currentUserName,
         callerAvatar: currentUserAvatar,
@@ -666,7 +677,7 @@ export function CallInterface({
       stopAudioAndVibration();
       setTimeout(() => resetCall(), 3000);
     }
-  }, [socket, activeRecipientId, activeRecipientName, activeRecipientAvatar, currentUserName, currentUserAvatar, initAudioContext, playDialTone, playBusyTone, stopAudioAndVibration, resetCall]);
+  }, [activeRecipientId, activeRecipientName, activeRecipientAvatar, currentUserName, currentUserAvatar, initAudioContext, playDialTone, playBusyTone, stopAudioAndVibration, resetCall]);
 
   // 9. Camera Flip / Switch (Front vs Back)
   const switchCamera = async () => {
@@ -740,7 +751,19 @@ export function CallInterface({
     setIsSpeakerOn(prev => !prev);
   };
 
-  // 11. Socket.io Connection & Signaling Event Listeners
+  // Sync stable callback refs on every render without triggering re-render loops
+  useEffect(() => {
+    latestInitiateCallRef.current = initiateCall;
+    latestStartRingtoneRef.current = startRingtoneAndVibration;
+    latestStopAudioRef.current = stopAudioAndVibration;
+    latestPlayBusyToneRef.current = playBusyTone;
+    latestPlayEndToneRef.current = playEndTone;
+    latestResetCallRef.current = resetCall;
+    latestCleanupWebRTCRef.current = cleanupWebRTC;
+    latestAcceptCallRef.current = acceptIncomingCall;
+  });
+
+  // 11. Socket.io Connection & Signaling Event Listeners (Initialized ONCE per user)
   useEffect(() => {
     if (!currentUserId) return;
 
@@ -751,6 +774,8 @@ export function CallInterface({
       reconnectionAttempts: 10,
       reconnectionDelay: 1500
     });
+    socketRef.current = s;
+    setSocket(s);
 
     s.on('connect', () => {
       console.log('[Call Client] Connected to signaling server:', s.id);
@@ -775,7 +800,7 @@ export function CallInterface({
       setIsMinimized(false);
 
       (window as any).incomingOffer = offer;
-      startRingtoneAndVibration(fromName, type, callId);
+      latestStartRingtoneRef.current?.(fromName, type, callId);
     });
 
     // Handle Remote Ringing Status (Caller Side)
@@ -785,7 +810,7 @@ export function CallInterface({
 
     // Handle Call Accepted by Remote Peer
     s.on('call-accepted', async ({ answer }) => {
-      stopAudioAndVibration();
+      latestStopAudioRef.current?.();
       setCallState('connected');
       if (callTimeoutTimerRef.current) {
         clearTimeout(callTimeoutTimerRef.current);
@@ -803,28 +828,28 @@ export function CallInterface({
 
     // Handle Call Rejection
     s.on('call-rejected', ({ reason }) => {
-      stopAudioAndVibration();
+      latestStopAudioRef.current?.();
       setFailureReason(reason || 'declined');
       setCallState('failed');
-      playBusyTone();
-      setTimeout(() => resetCall(), 3500);
+      latestPlayBusyToneRef.current?.();
+      setTimeout(() => latestResetCallRef.current?.(), 3500);
     });
 
     // Handle Call Failure (Busy / Offline / Timeout)
     s.on('call-failed', ({ reason }) => {
-      stopAudioAndVibration();
+      latestStopAudioRef.current?.();
       setFailureReason(reason || 'failed');
       setCallState('failed');
-      playBusyTone();
-      setTimeout(() => resetCall(), 3500);
+      latestPlayBusyToneRef.current?.();
+      setTimeout(() => latestResetCallRef.current?.(), 3500);
     });
 
     // Handle Call Ended
     s.on('call-ended', () => {
-      stopAudioAndVibration();
+      latestStopAudioRef.current?.();
       setCallState('ended');
-      playEndTone();
-      setTimeout(() => resetCall(), 1500);
+      latestPlayEndToneRef.current?.();
+      setTimeout(() => latestResetCallRef.current?.(), 1500);
     });
 
     // Handle Remote ICE Candidates
@@ -842,8 +867,6 @@ export function CallInterface({
       }
     });
 
-    setSocket(s);
-
     // Global helper for opening outgoing calls from any button in the app
     (window as any).startOutgoingCall = (
       type: 'audio' | 'video',
@@ -851,16 +874,17 @@ export function CallInterface({
       targetName?: string,
       targetAvatar?: string
     ) => {
-      initiateCall(type, targetId, targetName, targetAvatar);
+      latestInitiateCallRef.current?.(type, targetId, targetName, targetAvatar);
     };
 
     return () => {
       s.disconnect();
-      stopAudioAndVibration();
-      cleanupWebRTC();
+      socketRef.current = null;
+      latestStopAudioRef.current?.();
+      latestCleanupWebRTCRef.current?.();
       delete (window as any).startOutgoingCall;
     };
-  }, [currentUserId, initiateCall, startRingtoneAndVibration, stopAudioAndVibration, playBusyTone, playEndTone, resetCall, cleanupWebRTC]);
+  }, [currentUserId]);
 
   // 12. Multi-Tab Broadcast Channel Sync
   useEffect(() => {
@@ -870,9 +894,9 @@ export function CallInterface({
     bc.onmessage = (event) => {
       const { type, callId } = event.data || {};
       if (type === 'CALL_ANSWERED' || type === 'CALL_REJECTED' || type === 'CALL_ENDED') {
-        if (callState === 'incoming' && (!callId || callId === currentCallId)) {
-          stopAudioAndVibration();
-          resetCall();
+        if (callStateRef.current === 'incoming' && (!callId || callId === currentCallIdRef.current)) {
+          latestStopAudioRef.current?.();
+          latestResetCallRef.current?.();
         }
       }
     };
@@ -880,7 +904,7 @@ export function CallInterface({
     return () => {
       bc.close();
     };
-  }, [callState, currentCallId, stopAudioAndVibration, resetCall]);
+  }, []);
 
   // 13. Service Worker Signal & URL Search Params Handling (Push Notifications / PWA)
   useEffect(() => {
@@ -897,20 +921,20 @@ export function CallInterface({
       const type = (params.get('callType') as 'audio' | 'video') || 'audio';
 
       if (callId) {
-        if (incoming === 'true' && callState === 'idle') {
+        if (incoming === 'true' && callStateRef.current === 'idle') {
           setCallType(type);
           setPartner({ id: callerId || '', name: decodeURIComponent(callerName), avatar: decodeURIComponent(callerAvatar) });
           setCurrentCallId(callId);
           setCallState('incoming');
-          startRingtoneAndVibration(decodeURIComponent(callerName), type, callId);
-        } else if (action === 'answer' && (callState === 'incoming' || callState === 'idle')) {
+          latestStartRingtoneRef.current?.(decodeURIComponent(callerName), type, callId);
+        } else if (action === 'answer' && (callStateRef.current === 'incoming' || callStateRef.current === 'idle')) {
           setCallType(type);
           setPartner({ id: callerId || '', name: decodeURIComponent(callerName), avatar: decodeURIComponent(callerAvatar) });
           setCurrentCallId(callId);
-          acceptIncomingCall();
+          latestAcceptCallRef.current?.();
         }
 
-        // Clean query params from URL
+        // Clean query params from URL without wiping Next.js App Router state
         const cleanUrl = new URL(window.location.href);
         cleanUrl.searchParams.delete('callId');
         cleanUrl.searchParams.delete('action');
@@ -919,7 +943,7 @@ export function CallInterface({
         cleanUrl.searchParams.delete('callerName');
         cleanUrl.searchParams.delete('callerAvatar');
         cleanUrl.searchParams.delete('callType');
-        window.history.replaceState({}, '', cleanUrl.pathname + (cleanUrl.search ? cleanUrl.search : ''));
+        window.history.replaceState(window.history.state, '', cleanUrl.pathname + (cleanUrl.search ? cleanUrl.search : ''));
       }
     };
 
@@ -933,7 +957,7 @@ export function CallInterface({
             setCurrentCallId(callId);
             setCallType(callType || 'audio');
             setPartner({ id: callerId || '', name: callerName || 'Tolee User', avatar: callerAvatar || '/default-user-avatar.svg' });
-            acceptIncomingCall();
+            latestAcceptCallRef.current?.();
           }
         } else if (type === 'INCOMING_CALL_SIGNAL') {
           if (callId && callStateRef.current === 'idle') {
@@ -941,7 +965,7 @@ export function CallInterface({
             setCallType(callType || 'audio');
             setPartner({ id: callerId || '', name: callerName || 'Tolee User', avatar: callerAvatar || '/default-user-avatar.svg' });
             setCallState('incoming');
-            startRingtoneAndVibration(callerName || 'Tolee User', callType || 'audio', callId);
+            latestStartRingtoneRef.current?.(callerName || 'Tolee User', callType || 'audio', callId);
           }
         }
       };
@@ -951,7 +975,7 @@ export function CallInterface({
         navigator.serviceWorker.removeEventListener('message', handleSwMessage);
       };
     }
-  }, [callState, acceptIncomingCall, startRingtoneAndVibration]);
+  }, []);
 
   // Duration Counter
   useEffect(() => {
