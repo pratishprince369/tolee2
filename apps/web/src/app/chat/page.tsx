@@ -4100,6 +4100,18 @@ export default function ChatPage() {
                                           }
                                         </span>
                                       </div>
+                                      {!msg.isMe && (cStatus === 'missed' || cStatus === 'declined') && (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleStartCall(cType === 'video' ? 'video' : 'audio');
+                                          }}
+                                          className="ml-auto flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#0E8B83]/15 text-[#0E8B83] dark:text-teal-300 dark:bg-teal-900/40 hover:bg-[#0E8B83]/25 active:scale-95 transition-all shrink-0"
+                                        >
+                                          <Phone className="w-3 h-3" />
+                                          <span>Call Back</span>
+                                        </button>
+                                      )}
                                     </div>
                                   );
                                 })()

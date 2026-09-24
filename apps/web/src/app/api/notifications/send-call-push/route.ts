@@ -46,7 +46,8 @@ export async function POST(req: Request) {
         callerName,
         callerAvatar: callerAvatar || '',
         callId,
-        receiverId
+        receiverId,
+        url: `/chat?callId=${callId}&incoming=true&callerId=${callerId}&callerName=${encodeURIComponent(callerName)}&callerAvatar=${encodeURIComponent(callerAvatar || '')}&callType=${callType}`
       }
     );
 

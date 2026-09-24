@@ -158,6 +158,9 @@ export async function sendPushNotification(
         headers: {
           Urgency: 'high'
         },
+        fcmOptions: {
+          link: data?.url || '/chat'
+        },
         notification: isCall ? {
           title: `📞 Incoming ${data.callType === 'video' ? 'Video' : 'Audio'} Call`,
           body: `${data.callerName || 'Someone'} is calling you on Tolee...`,

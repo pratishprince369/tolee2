@@ -136,14 +136,18 @@ self.addEventListener('notificationclick', (event) => {
       return;
     }
 
-    // Answer action or clicking the notification body
-    const targetUrl = data.url || `/chat?callId=${data.callId}&action=answer`;
+    // Answer action vs clicking the notification body
+    const isAnswerAction = action === 'answer';
+    const targetUrl = isAnswerAction 
+      ? `/chat?callId=${data.callId}&action=answer&callerId=${data.callerId}&callerName=${encodeURIComponent(data.callerName || '')}&callerAvatar=${encodeURIComponent(data.callerAvatar || '')}&callType=${data.callType || 'audio'}`
+      : `/chat?callId=${data.callId}&incoming=true&callerId=${data.callerId}&callerName=${encodeURIComponent(data.callerName || '')}&callerAvatar=${encodeURIComponent(data.callerAvatar || '')}&callType=${data.callType || 'audio'}`;
+
     event.waitUntil(
       self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
         for (const client of clientList) {
           if ('focus' in client) {
             client.postMessage({
-              type: 'INCOMING_CALL_ANSWER_SIGNAL',
+              type: isAnswerAction ? 'INCOMING_CALL_ANSWER_SIGNAL' : 'INCOMING_CALL_SIGNAL',
               callId: data.callId,
               callType: data.callType,
               callerId: data.callerId,

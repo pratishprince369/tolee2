@@ -434,6 +434,45 @@ io.on('connection', (socket) => {
 
     console.log(`[Signaling] ${callerName} (${callerId}) is calling ${toUserId} via ${type}`);
 
+    // Check if either receiver or caller is already on another active call
+    let isReceiverBusy = false;
+    let isCallerBusy = false;
+    for (const [, activeCall] of activeCalls.entries()) {
+      if ((activeCall.receiverId === toUserId || activeCall.callerId === toUserId) &&
+          (activeCall.status === 'connected' || activeCall.status === 'ringing')) {
+        isReceiverBusy = true;
+        break;
+      }
+      if ((activeCall.receiverId === callerId || activeCall.callerId === callerId) &&
+          (activeCall.status === 'connected' || activeCall.status === 'ringing')) {
+        isCallerBusy = true;
+        break;
+      }
+    }
+
+    if (isReceiverBusy || isCallerBusy) {
+      console.log(`[Signaling] Call aborted: ${isReceiverBusy ? 'Receiver is busy' : 'Caller is already in a call'}`);
+      socket.emit('call-failed', { callId, reason: 'busy' });
+      if (isReceiverBusy) {
+        try {
+          await prisma.call.create({
+            data: {
+              id: callId,
+              callerId,
+              receiverId: toUserId,
+              type,
+              status: 'busy',
+              duration: 0
+            }
+          });
+          await logCallAsChatMessage(callerId, toUserId, type, 'busy', 0);
+        } catch (dbErr) {
+          console.error('[Signaling] Failed to record busy call:', dbErr);
+        }
+      }
+      return;
+    }
+
     // Create call history log in database as "ringing" initially
     let dbCall;
     try {
