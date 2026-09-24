@@ -3,7 +3,8 @@ export type AIProviderType =
   | 'gemini_official'
   | 'openai'
   | 'claude'
-  | 'nvidia';
+  | 'nvidia'
+  | 'freellmapi';
 
 export interface AIMessagePayload {
   role: 'user' | 'assistant' | 'system';

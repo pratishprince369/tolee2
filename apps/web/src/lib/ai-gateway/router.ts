@@ -12,10 +12,12 @@ import { GeminiOfficialProvider } from './providers/gemini-official';
 import { ClodOpenAIProvider } from './providers/clod-openai';
 import { GeminiWeb2APIProvider } from './providers/gemini-web2api';
 import { FallbackProvider } from './providers/fallback-provider';
+import { FreeLLMAPIProvider } from './providers/freellmapi';
 import { buildAIContext } from './context-builder';
 import { CentralAIEngine } from './central-engine';
 
 class AIGatewayRouter {
+  private freellmapi = new FreeLLMAPIProvider();
   private nvidia = new NvidiaNIMProvider();
   private geminiOfficial = new GeminiOfficialProvider();
   private clod = new ClodOpenAIProvider();
@@ -26,31 +28,35 @@ class AIGatewayRouter {
     const hasImage = options?.messages?.some((m) => m.mediaUrl && m.mediaType?.startsWith('image/'));
     const preferred = options?.persona?.preferredProvider;
 
-    // 1. Multimodal / Vision routing -> Gemini Official first, then OpenAI fallback
+    // 1. Multimodal / Vision routing -> Gemini Official first, then OpenAI/FreeLLM fallback
     if (hasImage) {
-      return [this.geminiOfficial, this.web2api, this.clod, this.nvidia, this.fallback];
+      return [this.geminiOfficial, this.web2api, this.freellmapi, this.clod, this.nvidia, this.fallback];
     }
 
     // 2. Explicit provider preference
+    if (preferred === 'freellmapi') {
+      return [this.freellmapi, this.nvidia, this.geminiOfficial, this.clod, this.fallback];
+    }
     if (preferred === 'nvidia') {
-      return [this.nvidia, this.geminiOfficial, this.clod, this.fallback, this.web2api];
+      return [this.nvidia, this.freellmapi, this.geminiOfficial, this.clod, this.fallback, this.web2api];
     }
     if (preferred === 'gemini_official') {
-      return [this.geminiOfficial, this.nvidia, this.clod, this.web2api, this.fallback];
+      return [this.geminiOfficial, this.freellmapi, this.nvidia, this.clod, this.web2api, this.fallback];
     }
     if (preferred === 'claude' || preferred === 'openai') {
-      return [this.clod, this.nvidia, this.geminiOfficial, this.fallback, this.web2api];
+      return [this.clod, this.freellmapi, this.nvidia, this.geminiOfficial, this.fallback, this.web2api];
     }
     if (preferred === 'gemini_web2api') {
-      return [this.web2api, this.nvidia, this.geminiOfficial, this.fallback];
+      return [this.web2api, this.freellmapi, this.nvidia, this.geminiOfficial, this.fallback];
     }
 
-    // 3. Default Capability-based Order: NVIDIA NIM -> Google Gemini -> Claude/OpenAI -> Web2API -> Fallback
-    return [this.nvidia, this.geminiOfficial, this.clod, this.web2api, this.fallback];
+    // 3. Default Capability-based Order: FreeLLMAPI -> NVIDIA NIM -> Google Gemini -> Claude/OpenAI -> Web2API -> Fallback
+    return [this.freellmapi, this.nvidia, this.geminiOfficial, this.clod, this.web2api, this.fallback];
   }
 
   async checkProvidersStatus() {
-    const [nvidiaOk, geminiOk, clodOk, web2apiOk, fallbackOk] = await Promise.all([
+    const [freellmOk, nvidiaOk, geminiOk, clodOk, web2apiOk, fallbackOk] = await Promise.all([
+      this.freellmapi.isAvailable().catch(() => false),
       this.nvidia.isAvailable().catch(() => false),
       this.geminiOfficial.isAvailable().catch(() => false),
       this.clod.isAvailable().catch(() => false),
@@ -59,6 +65,16 @@ class AIGatewayRouter {
     ]);
 
     return [
+      {
+        id: 'freellmapi',
+        name: 'FreeLLMAPI Unified Multi-Model Gateway (34 Providers)',
+        type: 'freellmapi',
+        status: freellmOk ? 'CONNECTED' : 'OFFLINE',
+        defaultModel: 'auto-free-pool',
+        isVision: true,
+        isVoice: false,
+        isStreaming: true,
+      },
       {
         id: 'nvidia',
         name: 'NVIDIA NIM Frontier Cluster',
