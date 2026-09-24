@@ -33,7 +33,7 @@ export const metadata: Metadata = {
   },
 };
 
-import { ClientRedirect } from '@/components/ClientRedirect';
+import { redirect } from 'next/navigation';
 import { ToleeLandingHome } from '@/components/landing/ToleeLandingHome';
 
 export default async function Home() {
@@ -41,7 +41,7 @@ export default async function Home() {
   const isAuthenticated = !!session?.user;
 
   if (isAuthenticated) {
-    return <ClientRedirect to="/feed" />;
+    redirect('/feed');
   }
 
   return <ToleeLandingHome />;

@@ -6,7 +6,12 @@ import { useRouter } from 'next/navigation';
 export function ClientRedirect({ to }: { to: string }) {
   const router = useRouter();
   React.useEffect(() => {
-    router.replace(to);
+    try {
+      router.replace(to);
+    } catch (_) {}
+    if (typeof window !== 'undefined') {
+      window.location.replace(to);
+    }
   }, [router, to]);
 
   return (
