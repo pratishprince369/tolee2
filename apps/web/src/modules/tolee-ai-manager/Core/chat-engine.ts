@@ -216,10 +216,44 @@ export async function generateAIImageWithFallback(prompt: string, modelType?: st
     } catch (err: any) {}
   }
 
+  // 2. FreeLLMAPI Unified Image Generation Gateway (/v1/images/generations with FLUX / SD)
+  const freellmBase = (process.env.FREELLMAPI_URL || process.env.FREELLMAPI_BASE_URL || 'http://localhost:8080/v1').replace(/\/+$/, '');
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(`${freellmBase}/images/generations`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${process.env.FREELLMAPI_API_KEY || 'freellmapi-root'}`
+      },
+      body: JSON.stringify({
+        prompt: enhancedPrompt,
+        model: 'flux',
+        size: '1024x1024'
+      }),
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    if (res.ok) {
+      const data = await res.json();
+      const b64 = data.data?.[0]?.b64_json;
+      const url = data.data?.[0]?.url;
+      if (b64) {
+        const cdnUrl = await uploadToCloudinarySafe(`data:image/png;base64,${b64}`);
+        return cdnUrl;
+      }
+      if (url) {
+        const cdnUrl = await uploadToCloudinarySafe(url);
+        return cdnUrl;
+      }
+    }
+  } catch (err: any) {}
+
   const sdKey = process.env.NVIDIA_SD35_KEY || "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";
   const fluxKey = process.env.NVIDIA_FLUX_SCHNELL_KEY || "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";
 
-  // 2. NVIDIA NIM Stability AI SD 3.5 Large & Black Forest Labs FLUX.1 Schnell
+  // 3. NVIDIA NIM Stability AI SD 3.5 Large & Black Forest Labs FLUX.1 Schnell
   const providers = [
     {
       key: sdKey,
