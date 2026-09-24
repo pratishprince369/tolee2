@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { extractYouTubeVideoId } from '@/lib/youtube';
+import { getTrendingYouTubeShorts } from '@/lib/youtubeShortsService';
 import type { Metadata } from 'next';
 
 export const dynamic = 'force-dynamic';
@@ -422,38 +423,17 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
     console.error("Failed to load DB reels", err);
   }
 
-  // If no database reels, fall back to some mock data just to show UI
-  if (dbReels.length === 0) {
-    dbReels = [
-      {
-        id: 'mock-1',
-        video: 'https://videos.pexels.com/video-files/7823396/7823396-hd_1080_1920_30fps.mp4',
-        toleeName: 'AI Automation Society',
-        toleeSlug: 'ai-automation-society',
-        author: 'Alex Johnson',
-        authorAvatar: 'https://i.pravatar.cc/150?u=99',
-        caption: '3 tools you must know to build an AI agency in 2024. 🚀 Watch till the end! #ai #automation #business',
-        likes: '45.2k',
-        comments: '1.2k',
-        shares: '8.4k',
-        audio: 'Original Audio - Alex Johnson',
-        isVerified: true
-      },
-      {
-        id: 'mock-2',
-        video: 'https://videos.pexels.com/video-files/10395606/10395606-hd_1080_1920_24fps.mp4',
-        toleeName: 'That Pickleball Tolee',
-        toleeSlug: 'pickleball',
-        author: 'Sarah Chen',
-        authorAvatar: 'https://i.pravatar.cc/150?u=41',
-        caption: 'Perfect your backhand spin with this simple drill 🏓🔥 Practice this 10 mins daily!',
-        likes: '12.8k',
-        comments: '342',
-        shares: '2.1k',
-        audio: 'Pickleball Masters - Trending',
-        isVerified: false
-      }
-    ];
+  // 🎥 Auto-fetch trending YouTube Shorts so the reels feed is ALWAYS full and active
+  try {
+    const shortsLimit = Math.max(15, 25 - dbReels.length);
+    const trendingShorts = await getTrendingYouTubeShorts(shortsLimit);
+    if (trendingShorts.length > 0) {
+      const existingIds = new Set(dbReels.map((r: any) => r.youtubeId || r.id));
+      const freshShorts = trendingShorts.filter((s: any) => !existingIds.has(s.youtubeId) && !existingIds.has(s.id));
+      dbReels = [...dbReels, ...freshShorts];
+    }
+  } catch (shortsErr) {
+    console.warn('YouTube Shorts auto-fetch notice:', shortsErr);
   }
 
   return <ReelsStream initialReels={dbReels} />;
