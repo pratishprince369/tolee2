@@ -71,19 +71,7 @@ export const metadata: Metadata = {
 
 import { Providers } from "@/components/Providers";
 import { BottomNav } from "@/components/BottomNav";
-import { OnboardingModal } from "@/components/OnboardingModal";
-import { OnboardingReminder } from "@/components/OnboardingReminder";
-import { AdsWalletWelcomeModal } from "@/components/AdsWalletWelcomeModal";
-import { UsernameSetupModal } from "@/components/UsernameSetupModal";
-import { AuthModal } from "@/components/AuthModal";
-import { PushNotificationManager } from "@/components/PushNotificationManager";
-import { ApkPromoManager } from "@/components/ApkPromoManager";
-import { PwaManager } from "@/components/PwaManager";
-import { MediaPickerModal } from "@/components/MediaPickerModal";
-import { GlobalAlarmListener } from "@/components/GlobalAlarmListener";
-import { CallInterface } from "@/components/CallInterface";
-import { DraftsReminderBanner } from "@/components/DraftsReminderBanner";
-import { OfflineSmartPocketBanner } from "@/components/OfflineSmartPocketBanner";
+import { ClientModals } from "@/components/ClientModals";
 import AnalyticsTracker from "@/components/AnalyticsTracker";
 import { RoutePrefetcher } from "@/components/RoutePrefetcher";
 import { MainLayoutWrapper } from "@/components/MainLayoutWrapper";
@@ -271,19 +259,7 @@ export default async function RootLayout({
       <body className="antialiased min-h-screen bg-background flex flex-col">
         <Providers>
           <RoutePrefetcher />
-          <OfflineSmartPocketBanner />
-          <GlobalAlarmListener />
-          <CallInterface />
-          <OnboardingModal />
-          <OnboardingReminder />
-          <AdsWalletWelcomeModal />
-          <UsernameSetupModal />
-          <AuthModal />
-          <PushNotificationManager />
-          <ApkPromoManager />
-          <PwaManager />
-          <MediaPickerModal />
-          <DraftsReminderBanner />
+          <ClientModals />
           <Suspense fallback={null}>
             <AnalyticsTracker />
           </Suspense>

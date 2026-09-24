@@ -345,7 +345,7 @@ export async function getPosts(options?: { mediaType?: string; limit?: number })
         ]
       },
       orderBy: { createdAt: 'desc' },
-      take: isSimOn ? 250 : 50, // Grab a larger pool when simulation is active for proper mixing
+      take: isSimOn ? Math.min(limit * 3, 90) : Math.min(limit * 2, 45), // ponytail: Lean candidate pool prevents excessive database egress while ensuring smooth 70/30 feed mixing
       select: {
         id: true,
         caption: true,

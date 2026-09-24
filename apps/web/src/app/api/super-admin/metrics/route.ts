@@ -346,11 +346,13 @@ export async function GET(req: NextRequest) {
     const todayNewsCount = await prismaAI.newsPost.count({ where: { createdAt: { gte: todayStart } } }).catch(() => 0);
     const monthNewsCount = await prismaAI.newsPost.count({ where: { createdAt: { gte: monthStart } } }).catch(() => 0);
     const aiDbPostCount = await prismaAI.post.count().catch(() => 0);
+    const monthPostsCount = await prisma.post.count({ where: { createdAt: { gte: monthStart }, isSimulation: showSimulated } }).catch(() => 0);
 
-    // Main DB transfer (real users only — should be very low)
+    // Main DB monthly network egress (monthly active user queries and new content — keep below 1 GB)
+    // ponytail: monthly egress tracks current billing cycle activity, avoiding cumulative lifetime post accumulation
     const estimatedMainTransferMB = Math.max(
-      parseFloat(((totalPosts * 0.4 + totalUsers * 0.2 + (activeMonth * 0.8))).toFixed(2)),
-      10
+      parseFloat(((monthPostsCount * 0.25 + activeMonth * 0.35 + newThisMonth * 0.15)).toFixed(2)),
+      12.5
     );
     // AI DB transfer (news posts, videos — separate from main)
     const estimatedAITransferMB = Math.max(
