@@ -53,31 +53,62 @@ CORE PERSONALITY & TONE:
     ];
 
     const tools = ToolRegistry.toOpenAITools();
+    const freellmBase = (process.env.FREELLMAPI_URL || process.env.FREELLMAPI_BASE_URL || 'http://localhost:8080/v1').replace(/\/+$/, '');
+    const freellmKey = process.env.FREELLMAPI_API_KEY || 'freellmapi-root';
 
     try {
+      // Helper function to dispatch OpenAI-compatible tool calling
+      const callLLM = async (callMessages: any[], maxTokens = 1024) => {
+        // 1. Try FreeLLMAPI Unified Gateway first
+        try {
+          const c = new AbortController();
+          const t = setTimeout(() => c.abort(), 6000);
+          const fRes = await fetch(`${freellmBase}/chat/completions`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${freellmKey}`,
+            },
+            body: JSON.stringify({
+              model: 'auto',
+              messages: callMessages,
+              tools,
+              tool_choice: 'auto',
+              temperature: 0.3,
+              max_tokens: maxTokens,
+            }),
+            signal: c.signal,
+          });
+          clearTimeout(t);
+          if (fRes.ok) return await fRes.json();
+        } catch {}
+
+        // 2. Fallback to NVIDIA NIM
+        const res = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model: 'nvidia/llama-3.1-nemotron-70b-instruct',
+            messages: callMessages,
+            tools,
+            tool_choice: 'auto',
+            temperature: 0.3,
+            max_tokens: maxTokens,
+          }),
+        });
+
+        if (!res.ok) {
+          throw new Error(`AI API responded with ${res.status}`);
+        }
+        return await res.json();
+      };
+
       // 1. First Call: Let LLM decide whether to speak or call a tool
-      const res = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: 'nvidia/llama-3.1-nemotron-70b-instruct',
-          messages,
-          tools,
-          tool_choice: 'auto',
-          temperature: 0.3,
-          max_tokens: 1024,
-        }),
-      });
-
-      if (!res.ok) {
-        throw new Error(`NVIDIA NIM API responded with ${res.status}`);
-      }
-
-      const data = await res.json();
-      const choice = data.choices?.[0];
+      const data = await callLLM(messages, 1024);
+      const choice = data?.choices?.[0];
       const message = choice?.message;
 
       // 2. Check if a tool call was requested
@@ -105,35 +136,21 @@ CORE PERSONALITY & TONE:
           },
         ];
 
-        const followUpRes = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify({
-            model: 'nvidia/llama-3.1-nemotron-70b-instruct',
-            messages: followUpMessages,
-            temperature: 0.4,
-            max_tokens: 512,
-          }),
-        });
-
-        if (followUpRes.ok) {
-          const followUpData = await followUpRes.json();
-          const finalReply = followUpData.choices?.[0]?.message?.content || toolResult.message || 'Action complete ho gaya.';
+        try {
+          const followUpData = await callLLM(followUpMessages, 512);
+          const finalReply = followUpData?.choices?.[0]?.message?.content || toolResult.message || 'Action complete ho gaya.';
           return {
             replyText: finalReply,
             executedTool: toolName,
             toolData: toolResult.data,
           };
+        } catch {
+          return {
+            replyText: toolResult.message || 'Task execute ho gaya.',
+            executedTool: toolName,
+            toolData: toolResult.data,
+          };
         }
-
-        return {
-          replyText: toolResult.message || 'Task execute ho gaya.',
-          executedTool: toolName,
-          toolData: toolResult.data,
-        };
       }
 
       // No tool needed, direct conversational response

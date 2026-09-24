@@ -3,6 +3,7 @@ import { classifyIntelligenceIntent } from '@/modules/tolee-ai-manager/Core/ai-r
 import { executeToleeAIAction, cleanAndTranslateImagePrompt } from '@/lib/tolee-action-engine';
 import cloudinary from '@/lib/cloudinary';
 import { NvidiaNIMProvider } from './providers/nvidia-nim';
+import { FreeLLMAPIProvider } from './providers/freellmapi';
 import { SYSTEM_PROMPTS } from '@/modules/tolee-ai-manager/Core/prompt-manager';
 
 // -------------------------------------------------------------
@@ -132,6 +133,24 @@ class ProviderHealthRegistry {
         'meta/llama-3.2-11b-vision-instruct',
         'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning',
         'nvidia/nemotron-3-super-120b-a12b'
+      ]
+    });
+
+    // 6. FreeLLMAPI Universal Multi-Model Gateway (DeepSeek, Llama, Qwen, Mistral, Cerebras, Pollinations)
+    this.providers.set('freellmapi', {
+      id: 'freellmapi',
+      name: 'FreeLLMAPI Unified Gateway (34 Providers)',
+      enabled: true,
+      healthy: true,
+      lastChecked: Date.now(),
+      models: [
+        'deepseek/deepseek-r1:free',
+        'meta-llama/llama-3.3-70b-instruct:free',
+        'qwen/qwen-2.5-coder-32b-instruct:free',
+        'llama3.1-70b',
+        'llama-3.3-70b-versatile',
+        'gemini-2.0-flash',
+        'openai'
       ]
     });
   }
@@ -693,8 +712,41 @@ export class CentralAIEngine {
       }
     }
 
-    // 🌐 6. Multi-Provider Cloud AI Router (NVIDIA NIM / Gemini / OpenAI / Groq)
-    // 6a. NVIDIA NIM Frontier Cluster (Active Model: meta/llama-3.2-11b-vision-instruct)
+    // 🌐 6. Multi-Provider Cloud AI Router (FreeLLMAPI / NVIDIA NIM / Gemini / OpenAI / Groq)
+    // 6a. FreeLLMAPI Unified Multi-Model Gateway (DeepSeek, Llama-3.3, Qwen, Cerebras, Pollinations)
+    try {
+      const freellm = new FreeLLMAPIProvider();
+      const freellmResult = await freellm.generateText({
+        model: options.model,
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPTS.PERSONAL_EMPLOYEE },
+          ...history.map(h => ({ role: (h.role === 'assistant' ? 'assistant' : 'user') as 'assistant' | 'user', content: h.content })),
+          { role: 'user', content: rawMessage }
+        ]
+      });
+
+      if (freellmResult.text && freellmResult.text.trim()) {
+        return {
+          success: true,
+          type: 'text',
+          content: freellmResult.text.trim(),
+          model: freellmResult.model,
+          provider: freellmResult.provider,
+          toolUsed: null,
+          image: null,
+          files: [],
+          metadata: {
+            latencyMs: Date.now() - startTime,
+            intent,
+            fallbackUsed: false
+          }
+        };
+      }
+    } catch (fErr: any) {
+      console.warn('[CentralAIEngine] FreeLLMAPI notice:', fErr?.message);
+    }
+
+    // 6b. NVIDIA NIM Frontier Cluster (Active Model: meta/llama-3.2-11b-vision-instruct)
     try {
       const nim = new NvidiaNIMProvider();
       const nimResult = await nim.generateText({
