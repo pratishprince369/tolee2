@@ -40,6 +40,8 @@ interface UnifiedCreatePostModalProps {
   onPost?: (post: any, postData?: any) => void;
   initialMode?: 'default' | 'requirement' | 'regular' | 'reel' | 'news';
   toleeId?: string;
+  initialMedia?: MediaItem[];
+  initialStep?: 1 | 2 | 3 | 4 | 5;
 }
 
 export function UnifiedCreatePostModal({
@@ -48,6 +50,8 @@ export function UnifiedCreatePostModal({
   onPost,
   initialMode = 'default',
   toleeId,
+  initialMedia,
+  initialStep,
 }: UnifiedCreatePostModalProps) {
   const { data: session } = useSession();
   const { startUpload } = useUpload();
@@ -102,15 +106,31 @@ export function UnifiedCreatePostModal({
         }
       });
 
-      // Handle initial mode preset
-      if (initialMode && initialMode !== 'default') {
-        setManualCategory(initialMode as PostCategoryType);
-        if (initialMode === 'reel') {
+      // Handle initial media from native picker
+      if (initialMedia && initialMedia.length > 0) {
+        setMediaList(initialMedia);
+        setActiveMediaIndex(0);
+        setIsTextOnly(false);
+        const hasVideo = initialMedia.some((m) => m.type === 'video');
+        if (hasVideo || initialMode === 'reel') {
           setSelectedRatio('9 / 16');
+          setManualCategory('reel');
         }
+        setStep(initialStep || 2);
+      } else {
+        // Handle initial mode preset
+        if (initialMode && initialMode !== 'default') {
+          setManualCategory(initialMode as PostCategoryType);
+          if (initialMode === 'reel') {
+            setSelectedRatio('9 / 16');
+          }
+        }
+        setStep(initialStep || 1);
       }
+    } else {
+      resetModal();
     }
-  }, [isOpen, initialMode, toleeId]);
+  }, [isOpen, initialMode, toleeId, initialMedia, initialStep]);
 
   // Cleanup audio preview on close or step change
   useEffect(() => {
@@ -270,7 +290,13 @@ export function UnifiedCreatePostModal({
     if (step === 5) setStep(4);
     else if (step === 4) setStep(isTextOnly ? 1 : 3);
     else if (step === 3) setStep(2);
-    else if (step === 2) setStep(1);
+    else if (step === 2) {
+      if (initialMedia && initialMedia.length > 0) {
+        onClose();
+      } else {
+        setStep(1);
+      }
+    }
   };
 
   const handlePublish = async () => {
@@ -618,6 +644,22 @@ export function UnifiedCreatePostModal({
                     />
                   )}
                 </div>
+
+                {/* Multiple Media Indicator Dots */}
+                {mediaList.length > 1 && (
+                  <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full z-10">
+                    {mediaList.map((_, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setActiveMediaIndex(idx)}
+                        className={`rounded-full transition-all ${
+                          activeMediaIndex === idx ? 'bg-white w-4 h-2' : 'bg-white/40 w-2 h-2'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Adjustments Sidebar */}
@@ -1109,12 +1151,12 @@ export function UnifiedCreatePostModal({
               disabled={
                 isGeneratingCard ||
                 (step === 1 && mediaList.length === 0 && !isTextOnly) ||
-                (step === 4 && !caption.trim())
+                (step === 4 && mediaList.length === 0 && !caption.trim())
               }
               className={`w-full h-14 rounded-full font-bold text-base flex items-center justify-center gap-2 transition-all duration-200 shadow-md ${
                 isGeneratingCard ||
                 (step === 1 && mediaList.length === 0 && !isTextOnly) ||
-                (step === 4 && !caption.trim())
+                (step === 4 && mediaList.length === 0 && !caption.trim())
                   ? 'bg-[#8ec5c5] hover:bg-[#8ec5c5] text-white opacity-90 cursor-not-allowed'
                   : 'bg-[#0a7c85] hover:bg-[#086970] text-white cursor-pointer active:scale-[0.99]'
               }`}

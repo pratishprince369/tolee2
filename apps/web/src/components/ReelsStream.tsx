@@ -16,8 +16,8 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { getOrCreatePersonalChat } from '@/actions/chat';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { CreatePostModal } from '@/components/CreatePostModal';
+import { UnifiedCreatePostModal } from '@/components/UnifiedCreatePostModal';
+import { MediaItem } from '@/components/UploadContext';
 import {
   createPost, toggleLike, addComment, getComments,
   toggleSavePost, toggleRepost, getReposts, recordView,
@@ -148,6 +148,46 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
   };
 
   const [reels, setReels] = useState(initialReels);
+  // Instagram-style Reels Upload Flow
+  const reelsFileInputRef = useRef<HTMLInputElement>(null);
+  const [isUnifiedModalOpen, setIsUnifiedModalOpen] = useState(false);
+  const [reelsPreloadedMedia, setReelsPreloadedMedia] = useState<MediaItem[]>([]);
+
+  const handleReelsUploadClick = () => {
+    if (!session?.user) {
+      router.push('/login');
+      return;
+    }
+    reelsFileInputRef.current?.click();
+  };
+
+  const handleReelsFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      const items: MediaItem[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const isVideo = file.type.startsWith('video/') || /\.(mp4|mov|avi|mkv|webm|3gp|m4v)$/i.test(file.name);
+        const isImage = file.type.startsWith('image/') || /\.(jpg|jpeg|png|webp|gif|bmp|heic|heif|svg)$/i.test(file.name);
+        if (!isVideo && !isImage) continue;
+        items.push({
+          type: isVideo ? 'video' : 'image',
+          url: URL.createObjectURL(file),
+          file,
+        });
+      }
+
+      if (items.length === 0) {
+        alert('Please select a valid video or photo.');
+        return;
+      }
+
+      if (reelsFileInputRef.current) reelsFileInputRef.current.value = '';
+      setReelsPreloadedMedia(items);
+      setIsUnifiedModalOpen(true);
+    }
+  };
+
   const [followStates, setFollowStates] = useState<Record<string, 'approved' | 'pending' | null>>(() => {
     const initialStates: Record<string, 'approved' | 'pending' | null> = {};
     initialReels.forEach((reel) => {
@@ -539,8 +579,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
   }, [isDesktop, desktopActiveIndex, mobileActiveIndex, itemsToRender, retriedUrls]);
 
   const handleNewPost = (post: any, postData?: any) => {
-    const isVideo = post && post.mediaTypes && (post.mediaTypes === 'video' || post.mediaTypes.split(',')[0] === 'video');
-    if (isVideo) {
+    if (post && post.mediaUrls) {
       const firstTolee = post.tolees?.[0]?.tolee;
       const authorId = post.author?.id || post.authorId || (session?.user as any)?.id;
       const authorUsername = post.author?.username || (session?.user as any)?.username || session?.user?.name || 'User';
@@ -551,7 +590,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
         authorId: authorId,
         authorIsPrivate: post.author?.isPrivate || false,
         visibility: post.visibility || 'public',
-        video: post.mediaUrls,
+        video: post.mediaUrls.split(',')[0],
         author: authorUsername,
         authorAvatar: authorAvatar,
         toleeName: firstTolee?.name || postData?.toleeName || null,
@@ -564,7 +603,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
         views: 0,
         shares: '0',
         reposts: 0,
-        audio: 'Original Audio',
+        audio: post.audio || 'Original Audio',
         isVerified: post.author?.isVerified || false,
         likedByMe: false,
         savedByMe: false,
@@ -746,14 +785,13 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
           </div>
           <div className="flex items-center gap-3">
             {session?.user && (
-              <CreatePostModal onPost={handleNewPost} videoOnly>
-                <button
-                  id="reels-upload-mobile"
-                  className="flex items-center justify-center w-9 h-9 rounded-full bg-white/20 hover:bg-white/30 active:bg-white/40 backdrop-blur-sm border border-white/30 transition-all"
-                >
-                  <Plus className="w-5 h-5 text-white" strokeWidth={2.5} />
-                </button>
-              </CreatePostModal>
+              <button
+                id="reels-upload-mobile"
+                onClick={handleReelsUploadClick}
+                className="flex items-center justify-center w-9 h-9 rounded-full bg-white/20 hover:bg-white/30 active:bg-white/40 backdrop-blur-sm border border-white/30 transition-all cursor-pointer"
+              >
+                <Plus className="w-5 h-5 text-white" strokeWidth={2.5} />
+              </button>
             )}
             {session?.user && (
               <Link href="/u/me">
@@ -767,7 +805,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
         </div>
 
         {itemsToRender.length === 0 ? (
-          <EmptyState onPost={handleNewPost} />
+          <EmptyState onUpload={handleReelsUploadClick} />
         ) : (
           /* Mobile scroll container */
           <div
@@ -849,15 +887,14 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
           </div>
           <div className="flex items-center gap-3 pointer-events-auto">
             {session?.user && (
-              <CreatePostModal onPost={handleNewPost} videoOnly>
-                <button
-                  id="reels-upload-desktop"
-                  className="flex items-center gap-2 px-4 py-2 rounded-full bg-white text-black hover:bg-gray-100 font-bold text-sm transition-all shadow-lg hover:scale-105 active:scale-95"
-                >
-                  <Plus className="w-4 h-4" strokeWidth={2.5} />
-                  Create Reel
-                </button>
-              </CreatePostModal>
+              <button
+                id="reels-upload-desktop"
+                onClick={handleReelsUploadClick}
+                className="flex items-center gap-2 px-4 py-2 rounded-full bg-white text-black hover:bg-gray-100 font-bold text-sm transition-all shadow-lg hover:scale-105 active:scale-95 cursor-pointer"
+              >
+                <Plus className="w-4 h-4" strokeWidth={2.5} />
+                Create Reel
+              </button>
             )}
             <button
               onClick={() => handleSetIsMuted((m) => !m)}
@@ -870,7 +907,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
 
         {itemsToRender.length === 0 ? (
           <div className="flex items-center justify-center h-full">
-            <EmptyState onPost={handleNewPost} />
+            <EmptyState onUpload={handleReelsUploadClick} />
           </div>
         ) : (
           <div className="flex items-center justify-center h-full gap-6 px-4">
@@ -1103,6 +1140,29 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
           }}
         />
       )}
+
+      {/* Hidden File Input for Native Media Picker */}
+      <input
+        ref={reelsFileInputRef}
+        type="file"
+        accept={typeof navigator !== 'undefined' && /android/i.test(navigator.userAgent) ? '*/*' : 'video/*,image/*'}
+        multiple
+        className="hidden"
+        onChange={handleReelsFileSelect}
+      />
+
+      {/* Instagram-Style Reels Post Composer Modal */}
+      <UnifiedCreatePostModal
+        isOpen={isUnifiedModalOpen}
+        onClose={() => {
+          setIsUnifiedModalOpen(false);
+          setReelsPreloadedMedia([]);
+        }}
+        onPost={handleNewPost}
+        initialMode="reel"
+        initialMedia={reelsPreloadedMedia}
+        initialStep={2}
+      />
     </>
   );
 }
@@ -1179,6 +1239,7 @@ const ReelSlide = memo(function ReelSlide({
                     extractYouTubeVideoId(reel.sourceUrl) || 
                     extractYouTubeVideoId(reel.mediaUrls);
   const isYouTube = Boolean(youtubeId);
+  const isVideo = reel.video ? isVideoUrl(reel.video) : false;
 
   return (
     <div
@@ -1186,7 +1247,7 @@ const ReelSlide = memo(function ReelSlide({
       className="reel-container w-full h-full snap-start snap-always relative flex items-center justify-center overflow-hidden bg-black"
       style={{ scrollSnapStop: 'always' }}
     >
-      {/* ── Video Playback: YouTube Player vs Native Tolee Video ── */}
+      {/* ── Video Playback: YouTube Player vs Native Tolee Video vs Image ── */}
       {isYouTube && youtubeId ? (
         <YouTubeReelPlayer
           videoId={youtubeId}
@@ -1196,7 +1257,7 @@ const ReelSlide = memo(function ReelSlide({
           desktop={desktop}
           posterUrl={getPosterUrl(reel.video)}
         />
-      ) : (
+      ) : isVideo ? (
         <>
           <HLSVideo
             src={reel.video}
@@ -1254,6 +1315,12 @@ const ReelSlide = memo(function ReelSlide({
             </div>
           )}
         </>
+      ) : (
+        <img
+          src={reel.video}
+          alt={reel.caption || 'Reel'}
+          className="w-full h-full object-cover"
+        />
       )}
 
       {/* Gradient overlay */}
@@ -1692,15 +1759,17 @@ function DesktopActionBar({ reel, session, onLike, onComment, onReshare, onRepos
 /* ═══════════════════════════════════════════════════════════════════════
    Empty State
    ═══════════════════════════════════════════════════════════════════════ */
-function EmptyState({ onPost }: { onPost: (d: any) => void }) {
+function EmptyState({ onUpload }: { onUpload: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center h-full text-center gap-4">
       <p className="text-gray-400 text-lg">No reels found. Be the first to upload one!</p>
-      <CreatePostModal onPost={onPost} videoOnly>
-        <Button variant="outline" className="text-black bg-white hover:bg-gray-200 font-bold rounded-full border-none">
-          Upload Video
-        </Button>
-      </CreatePostModal>
+      <Button
+        onClick={onUpload}
+        variant="outline"
+        className="text-black bg-white hover:bg-gray-200 font-bold rounded-full border-none cursor-pointer"
+      >
+        Upload Media
+      </Button>
     </div>
   );
 }
