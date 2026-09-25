@@ -167,7 +167,7 @@ function formatShortToReel(item: {
     hasActiveStory: false,
     location: 'India',
     subLocation: null,
-    createdAt: new Date(),
+    createdAt: new Date().toISOString() as any,
     duration: 30,
     aspectRatio: '9:16',
     videoType: 'youtube',

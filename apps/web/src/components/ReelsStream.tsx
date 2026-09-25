@@ -16,6 +16,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { getOrCreatePersonalChat } from '@/actions/chat';
 import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { MediaItem } from '@/components/UploadContext';
 import {
   createPost, toggleLike, addComment, getComments,

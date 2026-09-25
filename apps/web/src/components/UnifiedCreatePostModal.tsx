@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useTransition } from 'react';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -395,9 +395,12 @@ export function UnifiedCreatePostModal({
   const activeCategory = manualCategory || detectedResult?.category || 'regular';
   const userFirstName = session?.user?.name ? session.user.name.trim().split(' ')[0] : 'there';
 
+  if (!isOpen) return null;
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="w-full max-w-full sm:max-w-[700px] h-[100dvh] sm:h-[680px] max-h-[100dvh] sm:max-h-[90vh] p-0 gap-0 bg-white dark:bg-[#121212] rounded-none sm:rounded-3xl border-none sm:border border-gray-100 dark:border-zinc-800 flex flex-col overflow-hidden shadow-2xl relative select-none">
+        <DialogTitle className="sr-only">Create Post</DialogTitle>
         
         {/* Ambient Pastel Mint Accents matching mockup */}
         <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full bg-[#EAF7F6] dark:bg-teal-950/20 blur-2xl pointer-events-none -z-10" />
