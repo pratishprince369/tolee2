@@ -127,8 +127,6 @@ export function UnifiedCreatePostModal({
         }
         setStep(initialStep || 1);
       }
-    } else {
-      resetModal();
     }
   }, [isOpen, initialMode, toleeId, initialMedia, initialStep]);
 

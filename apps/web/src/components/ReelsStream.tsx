@@ -16,7 +16,6 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { getOrCreatePersonalChat } from '@/actions/chat';
 import { Input } from '@/components/ui/input';
-import { UnifiedCreatePostModal } from '@/components/UnifiedCreatePostModal';
 import { MediaItem } from '@/components/UploadContext';
 import {
   createPost, toggleLike, addComment, getComments,
@@ -36,6 +35,10 @@ import { isVideoUrl, getMediaThumbnail, getPosterUrl, parseMediaUrls } from '@/l
 import { YouTubeReelPlayer } from '@/components/YouTubeReelPlayer';
 import { extractYouTubeVideoId, decodeHtmlEntities } from '@/lib/youtube';
 
+const UnifiedCreatePostModal = dynamic(
+  () => import('@/components/UnifiedCreatePostModal').then((m) => m.UnifiedCreatePostModal),
+  { ssr: false }
+);
 const ReShareModal = dynamic(() => import('@/components/ReShareModal').then(m => m.ReShareModal), { ssr: false });
 const ShareModal = dynamic(() => import('@/components/ShareModal').then(m => m.ShareModal), { ssr: false });
 const QuickBoostModal = dynamic(() => import('@/components/QuickBoostModal').then(m => m.QuickBoostModal), { ssr: false });
@@ -158,7 +161,11 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
       router.push('/login');
       return;
     }
-    reelsFileInputRef.current?.click();
+    if (reelsFileInputRef.current) {
+      const isAndroid = typeof navigator !== 'undefined' && /android/i.test(navigator.userAgent);
+      reelsFileInputRef.current.accept = isAndroid ? '*/*' : 'video/*,image/*';
+      reelsFileInputRef.current.click();
+    }
   };
 
   const handleReelsFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1145,24 +1152,26 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
       <input
         ref={reelsFileInputRef}
         type="file"
-        accept={typeof navigator !== 'undefined' && /android/i.test(navigator.userAgent) ? '*/*' : 'video/*,image/*'}
+        accept="video/*,image/*"
         multiple
         className="hidden"
         onChange={handleReelsFileSelect}
       />
 
       {/* Instagram-Style Reels Post Composer Modal */}
-      <UnifiedCreatePostModal
-        isOpen={isUnifiedModalOpen}
-        onClose={() => {
-          setIsUnifiedModalOpen(false);
-          setReelsPreloadedMedia([]);
-        }}
-        onPost={handleNewPost}
-        initialMode="reel"
-        initialMedia={reelsPreloadedMedia}
-        initialStep={2}
-      />
+      {isUnifiedModalOpen && (
+        <UnifiedCreatePostModal
+          isOpen={isUnifiedModalOpen}
+          onClose={() => {
+            setIsUnifiedModalOpen(false);
+            setReelsPreloadedMedia([]);
+          }}
+          onPost={handleNewPost}
+          initialMode="reel"
+          initialMedia={reelsPreloadedMedia}
+          initialStep={2}
+        />
+      )}
     </>
   );
 }
@@ -1239,7 +1248,7 @@ const ReelSlide = memo(function ReelSlide({
                     extractYouTubeVideoId(reel.sourceUrl) || 
                     extractYouTubeVideoId(reel.mediaUrls);
   const isYouTube = Boolean(youtubeId);
-  const isVideo = reel.video ? isVideoUrl(reel.video) : false;
+  const isImageReel = reel.mediaTypes === 'image' || (!isVideoUrl(reel.video) && /\.(jpg|jpeg|png|webp|gif|bmp|heic|heif|svg)(\?.*)?$/i.test(reel.video || ''));
 
   return (
     <div
@@ -1247,7 +1256,7 @@ const ReelSlide = memo(function ReelSlide({
       className="reel-container w-full h-full snap-start snap-always relative flex items-center justify-center overflow-hidden bg-black"
       style={{ scrollSnapStop: 'always' }}
     >
-      {/* ── Video Playback: YouTube Player vs Native Tolee Video vs Image ── */}
+      {/* ── Video Playback: YouTube Player vs Image Reel vs Native Tolee Video ── */}
       {isYouTube && youtubeId ? (
         <YouTubeReelPlayer
           videoId={youtubeId}
@@ -1257,7 +1266,13 @@ const ReelSlide = memo(function ReelSlide({
           desktop={desktop}
           posterUrl={getPosterUrl(reel.video)}
         />
-      ) : isVideo ? (
+      ) : isImageReel ? (
+        <img
+          src={reel.video}
+          alt={reel.caption || 'Reel'}
+          className="w-full h-full object-cover"
+        />
+      ) : (
         <>
           <HLSVideo
             src={reel.video}
@@ -1315,12 +1330,6 @@ const ReelSlide = memo(function ReelSlide({
             </div>
           )}
         </>
-      ) : (
-        <img
-          src={reel.video}
-          alt={reel.caption || 'Reel'}
-          className="w-full h-full object-cover"
-        />
       )}
 
       {/* Gradient overlay */}
