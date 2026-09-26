@@ -265,7 +265,7 @@ export function ToleeSongsStream() {
                         </Link>
                         <p className="text-[11px] text-zinc-400 truncate">
                           {song.artist?.name || song.artistName || 'Tolee Artist'}{' '}
-                          {song.album && `• ${song.album.title}`}
+                          {(song.album?.title || song.albumName) && `• ${song.album?.title || song.albumName}`}
                         </p>
                       </div>
                     </div>
@@ -557,7 +557,7 @@ export function ToleeSongsStream() {
                           </Link>
                           <p className="text-[11px] text-zinc-400 truncate">
                             {song.artist?.name || song.artistName || 'Tolee Artist'}{' '}
-                            {song.album && `• ${song.album.title}`}
+                            {(song.album?.title || song.albumName) && `• ${song.album?.title || song.albumName}`}
                           </p>
                         </div>
                       </div>

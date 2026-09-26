@@ -126,24 +126,45 @@ export async function searchInvidiousAudio(
   }
 }
 
+import { searchToleeMusic } from './toleeMusicApi';
+
 /**
  * Universal Multi-source Music Search
- * Queries multiple providers in parallel with fallback.
+ * Queries Tolee universal music discovery with jamendo fallback.
  */
 export async function searchNuclearMusic(query: string): Promise<NuclearTrackResult[]> {
   if (!query.trim()) return [];
 
-  const [jamendoResults, invidiousResults] = await Promise.allSettled([
+  try {
+    const toleeTracks = await searchToleeMusic(query, 15);
+    if (toleeTracks.length > 0) {
+      return toleeTracks.map((t) => ({
+        id: t.id,
+        title: t.title,
+        artist: t.artistName,
+        album: t.albumName || 'Tolee Audio',
+        duration: t.duration,
+        streamUrl: t.audioUrl,
+        thumbnailUrl: t.coverUrl,
+        source: 'tolee',
+      }));
+    }
+  } catch (err) {
+    console.error('[Music API] searchToleeMusic error in nuclearApi:', err);
+  }
+
+  const [jamendoResults] = await Promise.allSettled([
     searchJamendoTracks(query),
-    searchInvidiousAudio(query),
   ]);
 
   const results: NuclearTrackResult[] = [];
   if (jamendoResults.status === 'fulfilled') {
-    results.push(...jamendoResults.value);
-  }
-  if (invidiousResults.status === 'fulfilled') {
-    results.push(...invidiousResults.value);
+    results.push(
+      ...jamendoResults.value.map((item) => ({
+        ...item,
+        source: 'tolee',
+      }))
+    );
   }
 
   return results;

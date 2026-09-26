@@ -5,6 +5,12 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
 import { generateWaveform } from '@/lib/audioLibrary';
+import {
+  searchToleeMusic,
+  fetchTrendingFeed,
+  POPULAR_TOLEE_ARTISTS,
+  type ToleeTrack,
+} from '@/lib/toleeMusicApi';
 
 // Initial dataset to auto-seed when database table is empty
 const INITIAL_ARTISTS = [
@@ -134,7 +140,7 @@ const INITIAL_SONGS = [
     artistId: 'artist-arijit',
     albumId: 'album-bollywood-dreams',
     coverUrl: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=500&auto=format&fit=crop&q=80',
-    audioUrl: '/audio/kesariya.mp3',
+    audioUrl: 'https://jiotunepreview.jio.com/content/Converted/010910141580615.mp3',
     duration: 135,
     genre: 'Bollywood',
     language: 'Hindi',
@@ -149,7 +155,7 @@ const INITIAL_SONGS = [
     artistId: 'artist-diljit',
     albumId: 'album-punjabi-heat',
     coverUrl: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&auto=format&fit=crop&q=80',
-    audioUrl: '/audio/patiala.mp3',
+    audioUrl: 'https://jiotunepreview.jio.com/content/Converted/010912582755792.mp3',
     duration: 110,
     genre: 'Punjabi',
     language: 'Punjabi',
@@ -164,7 +170,7 @@ const INITIAL_SONGS = [
     artistId: 'artist-tolee-lofi',
     albumId: 'album-lofi-chai',
     coverUrl: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=500&auto=format&fit=crop&q=80',
-    audioUrl: '/audio/midnight-chai.mp3',
+    audioUrl: 'https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/31/85/ba/3185ba87-9a45-0245-fa7c-4797df0851eb/mzaf_4695387691305305556.plus.aac.p.m4a',
     duration: 124,
     genre: 'Lo-Fi',
     language: 'Instrumental',
@@ -179,7 +185,7 @@ const INITIAL_SONGS = [
     artistId: 'artist-darshan',
     albumId: 'album-darshan-vedic',
     coverUrl: 'https://images.unsplash.com/photo-1545239351-ef35f43d514b?w=500&auto=format&fit=crop&q=80',
-    audioUrl: '/audio/shiva-mantra.mp3',
+    audioUrl: 'https://jiotunepreview.jio.com/content/Converted/010910092419390.mp3',
     duration: 155,
     genre: 'Devotional',
     language: 'Hindi',
@@ -194,7 +200,7 @@ const INITIAL_SONGS = [
     artistId: 'artist-prateek',
     albumId: 'album-mountain-acoustic',
     coverUrl: 'https://images.unsplash.com/photo-1445985543470-41fdd5c31447?w=500&auto=format&fit=crop&q=80',
-    audioUrl: '/audio/pahadi-breeze.mp3',
+    audioUrl: 'https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/40/e6/ba/40e6ba64-a4bb-16e3-15e9-f617f72df0a1/mzaf_1128798937893701954.plus.aac.p.m4a',
     duration: 115,
     genre: 'Indie',
     language: 'Hindi',
@@ -209,7 +215,7 @@ const INITIAL_SONGS = [
     artistId: 'artist-ajay-atul',
     albumId: 'album-marathi-dhol',
     coverUrl: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=500&auto=format&fit=crop&q=80',
-    audioUrl: '/audio/marathi-dhol.mp3',
+    audioUrl: 'https://jiotunepreview.jio.com/content/Converted/010912293765832.mp3',
     duration: 102,
     genre: 'Marathi',
     language: 'Marathi',
@@ -224,7 +230,7 @@ const INITIAL_SONGS = [
     artistId: 'artist-diljit',
     albumId: 'album-punjabi-heat',
     coverUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&auto=format&fit=crop&q=80',
-    audioUrl: '/audio/workout-energy.mp3',
+    audioUrl: 'https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/ab/18/d9/ab18d9e9-01f0-27ea-3a51-6e08585a0072/mzaf_14299744081264843911.plus.aac.p.m4a',
     duration: 95,
     genre: 'Workout',
     language: 'English',
@@ -239,7 +245,7 @@ const INITIAL_SONGS = [
     artistId: 'artist-ajay-atul',
     albumId: 'album-marathi-dhol',
     coverUrl: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=500&auto=format&fit=crop&q=80',
-    audioUrl: '/audio/party-celebration.mp3',
+    audioUrl: 'https://jiotunepreview.jio.com/content/Converted/010912023403849.mp3',
     duration: 98,
     genre: 'Party',
     language: 'Hindi',
@@ -250,13 +256,88 @@ const INITIAL_SONGS = [
   },
 ];
 
+export async function syncTrackToPrisma(track: ToleeTrack) {
+  try {
+    const artistId =
+      track.artist?.id ||
+      `artist-${encodeURIComponent(track.artistName.toLowerCase().replace(/[^a-z0-9]/g, '-'))}`;
+    await prisma.artist.upsert({
+      where: { id: artistId },
+      update: { name: track.artistName },
+      create: {
+        id: artistId,
+        name: track.artistName,
+        image: track.coverUrl,
+        genre: track.genre || 'Bollywood',
+        isVerified: true,
+        monthlyListeners: 12000000,
+      },
+    });
+
+    let albumId: string | null = null;
+    if (track.albumName) {
+      albumId =
+        track.album?.id ||
+        `album-${encodeURIComponent(track.albumName.toLowerCase().replace(/[^a-z0-9]/g, '-'))}`;
+      await prisma.album.upsert({
+        where: { id: albumId },
+        update: { title: track.albumName },
+        create: {
+          id: albumId,
+          title: track.albumName,
+          artistId,
+          coverUrl: track.coverUrl,
+          releaseYear: '2026',
+          genre: track.genre || 'Bollywood',
+          description: `${track.title} & top trending hits on Tolee Songs`,
+        },
+      });
+    }
+
+    return await prisma.song.upsert({
+      where: { id: track.id },
+      update: {
+        audioUrl: track.audioUrl,
+        coverUrl: track.coverUrl,
+        title: track.title,
+      },
+      create: {
+        id: track.id,
+        title: track.title,
+        artistId,
+        albumId,
+        coverUrl: track.coverUrl,
+        audioUrl: track.audioUrl,
+        duration: track.duration,
+        genre: track.genre || 'Bollywood',
+        language: track.language || 'Hindi',
+        isTrending: !!track.isTrending,
+        isFeatured: !!track.isFeatured,
+        playCount: track.playCount || 120000,
+        likeCount: track.likeCount || 34000,
+        waveform: track.waveform || JSON.stringify(generateWaveform(track.id)),
+      },
+      include: {
+        artist: true,
+        album: true,
+      },
+    });
+  } catch (e) {
+    console.error('[Tolee Songs] Error syncing track to DB:', e);
+    return null;
+  }
+}
+
 /**
  * Ensure music catalog is seeded into the database
  */
 export async function ensureInitialMusicSeeded() {
   try {
+    const dummyCheck = await prisma.song.findFirst({
+      where: { audioUrl: { startsWith: '/audio/' } },
+    });
     const songCount = await prisma.song.count();
-    if (songCount > 0) return;
+    if (songCount >= 8 && !dummyCheck) return;
 
     // Seed Artists
     for (const artist of INITIAL_ARTISTS) {
@@ -276,12 +357,15 @@ export async function ensureInitialMusicSeeded() {
       });
     }
 
-    // Seed Songs
+    // Seed or update Songs
     for (const song of INITIAL_SONGS) {
       const waveformJson = JSON.stringify(generateWaveform(song.id + song.title));
       await prisma.song.upsert({
         where: { id: song.id },
-        update: {},
+        update: {
+          audioUrl: song.audioUrl,
+          coverUrl: song.coverUrl,
+        },
         create: {
           ...song,
           waveform: waveformJson,
@@ -303,7 +387,7 @@ export async function getSongsFeedAction() {
   const userId = (session?.user as any)?.id;
 
   try {
-    const [
+    let [
       trendingSongs,
       featuredSongs,
       newReleases,
@@ -315,17 +399,17 @@ export async function getSongsFeedAction() {
         where: { isTrending: true },
         include: { artist: true, album: true },
         orderBy: { playCount: 'desc' },
-        take: 12,
+        take: 16,
       }),
       prisma.song.findMany({
         where: { isFeatured: true },
         include: { artist: true, album: true },
-        take: 12,
+        take: 16,
       }),
       prisma.song.findMany({
         orderBy: { createdAt: 'desc' },
         include: { artist: true, album: true },
-        take: 12,
+        take: 16,
       }),
       prisma.artist.findMany({
         orderBy: { monthlyListeners: 'desc' },
@@ -340,6 +424,34 @@ export async function getSongsFeedAction() {
         distinct: ['genre'],
       }),
     ]);
+
+    // Live music discovery injection: Ensure fresh catalog without external branding
+    try {
+      if (trendingSongs.length < 12) {
+        const liveHits = await fetchTrendingFeed();
+        for (const hit of liveHits) {
+          syncTrackToPrisma(hit).catch(() => {});
+        }
+        const seenIds = new Set(trendingSongs.map((s) => s.id));
+        for (const hit of liveHits) {
+          if (!seenIds.has(hit.id)) {
+            trendingSongs.push(hit as any);
+            seenIds.add(hit.id);
+          }
+        }
+      }
+    } catch (e) {
+      console.error('[Tolee Songs] Live feed sync error:', e);
+    }
+
+    // Fallback popular artists if needed
+    if (popularArtists.length < 6) {
+      for (const a of POPULAR_TOLEE_ARTISTS) {
+        if (!popularArtists.some((x) => x.name.toLowerCase() === a.name.toLowerCase())) {
+          popularArtists.push(a as any);
+        }
+      }
+    }
 
     // User's liked song IDs for optimistic UI
     let userLikedSongIds: string[] = [];
@@ -370,8 +482,8 @@ export async function getSongsFeedAction() {
     return {
       success: true,
       trendingSongs,
-      featuredSongs,
-      newReleases,
+      featuredSongs: featuredSongs.length > 0 ? featuredSongs : trendingSongs.slice(0, 8),
+      newReleases: newReleases.length > 0 ? newReleases : trendingSongs.slice(8, 16),
       popularArtists,
       featuredAlbums,
       genres: allGenres.map((g) => g.genre),
@@ -386,7 +498,7 @@ export async function getSongsFeedAction() {
 }
 
 /**
- * Spotify-Style Multi-Entity Music Search
+ * Spotify-Style Multi-Entity Music Search with Universal Live Resolvers
  */
 export async function searchSongsAction(query: string, genre?: string, language?: string) {
   await ensureInitialMusicSeeded();
@@ -409,7 +521,7 @@ export async function searchSongsAction(query: string, genre?: string, language?
       whereSong.language = { equals: language, mode: 'insensitive' };
     }
 
-    const [songs, artists, albums, playlists] = await Promise.all([
+    const [dbSongs, dbArtists, dbAlbums, playlists] = await Promise.all([
       prisma.song.findMany({
         where: whereSong,
         include: { artist: true, album: true },
@@ -440,6 +552,59 @@ export async function searchSongsAction(query: string, genre?: string, language?
         : [],
     ]);
 
+    const songs = [...dbSongs];
+    const artists = [...dbArtists];
+    const albums = [...dbAlbums];
+    const existingSongKeys = new Set(
+      songs.map((s) => s.title.toLowerCase().replace(/[^a-z0-9]/g, ''))
+    );
+
+    // If query provided or genre selected, query universal live discovery engine
+    if (trimmed || (genre && genre !== 'All')) {
+      try {
+        const liveQuery = trimmed || (genre !== 'All' ? `${genre} songs` : 'trending');
+        const liveTracks = await searchToleeMusic(liveQuery, 24);
+
+        for (const track of liveTracks) {
+          const key = track.title.toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (!existingSongKeys.has(key)) {
+            existingSongKeys.add(key);
+            songs.push(track as any);
+
+            // Background persist
+            syncTrackToPrisma(track).catch(() => {});
+
+            // Collect distinct artists and albums from live results
+            if (!artists.some((a) => a.name.toLowerCase() === track.artistName.toLowerCase())) {
+              artists.push({
+                id: track.artist?.id || `artist-${track.id}`,
+                name: track.artistName,
+                image: track.coverUrl,
+                genre: track.genre,
+                isVerified: true,
+                monthlyListeners: 10000000,
+              } as any);
+            }
+            if (
+              track.albumName &&
+              !albums.some((al) => al.title.toLowerCase() === track.albumName!.toLowerCase())
+            ) {
+              albums.push({
+                id: track.album?.id || `album-${track.id}`,
+                title: track.albumName,
+                coverUrl: track.coverUrl,
+                releaseYear: '2026',
+                genre: track.genre,
+                artist: { name: track.artistName },
+              } as any);
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[Tolee Songs] Universal search live query error:', err);
+      }
+    }
+
     return {
       success: true,
       songs,
@@ -457,7 +622,7 @@ export async function searchSongsAction(query: string, genre?: string, language?
  */
 export async function getSongByIdAction(songId: string) {
   try {
-    const song = await prisma.song.findUnique({
+    let song = await prisma.song.findUnique({
       where: { id: songId },
       include: {
         artist: {
@@ -485,6 +650,22 @@ export async function getSongByIdAction(songId: string) {
         },
       },
     });
+
+    if (!song) {
+      // Live resolve if not yet in database
+      const liveResults = await searchToleeMusic(songId.replace(/^tolee-[sa]-/, ''), 3);
+      if (liveResults.length > 0) {
+        await syncTrackToPrisma(liveResults[0]);
+        song = (await prisma.song.findUnique({
+          where: { id: liveResults[0].id },
+          include: {
+            artist: { include: { songs: true } },
+            album: { include: { songs: true } },
+            reelAudios: true,
+          },
+        })) as any;
+      }
+    }
 
     if (!song) return { success: false, error: 'Song not found' };
 
