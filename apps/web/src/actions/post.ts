@@ -10,6 +10,7 @@ import { createSystemNotification, createSystemNotificationsMany } from '@/lib/n
 import { getSimulationSettings, getSimulatedEngagement, generateDynamicComments, detectCountryCode, getAICacheSync } from '@/lib/simulation';
 import { runNewsAIPipeline } from '@/lib/aiNews';
 import { getMediaThumbnail } from '@/lib/media';
+import { CURATED_AUDIO_LIBRARY } from '@/lib/audioLibrary';
 
 export async function createPost(data: {
   content?: string;
@@ -191,6 +192,40 @@ export async function createPost(data: {
       }
     }
 
+    let validSongId: string | null = null;
+    if (data.songId) {
+      try {
+        let song = await prisma.song.findUnique({ where: { id: data.songId } });
+        if (!song) {
+          const curated = CURATED_AUDIO_LIBRARY.find((c) => c.id === data.songId);
+          if (curated) {
+            let artist = await prisma.artist.findFirst({ where: { name: curated.artist } });
+            if (!artist) {
+              artist = await prisma.artist.create({
+                data: { name: curated.artist, bio: 'Tolee Artist', avatar: curated.coverUrl },
+              });
+            }
+            song = await prisma.song.create({
+              data: {
+                id: curated.id,
+                title: curated.title,
+                artistId: artist.id,
+                audioUrl: curated.url,
+                coverUrl: curated.coverUrl,
+                duration: curated.duration || 120,
+                genre: curated.genre || 'Music',
+              },
+            });
+          }
+        }
+        if (song) {
+          validSongId = song.id;
+        }
+      } catch (err) {
+        console.warn('Error resolving songId for post:', err);
+      }
+    }
+
     const post = await prisma.post.create({
       data: {
         caption: data.postType === 'news' ? (safeHeadline || 'Untitled News') : (safeContent || ''),
@@ -228,9 +263,9 @@ export async function createPost(data: {
             readingTime: newsReadingTime
           }
         } : undefined,
-        reelAudio: data.songId ? {
+        reelAudio: validSongId ? {
           create: {
-            songId: data.songId,
+            songId: validSongId,
             startTime: data.audioStartTime ?? 0,
             endTime: data.audioEndTime ?? (data.audioDuration ?? 30),
             duration: data.audioDuration ?? 30,
@@ -394,6 +429,8 @@ export async function getPosts(options?: { mediaType?: string; limit?: number })
               select: {
                 id: true,
                 title: true,
+                audioUrl: true,
+                coverUrl: true,
                 artist: { select: { id: true, name: true } },
                 album: { select: { id: true, title: true } },
               }
@@ -3283,6 +3320,24 @@ export async function getPostById(id: string) {
             viewsCount: true,
           },
         },
+        reelAudio: {
+          select: {
+            songId: true,
+            startTime: true,
+            endTime: true,
+            duration: true,
+            song: {
+              select: {
+                id: true,
+                title: true,
+                audioUrl: true,
+                coverUrl: true,
+                artist: { select: { id: true, name: true } },
+                album: { select: { id: true, title: true } },
+              },
+            },
+          },
+        },
         _count: {
           select: { likes: true, comments: true, reposts: true, views: true },
         },
@@ -3382,6 +3437,7 @@ export async function getPostById(id: string) {
       } : null,
       createdAt: post.createdAt ? new Date(post.createdAt).toISOString() : new Date().toISOString(),
       isSimulation: post.isSimulation || false,
+      reelAudio: post.reelAudio || null,
     };
 
     return { success: true, post: mappedPost };

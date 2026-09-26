@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardFooter } from '@/components/ui/card'
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Heart, MessageCircle, Send, MoreHorizontal, Image as ImageIcon, Video, Trophy, Compass, Repeat, Bookmark, ShieldCheck, Plus, X, MapPin, Store, Globe, BookOpen, UtensilsCrossed, ShoppingBag, Users, Rocket, Eye, Newspaper, Search, Radio, Bot, Bell } from 'lucide-react';
+import { Heart, MessageCircle, Send, MoreHorizontal, Image as ImageIcon, Video, Trophy, Compass, Repeat, Bookmark, ShieldCheck, Plus, X, MapPin, Store, Globe, BookOpen, UtensilsCrossed, ShoppingBag, Users, Rocket, Eye, Newspaper, Search, Radio, Bot, Bell, Music } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
 import { getSidebarDataCached } from '@/lib/sidebar-data';
@@ -2139,6 +2139,14 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                             {post.visibility === 'hidden_from_public' && <span className="text-[10px] text-blue-500 bg-blue-500/10 px-1 rounded font-medium">Hidden from Public</span>}
                             {post.visibility === 'only_me' && <span className="text-[10px] text-purple-500 bg-purple-500/10 px-1 rounded font-medium">Only Me</span>}
                           </span>
+                          {post.reelAudio?.song && (
+                            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mt-0.5 max-w-full truncate">
+                              <Music className="w-3 h-3 text-[#0a7c85] shrink-0" />
+                              <span className="truncate">
+                                {post.reelAudio.song.artist?.name ? `${post.reelAudio.song.artist.name} • ` : ''}{post.reelAudio.song.title}
+                              </span>
+                            </div>
+                          )}
                           {(() => {
                             const count = post.reposts || 0;
                             if (count === 0) return null;
@@ -2283,6 +2291,7 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                             mediaUrls={post.mediaUrls || post.image || post.video || ''} 
                             mediaTypes={post.mediaTypes || (post.image ? 'image' : 'video')} 
                             postId={post.id} 
+                            reelAudio={post.reelAudio}
                           />
                         </div>
                       )}

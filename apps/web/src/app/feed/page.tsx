@@ -152,6 +152,7 @@ export default async function GlobalFeedPage() {
           worldProjectId: post.worldProjectId || null,
           worldProject: post.worldProject || null,
           newsRelation: post.newsRelation || null,
+          reelAudio: post.reelAudio || null,
           createdAt: post.createdAt,
         };
       });

@@ -500,6 +500,7 @@ export function ProfileFeedView({
                           mediaUrls={post.mediaUrls} 
                           mediaTypes={post.mediaTypes || 'image'} 
                           postId={post.id} 
+                          reelAudio={post.reelAudio}
                         />
                       </div>
                     )}

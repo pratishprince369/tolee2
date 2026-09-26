@@ -8,7 +8,9 @@ import {
   setGlobalActiveVideo,
   getGlobalActiveVideo,
   getSoundPreference,
-  setSoundPreference
+  setSoundPreference,
+  setGlobalActiveAudio,
+  getGlobalActiveAudio,
 } from '@/components/HLSVideo';
 import { getPosterUrl } from '@/lib/media';
 import { videoMetadataCache } from '@/lib/videoCache';
@@ -18,6 +20,20 @@ interface PostCarouselProps {
   mediaUrls: string;
   mediaTypes?: string | null;
   postId: string;
+  reelAudio?: {
+    songId?: string;
+    startTime?: number;
+    endTime?: number;
+    duration?: number;
+    song?: {
+      id?: string;
+      title?: string;
+      audioUrl?: string;
+      coverUrl?: string;
+      artist?: { id?: string; name?: string };
+      album?: { id?: string; title?: string };
+    };
+  } | null;
 }
 
 interface CarouselVideoProps {
@@ -268,7 +284,7 @@ function useMediaAspectRatio(url?: string, type?: 'image' | 'video' | string) {
   return aspectRatio;
 }
 
-export function PostCarousel({ mediaUrls, mediaTypes, postId }: PostCarouselProps) {
+export function PostCarousel({ mediaUrls, mediaTypes, postId, reelAudio }: PostCarouselProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const touchStartX = useRef<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -296,40 +312,174 @@ export function PostCarousel({ mediaUrls, mediaTypes, postId }: PostCarouselProp
 
   const items = allParsed.filter(item => item.type !== 'audio');
   const postAudioTrack = allParsed.find(item => item.type === 'audio');
+
+  // Background audio resolution: prioritize reelAudio relation, then postAudioTrack
+  const attachedAudioUrl = reelAudio?.song?.audioUrl || postAudioTrack?.url || null;
+  const audioStartTime = reelAudio?.startTime ?? 0;
+  const audioEndTime = reelAudio?.endTime ?? ((reelAudio?.duration ?? 30) + audioStartTime);
+
+  const [isSoundMuted, setIsSoundMuted] = useState<boolean>(() => getSoundPreference());
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
   const audioElRef = useRef<HTMLAudioElement | null>(null);
 
-  const togglePostAudio = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!audioElRef.current && postAudioTrack) {
-      const audio = new Audio(postAudioTrack.url);
-      audio.loop = true;
+  const isSoundMutedRef = useRef(isSoundMuted);
+  const isVisibleRef = useRef(isVisible);
+  const activeIndexRef = useRef(activeIndex);
+  const itemsRef = useRef(items);
+  const startTimeRef = useRef(audioStartTime);
+  const endTimeRef = useRef(audioEndTime);
+
+  isSoundMutedRef.current = isSoundMuted;
+  isVisibleRef.current = isVisible;
+  activeIndexRef.current = activeIndex;
+  itemsRef.current = items;
+  startTimeRef.current = audioStartTime;
+  endTimeRef.current = audioEndTime;
+
+  // Viewport detection (>= 50% visible -> in view, < 35% -> out of view)
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.intersectionRatio >= 0.5) {
+            setIsVisible(true);
+          } else if (entry.intersectionRatio < 0.35) {
+            setIsVisible(false);
+          }
+        }
+      },
+      { threshold: [0.35, 0.5] }
+    );
+
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
+
+  // Listen to global sound preference changes
+  useEffect(() => {
+    const handleSoundPref = (e: any) => {
+      const muted = e.detail?.isMuted ?? getSoundPreference();
+      setIsSoundMuted(muted);
+      if (audioElRef.current) {
+        if (muted) {
+          audioElRef.current.pause();
+          setIsPlayingAudio(false);
+        } else if (isVisibleRef.current && itemsRef.current[activeIndexRef.current]?.type !== 'video') {
+          audioElRef.current.muted = false;
+          setGlobalActiveVideo(null);
+          setGlobalActiveAudio(audioElRef.current);
+          audioElRef.current.play().then(() => setIsPlayingAudio(true)).catch(() => {});
+        }
+      }
+    };
+    window.addEventListener('tolee_sound_pref_change', handleSoundPref);
+    return () => window.removeEventListener('tolee_sound_pref_change', handleSoundPref);
+  }, []);
+
+  // Play / pause audio based on visibility and active slide type
+  useEffect(() => {
+    if (!attachedAudioUrl) return;
+
+    if (!audioElRef.current) {
+      const audio = new Audio(attachedAudioUrl);
+      audio.preload = 'auto';
+      audio.currentTime = startTimeRef.current;
+
+      const handleTimeUpdate = () => {
+        if (!audio) return;
+        const start = startTimeRef.current;
+        const end = endTimeRef.current;
+        if (audio.currentTime >= end || audio.currentTime < start) {
+          audio.currentTime = start;
+        }
+      };
+
+      const handleEnded = () => {
+        audio.currentTime = startTimeRef.current;
+        audio.play().catch(() => {});
+      };
+
+      audio.addEventListener('timeupdate', handleTimeUpdate);
+      audio.addEventListener('ended', handleEnded);
       audioElRef.current = audio;
     }
-    if (audioElRef.current) {
-      if (isPlayingAudio) {
-        audioElRef.current.pause();
-        setIsPlayingAudio(false);
-      } else {
-        audioElRef.current.play().catch(() => {});
-        setIsPlayingAudio(true);
+
+    const audio = audioElRef.current;
+    const isCurrentSlideVideo = items[activeIndex]?.type === 'video';
+
+    if (isVisible && !isCurrentSlideVideo && !isSoundMuted) {
+      audio.muted = false;
+      if (audio.currentTime < startTimeRef.current || audio.currentTime >= endTimeRef.current) {
+        audio.currentTime = startTimeRef.current;
+      }
+      setGlobalActiveVideo(null);
+      setGlobalActiveAudio(audio);
+      audio.play().then(() => setIsPlayingAudio(true)).catch(() => {});
+    } else {
+      audio.pause();
+      setIsPlayingAudio(false);
+      if (getGlobalActiveAudio() === audio) {
+        setGlobalActiveAudio(null);
       }
     }
-  };
+  }, [isVisible, activeIndex, isSoundMuted, attachedAudioUrl, items]);
 
+  // Clean up audio on unmount
   useEffect(() => {
     return () => {
       if (audioElRef.current) {
         audioElRef.current.pause();
+        if (getGlobalActiveAudio() === audioElRef.current) {
+          setGlobalActiveAudio(null);
+        }
+        audioElRef.current = null;
       }
     };
   }, []);
+
+  const toggleMute = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!attachedAudioUrl) return;
+
+    if (!audioElRef.current) {
+      const audio = new Audio(attachedAudioUrl);
+      audio.preload = 'auto';
+      audioElRef.current = audio;
+    }
+
+    const audio = audioElRef.current;
+    if (isSoundMuted || !isPlayingAudio) {
+      // Unmute & Play
+      setSoundPreference(false);
+      setIsSoundMuted(false);
+      audio.muted = false;
+      if (audio.currentTime < audioStartTime || audio.currentTime >= audioEndTime) {
+        audio.currentTime = audioStartTime;
+      }
+      setGlobalActiveVideo(null);
+      setGlobalActiveAudio(audio);
+      audio.play().then(() => setIsPlayingAudio(true)).catch(() => {});
+    } else {
+      // Mute & Pause
+      setSoundPreference(true);
+      setIsSoundMuted(true);
+      audio.pause();
+      setIsPlayingAudio(false);
+      if (getGlobalActiveAudio() === audio) {
+        setGlobalActiveAudio(null);
+      }
+    }
+  };
 
   const firstItem = items[0] || allParsed[0];
   const detectedRatio = useMediaAspectRatio(firstItem?.url, firstItem?.type);
   const displayRatio = detectedRatio || 4/5;
 
-  if (items.length === 0 && !postAudioTrack) return null;
+  if (items.length === 0 && !attachedAudioUrl) return null;
 
   const handlePrev = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -466,22 +616,31 @@ export function PostCarousel({ mediaUrls, mediaTypes, postId }: PostCarouselProp
           ))}
         </div>
       )}
-      {/* Audio Track Pill */}
-      {postAudioTrack && (
+
+      {/* Instagram-Style Audio Toggle (Bottom-Right Floating Speaker Button) */}
+      {attachedAudioUrl && items[activeIndex]?.type !== 'video' && (
         <button
-          onClick={togglePostAudio}
-          className="absolute bottom-3 left-3 z-30 flex items-center gap-1.5 px-3 py-1 bg-black/60 hover:bg-black/80 backdrop-blur-md rounded-full text-white text-xs font-semibold shadow-md transition-all active:scale-95 cursor-pointer"
-          title="Toggle background music"
+          type="button"
+          onClick={toggleMute}
+          className="absolute bottom-3 right-3 z-30 w-8 h-8 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-md text-white flex items-center justify-center shadow-lg transition-all active:scale-90 cursor-pointer"
+          title={isSoundMuted || !isPlayingAudio ? "Unmute audio" : "Mute audio"}
         >
-          {isPlayingAudio ? (
-            <Volume2 className="w-3.5 h-3.5 text-teal-400 animate-pulse" />
+          {isSoundMuted || !isPlayingAudio ? (
+            <VolumeX className="w-4 h-4 text-white" />
           ) : (
-            <VolumeX className="w-3.5 h-3.5 text-zinc-300" />
+            <Volume2 className="w-4 h-4 text-teal-400 animate-pulse" />
           )}
-          <span className="text-[11px] max-w-[130px] truncate">
-            {isPlayingAudio ? 'Playing Sound' : 'Play Sound'}
-          </span>
         </button>
+      )}
+
+      {/* Instagram-Style Song Pill (Bottom-Left) */}
+      {attachedAudioUrl && (
+        <div className="absolute bottom-3 left-3 z-30 flex items-center gap-1.5 px-2.5 py-1 bg-black/60 backdrop-blur-md rounded-full text-white text-[11px] font-semibold shadow-md pointer-events-none max-w-[200px]">
+          <Music className={`w-3 h-3 text-[#2dd4bf] ${isPlayingAudio ? 'animate-bounce' : ''}`} />
+          <span className="truncate">
+            {reelAudio?.song?.title || (reelAudio?.song as any)?.title || 'Audio'}
+          </span>
+        </div>
       )}
     </div>
   );

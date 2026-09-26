@@ -2019,6 +2019,7 @@ export function InstagramProfileView({
                 mediaUrls={selectedPost.mediaUrls || ''} 
                 mediaTypes={selectedPost.mediaTypes} 
                 postId={selectedPost.id} 
+                reelAudio={selectedPost.reelAudio}
               />
             )}
           </div>

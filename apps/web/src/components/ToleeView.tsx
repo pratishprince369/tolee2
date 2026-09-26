@@ -1978,6 +1978,7 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                                 mediaUrls={post.mediaUrls || post.image || post.video || ''} 
                                 mediaTypes={post.mediaTypes || (post.image ? 'image' : 'video')} 
                                 postId={post.id} 
+                                reelAudio={post.reelAudio}
                               />
                             </div>
                           )}
@@ -2609,6 +2610,7 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                           mediaUrls={post.mediaUrls || post.image || post.video || ''} 
                           mediaTypes={post.mediaTypes || (post.image ? 'image' : 'video')} 
                           postId={post.id} 
+                          reelAudio={post.reelAudio}
                         />
                       </div>
                     )}

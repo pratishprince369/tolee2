@@ -11,6 +11,7 @@ import { usePlaybackTracker } from '@/hooks/usePlaybackTracker';
    completely independent of React state/effect timing.
    ───────────────────────────────────────────────────────────────────── */
 let globalActiveVideo: HTMLVideoElement | null = null;
+let globalActiveAudio: HTMLAudioElement | null = null;
 
 export function getGlobalActiveVideo(): HTMLVideoElement | null {
   return globalActiveVideo;
@@ -24,7 +25,30 @@ export function setGlobalActiveVideo(video: HTMLVideoElement | null) {
       console.warn('[HLSVideo] pause failed:', e);
     }
   }
+  if (video && globalActiveAudio) {
+    try {
+      globalActiveAudio.pause();
+    } catch (e) {}
+  }
   globalActiveVideo = video;
+}
+
+export function getGlobalActiveAudio(): HTMLAudioElement | null {
+  return globalActiveAudio;
+}
+
+export function setGlobalActiveAudio(audio: HTMLAudioElement | null) {
+  if (globalActiveAudio && globalActiveAudio !== audio) {
+    try {
+      globalActiveAudio.pause();
+    } catch (e) {}
+  }
+  if (audio && globalActiveVideo) {
+    try {
+      globalActiveVideo.pause();
+    } catch (e) {}
+  }
+  globalActiveAudio = audio;
 }
 
 const SOUND_PREF_KEY = 'tolee_sound_pref';
