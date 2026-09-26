@@ -21,12 +21,15 @@ import {
   Trash2,
   X,
   Music,
+  Flag,
 } from 'lucide-react';
 import { useMusicPlayer } from '@/context/MusicPlayerContext';
 import { formatDuration } from '@/lib/audioLibrary';
+import { ReportSongModal } from '@/components/ReportSongModal';
 
 export function GlobalMusicPlayer() {
   const router = useRouter();
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const {
     currentTrack,
     isPlaying,
@@ -220,6 +223,16 @@ export function GlobalMusicPlayer() {
               title="Queue"
             >
               <ListMusic className="w-4 h-4" />
+            </button>
+
+            {/* Report Song */}
+            <button
+              type="button"
+              onClick={() => setIsReportModalOpen(true)}
+              className="p-1.5 rounded-lg text-zinc-400 hover:text-rose-400 transition-colors"
+              title="Report Song"
+            >
+              <Flag className="w-4 h-4" />
             </button>
 
             {/* Use in Reel Button */}
@@ -433,6 +446,15 @@ export function GlobalMusicPlayer() {
               >
                 <Share2 className="w-4 h-4" />
               </button>
+
+              <button
+                type="button"
+                onClick={() => setIsReportModalOpen(true)}
+                className="p-3 rounded-2xl bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-rose-400 transition-colors"
+                title="Report Song"
+              >
+                <Flag className="w-4 h-4" />
+              </button>
             </div>
           </div>
         </div>
@@ -520,6 +542,13 @@ export function GlobalMusicPlayer() {
           </div>
         </div>
       )}
+
+      {/* Report Song Modal */}
+      <ReportSongModal
+        isOpen={isReportModalOpen}
+        song={currentTrack}
+        onClose={() => setIsReportModalOpen(false)}
+      />
     </>
   );
 }

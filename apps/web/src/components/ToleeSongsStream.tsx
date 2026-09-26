@@ -18,11 +18,15 @@ import {
   Clock,
   Radio,
   Music,
+  Flag,
+  PlusCircle,
 } from 'lucide-react';
 import { getSongsFeedAction, searchSongsAction } from '@/actions/songs';
 import { useMusicPlayer } from '@/context/MusicPlayerContext';
 import { formatDuration } from '@/lib/audioLibrary';
 import { AudioWaveformTrimmer } from '@/components/AudioWaveformTrimmer';
+import { LaunchMusicModal } from '@/components/LaunchMusicModal';
+import { ReportSongModal } from '@/components/ReportSongModal';
 
 export function ToleeSongsStream() {
   const router = useRouter();
@@ -46,6 +50,9 @@ export function ToleeSongsStream() {
   const [isSearching, setIsSearching] = useState(false);
   const [trimmerTrack, setTrimmerTrack] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLaunchModalOpen, setIsLaunchModalOpen] = useState(false);
+  const [reportingSong, setReportingSong] = useState<any>(null);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
   const genres = [
     'All',
@@ -127,18 +134,28 @@ export function ToleeSongsStream() {
               </div>
             </div>
 
-            {/* Link to My Music */}
-            <Link
-              href="/songs/my-music"
-              className="md:hidden p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 text-xs font-bold flex items-center gap-1.5"
-            >
-              <Heart className="w-3.5 h-3.5 text-rose-500 fill-current" />
-              <span>Library</span>
-            </Link>
+            {/* Actions for Mobile */}
+            <div className="flex items-center gap-2 md:hidden">
+              <button
+                type="button"
+                onClick={() => setIsLaunchModalOpen(true)}
+                className="p-2 rounded-xl bg-gradient-to-r from-[#0a7c85] to-[#2dd4bf] text-white text-xs font-bold flex items-center gap-1 shadow-sm"
+              >
+                <PlusCircle className="w-3.5 h-3.5" />
+                <span>Launch</span>
+              </button>
+              <Link
+                href="/songs/my-music"
+                className="p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 text-xs font-bold flex items-center gap-1.5"
+              >
+                <Heart className="w-3.5 h-3.5 text-rose-500 fill-current" />
+                <span>Library</span>
+              </Link>
+            </div>
           </div>
 
-          {/* Search Box & Library button */}
-          <div className="flex items-center gap-3 w-full md:w-auto flex-1 max-w-md">
+          {/* Search Box, Launch & Library buttons */}
+          <div className="flex items-center gap-2.5 w-full md:w-auto flex-1 max-w-xl">
             <div className="relative flex-1">
               <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
               <input
@@ -149,6 +166,16 @@ export function ToleeSongsStream() {
                 className="w-full bg-zinc-900 border border-zinc-800 rounded-full pl-10 pr-4 py-2 text-xs sm:text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-[#2dd4bf] transition-colors"
               />
             </div>
+
+            <button
+              type="button"
+              onClick={() => setIsLaunchModalOpen(true)}
+              className="hidden md:flex items-center gap-1.5 px-4 py-2 rounded-full bg-gradient-to-r from-[#0a7c85] to-[#2dd4bf] hover:opacity-90 text-white text-xs font-bold transition-all shadow-md shadow-[#0a7c85]/20 whitespace-nowrap"
+            >
+              <PlusCircle className="w-3.5 h-3.5" />
+              <span>Launch Song / Album</span>
+            </button>
+
             <Link
               href="/songs/my-music"
               className="hidden md:flex items-center gap-1.5 px-4 py-2 rounded-full bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-200 text-xs font-bold transition-colors whitespace-nowrap shadow-sm"
@@ -297,6 +324,17 @@ export function ToleeSongsStream() {
                       >
                         <Film className="w-3.5 h-3.5" />
                         <span>Use in Reel</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setReportingSong(song);
+                          setIsReportModalOpen(true);
+                        }}
+                        title="Report Track"
+                        className="p-2 rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-zinc-800/80 transition-colors"
+                      >
+                        <Flag className="w-3.5 h-3.5" />
                       </button>
                       <span className="text-xs text-zinc-500 font-mono w-12 text-right hidden sm:inline">
                         {formatDuration(song.duration)}
@@ -670,6 +708,18 @@ export function ToleeSongsStream() {
                           <span>Use in Reel</span>
                         </button>
 
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setReportingSong(song);
+                            setIsReportModalOpen(true);
+                          }}
+                          title="Report Track"
+                          className="p-2 rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-zinc-800/80 transition-colors"
+                        >
+                          <Flag className="w-3.5 h-3.5" />
+                        </button>
+
                         <span className="text-xs text-zinc-500 font-mono w-12 text-right hidden sm:inline">
                           {formatDuration(song.duration)}
                         </span>
@@ -682,6 +732,27 @@ export function ToleeSongsStream() {
           </>
         )}
       </div>
+
+      {/* Launch Music Modal */}
+      <LaunchMusicModal
+        isOpen={isLaunchModalOpen}
+        onClose={() => setIsLaunchModalOpen(false)}
+        onSuccess={() => {
+          getSongsFeedAction().then((res) => {
+            if (res.success) setFeedData(res);
+          });
+        }}
+      />
+
+      {/* Report Song Modal */}
+      <ReportSongModal
+        isOpen={isReportModalOpen}
+        song={reportingSong}
+        onClose={() => {
+          setIsReportModalOpen(false);
+          setReportingSong(null);
+        }}
+      />
     </div>
   );
 }

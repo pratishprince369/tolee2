@@ -17,32 +17,41 @@ import {
   ArrowLeft,
   Music,
   Film,
+  Sparkles,
 } from 'lucide-react';
 import Link from 'next/link';
+import { LaunchMusicModal } from '@/components/LaunchMusicModal';
 
 export default function MyMusicPage() {
   const router = useRouter();
   const { playTrack, currentTrack, isPlaying, togglePlay } = useMusicPlayer();
 
-  const [activeTab, setActiveTab] = useState<'liked' | 'recent' | 'playlists' | 'artists' | 'albums'>('liked');
+  const [activeTab, setActiveTab] = useState<'liked' | 'recent' | 'playlists' | 'artists' | 'albums' | 'uploads'>('liked');
   const [data, setData] = useState<any>({
     likedSongs: [],
     likedAlbums: [],
     followedArtists: [],
     recentlyPlayed: [],
     playlists: [],
+    uploadedSongs: [],
+    uploadedAlbums: [],
   });
   const [loading, setLoading] = useState(true);
   const [newPlaylistTitle, setNewPlaylistTitle] = useState('');
   const [isCreatingPlaylist, setIsCreatingPlaylist] = useState(false);
+  const [isLaunchModalOpen, setIsLaunchModalOpen] = useState(false);
 
-  useEffect(() => {
+  const fetchMyMusic = () => {
     getUserMusicAction().then((res) => {
       if (res.success) {
         setData(res);
       }
       setLoading(false);
     });
+  };
+
+  useEffect(() => {
+    fetchMyMusic();
   }, []);
 
   const handleCreatePlaylist = async (e: React.FormEvent) => {
@@ -83,20 +92,31 @@ export default function MyMusicPage() {
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setIsCreatingPlaylist(!isCreatingPlaylist)}
-            className="px-3.5 py-1.5 rounded-full bg-[#0a7c85] hover:bg-[#086b73] text-white text-xs font-bold flex items-center gap-1.5 shadow-md"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>New Playlist</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsLaunchModalOpen(true)}
+              className="px-3.5 py-1.5 rounded-full bg-gradient-to-r from-[#0a7c85] to-[#2dd4bf] text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-[#0a7c85]/20"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Launch Song / Album</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsCreatingPlaylist(!isCreatingPlaylist)}
+              className="px-3.5 py-1.5 rounded-full bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-zinc-200 text-xs font-bold flex items-center gap-1.5 shadow-sm"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>New Playlist</span>
+            </button>
+          </div>
         </div>
 
         {/* Tab Switcher */}
         <div className="max-w-7xl mx-auto flex items-center gap-2 mt-4 overflow-x-auto no-scrollbar">
           {[
             { id: 'liked', label: 'Liked Songs', icon: Heart, count: data.likedSongs?.length },
+            { id: 'uploads', label: 'My Launched Music', icon: Sparkles, count: (data.uploadedSongs?.length || 0) + (data.uploadedAlbums?.length || 0) },
             { id: 'recent', label: 'Recently Played', icon: History, count: data.recentlyPlayed?.length },
             { id: 'playlists', label: 'My Playlists', icon: ListMusic, count: data.playlists?.length },
             { id: 'artists', label: 'Followed Artists', icon: User, count: data.followedArtists?.length },
@@ -347,7 +367,181 @@ export default function MyMusicPage() {
             ))}
           </div>
         )}
+
+        {/* Tab 6: My Uploaded Tracks & Albums */}
+        {activeTab === 'uploads' && (
+          <div className="space-y-8 animate-in fade-in duration-200">
+            {/* Action Bar */}
+            <div className="flex items-center justify-between p-4 rounded-2xl bg-zinc-900/60 border border-zinc-800">
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-[#2dd4bf]" />
+                  Your Released Music
+                </h3>
+                <p className="text-xs text-zinc-400">
+                  Manage songs and albums you launched on Tolee Songs.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsLaunchModalOpen(true)}
+                className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#0a7c85] to-[#2dd4bf] hover:opacity-90 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-[#0a7c85]/20"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Launch New Track / Album</span>
+              </button>
+            </div>
+
+            {(!data.uploadedSongs || data.uploadedSongs.length === 0) &&
+            (!data.uploadedAlbums || data.uploadedAlbums.length === 0) ? (
+              <div className="p-12 text-center rounded-3xl bg-zinc-900/40 border border-zinc-800 space-y-3">
+                <Music className="w-10 h-10 text-zinc-600 mx-auto" />
+                <h4 className="text-sm font-bold text-white">No tracks launched yet</h4>
+                <p className="text-xs text-zinc-400 max-w-sm mx-auto">
+                  Are you an artist, musician, or creator? Launch your original tracks or full albums to reach everyone on Tolee.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setIsLaunchModalOpen(true)}
+                  className="px-5 py-2.5 rounded-full bg-gradient-to-r from-[#0a7c85] to-[#2dd4bf] text-white text-xs font-bold inline-flex items-center gap-2 shadow-lg shadow-[#0a7c85]/20 hover:opacity-95"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  Launch Your First Track
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Uploaded Albums */}
+                {data.uploadedAlbums?.length > 0 && (
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+                      Your Albums ({data.uploadedAlbums.length})
+                    </h4>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
+                      {data.uploadedAlbums.map((album: any) => (
+                        <Link
+                          key={album.id}
+                          href={`/songs/album/${album.id}`}
+                          className="group p-3 rounded-2xl bg-zinc-900/60 hover:bg-zinc-900 border border-zinc-800 transition-all block"
+                        >
+                          <div className="aspect-square rounded-xl overflow-hidden mb-3">
+                            <img
+                              src={album.coverUrl || 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=300'}
+                              alt={album.title}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                            />
+                          </div>
+                          <h4 className="font-bold text-xs sm:text-sm text-zinc-100 truncate">{album.title}</h4>
+                          <p className="text-[10px] text-zinc-400">{album.songs?.length || 0} tracks • {album.genre}</p>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Uploaded Songs */}
+                {data.uploadedSongs?.length > 0 && (
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+                      Your Audio Tracks ({data.uploadedSongs.length})
+                    </h4>
+                    <div className="space-y-2">
+                      {data.uploadedSongs.map((song: any, idx: number) => {
+                        const isCurrent = currentTrack?.id === song.id;
+                        const isTrackPlaying = isCurrent && isPlaying;
+
+                        return (
+                          <div
+                            key={song.id}
+                            className={`flex items-center justify-between p-3 rounded-2xl border transition-all ${
+                              song.isSuspended
+                                ? 'bg-rose-950/20 border-rose-900/50'
+                                : isCurrent
+                                ? 'bg-zinc-900 border-[#0a7c85]/50'
+                                : 'bg-zinc-900/40 hover:bg-zinc-900/80 border-zinc-800/60'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
+                              <span className="text-xs text-zinc-500 font-mono w-4 text-center hidden sm:inline">
+                                {idx + 1}
+                              </span>
+
+                              <button
+                                type="button"
+                                disabled={song.isSuspended}
+                                onClick={() =>
+                                  isCurrent ? togglePlay() : playTrack(song, data.uploadedSongs)
+                                }
+                                className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-transform ${
+                                  song.isSuspended
+                                    ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed'
+                                    : isTrackPlaying
+                                    ? 'bg-[#2dd4bf] text-zinc-950 scale-105'
+                                    : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
+                                }`}
+                              >
+                                {isTrackPlaying ? (
+                                  <Pause className="w-4 h-4 fill-current" />
+                                ) : (
+                                  <Play className="w-4 h-4 fill-current ml-0.5" />
+                                )}
+                              </button>
+
+                              <img
+                                src={song.coverUrl || 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=100'}
+                                alt={song.title}
+                                className="w-10 h-10 rounded-lg object-cover"
+                              />
+
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2">
+                                  <Link
+                                    href={`/songs/audio/${song.id}`}
+                                    className={`text-xs sm:text-sm font-bold truncate block ${
+                                      isCurrent ? 'text-[#2dd4bf]' : 'text-zinc-100 hover:text-white'
+                                    }`}
+                                  >
+                                    {song.title}
+                                  </Link>
+                                  {song.isSuspended ? (
+                                    <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-rose-500/20 text-rose-400 border border-rose-500/30">
+                                      SUSPENDED BY MODERATION
+                                    </span>
+                                  ) : (
+                                    <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                                      LIVE
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-[11px] text-zinc-400 truncate">
+                                  {song.artist?.name || 'Artist'} {song.album?.title && `• ${song.album.title}`} • {song.genre}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-3 shrink-0">
+                              <span className="text-xs text-zinc-500 font-mono">
+                                {formatDuration(song.duration)}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
+
+      {/* Launch Music Modal */}
+      <LaunchMusicModal
+        isOpen={isLaunchModalOpen}
+        onClose={() => setIsLaunchModalOpen(false)}
+        onSuccess={fetchMyMusic}
+      />
     </div>
   );
 }

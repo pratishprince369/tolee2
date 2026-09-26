@@ -122,6 +122,9 @@ model User {
   recentlyPlayedSongs   RecentlyPlayedSong[]
   creditWithdrawals     CreditWithdrawal[]
   creditTransactions    CreditTransaction[]
+  uploadedSongs         Song[]               @relation("UserUploadedSongs")
+  uploadedAlbums        Album[]              @relation("UserUploadedAlbums")
+  songReports           SongReport[]         @relation("UserSongReports")
 
 
   pincode               String?
@@ -2779,12 +2782,16 @@ model Album {
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
+  uploaderId    String?
+  uploader      User?       @relation("UserUploadedAlbums", fields: [uploaderId], references: [id], onDelete: SetNull)
+
   artistId      String
   artist        Artist      @relation(fields: [artistId], references: [id], onDelete: Cascade)
   songs         Song[]
   likes         AlbumLike[]
 
   @@index([artistId])
+  @@index([uploaderId])
   @@index([title])
 }
 
@@ -2804,8 +2811,13 @@ model Song {
   isFeatured      Boolean             @default(false)
   isTrending      Boolean             @default(false)
   isNewRelease    Boolean             @default(false)
+  isSuspended     Boolean             @default(false)
+  reportsCount    Int                 @default(0)
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
+
+  uploaderId      String?
+  uploader        User?               @relation("UserUploadedSongs", fields: [uploaderId], references: [id], onDelete: SetNull)
 
   artistId        String
   artist          Artist              @relation(fields: [artistId], references: [id], onDelete: Cascade)
@@ -2816,13 +2828,16 @@ model Song {
   playlistSongs   PlaylistSong[]
   recentlyPlayed  RecentlyPlayedSong[]
   reelAudios      ReelAudio[]
+  reports         SongReport[]
 
   @@index([artistId])
   @@index([albumId])
+  @@index([uploaderId])
   @@index([title])
   @@index([genre])
   @@index([language])
   @@index([isTrending])
+  @@index([isSuspended])
 }
 
 model MusicPlaylist {
@@ -2928,6 +2943,24 @@ model ReelAudio {
   @@index([songId])
   @@index([postId])
 }
+
+model SongReport {
+  id          String   @id @default(cuid())
+  songId      String
+  song        Song     @relation(fields: [songId], references: [id], onDelete: Cascade)
+  reporterId  String
+  reporter    User     @relation("UserSongReports", fields: [reporterId], references: [id], onDelete: Cascade)
+  reason      String   // "spam" | "copyright" | "inappropriate" | "fake_audio" | "other"
+  details     String?
+  status      String   @default("PENDING") // "PENDING" | "RESOLVED" | "DISMISSED"
+  createdAt   DateTime @default(now())
+
+  @@unique([songId, reporterId])
+  @@index([songId])
+  @@index([reporterId])
+  @@index([status])
+}
+
 
 
 

@@ -9,6 +9,8 @@ import {
   adminDeleteArtistAction,
   adminCreateAlbumAction,
   adminDeleteAlbumAction,
+  adminGetReportedSongsAction,
+  adminModerateSongAction,
 } from '@/actions/songs';
 import { formatDuration } from '@/lib/audioLibrary';
 import {
@@ -16,18 +18,33 @@ import {
   User,
   Disc,
   Play,
+  Pause,
   Trash2,
   Plus,
   RefreshCw,
   Film,
   TrendingUp,
   Sparkles,
+  ShieldAlert,
+  AlertTriangle,
+  CheckCircle,
+  UserX,
+  Flag,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 
 export default function AdminSongsPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'songs' | 'artists' | 'albums'>('songs');
+  const [activeTab, setActiveTab] = useState<'songs' | 'artists' | 'albums' | 'reports'>('songs');
+
+  // Reported Songs Moderation State
+  const [reportedSongs, setReportedSongs] = useState<any[]>([]);
+  const [loadingReports, setLoadingReports] = useState(false);
+  const [moderatingId, setModeratingId] = useState<string | null>(null);
+  const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
+  const [audioPlayer, setAudioPlayer] = useState<HTMLAudioElement | null>(null);
 
   // New Song Form State
   const [songTitle, setSongTitle] = useState('');
@@ -70,8 +87,50 @@ export default function AdminSongsPage() {
     setLoading(false);
   };
 
+  const fetchReports = async () => {
+    setLoadingReports(true);
+    const res = await adminGetReportedSongsAction();
+    if (res.success) {
+      setReportedSongs(res.songs || []);
+    }
+    setLoadingReports(false);
+  };
+
+  const handleToggleAudio = (song: any) => {
+    if (playingAudioId === song.id) {
+      audioPlayer?.pause();
+      setPlayingAudioId(null);
+    } else {
+      audioPlayer?.pause();
+      const audio = new Audio(song.audioUrl);
+      audio.play().catch(() => {});
+      audio.onended = () => setPlayingAudioId(null);
+      setAudioPlayer(audio);
+      setPlayingAudioId(song.id);
+    }
+  };
+
+  const handleModerate = async (
+    songId: string,
+    action: 'suspend' | 'unsuspend' | 'delete' | 'dismiss',
+    options?: { suspendUser?: boolean; reason?: string }
+  ) => {
+    if (!confirm(`Are you sure you want to perform action "${action}" on this track?`)) return;
+    setModeratingId(songId);
+    const res = await adminModerateSongAction(songId, action, options);
+    if (res.success) {
+      alert(`Track action "${action}" applied.`);
+      fetchReports();
+      fetchStats();
+    } else {
+      alert(res.error || 'Failed to moderate track');
+    }
+    setModeratingId(null);
+  };
+
   useEffect(() => {
     fetchStats();
+    fetchReports();
   }, []);
 
   const handleCreateSong = async (e: React.FormEvent) => {
@@ -277,6 +336,22 @@ export default function AdminSongsPage() {
         >
           Albums ({data?.albums?.length || 0})
         </button>
+        <button
+          onClick={() => {
+            setActiveTab('reports');
+            fetchReports();
+          }}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+            activeTab === 'reports'
+              ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/20'
+              : 'text-zinc-400 hover:text-rose-400'
+          }`}
+        >
+          <ShieldAlert className="w-4 h-4" />
+          <span>
+            Flagged & Reported ({reportedSongs.filter((s) => s.reportsCount > 0 || s.isSuspended).length})
+          </span>
+        </button>
       </div>
 
       {/* Songs Table */}
@@ -414,6 +489,220 @@ export default function AdminSongsPage() {
               </button>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Reported & Flagged Songs Moderation Tab */}
+      {activeTab === 'reports' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <ShieldAlert className="w-5 h-5 text-rose-500" />
+                Reported Audio Tracks & Spam Moderation
+              </h3>
+              <p className="text-xs text-zinc-400">
+                Review flagged tracks reported by users for spam, copyright infringement, or inappropriate audio.
+              </p>
+            </div>
+            <button
+              onClick={fetchReports}
+              disabled={loadingReports}
+              className="px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs font-semibold text-zinc-300 hover:text-white flex items-center gap-1.5"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loadingReports ? 'animate-spin' : ''}`} />
+              <span>Refresh Reports</span>
+            </button>
+          </div>
+
+          {loadingReports ? (
+            <div className="p-12 text-center text-zinc-500 text-xs">Loading reported songs...</div>
+          ) : reportedSongs.length === 0 ? (
+            <div className="p-12 rounded-3xl bg-zinc-900/40 border border-zinc-800 text-center space-y-2">
+              <CheckCircle className="w-8 h-8 text-emerald-500 mx-auto" />
+              <h4 className="text-sm font-bold text-white">No Reported Songs</h4>
+              <p className="text-xs text-zinc-400">
+                All audio tracks and albums are in good standing with zero active reports.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {reportedSongs.map((song) => {
+                const isPlaying = playingAudioId === song.id;
+                const isSuspended = song.isSuspended;
+                const uploader = song.uploader;
+
+                return (
+                  <div
+                    key={song.id}
+                    className={`p-5 rounded-3xl border transition-all space-y-4 ${
+                      isSuspended
+                        ? 'bg-rose-950/20 border-rose-900/60'
+                        : 'bg-zinc-900/60 border-zinc-800'
+                    }`}
+                  >
+                    {/* Top Row: Track summary, Audio preview, Status */}
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleAudio(song)}
+                          className={`w-12 h-12 rounded-2xl flex items-center justify-center font-bold shrink-0 transition-transform shadow-lg ${
+                            isPlaying
+                              ? 'bg-rose-500 text-white scale-105 shadow-rose-500/30'
+                              : 'bg-zinc-800 text-zinc-200 hover:bg-zinc-700'
+                          }`}
+                          title={isPlaying ? 'Pause Preview' : 'Listen to Track'}
+                        >
+                          {isPlaying ? (
+                            <Pause className="w-5 h-5 fill-current" />
+                          ) : (
+                            <Play className="w-5 h-5 fill-current ml-0.5" />
+                          )}
+                        </button>
+
+                        <img
+                          src={song.coverUrl || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=200'}
+                          alt={song.title}
+                          className="w-12 h-12 rounded-2xl object-cover border border-zinc-700 shrink-0"
+                        />
+
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-extrabold text-sm sm:text-base text-white truncate">
+                              {song.title}
+                            </h4>
+                            {isSuspended ? (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-500/20 text-rose-400 border border-rose-500/30">
+                                SUSPENDED
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                ACTIVE ({song.reportsCount} Reports)
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-zinc-400">
+                            Artist: <span className="text-zinc-200 font-semibold">{song.artist?.name || 'Unknown'}</span>
+                            {song.album?.title && ` • Album: ${song.album.title}`}
+                            {` • ${song.genre} • ${song.language}`}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Uploader info box */}
+                      <div className="p-3 rounded-2xl bg-zinc-950 border border-zinc-800/80 flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center font-bold text-xs text-zinc-300">
+                          {uploader?.avatar ? (
+                            <img src={uploader.avatar} alt={uploader.name} className="w-full h-full rounded-full object-cover" />
+                          ) : (
+                            <User className="w-4 h-4 text-zinc-400" />
+                          )}
+                        </div>
+                        <div className="text-xs min-w-0">
+                          <span className="font-bold text-zinc-200 block truncate">
+                            {uploader?.name || 'Platform Track / Seeded'}
+                          </span>
+                          <span className="text-[10px] text-zinc-500 block truncate">
+                            {uploader?.email || (song.uploaderId ? `User ID: ${song.uploaderId}` : 'Seeded / API Track')}
+                          </span>
+                          {uploader?.isSuspended && (
+                            <span className="text-[9px] font-bold text-rose-400 block">
+                              Account Suspended
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Reports List */}
+                    {song.reports?.length > 0 && (
+                      <div className="pt-3 border-t border-zinc-800/80 space-y-2">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 block">
+                          User Reports ({song.reports.length})
+                        </span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {song.reports.map((report: any) => (
+                            <div
+                              key={report.id}
+                              className="p-3 rounded-xl bg-zinc-950/70 border border-zinc-800/60 text-xs space-y-1"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-rose-400 capitalize">
+                                  {report.reason.replace('_', ' ')}
+                                </span>
+                                <span className="text-[10px] text-zinc-500">
+                                  {new Date(report.createdAt).toLocaleDateString()}
+                                </span>
+                              </div>
+                              {report.details && (
+                                <p className="text-zinc-300 text-[11px] italic">"{report.details}"</p>
+                              )}
+                              <p className="text-[10px] text-zinc-500">
+                                Reporter: {report.reporter?.name || report.reporter?.username || 'User'}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Super Admin Action Controls */}
+                    <div className="pt-3 border-t border-zinc-800 flex flex-wrap items-center justify-end gap-2.5">
+                      <button
+                        type="button"
+                        disabled={moderatingId === song.id}
+                        onClick={() => handleModerate(song.id, 'dismiss')}
+                        className="px-3 py-1.5 rounded-xl border border-zinc-700 bg-zinc-800/60 hover:bg-zinc-800 text-zinc-300 hover:text-white text-xs font-semibold transition"
+                      >
+                        Dismiss Reports
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={moderatingId === song.id}
+                        onClick={() => handleModerate(song.id, isSuspended ? 'unsuspend' : 'suspend')}
+                        className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition ${
+                          isSuspended
+                            ? 'bg-emerald-500 hover:bg-emerald-600 text-black'
+                            : 'bg-amber-500/20 border border-amber-500/40 text-amber-300 hover:bg-amber-500/30'
+                        }`}
+                      >
+                        {isSuspended ? 'Unsuspend Track' : 'Suspend Audio Track'}
+                      </button>
+
+                      {uploader && !uploader.isSuspended && (
+                        <button
+                          type="button"
+                          disabled={moderatingId === song.id}
+                          onClick={() =>
+                            handleModerate(song.id, 'suspend', {
+                              suspendUser: true,
+                              reason: `Spam/Violation from music upload: "${song.title}"`,
+                            })
+                          }
+                          className="px-3.5 py-1.5 rounded-xl bg-orange-600/20 border border-orange-600/40 text-orange-300 hover:bg-orange-600/30 text-xs font-bold transition flex items-center gap-1.5"
+                        >
+                          <UserX className="w-3.5 h-3.5" />
+                          <span>Suspend Uploader</span>
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        disabled={moderatingId === song.id}
+                        onClick={() => handleModerate(song.id, 'delete')}
+                        className="px-3.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-rose-600/20"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Delete Track</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 

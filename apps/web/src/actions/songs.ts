@@ -404,17 +404,18 @@ export async function getSongsFeedAction() {
       allGenres,
     ] = await Promise.all([
       prisma.song.findMany({
-        where: { isTrending: true },
+        where: { isTrending: true, isSuspended: false },
         include: { artist: true, album: true },
         orderBy: { playCount: 'desc' },
         take: 16,
       }),
       prisma.song.findMany({
-        where: { isFeatured: true },
+        where: { isFeatured: true, isSuspended: false },
         include: { artist: true, album: true },
         take: 16,
       }),
       prisma.song.findMany({
+        where: { isSuspended: false },
         orderBy: { createdAt: 'desc' },
         include: { artist: true, album: true },
         take: 16,
@@ -522,7 +523,7 @@ export async function searchSongsAction(query: string, genre?: string, language?
   const trimmed = query.trim();
 
   try {
-    const whereSong: any = {};
+    const whereSong: any = { isSuspended: false };
     if (trimmed) {
       whereSong.OR = [
         { title: { contains: trimmed, mode: 'insensitive' } },
@@ -856,7 +857,7 @@ export async function getUserMusicAction() {
   const userId = (session.user as any).id;
 
   try {
-    const [likedSongs, likedAlbums, followedArtists, recentlyPlayed, playlists] =
+    const [likedSongs, likedAlbums, followedArtists, recentlyPlayed, playlists, uploadedSongs, uploadedAlbums] =
       await Promise.all([
         prisma.songLike.findMany({
           where: { userId },
@@ -897,6 +898,16 @@ export async function getUserMusicAction() {
           },
           orderBy: { updatedAt: 'desc' },
         }),
+        prisma.song.findMany({
+          where: { uploaderId: userId },
+          include: { artist: true, album: true },
+          orderBy: { createdAt: 'desc' },
+        }),
+        prisma.album.findMany({
+          where: { uploaderId: userId },
+          include: { artist: true, songs: true },
+          orderBy: { createdAt: 'desc' },
+        }),
       ]);
 
     return {
@@ -906,6 +917,8 @@ export async function getUserMusicAction() {
       followedArtists: followedArtists.map((f) => f.artist),
       recentlyPlayed: recentlyPlayed.map((r) => r.song),
       playlists,
+      uploadedSongs,
+      uploadedAlbums,
     };
   } catch (err: any) {
     return { success: false, error: err.message };
@@ -1193,3 +1206,411 @@ export async function adminDeleteAlbumAction(albumId: string) {
     return { success: false, error: err.message };
   }
 }
+
+/**
+ * User: Launch Single Song
+ */
+export async function userLaunchSongAction(data: {
+  title: string;
+  artistName?: string;
+  albumId?: string;
+  newAlbumTitle?: string;
+  audioUrl: string;
+  coverUrl?: string;
+  duration?: number;
+  genre?: string;
+  language?: string;
+  isExplicit?: boolean;
+}) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) {
+    return { success: false, error: 'Please log in to launch songs' };
+  }
+  const userId = (session.user as any).id;
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) return { success: false, error: 'User not found' };
+  if (user.isSuspended || user.isBanned) {
+    return { success: false, error: 'Your account is suspended and cannot upload music.' };
+  }
+
+  if (!data.title?.trim() || !data.audioUrl?.trim()) {
+    return { success: false, error: 'Song title and audio file are required.' };
+  }
+
+  try {
+    const artistDisplayName = (data.artistName?.trim() || user.name || user.username || 'Independent Artist').trim();
+
+    let artist = await prisma.artist.findFirst({
+      where: { name: { equals: artistDisplayName, mode: 'insensitive' } },
+    });
+    if (!artist) {
+      artist = await prisma.artist.create({
+        data: {
+          name: artistDisplayName,
+          genre: data.genre || 'Indie',
+          image: data.coverUrl || user.avatar || user.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400',
+          monthlyListeners: 100,
+          isVerified: false,
+        },
+      });
+    }
+
+    let albumId = data.albumId || null;
+    if (!albumId && data.newAlbumTitle?.trim()) {
+      const album = await prisma.album.create({
+        data: {
+          title: data.newAlbumTitle.trim(),
+          artistId: artist.id,
+          uploaderId: userId,
+          coverUrl: data.coverUrl || null,
+          genre: data.genre || 'Indie',
+          releaseYear: new Date().getFullYear().toString(),
+        },
+      });
+      albumId = album.id;
+    }
+
+    const song = await prisma.song.create({
+      data: {
+        title: data.title.trim(),
+        audioUrl: data.audioUrl.trim(),
+        coverUrl: data.coverUrl?.trim() || null,
+        duration: Math.max(10, data.duration || 180),
+        genre: data.genre || 'Indie',
+        language: data.language || 'Hindi',
+        isExplicit: !!data.isExplicit,
+        isNewRelease: true,
+        waveform: JSON.stringify(generateWaveform(data.title)),
+        artistId: artist.id,
+        albumId,
+        uploaderId: userId,
+      },
+      include: {
+        artist: true,
+        album: true,
+      },
+    });
+
+    revalidatePath('/songs');
+    return { success: true, song };
+  } catch (err: any) {
+    console.error('userLaunchSongAction error:', err);
+    return { success: false, error: err.message || 'Failed to launch song' };
+  }
+}
+
+/**
+ * User: Launch Album with multiple tracks
+ */
+export async function userLaunchAlbumAction(data: {
+  title: string;
+  artistName?: string;
+  coverUrl?: string;
+  genre?: string;
+  description?: string;
+  releaseYear?: string;
+  tracks: Array<{
+    title: string;
+    audioUrl: string;
+    duration?: number;
+    genre?: string;
+    language?: string;
+    isExplicit?: boolean;
+  }>;
+}) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) {
+    return { success: false, error: 'Please log in to launch an album' };
+  }
+  const userId = (session.user as any).id;
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) return { success: false, error: 'User not found' };
+  if (user.isSuspended || user.isBanned) {
+    return { success: false, error: 'Your account is suspended and cannot launch albums.' };
+  }
+
+  if (!data.title?.trim()) {
+    return { success: false, error: 'Album title is required.' };
+  }
+  if (!data.tracks || data.tracks.length === 0) {
+    return { success: false, error: 'Please add at least one audio track.' };
+  }
+
+  try {
+    const artistDisplayName = (data.artistName?.trim() || user.name || user.username || 'Independent Artist').trim();
+    let artist = await prisma.artist.findFirst({
+      where: { name: { equals: artistDisplayName, mode: 'insensitive' } },
+    });
+    if (!artist) {
+      artist = await prisma.artist.create({
+        data: {
+          name: artistDisplayName,
+          genre: data.genre || 'Indie',
+          image: data.coverUrl || user.avatar || user.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400',
+          monthlyListeners: 200,
+          isVerified: false,
+        },
+      });
+    }
+
+    const album = await prisma.album.create({
+      data: {
+        title: data.title.trim(),
+        artistId: artist.id,
+        uploaderId: userId,
+        coverUrl: data.coverUrl?.trim() || null,
+        genre: data.genre || 'Indie',
+        description: data.description?.trim() || null,
+        releaseYear: data.releaseYear || new Date().getFullYear().toString(),
+      },
+    });
+
+    const createdSongs = [];
+    for (const track of data.tracks) {
+      if (!track.title?.trim() || !track.audioUrl?.trim()) continue;
+      const song = await prisma.song.create({
+        data: {
+          title: track.title.trim(),
+          audioUrl: track.audioUrl.trim(),
+          coverUrl: data.coverUrl?.trim() || null,
+          duration: Math.max(10, track.duration || 180),
+          genre: track.genre || data.genre || 'Indie',
+          language: track.language || 'Hindi',
+          isExplicit: !!track.isExplicit,
+          isNewRelease: true,
+          waveform: JSON.stringify(generateWaveform(track.title)),
+          artistId: artist.id,
+          albumId: album.id,
+          uploaderId: userId,
+        },
+      });
+      createdSongs.push(song);
+    }
+
+    revalidatePath('/songs');
+    return { success: true, album, songs: createdSongs };
+  } catch (err: any) {
+    console.error('userLaunchAlbumAction error:', err);
+    return { success: false, error: err.message || 'Failed to launch album' };
+  }
+}
+
+/**
+ * Report a Song / Audio Track
+ */
+export async function reportSongAction(songId: string, reason: string, details?: string) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) {
+    return { success: false, error: 'Please log in to report a track' };
+  }
+  const reporterId = (session.user as any).id;
+
+  try {
+    const song = await prisma.song.findUnique({
+      where: { id: songId },
+      include: { artist: true, uploader: true },
+    });
+    if (!song) {
+      return { success: false, error: 'Song not found' };
+    }
+
+    const existing = await prisma.songReport.findUnique({
+      where: {
+        songId_reporterId: {
+          songId,
+          reporterId,
+        },
+      },
+    });
+    if (existing) {
+      return { success: false, error: 'You have already reported this audio track.' };
+    }
+
+    await prisma.songReport.create({
+      data: {
+        songId,
+        reporterId,
+        reason,
+        details: details ? details.trim().slice(0, 500) : null,
+        status: 'PENDING',
+      },
+    });
+
+    const updatedSong = await prisma.song.update({
+      where: { id: songId },
+      data: {
+        reportsCount: { increment: 1 },
+      },
+    });
+
+    // Notify Super Admin users
+    const SUPER_ADMIN_EMAIL = process.env.SUPER_ADMIN_EMAIL || 'pratishrupawate369@gmail.com';
+    const superAdmins = await prisma.user.findMany({
+      where: {
+        email: { equals: SUPER_ADMIN_EMAIL, mode: 'insensitive' },
+      },
+    });
+
+    const notificationMessage = `🚨 Song Reported (${reason}): "${song.title}" now has ${updatedSong.reportsCount} report(s). Action required.`;
+    for (const sa of superAdmins) {
+      await prisma.notification.create({
+        data: {
+          userId: sa.id,
+          type: 'song_reported',
+          message: notificationMessage,
+          link: '/super-admin/songs',
+        },
+      }).catch(() => {});
+    }
+
+    return {
+      success: true,
+      message: 'Report submitted. Our moderation team and Super Admin will review this track.',
+      reportsCount: updatedSong.reportsCount,
+    };
+  } catch (err: any) {
+    console.error('reportSongAction error:', err);
+    return { success: false, error: err.message || 'Failed to submit report' };
+  }
+}
+
+/**
+ * Super Admin: Get Reported Songs
+ */
+export async function adminGetReportedSongsAction() {
+  try {
+    const reportedSongs = await prisma.song.findMany({
+      where: {
+        OR: [
+          { reportsCount: { gt: 0 } },
+          { isSuspended: true },
+          { reports: { some: {} } },
+        ],
+      },
+      include: {
+        artist: true,
+        album: true,
+        uploader: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            username: true,
+            avatar: true,
+            isSuspended: true,
+          },
+        },
+        reports: {
+          include: {
+            reporter: {
+              select: {
+                id: true,
+                name: true,
+                username: true,
+                avatar: true,
+              },
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+      orderBy: [
+        { isSuspended: 'asc' },
+        { reportsCount: 'desc' },
+      ],
+    });
+
+    return { success: true, songs: reportedSongs };
+  } catch (err: any) {
+    console.error('adminGetReportedSongsAction error:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Super Admin: Moderate Song & User Action
+ */
+export async function adminModerateSongAction(
+  songId: string,
+  action: 'suspend' | 'unsuspend' | 'delete' | 'dismiss',
+  options?: { suspendUser?: boolean; reason?: string }
+) {
+  try {
+    const song = await prisma.song.findUnique({
+      where: { id: songId },
+      include: { uploader: true },
+    });
+    if (!song) return { success: false, error: 'Song not found' };
+
+    if (action === 'suspend') {
+      await prisma.song.update({
+        where: { id: songId },
+        data: { isSuspended: true },
+      });
+      await prisma.songReport.updateMany({
+        where: { songId },
+        data: { status: 'RESOLVED' },
+      });
+      if (song.uploaderId) {
+        await prisma.notification.create({
+          data: {
+            userId: song.uploaderId,
+            type: 'song_moderated',
+            message: `⚠️ Your track "${song.title}" was suspended due to community reports.`,
+            link: '/songs/my-music',
+          },
+        }).catch(() => {});
+      }
+    } else if (action === 'unsuspend') {
+      await prisma.song.update({
+        where: { id: songId },
+        data: { isSuspended: false, reportsCount: 0 },
+      });
+      await prisma.songReport.updateMany({
+        where: { songId },
+        data: { status: 'DISMISSED' },
+      });
+    } else if (action === 'dismiss') {
+      await prisma.song.update({
+        where: { id: songId },
+        data: { reportsCount: 0 },
+      });
+      await prisma.songReport.updateMany({
+        where: { songId },
+        data: { status: 'DISMISSED' },
+      });
+    } else if (action === 'delete') {
+      await prisma.song.delete({
+        where: { id: songId },
+      });
+      if (song.uploaderId) {
+        await prisma.notification.create({
+          data: {
+            userId: song.uploaderId,
+            type: 'song_deleted',
+            message: `🚫 Your track "${song.title}" was removed by Super Admin following policy review.`,
+            link: '/songs/my-music',
+          },
+        }).catch(() => {});
+      }
+    }
+
+    if (options?.suspendUser && song.uploaderId) {
+      await prisma.user.update({
+        where: { id: song.uploaderId },
+        data: {
+          isSuspended: true,
+          suspensionReason: options.reason || 'Violated music community guidelines (Spam/Copyright)',
+        },
+      });
+    }
+
+    revalidatePath('/songs');
+    revalidatePath('/super-admin/songs');
+    return { success: true };
+  } catch (err: any) {
+    console.error('adminModerateSongAction error:', err);
+    return { success: false, error: err.message };
+  }
+}
+
