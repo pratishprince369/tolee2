@@ -35,6 +35,7 @@ import { fetchEligibleAds } from '@/actions/ads';
 import { isVideoUrl, getMediaThumbnail, getPosterUrl, parseMediaUrls } from '@/lib/media';
 import { YouTubeReelPlayer } from '@/components/YouTubeReelPlayer';
 import { extractYouTubeVideoId, decodeHtmlEntities } from '@/lib/youtube';
+import { ToleeMediaPicker } from '@/lib/toleeMediaPicker';
 
 const UnifiedCreatePostModal = dynamic(
   () => import('@/components/UnifiedCreatePostModal').then((m) => m.UnifiedCreatePostModal),
@@ -164,26 +165,56 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
 
   const triggerGalleryPicker = useCallback(() => {
     if (reelsFileInputRef.current) {
-      // Include all standard video and image MIME types and file extensions so Android PhotoPicker lists all device videos
-      reelsFileInputRef.current.accept = 'video/mp4,video/quicktime,video/webm,video/3gpp,video/x-matroska,video/*,image/jpeg,image/png,image/webp,image/*,.mp4,.mov,.webm,.3gp,.mkv,.jpg,.jpeg,.png';
+      // Use clean standard MIME types without file extensions (.mp4, .mov, etc.)
+      // Listing file extensions forces Android WebView/Chrome to open the Documents/Files manager
+      reelsFileInputRef.current.accept = 'image/*,video/*';
       reelsFileInputRef.current.click();
     }
   }, []);
 
-  const handleReelsUploadClick = () => {
+  const handleReelsUploadClick = async () => {
     if (!session?.user) {
       router.push('/login');
       return;
     }
-    // On mobile screens, open Instagram-style camera modal with live viewfinder and gallery access
-    const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
-    if (isMobile) {
-      setIsCameraModalOpen(true);
-    } else {
-      // On laptop/desktop, open native gallery picker directly
+
+    try {
+      // Immediately open Native Gallery / Visual Media Picker
+      const assets = await ToleeMediaPicker.selectImageAndVideo({ multiple: true });
+      if (!assets || assets.length === 0) {
+        // User cancelled or closed picker, return smoothly to Reels
+        return;
+      }
+
+      const items: MediaItem[] = assets.map((asset) => ({
+        type: asset.type,
+        url: asset.uri,
+        file: asset.file,
+      }));
+
+      if (items.length === 0) {
+        return;
+      }
+
+      setIsCameraModalOpen(false);
+      setReelsPreloadedMedia(items);
+      setIsUnifiedModalOpen(true);
+    } catch (err) {
+      console.warn('[ReelsStream] ToleeMediaPicker error, falling back to input:', err);
       triggerGalleryPicker();
     }
   };
+
+  // Register global openInstagramCamera so in-app media picker camera button can trigger camera modal
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    (window as any).openInstagramCamera = () => {
+      setIsCameraModalOpen(true);
+    };
+    return () => {
+      delete (window as any).openInstagramCamera;
+    };
+  }, []);
 
   // Auto-open Reel creator when navigated from Tolee Songs ("Use in Reel")
   useEffect(() => {
@@ -1188,7 +1219,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
       <input
         ref={reelsFileInputRef}
         type="file"
-        accept="video/mp4,video/quicktime,video/webm,video/3gpp,video/x-matroska,video/*,image/jpeg,image/png,image/webp,image/*,.mp4,.mov,.webm,.3gp,.mkv,.jpg,.jpeg,.png"
+        accept="image/*,video/*"
         multiple
         className="hidden"
         onChange={handleReelsFileSelect}

@@ -392,9 +392,9 @@ public class MainActivity extends BridgeActivity {
                     for (String type : acceptTypes) {
                         if (type != null) {
                             String trimmed = type.trim().toLowerCase();
-                            if (trimmed.contains("video")) {
+                            if (trimmed.contains("video") || trimmed.endsWith(".mp4") || trimmed.endsWith(".mov") || trimmed.endsWith(".webm") || trimmed.endsWith(".mkv") || trimmed.endsWith(".3gp") || trimmed.endsWith(".m4v")) {
                                 isVideoOnly = true;
-                            } else if (trimmed.contains("image")) {
+                            } else if (trimmed.contains("image") || trimmed.endsWith(".jpg") || trimmed.endsWith(".jpeg") || trimmed.endsWith(".png") || trimmed.endsWith(".webp") || trimmed.endsWith(".gif")) {
                                 isImageOnly = true;
                             } else {
                                 isOther = true;
@@ -418,7 +418,7 @@ public class MainActivity extends BridgeActivity {
                     return true;
                 }
 
-                final String pickMode = isVideoOnly ? "videos" : (isImageOnly ? "photos" : "all");
+                final String pickMode = (isVideoOnly && !isImageOnly) ? "videos" : (isImageOnly && !isVideoOnly ? "photos" : "all");
                 final boolean multiple = fileChooserParams.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE;
 
                 runOnUiThread(() -> {
@@ -1192,14 +1192,24 @@ public class MainActivity extends BridgeActivity {
         @android.webkit.JavascriptInterface
         public void fallbackToFileChooser() {
             runOnUiThread(() -> {
-                Intent galleryIntent = new Intent(Intent.ACTION_GET_CONTENT);
-                galleryIntent.addCategory(Intent.CATEGORY_OPENABLE);
-                galleryIntent.setType("*/*");
-                Intent chooserIntent = Intent.createChooser(galleryIntent, "Select File");
+                Intent galleryIntent;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    galleryIntent = new Intent(MediaStore.ACTION_PICK_IMAGES);
+                } else {
+                    galleryIntent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+                    galleryIntent.setDataAndType(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, "image/*,video/*");
+                }
+                Intent chooserIntent = Intent.createChooser(galleryIntent, "Select Photos & Videos");
                 try {
                     startActivityForResult(chooserIntent, RC_FILE_CHOOSER);
                 } catch (Exception e) {
-                    mFilePathCallback = null;
+                    try {
+                        Intent fallbackIntent = new Intent(Intent.ACTION_GET_CONTENT);
+                        fallbackIntent.setType("image/*,video/*");
+                        startActivityForResult(Intent.createChooser(fallbackIntent, "Select Photos & Videos"), RC_FILE_CHOOSER);
+                    } catch (Exception ex) {
+                        mFilePathCallback = null;
+                    }
                 }
             });
         }

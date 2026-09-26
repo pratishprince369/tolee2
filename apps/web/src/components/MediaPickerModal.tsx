@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { X, Folder, Image as ImageIcon, Video, CheckCircle2, ChevronDown, RotateCcw, AlertTriangle, ArrowUpDown, Search } from 'lucide-react';
+import { X, Folder, Image as ImageIcon, Video, CheckCircle2, ChevronDown, RotateCcw, AlertTriangle, ArrowUpDown, Search, Camera } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface Album {
@@ -218,6 +218,21 @@ export function MediaPickerModal() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Instagram-Style Live Camera Switch */}
+          <button
+            type="button"
+            onClick={() => {
+              handleCancel();
+              if (typeof window !== 'undefined' && (window as any).openInstagramCamera) {
+                (window as any).openInstagramCamera();
+              }
+            }}
+            className="p-1.5 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white transition-all active:scale-95 border border-zinc-700/50"
+            title="Open Camera"
+          >
+            <Camera className="w-4 h-4" />
+          </button>
+
           {/* System Gallery Fallback Shortcut */}
           <button
             type="button"
