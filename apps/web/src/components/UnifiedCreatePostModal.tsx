@@ -177,10 +177,8 @@ export function UnifiedCreatePostModal({
       if (customAccept !== undefined) {
         fileInputRef.current.accept = customAccept;
       } else {
-        const isAndroid = typeof navigator !== 'undefined' && /android/i.test(navigator.userAgent);
-        // On Android, accept="*/*" prevents ColorOS / Realme from auto-selecting the [Videos] filter chip,
-        // allowing all photos and videos to be displayed mixed together in Recents.
-        fileInputRef.current.accept = isAndroid ? '*/*' : 'image/*,video/*';
+        fileInputRef.current.accept =
+          'video/mp4,video/quicktime,video/webm,video/3gpp,video/x-matroska,video/*,image/jpeg,image/png,image/webp,image/*,.mp4,.mov,.webm,.3gp,.mkv,.jpg,.jpeg,.png';
       }
       fileInputRef.current.click();
     }
@@ -497,7 +495,7 @@ export function UnifiedCreatePostModal({
 
                   {/* BOX 2: SELECT VIDEOS */}
                   <div
-                    onClick={() => triggerFileInput('video/*')}
+                    onClick={() => triggerFileInput('video/mp4,video/quicktime,video/webm,video/3gpp,video/x-matroska,video/*,.mp4,.mov,.webm,.3gp,.mkv')}
                     className="group relative flex items-start gap-4 p-5 rounded-[26px] bg-white dark:bg-[#181818] border border-[#DCF1EE] dark:border-zinc-800 hover:border-[#0a7c85]/50 hover:shadow-lg transition-all duration-200 cursor-pointer active:scale-[0.99] shadow-xs"
                   >
                     <div className="w-16 h-16 rounded-[22px] bg-[#EAF7F5] dark:bg-teal-950/40 text-[#0a7c85] flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform duration-200">

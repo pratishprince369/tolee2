@@ -164,8 +164,8 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
 
   const triggerGalleryPicker = useCallback(() => {
     if (reelsFileInputRef.current) {
-      // Specifically target photos and videos so mobile devices open Gallery instead of Document File Manager
-      reelsFileInputRef.current.accept = 'image/*,video/*';
+      // Include all standard video and image MIME types and file extensions so Android PhotoPicker lists all device videos
+      reelsFileInputRef.current.accept = 'video/mp4,video/quicktime,video/webm,video/3gpp,video/x-matroska,video/*,image/jpeg,image/png,image/webp,image/*,.mp4,.mov,.webm,.3gp,.mkv,.jpg,.jpeg,.png';
       reelsFileInputRef.current.click();
     }
   }, []);
@@ -1188,7 +1188,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
       <input
         ref={reelsFileInputRef}
         type="file"
-        accept="image/*,video/*"
+        accept="video/mp4,video/quicktime,video/webm,video/3gpp,video/x-matroska,video/*,image/jpeg,image/png,image/webp,image/*,.mp4,.mov,.webm,.3gp,.mkv,.jpg,.jpeg,.png"
         multiple
         className="hidden"
         onChange={handleReelsFileSelect}
