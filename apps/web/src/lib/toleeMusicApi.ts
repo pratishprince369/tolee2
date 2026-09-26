@@ -1,12 +1,13 @@
 /**
  * Tolee Songs – Universal Music Streaming & Discovery Engine
  * 
- * Powered by open discovery endpoints (inspired by legal aggregate resolvers in SayaMusicAPI).
+ * Full song streaming & full podcast listening without 15-second snippet cutoffs.
  * Privacy & White-label Guarantee:
- * All third-party provider names, brandings, and traces are strictly sanitized.
- * Tracks are presented exclusively under Tolee Songs branding.
+ * All third-party provider names and brandings are strictly sanitized.
+ * Tracks and podcasts are presented exclusively under Tolee branding.
  */
 
+import CryptoJS from 'crypto-js';
 import { generateWaveform } from './audioLibrary';
 
 export interface ToleeTrack {
@@ -55,6 +56,28 @@ export interface ToleeAlbum {
 }
 
 /**
+ * Decrypt JioSaavn encrypted_media_url to get 100% full song audio stream
+ */
+export function decryptSaavnMediaUrl(encrypted?: string): string {
+  if (!encrypted) return '';
+  try {
+    const key = CryptoJS.enc.Utf8.parse('38346591');
+    const decrypted = CryptoJS.DES.decrypt(
+      { ciphertext: CryptoJS.enc.Base64.parse(encrypted) },
+      key,
+      { mode: CryptoJS.mode.ECB, padding: CryptoJS.pad.Pkcs7 }
+    );
+    const decStr = decrypted.toString(CryptoJS.enc.Utf8);
+    if (!decStr || !decStr.startsWith('http')) return '';
+
+    // Upgrade to high-quality 160kbps/320kbps full track
+    return decStr.replace('_96.mp4', '_160.mp4');
+  } catch (e) {
+    return '';
+  }
+}
+
+/**
  * Sanitize text to decode HTML entities and remove external platform branding
  */
 export function sanitizeMusicText(text: string): string {
@@ -75,6 +98,7 @@ export function sanitizeMusicText(text: string): string {
     .replace(/gaana/gi, 'Tolee')
     .replace(/spotify/gi, 'Tolee')
     .replace(/apple\s*music/gi, 'Tolee Music')
+    .replace(/apple\s*podcasts?/gi, 'Tolee Podcasts')
     .replace(/itunes/gi, 'Tolee')
     .replace(/audius/gi, 'Tolee')
     .replace(/deezer/gi, 'Tolee')
@@ -99,9 +123,9 @@ export function upgradeCoverUrl(url?: string): string {
 }
 
 /**
- * Fetch songs from primary open API (JioSaavn API call)
+ * Fetch full songs from open primary catalog with DES decryption for full audio
  */
-async function fetchSaavnTracks(query: string, limit = 15): Promise<ToleeTrack[]> {
+async function fetchSaavnTracks(query: string, limit = 20): Promise<ToleeTrack[]> {
   try {
     const url = new URL('https://www.jiosaavn.com/api.php');
     url.searchParams.set('__call', 'search.getResults');
@@ -128,7 +152,14 @@ async function fetchSaavnTracks(query: string, limit = 15): Promise<ToleeTrack[]
 
     for (const item of data.results) {
       const moreInfo = item.more_info || {};
-      const audioUrl = moreInfo.vlink || item.media_preview_url || '';
+
+      // 1. Try to get FULL song audio URL via DES decryption
+      let audioUrl = decryptSaavnMediaUrl(moreInfo.encrypted_media_url);
+
+      // 2. Fallback to vlink or preview only if decryption not available
+      if (!audioUrl) {
+        audioUrl = moreInfo.vlink || item.media_preview_url || '';
+      }
       if (!audioUrl) continue;
 
       const title = sanitizeMusicText(item.song || item.title || 'Untitled Track');
@@ -141,7 +172,7 @@ async function fetchSaavnTracks(query: string, limit = 15): Promise<ToleeTrack[]
         'Tolee Artist';
       const artistName = sanitizeMusicText(rawArtist.split(',')[0] || rawArtist);
       const albumName = sanitizeMusicText(moreInfo.album || item.album || 'Tolee Singles');
-      const duration = parseInt(moreInfo.duration || item.duration || '180', 10);
+      const duration = parseInt(moreInfo.duration || item.duration || '210', 10);
       const coverUrl = upgradeCoverUrl(item.image);
       const id = `tolee-s-${item.id}`;
 
@@ -149,12 +180,12 @@ async function fetchSaavnTracks(query: string, limit = 15): Promise<ToleeTrack[]
         id,
         title,
         artistName,
-        artist: { id: `artist-${encodeURIComponent(artistName.toLowerCase().replace(/\s+/g, '-'))}`, name: artistName },
+        artist: { id: `artist-${encodeURIComponent(artistName.toLowerCase().replace(/[^a-z0-9]/g, '-'))}`, name: artistName },
         albumName,
-        album: { id: `album-${encodeURIComponent(albumName.toLowerCase().replace(/\s+/g, '-'))}`, title: albumName, coverUrl },
+        album: { id: `album-${encodeURIComponent(albumName.toLowerCase().replace(/[^a-z0-9]/g, '-'))}`, title: albumName, coverUrl },
         coverUrl,
         audioUrl,
-        duration: isNaN(duration) || duration <= 0 ? 180 : duration,
+        duration: isNaN(duration) || duration <= 0 ? 210 : duration,
         genre: sanitizeMusicText(item.language || moreInfo.language || 'Bollywood'),
         language: sanitizeMusicText(item.language || moreInfo.language || 'Hindi'),
         waveform: JSON.stringify(generateWaveform(id + title)),
@@ -172,13 +203,13 @@ async function fetchSaavnTracks(query: string, limit = 15): Promise<ToleeTrack[]
 }
 
 /**
- * Fetch tracks from secondary open API (iTunes Preview API)
+ * Fetch full podcast episodes for listening
  */
-async function fetchAppleTracks(query: string, limit = 10): Promise<ToleeTrack[]> {
+export async function searchToleePodcasts(query = 'hindi stories', limit = 12): Promise<ToleeTrack[]> {
   try {
     const url = new URL('https://itunes.apple.com/search');
     url.searchParams.set('term', query);
-    url.searchParams.set('entity', 'song');
+    url.searchParams.set('entity', 'podcast');
     url.searchParams.set('limit', String(limit));
     url.searchParams.set('country', 'IN');
 
@@ -187,99 +218,125 @@ async function fetchAppleTracks(query: string, limit = 10): Promise<ToleeTrack[]
         Accept: 'application/json',
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ToleeMusic/1.0',
       },
-      next: { revalidate: 300 },
+      next: { revalidate: 600 },
     });
 
     if (!res.ok) return [];
     const data = await res.json();
     if (!data || !Array.isArray(data.results)) return [];
 
-    const tracks: ToleeTrack[] = [];
+    const episodesList: ToleeTrack[] = [];
 
-    for (const item of data.results) {
-      if (!item.previewUrl) continue;
+    // Parallel fetch episodes for the top found podcasts
+    const lookups = data.results.slice(0, 5).map(async (pod: any) => {
+      try {
+        const epUrl = `https://itunes.apple.com/lookup?id=${pod.collectionId}&entity=podcastEpisode&limit=3`;
+        const epRes = await fetch(epUrl, {
+          headers: { Accept: 'application/json' },
+          next: { revalidate: 600 },
+        });
+        if (!epRes.ok) return [];
+        const epData = await epRes.json();
+        const eps = (epData.results || []).slice(1);
 
-      const title = sanitizeMusicText(item.trackName || 'Untitled Track');
-      const artistName = sanitizeMusicText(item.artistName || 'Tolee Artist');
-      const albumName = sanitizeMusicText(item.collectionName || 'Tolee Singles');
-      const duration = Math.round((item.trackTimeMillis || 180000) / 1000);
-      const coverUrl = upgradeCoverUrl(item.artworkUrl100);
-      const id = `tolee-a-${item.trackId}`;
+        return eps.map((ep: any) => {
+          if (!ep.episodeUrl) return null;
+          const title = sanitizeMusicText(ep.trackName || pod.collectionName);
+          const artistName = sanitizeMusicText(pod.artistName || 'Tolee Host');
+          const albumName = sanitizeMusicText(pod.collectionName || 'Tolee Podcast Show');
+          const coverUrl = upgradeCoverUrl(ep.artworkUrl600 || pod.artworkUrl600);
+          const duration = ep.trackTimeMillis ? Math.round(ep.trackTimeMillis / 1000) : 1800;
+          const id = `tolee-pod-${ep.trackId || pod.collectionId}`;
 
-      tracks.push({
-        id,
-        title,
-        artistName,
-        artist: { id: `artist-${encodeURIComponent(artistName.toLowerCase().replace(/\s+/g, '-'))}`, name: artistName },
-        albumName,
-        album: { id: `album-${encodeURIComponent(albumName.toLowerCase().replace(/\s+/g, '-'))}`, title: albumName, coverUrl },
-        coverUrl,
-        audioUrl: item.previewUrl,
-        duration: isNaN(duration) || duration <= 0 ? 180 : duration,
-        genre: sanitizeMusicText(item.primaryGenreName || 'Pop'),
-        language: 'Hindi',
-        waveform: JSON.stringify(generateWaveform(id + title)),
-        playCount: 180000,
-        likeCount: 42000,
-        source: 'tolee',
-      });
+          return {
+            id,
+            title,
+            artistName,
+            artist: { id: `artist-${encodeURIComponent(artistName.toLowerCase().replace(/[^a-z0-9]/g, '-'))}`, name: artistName },
+            albumName,
+            album: { id: `album-${encodeURIComponent(albumName.toLowerCase().replace(/[^a-z0-9]/g, '-'))}`, title: albumName, coverUrl },
+            coverUrl,
+            audioUrl: ep.episodeUrl, // 100% full podcast episode audio
+            duration,
+            genre: 'Podcast',
+            language: 'Hindi',
+            waveform: JSON.stringify(generateWaveform(id + title)),
+            playCount: 185000,
+            likeCount: 39000,
+            source: 'tolee',
+            isFeatured: true,
+          } as ToleeTrack;
+        }).filter(Boolean);
+      } catch {
+        return [];
+      }
+    });
+
+    const settled = await Promise.allSettled(lookups);
+    for (const s of settled) {
+      if (s.status === 'fulfilled' && Array.isArray(s.value)) {
+        for (const ep of s.value) {
+          if (ep) episodesList.push(ep);
+        }
+      }
     }
 
-    return tracks;
+    return episodesList;
   } catch (err) {
-    console.error('[Tolee Music API] Error fetching secondary tracks:', err);
+    console.error('[Tolee Music API] Error searching podcasts:', err);
     return [];
   }
 }
 
 /**
- * Universal Search across multi-providers with deduplication
+ * Universal Search across full songs and podcasts
  */
-export async function searchToleeMusic(query: string, limit = 20): Promise<ToleeTrack[]> {
+export async function searchToleeMusic(query: string, limit = 24): Promise<ToleeTrack[]> {
   const trimmed = query.trim();
   if (!trimmed) return [];
 
-  const [primary, secondary] = await Promise.allSettled([
-    fetchSaavnTracks(trimmed, limit),
-    fetchAppleTracks(trimmed, Math.min(10, limit)),
-  ]);
+  const isPodcastSearch = trimmed.toLowerCase().includes('podcast') || trimmed.toLowerCase().includes('show');
 
-  const results: ToleeTrack[] = [];
-  const seenTitles = new Set<string>();
-
-  const appendTracks = (list: ToleeTrack[]) => {
-    for (const track of list) {
-      const normalizedKey = `${track.title.toLowerCase().replace(/[^a-z0-9]/g, '')}-${track.artistName.toLowerCase().slice(0, 5)}`;
-      if (!seenTitles.has(normalizedKey)) {
-        seenTitles.add(normalizedKey);
-        results.push(track);
-      }
-    }
-  };
-
-  if (primary.status === 'fulfilled') {
-    appendTracks(primary.value);
-  }
-  if (secondary.status === 'fulfilled') {
-    appendTracks(secondary.value);
+  if (isPodcastSearch) {
+    const podcasts = await searchToleePodcasts(trimmed, limit);
+    if (podcasts.length > 0) return podcasts;
   }
 
-  return results.slice(0, limit);
+  // Fetch full songs
+  const tracks = await fetchSaavnTracks(trimmed, limit);
+
+  // If results are small, check podcasts as well
+  if (tracks.length < 5) {
+    const podcasts = await searchToleePodcasts(trimmed, 6);
+    return [...tracks, ...podcasts].slice(0, limit);
+  }
+
+  return tracks.slice(0, limit);
 }
 
 /**
- * Fetch Trending Songs Feed
+ * Fetch Trending Songs Feed with 100% Full Audio
  */
 export async function fetchTrendingFeed(): Promise<ToleeTrack[]> {
   const queries = ['trending hindi', 'top bollywood songs', 'viral hits 2026', 'punjabi hits'];
   const randomQuery = queries[Math.floor(Math.random() * queries.length)];
-  const tracks = await searchToleeMusic(randomQuery, 24);
+  const tracks = await fetchSaavnTracks(randomQuery, 24);
 
   return tracks.map((t) => ({
     ...t,
     isTrending: true,
     isFeatured: true,
   }));
+}
+
+/**
+ * Fetch Curated Full Podcasts Feed
+ */
+export async function fetchTrendingPodcasts(): Promise<ToleeTrack[]> {
+  const podQueries = ['hindi stories podcast', 'Ranveer Show', 'motivation hindi', 'true crime hindi'];
+  const q = podQueries[Math.floor(Math.random() * podQueries.length)];
+  const pods = await searchToleePodcasts(q, 10);
+  return pods;
 }
 
 /**

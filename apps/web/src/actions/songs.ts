@@ -8,6 +8,8 @@ import { generateWaveform } from '@/lib/audioLibrary';
 import {
   searchToleeMusic,
   fetchTrendingFeed,
+  fetchTrendingPodcasts,
+  searchToleePodcasts,
   POPULAR_TOLEE_ARTISTS,
   type ToleeTrack,
 } from '@/lib/toleeMusicApi';
@@ -140,8 +142,8 @@ const INITIAL_SONGS = [
     artistId: 'artist-arijit',
     albumId: 'album-bollywood-dreams',
     coverUrl: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=500&auto=format&fit=crop&q=80',
-    audioUrl: 'https://jiotunepreview.jio.com/content/Converted/010910141580615.mp3',
-    duration: 135,
+    audioUrl: 'https://aac.saavncdn.com/871/c2febd353f3a076a406fa37510f31f9f_160.mp4',
+    duration: 268,
     genre: 'Bollywood',
     language: 'Hindi',
     isTrending: true,
@@ -155,8 +157,8 @@ const INITIAL_SONGS = [
     artistId: 'artist-diljit',
     albumId: 'album-punjabi-heat',
     coverUrl: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&auto=format&fit=crop&q=80',
-    audioUrl: 'https://jiotunepreview.jio.com/content/Converted/010912582755792.mp3',
-    duration: 110,
+    audioUrl: 'https://aac.saavncdn.com/901/6f9a40435b170c06fb9c409dd8fb117e_160.mp4',
+    duration: 189,
     genre: 'Punjabi',
     language: 'Punjabi',
     isTrending: true,
@@ -170,8 +172,8 @@ const INITIAL_SONGS = [
     artistId: 'artist-tolee-lofi',
     albumId: 'album-lofi-chai',
     coverUrl: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=500&auto=format&fit=crop&q=80',
-    audioUrl: 'https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/31/85/ba/3185ba87-9a45-0245-fa7c-4797df0851eb/mzaf_4695387691305305556.plus.aac.p.m4a',
-    duration: 124,
+    audioUrl: 'https://aac.saavncdn.com/462/2684a8f71a4d9663cfd0e451bc1a9831_160.mp4',
+    duration: 160,
     genre: 'Lo-Fi',
     language: 'Instrumental',
     isTrending: false,
@@ -185,8 +187,8 @@ const INITIAL_SONGS = [
     artistId: 'artist-darshan',
     albumId: 'album-darshan-vedic',
     coverUrl: 'https://images.unsplash.com/photo-1545239351-ef35f43d514b?w=500&auto=format&fit=crop&q=80',
-    audioUrl: 'https://jiotunepreview.jio.com/content/Converted/010910092419390.mp3',
-    duration: 155,
+    audioUrl: 'https://aac.saavncdn.com/412/97ef6831f2ce71ecafb102ed2d3b7dac_160.mp4',
+    duration: 1200,
     genre: 'Devotional',
     language: 'Hindi',
     isTrending: true,
@@ -200,8 +202,8 @@ const INITIAL_SONGS = [
     artistId: 'artist-prateek',
     albumId: 'album-mountain-acoustic',
     coverUrl: 'https://images.unsplash.com/photo-1445985543470-41fdd5c31447?w=500&auto=format&fit=crop&q=80',
-    audioUrl: 'https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/40/e6/ba/40e6ba64-a4bb-16e3-15e9-f617f72df0a1/mzaf_1128798937893701954.plus.aac.p.m4a',
-    duration: 115,
+    audioUrl: 'https://aac.saavncdn.com/036/5ac1b1f1898a2e772191079ae1186e4c_160.mp4',
+    duration: 212,
     genre: 'Indie',
     language: 'Hindi',
     isTrending: true,
@@ -215,8 +217,8 @@ const INITIAL_SONGS = [
     artistId: 'artist-ajay-atul',
     albumId: 'album-marathi-dhol',
     coverUrl: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=500&auto=format&fit=crop&q=80',
-    audioUrl: 'https://jiotunepreview.jio.com/content/Converted/010912293765832.mp3',
-    duration: 102,
+    audioUrl: 'https://aac.saavncdn.com/224/f5801eb54c5b2947eccb401b7d62a683_160.mp4',
+    duration: 226,
     genre: 'Marathi',
     language: 'Marathi',
     isTrending: true,
@@ -230,8 +232,8 @@ const INITIAL_SONGS = [
     artistId: 'artist-diljit',
     albumId: 'album-punjabi-heat',
     coverUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&auto=format&fit=crop&q=80',
-    audioUrl: 'https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/ab/18/d9/ab18d9e9-01f0-27ea-3a51-6e08585a0072/mzaf_14299744081264843911.plus.aac.p.m4a',
-    duration: 95,
+    audioUrl: 'https://aac.saavncdn.com/230/a7a1bdc47088285c5397a1a7c3a0eaba_160.mp4',
+    duration: 195,
     genre: 'Workout',
     language: 'English',
     isTrending: true,
@@ -245,8 +247,8 @@ const INITIAL_SONGS = [
     artistId: 'artist-ajay-atul',
     albumId: 'album-marathi-dhol',
     coverUrl: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=500&auto=format&fit=crop&q=80',
-    audioUrl: 'https://jiotunepreview.jio.com/content/Converted/010912023403849.mp3',
-    duration: 98,
+    audioUrl: 'https://aac.saavncdn.com/620/bc9a9924233c798505985b281f9eb741_160.mp4',
+    duration: 185,
     genre: 'Party',
     language: 'Hindi',
     isTrending: true,
@@ -333,11 +335,16 @@ export async function syncTrackToPrisma(track: ToleeTrack) {
  */
 export async function ensureInitialMusicSeeded() {
   try {
-    const dummyCheck = await prisma.song.findFirst({
-      where: { audioUrl: { startsWith: '/audio/' } },
+    const snippetCheck = await prisma.song.findFirst({
+      where: {
+        OR: [
+          { audioUrl: { startsWith: '/audio/' } },
+          { audioUrl: { contains: 'jiotunepreview' } },
+        ],
+      },
     });
     const songCount = await prisma.song.count();
-    if (songCount >= 8 && !dummyCheck) return;
+    if (songCount >= 8 && !snippetCheck) return;
 
     // Seed Artists
     for (const artist of INITIAL_ARTISTS) {
@@ -365,6 +372,7 @@ export async function ensureInitialMusicSeeded() {
         update: {
           audioUrl: song.audioUrl,
           coverUrl: song.coverUrl,
+          duration: song.duration,
         },
         create: {
           ...song,
@@ -444,6 +452,14 @@ export async function getSongsFeedAction() {
       console.error('[Tolee Songs] Live feed sync error:', e);
     }
 
+    // Live podcasts injection
+    let podcasts: any[] = [];
+    try {
+      podcasts = await fetchTrendingPodcasts();
+    } catch (e) {
+      console.error('[Tolee Songs] Error fetching podcasts for feed:', e);
+    }
+
     // Fallback popular artists if needed
     if (popularArtists.length < 6) {
       for (const a of POPULAR_TOLEE_ARTISTS) {
@@ -486,6 +502,7 @@ export async function getSongsFeedAction() {
       newReleases: newReleases.length > 0 ? newReleases : trendingSongs.slice(8, 16),
       popularArtists,
       featuredAlbums,
+      podcasts,
       genres: allGenres.map((g) => g.genre),
       userLikedSongIds,
       userLikedAlbumIds,
@@ -498,7 +515,7 @@ export async function getSongsFeedAction() {
 }
 
 /**
- * Spotify-Style Multi-Entity Music Search with Universal Live Resolvers
+ * Spotify-Style Multi-Entity Music Search with Universal Live Resolvers & Podcasts
  */
 export async function searchSongsAction(query: string, genre?: string, language?: string) {
   await ensureInitialMusicSeeded();
@@ -514,7 +531,7 @@ export async function searchSongsAction(query: string, genre?: string, language?
         { genre: { contains: trimmed, mode: 'insensitive' } },
       ];
     }
-    if (genre && genre !== 'All') {
+    if (genre && genre !== 'All' && genre !== 'Podcasts') {
       whereSong.genre = { equals: genre, mode: 'insensitive' };
     }
     if (language && language !== 'All') {
@@ -562,41 +579,48 @@ export async function searchSongsAction(query: string, genre?: string, language?
     // If query provided or genre selected, query universal live discovery engine
     if (trimmed || (genre && genre !== 'All')) {
       try {
-        const liveQuery = trimmed || (genre !== 'All' ? `${genre} songs` : 'trending');
-        const liveTracks = await searchToleeMusic(liveQuery, 24);
+        if (genre === 'Podcasts' || trimmed.toLowerCase().includes('podcast') || trimmed.toLowerCase().includes('show')) {
+          const livePods = await searchToleePodcasts(trimmed || 'hindi stories', 20);
+          for (const pod of livePods) {
+            songs.push(pod as any);
+          }
+        } else {
+          const liveQuery = trimmed || (genre !== 'All' ? `${genre} songs` : 'trending');
+          const liveTracks = await searchToleeMusic(liveQuery, 24);
 
-        for (const track of liveTracks) {
-          const key = track.title.toLowerCase().replace(/[^a-z0-9]/g, '');
-          if (!existingSongKeys.has(key)) {
-            existingSongKeys.add(key);
-            songs.push(track as any);
+          for (const track of liveTracks) {
+            const key = track.title.toLowerCase().replace(/[^a-z0-9]/g, '');
+            if (!existingSongKeys.has(key)) {
+              existingSongKeys.add(key);
+              songs.push(track as any);
 
-            // Background persist
-            syncTrackToPrisma(track).catch(() => {});
+              // Background persist
+              syncTrackToPrisma(track).catch(() => {});
 
-            // Collect distinct artists and albums from live results
-            if (!artists.some((a) => a.name.toLowerCase() === track.artistName.toLowerCase())) {
-              artists.push({
-                id: track.artist?.id || `artist-${track.id}`,
-                name: track.artistName,
-                image: track.coverUrl,
-                genre: track.genre,
-                isVerified: true,
-                monthlyListeners: 10000000,
-              } as any);
-            }
-            if (
-              track.albumName &&
-              !albums.some((al) => al.title.toLowerCase() === track.albumName!.toLowerCase())
-            ) {
-              albums.push({
-                id: track.album?.id || `album-${track.id}`,
-                title: track.albumName,
-                coverUrl: track.coverUrl,
-                releaseYear: '2026',
-                genre: track.genre,
-                artist: { name: track.artistName },
-              } as any);
+              // Collect distinct artists and albums from live results
+              if (!artists.some((a) => a.name.toLowerCase() === track.artistName.toLowerCase())) {
+                artists.push({
+                  id: track.artist?.id || `artist-${track.id}`,
+                  name: track.artistName,
+                  image: track.coverUrl,
+                  genre: track.genre,
+                  isVerified: true,
+                  monthlyListeners: 10000000,
+                } as any);
+              }
+              if (
+                track.albumName &&
+                !albums.some((al) => al.title.toLowerCase() === track.albumName!.toLowerCase())
+              ) {
+                albums.push({
+                  id: track.album?.id || `album-${track.id}`,
+                  title: track.albumName,
+                  coverUrl: track.coverUrl,
+                  releaseYear: '2026',
+                  genre: track.genre,
+                  artist: { name: track.artistName },
+                } as any);
+              }
             }
           }
         }

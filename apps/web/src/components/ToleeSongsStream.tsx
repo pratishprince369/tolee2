@@ -39,6 +39,7 @@ export function ToleeSongsStream() {
     newReleases: [],
     popularArtists: [],
     featuredAlbums: [],
+    podcasts: [],
     genres: [],
   });
   const [searchResults, setSearchResults] = useState<any>(null);
@@ -50,6 +51,7 @@ export function ToleeSongsStream() {
     'All',
     'Bollywood',
     'Punjabi',
+    'Podcasts',
     'Lo-Fi',
     'Devotional',
     'Indie',
@@ -487,6 +489,83 @@ export function ToleeSongsStream() {
                       </div>
                     </Link>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* Popular Podcasts & Shows */}
+            {feedData.podcasts?.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg sm:text-xl font-bold flex items-center gap-2 text-white">
+                    <Radio className="w-5 h-5 text-[#2dd4bf]" />
+                    Popular Podcasts & Shows
+                  </h3>
+                  <span className="text-xs text-zinc-400">Full Audio Episodes</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {feedData.podcasts.map((pod: any) => {
+                    const isCurrent = currentTrack?.id === pod.id;
+                    const isTrackPlaying = isCurrent && isPlaying;
+                    const isLiked = likedSongIds.has(pod.id);
+
+                    return (
+                      <div
+                        key={pod.id}
+                        className={`flex items-center justify-between p-3 rounded-2xl border transition-all ${
+                          isCurrent
+                            ? 'bg-zinc-900 border-[#0a7c85]/50'
+                            : 'bg-zinc-900/40 hover:bg-zinc-900/80 border-zinc-800/60'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <button
+                            type="button"
+                            onClick={() => (isCurrent ? togglePlay() : playTrack(pod, feedData.podcasts))}
+                            className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 transition-transform ${
+                              isTrackPlaying
+                                ? 'bg-[#2dd4bf] text-zinc-950 scale-105'
+                                : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
+                            }`}
+                          >
+                            {isTrackPlaying ? (
+                              <Pause className="w-4 h-4 fill-current" />
+                            ) : (
+                              <Play className="w-4 h-4 fill-current ml-0.5" />
+                            )}
+                          </button>
+
+                          <img
+                            src={pod.coverUrl || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100'}
+                            alt={pod.title}
+                            className="w-11 h-11 rounded-xl object-cover shrink-0"
+                          />
+
+                          <div className="min-w-0 flex-1">
+                            <span className="text-xs sm:text-sm font-bold text-zinc-100 truncate block">
+                              {pod.title}
+                            </span>
+                            <p className="text-[11px] text-zinc-400 truncate">
+                              {pod.artistName || 'Tolee Host'} • {formatDuration(pod.duration)}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0 ml-2">
+                          <button
+                            type="button"
+                            onClick={() => toggleLike(pod.id)}
+                            className={`p-2 rounded-lg transition-colors ${
+                              isLiked ? 'text-rose-500' : 'text-zinc-500 hover:text-zinc-300'
+                            }`}
+                          >
+                            <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
