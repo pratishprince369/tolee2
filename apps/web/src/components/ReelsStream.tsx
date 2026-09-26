@@ -40,6 +40,10 @@ const UnifiedCreatePostModal = dynamic(
   () => import('@/components/UnifiedCreatePostModal').then((m) => m.UnifiedCreatePostModal),
   { ssr: false }
 );
+const InstagramReelsCameraModal = dynamic(
+  () => import('@/components/InstagramReelsCameraModal').then((m) => m.InstagramReelsCameraModal),
+  { ssr: false }
+);
 const ReShareModal = dynamic(() => import('@/components/ReShareModal').then(m => m.ReShareModal), { ssr: false });
 const ShareModal = dynamic(() => import('@/components/ShareModal').then(m => m.ShareModal), { ssr: false });
 const QuickBoostModal = dynamic(() => import('@/components/QuickBoostModal').then(m => m.QuickBoostModal), { ssr: false });
@@ -155,18 +159,36 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
   // Instagram-style Reels Upload Flow
   const reelsFileInputRef = useRef<HTMLInputElement>(null);
   const [isUnifiedModalOpen, setIsUnifiedModalOpen] = useState(false);
+  const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
   const [reelsPreloadedMedia, setReelsPreloadedMedia] = useState<MediaItem[]>([]);
+
+  const triggerGalleryPicker = useCallback(() => {
+    if (reelsFileInputRef.current) {
+      // Specifically target photos and videos so mobile devices open Gallery instead of Document File Manager
+      reelsFileInputRef.current.accept = 'image/*,video/*';
+      reelsFileInputRef.current.click();
+    }
+  }, []);
 
   const handleReelsUploadClick = () => {
     if (!session?.user) {
       router.push('/login');
       return;
     }
-    if (reelsFileInputRef.current) {
-      const isAndroid = typeof navigator !== 'undefined' && /android/i.test(navigator.userAgent);
-      reelsFileInputRef.current.accept = isAndroid ? '*/*' : 'video/*,image/*';
-      reelsFileInputRef.current.click();
+    // On mobile screens, open Instagram-style camera modal with live viewfinder and gallery access
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
+    if (isMobile) {
+      setIsCameraModalOpen(true);
+    } else {
+      // On laptop/desktop, open native gallery picker directly
+      triggerGalleryPicker();
     }
+  };
+
+  const handleCameraMediaCaptured = (item: MediaItem) => {
+    setReelsPreloadedMedia([item]);
+    setIsCameraModalOpen(false);
+    setIsUnifiedModalOpen(true);
   };
 
   const handleReelsFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -191,6 +213,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
       }
 
       if (reelsFileInputRef.current) reelsFileInputRef.current.value = '';
+      setIsCameraModalOpen(false);
       setReelsPreloadedMedia(items);
       setIsUnifiedModalOpen(true);
     }
@@ -1149,15 +1172,25 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
         />
       )}
 
-      {/* Hidden File Input for Native Media Picker */}
+      {/* Hidden File Input for Native Gallery Media Picker (Photos & Videos) */}
       <input
         ref={reelsFileInputRef}
         type="file"
-        accept="video/*,image/*"
+        accept="image/*,video/*"
         multiple
         className="hidden"
         onChange={handleReelsFileSelect}
       />
+
+      {/* Instagram-Style Live Camera Modal on Mobile */}
+      {isCameraModalOpen && (
+        <InstagramReelsCameraModal
+          isOpen={isCameraModalOpen}
+          onClose={() => setIsCameraModalOpen(false)}
+          onMediaCaptured={handleCameraMediaCaptured}
+          onOpenGallery={triggerGalleryPicker}
+        />
+      )}
 
       {/* Instagram-Style Reels Post Composer Modal */}
       {isUnifiedModalOpen && (
