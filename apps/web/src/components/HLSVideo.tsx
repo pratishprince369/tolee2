@@ -54,9 +54,9 @@ export function setGlobalActiveAudio(audio: HTMLAudioElement | null) {
 const SOUND_PREF_KEY = 'tolee_sound_pref';
 
 export function getSoundPreference(): boolean {
-  if (typeof window === 'undefined') return true; // Default to muted (true) on SSR
+  if (typeof window === 'undefined') return false;
   const pref = localStorage.getItem(SOUND_PREF_KEY);
-  if (pref === null) return true; // Default to muted (true) if not set
+  if (pref === null) return false; // Default unmuted so post music plays automatically
   return pref === 'muted';
 }
 

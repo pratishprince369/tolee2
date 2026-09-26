@@ -135,6 +135,24 @@ export default async function UserProfileFeed({ params }: PageProps) {
           }
         }
       },
+      reelAudio: {
+        select: {
+          songId: true,
+          startTime: true,
+          endTime: true,
+          duration: true,
+          song: {
+            select: {
+              id: true,
+              title: true,
+              audioUrl: true,
+              coverUrl: true,
+              artist: { select: { id: true, name: true } },
+              album: { select: { id: true, title: true } },
+            },
+          },
+        },
+      },
       _count: {
         select: {
           likes: true,
@@ -178,7 +196,8 @@ export default async function UserProfileFeed({ params }: PageProps) {
       },
       likedByMe,
       savedByMe,
-      repostedByMe
+      repostedByMe,
+      reelAudio: post.reelAudio || null,
     };
   });
 

@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { 
   ArrowLeft, Heart, MessageCircle, Send, MoreHorizontal, Repeat, 
   Bookmark, ShieldCheck, MapPin, Users, Lock, Trophy, Store, Globe, 
-  BookOpen, UtensilsCrossed, ShoppingBag, Eye, Loader2 
+  BookOpen, UtensilsCrossed, ShoppingBag, Eye, Loader2, Music 
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
@@ -54,6 +54,7 @@ interface PostType {
   likedByMe: boolean;
   savedByMe: boolean;
   repostedByMe: boolean;
+  reelAudio?: any;
 }
 
 interface UserType {
@@ -475,6 +476,14 @@ export function ProfileFeedView({
                         <span className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-0.5 leading-none">
                           {new Date(post.createdAt).toLocaleDateString()}
                         </span>
+                        {post.reelAudio?.song && (
+                          <div className="flex items-center gap-1.5 text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mt-1 max-w-full truncate">
+                            <Music className="w-3 h-3 text-[#0a7c85] shrink-0" />
+                            <span className="truncate">
+                              {post.reelAudio.song.artist?.name ? `${post.reelAudio.song.artist.name} • ` : ''}{post.reelAudio.song.title}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
 

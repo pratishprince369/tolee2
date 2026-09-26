@@ -337,22 +337,32 @@ export function PostCarousel({ mediaUrls, mediaTypes, postId, reelAudio }: PostC
   startTimeRef.current = audioStartTime;
   endTimeRef.current = audioEndTime;
 
-  // Viewport detection (>= 50% visible -> in view, < 35% -> out of view)
+  // Viewport detection (>= 40% visible -> in view, < 25% -> out of view)
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
+    // Check immediate visibility on mount
+    const checkImmediateVisibility = () => {
+      const rect = container.getBoundingClientRect();
+      const inView = rect.top < window.innerHeight * 0.85 && rect.bottom > window.innerHeight * 0.15;
+      if (inView) {
+        setIsVisible(true);
+      }
+    };
+    checkImmediateVisibility();
+
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
-          if (entry.intersectionRatio >= 0.5) {
+          if (entry.intersectionRatio >= 0.4) {
             setIsVisible(true);
-          } else if (entry.intersectionRatio < 0.35) {
+          } else if (entry.intersectionRatio < 0.25) {
             setIsVisible(false);
           }
         }
       },
-      { threshold: [0.35, 0.5] }
+      { threshold: [0.25, 0.4] }
     );
 
     observer.observe(container);
@@ -418,7 +428,17 @@ export function PostCarousel({ mediaUrls, mediaTypes, postId, reelAudio }: PostC
       }
       setGlobalActiveVideo(null);
       setGlobalActiveAudio(audio);
-      audio.play().then(() => setIsPlayingAudio(true)).catch(() => {});
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => setIsPlayingAudio(true))
+          .catch(() => {
+            // If unmuted autoplay blocked before user gesture, play muted to start playback loop
+            audio.muted = true;
+            setIsSoundMuted(true);
+            audio.play().then(() => setIsPlayingAudio(true)).catch(() => {});
+          });
+      }
     } else {
       audio.pause();
       setIsPlayingAudio(false);
