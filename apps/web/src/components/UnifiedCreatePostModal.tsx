@@ -16,6 +16,7 @@ import { getSidebarData } from '@/actions/user';
 import { useUpload, MediaItem } from './UploadContext';
 import { detectPostCategoryAction, CategoryDetectionResult, PostCategoryType } from '@/actions/aiPostClassifier';
 import { CURATED_AUDIO_LIBRARY, AudioTrack, formatDuration } from '@/lib/audioLibrary';
+import { AudioWaveformTrimmer } from '@/components/AudioWaveformTrimmer';
 import { TEXT_CARD_BACKGROUNDS, BackgroundStyle, renderTextCardToBlob } from '@/lib/renderTextCard';
 
 const FILTER_PRESETS = [
@@ -752,28 +753,42 @@ export function UnifiedCreatePostModal({
 
               {/* Current Attached Track Card */}
               {selectedAudio && (
-                <div className="flex items-center justify-between p-3.5 bg-teal-50 dark:bg-teal-950/30 border border-[#0a7c85]/30 rounded-2xl">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-[#0a7c85] text-white flex items-center justify-center font-bold">
-                      <Music className="w-5 h-5" />
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between p-3.5 bg-teal-50 dark:bg-teal-950/30 border border-[#0a7c85]/30 rounded-2xl">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-[#0a7c85] text-white flex items-center justify-center font-bold">
+                        <Music className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h5 className="font-bold text-xs sm:text-sm text-gray-900 dark:text-white">
+                          {selectedAudio.title}
+                        </h5>
+                        <p className="text-[11px] text-[#0a7c85] font-semibold">
+                          {selectedAudio.artist} • {selectedAudio.mood}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h5 className="font-bold text-xs sm:text-sm text-gray-900 dark:text-white">
-                        {selectedAudio.title}
-                      </h5>
-                      <p className="text-[11px] text-[#0a7c85] font-semibold">
-                        {selectedAudio.artist} • {selectedAudio.mood}
-                      </p>
-                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedAudio(null)}
+                      className="text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-xs font-bold rounded-full"
+                    >
+                      Remove
+                    </Button>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setSelectedAudio(null)}
-                    className="text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-xs font-bold rounded-full"
-                  >
-                    Remove
-                  </Button>
+
+                  {/* Audio Waveform & Trimmer for Reels */}
+                  <AudioWaveformTrimmer
+                    track={selectedAudio}
+                    initialClipDuration={selectedAudio.clipDuration || 15}
+                    initialClipStart={selectedAudio.clipStart || 0}
+                    onTrimChange={(start, end, duration) => {
+                      setSelectedAudio((prev) =>
+                        prev ? { ...prev, clipStart: start, clipDuration: duration } : null
+                      );
+                    }}
+                  />
                 </div>
               )}
 

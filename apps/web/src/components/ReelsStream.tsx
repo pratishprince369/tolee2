@@ -185,6 +185,18 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
     }
   };
 
+  // Auto-open Reel creator when navigated from Tolee Songs ("Use in Reel")
+  useEffect(() => {
+    if (searchParams?.get('action') === 'create') {
+      const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
+      if (isMobile) {
+        setIsCameraModalOpen(true);
+      } else {
+        setIsUnifiedModalOpen(true);
+      }
+    }
+  }, [searchParams]);
+
   const handleCameraMediaCaptured = (item: MediaItem) => {
     setReelsPreloadedMedia([item]);
     setIsCameraModalOpen(false);
