@@ -1039,6 +1039,10 @@ export function UnifiedCreatePostModal({
                           size="sm"
                           variant={isSelected ? 'default' : 'outline'}
                           onClick={() => {
+                            if (audioPlayerRef.current) {
+                              audioPlayerRef.current.pause();
+                              setPreviewingAudioId(null);
+                            }
                             if (isSelected) {
                               setSelectedAudio(null);
                             } else {

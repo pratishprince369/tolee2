@@ -28,6 +28,16 @@ export function AudioWaveformTrimmer({
   const [waveformBars, setWaveformBars] = useState<number[]>([]);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const clipStartRef = useRef<number>(clipStart);
+  const clipDurationRef = useRef<number>(clipDuration);
+
+  useEffect(() => {
+    clipStartRef.current = clipStart;
+  }, [clipStart]);
+
+  useEffect(() => {
+    clipDurationRef.current = clipDuration;
+  }, [clipDuration]);
 
   // Generate or read waveform bars
   useEffect(() => {
@@ -50,38 +60,63 @@ export function AudioWaveformTrimmer({
     }
   }, [clipDuration, totalDuration]);
 
+  const playFrom = (startTime: number) => {
+    if (!audioRef.current) return;
+    audioRef.current.currentTime = startTime;
+    audioRef.current.muted = isMuted;
+    const playPromise = audioRef.current.play();
+    if (playPromise !== undefined) {
+      playPromise
+        .then(() => setIsPlaying(true))
+        .catch(() => {
+          // Autoplay restricted until user gesture
+        });
+    }
+  };
+
   // Audio preview loop handling
   useEffect(() => {
     const audio = new Audio(track.url);
-    audio.preload = 'metadata';
+    audio.preload = 'auto';
     audioRef.current = audio;
+    audio.currentTime = clipStartRef.current;
+    audio.muted = isMuted;
 
     const handleTimeUpdate = () => {
-      if (!audio) return;
       setCurrentTime(audio.currentTime);
 
-      const clipEnd = clipStart + clipDuration;
+      const start = clipStartRef.current;
+      const end = start + clipDurationRef.current;
       // Loop within the trimmed segment
-      if (audio.currentTime >= clipEnd || audio.currentTime < clipStart) {
-        audio.currentTime = clipStart;
+      if (audio.currentTime >= end || audio.currentTime < start) {
+        audio.currentTime = start;
       }
     };
 
     const handleEnded = () => {
-      audio.currentTime = clipStart;
+      audio.currentTime = clipStartRef.current;
       audio.play().catch(() => {});
     };
 
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('ended', handleEnded);
 
+    // Auto-play the trimmed segment immediately on track selection
+    const playPromise = audio.play();
+    if (playPromise !== undefined) {
+      playPromise
+        .then(() => setIsPlaying(true))
+        .catch(() => {});
+    }
+
     return () => {
       audio.pause();
+      audio.src = '';
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('ended', handleEnded);
       audioRef.current = null;
     };
-  }, [track.url, clipStart, clipDuration]);
+  }, [track.url]);
 
   const togglePlay = () => {
     if (!audioRef.current) return;
@@ -90,22 +125,15 @@ export function AudioWaveformTrimmer({
       audioRef.current.pause();
       setIsPlaying(false);
     } else {
-      audioRef.current.currentTime = clipStart;
-      audioRef.current.muted = isMuted;
-      audioRef.current
-        .play()
-        .then(() => setIsPlaying(true))
-        .catch(() => setIsPlaying(false));
+      playFrom(clipStart);
     }
   };
 
   const handleStartChange = (newStart: number) => {
     const clamped = Math.max(0, Math.min(newStart, totalDuration - clipDuration));
     setClipStart(clamped);
-    if (audioRef.current) {
-      audioRef.current.currentTime = clamped;
-    }
     setCurrentTime(clamped);
+    playFrom(clamped);
     onTrimChange?.(clamped, clamped + clipDuration, clipDuration);
   };
 
@@ -115,24 +143,31 @@ export function AudioWaveformTrimmer({
     const maxStart = Math.max(0, totalDuration - dur);
     const adjustedStart = Math.min(clipStart, maxStart);
     setClipStart(adjustedStart);
-    if (audioRef.current) {
-      audioRef.current.currentTime = adjustedStart;
-    }
     setCurrentTime(adjustedStart);
+    playFrom(adjustedStart);
     onTrimChange?.(adjustedStart, adjustedStart + dur, dur);
   };
 
   const toggleMute = () => {
     if (audioRef.current) {
-      audioRef.current.muted = !isMuted;
-      setIsMuted(!isMuted);
+      const nextMuted = !isMuted;
+      audioRef.current.muted = nextMuted;
+      setIsMuted(nextMuted);
     }
+  };
+
+  const handleWaveformClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const ratio = Math.max(0, Math.min(1, clickX / rect.width));
+    const newStart = Math.max(0, Math.min(ratio * totalDuration, totalDuration - clipDuration));
+    handleStartChange(newStart);
   };
 
   const clipEnd = Math.min(totalDuration, clipStart + clipDuration);
   const startPercent = (clipStart / totalDuration) * 100;
   const widthPercent = (clipDuration / totalDuration) * 100;
-  const playheadPercent = ((currentTime - clipStart) / clipDuration) * 100;
+  const playheadPercent = clipDuration > 0 ? ((currentTime - clipStart) / clipDuration) * 100 : 0;
 
   return (
     <div className={`p-4 bg-zinc-950 text-white rounded-2xl border border-zinc-800 shadow-xl space-y-4 ${className}`}>
@@ -145,8 +180,9 @@ export function AudioWaveformTrimmer({
           <div>
             <h5 className="text-xs font-bold text-zinc-100 flex items-center gap-1.5">
               Audio Waveform & Trimmer
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#0a7c85]/20 text-[#2dd4bf] font-medium">
-                Reels Ready
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#0a7c85]/20 text-[#2dd4bf] font-medium flex items-center gap-1">
+                <span className={`w-1.5 h-1.5 rounded-full ${isPlaying ? 'bg-[#2dd4bf] animate-ping' : 'bg-zinc-500'}`} />
+                {isPlaying ? 'Playing Preview' : 'Reels Ready'}
               </span>
             </h5>
             <p className="text-[11px] text-zinc-400">
@@ -186,7 +222,11 @@ export function AudioWaveformTrimmer({
       </div>
 
       {/* Waveform Visualization Box */}
-      <div className="relative w-full h-20 bg-zinc-900/90 rounded-xl border border-zinc-800/80 px-3 py-2 flex items-center select-none overflow-hidden group">
+      <div
+        onClick={handleWaveformClick}
+        className="relative w-full h-20 bg-zinc-900/90 rounded-xl border border-zinc-800/80 px-3 py-2 flex items-center select-none overflow-hidden group cursor-pointer"
+        title="Click waveform to jump & preview"
+      >
         {/* Full Track Waveform Bars */}
         <div className="w-full h-full flex items-center justify-between gap-[2px]">
           {waveformBars.map((val, idx) => {
