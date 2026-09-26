@@ -238,10 +238,12 @@ export function formatDuration(seconds: number): string {
   return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
 }
 
+import { searchNuclearMusic } from './nuclearApi';
+
 // Multi-source music resolver (inspired by Nuclear music architecture)
 export async function searchMusic(query: string, genre?: string): Promise<AudioTrack[]> {
   const normalized = query.trim().toLowerCase();
-  return CURATED_AUDIO_LIBRARY.filter((track) => {
+  const localResults = CURATED_AUDIO_LIBRARY.filter((track) => {
     const matchesQuery =
       !normalized ||
       track.title.toLowerCase().includes(normalized) ||
@@ -252,4 +254,29 @@ export async function searchMusic(query: string, genre?: string): Promise<AudioT
       !genre || genre === 'All' || track.genre?.toLowerCase() === genre.toLowerCase();
     return matchesQuery && matchesGenre;
   });
+
+  // If user searched for something specific and local library is small, dynamically resolve via Nuclear stream providers
+  if (normalized.length >= 2) {
+    try {
+      const nuclearTracks = await searchNuclearMusic(query);
+      const converted: AudioTrack[] = nuclearTracks.map((nt) => ({
+        id: nt.id,
+        title: nt.title,
+        artist: nt.artist,
+        mood: 'Streaming',
+        album: nt.album || 'Nuclear Stream',
+        genre: genre !== 'All' ? genre : 'Pop',
+        duration: nt.duration || 120,
+        url: nt.streamUrl,
+        coverUrl: nt.thumbnailUrl || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300',
+        source: 'nuclear-stream',
+        waveform: generateWaveform(nt.id),
+      }));
+      return [...localResults, ...converted];
+    } catch {
+      return localResults;
+    }
+  }
+
+  return localResults;
 }
