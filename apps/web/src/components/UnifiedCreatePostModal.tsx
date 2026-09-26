@@ -359,6 +359,10 @@ export function UnifiedCreatePostModal({
       isAnonymous,
       headline: finalCategory === 'news' ? (headline || caption.slice(0, 80)) : undefined,
       category: finalCategory === 'news' ? 'Community News' : undefined,
+      songId: selectedAudio?.id,
+      audioStartTime: selectedAudio?.clipStart ?? 0,
+      audioEndTime: (selectedAudio?.clipStart ?? 0) + (selectedAudio?.clipDuration ?? 30),
+      audioDuration: selectedAudio?.clipDuration ?? 30,
     };
 
     // Trigger upload

@@ -27,6 +27,11 @@ export async function createPost(data: {
   metaDescription?: string;
   keywords?: string;
   tags?: string;
+  // Reel audio fields
+  songId?: string;
+  audioStartTime?: number;
+  audioEndTime?: number;
+  audioDuration?: number;
 }) {
   try {
     const session = await getServerSession(authOptions);
@@ -222,6 +227,14 @@ export async function createPost(data: {
             scoreAnalysis: newsScoreAnalysis,
             readingTime: newsReadingTime
           }
+        } : undefined,
+        reelAudio: data.songId ? {
+          create: {
+            songId: data.songId,
+            startTime: data.audioStartTime ?? 0,
+            endTime: data.audioEndTime ?? (data.audioDuration ?? 30),
+            duration: data.audioDuration ?? 30,
+          }
         } : undefined
       },
       include: {
@@ -369,6 +382,22 @@ export async function getPosts(options?: { mediaType?: string; limit?: number })
             category: true,
             readingTime: true,
             viewsCount: true,
+          }
+        },
+        reelAudio: {
+          select: {
+            songId: true,
+            startTime: true,
+            endTime: true,
+            duration: true,
+            song: {
+              select: {
+                id: true,
+                title: true,
+                artist: { select: { id: true, name: true } },
+                album: { select: { id: true, title: true } },
+              }
+            }
           }
         },
         worldProject: {

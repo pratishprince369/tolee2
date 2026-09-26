@@ -113,6 +113,13 @@ model User {
   // Tolee Credit Monetization System
   creditWallet          CreditWallet?
   creditBankAccounts    CreditBankAccount[]
+
+  // Tolee Songs Relations
+  songLikes             SongLike[]
+  albumLikes            AlbumLike[]
+  artistFollows         ArtistFollow[]
+  musicPlaylists        MusicPlaylist[]
+  recentlyPlayedSongs   RecentlyPlayedSong[]
   creditWithdrawals     CreditWithdrawal[]
   creditTransactions    CreditTransaction[]
 
@@ -357,6 +364,7 @@ model Post {
   isSimulation   Boolean       @default(false)
   storyAnalytics PostStoryAnalytics?
   newsRelation   NewsPost?
+  reelAudio      ReelAudio?
 
   @@index([authorId])
   @@index([createdAt])
@@ -2737,6 +2745,190 @@ model SportsApiConfig {
   createdAt               DateTime  @default(now())
   updatedAt               DateTime  @updatedAt
 }
+
+// ---------------------------------------------------------
+// TOLEE SONGS & MUSIC ENGINE
+// ---------------------------------------------------------
+
+model Artist {
+  id                String         @id @default(cuid())
+  name              String
+  bio               String?
+  image             String?
+  genre             String?
+  isVerified        Boolean        @default(false)
+  monthlyListeners  Int            @default(0)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  albums            Album[]
+  songs             Song[]
+  follows           ArtistFollow[]
+
+  @@index([name])
+}
+
+model Album {
+  id            String      @id @default(cuid())
+  title         String
+  coverUrl      String?
+  releaseYear   String?
+  genre         String?
+  description   String?
+  isFeatured    Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  artistId      String
+  artist        Artist      @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  songs         Song[]
+  likes         AlbumLike[]
+
+  @@index([artistId])
+  @@index([title])
+}
+
+model Song {
+  id              String              @id @default(cuid())
+  title           String
+  coverUrl        String?
+  audioUrl        String
+  duration        Float               // in seconds
+  genre           String              @default("Bollywood")
+  language        String              @default("Hindi")
+  isExplicit      Boolean             @default(false)
+  hasLyrics       Boolean             @default(false)
+  playCount       Int                 @default(0)
+  likeCount       Int                 @default(0)
+  waveform        String?             // JSON array string of normalized values e.g. [0.1, 0.4...]
+  isFeatured      Boolean             @default(false)
+  isTrending      Boolean             @default(false)
+  isNewRelease    Boolean             @default(false)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  artistId        String
+  artist          Artist              @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  albumId         String?
+  album           Album?              @relation(fields: [albumId], references: [id], onDelete: SetNull)
+
+  likes           SongLike[]
+  playlistSongs   PlaylistSong[]
+  recentlyPlayed  RecentlyPlayedSong[]
+  reelAudios      ReelAudio[]
+
+  @@index([artistId])
+  @@index([albumId])
+  @@index([title])
+  @@index([genre])
+  @@index([language])
+  @@index([isTrending])
+}
+
+model MusicPlaylist {
+  id          String         @id @default(cuid())
+  title       String
+  description String?
+  coverUrl    String?
+  isPublic    Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  userId      String
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  songs       PlaylistSong[]
+
+  @@index([userId])
+}
+
+model PlaylistSong {
+  id         String        @id @default(cuid())
+  order      Int           @default(0)
+  addedAt    DateTime      @default(now())
+
+  playlistId String
+  playlist   MusicPlaylist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  songId     String
+  song       Song          @relation(fields: [songId], references: [id], onDelete: Cascade)
+
+  @@unique([playlistId, songId])
+  @@index([playlistId])
+  @@index([songId])
+}
+
+model SongLike {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  songId    String
+  song      Song     @relation(fields: [songId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, songId])
+  @@index([userId])
+  @@index([songId])
+}
+
+model AlbumLike {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  albumId   String
+  album     Album    @relation(fields: [albumId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, albumId])
+  @@index([userId])
+  @@index([albumId])
+}
+
+model ArtistFollow {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  artistId  String
+  artist    Artist   @relation(fields: [artistId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, artistId])
+  @@index([userId])
+  @@index([artistId])
+}
+
+model RecentlyPlayedSong {
+  id                   String   @id @default(cuid())
+  playedAt             DateTime @default(now())
+  completionPercentage Float    @default(0)
+
+  userId               String
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  songId               String
+  song                 Song     @relation(fields: [songId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, songId])
+  @@index([userId])
+  @@index([songId])
+  @@index([playedAt])
+}
+
+model ReelAudio {
+  id              String   @id @default(cuid())
+  postId          String   @unique
+  post            Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  songId          String
+  song            Song     @relation(fields: [songId], references: [id], onDelete: Cascade)
+  startTime       Float    @default(0)
+  endTime         Float    @default(30)
+  duration        Float    @default(30)
+  createdAt       DateTime @default(now())
+
+  @@index([songId])
+  @@index([postId])
+}
+
 
 
 

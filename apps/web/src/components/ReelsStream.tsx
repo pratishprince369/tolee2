@@ -1464,10 +1464,14 @@ const ReelSlide = memo(function ReelSlide({
             <p className="text-[13px] text-white drop-shadow leading-snug whitespace-pre-wrap">{cleanCap}</p>
           );
         })()}
-        <div className="flex items-center gap-1.5 text-[12px] text-white/80 drop-shadow">
-          <Music className="w-3 h-3" />
+        <Link
+          href={reel.songId ? `/songs/audio/${reel.songId}` : `/songs`}
+          onClick={(e) => e.stopPropagation()}
+          className="flex items-center gap-1.5 text-[12px] text-white/90 drop-shadow hover:underline hover:text-[#2dd4bf] transition-colors cursor-pointer w-fit"
+        >
+          <Music className="w-3 h-3 text-[#2dd4bf] animate-pulse" />
           <span>{reel.audio}</span>
-        </div>
+        </Link>
       </div>
     </div>
   );
@@ -2102,10 +2106,14 @@ function ReelsDetailsContent({
                   <span className="font-bold text-[14px] text-white hover:underline cursor-pointer">{reel.author}</span>
                   {reel.isVerified && <ShieldCheck className="w-4 h-4 text-blue-400 fill-white" />}
                 </div>
-                <div className="flex items-center gap-1.5 text-[12px] text-gray-400 mt-0.5">
-                  <Music className="w-3.5 h-3.5" />
+                <Link
+                  href={reel.songId ? `/songs/audio/${reel.songId}` : `/songs`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex items-center gap-1.5 text-[12px] text-gray-400 mt-0.5 hover:underline hover:text-[#2dd4bf] transition-colors"
+                >
+                  <Music className="w-3.5 h-3.5 text-[#2dd4bf]" />
                   <span>{reel.audio}</span>
-                </div>
+                </Link>
               </div>
             </div>
             {!isOwner && onFollow && (

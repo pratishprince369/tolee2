@@ -199,6 +199,11 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         metaDescription: postData.metaDescription,
         keywords: postData.keywords,
         tags: postData.tags,
+        // Reel Audio metadata
+        songId: postData.songId,
+        audioStartTime: postData.audioStartTime,
+        audioEndTime: postData.audioEndTime,
+        audioDuration: postData.audioDuration,
       });
 
       clearInterval(stepInterval);
