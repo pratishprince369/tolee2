@@ -70,50 +70,157 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   const [likedSongIds, setLikedSongIds] = useState<Set<string>>(new Set());
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const isLoopingRef = useRef<boolean>(false);
+  const queueRef = useRef<MusicTrack[]>([]);
+  const queueIndexRef = useRef<number>(0);
+  const isShufflingRef = useRef<boolean>(false);
 
-  // Initialize Audio Object & MediaSession
+  // Sync refs to avoid stale closures in audio event listeners
+  useEffect(() => {
+    isLoopingRef.current = isLooping;
+  }, [isLooping]);
+
+  useEffect(() => {
+    queueRef.current = queue;
+  }, [queue]);
+
+  useEffect(() => {
+    queueIndexRef.current = queueIndex;
+  }, [queueIndex]);
+
+  useEffect(() => {
+    isShufflingRef.current = isShuffling;
+  }, [isShuffling]);
+
+  const playAudioInternal = useCallback((audio: HTMLAudioElement) => {
+    const playPromise = audio.play();
+    if (playPromise !== undefined) {
+      playPromise
+        .then(() => {
+          setIsPlaying(true);
+        })
+        .catch((err) => {
+          console.warn('[Tolee Music Player] playPromise caught:', err?.message || err);
+          setIsPlaying(false);
+        });
+    }
+  }, []);
+
+  const handleNextTrack = useCallback(() => {
+    const q = queueRef.current;
+    const qIdx = queueIndexRef.current;
+    if (q.length === 0) return;
+
+    let nextIdx = 0;
+    if (isShufflingRef.current && q.length > 1) {
+      do {
+        nextIdx = Math.floor(Math.random() * q.length);
+      } while (nextIdx === qIdx);
+    } else {
+      nextIdx = (qIdx + 1) % q.length;
+    }
+
+    const nextSong = q[nextIdx];
+    if (nextSong) {
+      setQueueIndex(nextIdx);
+      queueIndexRef.current = nextIdx;
+      setCurrentTrack(nextSong);
+      setIsPlaying(true);
+
+      const audio = audioRef.current;
+      if (audio) {
+        audio.src = nextSong.audioUrl;
+        audio.currentTime = 0;
+        playAudioInternal(audio);
+      }
+    }
+  }, [playAudioInternal]);
+
+  const handlePrevTrack = useCallback(() => {
+    const q = queueRef.current;
+    const qIdx = queueIndexRef.current;
+    if (q.length === 0) return;
+
+    const audio = audioRef.current;
+    // If playing for more than 3s, restart current track
+    if (audio && audio.currentTime > 3) {
+      audio.currentTime = 0;
+      setCurrentTime(0);
+      playAudioInternal(audio);
+      return;
+    }
+
+    const prevIdx = (qIdx - 1 + q.length) % q.length;
+    const prevSong = q[prevIdx];
+    if (prevSong) {
+      setQueueIndex(prevIdx);
+      queueIndexRef.current = prevIdx;
+      setCurrentTrack(prevSong);
+      setIsPlaying(true);
+
+      if (audio) {
+        audio.src = prevSong.audioUrl;
+        audio.currentTime = 0;
+        playAudioInternal(audio);
+      }
+    }
+  }, [playAudioInternal]);
+
+  // Initialize Singleton Audio Object & Native MediaSession
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
     const audio = new Audio();
-    audio.preload = 'metadata';
+    audio.preload = 'auto';
     audioRef.current = audio;
 
     const handleLoadedMetadata = () => {
-      setDuration(audio.duration || currentTrack?.duration || 0);
+      setDuration(audio.duration || 0);
     };
 
     const handleTimeUpdate = () => {
       setCurrentTime(audio.currentTime);
     };
 
+    const handlePlay = () => {
+      setIsPlaying(true);
+    };
+
+    const handlePause = () => {
+      setIsPlaying(false);
+    };
+
     const handleEnded = () => {
-      if (isLooping) {
+      if (isLoopingRef.current) {
         audio.currentTime = 0;
-        audio.play().catch(() => {});
+        playAudioInternal(audio);
       } else {
         handleNextTrack();
       }
     };
 
     const handleError = (e: any) => {
-      console.warn('[Tolee Music Player] Playback error on audio stream:', e);
+      console.warn('[Tolee Music Player] Audio element error:', e);
       setIsPlaying(false);
     };
 
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
     audio.addEventListener('timeupdate', handleTimeUpdate);
+    audio.addEventListener('play', handlePlay);
+    audio.addEventListener('pause', handlePause);
     audio.addEventListener('ended', handleEnded);
     audio.addEventListener('error', handleError);
 
-    // Setup native MediaSession action handlers (Headphone / Lock screen controls)
     if ('mediaSession' in navigator) {
       navigator.mediaSession.setActionHandler('play', () => togglePlay());
       navigator.mediaSession.setActionHandler('pause', () => togglePlay());
       navigator.mediaSession.setActionHandler('nexttrack', () => handleNextTrack());
       navigator.mediaSession.setActionHandler('previoustrack', () => handlePrevTrack());
       navigator.mediaSession.setActionHandler('seekto', (details) => {
-        if (details.seekTime !== undefined) seek(details.seekTime);
+        if (details.seekTime !== undefined) {
+          audio.currentTime = details.seekTime;
+          setCurrentTime(details.seekTime);
+        }
       });
     }
 
@@ -121,31 +228,18 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       audio.pause();
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
       audio.removeEventListener('timeupdate', handleTimeUpdate);
+      audio.removeEventListener('play', handlePlay);
+      audio.removeEventListener('pause', handlePause);
       audio.removeEventListener('ended', handleEnded);
       audio.removeEventListener('error', handleError);
       audioRef.current = null;
     };
-  }, [isLooping]);
+  }, [handleNextTrack, handlePrevTrack, playAudioInternal]);
 
-  // Sync current track with audio element
+  // Update MediaSession and DB play count when currentTrack changes
   useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio || !currentTrack) return;
+    if (!currentTrack) return;
 
-    if (audio.src !== currentTrack.audioUrl) {
-      audio.src = currentTrack.audioUrl;
-      audio.load();
-    }
-    audio.volume = isMuted ? 0 : volume;
-
-    if (isPlaying) {
-      audio.play().catch((err) => {
-        console.warn('[Music Player] Autoplay prevented or failed:', err);
-        setIsPlaying(false);
-      });
-    }
-
-    // Update MediaSession metadata
     if ('mediaSession' in navigator) {
       const artistName = currentTrack.artistName || currentTrack.artist?.name || 'Tolee Artist';
       const albumTitle = currentTrack.albumName || currentTrack.album?.title || 'Tolee Songs';
@@ -159,68 +253,67 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
       });
     }
 
-    // Record song play in database (async, debounced)
     recordSongPlayAction(currentTrack.id, 0).catch(() => {});
   }, [currentTrack]);
 
+  const playTrack = useCallback(
+    (track: MusicTrack, newQueue?: MusicTrack[]) => {
+      setCurrentTrack(track);
+      setIsPlaying(true);
+
+      if (newQueue && newQueue.length > 0) {
+        setQueue(newQueue);
+        queueRef.current = newQueue;
+        const idx = newQueue.findIndex((t) => t.id === track.id);
+        const resolvedIdx = idx !== -1 ? idx : 0;
+        setQueueIndex(resolvedIdx);
+        queueIndexRef.current = resolvedIdx;
+      } else {
+        setQueue((prev) => {
+          const exists = prev.some((t) => t.id === track.id);
+          const updated = exists ? prev : [...prev, track];
+          queueRef.current = updated;
+          return updated;
+        });
+      }
+
+      const audio = audioRef.current;
+      if (audio) {
+        // Resolve URL path
+        const targetSrc = track.audioUrl.startsWith('http')
+          ? track.audioUrl
+          : `${window.location.origin}${track.audioUrl.startsWith('/') ? '' : '/'}${track.audioUrl}`;
+
+        if (audio.src !== targetSrc) {
+          audio.src = targetSrc;
+          audio.currentTime = 0;
+        }
+        audio.volume = isMuted ? 0 : volume;
+        playAudioInternal(audio);
+      }
+    },
+    [isMuted, volume, playAudioInternal]
+  );
+
   const togglePlay = useCallback(() => {
     const audio = audioRef.current;
-    if (!audio || !currentTrack) return;
+    if (!audio) return;
 
-    if (isPlaying) {
+    if (!audio.paused) {
       audio.pause();
       setIsPlaying(false);
     } else {
-      audio
-        .play()
-        .then(() => setIsPlaying(true))
-        .catch(() => setIsPlaying(false));
+      if (currentTrack) {
+        if (!audio.src || audio.src === '' || audio.src === window.location.href) {
+          const targetSrc = currentTrack.audioUrl.startsWith('http')
+            ? currentTrack.audioUrl
+            : `${window.location.origin}${currentTrack.audioUrl.startsWith('/') ? '' : '/'}${currentTrack.audioUrl}`;
+          audio.src = targetSrc;
+        }
+        playAudioInternal(audio);
+      }
     }
-  }, [isPlaying, currentTrack]);
-
-  const playTrack = useCallback((track: MusicTrack, newQueue?: MusicTrack[]) => {
-    setCurrentTrack(track);
-    setIsPlaying(true);
-
-    if (newQueue && newQueue.length > 0) {
-      setQueue(newQueue);
-      const idx = newQueue.findIndex((t) => t.id === track.id);
-      setQueueIndex(idx !== -1 ? idx : 0);
-    } else {
-      // If not provided, add to current queue if not present
-      setQueue((prev) => {
-        const exists = prev.some((t) => t.id === track.id);
-        if (!exists) return [...prev, track];
-        return prev;
-      });
-    }
-  }, []);
-
-  const handleNextTrack = useCallback(() => {
-    if (queue.length === 0) return;
-
-    if (isShuffling) {
-      const randomIdx = Math.floor(Math.random() * queue.length);
-      setQueueIndex(randomIdx);
-      setCurrentTrack(queue[randomIdx]);
-      setIsPlaying(true);
-      return;
-    }
-
-    const nextIdx = (queueIndex + 1) % queue.length;
-    setQueueIndex(nextIdx);
-    setCurrentTrack(queue[nextIdx]);
-    setIsPlaying(true);
-  }, [queue, queueIndex, isShuffling]);
-
-  const handlePrevTrack = useCallback(() => {
-    if (queue.length === 0) return;
-
-    const prevIdx = (queueIndex - 1 + queue.length) % queue.length;
-    setQueueIndex(prevIdx);
-    setCurrentTrack(queue[prevIdx]);
-    setIsPlaying(true);
-  }, [queue, queueIndex]);
+  }, [currentTrack, playAudioInternal]);
 
   const seek = useCallback((seconds: number) => {
     const audio = audioRef.current;
@@ -229,16 +322,19 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     setCurrentTime(seconds);
   }, []);
 
-  const setVolume = useCallback((newVol: number) => {
-    const clamped = Math.max(0, Math.min(1, newVol));
-    setVolumeState(clamped);
-    if (audioRef.current) {
-      audioRef.current.volume = clamped;
-    }
-    if (clamped > 0 && isMuted) {
-      setIsMuted(false);
-    }
-  }, [isMuted]);
+  const setVolume = useCallback(
+    (newVol: number) => {
+      const clamped = Math.max(0, Math.min(1, newVol));
+      setVolumeState(clamped);
+      if (audioRef.current) {
+        audioRef.current.volume = clamped;
+      }
+      if (clamped > 0 && isMuted) {
+        setIsMuted(false);
+      }
+    },
+    [isMuted]
+  );
 
   const toggleMute = useCallback(() => {
     const audio = audioRef.current;
@@ -255,44 +351,71 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   }, [isMuted, volume]);
 
   const toggleLoop = useCallback(() => {
-    setIsLooping((prev) => !prev);
+    setIsLooping((prev) => {
+      const next = !prev;
+      isLoopingRef.current = next;
+      if (audioRef.current) {
+        audioRef.current.loop = next;
+      }
+      return next;
+    });
   }, []);
 
   const toggleShuffle = useCallback(() => {
-    setIsShuffling((prev) => !prev);
+    setIsShuffling((prev) => {
+      const next = !prev;
+      isShufflingRef.current = next;
+      return next;
+    });
   }, []);
 
   const addToQueue = useCallback((track: MusicTrack) => {
-    setQueue((prev) => [...prev, track]);
+    setQueue((prev) => {
+      const updated = [...prev, track];
+      queueRef.current = updated;
+      return updated;
+    });
   }, []);
 
   const playNext = useCallback((track: MusicTrack) => {
     setQueue((prev) => {
       const next = [...prev];
-      next.splice(queueIndex + 1, 0, track);
+      next.splice(queueIndexRef.current + 1, 0, track);
+      queueRef.current = next;
       return next;
     });
-  }, [queueIndex]);
+  }, []);
 
   const removeFromQueue = useCallback((index: number) => {
-    setQueue((prev) => prev.filter((_, i) => i !== index));
-    if (index < queueIndex) {
-      setQueueIndex((prev) => Math.max(0, prev - 1));
+    setQueue((prev) => {
+      const updated = prev.filter((_, i) => i !== index);
+      queueRef.current = updated;
+      return updated;
+    });
+    if (index < queueIndexRef.current) {
+      setQueueIndex((prev) => {
+        const nextIdx = Math.max(0, prev - 1);
+        queueIndexRef.current = nextIdx;
+        return nextIdx;
+      });
     }
-  }, [queueIndex]);
+  }, []);
 
   const clearQueue = useCallback(() => {
     if (currentTrack) {
       setQueue([currentTrack]);
+      queueRef.current = [currentTrack];
       setQueueIndex(0);
+      queueIndexRef.current = 0;
     } else {
       setQueue([]);
+      queueRef.current = [];
       setQueueIndex(0);
+      queueIndexRef.current = 0;
     }
   }, [currentTrack]);
 
   const toggleLike = useCallback(async (trackId: string): Promise<boolean> => {
-    // Optimistic update
     let nowLiked = false;
     setLikedSongIds((prev) => {
       const next = new Set(prev);
@@ -309,7 +432,6 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     try {
       const res = await toggleSongLikeAction(trackId);
       if (!res.success) {
-        // Rollback
         setLikedSongIds((prev) => {
           const next = new Set(prev);
           if (nowLiked) next.delete(trackId);
