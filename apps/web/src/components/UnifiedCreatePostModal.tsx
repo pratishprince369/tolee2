@@ -9,13 +9,15 @@ import {
   X, ArrowLeft, ArrowRight, Image as ImageIcon, Video, Music,
   Sparkles, Check, Play, Pause, Volume2, VolumeX, MapPin,
   Shield, CheckCircle2, Sliders, ChevronDown, Wand2, Newspaper,
-  Film, HelpCircle, Loader2, Plus, Tag, RefreshCw, FileText, ChevronRight
+  Film, HelpCircle, Loader2, Plus, Tag, RefreshCw, FileText, ChevronRight,
+  Search, Disc
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { getSidebarData } from '@/actions/user';
 import { useUpload, MediaItem } from './UploadContext';
 import { detectPostCategoryAction, CategoryDetectionResult, PostCategoryType } from '@/actions/aiPostClassifier';
-import { CURATED_AUDIO_LIBRARY, AudioTrack, formatDuration } from '@/lib/audioLibrary';
+import { CURATED_AUDIO_LIBRARY, AudioTrack, formatDuration, generateWaveform } from '@/lib/audioLibrary';
+import { getSongsFeedAction, searchSongsAction } from '@/actions/songs';
 import { AudioWaveformTrimmer } from '@/components/AudioWaveformTrimmer';
 import { TEXT_CARD_BACKGROUNDS, BackgroundStyle, renderTextCardToBlob } from '@/lib/renderTextCard';
 
@@ -77,6 +79,10 @@ export function UnifiedCreatePostModal({
   const [selectedAudio, setSelectedAudio] = useState<AudioTrack | null>(null);
   const [previewingAudioId, setPreviewingAudioId] = useState<string | null>(null);
   const [customAudioFile, setCustomAudioFile] = useState<File | null>(null);
+  const [musicSearchQuery, setMusicSearchQuery] = useState('');
+  const [selectedMusicGenre, setSelectedMusicGenre] = useState('All');
+  const [toleeSongsList, setToleeSongsList] = useState<AudioTrack[]>([]);
+  const [isLoadingMusic, setIsLoadingMusic] = useState(false);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const audioFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -171,6 +177,110 @@ export function UnifiedCreatePostModal({
       });
     }
   };
+
+  // Load trending Tolee Songs when Step 3 is reached
+  useEffect(() => {
+    if (step === 3 && toleeSongsList.length === 0) {
+      setIsLoadingMusic(true);
+      getSongsFeedAction()
+        .then((res) => {
+          if (res.success && (res.trendingSongs?.length > 0 || res.newReleases?.length > 0)) {
+            const combined = [...(res.trendingSongs || []), ...(res.newReleases || [])];
+            const seen = new Set<string>();
+            const tracks: AudioTrack[] = [];
+            for (const s of combined) {
+              if (!seen.has(s.id) && s.audioUrl) {
+                seen.add(s.id);
+                tracks.push({
+                  id: s.id,
+                  title: s.title,
+                  artist: s.artist?.name || s.artistName || 'Tolee Artist',
+                  mood: s.genre || 'Trending',
+                  duration: s.duration || 180,
+                  url: s.audioUrl,
+                  coverUrl: s.coverUrl,
+                  album: s.album?.title || s.albumName,
+                  genre: s.genre,
+                  waveform: generateWaveform(s.title),
+                });
+              }
+            }
+            setToleeSongsList(tracks.length > 0 ? tracks : CURATED_AUDIO_LIBRARY);
+          } else {
+            setToleeSongsList(CURATED_AUDIO_LIBRARY);
+          }
+          setIsLoadingMusic(false);
+        })
+        .catch(() => {
+          setToleeSongsList(CURATED_AUDIO_LIBRARY);
+          setIsLoadingMusic(false);
+        });
+    }
+  }, [step]);
+
+  // Debounced music search across Tolee Songs API & Database
+  useEffect(() => {
+    if (step !== 3) return;
+    const timer = setTimeout(() => {
+      const q = musicSearchQuery.trim();
+      if (q.length > 0 || selectedMusicGenre !== 'All') {
+        setIsLoadingMusic(true);
+        searchSongsAction(q, selectedMusicGenre !== 'All' ? selectedMusicGenre : undefined)
+          .then((res) => {
+            if (res.success && res.songs?.length > 0) {
+              const tracks: AudioTrack[] = res.songs.map((s: any) => ({
+                id: s.id,
+                title: s.title,
+                artist: s.artist?.name || s.artistName || 'Tolee Artist',
+                mood: s.genre || 'Music',
+                duration: s.duration || 180,
+                url: s.audioUrl,
+                coverUrl: s.coverUrl,
+                album: s.album?.title || s.albumName,
+                genre: s.genre,
+                waveform: generateWaveform(s.title),
+              }));
+              setToleeSongsList(tracks);
+            } else {
+              const filteredCurated = CURATED_AUDIO_LIBRARY.filter(
+                (t) =>
+                  t.title.toLowerCase().includes(q.toLowerCase()) ||
+                  t.artist.toLowerCase().includes(q.toLowerCase()) ||
+                  (selectedMusicGenre !== 'All' &&
+                    t.genre?.toLowerCase() === selectedMusicGenre.toLowerCase())
+              );
+              setToleeSongsList(filteredCurated);
+            }
+            setIsLoadingMusic(false);
+          })
+          .catch(() => {
+            setIsLoadingMusic(false);
+          });
+      } else {
+        getSongsFeedAction().then((res) => {
+          if (res.success && res.trendingSongs?.length > 0) {
+            const tracks: AudioTrack[] = res.trendingSongs.map((s: any) => ({
+              id: s.id,
+              title: s.title,
+              artist: s.artist?.name || s.artistName || 'Tolee Artist',
+              mood: s.genre || 'Trending',
+              duration: s.duration || 180,
+              url: s.audioUrl,
+              coverUrl: s.coverUrl,
+              album: s.album?.title || s.albumName,
+              genre: s.genre,
+              waveform: generateWaveform(s.title),
+            }));
+            setToleeSongsList(tracks);
+          } else {
+            setToleeSongsList(CURATED_AUDIO_LIBRARY);
+          }
+        });
+      }
+    }, 280);
+
+    return () => clearTimeout(timer);
+  }, [musicSearchQuery, selectedMusicGenre, step]);
 
   const triggerFileInput = (customAccept?: string) => {
     if (fileInputRef.current) {
@@ -735,38 +845,102 @@ export function UnifiedCreatePostModal({
 
               <div className="flex items-center justify-between">
                 <div>
-                  <h4 className="text-base font-extrabold text-gray-900 dark:text-zinc-100">
+                  <h4 className="text-base font-extrabold text-gray-900 dark:text-zinc-100 flex items-center gap-2">
                     Add Music to your Post
+                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-[#0a7c85]/10 text-[#0a7c85] border border-[#0a7c85]/20">
+                      Tolee Songs
+                    </span>
                   </h4>
                   <p className="text-xs text-gray-500">
-                    Choose royalty-free background audio or upload your custom audio track.
+                    Search and choose background songs or upload your custom audio track.
                   </p>
                 </div>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => audioFileInputRef.current?.click()}
-                  className="rounded-full border-gray-200 dark:border-zinc-800 text-xs font-bold"
+                  className="rounded-full border-gray-200 dark:border-zinc-800 text-xs font-bold shrink-0"
                 >
                   <Music className="w-3.5 h-3.5 mr-1 text-[#0a7c85]" />
                   Upload Audio
                 </Button>
               </div>
 
+              {/* Music Search & Genre Filter Chips */}
+              <div className="space-y-2.5">
+                <div className="relative">
+                  <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-zinc-500" />
+                  <input
+                    type="text"
+                    value={musicSearchQuery}
+                    onChange={(e) => setMusicSearchQuery(e.target.value)}
+                    placeholder="Search songs, artists, Bollywood, Punjabi, Lo-Fi..."
+                    className="w-full pl-10 pr-10 py-2.5 bg-gray-50 dark:bg-zinc-900/80 border border-gray-200 dark:border-zinc-800 rounded-full text-xs text-gray-900 dark:text-zinc-100 placeholder-gray-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#0a7c85] transition-colors"
+                  />
+                  {musicSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setMusicSearchQuery('')}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-zinc-200"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Genre Pills */}
+                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
+                  {[
+                    'All',
+                    'Trending',
+                    'Bollywood',
+                    'Punjabi',
+                    'Lo-Fi',
+                    'Romantic',
+                    'Party',
+                    'Devotional',
+                    'Indie',
+                    'Marathi',
+                    'Podcasts',
+                  ].map((g) => (
+                    <button
+                      key={g}
+                      type="button"
+                      onClick={() => setSelectedMusicGenre(g)}
+                      className={`px-3 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap transition-colors ${
+                        selectedMusicGenre === g
+                          ? 'bg-[#0a7c85] text-white font-bold shadow-sm'
+                          : 'bg-gray-100 dark:bg-zinc-800/80 text-gray-600 dark:text-zinc-400 hover:text-gray-900 dark:hover:text-white'
+                      }`}
+                    >
+                      {g}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Current Attached Track Card */}
               {selectedAudio && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between p-3.5 bg-teal-50 dark:bg-teal-950/30 border border-[#0a7c85]/30 rounded-2xl">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-[#0a7c85] text-white flex items-center justify-center font-bold">
-                        <Music className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <h5 className="font-bold text-xs sm:text-sm text-gray-900 dark:text-white">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      {selectedAudio.coverUrl ? (
+                        <img
+                          src={selectedAudio.coverUrl}
+                          alt={selectedAudio.title}
+                          className="w-11 h-11 rounded-xl object-cover shrink-0 border border-teal-200/50 dark:border-teal-800/50"
+                        />
+                      ) : (
+                        <div className="w-11 h-11 rounded-xl bg-[#0a7c85] text-white flex items-center justify-center font-bold shrink-0">
+                          <Music className="w-5 h-5" />
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <h5 className="font-bold text-xs sm:text-sm text-gray-900 dark:text-white truncate">
                           {selectedAudio.title}
                         </h5>
-                        <p className="text-[11px] text-[#0a7c85] font-semibold">
-                          {selectedAudio.artist} • {selectedAudio.mood}
+                        <p className="text-[11px] text-[#0a7c85] font-semibold truncate">
+                          {selectedAudio.artist} {selectedAudio.mood ? `• ${selectedAudio.mood}` : ''}
                         </p>
                       </div>
                     </div>
@@ -774,7 +948,7 @@ export function UnifiedCreatePostModal({
                       variant="ghost"
                       size="sm"
                       onClick={() => setSelectedAudio(null)}
-                      className="text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-xs font-bold rounded-full"
+                      className="text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-xs font-bold rounded-full shrink-0"
                     >
                       Remove
                     </Button>
@@ -794,63 +968,96 @@ export function UnifiedCreatePostModal({
                 </div>
               )}
 
-              {/* Curated Sound Library Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {CURATED_AUDIO_LIBRARY.map((track) => {
-                  const isSelected = selectedAudio?.id === track.id;
-                  const isPlaying = previewingAudioId === track.id;
+              {/* Sound Library Grid */}
+              {isLoadingMusic ? (
+                <div className="py-12 text-center space-y-2">
+                  <Loader2 className="w-6 h-6 animate-spin text-[#0a7c85] mx-auto" />
+                  <p className="text-xs text-gray-400">Loading songs from Tolee Songs...</p>
+                </div>
+              ) : toleeSongsList.length === 0 ? (
+                <div className="py-10 text-center rounded-2xl bg-gray-50 dark:bg-zinc-900/40 border border-gray-100 dark:border-zinc-800 space-y-2">
+                  <Disc className="w-8 h-8 text-gray-400 mx-auto" />
+                  <p className="text-xs font-bold text-gray-700 dark:text-zinc-300">No songs found</p>
+                  <p className="text-[11px] text-gray-400">Try searching for a different song or artist name</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[300px] overflow-y-auto pr-1">
+                  {toleeSongsList.map((track) => {
+                    const isSelected = selectedAudio?.id === track.id;
+                    const isPlaying = previewingAudioId === track.id;
 
-                  return (
-                    <div
-                      key={track.id}
-                      className={`flex items-center justify-between p-3 rounded-2xl border transition-all ${
-                        isSelected
-                          ? 'border-[#0a7c85] bg-teal-50/40 dark:bg-teal-950/20'
-                          : 'border-gray-100 dark:border-zinc-800 hover:border-gray-300 dark:hover:border-zinc-700'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <button
-                          type="button"
-                          onClick={() => toggleAudioPreview(track)}
-                          className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
-                            isPlaying
-                              ? 'bg-[#0a7c85] text-white scale-105 shadow-md'
-                              : 'bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-zinc-200 hover:bg-gray-200'
-                          }`}
-                        >
-                          {isPlaying ? (
-                            <Pause className="w-4 h-4 fill-current" />
-                          ) : (
-                            <Play className="w-4 h-4 fill-current ml-0.5" />
-                          )}
-                        </button>
-                        <div>
-                          <h5 className="font-bold text-xs text-gray-900 dark:text-zinc-100 truncate max-w-[140px]">
-                            {track.title}
-                          </h5>
-                          <p className="text-[10px] text-gray-500">
-                            {track.artist} • {formatDuration(track.duration)}
-                          </p>
-                        </div>
-                      </div>
-
-                      <Button
-                        size="sm"
-                        variant={isSelected ? 'default' : 'outline'}
-                        onClick={() => setSelectedAudio(isSelected ? null : track)}
-                        className={`h-7 px-3 text-xs rounded-full font-bold ${
+                    return (
+                      <div
+                        key={track.id}
+                        className={`flex items-center justify-between p-3 rounded-2xl border transition-all ${
                           isSelected
-                            ? 'bg-[#0a7c85] text-white'
-                            : 'border-gray-200 dark:border-zinc-800 text-gray-700 dark:text-zinc-300'
+                            ? 'border-[#0a7c85] bg-teal-50/40 dark:bg-teal-950/20'
+                            : 'border-gray-100 dark:border-zinc-800 hover:border-gray-300 dark:hover:border-zinc-700'
                         }`}
                       >
-                        {isSelected ? 'Added' : 'Select'}
-                      </Button>
-                    </div>
-                  );
-                })}
-              </div>
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <button
+                            type="button"
+                            onClick={() => toggleAudioPreview(track)}
+                            className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-all ${
+                              isPlaying
+                                ? 'bg-[#0a7c85] text-white scale-105 shadow-md'
+                                : 'bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-zinc-200 hover:bg-gray-200'
+                            }`}
+                            title={isPlaying ? 'Pause Preview' : 'Listen'}
+                          >
+                            {isPlaying ? (
+                              <Pause className="w-4 h-4 fill-current" />
+                            ) : (
+                              <Play className="w-4 h-4 fill-current ml-0.5" />
+                            )}
+                          </button>
+
+                          {track.coverUrl ? (
+                            <img
+                              src={track.coverUrl}
+                              alt={track.title}
+                              className="w-9 h-9 rounded-xl object-cover shrink-0"
+                            />
+                          ) : (
+                            <div className="w-9 h-9 rounded-xl bg-gray-100 dark:bg-zinc-800 flex items-center justify-center shrink-0 text-gray-400">
+                              <Music className="w-4 h-4" />
+                            </div>
+                          )}
+
+                          <div className="min-w-0 flex-1">
+                            <h5 className="font-bold text-xs text-gray-900 dark:text-zinc-100 truncate">
+                              {track.title}
+                            </h5>
+                            <p className="text-[10px] text-gray-500 truncate">
+                              {track.artist} {track.duration ? `• ${formatDuration(track.duration)}` : ''}
+                            </p>
+                          </div>
+                        </div>
+
+                        <Button
+                          size="sm"
+                          variant={isSelected ? 'default' : 'outline'}
+                          onClick={() => {
+                            if (isSelected) {
+                              setSelectedAudio(null);
+                            } else {
+                              setSelectedAudio(track);
+                            }
+                          }}
+                          className={`h-7 px-3 text-xs rounded-full font-bold ml-2 shrink-0 ${
+                            isSelected
+                              ? 'bg-[#0a7c85] text-white'
+                              : 'border-gray-200 dark:border-zinc-800 text-gray-700 dark:text-zinc-300'
+                          }`}
+                        >
+                          {isSelected ? 'Added' : 'Select'}
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
 
               <div className="p-3 bg-gray-50 dark:bg-zinc-900/40 rounded-xl text-center">
                 <p className="text-[11px] text-gray-400">
