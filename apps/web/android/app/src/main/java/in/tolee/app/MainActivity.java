@@ -1056,11 +1056,49 @@ public class MainActivity extends BridgeActivity {
         public String getFilesInFolder(String folderName, String type) {
             JSONArray files = new JSONArray();
             try {
+                if ("videos".equals(type)) {
+                    Uri uri = MediaStore.Video.Media.EXTERNAL_CONTENT_URI;
+                    String[] projection = {
+                        MediaStore.Video.Media._ID,
+                        MediaStore.Video.Media.DURATION,
+                        MediaStore.Video.Media.DATE_ADDED
+                    };
+                    String selection = null;
+                    List<String> selectionArgs = new ArrayList<>();
+                    if (!"Recents".equalsIgnoreCase(folderName)) {
+                        selection = MediaStore.Video.Media.BUCKET_DISPLAY_NAME + "=?";
+                        selectionArgs.add(folderName);
+                    }
+                    Cursor cursor = getContentResolver().query(
+                        uri,
+                        projection,
+                        selection,
+                        selectionArgs.isEmpty() ? null : selectionArgs.toArray(new String[0]),
+                        MediaStore.Video.Media.DATE_ADDED + " DESC"
+                    );
+                    if (cursor != null) {
+                        int idIdx = cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID);
+                        int durationIdx = cursor.getColumnIndex(MediaStore.Video.Media.DURATION);
+                        while (cursor.moveToNext()) {
+                            long id = cursor.getLong(idIdx);
+                            long duration = durationIdx != -1 ? cursor.getLong(durationIdx) : 0;
+                            Uri contentUri = Uri.withAppendedPath(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, String.valueOf(id));
+                            JSONObject fileObj = new JSONObject();
+                            fileObj.put("uri", contentUri.toString());
+                            fileObj.put("type", "video");
+                            fileObj.put("duration", duration);
+                            files.put(fileObj);
+                        }
+                        cursor.close();
+                    }
+                    return files.toString();
+                }
+
+                // If photos or all
                 Uri uri = MediaStore.Files.getContentUri("external");
                 String[] projection = {
                     MediaStore.Files.FileColumns._ID,
                     MediaStore.Files.FileColumns.MEDIA_TYPE,
-                    MediaStore.Video.VideoColumns.DURATION,
                     MediaStore.Files.FileColumns.DATE_ADDED
                 };
 
@@ -1070,8 +1108,6 @@ public class MainActivity extends BridgeActivity {
                 if ("Recents".equalsIgnoreCase(folderName)) {
                     if ("photos".equals(type)) {
                         selection = MediaStore.Files.FileColumns.MEDIA_TYPE + "=" + MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE;
-                    } else if ("videos".equals(type)) {
-                        selection = MediaStore.Files.FileColumns.MEDIA_TYPE + "=" + MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO;
                     } else {
                         selection = MediaStore.Files.FileColumns.MEDIA_TYPE + "=" + MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE
                             + " OR " + MediaStore.Files.FileColumns.MEDIA_TYPE + "=" + MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO;
@@ -1079,8 +1115,6 @@ public class MainActivity extends BridgeActivity {
                 } else {
                     if ("photos".equals(type)) {
                         selection = "(" + MediaStore.Files.FileColumns.MEDIA_TYPE + "=" + MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE + ")";
-                    } else if ("videos".equals(type)) {
-                        selection = "(" + MediaStore.Files.FileColumns.MEDIA_TYPE + "=" + MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO + ")";
                     } else {
                         selection = "(" + MediaStore.Files.FileColumns.MEDIA_TYPE + "=" + MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE
                             + " OR " + MediaStore.Files.FileColumns.MEDIA_TYPE + "=" + MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO + ")";
@@ -1100,12 +1134,10 @@ public class MainActivity extends BridgeActivity {
                 if (cursor != null) {
                     int idIdx = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns._ID);
                     int typeIdx = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.MEDIA_TYPE);
-                    int durationIdx = cursor.getColumnIndexOrThrow(MediaStore.Video.VideoColumns.DURATION);
 
                     while (cursor.moveToNext()) {
                         long id = cursor.getLong(idIdx);
                         int mediaType = cursor.getInt(typeIdx);
-                        long duration = cursor.getLong(durationIdx);
 
                         Uri contentUri;
                         String typeStr;
@@ -1120,7 +1152,7 @@ public class MainActivity extends BridgeActivity {
                         JSONObject fileObj = new JSONObject();
                         fileObj.put("uri", contentUri.toString());
                         fileObj.put("type", typeStr);
-                        fileObj.put("duration", duration); // duration in ms
+                        fileObj.put("duration", 0);
                         files.put(fileObj);
                     }
                     cursor.close();
