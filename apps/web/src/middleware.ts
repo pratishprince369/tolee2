@@ -115,20 +115,6 @@ const authMiddleware = withAuth(
 
 export default function middleware(req: NextRequest, event: any) {
   const { pathname } = req.nextUrl;
-  const host = req.headers.get("host") || "";
-  const proto = req.headers.get("x-forwarded-proto") || req.nextUrl.protocol.replace(":", "");
-
-  // 1. Canonical Domain & HTTPS 301 Permanent Redirect (SEO Duplicate Content Prevention)
-  // Redirects www.tolee.in -> https://tolee.in and HTTP -> HTTPS permanently with full path & query preservation
-  if (host === "www.tolee.in" || (host === "tolee.in" && proto === "http")) {
-    const redirectUrl = new URL(req.nextUrl.pathname + req.nextUrl.search, "https://tolee.in");
-    return NextResponse.redirect(redirectUrl, { status: 301 });
-  }
-  if (host.startsWith("www.") && !host.includes("localhost") && !host.includes("127.0.0.1")) {
-    const canonicalHost = host.replace(/^www\./, "");
-    const redirectUrl = new URL(req.nextUrl.pathname + req.nextUrl.search, `https://${canonicalHost}`);
-    return NextResponse.redirect(redirectUrl, { status: 301 });
-  }
 
   // Handle preflight OPTIONS requests cleanly
   if (req.method === "OPTIONS") {
