@@ -9,7 +9,7 @@ import {
   Heart, MessageCircle, Send, MoreVertical, Music,
   Volume2, VolumeX, ShieldCheck, Plus, Bookmark, Repeat,
   ChevronUp, ChevronDown, Eye, Rocket, MapPin, Smile, X,
-  Loader2, AlertCircle, ChevronLeft
+  Loader2, AlertCircle, ChevronLeft, Camera, Image as ImageIcon
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
@@ -161,6 +161,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
   const reelsFileInputRef = useRef<HTMLInputElement>(null);
   const [isUnifiedModalOpen, setIsUnifiedModalOpen] = useState(false);
   const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
+  const [isCreateChoiceOpen, setIsCreateChoiceOpen] = useState(false);
   const [reelsPreloadedMedia, setReelsPreloadedMedia] = useState<MediaItem[]>([]);
 
   const triggerGalleryPicker = useCallback(() => {
@@ -172,37 +173,12 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
     }
   }, []);
 
-  const handleReelsUploadClick = async () => {
+  const handleReelsUploadClick = () => {
     if (!session?.user) {
       router.push('/login');
       return;
     }
-
-    try {
-      // Immediately open Native Gallery / Visual Media Picker
-      const assets = await ToleeMediaPicker.selectImageAndVideo({ multiple: true });
-      if (!assets || assets.length === 0) {
-        // User cancelled or closed picker, return smoothly to Reels
-        return;
-      }
-
-      const items: MediaItem[] = assets.map((asset) => ({
-        type: asset.type,
-        url: asset.uri,
-        file: asset.file,
-      }));
-
-      if (items.length === 0) {
-        return;
-      }
-
-      setIsCameraModalOpen(false);
-      setReelsPreloadedMedia(items);
-      setIsUnifiedModalOpen(true);
-    } catch (err) {
-      console.warn('[ReelsStream] ToleeMediaPicker error, falling back to input:', err);
-      triggerGalleryPicker();
-    }
+    setIsCreateChoiceOpen(true);
   };
 
   // Register global openInstagramCamera so in-app media picker camera button can trigger camera modal
@@ -219,12 +195,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
   // Auto-open Reel creator when navigated from Tolee Songs ("Use in Reel")
   useEffect(() => {
     if (searchParams?.get('action') === 'create') {
-      const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
-      if (isMobile) {
-        setIsCameraModalOpen(true);
-      } else {
-        setIsUnifiedModalOpen(true);
-      }
+      setIsCreateChoiceOpen(true);
     }
   }, [searchParams]);
 
@@ -1224,6 +1195,71 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
         className="hidden"
         onChange={handleReelsFileSelect}
       />
+
+      {/* Instagram-Style "Create Reel" Choice Sheet */}
+      {isCreateChoiceOpen && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={() => setIsCreateChoiceOpen(false)}
+        >
+          <div
+            className="w-full sm:max-w-sm bg-zinc-900 border border-zinc-800 rounded-t-2xl sm:rounded-2xl p-5 text-white shadow-2xl animate-in slide-in-from-bottom-5 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Sheet Handle */}
+            <div className="w-10 h-1 bg-zinc-700 rounded-full mx-auto mb-4" />
+
+            <h3 className="text-center font-bold text-base text-zinc-100 mb-4">Create Reel</h3>
+
+            <div className="space-y-3">
+              {/* Option A: Camera */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCreateChoiceOpen(false);
+                  setIsCameraModalOpen(true);
+                }}
+                className="w-full flex items-center gap-4 p-3.5 rounded-xl bg-zinc-800/80 hover:bg-zinc-800 active:scale-[0.98] transition-all text-left border border-zinc-700/50"
+              >
+                <div className="w-11 h-11 rounded-full bg-gradient-to-tr from-rose-500 to-amber-500 flex items-center justify-center flex-shrink-0 shadow-md">
+                  <Camera className="w-5 h-5 text-white" />
+                </div>
+                <div className="flex-1">
+                  <div className="font-semibold text-sm text-zinc-100">Camera</div>
+                  <div className="text-xs text-zinc-400">Record a new video or snap photo</div>
+                </div>
+              </button>
+
+              {/* Option B: Photos & Videos (Native Device Gallery) */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCreateChoiceOpen(false);
+                  triggerGalleryPicker();
+                }}
+                className="w-full flex items-center gap-4 p-3.5 rounded-xl bg-zinc-800/80 hover:bg-zinc-800 active:scale-[0.98] transition-all text-left border border-zinc-700/50"
+              >
+                <div className="w-11 h-11 rounded-full bg-gradient-to-tr from-teal-500 to-emerald-500 flex items-center justify-center flex-shrink-0 shadow-md">
+                  <ImageIcon className="w-5 h-5 text-white" />
+                </div>
+                <div className="flex-1">
+                  <div className="font-semibold text-sm text-zinc-100">Photos & Videos</div>
+                  <div className="text-xs text-zinc-400">Choose from phone media gallery</div>
+                </div>
+              </button>
+            </div>
+
+            {/* Cancel */}
+            <button
+              type="button"
+              onClick={() => setIsCreateChoiceOpen(false)}
+              className="w-full mt-4 py-3 rounded-xl bg-zinc-800/50 hover:bg-zinc-800 text-zinc-300 font-medium text-sm transition-all active:scale-[0.98]"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Instagram-Style Live Camera Modal on Mobile */}
       {isCameraModalOpen && (

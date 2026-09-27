@@ -92,7 +92,6 @@ import { AuthModal } from "@/components/AuthModal";
 import { PushNotificationManager } from "@/components/PushNotificationManager";
 import { ApkPromoManager } from "@/components/ApkPromoManager";
 import { PwaManager } from "@/components/PwaManager";
-import { MediaPickerModal } from "@/components/MediaPickerModal";
 import { GlobalAlarmListener } from "@/components/GlobalAlarmListener";
 import { CallInterface } from "@/components/CallInterface";
 import { DraftsReminderBanner } from "@/components/DraftsReminderBanner";
@@ -292,7 +291,6 @@ export default async function RootLayout({
           <PushNotificationManager />
           <ApkPromoManager />
           <PwaManager />
-          <MediaPickerModal />
           <DraftsReminderBanner />
           <Suspense fallback={null}>
             <AnalyticsTracker />

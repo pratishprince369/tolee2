@@ -418,12 +418,66 @@ public class MainActivity extends BridgeActivity {
                     return true;
                 }
 
-                final String pickMode = (isVideoOnly && !isImageOnly) ? "videos" : (isImageOnly && !isVideoOnly ? "photos" : "all");
                 final boolean multiple = fileChooserParams.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE;
+                final boolean videoOnly = isVideoOnly && !isImageOnly;
+                final boolean photoOnly = isImageOnly && !isVideoOnly;
 
                 runOnUiThread(() -> {
-                    String js = "if(window.showInstagramMediaPicker){window.showInstagramMediaPicker('" + pickMode + "', " + multiple + ");} else { if(window.AndroidBridge && window.AndroidBridge.fallbackToFileChooser){ window.AndroidBridge.fallbackToFileChooser(); } }";
-                    webView.evaluateJavascript(js, null);
+                    try {
+                        Intent pickerIntent;
+                        // Android 13+ (API 33+) Native System Photo Picker
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            pickerIntent = new Intent(MediaStore.ACTION_PICK_IMAGES);
+                            if (videoOnly) {
+                                pickerIntent.setType("video/*");
+                            } else if (photoOnly) {
+                                pickerIntent.setType("image/*");
+                            }
+                            if (multiple) {
+                                int maxLimit = MediaStore.getPickImagesMaxLimit();
+                                pickerIntent.putExtra(MediaStore.EXTRA_PICK_IMAGES_MAX, Math.min(10, maxLimit));
+                            }
+                        } else {
+                            // Android 12 and below: System Gallery Picker
+                            pickerIntent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+                            if (videoOnly) {
+                                pickerIntent.setDataAndType(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, "video/*");
+                            } else if (photoOnly) {
+                                pickerIntent.setDataAndType(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, "image/*");
+                            } else {
+                                pickerIntent.setDataAndType(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, "image/*,video/*");
+                                pickerIntent.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"image/*", "video/*"});
+                            }
+                            if (multiple) {
+                                pickerIntent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+                            }
+                        }
+                        startActivityForResult(pickerIntent, RC_FILE_CHOOSER);
+                    } catch (Exception e) {
+                        Log.e(TAG, "Native Photo Picker launch failed, falling back to system chooser", e);
+                        try {
+                            Intent fallback = new Intent(Intent.ACTION_GET_CONTENT);
+                            fallback.addCategory(Intent.CATEGORY_OPENABLE);
+                            if (videoOnly) {
+                                fallback.setType("video/*");
+                            } else if (photoOnly) {
+                                fallback.setType("image/*");
+                            } else {
+                                fallback.setType("*/*");
+                                fallback.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"image/*", "video/*"});
+                            }
+                            if (multiple) {
+                                fallback.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+                            }
+                            startActivityForResult(Intent.createChooser(fallback, "Select Media"), RC_FILE_CHOOSER);
+                        } catch (Exception ex) {
+                            Log.e(TAG, "All media selection intents failed", ex);
+                            if (mFilePathCallback != null) {
+                                mFilePathCallback.onReceiveValue(null);
+                                mFilePathCallback = null;
+                            }
+                        }
+                    }
                 });
                 return true;
             }

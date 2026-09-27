@@ -49,22 +49,12 @@ export function MediaPickerModal() {
     return `https://local.tolee.in/${endpoint}?uri=${encodeURIComponent(coverUri)}`;
   };
 
-  // Listen for the global window triggers from Android WebView
+  // Global showInstagramMediaPicker is deprecated in favor of official Android System Photo Picker (MediaStore.ACTION_PICK_IMAGES)
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    (window as any).showInstagramMediaPicker = (mode: 'photos' | 'videos' | 'all', isMultiple: boolean) => {
-      setPickMode(mode);
-      setActiveFilter(mode === 'videos' ? 'videos' : mode === 'photos' ? 'photos' : 'all');
-      setMultiple(isMultiple);
-      setSelectedUris([]);
-      setSelectedAlbum('Recents');
-      setIsOpen(true);
-      checkPermissions();
-    };
-
     return () => {
-      delete (window as any).showInstagramMediaPicker;
+      if (typeof window !== 'undefined') {
+        delete (window as any).showInstagramMediaPicker;
+      }
     };
   }, []);
 
