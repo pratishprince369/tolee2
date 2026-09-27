@@ -22,6 +22,21 @@ const nextConfig = {
       { protocol: 'https', hostname: 'res.cloudinary.com' }
     ],
   },
+  async redirects() {
+    return [
+      {
+        source: '/:path*',
+        has: [
+          {
+            type: 'host',
+            value: 'www.tolee.in',
+          },
+        ],
+        destination: 'https://tolee.in/:path*',
+        permanent: true, // 301 Moved Permanently for SEO
+      },
+    ];
+  },
   async headers() {
     return [
       {
