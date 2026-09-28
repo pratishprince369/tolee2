@@ -21,9 +21,12 @@ export function isVideoUrl(url: string | null | undefined): boolean {
   const lower = url.toLowerCase();
   return (
     lower.endsWith('.mp4') ||
+    lower.includes('.mp4') ||
     lower.endsWith('.m3u8') ||
     lower.includes('/video/upload/') ||
-    lower.includes('/video/')
+    lower.includes('/video/') ||
+    lower.includes('drive.usercontent.google.com') ||
+    lower.includes('drive.google.com')
   );
 }
 
@@ -34,6 +37,14 @@ export function isVideoUrl(url: string | null | undefined): boolean {
 export function getMediaThumbnail(url: string | null | undefined): string {
   if (!url) return '/placeholder-ad.png';
   const lower = url.toLowerCase();
+
+  // If it's a Google Drive video/image URL, return the direct LH3 thumbnail
+  if (lower.includes('drive.usercontent.google.com') || lower.includes('drive.google.com')) {
+    const match = url.match(/[?&]id=([a-zA-Z0-9_-]+)/) || url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (match && match[1]) {
+      return `https://lh3.googleusercontent.com/d/${match[1]}`;
+    }
+  }
 
   // If it's already a standard image extension, return it directly
   if (
@@ -62,6 +73,13 @@ export function getMediaThumbnail(url: string | null | undefined): string {
 
 export function getPosterUrl(url: string | null | undefined): string {
   if (!url) return '';
+  if (url.includes('drive.usercontent.google.com') || url.includes('drive.google.com')) {
+    const match = url.match(/[?&]id=([a-zA-Z0-9_-]+)/) || url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (match && match[1]) {
+      return `https://lh3.googleusercontent.com/d/${match[1]}`;
+    }
+  }
+
   if (url.includes('/video/upload/')) {
     let thumbUrl = url;
     if (url.includes('/sp_hd/m3u8/')) {

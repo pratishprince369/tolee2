@@ -263,7 +263,7 @@ export const HLSVideo = forwardRef<HTMLVideoElement, HLSVideoProps>(
       video.addEventListener('loadedmetadata', onReady, { once: true });
     } else {
       // Standard mp4 / webm
-      const isMp4 = src.toLowerCase().includes('.mp4') || src.toLowerCase().includes('video') || src.toLowerCase().includes('.mov') || src.toLowerCase().includes('.webm');
+      const isMp4 = src.toLowerCase().includes('.mp4') || src.toLowerCase().includes('video') || src.toLowerCase().includes('.mov') || src.toLowerCase().includes('.webm') || src.toLowerCase().includes('drive.usercontent.google.com');
       const finalSrc = isMp4 && !src.includes('#t=') ? `${src}#t=0.001` : src;
       video.src = finalSrc;
       // canplay is fired earlier than loadeddata and is sufficient for play
