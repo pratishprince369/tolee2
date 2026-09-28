@@ -317,7 +317,7 @@ export async function createPost(data: {
   }
 }
 
-export async function getPosts(options?: { mediaType?: string; limit?: number }) {
+export async function getPosts(options?: { mediaType?: string; postType?: string; limit?: number }) {
   try {
     const session = await getServerSession(authOptions);
     const currentUserId = (session?.user as any)?.id;
@@ -327,6 +327,7 @@ export async function getPosts(options?: { mediaType?: string; limit?: number })
 
     const limit = options?.limit || 30;
     const mediaType = options?.mediaType;
+    const postType = options?.postType;
 
     // 🛡️ Bandwidth Safeguard: Removed aggressive 90s auto-publish trigger from getPosts().
     // Publishing is now handled ONLY via feed/page.tsx (6hr interval) and cron route with 10/day cap.
@@ -354,7 +355,8 @@ export async function getPosts(options?: { mediaType?: string; limit?: number })
       where: {
         isArchived: false,
         status: 'published',
-        ...(mediaType ? { mediaTypes: mediaType } : {}),
+        ...(postType ? { postType } : {}),
+        ...(mediaType ? { mediaTypes: { contains: mediaType } } : {}),
         AND: [
           ...(!isSimOn ? [{
             OR: [

@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { extractYouTubeVideoId } from '@/lib/youtube';
 import { getTrendingYouTubeShorts } from '@/lib/youtubeShortsService';
+import { publishDailyBundleReelsBatch } from '@/lib/reelsBundleAutoPublisher';
 import type { Metadata } from 'next';
 
 export const dynamic = 'force-dynamic';
@@ -48,10 +49,25 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
   const session = await getServerSession(authOptions);
   const currentUserId = (session?.user as any)?.id;
 
+  // 🎥 Daily Reels Bundle Auto-Publisher trigger (non-blocking in background)
+  void (async () => {
+    try {
+      const latestBundleReel = await prisma.post.findFirst({
+        where: { postType: 'reel', mediaUrls: { contains: 'drive.usercontent.google.com' } },
+        orderBy: { createdAt: 'desc' },
+        select: { createdAt: true }
+      });
+      const timeSince = latestBundleReel ? Date.now() - new Date(latestBundleReel.createdAt).getTime() : Infinity;
+      if (timeSince > 24 * 60 * 60 * 1000) {
+        publishDailyBundleReelsBatch(5).catch(() => {});
+      }
+    } catch {}
+  })();
+
   // Fetch real posts from DB (lean initial batch for instant page load)
   let dbReels: any[] = [];
   try {
-    const res = await getPosts({ mediaType: 'video', limit: 15 });
+    const res = await getPosts({ mediaType: 'video', postType: 'reel', limit: 25 });
     if (res.success && res.posts) {
       const videoPosts = res.posts.filter(post => post.postType === 'reel' && post.mediaUrls);
       const authorIds = videoPosts.map(p => p.author.id);
