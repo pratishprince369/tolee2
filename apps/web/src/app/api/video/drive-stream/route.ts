@@ -70,8 +70,10 @@ export async function GET(req: NextRequest) {
       headers,
     });
   } catch (err: any) {
-    console.error(`[DriveStreamProxy Error] fileId ${fileId}:`, err.message);
-    return new NextResponse('Error streaming video', { status: 502 });
+    console.error(`[DriveStreamProxy Error] fileId ${fileId}:`, err?.message || err);
+    return NextResponse.redirect(`https://drive.usercontent.google.com/download?id=${fileId}&export=download`, {
+      status: 307,
+    });
   }
 }
 

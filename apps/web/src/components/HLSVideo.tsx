@@ -298,11 +298,19 @@ export const HLSVideo = forwardRef<HTMLVideoElement, HLSVideoProps>(
       const finalSrc = isMp4 && !isStreamProxy && !props.poster && !resolvedSrc.includes('#t=') ? `${resolvedSrc}#t=0.001` : resolvedSrc;
       video.src = finalSrc;
 
+      const handleReady = () => {
+        video.removeEventListener('canplay', handleReady);
+        video.removeEventListener('loadeddata', handleReady);
+        video.removeEventListener('playing', handleReady);
+        onReady();
+      };
+
       if (video.readyState >= 2) {
         onReady();
       } else {
-        video.addEventListener('canplay', onReady, { once: true });
-        video.addEventListener('loadeddata', onReady, { once: true });
+        video.addEventListener('canplay', handleReady, { once: true });
+        video.addEventListener('loadeddata', handleReady, { once: true });
+        video.addEventListener('playing', handleReady, { once: true });
       }
     }
 

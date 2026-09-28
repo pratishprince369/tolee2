@@ -463,19 +463,20 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
   useEffect(() => {
     const activeIdx = isDesktop ? desktopActiveIndex : mobileActiveIndex;
     const activeItem = itemsToRender[activeIdx];
-    if (activeItem && activeItem.id && typeof window !== 'undefined') {
+    const activeId = activeItem?.type === 'reel' ? activeItem.data?.id : (activeItem?.data?.id || activeItem?.id);
+    if (activeItem && activeId && typeof window !== 'undefined') {
       const currentPath = window.location.pathname;
       if (currentPath.startsWith('/reel/') || currentPath.startsWith('/reels')) {
-        const targetUrl = `/reel/${activeItem.id}`;
+        const targetUrl = `/reel/${activeId}`;
         if (currentPath !== targetUrl) {
           window.history.replaceState(null, '', targetUrl);
         }
       }
 
       // Record view only after user has watched for >= 2 seconds (Section 22)
-      if (!viewedReelsRef.current.has(activeItem.id)) {
+      if (!viewedReelsRef.current.has(activeId)) {
         if (viewTimerRef.current) clearTimeout(viewTimerRef.current);
-        const reelIdToView = activeItem.id;
+        const reelIdToView = activeId;
         viewTimerRef.current = setTimeout(() => {
           if (!viewedReelsRef.current.has(reelIdToView)) {
             viewedReelsRef.current.add(reelIdToView);
@@ -1789,16 +1790,24 @@ const AdReelSlide = memo(function AdReelSlide({
                   </div>
                 )}
 
-                {/* Error placeholder */}
+                {/* Fallback to brand/ad visual on video failure instead of error block */}
                 {isError && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-950 text-center p-6 z-10 space-y-4">
-                    <div className="p-3 bg-red-500/10 rounded-full border border-red-500/30">
-                      <AlertCircle className="w-10 h-10 text-red-500" />
-                    </div>
-                    <div className="space-y-1">
-                      <h4 className="font-bold text-sm text-zinc-200">Video Unavailable</h4>
-                      <p className="text-xs text-zinc-500 max-w-[200px]">This sponsored ad video could not be loaded.</p>
-                    </div>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-950 p-6 z-10 text-center">
+                    {ad.imageUrl || ad.image ? (
+                      <img
+                        src={ad.imageUrl || ad.image}
+                        alt={ad.headline || 'Sponsored Ad'}
+                        className="w-full h-full object-cover opacity-80"
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center gap-3 p-6 rounded-2xl bg-zinc-900/90 border border-zinc-800 max-w-xs backdrop-blur-md">
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-r from-emerald-500 to-indigo-500 flex items-center justify-center text-white font-bold text-lg">
+                          {advertiserName?.[0] || 'T'}
+                        </div>
+                        <h4 className="font-bold text-base text-white">{ad.headline || advertiserName}</h4>
+                        <p className="text-xs text-zinc-400 line-clamp-2">{ad.description || 'Sponsored content on Tolee'}</p>
+                      </div>
+                    )}
                   </div>
                 )}
               </>
