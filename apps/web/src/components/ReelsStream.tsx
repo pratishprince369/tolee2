@@ -26,7 +26,7 @@ import {
 } from '@/actions/post';
 import { toggleFollow } from '@/actions/user';
 import dynamic from 'next/dynamic';
-import { HLSVideo, getSoundPreference, setSoundPreference, getDeviceNetworkStats } from '@/components/HLSVideo';
+import { HLSVideo, getSoundPreference, setSoundPreference, getDeviceNetworkStats, setGlobalActiveVideo } from '@/components/HLSVideo';
 import { useNetworkConfig } from '@/hooks/useNetworkConfig';
 import { videoMetadataCache } from '@/lib/videoCache';
 import { formatViewCount } from '@/lib/utils';
@@ -36,6 +36,7 @@ import { isVideoUrl, getMediaThumbnail, getPosterUrl, parseMediaUrls } from '@/l
 import { YouTubeReelPlayer } from '@/components/YouTubeReelPlayer';
 import { extractYouTubeVideoId, decodeHtmlEntities } from '@/lib/youtube';
 import { ToleeMediaPicker } from '@/lib/toleeMediaPicker';
+import { Capacitor } from '@capacitor/core';
 
 const UnifiedCreatePostModal = dynamic(
   () => import('@/components/UnifiedCreatePostModal').then((m) => m.UnifiedCreatePostModal),
@@ -162,12 +163,54 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
   const [isUnifiedModalOpen, setIsUnifiedModalOpen] = useState(false);
   const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
   const [isCreateChoiceOpen, setIsCreateChoiceOpen] = useState(false);
+  const [isPickingMedia, setIsPickingMedia] = useState(false);
   const [reelsPreloadedMedia, setReelsPreloadedMedia] = useState<MediaItem[]>([]);
 
-  const triggerGalleryPicker = useCallback(() => {
+  // Preload heavy modal bundles in idle background so opening them is instantaneous
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const preloadModals = () => {
+      import('@/components/UnifiedCreatePostModal').catch(() => {});
+      import('@/components/InstagramReelsCameraModal').catch(() => {});
+    };
+    if ('requestIdleCallback' in window) {
+      (window as any).requestIdleCallback(preloadModals);
+    } else {
+      setTimeout(preloadModals, 1200);
+    }
+  }, []);
+
+  const triggerGalleryPicker = useCallback(async () => {
+    setIsCreateChoiceOpen(false);
+    // 1. Native mobile (Capacitor Android / iOS)
+    if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
+      try {
+        setIsPickingMedia(true);
+        const assets = await ToleeMediaPicker.openMediaPicker({ mode: 'all', multiple: true });
+        if (assets && assets.length > 0) {
+          const items: MediaItem[] = assets.map((a) => ({
+            type: a.type,
+            url: a.uri,
+            file: a.file,
+          }));
+          setIsCameraModalOpen(false);
+          setReelsPreloadedMedia(items);
+          setIsUnifiedModalOpen(true);
+        }
+      } catch (err) {
+        console.warn('[ReelsStream] Native media picker fallback:', err);
+        if (reelsFileInputRef.current) {
+          reelsFileInputRef.current.accept = 'image/*,video/*';
+          reelsFileInputRef.current.click();
+        }
+      } finally {
+        setIsPickingMedia(false);
+      }
+      return;
+    }
+
+    // 2. Web fallback: HTML5 file input with standard MIME wildcards
     if (reelsFileInputRef.current) {
-      // Use clean standard MIME types without file extensions (.mp4, .mov, etc.)
-      // Listing file extensions forces Android WebView/Chrome to open the Documents/Files manager
       reelsFileInputRef.current.accept = 'image/*,video/*';
       reelsFileInputRef.current.click();
     }
@@ -488,44 +531,21 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
 
     const distance = idx - activeIndex;
 
-    // Past slides
+    // Past slides - keep at most 1 previous slide ready
     if (distance < 0) {
-      const lookBehind = direction === 'up' ? 3 : 2;
-      const shouldLoad = idx >= activeIndex - lookBehind;
+      const shouldLoad = distance >= -1;
       return {
         shouldLoad,
-        preload: shouldLoad ? ('auto' as const) : ('none' as const),
+        preload: shouldLoad ? ('metadata' as const) : ('none' as const),
       };
     }
 
-    // Future slides - adaptive preloading counts
-    let maxPreloadCount = 10;
-    let autoBufferCount = 4;
-
-    const conn = typeof window !== 'undefined' ? (navigator as any).connection : null;
-    const type = conn ? conn.effectiveType : '4g';
-    const isSlow = type === '2g' || type === '3g' || (conn && conn.downlink < 2);
-
-    if (isSlow) {
-      maxPreloadCount = 3;
-      autoBufferCount = 1;
-    } else if (type === '4g' && conn && conn.downlink < 10) {
-      maxPreloadCount = 7;
-      autoBufferCount = 2;
+    // Future slides - lightweight lookahead (only 1 next slide auto, 1 after metadata)
+    if (distance === 1) {
+      return { shouldLoad: true, preload: 'auto' as const };
     }
-
-    // Battery saver mode
-    if (isLowBattery) {
-      maxPreloadCount = 3;
-      autoBufferCount = 1;
-    }
-
-    if (distance <= maxPreloadCount) {
-      if (distance <= autoBufferCount) {
-        return { shouldLoad: true, preload: 'auto' as const };
-      } else {
-        return { shouldLoad: true, preload: 'metadata' as const };
-      }
+    if (distance === 2) {
+      return { shouldLoad: true, preload: 'metadata' as const };
     }
 
     return { shouldLoad: false, preload: 'none' as const };
@@ -549,7 +569,23 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [selectedReelForShare, setSelectedReelForShare] = useState<any | null>(null);
 
+  const isAnyModalOpen = Boolean(
+    isCreateChoiceOpen ||
+    isCameraModalOpen ||
+    isUnifiedModalOpen ||
+    activeCommentReel ||
+    activeRepostReel ||
+    activeOptionsReel ||
+    reshareModalOpen ||
+    shareModalOpen ||
+    isQuickBoostOpen
+  );
 
+  useEffect(() => {
+    if (isAnyModalOpen) {
+      setGlobalActiveVideo(null);
+    }
+  }, [isAnyModalOpen]);
 
   useEffect(() => {
     // When the user approaches the end of the loaded reels (e.g. index is reels.length - 6, i.e. 5 remaining reels)
@@ -815,7 +851,8 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
       {/* ────────────────────────────────────────────────────────────────
           MOBILE: full-screen fixed immersive (hidden on lg+)
          ──────────────────────────────────────────────────────────────── */}
-      <div className="lg:hidden fixed inset-0 z-40 bg-black text-white overflow-hidden flex justify-center">
+      {(!mounted || !isDesktop) && (
+        <div className="lg:hidden fixed inset-0 z-40 bg-black text-white overflow-hidden flex justify-center">
 
         {/* Mobile top bar */}
         <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between px-4 py-4 pointer-events-auto bg-gradient-to-b from-black/60 to-transparent">
@@ -858,6 +895,31 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
             className="w-full sm:max-w-[450px] h-full overflow-y-scroll snap-y snap-mandatory hide-scrollbar"
           >
             {itemsToRender.map((item, index) => {
+              // High performance sliding window virtualization:
+              // Only render full interactive slides within 2 indices of active reel.
+              // Faraway slides maintain exact snap height via lightweight placeholder.
+              const isWithinWindow = Math.abs(index - mobileActiveIndex) <= 2;
+              if (!isWithinWindow) {
+                return (
+                  <div
+                    key={`placeholder-${item.type}-${item.data?.id || index}`}
+                    data-index={index}
+                    className="reel-container w-full h-full snap-start snap-always relative flex items-center justify-center overflow-hidden bg-black"
+                    style={{ scrollSnapStop: 'always' }}
+                  >
+                    {item.data?.video && getPosterUrl(item.data.video) ? (
+                      <img
+                        src={getPosterUrl(item.data.video)}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                        className="w-full h-full object-cover opacity-20 pointer-events-none"
+                      />
+                    ) : null}
+                  </div>
+                );
+              }
+
               if (item.type === 'ad') {
                 // Find preceding reel details to attribute revenue correctly
                 let precedingReelId: string | undefined = undefined;
@@ -876,7 +938,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
                     key={`ad-${item.data.id}-${index}`}
                     ad={item.data}
                     index={index}
-                    isActive={!isDesktop && index === mobileActiveIndex}
+                    isActive={!isAnyModalOpen && !isDesktop && index === mobileActiveIndex}
                     desktop={false}
                     onAdClick={handleAdClick}
                     contentId={precedingReelId}
@@ -895,8 +957,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
                   key={`reel-${reel.id}-${index}`}
                   reel={reel}
                   index={index}
-                  // Only activate if this layout is currently VISIBLE (not desktop)
-                  isActive={!isDesktop && index === mobileActiveIndex}
+                  isActive={!isAnyModalOpen && !isDesktop && index === mobileActiveIndex}
                   isMuted={isMuted}
                   session={session}
                   desktop={false}
@@ -913,11 +974,13 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
           </div>
         )}
       </div>
+      )}
 
       {/* ────────────────────────────────────────────────────────────────
           DESKTOP: inline layout — sidebar stays visible (hidden on < lg)
          ──────────────────────────────────────────────────────────────── */}
-      <div className="hidden lg:flex flex-col h-[calc(100vh-4rem)] bg-black overflow-hidden relative">
+      {mounted && isDesktop && (
+        <div className="hidden lg:flex flex-col h-[calc(100vh-4rem)] bg-black overflow-hidden relative">
 
         {/* Desktop top bar */}
         <div className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-6 py-4 bg-gradient-to-b from-black/80 to-transparent pointer-events-none">
@@ -982,6 +1045,28 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
               style={{ width: 'min(380px, 40vw)', height: 'min(676px, calc(100vh - 80px))' }}
             >
               {itemsToRender.map((item, index) => {
+                const isWithinWindow = Math.abs(index - desktopActiveIndex) <= 2;
+                if (!isWithinWindow) {
+                  return (
+                    <div
+                      key={`placeholder-desktop-${item.type}-${item.data?.id || index}`}
+                      data-index={index}
+                      className="reel-container w-full h-full snap-start snap-always relative flex items-center justify-center overflow-hidden bg-black"
+                      style={{ scrollSnapStop: 'always' }}
+                    >
+                      {item.data?.video && getPosterUrl(item.data.video) ? (
+                        <img
+                          src={getPosterUrl(item.data.video)}
+                          alt=""
+                          loading="lazy"
+                          decoding="async"
+                          className="w-full h-full object-cover opacity-20 pointer-events-none"
+                        />
+                      ) : null}
+                    </div>
+                  );
+                }
+
                 if (item.type === 'ad') {
                   // Find preceding reel details to attribute revenue correctly
                   let precedingReelId: string | undefined = undefined;
@@ -1000,7 +1085,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
                     key={`ad-${item.data.id}-${index}`}
                     ad={item.data}
                     index={index}
-                    isActive={isDesktop && index === desktopActiveIndex}
+                    isActive={!isAnyModalOpen && isDesktop && index === desktopActiveIndex}
                     desktop={true}
                     onAdClick={handleAdClick}
                     contentId={precedingReelId}
@@ -1019,8 +1104,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
                   key={`reel-${reel.id}-${index}`}
                   reel={reel}
                   index={index}
-                  // Only activate if this layout is currently VISIBLE (desktop)
-                  isActive={isDesktop && index === desktopActiveIndex}
+                  isActive={!isAnyModalOpen && isDesktop && index === desktopActiveIndex}
                   isMuted={isMuted}
                   session={session}
                   desktop={true}
@@ -1069,6 +1153,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
           </div>
         )}
       </div>
+      )}
 
       {/* ══════════════ SHARED MODALS ══════════════ */}
       <CommentsModal

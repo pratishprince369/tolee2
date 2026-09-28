@@ -28,10 +28,14 @@ export function getVideoMetadata(file: File): Promise<{ duration: number; width:
       resolve({ duration: 0, width: 0, height: 0 });
       return;
     }
+    const timeout = setTimeout(() => {
+      resolve({ duration: 15, width: 1080, height: 1920 });
+    }, 1500);
     const video = document.createElement('video');
     video.preload = 'metadata';
     const url = URL.createObjectURL(file);
     video.onloadedmetadata = () => {
+      clearTimeout(timeout);
       const dur = video.duration || 0;
       const w = video.videoWidth || 0;
       const h = video.videoHeight || 0;
@@ -39,6 +43,7 @@ export function getVideoMetadata(file: File): Promise<{ duration: number; width:
       resolve({ duration: dur, width: w, height: h });
     };
     video.onerror = () => {
+      clearTimeout(timeout);
       URL.revokeObjectURL(url);
       resolve({ duration: 0, width: 0, height: 0 });
     };
@@ -55,15 +60,20 @@ export function getImageDimensions(file: File): Promise<{ width: number; height:
       resolve({ width: 0, height: 0 });
       return;
     }
+    const timeout = setTimeout(() => {
+      resolve({ width: 1080, height: 1080 });
+    }, 1500);
     const img = new Image();
     const url = URL.createObjectURL(file);
     img.onload = () => {
+      clearTimeout(timeout);
       const w = img.naturalWidth || 0;
       const h = img.naturalHeight || 0;
       URL.revokeObjectURL(url);
       resolve({ width: w, height: h });
     };
     img.onerror = () => {
+      clearTimeout(timeout);
       URL.revokeObjectURL(url);
       resolve({ width: 0, height: 0 });
     };

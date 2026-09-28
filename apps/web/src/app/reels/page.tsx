@@ -48,10 +48,10 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
   const session = await getServerSession(authOptions);
   const currentUserId = (session?.user as any)?.id;
 
-  // Fetch real posts from DB
+  // Fetch real posts from DB (lean initial batch for instant page load)
   let dbReels: any[] = [];
   try {
-    const res = await getPosts({ mediaType: 'video', limit: 100 });
+    const res = await getPosts({ mediaType: 'video', limit: 15 });
     if (res.success && res.posts) {
       const videoPosts = res.posts.filter(post => post.postType === 'reel' && post.mediaUrls);
       const authorIds = videoPosts.map(p => p.author.id);
@@ -425,7 +425,7 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
 
   // 🎥 Auto-fetch trending YouTube Shorts so the reels feed is ALWAYS full and active
   try {
-    const shortsLimit = Math.max(15, 25 - dbReels.length);
+    const shortsLimit = Math.max(5, 12 - dbReels.length);
     const trendingShorts = await getTrendingYouTubeShorts(shortsLimit);
     if (trendingShorts.length > 0) {
       const existingIds = new Set(dbReels.map((r: any) => r.youtubeId || r.id));
