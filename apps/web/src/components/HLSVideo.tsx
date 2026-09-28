@@ -12,24 +12,30 @@ import { usePlaybackTracker } from '@/hooks/usePlaybackTracker';
    ───────────────────────────────────────────────────────────────────── */
 let globalActiveVideo: HTMLVideoElement | null = null;
 let globalActiveAudio: HTMLAudioElement | null = null;
+const allMountedVideos = new Set<HTMLVideoElement>();
+let playbackGeneration = 0;
 
 export function getGlobalActiveVideo(): HTMLVideoElement | null {
   return globalActiveVideo;
 }
 
 export function setGlobalActiveVideo(video: HTMLVideoElement | null) {
-  if (globalActiveVideo && globalActiveVideo !== video) {
-    try {
-      globalActiveVideo.pause();
-    } catch (e) {
-      console.warn('[HLSVideo] pause failed:', e);
-    }
-  }
   if (video && globalActiveAudio) {
     try {
       globalActiveAudio.pause();
     } catch (e) {}
   }
+
+  // Instantly pause and mute every other video element mounted in the DOM
+  for (const v of allMountedVideos) {
+    if (v !== video) {
+      try {
+        v.pause();
+        v.muted = true;
+      } catch (e) {}
+    }
+  }
+
   globalActiveVideo = video;
 }
 
@@ -214,26 +220,44 @@ export const HLSVideo = forwardRef<HTMLVideoElement, HLSVideoProps>(
 
     teardown(); // clear any previous source first
 
-    const onReady = () => {
-      loadedRef.current = true;
+    const playSafe = async () => {
+      const token = ++playbackGeneration;
       video.muted = !!props.muted;
       if (!props.muted) {
         video.volume = 1.0;
       }
-      // Only play if this reel is still the active one when media is ready
+      try {
+        await video.play();
+        if (token !== playbackGeneration || !isActiveRef.current || globalActiveVideo !== video) {
+          video.pause();
+          video.muted = true;
+        }
+      } catch (e: any) {
+        if (e.name !== 'AbortError' && isActiveRef.current) {
+          video.muted = true;
+          try {
+            await video.play();
+            if (token !== playbackGeneration || !isActiveRef.current || globalActiveVideo !== video) {
+              video.pause();
+              video.muted = true;
+            }
+          } catch (err: any) {
+            console.log('[HLSVideo] play failed after muting:', err.message);
+          }
+        }
+      }
+    };
+
+    const onReady = () => {
+      loadedRef.current = true;
       if (isActiveRef.current) {
         if (!ignoreGlobalActiveRef.current) {
           setGlobalActiveVideo(video);
         }
-        video.play().catch((e) => {
-          if (e.name !== 'AbortError') {
-            console.log('[HLSVideo] play blocked:', e.message);
-            if (!video.muted) {
-              video.muted = true;
-              video.play().catch((err) => console.log('[HLSVideo] play failed after muting:', err.message));
-            }
-          }
-        });
+        playSafe();
+      } else {
+        video.pause();
+        video.muted = true;
       }
     };
 
@@ -257,7 +281,6 @@ export const HLSVideo = forwardRef<HTMLVideoElement, HLSVideoProps>(
       hlsRef.current = hls;
       hls.loadSource(resolvedSrc);
       hls.attachMedia(video);
-      // Wait for native canplay so we have actual video data buffered before playing
       video.addEventListener('canplay', onReady, { once: true });
       hls.on(Hls.Events.ERROR, (_ev, data) => {
         if (data.fatal) {
@@ -306,33 +329,36 @@ export const HLSVideo = forwardRef<HTMLVideoElement, HLSVideoProps>(
     }
 
     if (isActive) {
-      // STEP 1: Pause whatever is globally playing (even if it's from a
-      // different React tree, a different layout, or a stale async callback)
       if (!ignoreGlobalActive) {
         setGlobalActiveVideo(video);
       }
 
-      // STEP 2: Play this video if it has loaded
       if (loadedRef.current || video.readyState >= 1) {
+        const token = ++playbackGeneration;
         video.muted = !!props.muted;
         if (!props.muted) {
           video.volume = 1.0;
         }
-        video.play().catch((e) => {
-          if (e.name !== 'AbortError') {
-            console.log('[HLSVideo] play blocked:', e.message);
-            if (!video.muted) {
-              video.muted = true;
-              video.play().catch((err) => console.log('[HLSVideo] play failed after muting:', err.message));
-            }
+        video.play().then(() => {
+          if (token !== playbackGeneration || !isActiveRef.current || globalActiveVideo !== video) {
+            video.pause();
+            video.muted = true;
+          }
+        }).catch((e) => {
+          if (e.name !== 'AbortError' && isActiveRef.current) {
+            video.muted = true;
+            video.play().then(() => {
+              if (token !== playbackGeneration || !isActiveRef.current || globalActiveVideo !== video) {
+                video.pause();
+                video.muted = true;
+              }
+            }).catch(() => {});
           }
         });
       }
-      // If not loaded yet, Effect 1's onReady will handle it via isActiveRef
     } else {
-      // Pause immediately
       video.pause();
-      // Clear global ref if this was the active one
+      video.muted = true;
       if (!ignoreGlobalActive && getGlobalActiveVideo() === video) {
         setGlobalActiveVideo(null);
       }
@@ -349,6 +375,7 @@ export const HLSVideo = forwardRef<HTMLVideoElement, HLSVideoProps>(
     const onVisibility = () => {
       if (document.hidden) {
         video.pause();
+        video.muted = true;
       } else if (isActiveRef.current) {
         video.play().catch(() => {});
       }
@@ -356,16 +383,21 @@ export const HLSVideo = forwardRef<HTMLVideoElement, HLSVideoProps>(
 
     document.addEventListener('visibilitychange', onVisibility);
     return () => document.removeEventListener('visibilitychange', onVisibility);
-  }, []); // only on mount/unmount
+  }, []);
 
   /* ─────────────────────────────────────────────────────────────────────
-      EFFECT 4: Ensure cleanup on unmount — force stop audio
+      EFFECT 4: Lifecycle registry & cleanup on unmount
    ───────────────────────────────────────────────────────────────────── */
   useEffect(() => {
     const video = videoRef.current;
+    if (video) {
+      allMountedVideos.add(video);
+    }
     return () => {
       if (video) {
+        allMountedVideos.delete(video);
         video.pause();
+        video.muted = true;
         video.removeAttribute('src');
         try { video.load(); } catch {}
         if (!ignoreGlobalActiveRef.current && getGlobalActiveVideo() === video) {

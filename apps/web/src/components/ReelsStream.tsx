@@ -73,10 +73,9 @@ function useActiveReelIndex(
 
     const observer = new IntersectionObserver(
       (entries) => {
-        // Find the entry with the highest intersection ratio that is ≥ 0.5
         let best: IntersectionObserverEntry | null = null;
         for (const entry of entries) {
-          if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.75) {
             if (!best || entry.intersectionRatio > best.intersectionRatio) {
               best = entry;
             }
@@ -87,14 +86,13 @@ function useActiveReelIndex(
           if (!isNaN(idx)) setActiveIndex(idx);
         }
       },
-      { root: container, threshold: [0.5, 0.75, 1.0] }
+      { root: container, threshold: [0.75] }
     );
 
     const slides = container.querySelectorAll('.reel-container');
     slides.forEach((s) => observer.observe(s));
     return () => observer.disconnect();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reelCount]); // re-attach when reels are added/removed
+  }, [reelCount]);
 
   return activeIndex;
 }
@@ -287,10 +285,20 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
   });
 
   const isLoadingMore = useRef(false);
-  const isExhausted = useRef(false);
-  const skipRef = useRef(initialReels.length);
+  const hasMoreRef = useRef(true);
+  const nextCursorRef = useRef<string | null>(null);
   const loopCountRef = useRef(0);
   const originalReelsRef = useRef<any[]>(initialReels);
+
+  // Initialize nextCursor from initialReels
+  useEffect(() => {
+    if (initialReels.length > 0 && !nextCursorRef.current) {
+      const last = initialReels[initialReels.length - 1];
+      if (last.createdAt) {
+        nextCursorRef.current = new Date(last.createdAt).toISOString();
+      }
+    }
+  }, [initialReels]);
 
   // Sync originalReelsRef with newly added reels
   useEffect(() => {
@@ -309,23 +317,26 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
     isLoadingMore.current = true;
 
     try {
-      if (isExhausted.current) {
+      if (!hasMoreRef.current) {
         // Existed database reels are exhausted. Repeat from the beginning.
         loopCountRef.current += 1;
         const loopedReels = originalReelsRef.current.map((reel) => ({
           ...reel,
-          id: `${reel.id}-loop-${loopCountRef.current}-${Math.random()}`
+          id: `${reel.id}-loop-${loopCountRef.current}-${Math.random().toString(36).substring(7)}`
         }));
         setReels((prev) => [...prev, ...loopedReels]);
         isLoadingMore.current = false;
         return;
       }
 
-      const res = await getReels(skipRef.current, 20);
-      if (res.success && res.reels && res.reels.length > 0) {
-        const newReels = res.reels;
+      const cursorParam = nextCursorRef.current ? `&cursor=${encodeURIComponent(nextCursorRef.current)}` : '';
+      const res = await fetch(`/api/reels?limit=10${cursorParam}`).then(r => r.json()).catch(() => null);
 
-        // Add to original pool of reels
+      if (res && Array.isArray(res.data) && res.data.length > 0) {
+        const newReels = res.data;
+        nextCursorRef.current = res.nextCursor || null;
+        hasMoreRef.current = Boolean(res.hasMore);
+
         const seenIds = new Set(originalReelsRef.current.map((r: any) => r.id));
         newReels.forEach((r: any) => {
           videoMetadataCache.set(r.id, r);
@@ -334,26 +345,18 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
           }
         });
 
-        // Append to state
         setReels((prev) => {
           const existingIds = new Set(prev.map((r: any) => r.id));
           const filteredNewReels = newReels.filter((r: any) => !existingIds.has(r.id));
           return [...prev, ...filteredNewReels];
         });
-
-        skipRef.current += newReels.length;
-
-        // If we got fewer than 20 reels, database is exhausted
-        if (res.reels.length < 20) {
-          isExhausted.current = true;
-        }
       } else {
-        isExhausted.current = true;
+        hasMoreRef.current = false;
         if (originalReelsRef.current.length > 0) {
           loopCountRef.current += 1;
           const loopedReels = originalReelsRef.current.map((reel) => ({
             ...reel,
-            id: `${reel.id}-loop-${loopCountRef.current}-${Math.random()}`
+            id: `${reel.id}-loop-${loopCountRef.current}-${Math.random().toString(36).substring(7)}`
           }));
           setReels((prev) => [...prev, ...loopedReels]);
         }
@@ -454,6 +457,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
   const desktopActiveIndex = useActiveReelIndex(desktopScrollRef, itemsToRender.length);
 
   const viewedReelsRef = useRef<Set<string>>(new Set());
+  const viewTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Sync active reel to browser URL & record view so it's not shown again on next visit
   useEffect(() => {
@@ -468,17 +472,32 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
         }
       }
 
-      // Record view in DB once per reel ID
+      // Record view only after user has watched for >= 2 seconds (Section 22)
       if (!viewedReelsRef.current.has(activeItem.id)) {
-        viewedReelsRef.current.add(activeItem.id);
-        let fp = localStorage.getItem('device_fingerprint');
-        if (!fp) {
-          fp = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
-          localStorage.setItem('device_fingerprint', fp);
-        }
-        recordView(activeItem.id, 'reel', fp).catch(() => {});
+        if (viewTimerRef.current) clearTimeout(viewTimerRef.current);
+        const reelIdToView = activeItem.id;
+        viewTimerRef.current = setTimeout(() => {
+          if (!viewedReelsRef.current.has(reelIdToView)) {
+            viewedReelsRef.current.add(reelIdToView);
+            let fp = localStorage.getItem('device_fingerprint');
+            if (!fp) {
+              fp = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
+              localStorage.setItem('device_fingerprint', fp);
+            }
+            fetch(`/api/reels/${reelIdToView}/view`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ fingerprint: fp }),
+            }).catch(() => {
+              recordView(reelIdToView, 'reel', fp!).catch(() => {});
+            });
+          }
+        }, 2000);
       }
     }
+    return () => {
+      if (viewTimerRef.current) clearTimeout(viewTimerRef.current);
+    };
   }, [mobileActiveIndex, desktopActiveIndex, isDesktop, itemsToRender]);
 
   const network = useNetworkConfig();
@@ -905,7 +924,8 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
           /* Mobile scroll container */
           <div
             ref={mobileScrollRef}
-            className="w-full sm:max-w-[450px] h-full overflow-y-scroll snap-y snap-mandatory hide-scrollbar"
+            className="w-full sm:max-w-[450px] h-[100dvh] overflow-y-auto overscroll-y-contain snap-y snap-mandatory hide-scrollbar"
+            style={{ WebkitOverflowScrolling: 'touch', scrollBehavior: 'auto' }}
           >
             {itemsToRender.map((item, index) => {
               // High performance sliding window virtualization:
@@ -917,8 +937,8 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
                   <div
                     key={`placeholder-${item.type}-${item.data?.id || index}`}
                     data-index={index}
-                    className="reel-container w-full h-full snap-start snap-always relative flex items-center justify-center overflow-hidden bg-black"
-                    style={{ scrollSnapStop: 'always' }}
+                    className="reel-container w-full h-[100dvh] snap-start snap-always relative flex items-center justify-center overflow-hidden bg-black"
+                    style={{ scrollSnapStop: 'always', scrollSnapAlign: 'start' }}
                   >
                     {item.data?.video && getPosterUrl(item.data.video) ? (
                       <img
@@ -926,7 +946,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
                         alt=""
                         loading="lazy"
                         decoding="async"
-                        className="w-full h-full object-cover opacity-20 pointer-events-none"
+                        className="w-full h-full object-cover pointer-events-none"
                       />
                     ) : null}
                   </div>
@@ -1054,8 +1074,8 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
             {/* 9:16 Centered reel player */}
             <div
               ref={desktopScrollRef}
-              className="relative flex-shrink-0 overflow-y-scroll snap-y snap-mandatory hide-scrollbar rounded-2xl shadow-2xl shadow-black/60"
-              style={{ width: 'min(380px, 40vw)', height: 'min(676px, calc(100vh - 80px))' }}
+              className="relative flex-shrink-0 overflow-y-auto overscroll-y-contain snap-y snap-mandatory hide-scrollbar rounded-2xl shadow-2xl shadow-black/60"
+              style={{ width: 'min(380px, 40vw)', height: 'min(676px, calc(100dvh - 80px))', scrollBehavior: 'auto' }}
             >
               {itemsToRender.map((item, index) => {
                 const isWithinWindow = Math.abs(index - desktopActiveIndex) <= 2;
@@ -1065,7 +1085,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
                       key={`placeholder-desktop-${item.type}-${item.data?.id || index}`}
                       data-index={index}
                       className="reel-container w-full h-full snap-start snap-always relative flex items-center justify-center overflow-hidden bg-black"
-                      style={{ scrollSnapStop: 'always' }}
+                      style={{ scrollSnapStop: 'always', scrollSnapAlign: 'start' }}
                     >
                       {item.data?.video && getPosterUrl(item.data.video) ? (
                         <img
@@ -1073,7 +1093,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
                           alt=""
                           loading="lazy"
                           decoding="async"
-                          className="w-full h-full object-cover opacity-20 pointer-events-none"
+                          className="w-full h-full object-cover pointer-events-none"
                         />
                       ) : null}
                     </div>
@@ -1464,8 +1484,8 @@ const ReelSlide = memo(function ReelSlide({
   return (
     <div
       data-index={index}
-      className="reel-container w-full h-full snap-start snap-always relative flex items-center justify-center overflow-hidden bg-black"
-      style={{ scrollSnapStop: 'always' }}
+      className="reel-container w-full h-[100dvh] snap-start snap-always relative flex items-center justify-center overflow-hidden bg-black"
+      style={{ scrollSnapStop: 'always', scrollSnapAlign: 'start' }}
     >
       {/* ── Video Playback: YouTube Player vs Image Reel vs Native Tolee Video ── */}
       {isYouTube && youtubeId ? (
@@ -1697,8 +1717,8 @@ const AdReelSlide = memo(function AdReelSlide({
   return (
     <div
       data-index={index}
-      className="reel-container w-full h-full snap-start snap-always relative flex items-center justify-center overflow-hidden bg-[#0d0d0f]"
-      style={{ scrollSnapStop: 'always' }}
+      className="reel-container w-full h-[100dvh] snap-start snap-always relative flex items-center justify-center overflow-hidden bg-[#0d0d0f]"
+      style={{ scrollSnapStop: 'always', scrollSnapAlign: 'start' }}
     >
       {/* ── Impression Tracker ── */}
       <AdTracker adId={ad.id} type="impression" contentId={contentId} toleeId={toleeId} placementType="normal_feed" />
