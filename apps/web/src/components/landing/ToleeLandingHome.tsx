@@ -19,6 +19,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { startGoogleLogin, setupNativeGoogleCallbacks } from '@/lib/google-native';
+import { BeforeLoginFooter } from './BeforeLoginFooter';
 
 export function ToleeLandingHome() {
   const router = useRouter();
@@ -392,30 +393,9 @@ export function ToleeLandingHome() {
       </div>
 
       {/* ========================================================================= */}
-      {/* FOOTER (Similar to Instagram Landing Footer)                              */}
+      {/* BEFORE-LOGIN FOOTER (Facebook Style Language & Directory Footer)          */}
       {/* ========================================================================= */}
-      <footer className="py-6 px-4 border-t border-slate-200/80 dark:border-zinc-800/80 bg-white/70 dark:bg-zinc-950/70 backdrop-blur-md">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
-          
-          {/* Footer Navigation Links */}
-          <div className="flex flex-wrap justify-center sm:justify-start gap-x-5 gap-y-2 text-xs font-medium text-slate-500 dark:text-zinc-400">
-            <Link href="/about" className="hover:text-[#0E9F9A] transition-colors">About</Link>
-            <Link href="/radar" className="hover:text-[#0E9F9A] transition-colors">Radar</Link>
-            <Link href="/reels" className="hover:text-[#0E9F9A] transition-colors">Reels</Link>
-            <Link href="/discover" className="hover:text-[#0E9F9A] transition-colors">Communities</Link>
-            <Link href="/marketplace" className="hover:text-[#0E9F9A] transition-colors">Marketplace</Link>
-            <Link href="/privacy" className="hover:text-[#0E9F9A] transition-colors">Privacy</Link>
-            <Link href="/terms" className="hover:text-[#0E9F9A] transition-colors">Terms</Link>
-            <Link href="/contact" className="hover:text-[#0E9F9A] transition-colors">Help</Link>
-          </div>
-
-          {/* Copyright Branding */}
-          <div className="text-xs font-semibold text-slate-400 dark:text-zinc-500">
-            <span>© 2026 Tolee India</span>
-          </div>
-
-        </div>
-      </footer>
+      <BeforeLoginFooter />
 
     </div>
   );

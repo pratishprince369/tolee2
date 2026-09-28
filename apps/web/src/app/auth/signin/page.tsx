@@ -6,6 +6,7 @@ import { useEffect } from 'react';
 import { startGoogleLogin, setupNativeGoogleCallbacks } from '@/lib/google-native';
 
 import { useSearchParams } from 'next/navigation';
+import { BeforeLoginFooter } from '@/components/landing/BeforeLoginFooter';
 
 export default function SigninPage() {
   const { status } = useSession();
@@ -132,8 +133,9 @@ export default function SigninPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#fafafa] dark:bg-[#0a0a0a] flex items-center justify-center font-sans">
-      <div className="bg-white dark:bg-[#121212] p-8 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 w-full max-w-md">
+    <div className="min-h-screen bg-[#fafafa] dark:bg-[#0a0a0a] flex flex-col justify-between font-sans">
+      <div className="flex-1 flex items-center justify-center px-4 py-8">
+        <div className="bg-white dark:bg-[#121212] p-8 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 w-full max-w-md">
         <h1 className="text-2xl font-bold text-center mb-6">Log in to Tolee</h1>
         {successMessage && <div className="mb-4 text-green-500 text-sm text-center">{successMessage}</div>}
         {error && <div className="mb-4 text-red-500 text-sm text-center">{error}</div>}
@@ -184,6 +186,8 @@ export default function SigninPage() {
           </button>
         </div>
       </div>
+      </div>
+      <BeforeLoginFooter />
     </div>
   );
 }

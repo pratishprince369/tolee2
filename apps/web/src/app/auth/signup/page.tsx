@@ -5,6 +5,7 @@ import { signIn } from 'next-auth/react';
 import { startGoogleLogin, setupNativeGoogleCallbacks } from '@/lib/google-native';
 import { useSearchParams } from 'next/navigation';
 import { checkBotStatus } from '@/lib/botDetection';
+import { BeforeLoginFooter } from '@/components/landing/BeforeLoginFooter';
 
 // Inner component that uses useSearchParams — must be inside Suspense
 function SignupForm() {
@@ -88,8 +89,9 @@ function SignupForm() {
   };
 
   return (
-    <div className="min-h-screen bg-[#fafafa] dark:bg-[#0a0a0a] flex items-center justify-center font-sans px-4">
-      <div className="bg-white dark:bg-[#121212] p-8 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 w-full max-w-md">
+    <div className="min-h-screen bg-[#fafafa] dark:bg-[#0a0a0a] flex flex-col justify-between font-sans">
+      <div className="flex-1 flex items-center justify-center px-4 py-8">
+        <div className="bg-white dark:bg-[#121212] p-8 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 w-full max-w-md">
 
         <h1 className="text-2xl font-bold text-center mb-6">
           Sign Up for Tolee
@@ -170,6 +172,8 @@ function SignupForm() {
           <a href="/auth/signin" className="text-primary font-bold hover:underline">Sign In</a>
         </p>
       </div>
+      </div>
+      <BeforeLoginFooter />
     </div>
   );
 }
