@@ -1550,15 +1550,34 @@ const ReelSlide = memo(function ReelSlide({
             </div>
           )}
 
-          {/* ── Error Placeholder ── */}
+          {/* ── Error Placeholder with Poster & Retry (Section 23) ── */}
           {isError && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-950 text-center p-6 z-10 space-y-4">
-              <div className="p-3 bg-red-500/10 rounded-full border border-red-500/30">
-                <AlertCircle className="w-10 h-10 text-red-500" />
-              </div>
-              <div className="space-y-1">
-                <h4 className="font-bold text-sm text-zinc-200">Video Unavailable</h4>
-                <p className="text-xs text-zinc-500 max-w-[200px]">This video asset could not be loaded.</p>
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-950/80 text-center p-6 z-10 space-y-4">
+              {getPosterUrl(reel.video) && (
+                <img
+                  src={getPosterUrl(reel.video)}
+                  alt="Thumbnail"
+                  className="absolute inset-0 w-full h-full object-cover z-0 opacity-40 filter blur-[2px]"
+                />
+              )}
+              <div className="relative z-10 flex flex-col items-center space-y-3 bg-black/70 p-5 rounded-2xl border border-white/10 backdrop-blur-md">
+                <div className="p-3 bg-red-500/20 rounded-full border border-red-500/30">
+                  <AlertCircle className="w-8 h-8 text-red-400" />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="font-bold text-sm text-zinc-200">Buffering issue</h4>
+                  <p className="text-xs text-zinc-400 max-w-[200px]">Tap retry to reload video stream</p>
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsError(false);
+                    setIsReady(false);
+                  }}
+                  className="px-4 py-1.5 rounded-full bg-white/20 hover:bg-white/30 text-white font-medium text-xs transition-all active:scale-95 border border-white/20"
+                >
+                  Retry
+                </button>
               </div>
             </div>
           )}
