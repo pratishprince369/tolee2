@@ -332,31 +332,41 @@ export async function getPosts(options?: { mediaType?: string; postType?: string
     // 🛡️ Bandwidth Safeguard: Removed aggressive 90s auto-publish trigger from getPosts().
     // Publishing is now handled ONLY via feed/page.tsx (6hr interval) and cron route with 10/day cap.
 
-    // Determine viewed post history to support Anti-Repetition
+    // Determine viewed post/reel history to support Anti-Repetition
     let viewedPostIds: string[] = [];
-    if (currentUserId) {
-      const recentViews = await prisma.view.findMany({
-        where: {
-          viewer_user_id: currentUserId,
-          contentType: 'post',
-          createdAt: {
-            gte: new Date(Date.now() - 2 * 3600 * 1000) // last 2 hours
-          }
-        },
-        select: {
-          contentId: true
-        }
-      });
-      viewedPostIds = recentViews.map(v => v.contentId);
-    }
+    try {
+      const reqHeaders = headers();
+      const ip_address = reqHeaders.get('x-forwarded-for')?.split(',')[0].trim() || reqHeaders.get('x-real-ip') || '';
 
-    // Fetch all published posts
+      const userConditions: any[] = [];
+      if (currentUserId) userConditions.push({ viewer_user_id: currentUserId });
+      if (ip_address) userConditions.push({ ip_address });
+
+      if (userConditions.length > 0) {
+        const recentViews = await prisma.view.findMany({
+          where: {
+            OR: userConditions,
+            createdAt: {
+              gte: new Date(Date.now() - 30 * 24 * 3600 * 1000) // last 30 days
+            }
+          },
+          select: {
+            contentId: true
+          },
+          take: 3000
+        });
+        viewedPostIds = Array.from(new Set(recentViews.map(v => v.contentId).filter(Boolean)));
+      }
+    } catch {}
+
+    // Fetch all published posts excluding already-viewed items
     let posts = await prisma.post.findMany({
       where: {
         isArchived: false,
         status: 'published',
         ...(postType ? { postType } : {}),
         ...(mediaType ? { mediaTypes: { contains: mediaType } } : {}),
+        ...(viewedPostIds.length > 0 ? { id: { notIn: viewedPostIds } } : {}),
         AND: [
           ...(!isSimOn ? [{
             OR: [
@@ -894,12 +904,10 @@ export async function getPosts(options?: { mediaType?: string; postType?: string
         select: { tolee: { select: { category: true } } }
       })).map(m => m.tolee?.category).filter(Boolean) as string[] : [];
 
-      // ANTI-REPETITION FILTER: Filter out recently viewed posts
-      let candidates = combinedPosts.filter(p => !viewedPostIds.includes(p.id));
-      if (candidates.length < 10) {
-        // Fallback: If too few posts remain, ignore viewed filter to prevent empty feed
-        candidates = combinedPosts;
-      }
+      // ANTI-REPETITION FILTER: Strictly prioritize unviewed posts over viewed posts
+      const unviewed = combinedPosts.filter(p => !viewedPostIds.includes(p.id));
+      const alreadyViewed = combinedPosts.filter(p => viewedPostIds.includes(p.id));
+      const candidates = unviewed.length >= 10 ? unviewed : [...unviewed, ...alreadyViewed];
 
       // PERSONALIZATION & VIDEO FEATURED SCORING
       const scoredCandidates = candidates.map(post => {
@@ -908,6 +916,11 @@ export async function getPosts(options?: { mediaType?: string; postType?: string
         // Freshness boost: newer posts get higher priority
         const ageInHours = (Date.now() - new Date(post.createdAt).getTime()) / (3600 * 1000);
         score += Math.max(0, 8.0 - (ageInHours / 12)); // boost up to +8.0 for very fresh posts
+
+        // Heavily penalize already-viewed posts (-50.0) so fresh unviewed posts always lead
+        if (viewedPostIds.includes(post.id)) {
+          score -= 50.0;
+        }
 
         const authorId = post.author?.id || post.authorId;
 

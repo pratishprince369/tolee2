@@ -453,7 +453,9 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
   const mobileActiveIndex = useActiveReelIndex(mobileScrollRef, itemsToRender.length);
   const desktopActiveIndex = useActiveReelIndex(desktopScrollRef, itemsToRender.length);
 
-  // Sync active reel to browser URL so sharing/refreshing keeps the current reel position
+  const viewedReelsRef = useRef<Set<string>>(new Set());
+
+  // Sync active reel to browser URL & record view so it's not shown again on next visit
   useEffect(() => {
     const activeIdx = isDesktop ? desktopActiveIndex : mobileActiveIndex;
     const activeItem = itemsToRender[activeIdx];
@@ -464,6 +466,17 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
         if (currentPath !== targetUrl) {
           window.history.replaceState(null, '', targetUrl);
         }
+      }
+
+      // Record view in DB once per reel ID
+      if (!viewedReelsRef.current.has(activeItem.id)) {
+        viewedReelsRef.current.add(activeItem.id);
+        let fp = localStorage.getItem('device_fingerprint');
+        if (!fp) {
+          fp = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
+          localStorage.setItem('device_fingerprint', fp);
+        }
+        recordView(activeItem.id, 'reel', fp).catch(() => {});
       }
     }
   }, [mobileActiveIndex, desktopActiveIndex, isDesktop, itemsToRender]);
