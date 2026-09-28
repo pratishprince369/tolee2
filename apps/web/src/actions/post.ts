@@ -9,7 +9,7 @@ import { extractPublicIdFromUrl, extractResourceTypeFromUrl, destroyMultipleAsse
 import { createSystemNotification, createSystemNotificationsMany } from '@/lib/notification-service';
 import { getSimulationSettings, getSimulatedEngagement, generateDynamicComments, detectCountryCode, getAICacheSync } from '@/lib/simulation';
 import { runNewsAIPipeline } from '@/lib/aiNews';
-import { getMediaThumbnail } from '@/lib/media';
+import { getMediaThumbnail, getStreamableVideoUrl } from '@/lib/media';
 import { CURATED_AUDIO_LIBRARY } from '@/lib/audioLibrary';
 
 export async function createPost(data: {
@@ -2901,7 +2901,7 @@ export async function getReels(skip = 0, take = 20) {
         authorId: post.author.id,
         authorIsPrivate: post.author.isPrivate || false,
         visibility: post.visibility,
-        video: post.mediaUrls ? post.mediaUrls.split(/,(?=https?:\/\/)/)[0] : '',
+        video: post.mediaUrls ? getStreamableVideoUrl(post.mediaUrls.split(/,(?=https?:\/\/)/)[0]) : '',
         author: post.author.username || 'user',
         authorAvatar: post.author.avatar || '/default-user-avatar.svg',
         toleeName: firstTolee?.name || null,

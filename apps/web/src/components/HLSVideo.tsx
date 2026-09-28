@@ -187,6 +187,13 @@ export const HLSVideo = forwardRef<HTMLVideoElement, HLSVideoProps>(
     const video = videoRef.current;
     if (!video) return;
 
+    // Resolve Google Drive URLs to internal high-performance byte-range stream proxy
+    const resolvedSrc = (src.includes('drive.usercontent.google.com') || src.includes('drive.google.com'))
+      ? (src.match(/[?&]id=([a-zA-Z0-9_-]+)/)?.[1] || src.match(/\/file\/d\/([a-zA-Z0-9_-]+)/)?.[1] || src.match(/\/d\/([a-zA-Z0-9_-]+)/)?.[1]
+          ? `/api/video/drive-stream?id=${(src.match(/[?&]id=([a-zA-Z0-9_-]+)/)?.[1] || src.match(/\/file\/d\/([a-zA-Z0-9_-]+)/)?.[1] || src.match(/\/d\/([a-zA-Z0-9_-]+)/)?.[1])}`
+          : src)
+      : src;
+
     // Tear down anything that was already loaded
     const teardown = () => {
       loadedRef.current = false;
@@ -200,7 +207,7 @@ export const HLSVideo = forwardRef<HTMLVideoElement, HLSVideoProps>(
       try { video.load(); } catch {}
     };
 
-    if (!shouldLoad || !src) {
+    if (!shouldLoad || !resolvedSrc) {
       teardown();
       return teardown; // cleanup = same teardown
     }
@@ -230,7 +237,7 @@ export const HLSVideo = forwardRef<HTMLVideoElement, HLSVideoProps>(
       }
     };
 
-    if (src.endsWith('.m3u8') && Hls.isSupported()) {
+    if (resolvedSrc.endsWith('.m3u8') && Hls.isSupported()) {
       // HLS.js path
       const stats = getDeviceNetworkStats();
       const autoStartLoad = props.preload !== 'metadata' || isActiveRef.current;
@@ -248,7 +255,7 @@ export const HLSVideo = forwardRef<HTMLVideoElement, HLSVideoProps>(
         autoStartLoad,
       });
       hlsRef.current = hls;
-      hls.loadSource(src);
+      hls.loadSource(resolvedSrc);
       hls.attachMedia(video);
       // Wait for native canplay so we have actual video data buffered before playing
       video.addEventListener('canplay', onReady, { once: true });
@@ -257,17 +264,23 @@ export const HLSVideo = forwardRef<HTMLVideoElement, HLSVideoProps>(
           console.warn('[HLSVideo] Fatal HLS error:', data.type, data.details);
         }
       });
-    } else if (src.endsWith('.m3u8') && video.canPlayType('application/vnd.apple.mpegurl')) {
+    } else if (resolvedSrc.endsWith('.m3u8') && video.canPlayType('application/vnd.apple.mpegurl')) {
       // Native HLS (Safari / iOS)
-      video.src = src;
+      video.src = resolvedSrc;
       video.addEventListener('loadedmetadata', onReady, { once: true });
     } else {
-      // Standard mp4 / webm
-      const isMp4 = src.toLowerCase().includes('.mp4') || src.toLowerCase().includes('video') || src.toLowerCase().includes('.mov') || src.toLowerCase().includes('.webm') || src.toLowerCase().includes('drive.usercontent.google.com');
-      const finalSrc = isMp4 && !src.includes('#t=') ? `${src}#t=0.001` : src;
+      // Standard mp4 / webm / stream proxy
+      const isStreamProxy = resolvedSrc.includes('/api/video/drive-stream');
+      const isMp4 = resolvedSrc.toLowerCase().includes('.mp4') || resolvedSrc.toLowerCase().includes('video') || resolvedSrc.toLowerCase().includes('.mov') || resolvedSrc.toLowerCase().includes('.webm');
+      const finalSrc = isMp4 && !isStreamProxy && !props.poster && !resolvedSrc.includes('#t=') ? `${resolvedSrc}#t=0.001` : resolvedSrc;
       video.src = finalSrc;
-      // canplay is fired earlier than loadeddata and is sufficient for play
-      video.addEventListener('canplay', onReady, { once: true });
+
+      if (video.readyState >= 2) {
+        onReady();
+      } else {
+        video.addEventListener('canplay', onReady, { once: true });
+        video.addEventListener('loadeddata', onReady, { once: true });
+      }
     }
 
     return teardown;

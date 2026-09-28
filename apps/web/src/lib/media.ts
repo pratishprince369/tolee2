@@ -13,6 +13,18 @@ export function parseMediaUrls(urlsString?: string | null): string[] {
     .filter(Boolean);
 }
 
+export function getStreamableVideoUrl(url: string | null | undefined): string {
+  if (!url) return '';
+  const trimmed = url.trim();
+  if (trimmed.includes('drive.usercontent.google.com') || trimmed.includes('drive.google.com')) {
+    const match = trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/) || trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || trimmed.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (match && match[1]) {
+      return `/api/video/drive-stream?id=${match[1]}`;
+    }
+  }
+  return trimmed;
+}
+
 /**
  * Checks if a given media URL refers to a video file or stream.
  */
@@ -26,7 +38,8 @@ export function isVideoUrl(url: string | null | undefined): boolean {
     lower.includes('/video/upload/') ||
     lower.includes('/video/') ||
     lower.includes('drive.usercontent.google.com') ||
-    lower.includes('drive.google.com')
+    lower.includes('drive.google.com') ||
+    lower.includes('/api/video/drive-stream')
   );
 }
 
@@ -38,8 +51,8 @@ export function getMediaThumbnail(url: string | null | undefined): string {
   if (!url) return '/placeholder-ad.png';
   const lower = url.toLowerCase();
 
-  // If it's a Google Drive video/image URL, return the direct LH3 thumbnail
-  if (lower.includes('drive.usercontent.google.com') || lower.includes('drive.google.com')) {
+  // If it's a Google Drive video/image URL or stream proxy, return the direct LH3 thumbnail
+  if (lower.includes('drive.usercontent.google.com') || lower.includes('drive.google.com') || lower.includes('/api/video/drive-stream')) {
     const match = url.match(/[?&]id=([a-zA-Z0-9_-]+)/) || url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || url.match(/\/d\/([a-zA-Z0-9_-]+)/);
     if (match && match[1]) {
       return `https://lh3.googleusercontent.com/d/${match[1]}`;
@@ -73,7 +86,7 @@ export function getMediaThumbnail(url: string | null | undefined): string {
 
 export function getPosterUrl(url: string | null | undefined): string {
   if (!url) return '';
-  if (url.includes('drive.usercontent.google.com') || url.includes('drive.google.com')) {
+  if (url.includes('drive.usercontent.google.com') || url.includes('drive.google.com') || url.includes('/api/video/drive-stream')) {
     const match = url.match(/[?&]id=([a-zA-Z0-9_-]+)/) || url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || url.match(/\/d\/([a-zA-Z0-9_-]+)/);
     if (match && match[1]) {
       return `https://lh3.googleusercontent.com/d/${match[1]}`;

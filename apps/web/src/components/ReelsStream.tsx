@@ -1500,6 +1500,8 @@ const ReelSlide = memo(function ReelSlide({
             muted={isMuted}
             playsInline
             onCanPlay={() => setIsReady(true)}
+            onPlaying={() => setIsReady(true)}
+            onLoadedData={() => setIsReady(true)}
             onError={handleVideoError}
             onLoadStart={() => {
               setIsReady(false);
@@ -1718,6 +1720,8 @@ const AdReelSlide = memo(function AdReelSlide({
                   muted
                   playsInline
                   onCanPlay={() => setIsReady(true)}
+                  onPlaying={() => setIsReady(true)}
+                  onLoadedData={() => setIsReady(true)}
                   onError={handleVideoError}
                   onLoadStart={() => {
                     setIsReady(false);

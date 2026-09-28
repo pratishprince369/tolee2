@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma';
 import { extractYouTubeVideoId } from '@/lib/youtube';
 import { getTrendingYouTubeShorts } from '@/lib/youtubeShortsService';
 import { publishDailyBundleReelsBatch } from '@/lib/reelsBundleAutoPublisher';
+import { getStreamableVideoUrl } from '@/lib/media';
 import type { Metadata } from 'next';
 
 export const dynamic = 'force-dynamic';
@@ -126,7 +127,7 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
           authorId: post.author.id,
           authorIsPrivate: post.author.isPrivate || false,
           visibility: post.visibility,
-          video: post.mediaUrls.split(/,(?=https?:\/\/)/)[0],
+          video: getStreamableVideoUrl(post.mediaUrls.split(/,(?=https?:\/\/)/)[0]),
           author: post.author.username,
           authorAvatar: post.author.avatar || '/default-user-avatar.svg',
           toleeName: firstTolee?.name || null,
@@ -242,7 +243,7 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
                 authorId: post.author.id,
                 authorIsPrivate: post.author.isPrivate || false,
                 visibility: post.visibility,
-                video: post.mediaUrls ? post.mediaUrls.split(/,(?=https?:\/\/)/)[0] : '',
+                video: post.mediaUrls ? getStreamableVideoUrl(post.mediaUrls.split(/,(?=https?:\/\/)/)[0]) : '',
                 isYouTube,
                 youtubeId: ytId,
                 author: post.author.username,
