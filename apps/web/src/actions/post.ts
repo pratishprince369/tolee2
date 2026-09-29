@@ -332,41 +332,43 @@ export async function getPosts(options?: { mediaType?: string; postType?: string
     // 🛡️ Bandwidth Safeguard: Removed aggressive 90s auto-publish trigger from getPosts().
     // Publishing is now handled ONLY via feed/page.tsx (6hr interval) and cron route with 10/day cap.
 
-    // Determine viewed post/reel history to support Anti-Repetition
+    // Query user's joined Tolee IDs for group-based feed access
+    let userJoinedToleeIds: string[] = [];
+    if (currentUserId) {
+      try {
+        const memberships = await prisma.toleeMember.findMany({
+          where: { userId: currentUserId, status: 'approved' },
+          select: { toleeId: true }
+        });
+        userJoinedToleeIds = memberships.map(m => m.toleeId);
+      } catch {}
+    }
+
+    // Determine viewed post history to support ranking de-prioritization for simulated content
     let viewedPostIds: string[] = [];
-    try {
-      const reqHeaders = headers();
-      const ip_address = reqHeaders.get('x-forwarded-for')?.split(',')[0].trim() || reqHeaders.get('x-real-ip') || '';
-
-      const userConditions: any[] = [];
-      if (currentUserId) userConditions.push({ viewer_user_id: currentUserId });
-      if (ip_address) userConditions.push({ ip_address });
-
-      if (userConditions.length > 0) {
+    if (isSimOn && currentUserId) {
+      try {
         const recentViews = await prisma.view.findMany({
           where: {
-            OR: userConditions,
+            viewer_user_id: currentUserId,
             createdAt: {
-              gte: new Date(Date.now() - 30 * 24 * 3600 * 1000) // last 30 days
+              gte: new Date(Date.now() - 7 * 24 * 3600 * 1000)
             }
           },
-          select: {
-            contentId: true
-          },
-          take: 3000
+          select: { contentId: true },
+          take: 1000
         });
         viewedPostIds = Array.from(new Set(recentViews.map(v => v.contentId).filter(Boolean)));
-      }
-    } catch {}
+      } catch {}
+    }
 
-    // Fetch all published posts excluding already-viewed items
+    // Fetch all published posts
     let posts = await prisma.post.findMany({
       where: {
         isArchived: false,
         status: 'published',
         ...(postType ? { postType } : {}),
         ...(mediaType ? { mediaTypes: { contains: mediaType } } : {}),
-        ...(viewedPostIds.length > 0 ? { id: { notIn: viewedPostIds } } : {}),
         AND: [
           ...(!isSimOn ? [{
             OR: [
@@ -376,21 +378,39 @@ export async function getPosts(options?: { mediaType?: string; postType?: string
           }] : []),
           currentUserId ? {
             OR: [
+              // 1. Any public post from a non-private author
               {
                 author: { isPrivate: false },
                 visibility: 'public'
               },
+              // 2. User's own posts
               {
                 authorId: currentUserId
               },
+              // 3. Posts from authors the user follows
               {
                 author: {
-                  isPrivate: true,
                   followers: {
                     some: {
                       followerId: currentUserId,
                       status: 'approved'
                     }
+                  }
+                }
+              },
+              // 4. CRITICAL: Posts from ANY group (Tolee) where the user is a member
+              ...(userJoinedToleeIds.length > 0 ? [{
+                tolees: {
+                  some: {
+                    toleeId: { in: userJoinedToleeIds }
+                  }
+                }
+              }] : []),
+              // 5. Posts in public groups
+              {
+                tolees: {
+                  some: {
+                    tolee: { isPrivate: false }
                   }
                 },
                 visibility: 'public'
@@ -405,7 +425,7 @@ export async function getPosts(options?: { mediaType?: string; postType?: string
         ]
       },
       orderBy: { createdAt: 'desc' },
-      take: isSimOn ? 250 : 50, // Grab a larger pool when simulation is active for proper mixing
+      take: isSimOn ? 250 : 150, // Grab an ample pool so real user content is never crowded out
       select: {
         id: true,
         caption: true,
@@ -783,16 +803,7 @@ export async function getPosts(options?: { mediaType?: string; postType?: string
 
     let listings: any[] = [];
     if (currentUserId && !mediaType) { // only fetch marketplace listings for general feed (not reels)
-      const memberships = await prisma.toleeMember.findMany({
-        where: {
-          userId: currentUserId,
-          status: 'approved'
-        },
-        select: {
-          toleeId: true
-        }
-      });
-      const joinedToleeIds = memberships.map(m => m.toleeId);
+      const joinedToleeIds = userJoinedToleeIds;
 
       listings = await prisma.listing.findMany({
         where: {
@@ -929,6 +940,17 @@ export async function getPosts(options?: { mediaType?: string; postType?: string
           score += 50.0;
         }
 
+        // 🌟 REAL USER BOOST: Real human community members get strong priority (+35.0)
+        if (!post.isSimulation) {
+          score += 35.0;
+        }
+
+        // 👥 SHARED GROUP (TOLEE) BOOST: Posts from groups the current user is a member of (+20.0)
+        const postToleeIds = (post.tolees || []).map((t: any) => t.toleeId || t.tolee?.id).filter(Boolean);
+        if (userJoinedToleeIds.length > 0 && postToleeIds.some((id: string) => userJoinedToleeIds.includes(id))) {
+          score += 20.0;
+        }
+
         // 🎬 FEATURED BOOST FOR YOUTUBE CATEGORY VIDEO POSTS (+5.0)
         const isVideoPost = 
           post.postType === 'video' || 
@@ -946,7 +968,7 @@ export async function getPosts(options?: { mediaType?: string; postType?: string
 
         // Follow boost
         if (authorId && followedAuthorIds.includes(authorId)) {
-          score += 3.0;
+          score += 5.0;
         }
 
         // Like/Save boosts
@@ -970,29 +992,15 @@ export async function getPosts(options?: { mediaType?: string; postType?: string
       const realPool = scoredCandidates.filter(c => !c.post.isSimulation).sort((a, b) => b.score - a.score).map(c => c.post);
       const simPool = scoredCandidates.filter(c => c.post.isSimulation).sort((a, b) => b.score - a.score).map(c => c.post);
 
-      // MIXING ALGORITHM: Real user & YouTube video content FIRST, backfilled by simulated content
+      // MIXING ALGORITHM: Real user content FIRST, backfilled by simulated content
       const mixed: any[] = [];
       const targetSize = Math.min(limit, candidates.length);
-      
-      const targetRealCount = Math.floor(targetSize * 0.7); // 70% real/video posts priority
-      const actualRealCount = Math.min(realPool.length, targetRealCount);
-      const actualSimCount = targetSize - actualRealCount;
 
-      const selectedReal = realPool.slice(0, actualRealCount);
-      const selectedSim = simPool.slice(0, actualSimCount);
+      const selectedReal = realPool.slice(0, targetSize);
+      const remainingSlots = Math.max(0, targetSize - selectedReal.length);
+      const selectedSim = simPool.slice(0, remainingSlots);
 
-      // Interleave real/video content FIRST at index 0
-      let rIdx = 0;
-      let sIdx = 0;
-      while (mixed.length < targetSize) {
-        if (rIdx < selectedReal.length) {
-          mixed.push(selectedReal[rIdx++]);
-        } else if (sIdx < selectedSim.length) {
-          mixed.push(selectedSim[sIdx++]);
-        } else {
-          break;
-        }
-      }
+      mixed.push(...selectedReal, ...selectedSim);
 
       // SPACING OUT posts by the same author to prevent consecutive identical posters
       for (let i = 1; i < mixed.length; i++) {
@@ -1017,11 +1025,15 @@ export async function getPosts(options?: { mediaType?: string; postType?: string
       finalPosts = combinedPosts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     }
 
-    // Interleave: Video News Post FIRST -> News Post -> Video News Post -> News Post
+    // Separate real user posts from automated/simulated content to keep real posts upfront
+    const realUserPosts = finalPosts.filter((p: any) => !p.isSimulation);
+    const automatedPosts = finalPosts.filter((p: any) => p.isSimulation);
+
+    // For automated content, interleave Video and News
     const newsList: any[] = [];
     const videoList: any[] = [];
 
-    for (const p of finalPosts) {
+    for (const p of automatedPosts) {
       const isVid = p.postType === 'reel' || 
                     p.postType === 'video' ||
                     Boolean(p.newsRelation && p.mediaUrls && (p.mediaUrls.includes('youtube') || p.mediaUrls.includes('youtu.be'))) ||
@@ -1034,20 +1046,15 @@ export async function getPosts(options?: { mediaType?: string; postType?: string
       }
     }
 
-    // 🛡️ Bandwidth Safeguard: Removed auto-trigger YouTube batch on low video count.
-    // YouTube publishing is now handled ONLY via cron route with daily cap.
-
-    if (newsList.length > 0 && videoList.length > 0) {
-      const interleaved: any[] = [];
-      let nIdx = 0;
-      let vIdx = 0;
-      // Start with Video News Post FIRST at Index 0
-      while (nIdx < newsList.length || vIdx < videoList.length) {
-        if (vIdx < videoList.length) interleaved.push(videoList[vIdx++]);
-        if (nIdx < newsList.length) interleaved.push(newsList[nIdx++]);
-      }
-      finalPosts = interleaved;
+    const interleavedAuto: any[] = [];
+    let nIdx = 0;
+    let vIdx = 0;
+    while (nIdx < newsList.length || vIdx < videoList.length) {
+      if (vIdx < videoList.length) interleavedAuto.push(videoList[vIdx++]);
+      if (nIdx < newsList.length) interleavedAuto.push(newsList[nIdx++]);
     }
+
+    finalPosts = [...realUserPosts, ...interleavedAuto];
 
     const mappedPosts = finalPosts.map((post: any) => {
       if (isSimOn && post.isSimulation) {

@@ -70,7 +70,7 @@ export default async function GlobalFeedPage() {
       return [];
     });
 
-    const [res, aiPosts] = await Promise.all([getPosts(), aiPostsPromise]);
+    const [res, aiPosts] = await Promise.all([getPosts({ limit: 50 }), aiPostsPromise]);
 
     if (res?.success && res.posts) {
       const authorIds = res.posts.map((p: any) => p.author?.id).filter(Boolean);
@@ -154,6 +154,7 @@ export default async function GlobalFeedPage() {
           newsRelation: post.newsRelation || null,
           reelAudio: post.reelAudio || null,
           createdAt: post.createdAt,
+          isSimulation: post.isSimulation || false,
         };
       });
     }
@@ -205,12 +206,18 @@ export default async function GlobalFeedPage() {
       };
     });
 
-    // Merge and sort: User's own created posts ALWAYS at the top, then strict chronological timestamp
+    // Merge and sort: User's own posts FIRST -> Real community posts -> Chronological
     dbPosts = [...dbPosts, ...aiPostsMapped].sort((a, b) => {
       const isMineA = Boolean(currentUserId && a.authorId === currentUserId);
       const isMineB = Boolean(currentUserId && b.authorId === currentUserId);
       if (isMineA && !isMineB) return -1;
       if (!isMineA && isMineB) return 1;
+
+      // Real user community posts have priority over external AI news articles
+      const isRealUserA = !a._isAIPost && !a.isSimulation;
+      const isRealUserB = !b._isAIPost && !b.isSimulation;
+      if (isRealUserA && !isRealUserB) return -1;
+      if (!isRealUserA && isRealUserB) return 1;
 
       const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
       const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
