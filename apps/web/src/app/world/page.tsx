@@ -5,14 +5,14 @@ export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'Tolee World – Digital Books, AI Apps & Creator Tools',
-  description: 'Discover the suite of Tolee World tools: read free classic books on Tolee Book with multi-language support, create AI resumes, publish micro-websites, and launch digital storefronts.',
-  keywords: ['Tolee World', 'Tolee Book', 'AI tools', 'free books online', 'AI resume builder', 'micro-websites', 'creator economy'],
+  description: 'Discover the suite of Tolee World tools: read free classic books on Tolee Book with multi-language support, publish micro-websites, and launch digital storefronts.',
+  keywords: ['Tolee World', 'Tolee Book', 'AI tools', 'free books online', 'micro-websites', 'creator economy'],
   alternates: {
     canonical: 'https://tolee.in/world',
   },
   openGraph: {
     title: 'Tolee World – Digital Books, AI Apps & Creator Tools',
-    description: 'Discover the suite of Tolee World tools: read free books on Tolee Book, create AI resumes, publish micro-websites, and launch digital storefronts.',
+    description: 'Discover the suite of Tolee World tools: read free books on Tolee Book, publish micro-websites, and launch digital storefronts.',
     url: 'https://tolee.in/world',
     siteName: 'Tolee World',
     images: [{ url: 'https://tolee.in/logo.png', width: 1200, height: 630, alt: 'Tolee World' }],

@@ -144,14 +144,10 @@ export default function WorldDashboardClient() {
                   <div>
                     <div className="flex items-start justify-between gap-3 mb-4">
                       <div className="w-12 h-12 rounded-xl bg-[#0e1b30] border border-cyan-800/40 flex items-center justify-center text-cyan-400 group-hover:scale-105 transition-transform shadow-inner">
-                        {tool.icon === 'FileText' || tool.slug === 'ai-resume-builder' ? (
-                          <FileText className="w-6 h-6 text-cyan-400" />
-                        ) : tool.icon === 'Share2' || tool.slug === 'social-publisher' ? (
-                          <Share2 className="w-6 h-6 text-cyan-400" />
-                        ) : tool.icon === 'MessageCircle' || tool.slug === 'whatsapp-shoot' ? (
-                          <MessageCircle className="w-6 h-6 text-emerald-400" />
-                        ) : tool.icon === 'BookOpen' || tool.slug === 'book' ? (
+                        {tool.icon === 'BookOpen' || tool.slug === 'book' ? (
                           <BookOpen className="w-6 h-6 text-amber-400" />
+                        ) : tool.icon === 'FileText' ? (
+                          <FileText className="w-6 h-6 text-cyan-400" />
                         ) : (
                           <Sparkles className="w-6 h-6 text-cyan-400" />
                         )}

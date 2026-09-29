@@ -32,35 +32,14 @@ export interface WorldToolItem {
   daysRemaining?: number;
 }
 
+const REMOVED_TOOL_SLUGS = [
+  'whatsapp-shoot',
+  'social-publisher',
+  'linkedin-extractor',
+  'ai-resume-builder',
+];
+
 const DEFAULT_TOOLS: Omit<WorldToolItem, 'id'>[] = [
-  {
-    name: 'LinkedIn Extractor',
-    slug: 'linkedin-extractor',
-    description: 'Scout OSINT Engine for extracting live LinkedIn talent, verified corporate work emails & phone numbers.',
-    routeUrl: '/world/linkedin-extractor',
-    icon: 'Sparkles',
-    category: 'Lead Generation',
-    badge: 'POPULAR',
-    isVisible: true,
-    accessType: 'TIMED_FREE',
-    priceMonthly: 19.99,
-    freeTrialDays: 7,
-    order: 1,
-  },
-  {
-    name: 'AI Resume Builder & ATS Optimizer',
-    slug: 'ai-resume-builder',
-    description: 'Build ATS-optimized resumes with AI summary writer, action-verb enhancer, Job Description matcher, and 1-click PDF download.',
-    routeUrl: '/world/ai-resume-builder',
-    icon: 'FileText',
-    category: 'Career & Productivity',
-    badge: 'PRO AI',
-    isVisible: true,
-    accessType: 'TIMED_FREE',
-    priceMonthly: 14.99,
-    freeTrialDays: 7,
-    order: 2,
-  },
   {
     name: 'Tolee Book & Smart Reader',
     slug: 'book',
@@ -73,7 +52,7 @@ const DEFAULT_TOOLS: Omit<WorldToolItem, 'id'>[] = [
     accessType: 'FREE',
     priceMonthly: 0,
     freeTrialDays: null,
-    order: 3,
+    order: 1,
   },
 ];
 
@@ -85,13 +64,13 @@ export async function getPublicWorldTools(): Promise<{ success: boolean; tools: 
     const worldToolModel = getWorldToolModel();
     let dbTools: any[] = [];
     try {
-      // Purge deleted tools if still present in DB
+      // Purge permanently deleted tools if still present in DB
       await worldToolModel.deleteMany({
-        where: { slug: { in: ['whatsapp-shoot', 'social-publisher'] } }
+        where: { slug: { in: REMOVED_TOOL_SLUGS } }
       }).catch(() => {});
 
       dbTools = await worldToolModel.findMany({
-        where: { isVisible: true, slug: { notIn: ['whatsapp-shoot', 'social-publisher'] } },
+        where: { isVisible: true, slug: { notIn: REMOVED_TOOL_SLUGS } },
         orderBy: { order: 'asc' },
       });
     } catch (e) {
@@ -133,7 +112,7 @@ export async function getPublicWorldTools(): Promise<{ success: boolean; tools: 
     }
 
     // Filter out deleted tools in case of cache/fallback
-    dbTools = dbTools.filter((t: any) => t.slug !== 'whatsapp-shoot' && t.slug !== 'social-publisher');
+    dbTools = dbTools.filter((t: any) => !REMOVED_TOOL_SLUGS.includes(t.slug));
     dbTools.sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
 
     const now = new Date();
@@ -200,11 +179,11 @@ export async function getAllWorldToolsAdmin(): Promise<{ success: boolean; tools
     let dbTools: any[] = [];
     try {
       await worldToolModel.deleteMany({
-        where: { slug: { in: ['whatsapp-shoot', 'social-publisher'] } }
+        where: { slug: { in: REMOVED_TOOL_SLUGS } }
       }).catch(() => {});
 
       dbTools = await worldToolModel.findMany({
-        where: { slug: { notIn: ['whatsapp-shoot', 'social-publisher'] } },
+        where: { slug: { notIn: REMOVED_TOOL_SLUGS } },
         orderBy: { order: 'asc' },
       });
     } catch {
@@ -245,7 +224,7 @@ export async function getAllWorldToolsAdmin(): Promise<{ success: boolean; tools
       }
     }
 
-    dbTools = dbTools.filter((t: any) => t.slug !== 'whatsapp-shoot' && t.slug !== 'social-publisher');
+    dbTools = dbTools.filter((t: any) => !REMOVED_TOOL_SLUGS.includes(t.slug));
     dbTools.sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
 
     return {
