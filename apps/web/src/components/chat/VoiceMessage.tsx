@@ -58,8 +58,8 @@ export function VoiceMessagePlayer({ audioUrl, duration, isMe }: VoiceMessagePla
       currentlyPlayingAudio = audio;
 
       // If at end or finished, restart from start
-      const dur = totalDuration > 0 ? totalDuration : audio.duration;
-      if (audio.ended || (isFinite(dur) && dur > 0 && audio.currentTime >= dur - 0.2)) {
+      const dur = totalDuration > 0 ? totalDuration : (audio.duration && isFinite(audio.duration) ? audio.duration : 0);
+      if (audio.ended || (dur > 0 && audio.currentTime >= dur)) {
         audio.currentTime = 0;
         setCurrentTime(0);
       }
@@ -125,14 +125,26 @@ export function VoiceMessagePlayer({ audioUrl, duration, isMe }: VoiceMessagePla
           setCurrentTime(ct);
         }}
         onLoadedMetadata={(e) => {
-          const d = e.currentTarget.duration;
-          if (d && !isNaN(d) && isFinite(d) && d > 0) {
+          const audio = e.currentTarget;
+          const d = audio.duration;
+          if (d === Infinity) {
+            // Chromium WebM duration fix: seek to end to force duration computation
+            audio.currentTime = 1e101;
+            const handler = () => {
+              audio.removeEventListener('timeupdate', handler);
+              audio.currentTime = 0;
+              if (isFinite(audio.duration) && audio.duration > 0) {
+                setTotalDuration(Math.round(audio.duration));
+              }
+            };
+            audio.addEventListener('timeupdate', handler, { once: true });
+          } else if (isFinite(d) && d > 0) {
             setTotalDuration(Math.round(d));
           }
         }}
         onDurationChange={(e) => {
           const d = e.currentTarget.duration;
-          if (d && !isNaN(d) && isFinite(d) && d > 0) {
+          if (isFinite(d) && d > 0) {
             setTotalDuration(Math.round(d));
           }
         }}
@@ -227,6 +239,15 @@ export function VoiceRecorder({ onSendVoice, onCancel }: VoiceRecorderProps) {
   const [viewOnce, setViewOnce] = useState(false);
   const [waveformAmplitudes, setWaveformAmplitudes] = useState<number[]>(() => new Array(32).fill(15));
 
+  const onSendVoiceRef = useRef(onSendVoice);
+  onSendVoiceRef.current = onSendVoice;
+
+  const onCancelRef = useRef(onCancel);
+  onCancelRef.current = onCancel;
+
+  const viewOnceRef = useRef(viewOnce);
+  viewOnceRef.current = viewOnce;
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
@@ -298,13 +319,23 @@ export function VoiceRecorder({ onSendVoice, onCancel }: VoiceRecorderProps) {
           console.warn("[VoiceRecorder] AudioContext visualizer warning:", audioErr);
         }
 
-        const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-          ? 'audio/webm;codecs=opus'
-          : MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')
-            ? 'audio/ogg;codecs=opus'
-            : MediaRecorder.isTypeSupported('audio/mp4')
-              ? 'audio/mp4'
-              : '';
+        const candidateMimeTypes = [
+          'audio/webm;codecs=opus',
+          'audio/webm',
+          'audio/ogg;codecs=opus',
+          'audio/ogg',
+          'audio/mp4',
+          'audio/aac',
+        ];
+        let mimeType = '';
+        if (typeof MediaRecorder !== 'undefined' && typeof MediaRecorder.isTypeSupported === 'function') {
+          for (const cand of candidateMimeTypes) {
+            if (MediaRecorder.isTypeSupported(cand)) {
+              mimeType = cand;
+              break;
+            }
+          }
+        }
 
         const recorder = mimeType 
           ? new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 128000 })
@@ -319,8 +350,8 @@ export function VoiceRecorder({ onSendVoice, onCancel }: VoiceRecorderProps) {
           }
         };
 
-        // Start timeslice recording
-        recorder.start(100);
+        // Start timeslice recording (chunks collected every 250ms)
+        recorder.start(250);
 
         // Start wall-clock timer
         startTimeRef.current = Date.now();
@@ -331,12 +362,12 @@ export function VoiceRecorder({ onSendVoice, onCancel }: VoiceRecorderProps) {
             const elapsed = Math.floor((accumulatedTimeRef.current + (Date.now() - startTimeRef.current)) / 1000);
             setRecordingSeconds(elapsed);
           }
-        }, 100);
+        }, 200);
 
       } catch (err: any) {
         console.error("Microphone access error:", err);
         alert("Unable to access microphone: " + (err.message || 'Permission denied'));
-        onCancel();
+        onCancelRef.current();
       }
     }
 
@@ -349,11 +380,18 @@ export function VoiceRecorder({ onSendVoice, onCancel }: VoiceRecorderProps) {
       if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
         audioContextRef.current.close().catch(() => {});
       }
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        try {
+          mediaRecorderRef.current.onstop = null;
+          mediaRecorderRef.current.ondataavailable = null;
+          mediaRecorderRef.current.stop();
+        } catch {}
+      }
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(t => t.stop());
       }
     };
-  }, [onCancel]);
+  }, []);
 
   const togglePauseResume = () => {
     const recorder = mediaRecorderRef.current;
@@ -385,11 +423,12 @@ export function VoiceRecorder({ onSendVoice, onCancel }: VoiceRecorderProps) {
 
     const recorder = mediaRecorderRef.current;
     if (!recorder || recorder.state === 'inactive') {
-      onCancel();
+      onCancelRef.current();
       return;
     }
 
-    const finalDuration = Math.max(1, recordingSeconds);
+    const elapsedMs = accumulatedTimeRef.current + (startTimeRef.current > 0 ? (Date.now() - startTimeRef.current) : 0);
+    const finalDuration = Math.max(1, Math.round(elapsedMs / 1000));
 
     recorder.onstop = () => {
       const mime = recorder.mimeType || 'audio/webm';
@@ -402,14 +441,20 @@ export function VoiceRecorder({ onSendVoice, onCancel }: VoiceRecorderProps) {
         streamRef.current.getTracks().forEach(t => t.stop());
       }
 
-      onSendVoice(audioBlob, finalDuration, viewOnce);
+      if (audioBlob.size > 0) {
+        onSendVoiceRef.current(audioBlob, finalDuration, viewOnceRef.current);
+      } else {
+        onCancelRef.current();
+      }
     };
 
     try {
-      recorder.requestData();
-      recorder.stop();
+      if (recorder.state === 'recording' || recorder.state === 'paused') {
+        recorder.requestData();
+        recorder.stop();
+      }
     } catch {
-      recorder.stop();
+      try { recorder.stop(); } catch {}
     }
   };
 
@@ -417,16 +462,23 @@ export function VoiceRecorder({ onSendVoice, onCancel }: VoiceRecorderProps) {
     if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
 
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
+    const recorder = mediaRecorderRef.current;
+    if (recorder) {
+      recorder.onstop = null;
+      recorder.ondataavailable = null;
+      if (recorder.state !== 'inactive') {
+        try { recorder.stop(); } catch {}
+      }
     }
+    audioChunksRef.current = [];
+
     if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
       audioContextRef.current.close().catch(() => {});
     }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(t => t.stop());
     }
-    onCancel();
+    onCancelRef.current();
   };
 
   const formatTimer = (sec: number) => {

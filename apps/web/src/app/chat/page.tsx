@@ -2859,7 +2859,8 @@ export default function ChatPage() {
     }));
 
     try {
-      const audioFile = new File([audioBlob], `voice_${Date.now()}.webm`, { type: audioBlob.type || 'audio/webm' });
+      const ext = audioBlob.type.includes('mp4') ? 'mp4' : audioBlob.type.includes('ogg') ? 'ogg' : audioBlob.type.includes('aac') ? 'aac' : 'webm';
+      const audioFile = new File([audioBlob], `voice_${Date.now()}.${ext}`, { type: audioBlob.type || 'audio/webm' });
       let uploadedMediaUrl = '';
 
       try {
@@ -2920,6 +2921,10 @@ export default function ChatPage() {
       setIsRecordingVoice(false);
     }
   };
+
+  const handleCancelVoice = useCallback(() => {
+    setIsRecordingVoice(false);
+  }, []);
 
   // Reply Privately Flow
   const handlePrivateReply = async (msg: any) => {
@@ -4516,7 +4521,7 @@ export default function ChatPage() {
                   {isRecordingVoice ? (
                     <VoiceRecorder 
                       onSendVoice={handleSendVoiceNote} 
-                      onCancel={() => setIsRecordingVoice(false)} 
+                      onCancel={handleCancelVoice} 
                     />
                   ) : (
                     <div className="flex items-center gap-2">
