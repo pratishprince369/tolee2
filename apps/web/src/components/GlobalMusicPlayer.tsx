@@ -203,12 +203,35 @@ export function GlobalMusicPlayer() {
           </div>
 
           {/* Right: Actions, Volume & Mobile Play Toggle */}
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            {/* Mobile Quick Play/Pause */}
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+            {/* Like */}
+            <button
+              type="button"
+              onClick={() => toggleLike(currentTrack.id)}
+              className={`p-1.5 rounded-lg transition-colors ${
+                isLiked ? 'text-rose-500' : 'text-zinc-400 hover:text-white'
+              }`}
+              title="Like"
+            >
+              <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
+            </button>
+
+            {/* Mobile Prev */}
+            <button
+              type="button"
+              onClick={prevTrack}
+              className="lg:hidden p-1 text-zinc-300 hover:text-white active:scale-95 transition-transform"
+              title="Previous"
+            >
+              <SkipBack className="w-4 h-4 fill-current" />
+            </button>
+
+            {/* Mobile Play/Pause circular white button */}
             <button
               type="button"
               onClick={togglePlay}
-              className="lg:hidden w-9 h-9 rounded-full bg-[#2dd4bf] text-zinc-950 flex items-center justify-center font-bold active:scale-95 transition-transform shadow-md"
+              className="lg:hidden w-8.5 h-8.5 rounded-full bg-white text-zinc-950 flex items-center justify-center font-bold active:scale-95 transition-transform shadow-md"
+              title={isPlaying ? "Pause" : "Play"}
             >
               {isPlaying ? (
                 <Pause className="w-4 h-4 fill-current" />
@@ -217,15 +240,14 @@ export function GlobalMusicPlayer() {
               )}
             </button>
 
-            {/* Like */}
+            {/* Mobile Next */}
             <button
               type="button"
-              onClick={() => toggleLike(currentTrack.id)}
-              className={`p-1.5 rounded-lg transition-colors ${
-                isLiked ? 'text-rose-500' : 'text-zinc-400 hover:text-white'
-              }`}
+              onClick={nextTrack}
+              className="lg:hidden p-1 text-zinc-300 hover:text-white active:scale-95 transition-transform"
+              title="Next"
             >
-              <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
+              <SkipForward className="w-4 h-4 fill-current" />
             </button>
 
             {/* Queue Toggle */}
