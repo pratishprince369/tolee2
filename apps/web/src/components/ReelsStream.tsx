@@ -66,16 +66,48 @@ function useActiveReelIndex(
   reelCount: number,
 ): number {
   const [activeIndex, setActiveIndex] = useState(0);
+  const activeIndexRef = useRef(0);
+  activeIndexRef.current = activeIndex;
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container || reelCount === 0) return;
 
+    // 1. Instant Synchronous Scroll Listener:
+    // Calculates dominant index in real time (0ms delay) and enforces DOM-level audio pause on scroll
+    const handleScroll = () => {
+      const h = container.clientHeight;
+      if (!h) return;
+      const dominantIndex = Math.round(container.scrollTop / h);
+      if (dominantIndex !== activeIndexRef.current && dominantIndex >= 0 && dominantIndex < reelCount) {
+        activeIndexRef.current = dominantIndex;
+        setActiveIndex(dominantIndex);
+      }
+
+      // Hard DOM guarantee: the instant scrolling occurs, pause any video not in the active reel
+      const slides = container.querySelectorAll('.reel-container');
+      slides.forEach((slide) => {
+        const idx = Number(slide.getAttribute('data-index'));
+        if (idx !== dominantIndex) {
+          const v = slide.querySelector('video');
+          if (v && !v.paused) {
+            try {
+              v.pause();
+              v.muted = true;
+            } catch (e) {}
+          }
+        }
+      });
+    };
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+
+    // 2. Secondary confirmation via IntersectionObserver with 0.5 threshold
     const observer = new IntersectionObserver(
       (entries) => {
         let best: IntersectionObserverEntry | null = null;
         for (const entry of entries) {
-          if (entry.isIntersecting && entry.intersectionRatio >= 0.75) {
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
             if (!best || entry.intersectionRatio > best.intersectionRatio) {
               best = entry;
             }
@@ -83,16 +115,23 @@ function useActiveReelIndex(
         }
         if (best) {
           const idx = Number((best.target as HTMLElement).getAttribute('data-index'));
-          if (!isNaN(idx)) setActiveIndex(idx);
+          if (!isNaN(idx) && idx !== activeIndexRef.current) {
+            activeIndexRef.current = idx;
+            setActiveIndex(idx);
+          }
         }
       },
-      { root: container, threshold: [0.75] }
+      { root: container, threshold: [0.5, 0.75] }
     );
 
     const slides = container.querySelectorAll('.reel-container');
     slides.forEach((s) => observer.observe(s));
-    return () => observer.disconnect();
-  }, [reelCount]);
+
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+      observer.disconnect();
+    };
+  }, [reelCount, containerRef]);
 
   return activeIndex;
 }
@@ -887,35 +926,51 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
       {(!mounted || !isDesktop) && (
         <div className="lg:hidden fixed inset-0 z-40 bg-black text-white overflow-hidden flex justify-center">
 
-        {/* Mobile top bar */}
-        <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between px-4 py-4 pointer-events-auto bg-gradient-to-b from-black/60 to-transparent">
-          <div className="flex items-center gap-2">
+        {/* Mobile top bar: authentic Instagram-style floating header */}
+        <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between px-4 pt-3 pb-6 pointer-events-auto bg-gradient-to-b from-black/80 via-black/30 to-transparent">
+          <div className="flex items-center gap-3">
             <button
-              onClick={() => router.back()}
-              className="flex items-center justify-center w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 active:bg-white/30 backdrop-blur-sm border border-white/30 text-white transition-all mr-1"
+              onClick={() => {
+                if (window.history.length > 1) {
+                  router.back();
+                } else {
+                  router.push('/feed');
+                }
+              }}
+              className="flex items-center justify-center w-8 h-8 rounded-full bg-black/30 hover:bg-black/50 text-white backdrop-blur-md border border-white/10 active:scale-95 transition-all"
+              aria-label="Back"
             >
               <ChevronLeft className="w-5 h-5 text-white" strokeWidth={2.5} />
             </button>
-            <h1 className="text-xl font-bold text-white drop-shadow-md">Reels</h1>
-          </div>
-          <div className="flex items-center gap-3">
-            {session?.user && (
-              <button
-                id="reels-upload-mobile"
+            <div className="flex items-center gap-3">
+              <button 
                 onClick={handleReelsUploadClick}
-                className="flex items-center justify-center w-9 h-9 rounded-full bg-white/20 hover:bg-white/30 active:bg-white/40 backdrop-blur-sm border border-white/30 transition-all cursor-pointer"
+                className="flex items-center gap-1.5 text-white drop-shadow-md font-bold text-lg active:scale-95 transition-transform focus:outline-none"
               >
-                <Plus className="w-5 h-5 text-white" strokeWidth={2.5} />
+                <span>Reels</span>
+                <ChevronDown className="w-4 h-4 stroke-[3] text-white" />
               </button>
-            )}
-            {session?.user && (
-              <Link href="/u/me">
-                <Avatar className="w-8 h-8 border border-white/50 shadow-md">
-                  <AvatarImage src={getValidAvatarUrl(session.user.image)} />
-                  <AvatarFallback>{session.user.name?.[0]}</AvatarFallback>
-                </Avatar>
-              </Link>
-            )}
+              <span className="text-sm font-semibold text-white/70 tracking-wide drop-shadow-sm select-none">
+                Friends
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={() => handleSetIsMuted((m) => !m)}
+              className="flex items-center justify-center w-8 h-8 rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-md border border-white/20 active:scale-95 transition-all"
+              aria-label="Toggle sound"
+            >
+              {isMuted ? <VolumeX className="w-4 h-4 text-white" /> : <Volume2 className="w-4 h-4 text-white" />}
+            </button>
+            <button
+              id="reels-upload-mobile"
+              onClick={handleReelsUploadClick}
+              className="flex items-center justify-center w-8 h-8 rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-md border border-white/20 active:scale-95 transition-all cursor-pointer"
+              aria-label="Create Reel"
+            >
+              <Camera className="w-4.5 h-4.5 text-white" strokeWidth={2.2} />
+            </button>
           </div>
         </div>
 
@@ -1014,7 +1069,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
           DESKTOP: inline layout — sidebar stays visible (hidden on < lg)
          ──────────────────────────────────────────────────────────────── */}
       {mounted && isDesktop && (
-        <div className="hidden lg:flex flex-col h-[calc(100vh-4rem)] bg-black overflow-hidden relative">
+        <div className="hidden lg:flex flex-col h-[100dvh] bg-black overflow-hidden relative">
 
         {/* Desktop top bar */}
         <div className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-6 py-4 bg-gradient-to-b from-black/80 to-transparent pointer-events-none">
@@ -1076,7 +1131,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
             <div
               ref={desktopScrollRef}
               className="relative flex-shrink-0 overflow-y-auto overscroll-y-contain snap-y snap-mandatory hide-scrollbar rounded-2xl shadow-2xl shadow-black/60"
-              style={{ width: 'min(380px, 40vw)', height: 'min(676px, calc(100dvh - 80px))', scrollBehavior: 'auto' }}
+              style={{ width: 'min(420px, 42vw)', height: 'min(820px, calc(100dvh - 36px))', scrollBehavior: 'auto' }}
             >
               {itemsToRender.map((item, index) => {
                 const isWithinWindow = Math.abs(index - desktopActiveIndex) <= 2;

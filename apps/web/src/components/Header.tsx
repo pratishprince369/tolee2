@@ -137,6 +137,7 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
   }, []);
 
   const isMobileHeaderHidden = isMobileHeaderHiddenRoute(pathname);
+  const isReels = pathname?.startsWith('/reels') || pathname?.startsWith('/reel');
   const [scrolled, setScrolled] = React.useState(false);
 
   React.useEffect(() => {
@@ -147,6 +148,8 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  if (isReels) return null;
 
   return (
     <div className={cn(

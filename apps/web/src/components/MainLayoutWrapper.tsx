@@ -32,6 +32,7 @@ export function MainLayoutWrapper({
   isAuthenticated,
 }: MainLayoutWrapperProps) {
   const pathname = usePathname();
+  const isReels = pathname?.startsWith('/reels') || pathname?.startsWith('/reel');
   const hideMobileHeader = isMobileHeaderHiddenRoute(pathname);
 
   const isChat = pathname?.startsWith('/chat');
@@ -39,11 +40,11 @@ export function MainLayoutWrapper({
   return (
     <div className={cn(
       "flex flex-1 w-full relative",
-      isChat ? "pb-0" : "pb-16 lg:pb-0",
-      hideMobileHeader ? "pt-0 md:pt-16" : "pt-16"
+      isReels ? "p-0 m-0 h-[100dvh] overflow-hidden" : (isChat ? "pb-0" : "pb-16 lg:pb-0"),
+      isReels ? "pt-0" : (hideMobileHeader ? "pt-0 md:pt-16" : "pt-16")
     )}>
-      {sidebar}
-      <div className={cn("flex-grow w-full min-w-0 overflow-x-clip", isAuthenticated && "lg:pl-64")}>
+      {!isReels && sidebar}
+      <div className={cn("flex-grow w-full min-w-0 overflow-x-clip", !isReels && isAuthenticated && "lg:pl-64")}>
         {children}
       </div>
     </div>
