@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { notFound, redirect } from 'next/navigation';
 import PostViewer from '@/components/PostViewer';
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 
 export const dynamic = 'force-dynamic';
 
@@ -219,7 +220,13 @@ export default async function PostPage({ params }: PostPageProps) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdBreadcrumbs) }}
       />
-      <PostViewer post={post} />
+      <Suspense fallback={
+        <div className="min-h-screen bg-[#070b13] flex items-center justify-center">
+          <div className="w-8 h-8 rounded-full border-2 border-teal-500 border-t-transparent animate-spin" />
+        </div>
+      }>
+        <PostViewer post={post} />
+      </Suspense>
     </>
   );
 }

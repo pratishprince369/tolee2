@@ -103,6 +103,8 @@ interface PostViewerProps {
     subLocation: string | null;
     createdAt: string;
     isSimulation?: boolean;
+    sourceUrl?: string | null;
+    reelAudio?: any | null;
   };
 }
 
@@ -127,6 +129,7 @@ export default function PostViewer({ post }: PostViewerProps) {
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [authPromptOpen, setAuthPromptOpen] = useState(false);
   const [isQuickBoostOpen, setIsQuickBoostOpen] = useState(false);
+  const [isInsightsOpen, setIsInsightsOpen] = useState(false);
   const searchParams = useSearchParams();
   const targetCommentId = searchParams?.get('commentId') || '';
   const targetReplyId = searchParams?.get('replyId') || '';
@@ -815,3 +818,5 @@ export default function PostViewer({ post }: PostViewerProps) {
     </div>
   );
 }
+
+export { PostViewer };
