@@ -9,9 +9,17 @@ export interface BundleReelItem {
 }
 
 const BUNDLE_FOLDERS = [
+  // Original Reel bundles
   { name: 'Cartoon Explained Shorts', url: 'https://drive.google.com/drive/folders/1dHDKZe6HIDnDpX4jXMfow3VEXYxRJgY5' },
   { name: 'Movie Explained Shorts 1', url: 'https://drive.google.com/drive/folders/1mOTYdoy7KXvd-rqh7tJwtEL08v5ibt8j' },
-  { name: '500+ Movie Explained Shorts', url: 'https://drive.google.com/drive/folders/1dVjqB7m_IKHIZ2-PN8PmNiXhC4jRVFbU' }
+  { name: '500+ Movie Explained Shorts', url: 'https://drive.google.com/drive/folders/1dVjqB7m_IKHIZ2-PN8PmNiXhC4jRVFbU' },
+  // Google Sites Reel & Shorts Bundle (https://sites.google.com/view/reel-shorts-bundle/home?pli=1&authuser=0)
+  { name: '500+ 2D Funny Animation Videos', url: 'https://drive.google.com/drive/folders/1OztyF42rnSi_P1F1XdT78JoyBLFr5W7M' },
+  { name: '200+ Viral Reel Videos', url: 'https://drive.google.com/drive/folders/1C2es7ujnrFvas4_b8eYJP6DmAkpwAxMj' },
+  { name: '200+ Shin Chan Videos', url: 'https://drive.google.com/drive/folders/1Hyk3ZH2l3_3JQYFvzWiuEuND4_gYg7Pv' },
+  { name: '150+ Motivational Reels Videos', url: 'https://drive.google.com/drive/folders/13DYmOOCGU5yrk3loYHwcwjXsyCTUVwLI' },
+  { name: '300+ Viral Reel Videos', url: 'https://drive.google.com/drive/folders/1h5q_Bd1OoD4dAeZVtNUoqRzkq-V9DTke' },
+  { name: 'Other Reel Videos', url: 'https://drive.google.com/drive/folders/1IPE8zRVYcm-l4tHN3A3gAzGJ-GQFffc2' }
 ];
 
 export const POSTING_ACCOUNTS = [
@@ -115,7 +123,7 @@ export async function publishDailyBundleReelsBatch(maxLimit: number = 5): Promis
       return { success: false, count: 0, log: logs };
     }
 
-    const userMap = new Map<string, typeof users[0]>(users.map(u => [u.email, u]));
+    const userMap = new Map<string, typeof users[0]>(users.map((u: any) => [u.email, u]));
     const defaultTolee = await prisma.tolee.findFirst({ select: { id: true } });
 
     // Scrape candidate videos from source bundle
