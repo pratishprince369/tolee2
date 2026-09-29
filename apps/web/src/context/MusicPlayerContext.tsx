@@ -50,6 +50,7 @@ interface MusicPlayerContextType {
   toggleLike: (trackId: string) => Promise<boolean>;
   setIsFullScreenOpen: (open: boolean) => void;
   setIsQueueOpen: (open: boolean) => void;
+  closePlayer: () => void;
 }
 
 const MusicPlayerContext = createContext<MusicPlayerContextType | null>(null);
@@ -440,9 +441,29 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         });
         return !nowLiked;
       }
-      return res.liked;
+      return Boolean(res.liked);
     } catch {
       return nowLiked;
+    }
+  }, []);
+
+  const closePlayer = useCallback(() => {
+    const audio = audioRef.current;
+    if (audio) {
+      audio.pause();
+      audio.currentTime = 0;
+      audio.src = '';
+    }
+    setIsPlaying(false);
+    setCurrentTrack(null);
+    setCurrentTime(0);
+    setDuration(0);
+    setIsFullScreenOpen(false);
+    setIsQueueOpen(false);
+    if ('mediaSession' in navigator) {
+      try {
+        navigator.mediaSession.playbackState = 'none';
+      } catch {}
     }
   }, []);
 
@@ -478,6 +499,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         toggleLike,
         setIsFullScreenOpen,
         setIsQueueOpen,
+        closePlayer,
       }}
     >
       {children}

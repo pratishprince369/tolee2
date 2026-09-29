@@ -58,6 +58,7 @@ export function GlobalMusicPlayer() {
     setIsFullScreenOpen,
     setIsQueueOpen,
     playTrack,
+    closePlayer,
   } = useMusicPlayer();
 
   if (!currentTrack) return null;
@@ -78,6 +79,20 @@ export function GlobalMusicPlayer() {
     <>
       {/* ── Mini / Bottom Sticky Player ── */}
       <div className="fixed bottom-[60px] lg:bottom-0 left-0 right-0 z-40 bg-zinc-950/95 backdrop-blur-xl border-t border-zinc-800/90 shadow-2xl transition-all">
+        {/* Top-Right Corner Close Button */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            closePlayer();
+          }}
+          className="absolute -top-2.5 right-3 sm:right-6 z-50 w-6 h-6 rounded-full bg-zinc-900 border border-zinc-700/90 text-zinc-300 hover:text-white hover:bg-zinc-800 hover:border-zinc-500 flex items-center justify-center shadow-lg transition-all active:scale-90 cursor-pointer"
+          title="Close player and stop music"
+          aria-label="Close music player"
+        >
+          <X className="w-3.5 h-3.5 stroke-[2.5]" />
+        </button>
+
         {/* Mobile thin top progress indicator */}
         <div className="w-full h-1 bg-zinc-800 lg:hidden">
           <div
@@ -277,6 +292,20 @@ export function GlobalMusicPlayer() {
               title="Full screen player"
             >
               <Maximize2 className="w-4 h-4" />
+            </button>
+
+            {/* Desktop Inline Close Button */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                closePlayer();
+              }}
+              className="hidden lg:flex p-1.5 text-zinc-400 hover:text-rose-400 rounded-lg transition-colors cursor-pointer"
+              title="Close player"
+              aria-label="Close music player"
+            >
+              <X className="w-4 h-4" />
             </button>
           </div>
         </div>
