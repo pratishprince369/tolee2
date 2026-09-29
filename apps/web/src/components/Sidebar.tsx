@@ -4,7 +4,6 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Home, Compass, Film, MessageCircle, Bell, Settings, Store, Bot, Globe, Megaphone, Zap, MessageSquare, Map, Tv, Newspaper, Crown, Plus, Radio, Sparkles, Trophy, Music } from 'lucide-react';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { useSession } from 'next-auth/react';
 import { getSidebarDataCached } from '@/lib/sidebar-data';
@@ -207,115 +206,115 @@ export function Sidebar() {
   const joinedTolees = data.joinedTolees;
 
   return (
-    <aside className="w-64 fixed left-0 top-16 h-[calc(100vh-4rem)] border-r border-[#E5E7EB] dark:border-zinc-900 bg-white dark:bg-zinc-950 overflow-hidden hidden lg:flex flex-col z-40">
-      <ScrollArea className="flex-1 py-6 px-4">
-        
-        {/* Main Nav */}
-        <div className="relative space-y-1.5 mb-8">
-          {mainNav.map((item) => {
-            const isActive = activePath === item.href || (activePath.startsWith('/t/') && item.name === 'Feed');
-            return (
-              <SidebarNavItem
-                key={item.name}
-                name={item.name}
-                href={item.href}
-                icon={item.icon}
-                isActive={isActive}
-                isCreator={(item as any).isCreator}
-                badge={item.badge}
-                hasPulse={item.name === 'AI Manager' && !isActive}
-                onClick={handleItemClick}
-              />
-            );
-          })}
+    <aside className="w-64 fixed left-0 top-16 h-[calc(100vh-4rem)] border-r border-[#E5E7EB] dark:border-zinc-900 bg-white dark:bg-zinc-950 hidden lg:flex flex-col z-40">
+      <div className="flex-1 overflow-y-auto overscroll-contain sidebar-scrollbar py-5 px-3.5 flex flex-col justify-between">
+        <div>
+          {/* Main Nav */}
+          <div className="relative space-y-1 mb-6">
+            {mainNav.map((item) => {
+              const isActive = activePath === item.href || (activePath.startsWith('/t/') && item.name === 'Feed');
+              return (
+                <SidebarNavItem
+                  key={item.name}
+                  name={item.name}
+                  href={item.href}
+                  icon={item.icon}
+                  isActive={isActive}
+                  isCreator={(item as any).isCreator}
+                  badge={item.badge}
+                  hasPulse={item.name === 'AI Manager' && !isActive}
+                  onClick={handleItemClick}
+                />
+              );
+            })}
+          </div>
+
+          {/* Tolees You Manage */}
+          {isAuthenticated && managedTolees.length > 0 && (
+            <div className="mb-6">
+              <div className="flex items-center justify-between px-3 mb-3">
+                <h3 className="text-[11px] font-bold text-[#6B7280] dark:text-zinc-500 uppercase tracking-wider">Tolees You Manage</h3>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsCreditTermsModalOpen(true)}
+                  className="w-7 h-7 rounded-lg border border-[#E5E7EB] dark:border-zinc-800 text-[#6B7280] hover:text-[#0E9F9A] hover:border-[#0E9F9A] bg-white dark:bg-zinc-900/50 shadow-xs hover:shadow transition-colors duration-105 flex items-center justify-center cursor-pointer"
+                  title="Create Tolee Group"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+              <div className="space-y-1.5">
+                {managedTolees.map((tolee) => (
+                  <ToleeNavItem
+                    key={tolee.id}
+                    id={tolee.id}
+                    name={tolee.name}
+                    slug={tolee.slug}
+                    avatar={tolee.avatar}
+                    role="owner"
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Your Tolees */}
+          {isAuthenticated && joinedTolees.length > 0 && (
+            <div className="mb-6">
+              <div className="px-3 mb-3">
+                <h3 className="text-[11px] font-bold text-[#6B7280] dark:text-zinc-500 uppercase tracking-wider">Your Tolees</h3>
+              </div>
+              <div className="space-y-1.5">
+                {joinedTolees.map((tolee) => (
+                  <ToleeNavItem
+                    key={tolee.id}
+                    id={tolee.id}
+                    name={tolee.name}
+                    slug={tolee.slug}
+                    avatar={tolee.avatar}
+                    role="member"
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {isAuthenticated && managedTolees.length === 0 && joinedTolees.length === 0 && (
+            <div className="px-3 py-4 text-center bg-gray-50 dark:bg-zinc-900/30 rounded-xl border border-dashed border-gray-200 dark:border-zinc-800 mb-6">
+              <p className="text-xs text-gray-500 mb-2">You haven&apos;t joined any Tolees yet.</p>
+              <Link href="/">
+                <Button size="sm" variant="outline" className="text-[10px] h-7 rounded-lg">Explore Tolees</Button>
+              </Link>
+            </div>
+          )}
         </div>
-
-        {/* Tolees You Manage */}
-        {isAuthenticated && managedTolees.length > 0 && (
-          <div className="mb-6">
-            <div className="flex items-center justify-between px-3 mb-3">
-              <h3 className="text-[11px] font-bold text-[#6B7280] dark:text-zinc-500 uppercase tracking-wider">Tolees You Manage</h3>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsCreditTermsModalOpen(true)}
-                className="w-7 h-7 rounded-lg border border-[#E5E7EB] dark:border-zinc-800 text-[#6B7280] hover:text-[#0E9F9A] hover:border-[#0E9F9A] bg-white dark:bg-zinc-900/50 shadow-xs hover:shadow transition-colors duration-105 flex items-center justify-center cursor-pointer"
-                title="Create Tolee Group"
-              >
-                <Plus className="w-3.5 h-3.5" />
-              </Button>
-            </div>
-            <div className="space-y-1.5">
-              {managedTolees.map((tolee) => (
-                <ToleeNavItem
-                  key={tolee.id}
-                  id={tolee.id}
-                  name={tolee.name}
-                  slug={tolee.slug}
-                  avatar={tolee.avatar}
-                  role="owner"
-                />
-              ))}
-            </div>
+        
+        {/* Settings / Bottom Footer */}
+        <div className="pt-4 mt-6 border-t border-[#E5E7EB] dark:border-zinc-900 bg-zinc-50/50 dark:bg-zinc-950/50 -mx-3.5 -mb-5 p-4">
+          {isAuthenticated && (
+            <>
+              <Link href="/settings" className="w-full block mb-1.5">
+                <Button variant="ghost" className="w-full justify-start rounded-xl h-10 text-sm font-semibold text-[#1F2937] dark:text-zinc-300 hover:bg-[#EAF9F8] dark:hover:bg-[#0E9F9A]/10 hover:text-[#0E9F9A] transition-colors duration-105">
+                  <Settings className="w-4 h-4 mr-3 flex-shrink-0" />
+                  Settings & Privacy
+                </Button>
+              </Link>
+              <Link href="/feedback" className="w-full block mb-1.5">
+                <Button variant="ghost" className="w-full justify-start rounded-xl h-10 text-sm font-semibold text-[#1F2937] dark:text-zinc-300 hover:bg-[#EAF9F8] dark:hover:bg-[#0E9F9A]/10 hover:text-[#0E9F9A] transition-colors duration-105">
+                  <MessageSquare className="w-4 h-4 mr-3 flex-shrink-0" />
+                  Send Feedback
+                </Button>
+              </Link>
+            </>
+          )}
+          <div className="px-2 py-1 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-[#6B7280] dark:text-zinc-500 font-medium">
+            <Link href="/about" className="hover:text-[#0E9F9A] dark:hover:text-[#0E9F9A] transition-colors">About Us</Link>
+            <Link href="/privacy" className="hover:text-[#0E9F9A] dark:hover:text-[#0E9F9A] transition-colors">Privacy Policy</Link>
+            <Link href="/terms" className="hover:text-[#0E9F9A] dark:hover:text-[#0E9F9A] transition-colors">Terms & Conditions</Link>
+            <Link href="/contact" className="hover:text-[#0E9F9A] dark:hover:text-[#0E9F9A] transition-colors">Contact Us</Link>
+            <span>© 2026 Tolee</span>
           </div>
-        )}
-
-        {/* Your Tolees */}
-        {isAuthenticated && joinedTolees.length > 0 && (
-          <div className="mb-6">
-            <div className="px-3 mb-3">
-              <h3 className="text-[11px] font-bold text-[#6B7280] dark:text-zinc-500 uppercase tracking-wider">Your Tolees</h3>
-            </div>
-            <div className="space-y-1.5">
-              {joinedTolees.map((tolee) => (
-                <ToleeNavItem
-                  key={tolee.id}
-                  id={tolee.id}
-                  name={tolee.name}
-                  slug={tolee.slug}
-                  avatar={tolee.avatar}
-                  role="member"
-                />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {isAuthenticated && managedTolees.length === 0 && joinedTolees.length === 0 && (
-          <div className="px-3 py-4 text-center bg-gray-50 dark:bg-zinc-900/30 rounded-xl border border-dashed border-gray-200 dark:border-zinc-800">
-            <p className="text-xs text-gray-500 mb-2">You haven't joined any Tolees yet.</p>
-            <Link href="/">
-              <Button size="sm" variant="outline" className="text-[10px] h-7 rounded-lg">Explore Tolees</Button>
-            </Link>
-          </div>
-        )}
-
-      </ScrollArea>
-      
-      {/* Settings / Bottom Footer */}
-      <div className="mt-auto p-4 border-t border-[#E5E7EB] dark:border-zinc-900 bg-zinc-50/50 dark:bg-zinc-950/50">
-        {isAuthenticated && (
-          <>
-            <Link href="/settings" className="w-full block mb-2">
-              <Button variant="ghost" className="w-full justify-start rounded-xl h-10 text-sm font-semibold text-[#1F2937] dark:text-zinc-300 hover:bg-[#EAF9F8] dark:hover:bg-[#0E9F9A]/10 hover:text-[#0E9F9A] transition-colors duration-105">
-                <Settings className="w-4 h-4 mr-3 flex-shrink-0" />
-                Settings & Privacy
-              </Button>
-            </Link>
-            <Link href="/feedback" className="w-full block mb-2">
-              <Button variant="ghost" className="w-full justify-start rounded-xl h-10 text-sm font-semibold text-[#1F2937] dark:text-zinc-300 hover:bg-[#EAF9F8] dark:hover:bg-[#0E9F9A]/10 hover:text-[#0E9F9A] transition-colors duration-105">
-                <MessageSquare className="w-4 h-4 mr-3 flex-shrink-0" />
-                Send Feedback
-              </Button>
-            </Link>
-          </>
-        )}
-        <div className="px-3 py-1 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-[#6B7280] dark:text-zinc-500 font-medium">
-          <Link href="/about" className="hover:text-[#0E9F9A] dark:hover:text-[#0E9F9A] transition-colors">About Us</Link>
-          <Link href="/privacy" className="hover:text-[#0E9F9A] dark:hover:text-[#0E9F9A] transition-colors">Privacy Policy</Link>
-          <Link href="/terms" className="hover:text-[#0E9F9A] dark:hover:text-[#0E9F9A] transition-colors">Terms & Conditions</Link>
-          <Link href="/contact" className="hover:text-[#0E9F9A] dark:hover:text-[#0E9F9A] transition-colors">Contact Us</Link>
-          <span>© 2026 Tolee</span>
         </div>
       </div>
 
