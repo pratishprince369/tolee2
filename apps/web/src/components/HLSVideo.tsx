@@ -20,6 +20,10 @@ export function getGlobalActiveVideo(): HTMLVideoElement | null {
 }
 
 export function setGlobalActiveVideo(video: HTMLVideoElement | null) {
+  if (video && typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('tolee_pause_music_player'));
+  }
+
   if (video && globalActiveAudio) {
     try {
       globalActiveAudio.pause();
@@ -44,6 +48,10 @@ export function getGlobalActiveAudio(): HTMLAudioElement | null {
 }
 
 export function setGlobalActiveAudio(audio: HTMLAudioElement | null) {
+  if (audio && typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('tolee_pause_music_player'));
+  }
+
   if (globalActiveAudio && globalActiveAudio !== audio) {
     try {
       globalActiveAudio.pause();
@@ -55,6 +63,23 @@ export function setGlobalActiveAudio(audio: HTMLAudioElement | null) {
     } catch (e) {}
   }
   globalActiveAudio = audio;
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('tolee_pause_all_videos', () => {
+    if (globalActiveVideo) {
+      try {
+        globalActiveVideo.pause();
+      } catch (e) {}
+      globalActiveVideo = null;
+    }
+    for (const v of allMountedVideos) {
+      try {
+        v.pause();
+        v.muted = true;
+      } catch (e) {}
+    }
+  });
 }
 
 const SOUND_PREF_KEY = 'tolee_sound_pref';

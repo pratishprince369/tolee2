@@ -50,6 +50,7 @@ interface MusicPlayerContextType {
   toggleLike: (trackId: string) => Promise<boolean>;
   setIsFullScreenOpen: (open: boolean) => void;
   setIsQueueOpen: (open: boolean) => void;
+  pauseMusic: () => void;
   closePlayer: () => void;
 }
 
@@ -94,6 +95,10 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
   }, [isShuffling]);
 
   const playAudioInternal = useCallback((audio: HTMLAudioElement) => {
+    // Ponytail: notify any active video elements to pause when music starts
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('tolee_pause_all_videos'));
+    }
     const playPromise = audio.play();
     if (playPromise !== undefined) {
       playPromise
@@ -212,6 +217,29 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     audio.addEventListener('ended', handleEnded);
     audio.addEventListener('error', handleError);
 
+    // Global coordination: If ANY video or external audio element starts playing anywhere in the app,
+    // automatically pause the background music player so sounds never overlap.
+    const handleGlobalMediaPlay = (event: Event) => {
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
+      if (target !== audio && (target instanceof HTMLMediaElement || target.tagName === 'VIDEO' || target.tagName === 'AUDIO')) {
+        if (!audio.paused) {
+          audio.pause();
+          setIsPlaying(false);
+        }
+      }
+    };
+
+    const handleCustomPauseMusic = () => {
+      if (!audio.paused) {
+        audio.pause();
+        setIsPlaying(false);
+      }
+    };
+
+    window.addEventListener('play', handleGlobalMediaPlay, true);
+    window.addEventListener('tolee_pause_music_player', handleCustomPauseMusic);
+
     if ('mediaSession' in navigator) {
       navigator.mediaSession.setActionHandler('play', () => togglePlay());
       navigator.mediaSession.setActionHandler('pause', () => togglePlay());
@@ -227,6 +255,8 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
 
     return () => {
       audio.pause();
+      window.removeEventListener('play', handleGlobalMediaPlay, true);
+      window.removeEventListener('tolee_pause_music_player', handleCustomPauseMusic);
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('play', handlePlay);
@@ -447,6 +477,14 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
     }
   }, []);
 
+  const pauseMusic = useCallback(() => {
+    const audio = audioRef.current;
+    if (audio && !audio.paused) {
+      audio.pause();
+      setIsPlaying(false);
+    }
+  }, []);
+
   const closePlayer = useCallback(() => {
     const audio = audioRef.current;
     if (audio) {
@@ -499,6 +537,7 @@ export function MusicPlayerProvider({ children }: { children: React.ReactNode })
         toggleLike,
         setIsFullScreenOpen,
         setIsQueueOpen,
+        pauseMusic,
         closePlayer,
       }}
     >

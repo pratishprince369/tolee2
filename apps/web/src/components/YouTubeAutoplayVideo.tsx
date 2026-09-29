@@ -71,6 +71,12 @@ export function YouTubeAutoplayVideo({
     }
   }, []);
 
+  useEffect(() => {
+    if (mounted && isIntersecting && !hasError && cleanVideoId && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('tolee_pause_music_player'));
+    }
+  }, [mounted, isIntersecting, hasError, cleanVideoId]);
+
   const fallbackThumbnail = thumbnailUrl || (cleanVideoId ? `https://i.ytimg.com/vi/${cleanVideoId}/hqdefault.jpg` : '/tolee-news-default.png');
 
   if (hasError || !cleanVideoId) {

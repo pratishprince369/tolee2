@@ -30,6 +30,8 @@ export function YouTubeReelPlayer({
     if (!isActive) {
       setIsIframeLoaded(false);
       setHasError(false);
+    } else if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('tolee_pause_music_player'));
     }
   }, [isActive]);
 
