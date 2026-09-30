@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Search, Bell, MessageCircle, LogOut, User, Settings, Compass, Store, Globe, Heart, Bot, Zap, MessageSquare, Briefcase, Award, FileText, Radio, Wallet, Plus, Trophy, Music } from 'lucide-react';
+import { Search, Bell, MessageCircle, LogOut, User, Settings, Compass, Store, Globe, Heart, Bot, Zap, MessageSquare, Briefcase, Award, FileText, Radio, Wallet, Plus, Trophy, Music, Gamepad2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -246,6 +246,25 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
               <Music className="w-4.5 h-4.5 xs:w-5 xs:h-5 text-gray-700 dark:text-zinc-200" />
             </Button>
 
+            {/* Mobile Dedicated Tolee Games Icon Button */}
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => router.push('/games')}
+              onTouchStart={() => router.prefetch('/games')}
+              onMouseEnter={() => router.prefetch('/games')}
+              className={cn(
+                "rounded-full md:hidden flex items-center justify-center h-8.5 w-8.5 xs:h-9 xs:w-9 flex-shrink-0 transition-all active:scale-95",
+                pathname.startsWith('/games') 
+                  ? 'text-primary bg-primary/10 border border-primary/20' 
+                  : 'text-gray-700 dark:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-800'
+              )}
+              aria-label="Tolee Games"
+              title="Tolee Games"
+            >
+              <Gamepad2 className="w-4.5 h-4.5 xs:w-5 xs:h-5 text-gray-700 dark:text-zinc-200" />
+            </Button>
+
             {/* Mobile Dedicated Sports Icon Button (2nd position) */}
             <Button 
               variant="ghost" 
@@ -360,6 +379,19 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
                   title="Tolee Songs"
                 >
                   <Music className="w-5 h-5 stroke-[1.5]" />
+                </Button>
+              </Link>
+              <Link href="/games">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className={cn(
+                    "text-gray-700 dark:text-zinc-300 hover:text-primary dark:hover:text-primary rounded-xl w-10 h-10 hover:bg-gray-50 dark:hover:bg-zinc-900/50",
+                    pathname.startsWith('/games') && 'text-primary bg-primary/10'
+                  )}
+                  title="Tolee Games"
+                >
+                  <Gamepad2 className="w-5 h-5 stroke-[1.5]" />
                 </Button>
               </Link>
               <Link href="/chat">
@@ -548,6 +580,22 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
               title="Tolee Songs"
             >
               <Music className="w-4.5 h-4.5 xs:w-5 xs:h-5" />
+            </Button>
+            {/* Mobile Games Button for guests */}
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => router.push('/games')}
+              className={cn(
+                "rounded-full md:hidden flex items-center justify-center h-8.5 w-8.5 xs:h-9 xs:w-9 flex-shrink-0 transition-all active:scale-95",
+                pathname.startsWith('/games') 
+                  ? 'text-primary bg-primary/10 border border-primary/20' 
+                  : 'text-gray-700 dark:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-800'
+              )}
+              aria-label="Tolee Games"
+              title="Tolee Games"
+            >
+              <Gamepad2 className="w-4.5 h-4.5 xs:w-5 xs:h-5" />
             </Button>
             {/* Mobile Sports Button for guests (2nd position) */}
             <Button 

@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Home, Compass, Film, MessageCircle, Menu, User, Settings, Globe, Store, LogOut, MessageSquare, Map, Radio, Briefcase, Award, Newspaper, Tv, Bot, Bell, Megaphone, Zap, HelpCircle, FileText, Wallet, Sparkles, Trophy, Music } from 'lucide-react';
+import { Home, Compass, Film, MessageCircle, Menu, User, Settings, Globe, Store, LogOut, MessageSquare, Map, Radio, Briefcase, Award, Newspaper, Tv, Bot, Bell, Megaphone, Zap, HelpCircle, FileText, Wallet, Sparkles, Trophy, Music, Gamepad2 } from 'lucide-react';
 import { useSession, signOut } from 'next-auth/react';
 import { getSidebarDataCached } from '@/lib/sidebar-data';
 import { getDrafts } from '@/lib/draftManager';
@@ -180,6 +180,10 @@ export function BottomNav() {
                 <DropdownMenuItem onClick={() => { setClickedPath('/songs'); router.push('/songs'); }} className={getDropdownItemClass('/songs')}>
                   <Music className={getDropdownIconClass('/songs')} />
                   <span>Tolee Songs</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { setClickedPath('/games'); router.push('/games'); }} className={getDropdownItemClass('/games')}>
+                  <Gamepad2 className={getDropdownIconClass('/games')} />
+                  <span>Tolee Games</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => { setClickedPath('/darshan'); router.push('/darshan'); }} className={getDropdownItemClass('/darshan')}>
                   <NamasteIcon className={getDropdownIconClass('/darshan')} />
