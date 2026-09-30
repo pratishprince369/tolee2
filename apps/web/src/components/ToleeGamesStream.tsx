@@ -2,22 +2,16 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import {
   Gamepad2,
   Search,
-  Sparkles,
-  TrendingUp,
   Star,
   Play,
   Share2,
   ExternalLink,
   Flame,
   Zap,
-  Filter,
-  Check,
-  ChevronRight,
-  Trophy,
   Users,
   Download,
   Smartphone,
@@ -27,41 +21,103 @@ import {
   Crown,
   CircleDot,
   ArrowRight,
-  ChevronDown,
+  Heart,
+  Check,
+  Code,
+  ShieldCheck,
+  ChevronRight,
+  Sparkles,
+  Trophy,
 } from 'lucide-react';
 import {
   ToleeGame,
-  GAME_GENRES,
-  GameGenre,
+  MultiplayerRepo,
+  READY_MULTIPLAYER_REPOS,
+  GAME_CATEGORIES,
   getAllGames,
   getFeaturedGames,
   getTrendingGames,
+  getGamesByCategory,
   getGameById,
 } from '@/lib/gamesData';
 import { GamePlayerModal } from '@/components/GamePlayerModal';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
 export function ToleeGamesStream() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const initialGameId = searchParams.get('play');
 
   const allGames = useMemo(() => getAllGames(), []);
   const featuredGames = useMemo(() => getFeaturedGames(), []);
   const trendingGames = useMemo(() => getTrendingGames(), []);
+  const multiplayerRepos = useMemo(() => READY_MULTIPLAYER_REPOS, []);
 
-  const [selectedGenre, setSelectedGenre] = useState<GameGenre>('All');
+  const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'popular' | 'rating' | 'new' | 'recent'>('popular');
-  const [sortBy, setSortBy] = useState<'popular' | 'rating' | 'newest'>('popular');
+  const [activeTab, setActiveTab] = useState<'popular' | 'rating' | 'new'>('popular');
   const [activeGame, setActiveGame] = useState<ToleeGame | null>(null);
   const [isPlayerOpen, setIsPlayerOpen] = useState(false);
-  const [visibleCount, setVisibleCount] = useState(20);
+  const [visibleCount, setVisibleCount] = useState(25);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [favorites, setFavorites] = useState<string[]>([]);
 
   const browseSectionRef = useRef<HTMLDivElement>(null);
+  const multiplayerSectionRef = useRef<HTMLDivElement>(null);
+
+  // Sync favorites with localStorage
+  useEffect(() => {
+    const loadFavorites = () => {
+      try {
+        const stored = JSON.parse(localStorage.getItem('tolee_game_favorites') || '[]');
+        setFavorites(stored);
+      } catch {
+        setFavorites([]);
+      }
+    };
+    loadFavorites();
+    window.addEventListener('tolee_favorites_updated', loadFavorites);
+    return () => window.removeEventListener('tolee_favorites_updated', loadFavorites);
+  }, []);
+
+  const toggleFavorite = (gameId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    try {
+      const stored: string[] = JSON.parse(localStorage.getItem('tolee_game_favorites') || '[]');
+      let updated: string[];
+      if (stored.includes(gameId)) {
+        updated = stored.filter((id) => id !== gameId);
+      } else {
+        updated = [...stored, gameId];
+      }
+      localStorage.setItem('tolee_game_favorites', JSON.stringify(updated));
+      setFavorites(updated);
+      window.dispatchEvent(new CustomEvent('tolee_favorites_updated'));
+    } catch (err) {
+      console.warn('Favorite storage error:', err);
+    }
+  };
+
+  const handleShareGame = async (game: ToleeGame, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const shareUrl = `${window.location.origin}/games/${game.id}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Play ${game.title} on Tolee Games`,
+          text: `Play ${game.title} free without downloads on Tolee Games!`,
+          url: shareUrl,
+        });
+        return;
+      } catch {}
+    }
+
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopiedId(game.id);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch {}
+  };
 
   // Auto-open game if ?play=game-id is in URL
   useEffect(() => {
@@ -74,33 +130,9 @@ export function ToleeGamesStream() {
     }
   }, [initialGameId]);
 
-  // Handle Tab switch
-  const handleTabChange = (tab: 'popular' | 'rating' | 'new' | 'recent') => {
-    setActiveTab(tab);
-    if (tab === 'rating') setSortBy('rating');
-    else if (tab === 'new' || tab === 'recent') setSortBy('newest');
-    else setSortBy('popular');
-  };
-
   // Filtered & Sorted Games List
   const filteredGames = useMemo(() => {
-    let list = [...allGames];
-
-    if (selectedGenre !== 'All') {
-      if (selectedGenre === 'Sports') {
-        list = list.filter((g) => {
-          const t = (g.title + ' ' + g.description + ' ' + g.technology.join(' ')).toLowerCase();
-          return t.includes('kart') || t.includes('racer') || t.includes('drift') || t.includes('sports') || t.includes('pool') || t.includes('golf') || t.includes('ball') || t.includes('fighter') || t.includes('kombat');
-        });
-      } else if (selectedGenre === 'Multiplayer') {
-        list = list.filter((g) => {
-          const t = (g.title + ' ' + g.description + ' ' + g.technology.join(' ')).toLowerCase();
-          return t.includes('multiplayer') || t.includes('chess') || t.includes('fighter') || t.includes('combat') || t.includes('durable objects') || t.includes('battle') || t.includes('match') || t.includes('rogue');
-        });
-      } else {
-        list = list.filter((g) => g.genre === selectedGenre);
-      }
-    }
+    let list = getGamesByCategory(selectedCategory);
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
@@ -108,21 +140,23 @@ export function ToleeGamesStream() {
         (g) =>
           g.title.toLowerCase().includes(q) ||
           g.description.toLowerCase().includes(q) ||
+          g.genre.toLowerCase().includes(q) ||
+          (g.category && g.category.toLowerCase().includes(q)) ||
           g.technology.some((t) => t.toLowerCase().includes(q)) ||
           g.modelAttribution.toLowerCase().includes(q)
       );
     }
 
-    if (sortBy === 'rating') {
+    if (activeTab === 'rating') {
       list.sort((a, b) => b.rating - a.rating);
-    } else if (sortBy === 'newest') {
-      list.reverse();
+    } else if (activeTab === 'new') {
+      list = [...list].reverse();
     } else {
       list.sort((a, b) => b.playsCount - a.playsCount);
     }
 
     return list;
-  }, [allGames, selectedGenre, searchQuery, sortBy]);
+  }, [selectedCategory, searchQuery, activeTab]);
 
   const displayedGames = useMemo(() => {
     return filteredGames.slice(0, visibleCount);
@@ -133,51 +167,43 @@ export function ToleeGamesStream() {
     setIsPlayerOpen(true);
   };
 
-  const handleStartPlayingHero = () => {
-    const topGame = featuredGames[0] || allGames[0];
-    if (topGame) {
-      handlePlayGame(topGame);
-    }
-  };
-
-  const scrollToBrowse = () => {
-    browseSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  // Genre Icon Helper matching the mockup
-  const renderGenreIcon = (genre: GameGenre) => {
-    switch (genre) {
-      case '3D & Racing':
-        return <Car className="w-4 h-4 text-cyan-400" />;
-      case 'Action & Combat':
-        return <Swords className="w-4 h-4 text-amber-400" />;
-      case 'Puzzle & Board':
-        return <Puzzle className="w-4 h-4 text-indigo-400" />;
-      case 'Arcade & Casual':
-        return <Gamepad2 className="w-4 h-4 text-orange-400" />;
-      case 'Strategy & RPG':
-        return <Crown className="w-4 h-4 text-purple-400" />;
-      case 'Sports':
-        return <Trophy className="w-4 h-4 text-rose-400" />;
-      case 'Multiplayer':
-        return <Users className="w-4 h-4 text-teal-400" />;
-      default:
-        return null;
-    }
-  };
+  // Pre-filtered genre slices for the categorized carousels
+  const racingGames = useMemo(() => getGamesByCategory('Racing').slice(0, 6), []);
+  const puzzleGames = useMemo(() => getGamesByCategory('Puzzle').slice(0, 6), []);
+  const classicGames = useMemo(() => getGamesByCategory('Classic').slice(0, 6), []);
+  const boardGames = useMemo(() => getGamesByCategory('Board').slice(0, 6), []);
+  const sportsGames = useMemo(() => getGamesByCategory('Sports').slice(0, 6), []);
+  const shootingGames = useMemo(() => getGamesByCategory('Shooting').slice(0, 6), []);
+  const multiplayerGames = useMemo(() => getGamesByCategory('Multiplayer').slice(0, 6), []);
+  const newGames = useMemo(() => getGamesByCategory('New').slice(0, 6), []);
 
   return (
     <div className="min-h-screen bg-[#070B11] text-white pb-24 md:pb-16 select-none font-sans">
-      {/* ── Top Search Header Bar (matching mockup center input) ── */}
-      <div className="w-full bg-[#0B1019]/90 backdrop-blur-md border-b border-[#182332] px-4 py-3 sticky top-16 z-30">
-        <div className="max-w-7xl mx-auto flex items-center justify-center">
-          <div className="relative w-full max-w-xl">
+      {/* ── Top Search Header Bar ── */}
+      <div className="w-full bg-[#0B1019]/95 backdrop-blur-md border-b border-[#182332] px-4 py-3 sticky top-16 z-30 shadow-md">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#00D2C4] to-[#00F0FF] p-0.5 flex items-center justify-center shadow-lg shadow-[#00D2C4]/20">
+              <div className="w-full h-full bg-[#0B1019] rounded-[10px] flex items-center justify-center text-[#00D2C4]">
+                <Gamepad2 className="w-5 h-5" />
+              </div>
+            </div>
+            <div>
+              <h1 className="text-base sm:text-lg font-black tracking-wider text-white uppercase flex items-center gap-1.5">
+                <span>TOLEE</span>
+                <span className="text-[#00D2C4]">GAMES</span>
+              </h1>
+              <p className="text-[10px] text-zinc-400 font-medium">Free HTML5 & Multiplayer Hub</p>
+            </div>
+          </div>
+
+          <div className="relative w-full sm:max-w-md">
             <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search games, 3D, racing, puzzle, action..."
+              placeholder="Search 240+ games, 3D, chess, racing..."
               className="w-full h-10 pl-10 pr-9 rounded-full bg-[#111926] border border-[#202E42] text-xs sm:text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-[#00D2C4] focus:ring-1 focus:ring-[#00D2C4] transition-all"
             />
             {searchQuery && (
@@ -192,196 +218,119 @@ export function ToleeGamesStream() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-5 space-y-6">
-        {/* ── WELCOME TO TOLEE GAMES — HERO BANNER ── */}
-        {!searchQuery && selectedGenre === 'All' && (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-5 space-y-8">
+        
+        {/* ── Category Filter Pills Row (13 requested categories) ── */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar py-1">
+            {GAME_CATEGORIES.map((cat) => {
+              const isSelected = selectedCategory === cat.id;
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => setSelectedCategory(cat.id)}
+                  className={cn(
+                    'flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all duration-200 cursor-pointer shadow-sm',
+                    isSelected
+                      ? 'bg-[#00D2C4] text-black shadow-lg shadow-[#00D2C4]/30 scale-[1.03]'
+                      : 'bg-[#0E1624] text-zinc-300 hover:text-white hover:bg-[#141F30] border border-[#1F2D40]'
+                  )}
+                >
+                  <span>{cat.icon}</span>
+                  <span>{cat.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ── Top Hero Banner (Shown when not searching and on All) ── */}
+        {!searchQuery && selectedCategory === 'All' && (
           <div className="relative rounded-3xl overflow-hidden border border-[#1C283B] bg-gradient-to-r from-[#0B131E] via-[#0E1A29] to-[#0A131F] shadow-2xl p-6 sm:p-9">
-            {/* Ambient Background Radial Glows */}
             <div className="absolute -left-20 -top-20 w-96 h-96 bg-[#00D2C4]/15 rounded-full filter blur-3xl pointer-events-none" />
             <div className="absolute right-10 bottom-0 w-96 h-96 bg-[#0070F3]/15 rounded-full filter blur-3xl pointer-events-none" />
 
             <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-8">
-              {/* Left Column: Heading, Subtitle & Start Playing CTA */}
               <div className="flex-1 space-y-3.5 text-center lg:text-left">
                 <span className="text-[11px] sm:text-xs font-black uppercase tracking-[0.25em] text-[#00D2C4]">
-                  WELCOME TO
+                  PREMIUM ONLINE GAMING
                 </span>
 
-                <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-none">
-                  Tolee <span className="bg-gradient-to-r from-[#00E5FF] via-[#00D2C4] to-[#00BFA5] text-transparent bg-clip-text">Games</span>
-                </h1>
+                <h2 className="text-3xl sm:text-5xl font-black text-white tracking-tight leading-none">
+                  Tolee <span className="bg-gradient-to-r from-[#00E5FF] via-[#00D2C4] to-[#00BFA5] text-transparent bg-clip-text">Games Hub</span>
+                </h2>
 
-                <p className="text-base sm:text-lg font-bold text-zinc-200">
-                  Play. Compete. Have Fun.
+                <p className="text-sm sm:text-base font-semibold text-zinc-300">
+                  Instant HTML5 & WebGL Games with Realtime Multiplayer
                 </p>
 
                 <p className="text-xs sm:text-sm text-zinc-400 max-w-md mx-auto lg:mx-0">
-                  Instant HTML5 & WebGL games — No downloads required
+                  Zero downloads, instant play on mobile and desktop. Play solo or challenge friends.
                 </p>
 
-                <div className="pt-2 flex justify-center lg:justify-start">
+                <div className="pt-2 flex flex-wrap items-center justify-center lg:justify-start gap-3">
                   <button
-                    onClick={handleStartPlayingHero}
-                    className="inline-flex items-center gap-2.5 px-6 sm:px-8 py-3 rounded-full bg-[#00D2C4] hover:bg-[#00E5FF] text-black font-extrabold text-sm shadow-lg shadow-[#00D2C4]/25 hover:shadow-[#00D2C4]/40 active:scale-95 transition-all cursor-pointer"
+                    onClick={() => {
+                      const top = featuredGames[0] || allGames[0];
+                      if (top) handlePlayGame(top);
+                    }}
+                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-[#00D2C4] hover:bg-[#00E5FF] text-black font-extrabold text-xs sm:text-sm shadow-lg shadow-[#00D2C4]/25 active:scale-95 transition-all cursor-pointer"
                   >
-                    <Gamepad2 className="w-4 h-4 fill-black stroke-black" />
-                    <span>Start Playing</span>
-                    <ArrowRight className="w-4 h-4" />
+                    <Play className="w-4 h-4 fill-black" />
+                    <span>Play Featured Game</span>
+                  </button>
+
+                  <button
+                    onClick={() => multiplayerSectionRef.current?.scrollIntoView({ behavior: 'smooth' })}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#0E1624] hover:bg-[#141F30] border border-[#202E42] text-white font-bold text-xs sm:text-sm transition-all cursor-pointer"
+                  >
+                    <Users className="w-4 h-4 text-[#00D2C4]" />
+                    <span>Multiplayer Repos</span>
                   </button>
                 </div>
               </div>
 
-              {/* Center 3D Illustration Graphic (Gamepad + 3D Cards) */}
-              <div className="relative w-full max-w-sm sm:max-w-md h-52 sm:h-64 flex items-center justify-center select-none">
-                {/* 3D Floating Neon Game Controller Composition */}
-                <div className="relative w-full h-full flex items-center justify-center">
-                  {/* Floating Top Left Badge (Racing Car) */}
-                  <div className="absolute top-2 left-6 w-20 sm:w-24 aspect-16/10 rounded-xl overflow-hidden border border-[#00F0FF]/40 shadow-xl shadow-cyan-500/20 transform -rotate-12 hover:rotate-0 transition-transform duration-300">
-                    <img
-                      src="https://images.unsplash.com/photo-1542751371-adc38448a05e?w=300&q=80"
-                      alt="3D Racing"
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-
-                  {/* Floating Crown Badge */}
-                  <div className="absolute top-1 right-20 w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 p-2 shadow-lg shadow-amber-500/30 transform rotate-12 flex items-center justify-center">
-                    <Crown className="w-6 h-6 text-black fill-black" />
-                  </div>
-
-                  {/* Floating Dartboard Badge */}
-                  <div className="absolute bottom-4 right-10 w-11 h-11 rounded-xl bg-gradient-to-br from-rose-500 to-pink-600 p-2 shadow-lg shadow-rose-500/30 transform -rotate-6 flex items-center justify-center">
-                    <CircleDot className="w-6 h-6 text-white" />
-                  </div>
-
-                  {/* Floating Retro Character Badge */}
-                  <div className="absolute bottom-2 left-16 w-16 h-12 rounded-xl overflow-hidden border border-amber-500/40 shadow-xl shadow-amber-500/20 transform rotate-6">
-                    <img
-                      src="https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=300&q=80"
-                      alt="Pixel Retro"
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-
-                  {/* Main High-Tech Gamepad Center Art */}
-                  <div className="relative z-10 w-44 sm:w-56 filter drop-shadow-[0_15px_30px_rgba(0,210,196,0.35)] transform hover:scale-105 transition-transform duration-300">
-                    <svg viewBox="0 0 240 160" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-auto">
-                      <defs>
-                        <linearGradient id="bodyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                          <stop offset="0%" stopColor="#FFFFFF" />
-                          <stop offset="60%" stopColor="#E2E8F0" />
-                          <stop offset="100%" stopColor="#CBD5E1" />
-                        </linearGradient>
-                        <linearGradient id="tealGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                          <stop offset="0%" stopColor="#00F0FF" />
-                          <stop offset="100%" stopColor="#00D2C4" />
-                        </linearGradient>
-                      </defs>
-                      {/* Controller Body Shell */}
-                      <path
-                        d="M60 40 C30 40 15 70 20 120 C23 145 45 155 65 140 C80 130 90 100 120 100 C150 100 160 130 175 140 C195 155 217 145 220 120 C225 70 210 40 180 40 C155 40 135 55 120 55 C105 55 85 40 60 40 Z"
-                        fill="url(#bodyGrad)"
-                        stroke="#94A3B8"
-                        strokeWidth="3"
-                      />
-                      {/* D-Pad on Left */}
-                      <rect x="52" y="72" width="12" height="34" rx="3" fill="#0F172A" />
-                      <rect x="41" y="83" width="34" height="12" rx="3" fill="#0F172A" />
-                      {/* D-Pad Teal Center */}
-                      <circle cx="58" cy="89" r="3.5" fill="url(#tealGrad)" />
-                      {/* Action Buttons on Right */}
-                      <circle cx="182" cy="76" r="6" fill="url(#tealGrad)" />
-                      <circle cx="194" cy="88" r="6" fill="#00D2C4" />
-                      <circle cx="170" cy="88" r="6" fill="#00D2C4" />
-                      <circle cx="182" cy="100" r="6" fill="#00BFA5" />
-                      {/* Thumbsticks */}
-                      <circle cx="92" cy="98" r="14" fill="#1E293B" stroke="#00D2C4" strokeWidth="2.5" />
-                      <circle cx="92" cy="98" r="8" fill="#334155" />
-                      <circle cx="148" cy="98" r="14" fill="#1E293B" stroke="#00D2C4" strokeWidth="2.5" />
-                      <circle cx="148" cy="98" r="8" fill="#334155" />
-                      {/* Tolee Brand Text on Center */}
-                      <text x="120" y="75" textAnchor="middle" fill="#0F172A" fontSize="11" fontWeight="bold" fontFamily="sans-serif">
-                        tolee
-                      </text>
-                    </svg>
-                  </div>
+              {/* 4 Feature Highlights */}
+              <div className="grid grid-cols-2 gap-2.5 w-full sm:w-auto shrink-0">
+                <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-2xl bg-[#0E1624] border border-[#1F2D40] text-xs font-bold text-zinc-200">
+                  <Gamepad2 className="w-4 h-4 text-[#00D2C4]" />
+                  <span>240+ Free Games</span>
                 </div>
-              </div>
-
-              {/* Right Column: 4 Feature Highlights */}
-              <div className="flex flex-col gap-2.5 w-full sm:w-64 shrink-0">
-                <div className="flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-[#0E1624] border border-[#1F2D40] text-xs font-bold text-zinc-200 shadow-sm hover:border-[#00D2C4]/40 transition-colors">
-                  <div className="w-7 h-7 rounded-xl bg-[#00D2C4]/15 text-[#00D2C4] flex items-center justify-center">
-                    <Gamepad2 className="w-4 h-4" />
-                  </div>
-                  <span>200+ Free Games</span>
+                <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-2xl bg-[#0E1624] border border-[#1F2D40] text-xs font-bold text-zinc-200">
+                  <Download className="w-4 h-4 text-[#00F0FF]" />
+                  <span>0 MB Downloads</span>
                 </div>
-
-                <div className="flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-[#0E1624] border border-[#1F2D40] text-xs font-bold text-zinc-200 shadow-sm hover:border-[#00D2C4]/40 transition-colors">
-                  <div className="w-7 h-7 rounded-xl bg-[#00F0FF]/15 text-[#00F0FF] flex items-center justify-center">
-                    <Download className="w-4 h-4" />
-                  </div>
-                  <span>No Downloads</span>
+                <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-2xl bg-[#0E1624] border border-[#1F2D40] text-xs font-bold text-zinc-200">
+                  <Smartphone className="w-4 h-4 text-[#3B82F6]" />
+                  <span>Mobile First</span>
                 </div>
-
-                <div className="flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-[#0E1624] border border-[#1F2D40] text-xs font-bold text-zinc-200 shadow-sm hover:border-[#00D2C4]/40 transition-colors">
-                  <div className="w-7 h-7 rounded-xl bg-[#3B82F6]/15 text-[#3B82F6] flex items-center justify-center">
-                    <Smartphone className="w-4 h-4" />
-                  </div>
-                  <span>Play on Any Device</span>
-                </div>
-
-                <div className="flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-[#0E1624] border border-[#1F2D40] text-xs font-bold text-zinc-200 shadow-sm hover:border-[#00D2C4]/40 transition-colors">
-                  <div className="w-7 h-7 rounded-xl bg-[#F59E0B]/15 text-[#F59E0B] flex items-center justify-center">
-                    <Zap className="w-4 h-4" />
-                  </div>
-                  <span>New Games Daily</span>
+                <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-2xl bg-[#0E1624] border border-[#1F2D40] text-xs font-bold text-zinc-200">
+                  <Zap className="w-4 h-4 text-[#F59E0B]" />
+                  <span>Open Source</span>
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* ── Category Filter Pills Row (matching mockup) ── */}
-        <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar py-1">
-          {GAME_GENRES.map((genre) => {
-            const isSelected = selectedGenre === genre;
-            return (
-              <button
-                key={genre}
-                onClick={() => setSelectedGenre(genre)}
-                className={cn(
-                  'flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-bold whitespace-nowrap transition-all duration-200 cursor-pointer',
-                  isSelected
-                    ? 'bg-[#00D2C4] text-black shadow-lg shadow-[#00D2C4]/30 scale-[1.03]'
-                    : 'bg-[#0E1624] text-zinc-300 hover:text-white hover:bg-[#141F30] border border-[#1F2D40]'
-                )}
-              >
-                {renderGenreIcon(genre)}
-                <span>{genre}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* ── Trending Now Section (matching mockup) ── */}
-        {!searchQuery && selectedGenre === 'All' && (
-          <div className="space-y-3.5 pt-2">
+        {/* ── 1. 🔥 TRENDING GAMES ── */}
+        {!searchQuery && selectedCategory === 'All' && (
+          <section className="space-y-4">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-2">
                 <span className="text-xl">🔥</span>
                 <div>
-                  <h2 className="text-base sm:text-lg font-black text-white tracking-tight">
-                    Trending Now
-                  </h2>
+                  <h3 className="text-base sm:text-lg font-black text-white tracking-tight">
+                    Trending Games
+                  </h3>
                   <p className="text-xs text-zinc-400">
-                    Most played games on Tolee this week
+                    Most popular games played this week on Tolee
                   </p>
                 </div>
               </div>
 
               <button
-                onClick={scrollToBrowse}
+                onClick={() => browseSectionRef.current?.scrollIntoView({ behavior: 'smooth' })}
                 className="text-xs font-bold text-[#00D2C4] hover:text-[#00F0FF] flex items-center gap-1 cursor-pointer transition-colors"
               >
                 <span>View All</span>
@@ -389,103 +338,243 @@ export function ToleeGamesStream() {
               </button>
             </div>
 
-            {/* Trending Horizontal Row of 5 Cards */}
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
               {trendingGames.slice(0, 5).map((game) => (
-                <div
+                <GameCard
                   key={`trending-${game.id}`}
-                  onClick={() => handlePlayGame(game)}
-                  className="rounded-2xl bg-[#0D1522] border border-[#1A2636] hover:border-[#00D2C4]/60 transition-all duration-200 cursor-pointer overflow-hidden flex flex-col group shadow-lg hover:shadow-cyan-500/10"
+                  game={game}
+                  isFavorite={favorites.includes(game.id)}
+                  copiedId={copiedId}
+                  onPlay={() => handlePlayGame(game)}
+                  onToggleFavorite={(e) => toggleFavorite(game.id, e)}
+                  onShare={(e) => handleShareGame(game, e)}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ── 2. 🎮 READY MULTIPLAYER GAME REPOSITORIES (Dedicated Showcase) ── */}
+        {!searchQuery && (selectedCategory === 'All' || selectedCategory === 'Multiplayer') && (
+          <section ref={multiplayerSectionRef} className="space-y-4 pt-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">🎮</span>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-white tracking-tight flex items-center gap-2">
+                    <span>Ready Multiplayer Games</span>
+                    <span className="text-[10px] uppercase font-extrabold px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30">
+                      GitHub Repos
+                    </span>
+                  </h3>
+                  <p className="text-xs text-zinc-400">
+                    Production-ready multiplayer engines, WebSocket servers & open-source game repositories
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {multiplayerRepos.map((repo) => (
+                <div
+                  key={repo.id}
+                  className="rounded-2xl bg-[#0D1522] border border-[#1A2636] hover:border-[#00D2C4]/60 p-4 flex flex-col justify-between space-y-3.5 group shadow-lg hover:shadow-cyan-500/10 transition-all duration-200"
                 >
-                  {/* Card Thumbnail */}
-                  <div className="relative aspect-4/3 overflow-hidden bg-black">
-                    <img
-                      src={game.coverImage}
-                      alt={game.title}
-                      loading="lazy"
-                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                    />
-                    {/* Rating Badge top-right with gold star */}
-                    <div className="absolute top-2 right-2 px-2 py-0.5 rounded-md text-[10px] font-black bg-black/75 backdrop-blur-md text-amber-400 flex items-center gap-1 border border-white/10 shadow-sm">
-                      <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />
-                      <span>{game.rating.toFixed(1)}</span>
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-extrabold text-sm sm:text-base text-zinc-100 group-hover:text-[#00D2C4] transition-colors truncate">
+                            {repo.name}
+                          </h4>
+                        </div>
+                        <span className="text-[10px] font-bold text-teal-400 flex items-center gap-1 mt-0.5">
+                          <Users className="w-3 h-3" />
+                          {repo.multiplayerType}
+                        </span>
+                      </div>
+
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-zinc-800 text-zinc-300 border border-zinc-700 shrink-0">
+                        {repo.license}
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-zinc-400 leading-relaxed line-clamp-2">
+                      {repo.description}
+                    </p>
+
+                    {/* Compatibility & Tech Badges */}
+                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                        {repo.compatibility}
+                      </span>
+                      {repo.technology.slice(0, 3).map((tech) => (
+                        <span
+                          key={tech}
+                          className="px-2 py-0.5 rounded text-[10px] font-medium bg-zinc-800/80 text-zinc-300 border border-zinc-700/60"
+                        >
+                          {tech}
+                        </span>
+                      ))}
                     </div>
                   </div>
 
-                  {/* Card Bottom Footer */}
-                  <div className="p-3 flex items-center justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <h3 className="font-extrabold text-xs text-zinc-100 truncate group-hover:text-[#00D2C4] transition-colors">
-                        {game.title}
-                      </h3>
-                      <p className="text-[10px] text-zinc-400 truncate mt-0.5">
-                        {game.genre}
-                      </p>
-                      <div className="flex items-center gap-1 text-[10px] text-zinc-500 font-mono mt-0.5">
-                        <Users className="w-3 h-3 text-zinc-500" />
-                        <span>{(game.playsCount / 1000).toFixed(0)}K plays</span>
-                      </div>
-                    </div>
-
-                    {/* Circular Cyan Play Button */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handlePlayGame(game);
-                      }}
-                      className="w-8 h-8 rounded-full bg-[#00D2C4] text-black flex items-center justify-center shrink-0 shadow-md shadow-[#00D2C4]/30 group-hover:scale-110 group-hover:bg-[#00F0FF] transition-all cursor-pointer"
-                      title="Play Now"
+                  {/* Actions: GitHub Repo + Play/Integrate Game */}
+                  <div className="flex items-center gap-2 pt-2 border-t border-[#1C283B]">
+                    <a
+                      href={repo.githubUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-[#111A27] hover:bg-[#182436] text-xs font-semibold text-zinc-200 border border-[#202E42] transition-colors"
                     >
-                      <Play className="w-3.5 h-3.5 fill-black stroke-black translate-x-0.5" />
-                    </button>
+                      <Code className="w-3.5 h-3.5 text-zinc-400" />
+                      <span>GitHub Repo</span>
+                      <ExternalLink className="w-3 h-3 text-zinc-500 ml-auto" />
+                    </a>
+
+                    <a
+                      href={repo.githubUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-[#00D2C4] hover:bg-[#00E5FF] text-xs font-extrabold text-black shadow-md shadow-[#00D2C4]/20 transition-all"
+                    >
+                      <Gamepad2 className="w-3.5 h-3.5 fill-black stroke-black" />
+                      <span>Integrate Game</span>
+                    </a>
                   </div>
                 </div>
               ))}
             </div>
+          </section>
+        )}
+
+        {/* ── 3. 🆓 FREE HTML5 GAMES LIBRARY (Categorized Carousels / Grids) ── */}
+        {!searchQuery && selectedCategory === 'All' && (
+          <div className="space-y-8 pt-4">
+            
+            {/* Racing Section */}
+            <CategorizedSection
+              title="🏎️ Racing & High-Speed Games"
+              subtitle="Futuristic 3D racers, turbo challenges, and track drifts"
+              games={racingGames}
+              favorites={favorites}
+              copiedId={copiedId}
+              onPlay={handlePlayGame}
+              onToggleFavorite={toggleFavorite}
+              onShare={handleShareGame}
+              onViewAll={() => setSelectedCategory('Racing')}
+            />
+
+            {/* Puzzle Section */}
+            <CategorizedSection
+              title="🧩 Puzzle & Brain Teasers"
+              subtitle="Logic puzzles, 2048, Hextris, Sudoku and spatial riddles"
+              games={puzzleGames}
+              favorites={favorites}
+              copiedId={copiedId}
+              onPlay={handlePlayGame}
+              onToggleFavorite={toggleFavorite}
+              onShare={handleShareGame}
+              onViewAll={() => setSelectedCategory('Puzzle')}
+            />
+
+            {/* Classic Section */}
+            <CategorizedSection
+              title="🐍 Classic & Retro Games"
+              subtitle="Tetris, Snake 97, Pong, Pacman and nostalgia masterpieces"
+              games={classicGames}
+              favorites={favorites}
+              copiedId={copiedId}
+              onPlay={handlePlayGame}
+              onToggleFavorite={toggleFavorite}
+              onShare={handleShareGame}
+              onViewAll={() => setSelectedCategory('Classic')}
+            />
+
+            {/* Board Games Section */}
+            <CategorizedSection
+              title="♟️ Board & Turn-Based Games"
+              subtitle="Chessboard JS, Tic-Tac-Toe, Connect Four and strategic duel"
+              games={boardGames}
+              favorites={favorites}
+              copiedId={copiedId}
+              onPlay={handlePlayGame}
+              onToggleFavorite={toggleFavorite}
+              onShare={handleShareGame}
+              onViewAll={() => setSelectedCategory('Board')}
+            />
+
+            {/* Sports Section */}
+            <CategorizedSection
+              title="⚽ Sports & Skill Games"
+              subtitle="Pong, basketball shootouts, pool and sports athletics"
+              games={sportsGames}
+              favorites={favorites}
+              copiedId={copiedId}
+              onPlay={handlePlayGame}
+              onToggleFavorite={toggleFavorite}
+              onShare={handleShareGame}
+              onViewAll={() => setSelectedCategory('Sports')}
+            />
+
+            {/* Shooting Section */}
+            <CategorizedSection
+              title="🔫 Shooting & Space Combat"
+              subtitle="Vector Asteroids, Space Invaders, galactic defense"
+              games={shootingGames}
+              favorites={favorites}
+              copiedId={copiedId}
+              onPlay={handlePlayGame}
+              onToggleFavorite={toggleFavorite}
+              onShare={handleShareGame}
+              onViewAll={() => setSelectedCategory('Shooting')}
+            />
+
+            {/* Online Multiplayer Section */}
+            <CategorizedSection
+              title="👥 Online & Local Multiplayer"
+              subtitle="Battle friends live in BrowserQuest, Agar clone, and 2-Player games"
+              games={multiplayerGames}
+              favorites={favorites}
+              copiedId={copiedId}
+              onPlay={handlePlayGame}
+              onToggleFavorite={toggleFavorite}
+              onShare={handleShareGame}
+              onViewAll={() => setSelectedCategory('Multiplayer')}
+            />
+
+            {/* New Games Section */}
+            <CategorizedSection
+              title="🆕 Newly Added HTML5 Games"
+              subtitle="Fresh browser releases engineered for web performance"
+              games={newGames}
+              favorites={favorites}
+              copiedId={copiedId}
+              onPlay={handlePlayGame}
+              onToggleFavorite={toggleFavorite}
+              onShare={handleShareGame}
+              onViewAll={() => setSelectedCategory('New')}
+            />
           </div>
         )}
 
-        {/* ── Browse All Games Section ── */}
-        <div ref={browseSectionRef} className="space-y-4 pt-4">
+        {/* ── 4. BROWSE ALL GAMES SECTION (Main Grid with Tabs & Filter) ── */}
+        <div ref={browseSectionRef} className="space-y-4 pt-4 border-t border-[#182332]">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <Gamepad2 className="w-5 h-5 text-[#00D2C4]" />
-              <h2 className="text-base sm:text-lg font-black text-white tracking-tight">
-                Browse All Games{' '}
+              <h3 className="text-base sm:text-lg font-black text-white tracking-tight">
+                {selectedCategory === 'All' ? 'All Free HTML5 Games' : `${selectedCategory} Games`}{' '}
                 <span className="text-xs font-medium text-zinc-500">
-                  ({filteredGames.length} games)
+                  ({filteredGames.length} available)
                 </span>
-              </h2>
+              </h3>
             </div>
 
-            {/* Right Tabs & Filter: New, Top Rated, Most Popular, Recently Added */}
+            {/* Tabs: Most Popular, Top Rated, New */}
             <div className="flex items-center gap-1.5 overflow-x-auto hide-scrollbar">
               <button
-                onClick={() => handleTabChange('new')}
-                className={cn(
-                  'px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap',
-                  activeTab === 'new'
-                    ? 'bg-[#00D2C4] text-black font-extrabold shadow-md shadow-[#00D2C4]/20'
-                    : 'bg-[#0E1624] text-zinc-400 hover:text-white border border-[#1F2D40]'
-                )}
-              >
-                New
-              </button>
-
-              <button
-                onClick={() => handleTabChange('rating')}
-                className={cn(
-                  'px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap',
-                  activeTab === 'rating'
-                    ? 'bg-[#00D2C4] text-black font-extrabold shadow-md shadow-[#00D2C4]/20'
-                    : 'bg-[#0E1624] text-zinc-400 hover:text-white border border-[#1F2D40]'
-                )}
-              >
-                Top Rated
-              </button>
-
-              <button
-                onClick={() => handleTabChange('popular')}
+                onClick={() => setActiveTab('popular')}
                 className={cn(
                   'px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap',
                   activeTab === 'popular'
@@ -493,24 +582,36 @@ export function ToleeGamesStream() {
                     : 'bg-[#0E1624] text-zinc-400 hover:text-white border border-[#1F2D40]'
                 )}
               >
-                Most Popular
+                🔥 Most Popular
               </button>
 
               <button
-                onClick={() => handleTabChange('recent')}
+                onClick={() => setActiveTab('rating')}
                 className={cn(
                   'px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap',
-                  activeTab === 'recent'
+                  activeTab === 'rating'
                     ? 'bg-[#00D2C4] text-black font-extrabold shadow-md shadow-[#00D2C4]/20'
                     : 'bg-[#0E1624] text-zinc-400 hover:text-white border border-[#1F2D40]'
                 )}
               >
-                Recently Added
+                ⭐ Top Rated
+              </button>
+
+              <button
+                onClick={() => setActiveTab('new')}
+                className={cn(
+                  'px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap',
+                  activeTab === 'new'
+                    ? 'bg-[#00D2C4] text-black font-extrabold shadow-md shadow-[#00D2C4]/20'
+                    : 'bg-[#0E1624] text-zinc-400 hover:text-white border border-[#1F2D40]'
+                )}
+              >
+                🆕 Newest
               </button>
             </div>
           </div>
 
-          {/* Grid of Games Cards */}
+          {/* Grid of Game Cards */}
           {displayedGames.length === 0 ? (
             <div className="py-20 text-center space-y-3">
               <div className="w-14 h-14 rounded-2xl bg-[#0E1624] border border-[#1F2D40] text-zinc-500 mx-auto flex items-center justify-center">
@@ -518,14 +619,14 @@ export function ToleeGamesStream() {
               </div>
               <h4 className="font-bold text-base text-zinc-200">No games found</h4>
               <p className="text-xs text-zinc-500 max-w-sm mx-auto">
-                No matching games found for &quot;{searchQuery}&quot;. Try searching for &quot;chess&quot;, &quot;3D&quot;, or &quot;fighter&quot;.
+                No matching games for &quot;{searchQuery}&quot;. Try searching for &quot;tetris&quot;, &quot;2048&quot;, or &quot;racing&quot;.
               </p>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => {
                   setSearchQuery('');
-                  setSelectedGenre('All');
+                  setSelectedCategory('All');
                 }}
                 className="rounded-full border-zinc-700 text-xs mt-2"
               >
@@ -535,54 +636,15 @@ export function ToleeGamesStream() {
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
               {displayedGames.map((game) => (
-                <div
+                <GameCard
                   key={game.id}
-                  onClick={() => handlePlayGame(game)}
-                  className="rounded-2xl bg-[#0D1522] border border-[#1A2636] hover:border-[#00D2C4]/60 transition-all duration-200 cursor-pointer overflow-hidden flex flex-col group shadow-md hover:shadow-cyan-500/10"
-                >
-                  {/* Card Thumbnail */}
-                  <div className="relative aspect-4/3 overflow-hidden bg-black">
-                    <img
-                      src={game.coverImage}
-                      alt={game.title}
-                      loading="lazy"
-                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                    />
-                    {/* Rating Badge top-right with gold star */}
-                    <div className="absolute top-2 right-2 px-2 py-0.5 rounded-md text-[10px] font-black bg-black/75 backdrop-blur-md text-amber-400 flex items-center gap-1 border border-white/10 shadow-sm">
-                      <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />
-                      <span>{game.rating.toFixed(1)}</span>
-                    </div>
-                  </div>
-
-                  {/* Card Bottom Footer */}
-                  <div className="p-3 flex items-center justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <h3 className="font-extrabold text-xs text-zinc-100 truncate group-hover:text-[#00D2C4] transition-colors">
-                        {game.title}
-                      </h3>
-                      <p className="text-[10px] text-zinc-400 truncate mt-0.5">
-                        {game.genre}
-                      </p>
-                      <div className="flex items-center gap-1 text-[10px] text-zinc-500 font-mono mt-0.5">
-                        <Users className="w-3 h-3 text-zinc-500" />
-                        <span>{(game.playsCount / 1000).toFixed(0)}K plays</span>
-                      </div>
-                    </div>
-
-                    {/* Circular Cyan Play Button */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handlePlayGame(game);
-                      }}
-                      className="w-8 h-8 rounded-full bg-[#00D2C4] text-black flex items-center justify-center shrink-0 shadow-md shadow-[#00D2C4]/30 group-hover:scale-110 group-hover:bg-[#00F0FF] transition-all cursor-pointer"
-                      title="Play Now"
-                    >
-                      <Play className="w-3.5 h-3.5 fill-black stroke-black translate-x-0.5" />
-                    </button>
-                  </div>
-                </div>
+                  game={game}
+                  isFavorite={favorites.includes(game.id)}
+                  copiedId={copiedId}
+                  onPlay={() => handlePlayGame(game)}
+                  onToggleFavorite={(e) => toggleFavorite(game.id, e)}
+                  onShare={(e) => handleShareGame(game, e)}
+                />
               ))}
             </div>
           )}
@@ -591,7 +653,7 @@ export function ToleeGamesStream() {
           {visibleCount < filteredGames.length && (
             <div className="pt-6 text-center">
               <button
-                onClick={() => setVisibleCount((prev) => prev + 20)}
+                onClick={() => setVisibleCount((prev) => prev + 25)}
                 className="px-8 py-2.5 rounded-full border border-[#202E42] bg-[#0E1624] hover:bg-[#141F30] text-xs font-bold text-zinc-200 transition-colors shadow-md cursor-pointer"
               >
                 Load More Games ({filteredGames.length - visibleCount} remaining)
@@ -599,6 +661,32 @@ export function ToleeGamesStream() {
             </div>
           )}
         </div>
+
+        {/* ── 5. “MORE GAMES COMING SOON” FOOTER CARD ── */}
+        <div className="rounded-3xl border border-[#1F2D40] bg-gradient-to-r from-[#0C1420] via-[#0F1B2B] to-[#0C1420] p-6 sm:p-8 text-center space-y-3 relative overflow-hidden shadow-xl">
+          <div className="w-12 h-12 rounded-2xl bg-[#00D2C4]/15 text-[#00D2C4] border border-[#00D2C4]/30 flex items-center justify-center mx-auto">
+            <Sparkles className="w-6 h-6 animate-pulse" />
+          </div>
+          <h4 className="text-lg sm:text-xl font-black text-white">
+            More Games Coming Soon!
+          </h4>
+          <p className="text-xs sm:text-sm text-zinc-400 max-w-md mx-auto">
+            Our team is continually integrating open-source games and WebGL engines. Have a game repo you want included?
+          </p>
+          <div className="pt-2">
+            <a
+              href="https://github.com/AgentsLoop/awesome-opus-5.5-games"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-[#111A27] hover:bg-[#182436] border border-[#202E42] text-xs font-bold text-zinc-200 transition-colors"
+            >
+              <Code className="w-3.5 h-3.5 text-[#00D2C4]" />
+              <span>Submit Game on GitHub</span>
+              <ExternalLink className="w-3 h-3 text-zinc-500" />
+            </a>
+          </div>
+        </div>
+
       </div>
 
       {/* ── Active Game Player Modal ── */}
@@ -610,6 +698,182 @@ export function ToleeGamesStream() {
           setActiveGame(null);
         }}
       />
+    </div>
+  );
+}
+
+// ── Reusable Categorized Carousel / Grid Component ──
+interface CategorizedSectionProps {
+  title: string;
+  subtitle: string;
+  games: ToleeGame[];
+  favorites: string[];
+  copiedId: string | null;
+  onPlay: (game: ToleeGame) => void;
+  onToggleFavorite: (id: string, e: React.MouseEvent) => void;
+  onShare: (game: ToleeGame, e: React.MouseEvent) => void;
+  onViewAll: () => void;
+}
+
+function CategorizedSection({
+  title,
+  subtitle,
+  games,
+  favorites,
+  copiedId,
+  onPlay,
+  onToggleFavorite,
+  onShare,
+  onViewAll,
+}: CategorizedSectionProps) {
+  if (!games || games.length === 0) return null;
+
+  return (
+    <section className="space-y-3.5">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-base sm:text-lg font-black text-white tracking-tight">
+            {title}
+          </h3>
+          <p className="text-xs text-zinc-400">{subtitle}</p>
+        </div>
+
+        <button
+          onClick={onViewAll}
+          className="text-xs font-bold text-[#00D2C4] hover:text-[#00F0FF] flex items-center gap-1 cursor-pointer transition-colors"
+        >
+          <span>View All</span>
+          <ArrowRight className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3.5">
+        {games.map((game) => (
+          <GameCard
+            key={`${title}-${game.id}`}
+            game={game}
+            isFavorite={favorites.includes(game.id)}
+            copiedId={copiedId}
+            onPlay={() => onPlay(game)}
+            onToggleFavorite={(e) => onToggleFavorite(game.id, e)}
+            onShare={(e) => onShare(game, e)}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// ── Reusable Individual Game Card with Play, GitHub, Favorite, Share ──
+interface GameCardProps {
+  game: ToleeGame;
+  isFavorite: boolean;
+  copiedId: string | null;
+  onPlay: () => void;
+  onToggleFavorite: (e: React.MouseEvent) => void;
+  onShare: (e: React.MouseEvent) => void;
+}
+
+function GameCard({
+  game,
+  isFavorite,
+  copiedId,
+  onPlay,
+  onToggleFavorite,
+  onShare,
+}: GameCardProps) {
+  return (
+    <div
+      onClick={onPlay}
+      className="rounded-2xl bg-[#0D1522] border border-[#1A2636] hover:border-[#00D2C4]/60 transition-all duration-200 cursor-pointer overflow-hidden flex flex-col group shadow-md hover:shadow-cyan-500/10"
+    >
+      {/* Thumbnail Container */}
+      <div className="relative aspect-4/3 overflow-hidden bg-black">
+        <img
+          src={game.coverImage}
+          alt={game.title}
+          loading="lazy"
+          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+        />
+
+        {/* Rating Badge top-right */}
+        <div className="absolute top-2 right-2 px-2 py-0.5 rounded-md text-[10px] font-black bg-black/80 backdrop-blur-md text-amber-400 flex items-center gap-1 border border-white/10 shadow-sm">
+          <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />
+          <span>{game.rating.toFixed(1)}</span>
+        </div>
+
+        {/* Favorite Icon Top-Left */}
+        <button
+          onClick={onToggleFavorite}
+          className="absolute top-2 left-2 w-7 h-7 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center text-zinc-300 hover:text-rose-400 transition-colors"
+          title={isFavorite ? 'Favorited' : 'Add to Favorites'}
+        >
+          <Heart className={`w-3.5 h-3.5 ${isFavorite ? 'fill-rose-500 text-rose-500' : ''}`} />
+        </button>
+
+        {/* Single / Multiplayer & Mobile Badges Overlay at bottom of image */}
+        <div className="absolute bottom-1.5 left-2 right-2 flex items-center justify-between text-[9px] font-bold">
+          <span className="px-1.5 py-0.5 rounded bg-black/75 backdrop-blur-xs text-zinc-200 border border-white/10">
+            {game.multiplayer || 'Single Player'}
+          </span>
+          {game.mobileSupported !== false && (
+            <span className="px-1.5 py-0.5 rounded bg-emerald-500/80 backdrop-blur-xs text-white">
+              📱 Mobile
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Card Body */}
+      <div className="p-3 flex flex-col justify-between flex-1 space-y-2">
+        <div>
+          <h4 className="font-extrabold text-xs text-zinc-100 truncate group-hover:text-[#00D2C4] transition-colors">
+            {game.title}
+          </h4>
+          <p className="text-[10px] text-zinc-400 truncate mt-0.5">
+            {game.genre}
+          </p>
+        </div>
+
+        {/* Card Buttons: PLAY NOW + GitHub + Share */}
+        <div className="flex items-center gap-1.5 pt-1 border-t border-[#1C283B]">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onPlay();
+            }}
+            className="flex-1 py-1.5 rounded-lg bg-[#00D2C4] hover:bg-[#00E5FF] text-black font-extrabold text-[11px] flex items-center justify-center gap-1 shadow-sm transition-all"
+          >
+            <Play className="w-3 h-3 fill-black" />
+            <span>PLAY NOW</span>
+          </button>
+
+          {game.githubUrl && (
+            <a
+              href={game.githubUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="w-7 h-7 rounded-lg bg-[#111A27] hover:bg-[#182436] border border-[#202E42] text-zinc-400 hover:text-white flex items-center justify-center shrink-0 transition-colors"
+              title="View on GitHub"
+            >
+              <Code className="w-3.5 h-3.5" />
+            </a>
+          )}
+
+          <button
+            onClick={onShare}
+            className="w-7 h-7 rounded-lg bg-[#111A27] hover:bg-[#182436] border border-[#202E42] text-zinc-400 hover:text-white flex items-center justify-center shrink-0 transition-colors"
+            title="Share Game"
+          >
+            {copiedId === game.id ? (
+              <Check className="w-3.5 h-3.5 text-emerald-400" />
+            ) : (
+              <Share2 className="w-3.5 h-3.5" />
+            )}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

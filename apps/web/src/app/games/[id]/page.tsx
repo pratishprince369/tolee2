@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { getGameById, getGamesByGenre, ToleeGame } from '@/lib/gamesData';
+import { getGameById, getRelatedGames, ToleeGame } from '@/lib/gamesData';
 import { Gamepad2, ArrowLeft, Star, ExternalLink, Share2, Sparkles, Trophy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { GameDetailFrame } from '@/components/GameDetailFrame';
@@ -42,21 +42,19 @@ export default function GameDetailPage({ params }: GameDetailPageProps) {
     notFound();
   }
 
-  const relatedGames = getGamesByGenre(game.genre)
-    .filter((g) => g.id !== game.id)
-    .slice(0, 4);
+  const relatedGames = getRelatedGames(game.id, 6);
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white pb-24">
+    <div className="min-h-screen bg-[#070B11] text-white pb-24 font-sans">
       {/* Top Breadcrumb & Controls */}
-      <div className="border-b border-zinc-800/80 bg-zinc-900/60 backdrop-blur-md px-4 sm:px-6 py-3">
+      <div className="border-b border-[#182332] bg-[#0B1019]/90 backdrop-blur-md px-4 sm:px-6 py-3 sticky top-16 z-30">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <Link
             href="/games"
-            className="inline-flex items-center gap-2 text-xs sm:text-sm font-semibold text-zinc-400 hover:text-white transition-colors"
+            className="inline-flex items-center gap-2 text-xs sm:text-sm font-semibold text-zinc-400 hover:text-[#00D2C4] transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Back to All Games</span>
+            <span>Back to Tolee Games</span>
           </Link>
 
           <div className="flex items-center gap-2">
@@ -67,7 +65,7 @@ export default function GameDetailPage({ params }: GameDetailPageProps) {
               href={game.playUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-zinc-800 hover:bg-zinc-700 text-zinc-200"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-[#111A27] hover:bg-[#182436] border border-[#202E42] text-zinc-200"
             >
               <span>Open in Window</span>
               <ExternalLink className="w-3.5 h-3.5" />
@@ -84,13 +82,16 @@ export default function GameDetailPage({ params }: GameDetailPageProps) {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-4">
             <div className="flex flex-wrap items-center gap-2.5">
-              <span className="px-3 py-1 rounded-full text-xs font-bold bg-primary/20 text-primary border border-primary/30 flex items-center gap-1.5">
+              <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#00D2C4]/20 text-[#00D2C4] border border-[#00D2C4]/30 flex items-center gap-1.5">
                 <Gamepad2 className="w-3.5 h-3.5" />
                 {game.genre}
               </span>
               <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1">
                 <Star className="w-3 h-3 fill-amber-300" />
                 {game.rating.toFixed(1)} Rating
+              </span>
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-zinc-800 text-zinc-300 border border-zinc-700">
+                {game.license || 'MIT License'}
               </span>
               {game.badge && (
                 <span className="px-2 py-0.5 rounded-full text-xs font-extrabold uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
@@ -113,7 +114,7 @@ export default function GameDetailPage({ params }: GameDetailPageProps) {
                 {game.technology.map((tech) => (
                   <span
                     key={tech}
-                    className="px-2.5 py-1 rounded-lg text-xs font-medium bg-zinc-900 border border-zinc-800 text-zinc-300"
+                    className="px-2.5 py-1 rounded-lg text-xs font-medium bg-[#0E1624] border border-[#1F2D40] text-zinc-300"
                   >
                     {tech}
                   </span>
@@ -123,16 +124,20 @@ export default function GameDetailPage({ params }: GameDetailPageProps) {
           </div>
 
           {/* Sidebar / Quick Stats */}
-          <div className="rounded-2xl bg-zinc-900/60 border border-zinc-800 p-5 space-y-4 h-fit">
+          <div className="rounded-2xl bg-[#0D1522] border border-[#1A2636] p-5 space-y-4 h-fit">
             <h3 className="font-extrabold text-sm text-zinc-200">Game Information</h3>
-            <div className="divide-y divide-zinc-800 text-xs">
+            <div className="divide-y divide-[#1C283B] text-xs">
               <div className="py-2.5 flex justify-between">
                 <span className="text-zinc-500">Total Plays</span>
                 <span className="text-zinc-200 font-semibold">{game.playsCount.toLocaleString()}</span>
               </div>
               <div className="py-2.5 flex justify-between">
-                <span className="text-zinc-500">AI Attribution</span>
-                <span className="text-primary font-semibold">{game.modelAttribution}</span>
+                <span className="text-zinc-500">Mode</span>
+                <span className="text-teal-400 font-semibold">{game.multiplayer || 'Single Player'}</span>
+              </div>
+              <div className="py-2.5 flex justify-between">
+                <span className="text-zinc-500">Developer</span>
+                <span className="text-[#00D2C4] font-semibold">{game.developer || game.modelAttribution}</span>
               </div>
               <div className="py-2.5 flex justify-between">
                 <span className="text-zinc-500">Installation</span>
@@ -140,7 +145,11 @@ export default function GameDetailPage({ params }: GameDetailPageProps) {
               </div>
               <div className="py-2.5 flex justify-between">
                 <span className="text-zinc-500">Controls</span>
-                <span className="text-zinc-200 font-semibold">Touch / Keyboard / Mouse</span>
+                <span className="text-zinc-200 font-semibold">{game.controls || 'Touch / Keyboard / Mouse'}</span>
+              </div>
+              <div className="py-2.5 flex justify-between">
+                <span className="text-zinc-500">Open-Source License</span>
+                <span className="text-zinc-300 font-semibold">{game.license || 'MIT'}</span>
               </div>
             </div>
 
@@ -150,9 +159,9 @@ export default function GameDetailPage({ params }: GameDetailPageProps) {
                   href={game.githubUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-zinc-200 transition-colors"
+                  className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-[#111A27] hover:bg-[#182436] border border-[#202E42] text-xs font-semibold text-zinc-200 transition-colors"
                 >
-                  <span>Open Open-Source Repo</span>
+                  <span>Open GitHub Repository</span>
                   <ExternalLink className="w-3.5 h-3.5" />
                 </a>
               </div>
@@ -160,38 +169,41 @@ export default function GameDetailPage({ params }: GameDetailPageProps) {
           </div>
         </div>
 
-        {/* Related Games in Same Genre */}
+        {/* More Games You May Like (6 Cards) */}
         {relatedGames.length > 0 && (
-          <div className="space-y-4 pt-6 border-t border-zinc-800/80">
+          <div className="space-y-4 pt-6 border-t border-[#182332]">
             <div className="flex items-center justify-between">
-              <h3 className="font-extrabold text-lg text-zinc-100">
-                More in {game.genre}
-              </h3>
-              <Link href="/games" className="text-xs font-semibold text-primary hover:underline">
-                View All
+              <div>
+                <h3 className="font-black text-lg text-zinc-100">
+                  More Games You May Like
+                </h3>
+                <p className="text-xs text-zinc-400">Recommended similar HTML5 and browser games</p>
+              </div>
+              <Link href="/games" className="text-xs font-bold text-[#00D2C4] hover:underline">
+                View All Games →
               </Link>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-              {relatedGames.map((rg) => (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3.5">
+              {relatedGames.map((rg: ToleeGame) => (
                 <Link
                   key={rg.id}
                   href={`/games/${rg.id}`}
-                  className="rounded-2xl bg-zinc-900/60 border border-zinc-800 hover:border-zinc-700 p-3 flex flex-col space-y-2 group transition-all"
+                  className="rounded-2xl bg-[#0D1522] border border-[#1A2636] hover:border-[#00D2C4]/60 p-2.5 flex flex-col space-y-2 group transition-all"
                 >
-                  <div className="aspect-16/10 rounded-xl overflow-hidden bg-zinc-950">
+                  <div className="aspect-16/10 rounded-xl overflow-hidden bg-black">
                     <img
                       src={rg.coverImage}
                       alt={rg.title}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                     />
                   </div>
-                  <h4 className="font-bold text-xs text-zinc-200 group-hover:text-primary transition-colors truncate">
+                  <h4 className="font-bold text-xs text-zinc-200 group-hover:text-[#00D2C4] transition-colors truncate">
                     {rg.title}
                   </h4>
-                  <div className="flex items-center justify-between text-[11px] text-zinc-500">
+                  <div className="flex items-center justify-between text-[10px] text-zinc-500">
                     <span>⭐ {rg.rating.toFixed(1)}</span>
-                    <span>{(rg.playsCount / 1000).toFixed(0)}k plays</span>
+                    <span>{(rg.playsCount / 1000).toFixed(0)}k</span>
                   </div>
                 </Link>
               ))}
