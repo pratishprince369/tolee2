@@ -100,11 +100,19 @@ export function GamePlayerModal({ game, isOpen, onClose }: GamePlayerModalProps)
     }
   };
 
-  // Pause background media when game opens
+  // Pause background media when game opens & ensure Poki SDK bridge
   useEffect(() => {
     if (isOpen && typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('tolee_pause_music_player'));
       window.dispatchEvent(new CustomEvent('tolee_pause_all_videos'));
+
+      // Ensure Defold Poki SDK bridge is active
+      if (!(window as any).PokiSDK) {
+        const script = document.createElement('script');
+        script.src = '/poki-sdk.js';
+        script.async = true;
+        document.body.appendChild(script);
+      }
     }
   }, [isOpen]);
 

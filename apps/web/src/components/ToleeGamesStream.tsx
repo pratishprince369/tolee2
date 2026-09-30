@@ -291,7 +291,7 @@ export function ToleeGamesStream() {
               <div className="grid grid-cols-2 gap-2.5 w-full sm:w-auto shrink-0">
                 <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-2xl bg-[#0E1624] border border-[#1F2D40] text-xs font-bold text-zinc-200">
                   <Gamepad2 className="w-4 h-4 text-[#00D2C4]" />
-                  <span>240+ Free Games</span>
+                  <span>140+ Free Games</span>
                 </div>
                 <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-2xl bg-[#0E1624] border border-[#1F2D40] text-xs font-bold text-zinc-200">
                   <Download className="w-4 h-4 text-[#00F0FF]" />
