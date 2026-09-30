@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Maximize2, Minimize2, RotateCw, ExternalLink, Share2, Check } from 'lucide-react';
+import { Maximize2, Minimize2, RotateCw, Share2, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ToleeGame } from '@/lib/gamesData';
 
@@ -104,15 +104,7 @@ export function GameDetailFrame({ game }: { game: ToleeGame }) {
         >
           {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Share2 className="w-3.5 h-3.5" />}
         </Button>
-        <a
-          href={resolvedPlayUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-zinc-300 hover:text-white hover:bg-zinc-800"
-          title="Open in New Window"
-        >
-          <ExternalLink className="w-3.5 h-3.5" />
-        </a>
+
         <Button
           variant="ghost"
           size="icon"

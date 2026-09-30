@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { getGameById, getRelatedGames, ToleeGame } from '@/lib/gamesData';
-import { Gamepad2, ArrowLeft, Star, ExternalLink, Share2, Sparkles, Trophy } from 'lucide-react';
+import { Gamepad2, ArrowLeft, Star, Share2, Sparkles, Trophy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { GameDetailFrame } from '@/components/GameDetailFrame';
 
@@ -61,15 +61,6 @@ export default function GameDetailPage({ params }: GameDetailPageProps) {
             <span className="text-xs text-zinc-400 hidden sm:inline">
               Category: <strong className="text-zinc-200">{game.genre}</strong>
             </span>
-            <a
-              href={game.playUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-[#111A27] hover:bg-[#182436] border border-[#202E42] text-zinc-200"
-            >
-              <span>Open in Window</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
           </div>
         </div>
       </div>
