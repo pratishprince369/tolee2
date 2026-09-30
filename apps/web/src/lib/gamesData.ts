@@ -1,13 +1,3 @@
-import {
-  MultiplayerRepo,
-  READY_MULTIPLAYER_REPOS,
-  TOP_30_GITHUB_GAMES,
-  ToleeGameItem,
-} from './githubGamesData';
-
-export type { MultiplayerRepo };
-export { READY_MULTIPLAYER_REPOS };
-
 export interface ToleeGame {
   id: string;
   title: string;
@@ -4195,17 +4185,10 @@ export const TOLEE_GAMES: ToleeGame[] = [
   }
 ];
 
-export const COMBINED_GAMES: ToleeGame[] = [
-  ...TOP_30_GITHUB_GAMES,
-  ...TOLEE_GAMES,
-];
+export const COMBINED_GAMES: ToleeGame[] = TOLEE_GAMES;
 
 export function getAllGames(): ToleeGame[] {
-  return COMBINED_GAMES;
-}
-
-export function getMultiplayerRepos(): MultiplayerRepo[] {
-  return READY_MULTIPLAYER_REPOS;
+  return TOLEE_GAMES;
 }
 
 export function getGameById(id: string): ToleeGame | undefined {
