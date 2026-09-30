@@ -242,7 +242,7 @@ export function ToleeGamesStream() {
         </div>
 
         {/* ── Top Hero Banner (Shown when not searching and on All) ── */}
-        {!searchQuery && selectedCategory === 'All' && (
+        {!searchQuery && selectedCategory === 'All' && allGames.length > 0 && (
           <div className="relative rounded-3xl overflow-hidden border border-[#1C283B] bg-gradient-to-r from-[#0B131E] via-[#0E1A29] to-[#0A131F] shadow-2xl p-6 sm:p-9">
             <div className="absolute -left-20 -top-20 w-96 h-96 bg-[#00D2C4]/15 rounded-full filter blur-3xl pointer-events-none" />
             <div className="absolute right-10 bottom-0 w-96 h-96 bg-[#0070F3]/15 rounded-full filter blur-3xl pointer-events-none" />
@@ -537,21 +537,25 @@ export function ToleeGamesStream() {
               <div className="w-14 h-14 rounded-2xl bg-[#0E1624] border border-[#1F2D40] text-zinc-500 mx-auto flex items-center justify-center">
                 <Gamepad2 className="w-7 h-7" />
               </div>
-              <h4 className="font-bold text-base text-zinc-200">No games found</h4>
+              <h4 className="font-bold text-base text-zinc-200">No games available</h4>
               <p className="text-xs text-zinc-500 max-w-sm mx-auto">
-                No matching games for &quot;{searchQuery}&quot;. Try searching for &quot;tetris&quot;, &quot;2048&quot;, or &quot;racing&quot;.
+                {allGames.length === 0
+                  ? 'All games have been removed from Tolee Games.'
+                  : `No matching games for "${searchQuery}".`}
               </p>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setSearchQuery('');
-                  setSelectedCategory('All');
-                }}
-                className="rounded-full border-zinc-700 text-xs mt-2"
-              >
-                Reset Filters
-              </Button>
+              {allGames.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setSelectedCategory('All');
+                  }}
+                  className="rounded-full border-zinc-700 text-xs mt-2"
+                >
+                  Reset Filters
+                </Button>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
