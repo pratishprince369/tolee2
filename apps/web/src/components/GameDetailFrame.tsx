@@ -12,6 +12,18 @@ export function GameDetailFrame({ game }: { game: ToleeGame }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
+  // Guarantee game.play_url is local/self-hosted and NEVER points to GitHub source repo
+  const resolvedPlayUrl = React.useMemo(() => {
+    const url = game.playUrl || '';
+    if (url.includes('github.com') || url.includes('raw.githubusercontent.com')) {
+      return `/games/${game.id}/index.html`;
+    }
+    if (url.startsWith('/games/') && !url.endsWith('.html')) {
+      return url.endsWith('/') ? `${url}index.html` : `${url}/index.html`;
+    }
+    return url || `/games/${game.id}/index.html`;
+  }, [game]);
+
   // Instantly pause music and videos
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -46,7 +58,7 @@ export function GameDetailFrame({ game }: { game: ToleeGame }) {
   const handleReload = () => {
     if (iframeRef.current) {
       setIsLoading(true);
-      iframeRef.current.src = game.playUrl;
+      iframeRef.current.src = resolvedPlayUrl;
     }
   };
 
@@ -93,7 +105,7 @@ export function GameDetailFrame({ game }: { game: ToleeGame }) {
           {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Share2 className="w-3.5 h-3.5" />}
         </Button>
         <a
-          href={game.playUrl}
+          href={resolvedPlayUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-zinc-300 hover:text-white hover:bg-zinc-800"
@@ -122,8 +134,9 @@ export function GameDetailFrame({ game }: { game: ToleeGame }) {
       )}
 
       <iframe
+        key={game.id}
         ref={iframeRef}
-        src={game.playUrl}
+        src={resolvedPlayUrl}
         title={game.title}
         onLoad={() => setIsLoading(false)}
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; gamepad"

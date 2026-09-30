@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Tic Tac Toe Duo - Tolee Games</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    body {
+      background: #070B11;
+      color: #FFF;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+    .wrapper {
+      width: 100%;
+      max-width: 360px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+    h1 { font-size: 26px; font-weight: 900; color: #00D2C4; }
+    .mode-bar {
+      display: flex;
+      background: #0E1624;
+      border: 1px solid #1F2D40;
+      border-radius: 999px;
+      padding: 3px;
+      gap: 4px;
+    }
+    .mode-btn {
+      background: transparent;
+      border: none;
+      color: #94A3B8;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 6px 14px;
+      border-radius: 999px;
+      cursor: pointer;
+    }
+    .mode-btn.active {
+      background: #00D2C4;
+      color: #070B11;
+    }
+    .turn-text {
+      font-size: 14px;
+      font-weight: 700;
+      color: #CBD5E1;
+    }
+    .board {
+      width: 300px;
+      height: 300px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(3, 1fr);
+      gap: 10px;
+      background: #0E1624;
+      border: 2px solid #1F2D40;
+      border-radius: 16px;
+      padding: 10px;
+      box-shadow: 0 10px 30px rgba(0, 210, 196, 0.15);
+    }
+    .cell {
+      background: #141F30;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 48px;
+      font-weight: 900;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .cell:active { transform: scale(0.95); }
+    .cell.x { color: #00F0FF; text-shadow: 0 0 15px rgba(0, 240, 255, 0.6); }
+    .cell.o { color: #FF0055; text-shadow: 0 0 15px rgba(255, 0, 85, 0.6); }
+    .cell.win { background: #00D2C4; color: #000; text-shadow: none; animation: pulse 0.6s infinite alternate; }
+    @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.05); } }
+    .reset-btn {
+      background: #00D2C4;
+      color: #000;
+      border: none;
+      padding: 10px 24px;
+      border-radius: 999px;
+      font-weight: 900;
+      font-size: 13px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <h1>TIC TAC TOE</h1>
+
+    <div class="mode-bar">
+      <button class="mode-btn active" id="btnVsAI" onclick="setMode('ai')">VS COMPUTER</button>
+      <button class="mode-btn" id="btn2P" onclick="setMode('2p')">2 PLAYERS</button>
+    </div>
+
+    <div class="turn-text" id="status">Player X's Turn</div>
+
+    <div class="board" id="board">
+      <div class="cell" onclick="cellClick(0)"></div>
+      <div class="cell" onclick="cellClick(1)"></div>
+      <div class="cell" onclick="cellClick(2)"></div>
+      <div class="cell" onclick="cellClick(3)"></div>
+      <div class="cell" onclick="cellClick(4)"></div>
+      <div class="cell" onclick="cellClick(5)"></div>
+      <div class="cell" onclick="cellClick(6)"></div>
+      <div class="cell" onclick="cellClick(7)"></div>
+      <div class="cell" onclick="cellClick(8)"></div>
+    </div>
+
+    <button class="reset-btn" onclick="resetBoard()">Restart Match</button>
+  </div>
+
+  <script>
+    let mode = 'ai';
+    let board = Array(9).fill(null);
+    let turn = 'X';
+    let active = true;
+
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function beep(freq = 500, dur = 0.05) {
+      if (!audioCtx) return;
+      try {
+        const o = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        o.connect(g);
+        g.connect(audioCtx.destination);
+        o.frequency.value = freq;
+        g.gain.setValueAtTime(0.08, audioCtx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+        o.start();
+        o.stop(audioCtx.currentTime + dur);
+      } catch(e) {}
+    }
+
+    function setMode(m) {
+      mode = m;
+      document.getElementById('btnVsAI').className = 'mode-btn' + (m === 'ai' ? ' active' : '');
+      document.getElementById('btn2P').className = 'mode-btn' + (m === '2p' ? ' active' : '');
+      resetBoard();
+    }
+
+    function cellClick(idx) {
+      if (!active || board[idx]) return;
+      makeMove(idx, turn);
+      beep(turn === 'X' ? 440 : 660, 0.05);
+
+      if (checkWin(board, turn)) {
+        document.getElementById('status').innerText = `Player ${turn} Wins! 🎉`;
+        active = false;
+        highlightWin(checkWin(board, turn));
+        beep(880, 0.2);
+        return;
+      }
+
+      if (board.every(c => c !== null)) {
+        document.getElementById('status').innerText = "It's a Draw!";
+        active = false;
+        return;
+      }
+
+      turn = turn === 'X' ? 'O' : 'X';
+      document.getElementById('status').innerText = `Player ${turn}'s Turn`;
+
+      if (mode === 'ai' && turn === 'O' && active) {
+        setTimeout(aiMove, 250);
+      }
+    }
+
+    function makeMove(idx, player) {
+      board[idx] = player;
+      const cell = document.getElementsByClassName('cell')[idx];
+      cell.innerText = player;
+      cell.className = `cell ${player.toLowerCase()}`;
+    }
+
+    function aiMove() {
+      // Minimax or greedy block
+      let empty = board.map((v, i) => v === null ? i : null).filter(v => v !== null);
+      if (empty.length === 0 || !active) return;
+
+      // 1. Can AI win?
+      for (let idx of empty) {
+        let copy = [...board];
+        copy[idx] = 'O';
+        if (checkWin(copy, 'O')) return cellClick(idx);
+      }
+
+      // 2. Block player X
+      for (let idx of empty) {
+        let copy = [...board];
+        copy[idx] = 'X';
+        if (checkWin(copy, 'X')) return cellClick(idx);
+      }
+
+      // 3. Take center if free
+      if (board[4] === null) return cellClick(4);
+
+      // 4. Random choice
+      let randomPick = empty[Math.floor(Math.random() * empty.length)];
+      cellClick(randomPick);
+    }
+
+    function checkWin(b, player) {
+      const wins = [
+        [0,1,2],[3,4,5],[6,7,8],
+        [0,3,6],[1,4,7],[2,5,8],
+        [0,4,8],[2,4,6]
+      ];
+      for (let combo of wins) {
+        if (combo.every(idx => b[idx] === player)) return combo;
+      }
+      return null;
+    }
+
+    function highlightWin(combo) {
+      for (let idx of combo) {
+        document.getElementsByClassName('cell')[idx].classList.add('win');
+      }
+    }
+
+    function resetBoard() {
+      board = Array(9).fill(null);
+      turn = 'X';
+      active = true;
+      document.getElementById('status').innerText = "Player X's Turn";
+      const cells = document.getElementsByClassName('cell');
+      for (let c of cells) {
+        c.innerText = '';
+        c.className = 'cell';
+      }
+    }
+  </script>
+</body>
+</html>

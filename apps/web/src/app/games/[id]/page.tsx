@@ -161,7 +161,7 @@ export default function GameDetailPage({ params }: GameDetailPageProps) {
                   rel="noopener noreferrer"
                   className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-[#111A27] hover:bg-[#182436] border border-[#202E42] text-xs font-semibold text-zinc-200 transition-colors"
                 >
-                  <span>Open GitHub Repository</span>
+                  <span>VIEW GITHUB REPOSITORY</span>
                   <ExternalLink className="w-3.5 h-3.5" />
                 </a>
               </div>

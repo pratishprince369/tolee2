@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Word Search - Tolee Games</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    body {
+      background: #070B11;
+      color: #FFF;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+    .wrapper {
+      width: 100%;
+      max-width: 360px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+    h1 { font-size: 24px; font-weight: 900; color: #00D2C4; }
+    .word-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      justify-content: center;
+    }
+    .word-chip {
+      background: #0E1624;
+      border: 1px solid #1F2D40;
+      color: #94A3B8;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 4px 10px;
+      border-radius: 999px;
+    }
+    .word-chip.found {
+      background: #00D2C4;
+      color: #070B11;
+      text-decoration: line-through;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(8, 36px);
+      grid-template-rows: repeat(8, 36px);
+      gap: 3px;
+      background: #0E1624;
+      border: 2px solid #1F2D40;
+      border-radius: 14px;
+      padding: 6px;
+    }
+    .letter {
+      background: #141F30;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      font-weight: 900;
+      color: #FFF;
+      cursor: pointer;
+    }
+    .letter.selected { background: #00D2C4; color: #000; }
+    .letter.found { background: #10B981; color: #000; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <h1>WORD SEARCH</h1>
+    <div class="word-list" id="wordList"></div>
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <script>
+    const WORDS = ['TOLEE', 'GAME', 'REACT', 'HTML', 'CHESS', 'NODE'];
+    const GRID_SIZE = 8;
+    let grid = Array.from({length: GRID_SIZE}, () => Array(GRID_SIZE).fill(''));
+    let foundWords = [];
+    let selectedCells = [];
+
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function beep(freq = 440, dur = 0.04) {
+      if (!audioCtx) return;
+      try {
+        const o = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        o.connect(g);
+        g.connect(audioCtx.destination);
+        o.frequency.value = freq;
+        g.gain.setValueAtTime(0.06, audioCtx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+        o.start();
+        o.stop(audioCtx.currentTime + dur);
+      } catch(e) {}
+    }
+
+    function initGame() {
+      // Place words horizontally or vertically
+      WORDS.forEach((word, wIdx) => {
+        let placed = false;
+        let attempts = 0;
+        while (!placed && attempts < 100) {
+          attempts++;
+          let horizontal = Math.random() > 0.5;
+          let r = Math.floor(Math.random() * (horizontal ? GRID_SIZE : (GRID_SIZE - word.length)));
+          let c = Math.floor(Math.random() * (horizontal ? (GRID_SIZE - word.length) : GRID_SIZE));
+
+          let canPlace = true;
+          for (let i = 0; i < word.length; i++) {
+            let tr = horizontal ? r : r + i;
+            let tc = horizontal ? c + i : c;
+            if (grid[tr][tc] !== '' && grid[tr][tc] !== word[i]) {
+              canPlace = false;
+              break;
+            }
+          }
+
+          if (canPlace) {
+            for (let i = 0; i < word.length; i++) {
+              let tr = horizontal ? r : r + i;
+              let tc = horizontal ? c + i : c;
+              grid[tr][tc] = word[i];
+            }
+            placed = true;
+          }
+        }
+      });
+
+      // Fill remaining with random letters
+      const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      for (let r = 0; r < GRID_SIZE; r++) {
+        for (let c = 0; c < GRID_SIZE; c++) {
+          if (grid[r][c] === 0 || grid[r][c] === '') {
+            grid[r][c] = letters[Math.floor(Math.random() * letters.length)];
+          }
+        }
+      }
+
+      renderList();
+      renderGrid();
+    }
+
+    function renderList() {
+      const listEl = document.getElementById('wordList');
+      listEl.innerHTML = '';
+      WORDS.forEach(w => {
+        const span = document.createElement('span');
+        span.className = 'word-chip' + (foundWords.includes(w) ? ' found' : '');
+        span.innerText = w;
+        listEl.appendChild(span);
+      });
+    }
+
+    function renderGrid() {
+      const gridEl = document.getElementById('grid');
+      gridEl.innerHTML = '';
+      for (let r = 0; r < GRID_SIZE; r++) {
+        for (let c = 0; c < GRID_SIZE; c++) {
+          const div = document.createElement('div');
+          div.className = 'letter';
+          div.innerText = grid[r][c];
+          div.onclick = () => selectCell(r, c, div);
+          gridEl.appendChild(div);
+        }
+      }
+    }
+
+    function selectCell(r, c, el) {
+      el.classList.toggle('selected');
+      const idx = selectedCells.findIndex(cell => cell.r === r && cell.c === c);
+      if (idx > -1) {
+        selectedCells.splice(idx, 1);
+      } else {
+        selectedCells.push({ r, c, char: grid[r][c], el });
+      }
+
+      beep(400, 0.02);
+
+      // Check if selected cells form a target word
+      const formedWord = selectedCells.map(c => c.char).join('');
+      const reversedWord = formedWord.split('').reverse().join('');
+
+      WORDS.forEach(w => {
+        if (!foundWords.includes(w) && (formedWord === w || reversedWord === w)) {
+          foundWords.push(w);
+          beep(680, 0.12);
+          selectedCells.forEach(cell => {
+            cell.el.classList.remove('selected');
+            cell.el.classList.add('found');
+          });
+          selectedCells = [];
+          renderList();
+
+          if (foundWords.length === WORDS.length) {
+            alert('🎉 All words found! Fantastic job!');
+          }
+        }
+      });
+    }
+
+    initGame();
+  </script>
+</body>
+</html>

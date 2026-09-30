@@ -38,9 +38,37 @@ export function GamePlayerModal({ game, isOpen, onClose }: GamePlayerModalProps)
   const [copied, setCopied] = useState(false);
   const [reported, setReported] = useState(false);
   const [mobileInfoOpen, setMobileInfoOpen] = useState(false);
+  const [roomCode, setRoomCode] = useState<string | null>(null);
+  const [roomCopied, setRoomCopied] = useState(false);
+
+  const handleGenerateRoom = () => {
+    const code = 'TLE' + Math.floor(100 + Math.random() * 900);
+    setRoomCode(code);
+  };
+
+  const handleCopyRoom = () => {
+    if (!roomCode || !game) return;
+    const roomUrl = `${window.location.origin}/games/${game.id}?room=${roomCode}`;
+    navigator.clipboard.writeText(roomUrl);
+    setRoomCopied(true);
+    setTimeout(() => setRoomCopied(false), 2000);
+  };
 
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  // Guarantee game.play_url is local/self-hosted and NEVER points to GitHub source repo
+  const resolvedPlayUrl = React.useMemo(() => {
+    if (!game) return '';
+    const url = game.playUrl || '';
+    if (url.includes('github.com') || url.includes('raw.githubusercontent.com')) {
+      return `/games/${game.id}/index.html`;
+    }
+    if (url.startsWith('/games/') && !url.endsWith('.html')) {
+      return url.endsWith('/') ? `${url}index.html` : `${url}/index.html`;
+    }
+    return url || `/games/${game.id}/index.html`;
+  }, [game]);
 
   // Sync favorites with localStorage
   useEffect(() => {
@@ -116,7 +144,7 @@ export function GamePlayerModal({ game, isOpen, onClose }: GamePlayerModalProps)
   const handleReload = () => {
     if (iframeRef.current && game) {
       setIsLoading(true);
-      iframeRef.current.src = game.playUrl;
+      iframeRef.current.src = resolvedPlayUrl;
     }
   };
 
@@ -233,7 +261,7 @@ export function GamePlayerModal({ game, isOpen, onClose }: GamePlayerModalProps)
               </Button>
 
               <a
-                href={game.playUrl}
+                href={resolvedPlayUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
@@ -297,7 +325,7 @@ export function GamePlayerModal({ game, isOpen, onClose }: GamePlayerModalProps)
               <iframe
                 key={game.id}
                 ref={iframeRef}
-                src={game.playUrl}
+                src={resolvedPlayUrl}
                 title={game.title}
                 onLoad={() => setIsLoading(false)}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; gamepad"
@@ -393,6 +421,51 @@ export function GamePlayerModal({ game, isOpen, onClose }: GamePlayerModalProps)
                 </div>
               </div>
 
+              {/* Multiplayer Lobby / Rooms (Section 18) */}
+              {(game.multiplayer === 'Online Multiplayer' || game.multiplayer === '2 Player') && (
+                <div className="p-3 rounded-xl bg-zinc-950/80 border border-emerald-500/30 space-y-2 mt-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-emerald-400 flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5" />
+                      Multiplayer Lobby
+                    </span>
+                    {roomCode && (
+                      <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono font-bold text-[11px]">
+                        {roomCode}
+                      </span>
+                    )}
+                  </div>
+                  {roomCode ? (
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={handleCopyRoom}
+                        className="flex-1 text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-semibold"
+                      >
+                        {roomCopied ? 'Room Link Copied!' : 'Invite Friends'}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={handleGenerateRoom}
+                        className="text-xs text-zinc-400 hover:text-white"
+                        title="New Room Code"
+                      >
+                        <RotateCw className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      size="sm"
+                      onClick={handleGenerateRoom}
+                      className="w-full text-xs bg-emerald-600/90 hover:bg-emerald-500 text-white font-semibold"
+                    >
+                      Create Game Room
+                    </Button>
+                  )}
+                </div>
+              )}
+
               {/* Bottom Actions */}
               <div className="pt-3 space-y-2 mt-auto">
                 {game.githubUrl && (
@@ -400,10 +473,10 @@ export function GamePlayerModal({ game, isOpen, onClose }: GamePlayerModalProps)
                     href={game.githubUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-zinc-200 transition-colors"
+                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 border border-zinc-700/60 text-xs font-bold text-zinc-100 transition-colors shadow-sm"
                   >
-                    <span>View GitHub Repository</span>
-                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>VIEW GITHUB REPOSITORY</span>
+                    <ExternalLink className="w-3.5 h-3.5 text-zinc-400" />
                   </a>
                 )}
 

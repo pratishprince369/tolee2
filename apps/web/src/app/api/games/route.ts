@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  TOLEE_GAMES,
+  getAllGames,
   GAME_GENRES,
   getFeaturedGames,
   getTrendingGames,
@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
     const limit = Math.min(60, Math.max(1, parseInt(searchParams.get('limit') || '24', 10)));
 
-    let filtered = [...TOLEE_GAMES];
+    let filtered = getAllGames();
 
     if (genre && genre !== 'All') {
       filtered = filtered.filter((g) => g.genre === genre);

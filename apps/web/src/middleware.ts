@@ -2,11 +2,11 @@ import { withAuth } from "next-auth/middleware";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-// Enterprise Security Headers
+// Enterprise Security Headers (permits same-origin iframe embedding for Tolee Games while protecting against clickjacking)
 const securityHeaders = {
-  "Content-Security-Policy": "default-src 'self' https: 'unsafe-inline' 'unsafe-eval'; img-src 'self' data: blob: https:; media-src 'self' https: blob:; connect-src 'self' https: wss: ws:; frame-ancestors 'none';",
+  "Content-Security-Policy": "default-src 'self' https: 'unsafe-inline' 'unsafe-eval'; img-src 'self' data: blob: https:; media-src 'self' https: blob:; connect-src 'self' https: wss: ws:; frame-ancestors 'self';",
   "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
-  "X-Frame-Options": "DENY",
+  "X-Frame-Options": "SAMEORIGIN",
   "X-Content-Type-Options": "nosniff",
   "X-XSS-Protection": "1; mode=block",
   "Referrer-Policy": "strict-origin-when-cross-origin",

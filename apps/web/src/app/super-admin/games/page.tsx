@@ -32,7 +32,7 @@ export default function SuperAdminGamesPage() {
   const allGames = useMemo(() => getAllGames(), []);
   const multiplayerRepos = useMemo(() => getMultiplayerRepos(), []);
 
-  const [activeTab, setActiveTab] = useState<'all' | 'multiplayer' | 'featured' | 'licenses'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'multiplayer' | 'featured' | 'licenses' | 'importer'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedLicense, setSelectedLicense] = useState('All');
@@ -41,6 +41,63 @@ export default function SuperAdminGamesPage() {
   const [featuredOverrides, setFeaturedOverrides] = useState<Record<string, boolean>>({});
   const [trendingOverrides, setTrendingOverrides] = useState<Record<string, boolean>>({});
   const [testPlayGame, setTestPlayGame] = useState<ToleeGame | null>(null);
+
+  // Importer states (Section 11)
+  const [importRepoUrl, setImportRepoUrl] = useState('');
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState<any>(null);
+  const [isDeploying, setIsDeploying] = useState(false);
+  const [deploymentResult, setDeploymentResult] = useState<any>(null);
+  const [importerError, setImporterError] = useState<string | null>(null);
+
+  const handleAnalyzeRepo = async () => {
+    if (!importRepoUrl.trim()) return;
+    setIsAnalyzing(true);
+    setImporterError(null);
+    setAnalysisResult(null);
+    setDeploymentResult(null);
+    try {
+      const res = await fetch('/api/games/importer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'analyze', githubUrl: importRepoUrl }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to analyze repository');
+      setAnalysisResult(data.data);
+    } catch (err: any) {
+      setImporterError(err.message || 'Error analyzing repository');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleDeployGame = async () => {
+    if (!analysisResult) return;
+    setIsDeploying(true);
+    setImporterError(null);
+    try {
+      const res = await fetch('/api/games/importer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'deploy',
+          githubUrl: analysisResult.githubUrl,
+          gameName: analysisResult.gameName,
+          slug: analysisResult.slug,
+          category: 'Arcade',
+          technology: [analysisResult.framework],
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Deployment failed');
+      setDeploymentResult(data.game);
+    } catch (err: any) {
+      setImporterError(err.message || 'Error deploying game');
+    } finally {
+      setIsDeploying(false);
+    }
+  };
 
   const toggleFeatured = (id: string, current: boolean) => {
     setFeaturedOverrides((prev) => ({
@@ -200,6 +257,17 @@ export default function SuperAdminGamesPage() {
           }`}
         >
           📜 License Directory
+        </button>
+
+        <button
+          onClick={() => setActiveTab('importer')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'importer'
+              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+              : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
+          }`}
+        >
+          ⚡ Import Game from GitHub
         </button>
       </div>
 
@@ -449,6 +517,173 @@ export default function SuperAdminGamesPage() {
               <li><strong>MPL-2.0 (Mozilla Public License):</strong> File-level copyleft license used by BrowserQuest with source code attribution.</li>
             </ul>
           </div>
+        </div>
+      )}
+
+      {/* TAB 5: Automatic Game Importer (Section 11) */}
+      {activeTab === 'importer' && (
+        <div className="space-y-6">
+          <div className="p-6 rounded-2xl bg-zinc-900/60 border border-zinc-800 space-y-4">
+            <div>
+              <h3 className="text-base font-bold text-zinc-100 flex items-center gap-2">
+                <Code className="w-5 h-5 text-emerald-400" />
+                Automatic Game Importer from GitHub
+              </h3>
+              <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
+                Enter any open-source GitHub game repository URL to analyze the repository, detect game framework and assets, build if required, validate, and deploy directly into Tolee Games (<code className="text-emerald-400">/public/games/{"{slug}"}/</code>).
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center gap-3">
+              <input
+                type="url"
+                value={importRepoUrl}
+                onChange={(e) => setImportRepoUrl(e.target.value)}
+                placeholder="https://github.com/example/game-repo"
+                className="flex-1 w-full h-11 px-4 rounded-xl bg-zinc-950 border border-zinc-800 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500"
+              />
+              <Button
+                onClick={handleAnalyzeRepo}
+                disabled={isAnalyzing || !importRepoUrl.trim()}
+                className="w-full sm:w-auto h-11 px-6 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/20"
+              >
+                {isAnalyzing ? (
+                  <span className="flex items-center gap-2">
+                    <RotateCw className="w-4 h-4 animate-spin" />
+                    Analyzing...
+                  </span>
+                ) : (
+                  'ANALYZE REPOSITORY'
+                )}
+              </Button>
+            </div>
+
+            {importerError && (
+              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-xs text-red-400">
+                ❌ {importerError}
+              </div>
+            )}
+          </div>
+
+          {/* Analysis Result Card */}
+          {analysisResult && (
+            <div className="p-6 rounded-2xl bg-zinc-900/80 border border-zinc-800 space-y-5 animate-in fade-in duration-200">
+              <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5 text-emerald-400" />
+                  <h4 className="font-bold text-sm text-zinc-100">Repository Analysis Report</h4>
+                </div>
+                <Badge className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-semibold">
+                  {analysisResult.status}
+                </Badge>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+                <div className="p-3 rounded-xl bg-zinc-950/60 border border-zinc-800/80">
+                  <span className="text-zinc-500 block mb-1">Game Name</span>
+                  <span className="text-zinc-100 font-bold">{analysisResult.gameName}</span>
+                </div>
+                <div className="p-3 rounded-xl bg-zinc-950/60 border border-zinc-800/80">
+                  <span className="text-zinc-500 block mb-1">Framework</span>
+                  <span className="text-emerald-400 font-bold">{analysisResult.framework}</span>
+                </div>
+                <div className="p-3 rounded-xl bg-zinc-950/60 border border-zinc-800/80">
+                  <span className="text-zinc-500 block mb-1">Entry File</span>
+                  <span className="text-zinc-200 font-mono">{analysisResult.entryFile}</span>
+                </div>
+                <div className="p-3 rounded-xl bg-zinc-950/60 border border-zinc-800/80">
+                  <span className="text-zinc-500 block mb-1">License</span>
+                  <span className="text-zinc-200 font-semibold">{analysisResult.license}</span>
+                </div>
+                <div className="p-3 rounded-xl bg-zinc-950/60 border border-zinc-800/80">
+                  <span className="text-zinc-500 block mb-1">Build Required</span>
+                  <span className="text-zinc-200">{analysisResult.buildRequired}</span>
+                </div>
+                <div className="p-3 rounded-xl bg-zinc-950/60 border border-zinc-800/80">
+                  <span className="text-zinc-500 block mb-1">API Required</span>
+                  <span className="text-zinc-200">{analysisResult.apiRequired}</span>
+                </div>
+                <div className="p-3 rounded-xl bg-zinc-950/60 border border-zinc-800/80">
+                  <span className="text-zinc-500 block mb-1">Multiplayer Mode</span>
+                  <span className="text-zinc-200">{analysisResult.multiplayer}</span>
+                </div>
+                <div className="p-3 rounded-xl bg-zinc-950/60 border border-zinc-800/80">
+                  <span className="text-zinc-500 block mb-1">Detected Assets</span>
+                  <span className="text-zinc-200">{analysisResult.assetsCount} files</span>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <span className="text-zinc-500">Target Play URL: </span>
+                  <code className="text-emerald-400 font-mono">{analysisResult.playUrl}</code>
+                </div>
+                <span className="text-zinc-500">Destination: {analysisResult.targetPath}</span>
+              </div>
+
+              {!deploymentResult ? (
+                <Button
+                  onClick={handleDeployGame}
+                  disabled={isDeploying}
+                  className="w-full sm:w-auto h-11 px-8 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-2"
+                >
+                  {isDeploying ? (
+                    <>
+                      <RotateCw className="w-4 h-4 animate-spin" />
+                      BUILDING & DEPLOYING TOLEE GAME...
+                    </>
+                  ) : (
+                    'IMPORT & DEPLOY TO TOLEE'
+                  )}
+                </Button>
+              ) : (
+                <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 space-y-3">
+                  <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
+                    <CheckCircle className="w-4 h-4" />
+                    <span>GAME VALIDATED & DEPLOYED (STATUS = READY)</span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-zinc-300">
+                    <div>✓ index.html exists</div>
+                    <div>✓ JavaScript loads</div>
+                    <div>✓ Assets validated</div>
+                    <div>✓ Touch & keyboard ready</div>
+                  </div>
+                  <div className="pt-2 flex items-center gap-3">
+                    <Button
+                      size="sm"
+                      onClick={() =>
+                        setTestPlayGame({
+                          id: deploymentResult.slug,
+                          title: deploymentResult.game_name,
+                          description: 'Imported game ready for Tolee player',
+                          genre: 'Arcade',
+                          playUrl: deploymentResult.play_url,
+                          rating: 9.0,
+                          technology: ['HTML5 Canvas'],
+                          modelAttribution: 'Tolee Importer',
+                          githubUrl: analysisResult.githubUrl,
+                          coverImage: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=600&q=80',
+                          featured: false,
+                          playsCount: 1,
+                        })
+                      }
+                      className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold"
+                    >
+                      PLAY IN TOLEE PLAYER 🎮
+                    </Button>
+                    <a
+                      href={deploymentResult.play_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-zinc-400 hover:text-white underline flex items-center gap-1"
+                    >
+                      Open direct link <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

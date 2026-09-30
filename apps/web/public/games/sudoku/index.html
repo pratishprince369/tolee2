@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Sudoku - Tolee Games</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    body {
+      background: #070B11;
+      color: #FFF;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+    .wrapper {
+      width: 100%;
+      max-width: 360px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+    .top-bar {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    h1 { font-size: 24px; font-weight: 900; color: #00D2C4; }
+    .board {
+      display: grid;
+      grid-template-columns: repeat(9, 32px);
+      grid-template-rows: repeat(9, 32px);
+      gap: 2px;
+      background: #1F2D40;
+      padding: 4px;
+      border: 2px solid #00D2C4;
+      border-radius: 12px;
+    }
+    .cell {
+      background: #0E1624;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      font-weight: 900;
+      color: #00F0FF;
+      cursor: pointer;
+    }
+    .cell.initial { color: #FFF; }
+    .cell.selected { background: #00D2C4; color: #000; }
+    .numpad {
+      display: grid;
+      grid-template-columns: repeat(5, 52px);
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .num-btn {
+      background: #0E1624;
+      border: 1px solid #1F2D40;
+      color: #00D2C4;
+      border-radius: 12px;
+      height: 44px;
+      font-size: 18px;
+      font-weight: 900;
+      cursor: pointer;
+    }
+    .num-btn:active { background: #00D2C4; color: #000; }
+    .action-btn {
+      background: #141F30;
+      color: #94A3B8;
+      border: 1px solid #202E42;
+      border-radius: 999px;
+      padding: 6px 16px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="top-bar">
+      <h1>SUDOKU</h1>
+      <button class="action-btn" onclick="initGame()">New Puzzle</button>
+    </div>
+
+    <div class="board" id="board"></div>
+
+    <div class="numpad" id="numpad">
+      <button class="num-btn" onclick="inputNum(1)">1</button>
+      <button class="num-btn" onclick="inputNum(2)">2</button>
+      <button class="num-btn" onclick="inputNum(3)">3</button>
+      <button class="num-btn" onclick="inputNum(4)">4</button>
+      <button class="num-btn" onclick="inputNum(5)">5</button>
+      <button class="num-btn" onclick="inputNum(6)">6</button>
+      <button class="num-btn" onclick="inputNum(7)">7</button>
+      <button class="num-btn" onclick="inputNum(8)">8</button>
+      <button class="num-btn" onclick="inputNum(9)">9</button>
+      <button class="num-btn" onclick="inputNum(0)" style="color:#EF4444;">✕</button>
+    </div>
+  </div>
+
+  <script>
+    // Standard playable board pattern
+    const SOLVED = [
+      [5,3,4,6,7,8,9,1,2],
+      [6,7,2,1,9,5,3,4,8],
+      [1,9,8,3,4,2,5,6,7],
+      [8,5,9,7,6,1,4,2,3],
+      [4,2,6,8,5,3,7,9,1],
+      [7,1,3,9,2,4,8,5,6],
+      [9,6,1,5,3,7,2,8,4],
+      [2,8,7,4,1,9,6,3,5],
+      [3,4,5,2,8,6,1,7,9]
+    ];
+
+    let puzzle = [];
+    let initial = [];
+    let selected = null;
+
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function beep(freq = 440, dur = 0.04) {
+      if (!audioCtx) return;
+      try {
+        const o = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        o.connect(g);
+        g.connect(audioCtx.destination);
+        o.frequency.value = freq;
+        g.gain.setValueAtTime(0.06, audioCtx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+        o.start();
+        o.stop(audioCtx.currentTime + dur);
+      } catch(e) {}
+    }
+
+    function initGame() {
+      puzzle = SOLVED.map(r => [...r]);
+      initial = Array.from({length: 9}, () => Array(9).fill(false));
+
+      // Remove ~40 random numbers
+      for (let i = 0; i < 42; i++) {
+        let r = Math.floor(Math.random() * 9);
+        let c = Math.floor(Math.random() * 9);
+        puzzle[r][c] = 0;
+      }
+
+      for (let r = 0; r < 9; r++) {
+        for (let c = 0; c < 9; c++) {
+          if (puzzle[r][c] !== 0) initial[r][c] = true;
+        }
+      }
+
+      selected = null;
+      render();
+    }
+
+    function render() {
+      const boardEl = document.getElementById('board');
+      boardEl.innerHTML = '';
+      for (let r = 0; r < 9; r++) {
+        for (let c = 0; c < 9; c++) {
+          const div = document.createElement('div');
+          div.className = 'cell';
+          if (initial[r][c]) div.classList.add('initial');
+          if (selected && selected.r === r && selected.c === c) div.classList.add('selected');
+
+          div.innerText = puzzle[r][c] > 0 ? puzzle[r][c] : '';
+          div.onclick = () => selectCell(r, c);
+          boardEl.appendChild(div);
+        }
+      }
+    }
+
+    function selectCell(r, c) {
+      if (initial[r][c]) return;
+      selected = { r, c };
+      beep(380, 0.03);
+      render();
+    }
+
+    function inputNum(n) {
+      if (!selected) return;
+      puzzle[selected.r][selected.c] = n;
+      beep(500 + n * 40, 0.04);
+      render();
+    }
+
+    initGame();
+  </script>
+</body>
+</html>
