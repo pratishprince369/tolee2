@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
+import React, { useEffect, useRef, forwardRef, useImperativeHandle, useCallback } from 'react';
 import Hls from 'hls.js';
 import { usePlaybackTracker } from '@/hooks/usePlaybackTracker';
 
@@ -20,6 +20,8 @@ export function getGlobalActiveVideo(): HTMLVideoElement | null {
 }
 
 export function setGlobalActiveVideo(video: HTMLVideoElement | null) {
+  playbackGeneration++;
+
   if (video && typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('tolee_pause_music_player'));
   }
@@ -200,60 +202,29 @@ export const HLSVideo = forwardRef<HTMLVideoElement, HLSVideoProps>(
         video.removeEventListener('seeked', handlePlaying);
       };
     }, [onBufferingChange]);
-  const hlsRef = useRef<Hls | null>(null);
-  // Track whether video is currently "loaded" (src attached & ready)
-  const loadedRef = useRef(false);
-  // Keep a ref to the latest isActive so async callbacks never stale-close over it
-  const isActiveRef = useRef(isActive);
-  isActiveRef.current = isActive;
-  const ignoreGlobalActiveRef = useRef(ignoreGlobalActive);
-  ignoreGlobalActiveRef.current = ignoreGlobalActive;
+    const hlsRef = useRef<Hls | null>(null);
+    // Track whether video is currently "loaded" (src attached & ready)
+    const loadedRef = useRef(false);
+    // Keep a ref to the latest isActive so async callbacks never stale-close over it
+    const isActiveRef = useRef(isActive);
+    isActiveRef.current = isActive;
+    const ignoreGlobalActiveRef = useRef(ignoreGlobalActive);
+    ignoreGlobalActiveRef.current = ignoreGlobalActive;
+    const mutedRef = useRef(props.muted);
+    mutedRef.current = props.muted;
 
-  /* ─────────────────────────────────────────────────────────────────────
-      EFFECT 1: Manage HLS / src loading
-      Re-runs only when `src` or `shouldLoad` changes.
-      This effect NEVER calls play() — that is handled by Effect 2.
-   ───────────────────────────────────────────────────────────────────── */
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
+    const playSafe = useCallback(async () => {
+      const video = videoRef.current;
+      if (!video) return;
 
-    // Resolve Google Drive URLs to internal high-performance byte-range stream proxy
-    const resolvedSrc = (src.includes('drive.usercontent.google.com') || src.includes('drive.google.com'))
-      ? (src.match(/[?&]id=([a-zA-Z0-9_-]+)/)?.[1] || src.match(/\/file\/d\/([a-zA-Z0-9_-]+)/)?.[1] || src.match(/\/d\/([a-zA-Z0-9_-]+)/)?.[1]
-          ? `/api/video/drive-stream?id=${(src.match(/[?&]id=([a-zA-Z0-9_-]+)/)?.[1] || src.match(/\/file\/d\/([a-zA-Z0-9_-]+)/)?.[1] || src.match(/\/d\/([a-zA-Z0-9_-]+)/)?.[1])}`
-          : src)
-      : src;
-
-    // Tear down anything that was already loaded
-    const teardown = () => {
-      loadedRef.current = false;
-      if (hlsRef.current) {
-        hlsRef.current.destroy();
-        hlsRef.current = null;
-      }
-      // Fully unload video to free memory & kill audio
-      video.pause();
-      video.removeAttribute('src');
-      try { video.load(); } catch {}
-    };
-
-    if (!shouldLoad || !resolvedSrc) {
-      teardown();
-      return teardown; // cleanup = same teardown
-    }
-
-    teardown(); // clear any previous source first
-
-    const playSafe = async () => {
       const token = ++playbackGeneration;
-      video.muted = !!props.muted;
-      if (!props.muted) {
+      video.muted = !!mutedRef.current;
+      if (!mutedRef.current) {
         video.volume = 1.0;
       }
       try {
         await video.play();
-        if (token !== playbackGeneration || !isActiveRef.current || globalActiveVideo !== video) {
+        if (token !== playbackGeneration || !isActiveRef.current || (!ignoreGlobalActiveRef.current && globalActiveVideo !== video)) {
           video.pause();
           video.muted = true;
         }
@@ -262,161 +233,177 @@ export const HLSVideo = forwardRef<HTMLVideoElement, HLSVideoProps>(
           video.muted = true;
           try {
             await video.play();
-            if (token !== playbackGeneration || !isActiveRef.current || globalActiveVideo !== video) {
+            if (token !== playbackGeneration || !isActiveRef.current || (!ignoreGlobalActiveRef.current && globalActiveVideo !== video)) {
               video.pause();
               video.muted = true;
             }
           } catch (err: any) {
-            console.log('[HLSVideo] play failed after muting:', err.message);
+            // Aborted or blocked
           }
         }
       }
-    };
+    }, []);
 
-    const onReady = () => {
-      loadedRef.current = true;
-      if (isActiveRef.current) {
-        if (!ignoreGlobalActiveRef.current) {
-          setGlobalActiveVideo(video);
+    /* ─────────────────────────────────────────────────────────────────────
+       EFFECT 1: Manage HLS / src loading
+       Re-runs only when `src` or `shouldLoad` changes.
+       This effect NEVER calls play() without playSafe guards.
+    ───────────────────────────────────────────────────────────────────── */
+    useEffect(() => {
+      const video = videoRef.current;
+      if (!video) return;
+
+      // Resolve Google Drive URLs to internal high-performance byte-range stream proxy
+      const resolvedSrc = (src.includes('drive.usercontent.google.com') || src.includes('drive.google.com'))
+        ? (src.match(/[?&]id=([a-zA-Z0-9_-]+)/)?.[1] || src.match(/\/file\/d\/([a-zA-Z0-9_-]+)/)?.[1] || src.match(/\/d\/([a-zA-Z0-9_-]+)/)?.[1]
+            ? `/api/video/drive-stream?id=${(src.match(/[?&]id=([a-zA-Z0-9_-]+)/)?.[1] || src.match(/\/file\/d\/([a-zA-Z0-9_-]+)/)?.[1] || src.match(/\/d\/([a-zA-Z0-9_-]+)/)?.[1])}`
+            : src)
+        : src;
+
+      // Tear down anything that was already loaded
+      const teardown = () => {
+        loadedRef.current = false;
+        if (hlsRef.current) {
+          hlsRef.current.destroy();
+          hlsRef.current = null;
         }
-        playSafe();
-      } else {
+        // Fully unload video to free memory & kill audio
         video.pause();
-        video.muted = true;
-      }
-    };
-
-    if (resolvedSrc.endsWith('.m3u8') && Hls.isSupported()) {
-      // HLS.js path
-      const stats = getDeviceNetworkStats();
-      const autoStartLoad = props.preload !== 'metadata' || isActiveRef.current;
-      const hls = new Hls({
-        enableWorker: true,
-        capLevelToPlayerSize: true,
-        maxBufferLength: isActiveRef.current ? (stats.lowRAM ? 6 : 12) : 2.5,
-        maxMaxBufferLength: isActiveRef.current ? (stats.lowRAM ? 10 : 20) : 5,
-        backBufferLength: 4,
-        lowLatencyMode: true,
-        startLevel: -1,
-        startFragPrefetch: true,
-        testBandwidth: isActiveRef.current,
-        abrEwmaDefaultEstimate: 600000,
-        autoStartLoad,
-      });
-      hlsRef.current = hls;
-      hls.loadSource(resolvedSrc);
-      hls.attachMedia(video);
-      video.addEventListener('canplay', onReady, { once: true });
-      hls.on(Hls.Events.ERROR, (_ev, data) => {
-        if (data.fatal) {
-          console.warn('[HLSVideo] Fatal HLS error:', data.type, data.details);
-        }
-      });
-    } else if (resolvedSrc.endsWith('.m3u8') && video.canPlayType('application/vnd.apple.mpegurl')) {
-      // Native HLS (Safari / iOS)
-      video.src = resolvedSrc;
-      video.addEventListener('loadedmetadata', onReady, { once: true });
-    } else {
-      // Standard mp4 / webm / stream proxy
-      const isStreamProxy = resolvedSrc.includes('/api/video/drive-stream');
-      const isMp4 = resolvedSrc.toLowerCase().includes('.mp4') || resolvedSrc.toLowerCase().includes('video') || resolvedSrc.toLowerCase().includes('.mov') || resolvedSrc.toLowerCase().includes('.webm');
-      const finalSrc = isMp4 && !isStreamProxy && !props.poster && !resolvedSrc.includes('#t=') ? `${resolvedSrc}#t=0.001` : resolvedSrc;
-      video.src = finalSrc;
-
-      const handleReady = () => {
-        video.removeEventListener('canplay', handleReady);
-        video.removeEventListener('loadeddata', handleReady);
-        video.removeEventListener('playing', handleReady);
-        onReady();
+        video.removeAttribute('src');
+        try { video.load(); } catch {}
       };
 
-      if (video.readyState >= 2) {
-        onReady();
-      } else {
-        video.addEventListener('canplay', handleReady, { once: true });
-        video.addEventListener('loadeddata', handleReady, { once: true });
-        video.addEventListener('playing', handleReady, { once: true });
-      }
-    }
-
-    return teardown;
-  }, [src, shouldLoad]); // intentionally excludes isActive
-
-  /* ─────────────────────────────────────────────────────────────────────
-      EFFECT 2: Respond to active state changes (play / pause)
-      This is the SINGLE place where play/pause decisions are made.
-      Uses globalActiveVideo to guarantee only ONE video plays at a time.
-   ───────────────────────────────────────────────────────────────────── */
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    const stats = getDeviceNetworkStats();
-    if (hlsRef.current) {
-      hlsRef.current.config.maxBufferLength = isActive ? (stats.lowRAM ? 6 : 12) : 2.5;
-      hlsRef.current.config.maxMaxBufferLength = isActive ? (stats.lowRAM ? 10 : 20) : 5;
-      hlsRef.current.config.testBandwidth = isActive;
-      if (isActive) {
-        hlsRef.current.startLoad();
-      }
-    }
-
-    if (isActive) {
-      if (!ignoreGlobalActive) {
-        setGlobalActiveVideo(video);
+      if (!shouldLoad || !resolvedSrc) {
+        teardown();
+        return teardown; // cleanup = same teardown
       }
 
-      if (loadedRef.current || video.readyState >= 1) {
-        const token = ++playbackGeneration;
-        video.muted = !!props.muted;
-        if (!props.muted) {
-          video.volume = 1.0;
-        }
-        video.play().then(() => {
-          if (token !== playbackGeneration || !isActiveRef.current || globalActiveVideo !== video) {
-            video.pause();
-            video.muted = true;
+      teardown(); // clear any previous source first
+
+      const onReady = () => {
+        loadedRef.current = true;
+        if (isActiveRef.current) {
+          if (!ignoreGlobalActiveRef.current) {
+            setGlobalActiveVideo(video);
           }
-        }).catch((e) => {
-          if (e.name !== 'AbortError' && isActiveRef.current) {
-            video.muted = true;
-            video.play().then(() => {
-              if (token !== playbackGeneration || !isActiveRef.current || globalActiveVideo !== video) {
-                video.pause();
-                video.muted = true;
-              }
-            }).catch(() => {});
+          playSafe();
+        } else {
+          video.pause();
+          video.muted = true;
+        }
+      };
+
+      if (resolvedSrc.endsWith('.m3u8') && Hls.isSupported()) {
+        // HLS.js path
+        const stats = getDeviceNetworkStats();
+        const autoStartLoad = props.preload !== 'metadata' || isActiveRef.current;
+        const hls = new Hls({
+          enableWorker: true,
+          capLevelToPlayerSize: true,
+          maxBufferLength: isActiveRef.current ? (stats.lowRAM ? 6 : 12) : 2.5,
+          maxMaxBufferLength: isActiveRef.current ? (stats.lowRAM ? 10 : 20) : 5,
+          backBufferLength: 4,
+          lowLatencyMode: true,
+          startLevel: -1,
+          startFragPrefetch: true,
+          testBandwidth: isActiveRef.current,
+          abrEwmaDefaultEstimate: 600000,
+          autoStartLoad,
+        });
+        hlsRef.current = hls;
+        hls.loadSource(resolvedSrc);
+        hls.attachMedia(video);
+        video.addEventListener('canplay', onReady, { once: true });
+        hls.on(Hls.Events.ERROR, (_ev, data) => {
+          if (data.fatal) {
+            console.warn('[HLSVideo] Fatal HLS error:', data.type, data.details);
           }
         });
-      }
-    } else {
-      video.pause();
-      video.muted = true;
-      if (!ignoreGlobalActive && getGlobalActiveVideo() === video) {
-        setGlobalActiveVideo(null);
-      }
-    }
-  }, [isActive, ignoreGlobalActive]);
+      } else if (resolvedSrc.endsWith('.m3u8') && video.canPlayType('application/vnd.apple.mpegurl')) {
+        // Native HLS (Safari / iOS)
+        video.src = resolvedSrc;
+        video.addEventListener('loadedmetadata', onReady, { once: true });
+      } else {
+        // Standard mp4 / webm / stream proxy
+        const isStreamProxy = resolvedSrc.includes('/api/video/drive-stream');
+        const isMp4 = resolvedSrc.toLowerCase().includes('.mp4') || resolvedSrc.toLowerCase().includes('video') || resolvedSrc.toLowerCase().includes('.mov') || resolvedSrc.toLowerCase().includes('.webm');
+        const finalSrc = isMp4 && !isStreamProxy && !props.poster && !resolvedSrc.includes('#t=') ? `${resolvedSrc}#t=0.001` : resolvedSrc;
+        video.src = finalSrc;
 
-  /* ─────────────────────────────────────────────────────────────────────
-      EFFECT 3: Page visibility — pause all when tab is hidden
-   ───────────────────────────────────────────────────────────────────── */
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
+        const handleReady = () => {
+          video.removeEventListener('canplay', handleReady);
+          video.removeEventListener('loadeddata', handleReady);
+          video.removeEventListener('playing', handleReady);
+          onReady();
+        };
 
-    const onVisibility = () => {
-      if (document.hidden) {
+        if (video.readyState >= 2) {
+          onReady();
+        } else {
+          video.addEventListener('canplay', handleReady, { once: true });
+          video.addEventListener('loadeddata', handleReady, { once: true });
+          video.addEventListener('playing', handleReady, { once: true });
+        }
+      }
+
+      return teardown;
+    }, [src, shouldLoad, playSafe]); // intentionally excludes isActive
+
+    /* ─────────────────────────────────────────────────────────────────────
+       EFFECT 2: Respond to active state changes (play / pause)
+       This is the SINGLE place where play/pause decisions are made.
+       Uses globalActiveVideo to guarantee only ONE video plays at a time.
+    ───────────────────────────────────────────────────────────────────── */
+    useEffect(() => {
+      const video = videoRef.current;
+      if (!video) return;
+
+      const stats = getDeviceNetworkStats();
+      if (hlsRef.current) {
+        hlsRef.current.config.maxBufferLength = isActive ? (stats.lowRAM ? 6 : 12) : 2.5;
+        hlsRef.current.config.maxMaxBufferLength = isActive ? (stats.lowRAM ? 10 : 20) : 5;
+        hlsRef.current.config.testBandwidth = isActive;
+        if (isActive) {
+          hlsRef.current.startLoad();
+        }
+      }
+
+      if (isActive) {
+        if (!ignoreGlobalActive) {
+          setGlobalActiveVideo(video);
+        }
+
+        if (loadedRef.current || video.readyState >= 1) {
+          playSafe();
+        }
+      } else {
         video.pause();
         video.muted = true;
-      } else if (isActiveRef.current) {
-        video.play().catch(() => {});
+        if (!ignoreGlobalActive && getGlobalActiveVideo() === video) {
+          setGlobalActiveVideo(null);
+        }
       }
-    };
+    }, [isActive, ignoreGlobalActive, playSafe]);
 
-    document.addEventListener('visibilitychange', onVisibility);
-    return () => document.removeEventListener('visibilitychange', onVisibility);
-  }, []);
+    /* ─────────────────────────────────────────────────────────────────────
+       EFFECT 3: Page visibility — pause all when tab is hidden
+    ───────────────────────────────────────────────────────────────────── */
+    useEffect(() => {
+      const video = videoRef.current;
+      if (!video) return;
+
+      const onVisibility = () => {
+        if (document.hidden) {
+          video.pause();
+          video.muted = true;
+        } else if (isActiveRef.current) {
+          playSafe();
+        }
+      };
+
+      document.addEventListener('visibilitychange', onVisibility);
+      return () => document.removeEventListener('visibilitychange', onVisibility);
+    }, [playSafe]);
 
   /* ─────────────────────────────────────────────────────────────────────
       EFFECT 4: Lifecycle registry & cleanup on unmount

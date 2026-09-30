@@ -68,7 +68,7 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
   // Fetch real posts from DB (lean initial batch for instant page load)
   let dbReels: any[] = [];
   try {
-    const res = await getPosts({ mediaType: 'video', postType: 'reel', limit: 25 });
+    const res = await getPosts({ mediaType: 'video', postType: 'reel', limit: 10 });
     if (res.success && res.posts) {
       const videoPosts = res.posts.filter(post => post.postType === 'reel' && post.mediaUrls);
       const authorIds = videoPosts.map(p => p.author.id);
@@ -440,17 +440,19 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
     console.error("Failed to load DB reels", err);
   }
 
-  // 🎥 Auto-fetch trending YouTube Shorts so the reels feed is ALWAYS full and active
-  try {
-    const shortsLimit = Math.max(5, 12 - dbReels.length);
-    const trendingShorts = await getTrendingYouTubeShorts(shortsLimit);
-    if (trendingShorts.length > 0) {
-      const existingIds = new Set(dbReels.map((r: any) => r.youtubeId || r.id));
-      const freshShorts = trendingShorts.filter((s: any) => !existingIds.has(s.youtubeId) && !existingIds.has(s.id));
-      dbReels = [...dbReels, ...freshShorts];
+  // 🎥 Auto-fetch trending YouTube Shorts only if initial DB reels count is low (< 8)
+  if (dbReels.length < 8) {
+    try {
+      const shortsLimit = Math.max(3, 8 - dbReels.length);
+      const trendingShorts = await getTrendingYouTubeShorts(shortsLimit);
+      if (trendingShorts.length > 0) {
+        const existingIds = new Set(dbReels.map((r: any) => r.youtubeId || r.id));
+        const freshShorts = trendingShorts.filter((s: any) => !existingIds.has(s.youtubeId) && !existingIds.has(s.id));
+        dbReels = [...dbReels, ...freshShorts];
+      }
+    } catch (shortsErr) {
+      console.warn('YouTube Shorts auto-fetch notice:', shortsErr);
     }
-  } catch (shortsErr) {
-    console.warn('YouTube Shorts auto-fetch notice:', shortsErr);
   }
 
   return <ReelsStream initialReels={dbReels} />;

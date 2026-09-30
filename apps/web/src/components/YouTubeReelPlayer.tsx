@@ -5,6 +5,7 @@ import { ExternalLink, Play, AlertCircle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { getYouTubeEmbedUrl, getYouTubeThumbnailUrl, getYouTubeWatchUrl, decodeHtmlEntities } from '@/lib/youtube';
+import { setGlobalActiveVideo } from '@/components/HLSVideo';
 
 interface YouTubeReelPlayerProps {
   videoId: string;
@@ -30,8 +31,11 @@ export function YouTubeReelPlayer({
     if (!isActive) {
       setIsIframeLoaded(false);
       setHasError(false);
-    } else if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('tolee_pause_music_player'));
+    } else {
+      setGlobalActiveVideo(null);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('tolee_pause_music_player'));
+      }
     }
   }, [isActive]);
 

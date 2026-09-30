@@ -45,16 +45,6 @@ export async function GET(req: NextRequest) {
             }
           }
         },
-        likes: { select: { userId: true } },
-        savedBy: { select: { userId: true } },
-        reposts: {
-          orderBy: { createdAt: 'desc' },
-          select: {
-            userId: true,
-            createdAt: true,
-            user: { select: { id: true, name: true, username: true, avatar: true } }
-          }
-        },
         _count: {
           select: { likes: true, comments: true, reposts: true, views: true }
         }
@@ -80,7 +70,7 @@ export async function GET(req: NextRequest) {
         toleeId: firstTolee?.id || null,
         role: firstTolee?.ownerId === post.author.id ? 'Admin' : 'Member',
         caption: post.caption || '',
-        likes: post.likes?.length || 0,
+        likes: post._count?.likes || 0,
         comments: post._count?.comments || 0,
         views: post._count?.views || 0,
         shares: '0',

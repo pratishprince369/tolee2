@@ -73,29 +73,18 @@ function useActiveReelIndex(
     const container = containerRef.current;
     if (!container || reelCount === 0) return;
 
-    // 1. Instant Synchronous Scroll Listener:
-    // Calculates dominant index in real time (0ms delay) and enforces DOM-level audio pause on scroll
+    // 1. Smooth RAF-throttled scroll handler (zero DOM layout thrashing)
+    let rafId: number | null = null;
     const handleScroll = () => {
-      const h = container.clientHeight;
-      if (!h) return;
-      const dominantIndex = Math.round(container.scrollTop / h);
-      if (dominantIndex !== activeIndexRef.current && dominantIndex >= 0 && dominantIndex < reelCount) {
-        activeIndexRef.current = dominantIndex;
-        setActiveIndex(dominantIndex);
-      }
-
-      // Hard DOM guarantee: the instant scrolling occurs, pause any video not in the active reel
-      const slides = container.querySelectorAll('.reel-container');
-      slides.forEach((slide) => {
-        const idx = Number(slide.getAttribute('data-index'));
-        if (idx !== dominantIndex) {
-          const v = slide.querySelector('video');
-          if (v && !v.paused) {
-            try {
-              v.pause();
-              v.muted = true;
-            } catch (e) {}
-          }
+      if (rafId !== null) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        const h = container.clientHeight;
+        if (!h) return;
+        const dominantIndex = Math.round(container.scrollTop / h);
+        if (dominantIndex !== activeIndexRef.current && dominantIndex >= 0 && dominantIndex < reelCount) {
+          activeIndexRef.current = dominantIndex;
+          setActiveIndex(dominantIndex);
         }
       });
     };
@@ -115,7 +104,7 @@ function useActiveReelIndex(
         }
         if (best) {
           const idx = Number((best.target as HTMLElement).getAttribute('data-index'));
-          if (!isNaN(idx) && idx !== activeIndexRef.current) {
+          if (!isNaN(idx) && idx !== activeIndexRef.current && idx >= 0 && idx < reelCount) {
             activeIndexRef.current = idx;
             setActiveIndex(idx);
           }
@@ -128,6 +117,7 @@ function useActiveReelIndex(
     slides.forEach((s) => observer.observe(s));
 
     return () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
       container.removeEventListener('scroll', handleScroll);
       observer.disconnect();
     };
@@ -165,6 +155,9 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
 
   useEffect(() => {
     setMounted(true);
+    return () => {
+      setGlobalActiveVideo(null);
+    };
   }, []);
 
   const handleAdClick = async (e: React.MouseEvent, ad: any) => {
@@ -603,21 +596,14 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
 
     const distance = idx - activeIndex;
 
-    // Past slides - keep at most 1 previous slide ready
-    if (distance < 0) {
-      const shouldLoad = distance >= -1;
-      return {
-        shouldLoad,
-        preload: shouldLoad ? ('metadata' as const) : ('none' as const),
-      };
+    // Past slide - keep at most 1 previous slide ready with preload none
+    if (distance === -1) {
+      return { shouldLoad: true, preload: 'none' as const };
     }
 
-    // Future slides - lightweight lookahead (only 1 next slide auto, 1 after metadata)
+    // Future slide - preload next video buffer
     if (distance === 1) {
       return { shouldLoad: true, preload: 'auto' as const };
-    }
-    if (distance === 2) {
-      return { shouldLoad: true, preload: 'metadata' as const };
     }
 
     return { shouldLoad: false, preload: 'none' as const };
@@ -985,9 +971,9 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
           >
             {itemsToRender.map((item, index) => {
               // High performance sliding window virtualization:
-              // Only render full interactive slides within 2 indices of active reel.
+              // Only render full interactive slides within 1 index of active reel (active, previous, next).
               // Faraway slides maintain exact snap height via lightweight placeholder.
-              const isWithinWindow = Math.abs(index - mobileActiveIndex) <= 2;
+              const isWithinWindow = Math.abs(index - mobileActiveIndex) <= 1;
               if (!isWithinWindow) {
                 return (
                   <div
@@ -1134,7 +1120,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
               style={{ width: 'min(420px, 42vw)', height: 'min(820px, calc(100dvh - 36px))', scrollBehavior: 'auto' }}
             >
               {itemsToRender.map((item, index) => {
-                const isWithinWindow = Math.abs(index - desktopActiveIndex) <= 2;
+                const isWithinWindow = Math.abs(index - desktopActiveIndex) <= 1;
                 if (!isWithinWindow) {
                   return (
                     <div
