@@ -91,7 +91,7 @@ export default function GameDetailPage({ params }: GameDetailPageProps) {
                 {game.rating.toFixed(1)} Rating
               </span>
               <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-zinc-800 text-zinc-300 border border-zinc-700">
-                {game.license || 'MIT License'}
+                Instant Play
               </span>
               {game.badge && (
                 <span className="px-2 py-0.5 rounded-full text-xs font-extrabold uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
@@ -107,20 +107,6 @@ export default function GameDetailPage({ params }: GameDetailPageProps) {
             <p className="text-sm sm:text-base text-zinc-300 leading-relaxed">
               {game.description}
             </p>
-
-            <div className="pt-2">
-              <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Technologies</h4>
-              <div className="flex flex-wrap gap-2">
-                {game.technology.map((tech) => (
-                  <span
-                    key={tech}
-                    className="px-2.5 py-1 rounded-lg text-xs font-medium bg-[#0E1624] border border-[#1F2D40] text-zinc-300"
-                  >
-                    {tech}
-                  </span>
-                ))}
-              </div>
-            </div>
           </div>
 
           {/* Sidebar / Quick Stats */}
@@ -136,10 +122,6 @@ export default function GameDetailPage({ params }: GameDetailPageProps) {
                 <span className="text-teal-400 font-semibold">{game.multiplayer || 'Single Player'}</span>
               </div>
               <div className="py-2.5 flex justify-between">
-                <span className="text-zinc-500">Developer</span>
-                <span className="text-[#00D2C4] font-semibold">{game.developer || game.modelAttribution}</span>
-              </div>
-              <div className="py-2.5 flex justify-between">
                 <span className="text-zinc-500">Installation</span>
                 <span className="text-emerald-400 font-semibold">Instant Web (0 MB)</span>
               </div>
@@ -147,25 +129,7 @@ export default function GameDetailPage({ params }: GameDetailPageProps) {
                 <span className="text-zinc-500">Controls</span>
                 <span className="text-zinc-200 font-semibold">{game.controls || 'Touch / Keyboard / Mouse'}</span>
               </div>
-              <div className="py-2.5 flex justify-between">
-                <span className="text-zinc-500">Open-Source License</span>
-                <span className="text-zinc-300 font-semibold">{game.license || 'MIT'}</span>
-              </div>
             </div>
-
-            {game.githubUrl && (
-              <div className="pt-2">
-                <a
-                  href={game.githubUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-[#111A27] hover:bg-[#182436] border border-[#202E42] text-xs font-semibold text-zinc-200 transition-colors"
-                >
-                  <span>VIEW GITHUB REPOSITORY</span>
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </a>
-              </div>
-            )}
           </div>
         </div>
 

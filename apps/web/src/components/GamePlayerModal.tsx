@@ -389,35 +389,8 @@ export function GamePlayerModal({ game, isOpen, onClose }: GamePlayerModalProps)
                 </div>
 
                 <div className="flex justify-between py-1">
-                  <span className="text-zinc-500 flex items-center gap-1.5">
-                    <Code className="w-3.5 h-3.5" />
-                    License
-                  </span>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-zinc-800 text-zinc-300 border border-zinc-700">
-                    {game.license || 'MIT'}
-                  </span>
-                </div>
-
-                <div className="flex justify-between py-1">
-                  <span className="text-zinc-500">Developer</span>
-                  <span className="text-primary font-medium truncate max-w-[170px]">
-                    {game.developer || game.modelAttribution}
-                  </span>
-                </div>
-              </div>
-
-              {/* Tech Tags */}
-              <div className="space-y-1.5 pt-2 border-t border-zinc-800/80">
-                <span className="text-xs text-zinc-500 font-medium">Built with</span>
-                <div className="flex flex-wrap gap-1 pt-1">
-                  {game.technology.map((tech) => (
-                    <span
-                      key={tech}
-                      className="px-2 py-0.5 rounded text-[10px] font-medium bg-zinc-800 text-zinc-300 border border-zinc-700/60"
-                    >
-                      {tech}
-                    </span>
-                  ))}
+                  <span className="text-zinc-500">Installation</span>
+                  <span className="text-emerald-400 font-medium">Instant Web (0 MB)</span>
                 </div>
               </div>
 
@@ -468,17 +441,6 @@ export function GamePlayerModal({ game, isOpen, onClose }: GamePlayerModalProps)
 
               {/* Bottom Actions */}
               <div className="pt-3 space-y-2 mt-auto">
-                {game.githubUrl && (
-                  <a
-                    href={game.githubUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 border border-zinc-700/60 text-xs font-bold text-zinc-100 transition-colors shadow-sm"
-                  >
-                    <span>VIEW GITHUB REPOSITORY</span>
-                    <ExternalLink className="w-3.5 h-3.5 text-zinc-400" />
-                  </a>
-                )}
 
                 <div className="flex items-center gap-2">
                   <Button
@@ -525,19 +487,8 @@ export function GamePlayerModal({ game, isOpen, onClose }: GamePlayerModalProps)
                   <div>Genre: <strong className="text-zinc-200">{game.genre}</strong></div>
                   <div>Players: <strong className="text-zinc-200">{game.multiplayer || 'Single'}</strong></div>
                   <div>Controls: <strong className="text-zinc-200">{game.controls || 'Touch'}</strong></div>
-                  <div>License: <strong className="text-emerald-400">{game.license || 'MIT'}</strong></div>
+                  <div>Mode: <strong className="text-emerald-400">Instant Web</strong></div>
                 </div>
-                {game.githubUrl && (
-                  <a
-                    href={game.githubUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-zinc-800 text-xs font-semibold text-zinc-200"
-                  >
-                    <span>View on GitHub</span>
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </a>
-                )}
               </div>
             )}
           </div>

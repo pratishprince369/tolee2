@@ -31,8 +31,6 @@ import {
 } from 'lucide-react';
 import {
   ToleeGame,
-  MultiplayerRepo,
-  READY_MULTIPLAYER_REPOS,
   GAME_CATEGORIES,
   getAllGames,
   getFeaturedGames,
@@ -51,7 +49,6 @@ export function ToleeGamesStream() {
   const allGames = useMemo(() => getAllGames(), []);
   const featuredGames = useMemo(() => getFeaturedGames(), []);
   const trendingGames = useMemo(() => getTrendingGames(), []);
-  const multiplayerRepos = useMemo(() => READY_MULTIPLAYER_REPOS, []);
 
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -285,7 +282,7 @@ export function ToleeGamesStream() {
                     className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#0E1624] hover:bg-[#141F30] border border-[#202E42] text-white font-bold text-xs sm:text-sm transition-all cursor-pointer"
                   >
                     <Users className="w-4 h-4 text-[#00D2C4]" />
-                    <span>Multiplayer Repos</span>
+                    <span>Multiplayer Games</span>
                   </button>
                 </div>
               </div>
@@ -306,7 +303,7 @@ export function ToleeGamesStream() {
                 </div>
                 <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-2xl bg-[#0E1624] border border-[#1F2D40] text-xs font-bold text-zinc-200">
                   <Zap className="w-4 h-4 text-[#F59E0B]" />
-                  <span>Open Source</span>
+                  <span>Instant Play</span>
                 </div>
               </div>
             </div>
@@ -354,98 +351,21 @@ export function ToleeGamesStream() {
           </section>
         )}
 
-        {/* ── 2. 🎮 READY MULTIPLAYER GAME REPOSITORIES (Dedicated Showcase) ── */}
+        {/* ── 2. 🎮 MULTIPLAYER GAMES (Standard Game Catalog) ── */}
         {!searchQuery && (selectedCategory === 'All' || selectedCategory === 'Multiplayer') && (
-          <section ref={multiplayerSectionRef} className="space-y-4 pt-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">🎮</span>
-                <div>
-                  <h3 className="text-base sm:text-lg font-black text-white tracking-tight flex items-center gap-2">
-                    <span>Ready Multiplayer Games</span>
-                    <span className="text-[10px] uppercase font-extrabold px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30">
-                      GitHub Repos
-                    </span>
-                  </h3>
-                  <p className="text-xs text-zinc-400">
-                    Production-ready multiplayer engines, WebSocket servers & open-source game repositories
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {multiplayerRepos.map((repo) => (
-                <div
-                  key={repo.id}
-                  className="rounded-2xl bg-[#0D1522] border border-[#1A2636] hover:border-[#00D2C4]/60 p-4 flex flex-col justify-between space-y-3.5 group shadow-lg hover:shadow-cyan-500/10 transition-all duration-200"
-                >
-                  <div className="space-y-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-extrabold text-sm sm:text-base text-zinc-100 group-hover:text-[#00D2C4] transition-colors truncate">
-                            {repo.name}
-                          </h4>
-                        </div>
-                        <span className="text-[10px] font-bold text-teal-400 flex items-center gap-1 mt-0.5">
-                          <Users className="w-3 h-3" />
-                          {repo.multiplayerType}
-                        </span>
-                      </div>
-
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-zinc-800 text-zinc-300 border border-zinc-700 shrink-0">
-                        {repo.license}
-                      </span>
-                    </div>
-
-                    <p className="text-xs text-zinc-400 leading-relaxed line-clamp-2">
-                      {repo.description}
-                    </p>
-
-                    {/* Compatibility & Tech Badges */}
-                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                        {repo.compatibility}
-                      </span>
-                      {repo.technology.slice(0, 3).map((tech) => (
-                        <span
-                          key={tech}
-                          className="px-2 py-0.5 rounded text-[10px] font-medium bg-zinc-800/80 text-zinc-300 border border-zinc-700/60"
-                        >
-                          {tech}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Actions: GitHub Repo + Play/Integrate Game */}
-                  <div className="flex items-center gap-2 pt-2 border-t border-[#1C283B]">
-                    <a
-                      href={repo.githubUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-[#111A27] hover:bg-[#182436] text-xs font-semibold text-zinc-200 border border-[#202E42] transition-colors"
-                    >
-                      <Code className="w-3.5 h-3.5 text-zinc-400" />
-                      <span>GitHub Repo</span>
-                      <ExternalLink className="w-3 h-3 text-zinc-500 ml-auto" />
-                    </a>
-
-                    <a
-                      href={repo.githubUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-[#00D2C4] hover:bg-[#00E5FF] text-xs font-extrabold text-black shadow-md shadow-[#00D2C4]/20 transition-all"
-                    >
-                      <Gamepad2 className="w-3.5 h-3.5 fill-black stroke-black" />
-                      <span>Integrate Game</span>
-                    </a>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
+          <div ref={multiplayerSectionRef}>
+            <CategorizedSection
+              title="🎮 Multiplayer Games"
+              subtitle="Real-time arena combat, 2-player battles, and online multiplayer"
+              games={multiplayerGames}
+              favorites={favorites}
+              copiedId={copiedId}
+              onPlay={handlePlayGame}
+              onToggleFavorite={toggleFavorite}
+              onShare={handleShareGame}
+              onViewAll={() => setSelectedCategory('Multiplayer')}
+            />
+          </div>
         )}
 
         {/* ── 3. 🆓 FREE HTML5 GAMES LIBRARY (Categorized Carousels / Grids) ── */}
@@ -668,22 +588,19 @@ export function ToleeGamesStream() {
             <Sparkles className="w-6 h-6 animate-pulse" />
           </div>
           <h4 className="text-lg sm:text-xl font-black text-white">
-            More Games Coming Soon!
+            New Free Games Added Weekly!
           </h4>
           <p className="text-xs sm:text-sm text-zinc-400 max-w-md mx-auto">
-            Our team is continually integrating open-source games and WebGL engines. Have a game repo you want included?
+            Experience lightning fast browser gaming with instant play, zero storage required, and full mobile touch support.
           </p>
           <div className="pt-2">
-            <a
-              href="https://github.com/AgentsLoop/awesome-opus-5.5-games"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-[#111A27] hover:bg-[#182436] border border-[#202E42] text-xs font-bold text-zinc-200 transition-colors"
+            <button
+              onClick={() => browseSectionRef.current?.scrollIntoView({ behavior: 'smooth' })}
+              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-[#00D2C4] hover:bg-[#00E5FF] text-black font-extrabold text-xs transition-all shadow-lg shadow-[#00D2C4]/20 cursor-pointer"
             >
-              <Code className="w-3.5 h-3.5 text-[#00D2C4]" />
-              <span>Submit Game on GitHub</span>
-              <ExternalLink className="w-3 h-3 text-zinc-500" />
-            </a>
+              <Gamepad2 className="w-4 h-4 fill-black stroke-black" />
+              <span>Browse All Games</span>
+            </button>
           </div>
         </div>
 
@@ -764,7 +681,7 @@ function CategorizedSection({
   );
 }
 
-// ── Reusable Individual Game Card with Play, GitHub, Favorite, Share ──
+// ── Reusable Individual Game Card with Play, Favorite, Share (No Repo UI) ──
 interface GameCardProps {
   game: ToleeGame;
   isFavorite: boolean;
@@ -802,19 +719,10 @@ function GameCard({
           <span>{game.rating.toFixed(1)}</span>
         </div>
 
-        {/* Favorite Icon Top-Left */}
-        <button
-          onClick={onToggleFavorite}
-          className="absolute top-2 left-2 w-7 h-7 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center text-zinc-300 hover:text-rose-400 transition-colors"
-          title={isFavorite ? 'Favorited' : 'Add to Favorites'}
-        >
-          <Heart className={`w-3.5 h-3.5 ${isFavorite ? 'fill-rose-500 text-rose-500' : ''}`} />
-        </button>
-
         {/* Single / Multiplayer & Mobile Badges Overlay at bottom of image */}
         <div className="absolute bottom-1.5 left-2 right-2 flex items-center justify-between text-[9px] font-bold">
           <span className="px-1.5 py-0.5 rounded bg-black/75 backdrop-blur-xs text-zinc-200 border border-white/10">
-            {game.multiplayer || 'Single Player'}
+            {game.multiplayer === 'Online Multiplayer' ? '🎮 Multiplayer' : game.multiplayer || 'Single Player'}
           </span>
           {game.mobileSupported !== false && (
             <span className="px-1.5 py-0.5 rounded bg-emerald-500/80 backdrop-blur-xs text-white">
@@ -825,45 +733,49 @@ function GameCard({
       </div>
 
       {/* Card Body */}
-      <div className="p-3 flex flex-col justify-between flex-1 space-y-2">
+      <div className="p-3 flex flex-col justify-between flex-1 space-y-2.5">
         <div>
-          <h4 className="font-extrabold text-xs text-zinc-100 truncate group-hover:text-[#00D2C4] transition-colors">
+          <h4 className="font-extrabold text-xs sm:text-sm text-zinc-100 truncate group-hover:text-[#00D2C4] transition-colors">
             {game.title}
           </h4>
-          <p className="text-[10px] text-zinc-400 truncate mt-0.5">
-            {game.genre}
-          </p>
+          <div className="flex items-center justify-between text-[10px] text-zinc-400 mt-1">
+            <span className="truncate">{game.genre}</span>
+            <span className="text-zinc-500 shrink-0">{game.multiplayer || 'Single Player'}</span>
+          </div>
         </div>
 
-        {/* Card Buttons: PLAY NOW + GitHub + Share */}
-        <div className="flex items-center gap-1.5 pt-1 border-t border-[#1C283B]">
+        {/* Card Action Buttons: PLAY NOW + Favorite + Share (Clean Gamer UX) */}
+        <div className="flex items-center gap-1.5 pt-1.5 border-t border-[#1C283B]">
           <button
             onClick={(e) => {
               e.stopPropagation();
               onPlay();
             }}
-            className="flex-1 py-1.5 rounded-lg bg-[#00D2C4] hover:bg-[#00E5FF] text-black font-extrabold text-[11px] flex items-center justify-center gap-1 shadow-sm transition-all"
+            className="flex-1 py-1.5 px-2.5 rounded-xl bg-[#00D2C4] hover:bg-[#00E5FF] text-black font-black text-xs flex items-center justify-center gap-1.5 shadow-md shadow-[#00D2C4]/20 transition-all active:scale-[0.98]"
           >
-            <Play className="w-3 h-3 fill-black" />
+            <Play className="w-3.5 h-3.5 fill-black stroke-black" />
             <span>PLAY NOW</span>
           </button>
 
-          {game.githubUrl && (
-            <a
-              href={game.githubUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="w-7 h-7 rounded-lg bg-[#111A27] hover:bg-[#182436] border border-[#202E42] text-zinc-400 hover:text-white flex items-center justify-center shrink-0 transition-colors"
-              title="View on GitHub"
-            >
-              <Code className="w-3.5 h-3.5" />
-            </a>
-          )}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleFavorite(e);
+            }}
+            className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-[#111A27] hover:bg-[#182436] border border-[#202E42] flex items-center justify-center shrink-0 transition-colors ${
+              isFavorite ? 'text-rose-400 border-rose-500/40 bg-rose-500/10' : 'text-zinc-400 hover:text-white'
+            }`}
+            title={isFavorite ? 'Favorited' : 'Favorite'}
+          >
+            <Heart className={`w-3.5 h-3.5 ${isFavorite ? 'fill-rose-500 text-rose-500' : ''}`} />
+          </button>
 
           <button
-            onClick={onShare}
-            className="w-7 h-7 rounded-lg bg-[#111A27] hover:bg-[#182436] border border-[#202E42] text-zinc-400 hover:text-white flex items-center justify-center shrink-0 transition-colors"
+            onClick={(e) => {
+              e.stopPropagation();
+              onShare(e);
+            }}
+            className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-[#111A27] hover:bg-[#182436] border border-[#202E42] text-zinc-400 hover:text-white flex items-center justify-center shrink-0 transition-colors"
             title="Share Game"
           >
             {copiedId === game.id ? (
