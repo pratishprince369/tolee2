@@ -703,19 +703,30 @@ function GameCard({
   onToggleFavorite,
   onShare,
 }: GameCardProps) {
+  const [imgError, setImgError] = useState(false);
+
   return (
     <div
       onClick={onPlay}
       className="rounded-2xl bg-[#0D1522] border border-[#1A2636] hover:border-[#00D2C4]/60 transition-all duration-200 cursor-pointer overflow-hidden flex flex-col group shadow-md hover:shadow-cyan-500/10"
     >
       {/* Thumbnail Container */}
-      <div className="relative aspect-4/3 overflow-hidden bg-black">
-        <img
-          src={game.coverImage}
-          alt={game.title}
-          loading="lazy"
-          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-        />
+      <div className="relative aspect-4/3 overflow-hidden bg-gradient-to-br from-[#0c1421] to-[#162338]">
+        {!imgError ? (
+          <img
+            src={game.coverImage}
+            alt={game.title}
+            loading="lazy"
+            onError={() => setImgError(true)}
+            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+          />
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center p-3 text-center bg-gradient-to-br from-[#121c2c] via-[#0b1320] to-[#050b14]">
+            <Gamepad2 className="w-8 h-8 text-[#00D2C4]/70 mb-1 group-hover:scale-110 transition-transform" />
+            <span className="text-xs font-bold text-zinc-300 line-clamp-1">{game.title}</span>
+            <span className="text-[10px] text-zinc-500">{game.genre}</span>
+          </div>
+        )}
 
         {/* Rating Badge top-right */}
         <div className="absolute top-2 right-2 px-2 py-0.5 rounded-md text-[10px] font-black bg-black/80 backdrop-blur-md text-amber-400 flex items-center gap-1 border border-white/10 shadow-sm">
