@@ -22,6 +22,8 @@ export const GAME_GENRES = [
   'Puzzle & Board',
   'Arcade & Casual',
   'Strategy & RPG',
+  'Sports',
+  'Multiplayer',
 ] as const;
 
 export type GameGenre = (typeof GAME_GENRES)[number];
@@ -4175,6 +4177,18 @@ export function getTrendingGames(): ToleeGame[] {
 
 export function getGamesByGenre(genre: string): ToleeGame[] {
   if (!genre || genre === 'All') return TOLEE_GAMES;
+  if (genre === 'Sports') {
+    return TOLEE_GAMES.filter((g) => {
+      const t = (g.title + ' ' + g.description + ' ' + g.technology.join(' ')).toLowerCase();
+      return t.includes('kart') || t.includes('racer') || t.includes('drift') || t.includes('sports') || t.includes('pool') || t.includes('golf') || t.includes('ball') || t.includes('fighter') || t.includes('kombat');
+    });
+  }
+  if (genre === 'Multiplayer') {
+    return TOLEE_GAMES.filter((g) => {
+      const t = (g.title + ' ' + g.description + ' ' + g.technology.join(' ')).toLowerCase();
+      return t.includes('multiplayer') || t.includes('chess') || t.includes('fighter') || t.includes('combat') || t.includes('durable objects') || t.includes('battle') || t.includes('match') || t.includes('rogue');
+    });
+  }
   return TOLEE_GAMES.filter((g) => g.genre === genre);
 }
 
