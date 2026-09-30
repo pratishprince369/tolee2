@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>15 Sliding Puzzle - Tolee Games</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    body {
+      background: #070B11;
+      color: #FFF;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+    .wrapper {
+      width: 100%;
+      max-width: 360px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+    }
+    h1 { font-size: 24px; font-weight: 900; color: #00D2C4; }
+    .status-bar {
+      display: flex;
+      gap: 12px;
+    }
+    .pill {
+      background: #0E1624;
+      border: 1px solid #1F2D40;
+      border-radius: 12px;
+      padding: 6px 14px;
+      text-align: center;
+    }
+    .pill small { display: block; font-size: 9px; color: #64748B; font-weight: 800; text-transform: uppercase; }
+    .pill strong { font-size: 15px; color: #00F0FF; font-weight: 800; }
+    .board {
+      width: 300px;
+      height: 300px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      grid-template-rows: repeat(4, 1fr);
+      gap: 8px;
+      background: #0E1624;
+      border: 2px solid #1F2D40;
+      border-radius: 16px;
+      padding: 8px;
+      box-shadow: 0 10px 30px rgba(0, 210, 196, 0.12);
+    }
+    .tile {
+      background: #141F30;
+      color: #FFFFFF;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      font-weight: 900;
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+    .tile:active { transform: scale(0.95); }
+    .tile.empty { background: transparent; cursor: default; }
+    .shuffle-btn {
+      background: #00D2C4;
+      color: #070B11;
+      border: none;
+      padding: 10px 24px;
+      border-radius: 999px;
+      font-weight: 900;
+      font-size: 13px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <h1>15 PUZZLE</h1>
+
+    <div class="status-bar">
+      <div class="pill"><small>Moves</small><strong id="moves">0</strong></div>
+      <div class="pill"><small>Time</small><strong id="timer">00:00</strong></div>
+    </div>
+
+    <div class="board" id="board"></div>
+
+    <button class="shuffle-btn" onclick="shuffleGame()">Shuffle Board</button>
+  </div>
+
+  <script>
+    let tiles = [];
+    let moves = 0;
+    let seconds = 0;
+    let timer = null;
+
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function beep(freq = 440, dur = 0.04) {
+      if (!audioCtx) return;
+      try {
+        const o = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        o.connect(g);
+        g.connect(audioCtx.destination);
+        o.frequency.value = freq;
+        g.gain.setValueAtTime(0.08, audioCtx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+        o.start();
+        o.stop(audioCtx.currentTime + dur);
+      } catch(e) {}
+    }
+
+    function initBoard() {
+      tiles = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,0];
+      moves = 0;
+      seconds = 0;
+      clearInterval(timer);
+      document.getElementById('moves').innerText = '0';
+      document.getElementById('timer').innerText = '00:00';
+      render();
+    }
+
+    function shuffleGame() {
+      initBoard();
+      // Perform 100 valid random moves to guarantee solvability
+      for (let i = 0; i < 120; i++) {
+        const emptyIdx = tiles.indexOf(0);
+        const valid = getValidMoves(emptyIdx);
+        const pick = valid[Math.floor(Math.random() * valid.length)];
+        tiles[emptyIdx] = tiles[pick];
+        tiles[pick] = 0;
+      }
+      moves = 0;
+      document.getElementById('moves').innerText = '0';
+      render();
+
+      timer = setInterval(() => {
+        seconds++;
+        let m = String(Math.floor(seconds / 60)).padStart(2, '0');
+        let s = String(seconds % 60).padStart(2, '0');
+        document.getElementById('timer').innerText = `${m}:${s}`;
+      }, 1000);
+    }
+
+    function getValidMoves(empty) {
+      const row = Math.floor(empty / 4);
+      const col = empty % 4;
+      const valid = [];
+      if (row > 0) valid.push(empty - 4);
+      if (row < 3) valid.push(empty + 4);
+      if (col > 0) valid.push(empty - 1);
+      if (col < 3) valid.push(empty + 1);
+      return valid;
+    }
+
+    function render() {
+      const boardEl = document.getElementById('board');
+      boardEl.innerHTML = '';
+      tiles.forEach((num, idx) => {
+        const div = document.createElement('div');
+        div.className = 'tile' + (num === 0 ? ' empty' : '');
+        div.innerText = num > 0 ? num : '';
+        if (num > 0) {
+          div.addEventListener('click', () => tileClick(idx));
+        }
+        boardEl.appendChild(div);
+      });
+    }
+
+    function tileClick(idx) {
+      const emptyIdx = tiles.indexOf(0);
+      const valid = getValidMoves(emptyIdx);
+      if (valid.includes(idx)) {
+        tiles[emptyIdx] = tiles[idx];
+        tiles[idx] = 0;
+        moves++;
+        document.getElementById('moves').innerText = moves;
+        beep(360 + tiles[emptyIdx] * 15, 0.03);
+        render();
+        checkSolved();
+      }
+    }
+
+    function checkSolved() {
+      for (let i = 0; i < 15; i++) {
+        if (tiles[i] !== i + 1) return;
+      }
+      clearInterval(timer);
+      beep(880, 0.3);
+      alert(`🎉 Puzzle Solved in ${moves} moves!`);
+    }
+
+    shuffleGame();
+  </script>
+</body>
+</html>

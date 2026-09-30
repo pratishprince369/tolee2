@@ -153,7 +153,7 @@ export function GamePlayerModal({ game, isOpen, onClose }: GamePlayerModalProps)
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        className="max-w-[98vw] w-[1500px] h-[94vh] p-0 bg-zinc-950 border border-zinc-800 rounded-2xl lg:rounded-3xl overflow-hidden flex flex-col shadow-2xl z-50 text-white"
+        className="!max-w-[96vw] sm:!max-w-[96vw] lg:!max-w-[1380px] !w-[96vw] lg:!w-[1380px] !h-[92vh] sm:!h-[90vh] p-0 bg-zinc-950 border border-zinc-800 rounded-2xl overflow-hidden flex flex-col shadow-2xl z-50 text-white"
       >
         <DialogTitle className="sr-only">{game.title} - Tolee Games</DialogTitle>
         <div ref={containerRef} className="w-full h-full flex flex-col bg-zinc-950 relative overflow-hidden">
@@ -295,6 +295,7 @@ export function GamePlayerModal({ game, isOpen, onClose }: GamePlayerModalProps)
               )}
 
               <iframe
+                key={game.id}
                 ref={iframeRef}
                 src={game.playUrl}
                 title={game.title}
