@@ -163,7 +163,8 @@ export async function publishDailyBundleReelsBatch(maxLimit: number = 5): Promis
           status: 'published',
           visibility: 'public',
           authorId: dbUser.id,
-          isSimulation: false,
+          isSimulation: true,
+          mediaResourceTypes: 'google_drive',
           tolees: defaultTolee ? { create: [{ toleeId: defaultTolee.id }] } : undefined
         }
       });

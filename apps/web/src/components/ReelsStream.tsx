@@ -32,7 +32,7 @@ import { videoMetadataCache } from '@/lib/videoCache';
 import { formatViewCount } from '@/lib/utils';
 import { AdTracker } from '@/components/AdTracker';
 import { fetchEligibleAds } from '@/actions/ads';
-import { isVideoUrl, getMediaThumbnail, getPosterUrl, parseMediaUrls } from '@/lib/media';
+import { isVideoUrl, getMediaThumbnail, getPosterUrl, parseMediaUrls, isGoogleDriveUrl } from '@/lib/media';
 import { YouTubeReelPlayer } from '@/components/YouTubeReelPlayer';
 import { extractYouTubeVideoId, decodeHtmlEntities } from '@/lib/youtube';
 import { ToleeMediaPicker } from '@/lib/toleeMediaPicker';
@@ -589,6 +589,22 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
 
   const activeIndex = isDesktop ? desktopActiveIndex : mobileActiveIndex;
 
+  // Step 18: Defer next video buffer preload until current video has begun smooth playback
+  const [activeVideoPlaying, setActiveVideoPlaying] = useState(false);
+  const activePlayTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    setActiveVideoPlaying(false);
+    if (activePlayTimerRef.current) clearTimeout(activePlayTimerRef.current);
+    // Allow ~800ms for current video to start playing smoothly before preloading next buffer
+    activePlayTimerRef.current = setTimeout(() => {
+      setActiveVideoPlaying(true);
+    }, 800);
+    return () => {
+      if (activePlayTimerRef.current) clearTimeout(activePlayTimerRef.current);
+    };
+  }, [activeIndex]);
+
   const getPreloadParams = (idx: number) => {
     if (idx === activeIndex) {
       return { shouldLoad: true, preload: 'auto' as const };
@@ -601,11 +617,25 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
       return { shouldLoad: true, preload: 'none' as const };
     }
 
-    // Future slide - preload next video buffer
+    // Future slide (next video):
     if (distance === 1) {
-      return { shouldLoad: true, preload: 'auto' as const };
+      const nextItem = itemsToRender[idx];
+      const nextVideoUrl = nextItem?.data?.video || nextItem?.data?.mediaUrls || '';
+      const isNextDrive = isGoogleDriveUrl(nextVideoUrl);
+
+      // Step 17: If next is Google Drive, do not aggressively preload video buffer
+      if (isNextDrive) {
+        return { shouldLoad: true, preload: 'metadata' as const };
+      }
+
+      // Step 18: Preload next video buffer ONLY after active video has started playing
+      return {
+        shouldLoad: true,
+        preload: activeVideoPlaying ? ('auto' as const) : ('metadata' as const),
+      };
     }
 
+    // Distant slides: unmount / release video resources
     return { shouldLoad: false, preload: 'none' as const };
   };
   
@@ -1537,7 +1567,7 @@ const ReelSlide = memo(function ReelSlide({
           isActive={isActive}
           isMuted={isMuted}
           desktop={desktop}
-          posterUrl={getPosterUrl(reel.video)}
+          posterUrl={reel.poster || getPosterUrl(reel.video)}
         />
       ) : isImageReel ? (
         <img
@@ -1550,7 +1580,7 @@ const ReelSlide = memo(function ReelSlide({
           <HLSVideo
             src={reel.video}
             className={`w-full h-full object-cover transition-opacity duration-300 ${isReady ? 'opacity-100' : 'opacity-0'}`}
-            poster={getPosterUrl(reel.video)}
+            poster={reel.poster || getPosterUrl(reel.video)}
             isActive={isActive}
             shouldLoad={shouldLoad}
             preload={preload}
@@ -1572,11 +1602,12 @@ const ReelSlide = memo(function ReelSlide({
           />
 
           {/* ── Thumbnail Overlay (shown before first frame is ready) ── */}
-          {!isReady && !isError && getPosterUrl(reel.video) && (
+          {!isReady && !isError && (reel.poster || getPosterUrl(reel.video)) && (
             <img
-              src={getPosterUrl(reel.video)}
+              src={reel.poster || getPosterUrl(reel.video)}
               alt="Thumbnail"
-              className="absolute inset-0 w-full h-full object-cover z-0 filter blur-[2px] scale-105"
+              loading="eager"
+              className="absolute inset-0 w-full h-full object-cover z-0 filter blur-[1px] scale-102"
             />
           )}
 

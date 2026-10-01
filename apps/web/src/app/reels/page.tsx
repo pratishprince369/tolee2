@@ -6,8 +6,7 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { extractYouTubeVideoId } from '@/lib/youtube';
 import { getTrendingYouTubeShorts } from '@/lib/youtubeShortsService';
-import { publishDailyBundleReelsBatch } from '@/lib/reelsBundleAutoPublisher';
-import { getStreamableVideoUrl } from '@/lib/media';
+import { getStreamableVideoUrl, getPosterUrl, isGoogleDriveUrl } from '@/lib/media';
 import type { Metadata } from 'next';
 
 export const dynamic = 'force-dynamic';
@@ -50,20 +49,7 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
   const session = await getServerSession(authOptions);
   const currentUserId = (session?.user as any)?.id;
 
-  // 🎥 Daily Reels Bundle Auto-Publisher trigger (non-blocking in background)
-  void (async () => {
-    try {
-      const latestBundleReel = await prisma.post.findFirst({
-        where: { postType: 'reel', mediaUrls: { contains: 'drive.usercontent.google.com' } },
-        orderBy: { createdAt: 'desc' },
-        select: { createdAt: true }
-      });
-      const timeSince = latestBundleReel ? Date.now() - new Date(latestBundleReel.createdAt).getTime() : Infinity;
-      if (timeSince > 24 * 60 * 60 * 1000) {
-        publishDailyBundleReelsBatch(5).catch(() => {});
-      }
-    } catch {}
-  })();
+
 
   // Fetch real posts from DB (lean initial batch for instant page load)
   let dbReels: any[] = [];
@@ -150,13 +136,22 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
           followStatus,
           hasActiveStory,
           location: post.location || null,
-          subLocation: post.subLocation || null,
+          poster: getPosterUrl(post.mediaUrls.split(/,(?=https?:\/\/)/)[0]),
           createdAt: post.createdAt,
           duration: 15,
           aspectRatio: '9:16',
           videoType: 'hls',
           audioInfo: 'Original Audio',
         };
+      });
+
+      // Priority sort: CDN streams first, legacy Google Drive streams as fallback
+      dbReels.sort((a, b) => {
+        const aIsDrive = isGoogleDriveUrl(a.video);
+        const bIsDrive = isGoogleDriveUrl(b.video);
+        if (aIsDrive && !bIsDrive) return 1;
+        if (!aIsDrive && bIsDrive) return -1;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       });
     }
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getStreamableVideoUrl } from '@/lib/media';
+import { getStreamableVideoUrl, getPosterUrl } from '@/lib/media';
 
 export const dynamic = 'force-dynamic';
 
@@ -84,7 +84,7 @@ export async function GET(req: NextRequest) {
         isFollowing: false,
         followStatus: null,
         location: post.location || null,
-        subLocation: post.subLocation || null,
+        poster: getPosterUrl(post.mediaUrls ? post.mediaUrls.split(/,(?=https?:\/\/)/)[0] : ''),
         createdAt: post.createdAt,
         duration: 15,
         aspectRatio: '9:16',

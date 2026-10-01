@@ -13,13 +13,32 @@ export function parseMediaUrls(urlsString?: string | null): string[] {
     .filter(Boolean);
 }
 
+export function isGoogleDriveUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+  return url.includes('drive.usercontent.google.com') || url.includes('drive.google.com');
+}
+
+export function isCdnVideoUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+  const lower = url.toLowerCase();
+  return (
+    lower.includes('videos.pexels.com') ||
+    lower.includes('cloudinary.com') ||
+    lower.includes('mux.com') ||
+    lower.includes('cloudfront.net') ||
+    lower.includes('r2.cloudflarestorage.com') ||
+    lower.includes('b-cdn.net')
+  );
+}
+
 export function getStreamableVideoUrl(url: string | null | undefined): string {
   if (!url) return '';
   const trimmed = url.trim();
   if (trimmed.includes('drive.usercontent.google.com') || trimmed.includes('drive.google.com')) {
     const match = trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/) || trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || trimmed.match(/\/d\/([a-zA-Z0-9_-]+)/);
     if (match && match[1]) {
-      return `/api/video/drive-stream?id=${match[1]}`;
+      // Direct high-performance byte-range URL with CORS * bypassing Vercel server proxy
+      return `https://drive.usercontent.google.com/download?id=${match[1]}&export=download`;
     }
   }
   return trimmed;

@@ -253,10 +253,10 @@ export const HLSVideo = forwardRef<HTMLVideoElement, HLSVideoProps>(
       const video = videoRef.current;
       if (!video) return;
 
-      // Resolve Google Drive URLs to internal high-performance byte-range stream proxy
+      // Resolve Google Drive URLs to direct byte-range download URL without serverless proxying
       const resolvedSrc = (src.includes('drive.usercontent.google.com') || src.includes('drive.google.com'))
         ? (src.match(/[?&]id=([a-zA-Z0-9_-]+)/)?.[1] || src.match(/\/file\/d\/([a-zA-Z0-9_-]+)/)?.[1] || src.match(/\/d\/([a-zA-Z0-9_-]+)/)?.[1]
-            ? `/api/video/drive-stream?id=${(src.match(/[?&]id=([a-zA-Z0-9_-]+)/)?.[1] || src.match(/\/file\/d\/([a-zA-Z0-9_-]+)/)?.[1] || src.match(/\/d\/([a-zA-Z0-9_-]+)/)?.[1])}`
+            ? `https://drive.usercontent.google.com/download?id=${(src.match(/[?&]id=([a-zA-Z0-9_-]+)/)?.[1] || src.match(/\/file\/d\/([a-zA-Z0-9_-]+)/)?.[1] || src.match(/\/d\/([a-zA-Z0-9_-]+)/)?.[1])}&export=download`
             : src)
         : src;
 

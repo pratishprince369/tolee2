@@ -988,19 +988,30 @@ export async function getPosts(options?: { mediaType?: string; postType?: string
         return { post, score };
       });
 
-      // Split into Real and Simulation pools
-      const realPool = scoredCandidates.filter(c => !c.post.isSimulation).sort((a, b) => b.score - a.score).map(c => c.post);
-      const simPool = scoredCandidates.filter(c => c.post.isSimulation).sort((a, b) => b.score - a.score).map(c => c.post);
-
-      // MIXING ALGORITHM: Real user content FIRST, backfilled by simulated content
-      const mixed: any[] = [];
       const targetSize = Math.min(limit, candidates.length);
+      const mixed: any[] = [];
 
-      const selectedReal = realPool.slice(0, targetSize);
-      const remainingSlots = Math.max(0, targetSize - selectedReal.length);
-      const selectedSim = simPool.slice(0, remainingSlots);
+      if (postType === 'reel') {
+        // Prioritize fast CDN reels and real user reels, demoting legacy Google Drive reels
+        mixed.push(...scoredCandidates.sort((a, b) => {
+          const aIsDrive = a.post.mediaUrls && (a.post.mediaUrls.includes('drive.usercontent.google.com') || a.post.mediaUrls.includes('drive.google.com'));
+          const bIsDrive = b.post.mediaUrls && (b.post.mediaUrls.includes('drive.usercontent.google.com') || b.post.mediaUrls.includes('drive.google.com'));
+          if (aIsDrive && !bIsDrive) return 1;
+          if (!aIsDrive && bIsDrive) return -1;
+          return b.score - a.score;
+        }).slice(0, targetSize).map(c => c.post));
+      } else {
+        // Split into Real and Simulation pools
+        const realPool = scoredCandidates.filter(c => !c.post.isSimulation).sort((a, b) => b.score - a.score).map(c => c.post);
+        const simPool = scoredCandidates.filter(c => c.post.isSimulation).sort((a, b) => b.score - a.score).map(c => c.post);
 
-      mixed.push(...selectedReal, ...selectedSim);
+        // MIXING ALGORITHM: Real user content FIRST, backfilled by simulated content
+        const selectedReal = realPool.slice(0, targetSize);
+        const remainingSlots = Math.max(0, targetSize - selectedReal.length);
+        const selectedSim = simPool.slice(0, remainingSlots);
+
+        mixed.push(...selectedReal, ...selectedSim);
+      }
 
       // SPACING OUT posts by the same author to prevent consecutive identical posters
       for (let i = 1; i < mixed.length; i++) {
