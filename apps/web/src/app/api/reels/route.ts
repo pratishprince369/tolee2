@@ -2,14 +2,45 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getStreamableVideoUrl, getPosterUrl } from '@/lib/media';
 
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
+
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '10', 10), 1), 30);
   const cursor = searchParams.get('cursor');
+  const fingerprint = searchParams.get('fingerprint');
+
+  const session = await getServerSession(authOptions);
+  const currentUserId = (session?.user as any)?.id || searchParams.get('userId');
 
   try {
+    // 1. Fetch user-specific watch history (Steps 13, 14, 15)
+    let viewedReelIds = new Set<string>();
+    if (currentUserId || fingerprint) {
+      try {
+        const recentViews = await prisma.view.findMany({
+          where: {
+            contentType: 'reel',
+            OR: [
+              ...(currentUserId ? [{ viewer_user_id: currentUserId }] : []),
+              ...(fingerprint ? [{ device_fingerprint: fingerprint }] : [])
+            ]
+          },
+          select: { contentId: true },
+          take: 500,
+          orderBy: { createdAt: 'desc' }
+        });
+        viewedReelIds = new Set(recentViews.map(v => v.contentId));
+      } catch (err) {
+        // Fallback silently if views query fails
+      }
+    }
+
+    // 2. Query candidates from Neon DB
+    const poolSize = cursor ? limit + 1 : 50;
     const posts = await prisma.post.findMany({
       where: {
         postType: 'reel',
@@ -21,7 +52,7 @@ export async function GET(req: NextRequest) {
         ...(cursor ? { createdAt: { lt: new Date(cursor) } } : {})
       },
       orderBy: { createdAt: 'desc' },
-      take: limit + 1,
+      take: poolSize,
       include: {
         author: {
           select: {
@@ -51,9 +82,42 @@ export async function GET(req: NextRequest) {
       }
     });
 
-    const hasMore = posts.length > limit;
-    const items = hasMore ? posts.slice(0, limit) : posts;
-    const nextCursor = hasMore && items.length > 0 ? items[items.length - 1].createdAt.toISOString() : null;
+    let items: typeof posts = [];
+    let nextCursor: string | null = null;
+    let hasMore = false;
+
+    if (!cursor) {
+      // STEPS 14, 15, 30, 31: Split into NEVER SEEN vs ALREADY SEEN
+      const unseen = posts.filter(p => !viewedReelIds.has(p.id));
+      const seen = posts.filter(p => viewedReelIds.has(p.id));
+
+      // Controlled shuffle of the top unseen candidates so returning users never see identical order
+      const sortedUnseen = unseen.sort((a, b) => {
+        const aIsDrive = a.mediaUrls && (a.mediaUrls.includes('drive.usercontent.google.com') || a.mediaUrls.includes('drive.google.com'));
+        const bIsDrive = b.mediaUrls && (b.mediaUrls.includes('drive.usercontent.google.com') || b.mediaUrls.includes('drive.google.com'));
+        // Fast CDN reels take top priority
+        if (aIsDrive && !bIsDrive) return 1;
+        if (!aIsDrive && bIsDrive) return -1;
+        // Micro-randomization within same tier to keep fresh experience
+        return 0.5 - Math.random();
+      });
+
+      // If unseen is sufficient, use unseen; otherwise backfill with least recently seen (Step 31)
+      const selected = sortedUnseen.slice(0, limit);
+      if (selected.length < limit && seen.length > 0) {
+        const remaining = limit - selected.length;
+        selected.push(...seen.slice(0, remaining));
+      }
+
+      items = selected.length > 0 ? selected : posts.slice(0, limit);
+      hasMore = posts.length > items.length;
+      nextCursor = items.length > 0 ? items[items.length - 1].createdAt.toISOString() : null;
+    } else {
+      // Normal cursor pagination
+      hasMore = posts.length > limit;
+      items = hasMore ? posts.slice(0, limit) : posts;
+      nextCursor = hasMore && items.length > 0 ? items[items.length - 1].createdAt.toISOString() : null;
+    }
 
     const data = items.map(post => {
       const firstTolee = post.tolees?.[0]?.tolee;

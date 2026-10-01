@@ -361,8 +361,10 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
         return;
       }
 
+      const fp = typeof window !== 'undefined' ? localStorage.getItem('device_fingerprint') || '' : '';
+      const fpParam = fp ? `&fingerprint=${encodeURIComponent(fp)}` : '';
       const cursorParam = nextCursorRef.current ? `&cursor=${encodeURIComponent(nextCursorRef.current)}` : '';
-      const res = await fetch(`/api/reels?limit=10${cursorParam}`).then(r => r.json()).catch(() => null);
+      const res = await fetch(`/api/reels?limit=10${cursorParam}${fpParam}`).then(r => r.json()).catch(() => null);
 
       if (res && Array.isArray(res.data) && res.data.length > 0) {
         const newReels = res.data;
@@ -473,10 +475,13 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
     }).catch((err) => console.error('Failed to load sponsored ads:', err));
   }, []);
 
-  // Compute itemsToRender to interleave sponsored ads
+  // Step 16: Same-session duplicate protection
+  const displayedReelIds = new Set<string>();
   const itemsToRender: any[] = [];
   let adIndex = 0;
   visibleReels.forEach((reel, index) => {
+    if (displayedReelIds.has(reel.id)) return;
+    displayedReelIds.add(reel.id);
     itemsToRender.push({ type: 'reel', data: reel });
     if ((index + 1) % 4 === 0 && sponsoredAds.length > 0) {
       itemsToRender.push({ type: 'ad', data: sponsoredAds[adIndex % sponsoredAds.length] });
