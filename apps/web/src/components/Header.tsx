@@ -168,7 +168,7 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
         </div>
       )}
       <header className={cn(
-        "w-full h-16 flex items-center justify-between px-3 sm:px-4 lg:px-6 gap-2 sm:gap-4 select-none transition-all duration-300 border-b",
+        "w-full h-14 sm:h-16 flex items-center justify-between px-2 xs:px-3 sm:px-4 lg:px-6 gap-1 xs:gap-2 sm:gap-4 select-none transition-all duration-300 border-b",
         "bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md",
         scrolled
           ? "border-zinc-200/80 dark:border-zinc-800/80 shadow-md shadow-zinc-100/10 dark:shadow-black/25"
@@ -177,15 +177,15 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
       
       {/* Left: Full Brand Logo (Mobile & Desktop with Transparent Blending) */}
       <div className="flex items-center flex-shrink-0">
-        <Link href={session?.user ? "/feed" : "/"} className="flex items-center gap-2 hover:opacity-90 active:scale-95 transition-all duration-200">
+        <Link href={session?.user ? "/feed" : "/"} className="flex items-center gap-1.5 xs:gap-2 hover:opacity-90 active:scale-95 transition-all duration-200">
           {branding.headerLogoUrl ? (
             <img
               src={branding.headerLogoUrl}
               alt={branding.siteName || 'tolee'}
-              className="h-7 sm:h-9 w-auto max-w-[100px] xs:max-w-[120px] sm:max-w-[150px] object-contain mix-blend-multiply dark:mix-blend-screen bg-transparent"
+              className="h-6 xs:h-7 sm:h-9 w-auto max-w-[70px] xs:max-w-[95px] sm:max-w-[150px] object-contain mix-blend-multiply dark:mix-blend-screen bg-transparent"
             />
           ) : (
-            <span className="text-xl sm:text-2xl font-black tracking-tight text-primary dark:text-[#0E9F9A] select-none lowercase">
+            <span className="text-lg xs:text-xl sm:text-2xl font-black tracking-tight text-primary dark:text-[#0E9F9A] select-none lowercase">
               {branding.siteName || 'tolee'}
             </span>
           )}
@@ -202,136 +202,139 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
       )}
 
       {/* Right: User Profile & Actions */}
-      <div className="flex items-center justify-end gap-1 xs:gap-1.5 sm:gap-2 md:gap-3 flex-shrink-0">
+      <div className="flex items-center justify-end gap-1 xs:gap-1.5 sm:gap-2 md:gap-3 min-w-0 flex-1 sm:flex-initial">
         
         {status === 'loading' ? (
           <div className="w-8 h-8 xs:w-9 xs:h-9 sm:w-10 sm:h-10 rounded-full bg-gray-200 dark:bg-gray-800 animate-pulse" />
         ) : session?.user ? (
           <>
-            {/* Mobile Dedicated Search Icon Button (1st position) */}
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => router.push('/search')}
-              onTouchStart={() => router.prefetch('/search')}
-              onMouseEnter={() => router.prefetch('/search')}
-              className={cn(
-                "rounded-full md:hidden flex items-center justify-center h-8.5 w-8.5 xs:h-9 xs:w-9 flex-shrink-0 transition-all active:scale-95",
-                pathname.startsWith('/search') 
-                  ? 'text-primary bg-primary/10 border border-primary/20' 
-                  : 'text-gray-700 dark:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-800'
-              )}
-              aria-label="Search"
-              title="Search"
-            >
-              <Search className="w-4.5 h-4.5 xs:w-5 xs:h-5 text-gray-700 dark:text-zinc-200" />
-            </Button>
+            {/* Mobile Feature Shortcuts (Scrollable on very narrow screens, fits cleanly on all devices) */}
+            <div className="md:hidden flex items-center gap-0.5 xs:gap-1 overflow-x-auto no-scrollbar min-w-0 flex-1 justify-end py-0.5">
+              {/* Mobile Dedicated Search Icon Button */}
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => router.push('/search')}
+                onTouchStart={() => router.prefetch('/search')}
+                onMouseEnter={() => router.prefetch('/search')}
+                className={cn(
+                  "rounded-full flex items-center justify-center h-8 w-8 xs:h-8.5 xs:w-8.5 flex-shrink-0 transition-all active:scale-95",
+                  pathname.startsWith('/search') 
+                    ? 'text-primary bg-primary/10 border border-primary/20' 
+                    : 'text-gray-700 dark:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-800'
+                )}
+                aria-label="Search"
+                title="Search"
+              >
+                <Search className="w-4 h-4 xs:w-4.5 xs:h-4.5 text-gray-700 dark:text-zinc-200" />
+              </Button>
 
-            {/* Mobile Dedicated Tolee Songs Icon Button (next to Search) */}
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => router.push('/songs')}
-              onTouchStart={() => router.prefetch('/songs')}
-              onMouseEnter={() => router.prefetch('/songs')}
-              className={cn(
-                "rounded-full md:hidden flex items-center justify-center h-8.5 w-8.5 xs:h-9 xs:w-9 flex-shrink-0 transition-all active:scale-95",
-                pathname.startsWith('/songs') 
-                  ? 'text-primary bg-primary/10 border border-primary/20' 
-                  : 'text-gray-700 dark:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-800'
-              )}
-              aria-label="Tolee Songs"
-              title="Tolee Songs"
-            >
-              <Music className="w-4.5 h-4.5 xs:w-5 xs:h-5 text-gray-700 dark:text-zinc-200" />
-            </Button>
+              {/* Mobile Dedicated Tolee Songs Icon Button */}
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => router.push('/songs')}
+                onTouchStart={() => router.prefetch('/songs')}
+                onMouseEnter={() => router.prefetch('/songs')}
+                className={cn(
+                  "rounded-full flex items-center justify-center h-8 w-8 xs:h-8.5 xs:w-8.5 flex-shrink-0 transition-all active:scale-95",
+                  pathname.startsWith('/songs') 
+                    ? 'text-primary bg-primary/10 border border-primary/20' 
+                    : 'text-gray-700 dark:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-800'
+                )}
+                aria-label="Tolee Songs"
+                title="Tolee Songs"
+              >
+                <Music className="w-4 h-4 xs:w-4.5 xs:h-4.5 text-gray-700 dark:text-zinc-200" />
+              </Button>
 
-            {/* Mobile Dedicated Tolee Games Icon Button */}
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => router.push('/games')}
-              onTouchStart={() => router.prefetch('/games')}
-              onMouseEnter={() => router.prefetch('/games')}
-              className={cn(
-                "rounded-full md:hidden flex items-center justify-center h-8.5 w-8.5 xs:h-9 xs:w-9 flex-shrink-0 transition-all active:scale-95",
-                pathname.startsWith('/games') 
-                  ? 'text-primary bg-primary/10 border border-primary/20' 
-                  : 'text-gray-700 dark:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-800'
-              )}
-              aria-label="Tolee Games"
-              title="Tolee Games"
-            >
-              <Gamepad2 className="w-4.5 h-4.5 xs:w-5 xs:h-5 text-gray-700 dark:text-zinc-200" />
-            </Button>
+              {/* Mobile Dedicated Tolee Games Icon Button */}
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => router.push('/games')}
+                onTouchStart={() => router.prefetch('/games')}
+                onMouseEnter={() => router.prefetch('/games')}
+                className={cn(
+                  "rounded-full flex items-center justify-center h-8 w-8 xs:h-8.5 xs:w-8.5 flex-shrink-0 transition-all active:scale-95",
+                  pathname.startsWith('/games') 
+                    ? 'text-primary bg-primary/10 border border-primary/20' 
+                    : 'text-gray-700 dark:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-800'
+                )}
+                aria-label="Tolee Games"
+                title="Tolee Games"
+              >
+                <Gamepad2 className="w-4 h-4 xs:w-4.5 xs:h-4.5 text-gray-700 dark:text-zinc-200" />
+              </Button>
 
-            {/* Mobile Dedicated Sports Icon Button (2nd position) */}
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => router.push('/sports')}
-              onTouchStart={() => router.prefetch('/sports')}
-              onMouseEnter={() => router.prefetch('/sports')}
-              className={cn(
-                "rounded-full md:hidden flex items-center justify-center h-8.5 w-8.5 xs:h-9 xs:w-9 flex-shrink-0 transition-all active:scale-95",
-                pathname.startsWith('/sports') 
-                  ? 'text-primary bg-primary/10 border border-primary/20' 
-                  : 'text-gray-700 dark:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-800'
-              )}
-              aria-label="Tolee Sports"
-              title="Tolee Sports"
-            >
-              <img 
-                src="/sports/cricket-icon.png" 
-                alt="Tolee Sports" 
-                className="h-5 w-5 xs:h-5.5 xs:w-5.5 object-contain dark:brightness-0 dark:invert transition-transform" 
-              />
-            </Button>
+              {/* Mobile Dedicated Sports Icon Button */}
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => router.push('/sports')}
+                onTouchStart={() => router.prefetch('/sports')}
+                onMouseEnter={() => router.prefetch('/sports')}
+                className={cn(
+                  "rounded-full flex items-center justify-center h-8 w-8 xs:h-8.5 xs:w-8.5 flex-shrink-0 transition-all active:scale-95",
+                  pathname.startsWith('/sports') 
+                    ? 'text-primary bg-primary/10 border border-primary/20' 
+                    : 'text-gray-700 dark:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-800'
+                )}
+                aria-label="Tolee Sports"
+                title="Tolee Sports"
+              >
+                <img 
+                  src="/sports/cricket-icon.png" 
+                  alt="Tolee Sports" 
+                  className="h-4.5 w-4.5 xs:h-5 xs:w-5 object-contain dark:brightness-0 dark:invert transition-transform" 
+                />
+              </Button>
 
-            {/* Mobile Radar Shortcut */}
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => router.push('/radar')}
-              onTouchStart={() => router.prefetch('/radar')}
-              onMouseEnter={() => router.prefetch('/radar')}
-              className={cn(
-                "rounded-full md:hidden flex items-center justify-center h-8.5 w-8.5 xs:h-9 xs:w-9 flex-shrink-0 transition-all active:scale-95",
-                pathname.startsWith('/radar') 
-                  ? 'text-primary bg-primary/10 border border-primary/20' 
-                  : 'text-gray-700 dark:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-800'
-              )}
-              aria-label="Tolee Radar"
-              title="Tolee Radar"
-            >
-              <Radio className="w-4.5 h-4.5 xs:w-5 xs:h-5" />
-            </Button>
+              {/* Mobile Radar Shortcut */}
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => router.push('/radar')}
+                onTouchStart={() => router.prefetch('/radar')}
+                onMouseEnter={() => router.prefetch('/radar')}
+                className={cn(
+                  "rounded-full flex items-center justify-center h-8 w-8 xs:h-8.5 xs:w-8.5 flex-shrink-0 transition-all active:scale-95",
+                  pathname.startsWith('/radar') 
+                    ? 'text-primary bg-primary/10 border border-primary/20' 
+                    : 'text-gray-700 dark:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-800'
+                )}
+                aria-label="Tolee Radar"
+                title="Tolee Radar"
+              >
+                <Radio className="w-4 h-4 xs:w-4.5 xs:h-4.5" />
+              </Button>
 
-            {/* Mobile AI Manager Shortcut */}
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => router.push('/ai-manager')}
-              onTouchStart={() => router.prefetch('/ai-manager')}
-              onMouseEnter={() => router.prefetch('/ai-manager')}
-              className={cn(
-                "rounded-full md:hidden flex items-center justify-center h-8.5 w-8.5 xs:h-9 xs:w-9 flex-shrink-0 transition-all active:scale-95 relative",
-                pathname.startsWith('/ai-manager') 
-                  ? 'text-primary bg-primary/10 border border-primary/20' 
-                  : 'text-gray-700 dark:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-800'
-              )}
-              aria-label="AI Manager"
-              title="AI Tolee Manager"
-            >
-              <Bot className="w-4.5 h-4.5 xs:w-5 xs:h-5" />
-              {!pathname.startsWith('/ai-manager') && (
-                <span className="absolute top-1 right-1 w-2 h-2 bg-emerald-500 rounded-full animate-pulse border border-white dark:border-black"></span>
-              )}
-            </Button>
+              {/* Mobile AI Manager Shortcut */}
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => router.push('/ai-manager')}
+                onTouchStart={() => router.prefetch('/ai-manager')}
+                onMouseEnter={() => router.prefetch('/ai-manager')}
+                className={cn(
+                  "rounded-full flex items-center justify-center h-8 w-8 xs:h-8.5 xs:w-8.5 flex-shrink-0 transition-all active:scale-95 relative",
+                  pathname.startsWith('/ai-manager') 
+                    ? 'text-primary bg-primary/10 border border-primary/20' 
+                    : 'text-gray-700 dark:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-800'
+                )}
+                aria-label="AI Manager"
+                title="AI Tolee Manager"
+              >
+                <Bot className="w-4 h-4 xs:w-4.5 xs:h-4.5" />
+                {!pathname.startsWith('/ai-manager') && (
+                  <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 xs:w-2 xs:h-2 bg-emerald-500 rounded-full animate-pulse border border-white dark:border-black"></span>
+                )}
+              </Button>
+            </div>
 
             {/* Inline Upload Status Component in Header */}
             {task.state !== 'idle' && (
-              <div className="flex items-center gap-2 text-xs font-bold text-gray-700 dark:text-zinc-300 bg-gray-50 dark:bg-zinc-900 border border-gray-150 dark:border-zinc-800 px-3 py-1.5 rounded-full mr-2 select-none shadow-sm animate-pulse">
+              <div className="flex items-center gap-2 text-xs font-bold text-gray-700 dark:text-zinc-300 bg-gray-50 dark:bg-zinc-900 border border-gray-150 dark:border-zinc-800 px-3 py-1.5 rounded-full mr-2 select-none shadow-sm animate-pulse flex-shrink-0">
                 {task.state === 'uploading' && (
                   <>
                     <span className="animate-spin text-[#0a7c85]">⬆</span>
@@ -436,45 +439,48 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
               </Link>
             </div>
 
-            {/* Mobile Notification Bell */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => router.push('/notifications')}
-              onTouchStart={() => router.prefetch('/notifications')}
-              onMouseEnter={() => router.prefetch('/notifications')}
-              className={cn(
-                "rounded-full md:hidden flex items-center justify-center h-8.5 w-8.5 xs:h-9 xs:w-9 flex-shrink-0 transition-all active:scale-95 relative",
-                pathname.startsWith('/notifications')
-                  ? 'text-primary bg-primary/10 border border-primary/20'
-                  : 'text-gray-700 dark:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-800'
-              )}
-              aria-label="Notifications"
-              title="Notifications"
-            >
-              <Bell className="w-4.5 h-4.5 xs:w-5 xs:h-5" />
-              {counts.notifications > 0 && (
-                <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 bg-red-500 text-white text-[8px] font-bold flex items-center justify-center rounded-full border border-white dark:border-black">
-                  {counts.notifications > 9 ? '9+' : counts.notifications}
-                </span>
-              )}
-            </Button>
+            {/* Mobile Pinned Action Group (Notifications Bell + Create (+) Button) - NEVER CUT OFF */}
+            <div className="md:hidden flex items-center gap-1 xs:gap-1.5 flex-shrink-0">
+              {/* Mobile Notification Bell */}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => router.push('/notifications')}
+                onTouchStart={() => router.prefetch('/notifications')}
+                onMouseEnter={() => router.prefetch('/notifications')}
+                className={cn(
+                  "rounded-full flex items-center justify-center h-8 w-8 xs:h-8.5 xs:w-8.5 flex-shrink-0 transition-all active:scale-95 relative",
+                  pathname.startsWith('/notifications')
+                    ? 'text-primary bg-primary/10 border border-primary/20'
+                    : 'text-gray-700 dark:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-800'
+                )}
+                aria-label="Notifications"
+                title="Notifications"
+              >
+                <Bell className="w-4 h-4 xs:w-4.5 xs:h-4.5" />
+                {counts.notifications > 0 && (
+                  <span className="absolute top-0 right-0 w-3 h-3 xs:w-3.5 xs:h-3.5 bg-red-500 text-white text-[7px] xs:text-[8px] font-bold flex items-center justify-center rounded-full border border-white dark:border-black">
+                    {counts.notifications > 9 ? '9+' : counts.notifications}
+                  </span>
+                )}
+              </Button>
 
-            {/* Mobile Quick Create (+) Button next to Bell & DP Profile */}
-            <button
-              type="button"
-              onClick={() => {
-                window.dispatchEvent(new CustomEvent('tolee_open_quick_actions'));
-                if (pathname !== '/feed' && pathname !== '/') {
-                  router.push('/feed?action=create');
-                }
-              }}
-              className="md:hidden h-8.5 w-8.5 xs:h-9 xs:w-9 bg-primary dark:bg-white text-white dark:text-primary rounded-[12px] flex items-center justify-center transition-all duration-200 active:scale-95 shadow-[0_4px_14px_rgba(10,124,133,0.22)] dark:shadow-white/10 hover:opacity-90 border border-primary/10 dark:border-white/10 flex-shrink-0"
-              aria-label="Create Post"
-              title="Create Post"
-            >
-              <Plus className="w-4.5 h-4.5 xs:w-5 xs:h-5 stroke-[2.5]" />
-            </button>
+              {/* Mobile Quick Create (+) Button next to Bell & DP Profile */}
+              <button
+                type="button"
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent('tolee_open_quick_actions'));
+                  if (pathname !== '/feed' && pathname !== '/') {
+                    router.push('/feed?action=create');
+                  }
+                }}
+                className="h-8 w-8 xs:h-8.5 xs:w-8.5 bg-primary dark:bg-white text-white dark:text-primary rounded-[10px] xs:rounded-[12px] flex items-center justify-center transition-all duration-200 active:scale-95 shadow-[0_4px_14px_rgba(10,124,133,0.22)] dark:shadow-white/10 hover:opacity-90 border border-primary/10 dark:border-white/10 flex-shrink-0"
+                aria-label="Create Post"
+                title="Create Post"
+              >
+                <Plus className="w-4 h-4 xs:w-4.5 xs:h-4.5 stroke-[2.5]" />
+              </button>
+            </div>
 
             {/* Unified Avatar Dropdown (Desktop/Tablet Only — on mobile DP is in bottom nav, replaced by + button here) */}
             <div className="hidden md:flex items-center">
@@ -553,69 +559,71 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
             </div>
           </>
         ) : (
-          <div className="flex items-center gap-1.5 sm:gap-3">
-            {/* Mobile Search Button for guests (1st position) */}
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => router.push('/search')}
-              className="rounded-full md:hidden flex items-center justify-center h-8.5 w-8.5 xs:h-9 xs:w-9 flex-shrink-0 text-gray-700 dark:text-zinc-200"
-              aria-label="Search"
-              title="Search"
-            >
-              <Search className="w-4.5 h-4.5 xs:w-5 xs:h-5" />
-            </Button>
-            {/* Mobile Songs Button for guests (next to Search) */}
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => router.push('/songs')}
-              className={cn(
-                "rounded-full md:hidden flex items-center justify-center h-8.5 w-8.5 xs:h-9 xs:w-9 flex-shrink-0 transition-all active:scale-95",
-                pathname.startsWith('/songs') 
-                  ? 'text-primary bg-primary/10 border border-primary/20' 
-                  : 'text-gray-700 dark:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-800'
-              )}
-              aria-label="Tolee Songs"
-              title="Tolee Songs"
-            >
-              <Music className="w-4.5 h-4.5 xs:w-5 xs:h-5" />
-            </Button>
-            {/* Mobile Games Button for guests */}
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => router.push('/games')}
-              className={cn(
-                "rounded-full md:hidden flex items-center justify-center h-8.5 w-8.5 xs:h-9 xs:w-9 flex-shrink-0 transition-all active:scale-95",
-                pathname.startsWith('/games') 
-                  ? 'text-primary bg-primary/10 border border-primary/20' 
-                  : 'text-gray-700 dark:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-800'
-              )}
-              aria-label="Tolee Games"
-              title="Tolee Games"
-            >
-              <Gamepad2 className="w-4.5 h-4.5 xs:w-5 xs:h-5" />
-            </Button>
-            {/* Mobile Sports Button for guests (2nd position) */}
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => router.push('/sports')}
-              className="rounded-full md:hidden flex items-center justify-center h-8.5 w-8.5 xs:h-9 xs:w-9 flex-shrink-0 text-gray-700 dark:text-zinc-200"
-              aria-label="Tolee Sports"
-              title="Tolee Sports"
-            >
-              <img 
-                src="/sports/cricket-icon.png" 
-                alt="Tolee Sports" 
-                className="h-5 w-5 xs:h-5.5 xs:w-5.5 object-contain dark:brightness-0 dark:invert transition-transform" 
-              />
-            </Button>
-            <Link href="/auth/signin">
+          <div className="flex items-center gap-1 xs:gap-1.5 sm:gap-3 min-w-0 flex-1 sm:flex-initial justify-end">
+            <div className="md:hidden flex items-center gap-0.5 xs:gap-1 overflow-x-auto no-scrollbar min-w-0 flex-1 justify-end py-0.5">
+              {/* Mobile Search Button for guests */}
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => router.push('/search')}
+                className="rounded-full flex items-center justify-center h-8 w-8 xs:h-8.5 xs:w-8.5 flex-shrink-0 text-gray-700 dark:text-zinc-200"
+                aria-label="Search"
+                title="Search"
+              >
+                <Search className="w-4 h-4 xs:w-4.5 xs:h-4.5" />
+              </Button>
+              {/* Mobile Songs Button for guests */}
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => router.push('/songs')}
+                className={cn(
+                  "rounded-full flex items-center justify-center h-8 w-8 xs:h-8.5 xs:w-8.5 flex-shrink-0 transition-all active:scale-95",
+                  pathname.startsWith('/songs') 
+                    ? 'text-primary bg-primary/10 border border-primary/20' 
+                    : 'text-gray-700 dark:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-800'
+                )}
+                aria-label="Tolee Songs"
+                title="Tolee Songs"
+              >
+                <Music className="w-4 h-4 xs:w-4.5 xs:h-4.5" />
+              </Button>
+              {/* Mobile Games Button for guests */}
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => router.push('/games')}
+                className={cn(
+                  "rounded-full flex items-center justify-center h-8 w-8 xs:h-8.5 xs:w-8.5 flex-shrink-0 transition-all active:scale-95",
+                  pathname.startsWith('/games') 
+                    ? 'text-primary bg-primary/10 border border-primary/20' 
+                    : 'text-gray-700 dark:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-800'
+                )}
+                aria-label="Tolee Games"
+                title="Tolee Games"
+              >
+                <Gamepad2 className="w-4 h-4 xs:w-4.5 xs:h-4.5" />
+              </Button>
+              {/* Mobile Sports Button for guests */}
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => router.push('/sports')}
+                className="rounded-full flex items-center justify-center h-8 w-8 xs:h-8.5 xs:w-8.5 flex-shrink-0 text-gray-700 dark:text-zinc-200"
+                aria-label="Tolee Sports"
+                title="Tolee Sports"
+              >
+                <img 
+                  src="/sports/cricket-icon.png" 
+                  alt="Tolee Sports" 
+                  className="h-4.5 w-4.5 xs:h-5 xs:w-5 object-contain dark:brightness-0 dark:invert transition-transform" 
+                />
+              </Button>
+            </div>
+            <Link href="/auth/signin" className="flex-shrink-0">
               <Button 
                 variant="outline" 
-                className="rounded-full border-gray-300 dark:border-zinc-800 text-gray-700 dark:text-zinc-300 font-extrabold px-3.5 sm:px-6 py-1.5 sm:py-2 text-xs sm:text-sm h-8 sm:h-10 hover:bg-gray-50 dark:hover:bg-zinc-900 active:scale-95 transition-all duration-200"
+                className="rounded-full border-gray-300 dark:border-zinc-800 text-gray-700 dark:text-zinc-300 font-extrabold px-2.5 xs:px-3.5 sm:px-6 py-1 sm:py-2 text-xs sm:text-sm h-7.5 xs:h-8 sm:h-10 hover:bg-gray-50 dark:hover:bg-zinc-900 active:scale-95 transition-all duration-200"
               >
                 Log In
               </Button>
