@@ -54,9 +54,19 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
   // Fetch real posts from DB (lean initial batch for instant page load)
   let dbReels: any[] = [];
   try {
-    const res = await getPosts({ mediaType: 'video', postType: 'reel', limit: 10 });
+    const res = await getPosts({ mediaType: 'video', postType: 'reel', limit: 30 });
     if (res.success && res.posts) {
-      const videoPosts = res.posts.filter(post => post.postType === 'reel' && post.mediaUrls);
+      // Step 4 & 16: Deduplicate by post ID and clean video URL
+      const seenVideoKeys = new Set<string>();
+      const videoPosts: any[] = [];
+      for (const post of res.posts) {
+        if (post.postType !== 'reel' || !post.mediaUrls) continue;
+        const cleanV = (post.mediaUrls.split(/,(?=https?:\/\/)/)[0] || '').split('?')[0].toLowerCase();
+        if (cleanV && seenVideoKeys.has(cleanV)) continue;
+        if (cleanV) seenVideoKeys.add(cleanV);
+        videoPosts.push(post);
+        if (videoPosts.length >= 10) break;
+      }
       const authorIds = videoPosts.map(p => p.author.id);
 
       // Query follow statuses of these authors for the current user

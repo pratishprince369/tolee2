@@ -318,82 +318,70 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
 
   const isLoadingMore = useRef(false);
   const hasMoreRef = useRef(true);
-  const nextCursorRef = useRef<string | null>(null);
-  const loopCountRef = useRef(0);
-  const originalReelsRef = useRef<any[]>(initialReels);
 
-  // Initialize nextCursor from initialReels
-  useEffect(() => {
-    if (initialReels.length > 0 && !nextCursorRef.current) {
-      const last = initialReels[initialReels.length - 1];
-      if (last.createdAt) {
-        nextCursorRef.current = new Date(last.createdAt).toISOString();
-      }
-    }
-  }, [initialReels]);
+  // STEP 16: Active session deduplication tracking
+  const sessionLoadedReelIds = useRef(new Set<string>());
+  const displayedVideoUrls = useRef(new Set<string>());
 
-  // Sync originalReelsRef with newly added reels
+  // Sync displayed IDs and video URLs with reels state
   useEffect(() => {
-    const seen = new Set(originalReelsRef.current.map(r => r.id));
-    initialReels.forEach(r => {
-      videoMetadataCache.set(r.id, r);
-      if (!seen.has(r.id)) {
-        originalReelsRef.current.push(r);
-        seen.add(r.id);
-      }
+    reels.forEach((r: any) => {
+      if (r?.id) sessionLoadedReelIds.current.add(r.id);
+      const vKey = (r?.video || '').split('?')[0].toLowerCase();
+      if (vKey) displayedVideoUrls.current.add(vKey);
+      if (r?.id) videoMetadataCache.set(r.id, r);
     });
-  }, [initialReels]);
+  }, [reels]);
 
   const loadMoreReels = useCallback(async () => {
-    if (isLoadingMore.current) return;
+    if (isLoadingMore.current || !hasMoreRef.current) return;
     isLoadingMore.current = true;
 
     try {
-      if (!hasMoreRef.current) {
-        // Existed database reels are exhausted. Repeat from the beginning.
-        loopCountRef.current += 1;
-        const loopedReels = originalReelsRef.current.map((reel) => ({
-          ...reel,
-          id: `${reel.id}-loop-${loopCountRef.current}-${Math.random().toString(36).substring(7)}`
-        }));
-        setReels((prev) => [...prev, ...loopedReels]);
-        isLoadingMore.current = false;
-        return;
-      }
-
       const fp = typeof window !== 'undefined' ? localStorage.getItem('device_fingerprint') || '' : '';
       const fpParam = fp ? `&fingerprint=${encodeURIComponent(fp)}` : '';
-      const cursorParam = nextCursorRef.current ? `&cursor=${encodeURIComponent(nextCursorRef.current)}` : '';
-      const res = await fetch(`/api/reels?limit=10${cursorParam}${fpParam}`).then(r => r.json()).catch(() => null);
+      
+      // Step 16 & 17: Exclude all recently displayed reel IDs (server-side query filtering)
+      const excludeList = Array.from(sessionLoadedReelIds.current).slice(-100).join(',');
+      const excludeParam = excludeList ? `&excludeIds=${encodeURIComponent(excludeList)}` : '';
 
-      if (res && Array.isArray(res.data) && res.data.length > 0) {
+      const res = await fetch(`/api/reels?limit=10${excludeParam}${fpParam}`).then(r => r.json()).catch(() => null);
+
+      if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
         const newReels = res.data;
-        nextCursorRef.current = res.nextCursor || null;
         hasMoreRef.current = Boolean(res.hasMore);
-
-        const seenIds = new Set(originalReelsRef.current.map((r: any) => r.id));
-        newReels.forEach((r: any) => {
-          videoMetadataCache.set(r.id, r);
-          if (!seenIds.has(r.id)) {
-            originalReelsRef.current.push(r);
-          }
-        });
 
         setReels((prev) => {
           const existingIds = new Set(prev.map((r: any) => r.id));
-          const filteredNewReels = newReels.filter((r: any) => !existingIds.has(r.id));
-          return [...prev, ...filteredNewReels];
+          const existingVideos = new Set(
+            prev.map((r: any) => (r.video || '').split('?')[0].toLowerCase()).filter(Boolean)
+          );
+
+          // Step 16: Zero duplicates guarantee by ID & clean video stream URL
+          const uniqueNewReels = newReels.filter((r: any) => {
+            if (!r || !r.id || existingIds.has(r.id)) return false;
+            const vKey = (r.video || '').split('?')[0].toLowerCase();
+            if (vKey && existingVideos.has(vKey)) return false;
+
+            existingIds.add(r.id);
+            sessionLoadedReelIds.current.add(r.id);
+            if (vKey) {
+              existingVideos.add(vKey);
+              displayedVideoUrls.current.add(vKey);
+            }
+            videoMetadataCache.set(r.id, r);
+            return true;
+          });
+
+          if (uniqueNewReels.length === 0) {
+            hasMoreRef.current = false;
+            return prev;
+          }
+
+          return [...prev, ...uniqueNewReels];
         });
       } else {
         hasMoreRef.current = false;
-        if (originalReelsRef.current.length > 0) {
-          loopCountRef.current += 1;
-          const loopedReels = originalReelsRef.current.map((reel) => ({
-            ...reel,
-            id: `${reel.id}-loop-${loopCountRef.current}-${Math.random().toString(36).substring(7)}`
-          }));
-          setReels((prev) => [...prev, ...loopedReels]);
-        }
       }
     } catch (err) {
       console.error('Failed to load more reels:', err);

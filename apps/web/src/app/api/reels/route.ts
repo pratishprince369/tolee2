@@ -1,24 +1,52 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getStreamableVideoUrl, getPosterUrl } from '@/lib/media';
-
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
+function extractVideoFingerprint(url: string | null | undefined): string {
+  if (!url) return '';
+  const firstUrl = url.split(/,(?=https?:\/\/)/)[0].trim();
+  // 1. Google Drive file ID
+  const gMatch = firstUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/) || firstUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  if (gMatch && gMatch[1]) return `gdrive_${gMatch[1]}`;
+  // 2. YouTube Shorts / Video ID
+  const yMatch = firstUrl.match(/(?:youtu\.be\/|youtube\.com\/(?:shorts\/|watch\?v=))([a-zA-Z0-9_-]{11})/);
+  if (yMatch && yMatch[1]) return `yt_${yMatch[1]}`;
+  // 3. Normalized direct media URL (removes query strings)
+  try {
+    const parsed = new URL(firstUrl);
+    return `${parsed.host}${parsed.pathname}`.toLowerCase();
+  } catch {
+    return firstUrl.split('?')[0].toLowerCase();
+  }
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '10', 10), 1), 30);
-  const cursor = searchParams.get('cursor');
   const fingerprint = searchParams.get('fingerprint');
+  const excludeIdsParam = searchParams.get('excludeIds');
 
   const session = await getServerSession(authOptions);
   const currentUserId = (session?.user as any)?.id || searchParams.get('userId');
 
   try {
-    // 1. Fetch user-specific watch history (Steps 13, 14, 15)
-    let viewedReelIds = new Set<string>();
+    // 1. Collect IDs already loaded on the client session (Step 16)
+    const excludeIdSet = new Set<string>();
+    if (excludeIdsParam) {
+      excludeIdsParam.split(',').forEach(id => {
+        const clean = id.trim();
+        if (clean) excludeIdSet.add(clean);
+      });
+    }
+
+    // 2. Fetch user-specific watch history (Steps 13, 14, 15)
+    const viewedReelIds = new Set<string>();
+    const viewedVideoFingerprints = new Set<string>();
+
     if (currentUserId || fingerprint) {
       try {
         const recentViews = await prisma.view.findMany({
@@ -30,18 +58,45 @@ export async function GET(req: NextRequest) {
             ]
           },
           select: { contentId: true },
-          take: 500,
+          take: 1000,
           orderBy: { createdAt: 'desc' }
         });
-        viewedReelIds = new Set((recentViews as any[]).map((v: any) => v.contentId));
+        (recentViews as any[]).forEach((v: any) => {
+          if (v.contentId) viewedReelIds.add(v.contentId);
+        });
+
+        // Also resolve fingerprints of viewed reels to catch re-uploaded duplicate clips (Step 4 & 5)
+        if (viewedReelIds.size > 0) {
+          const sampleViewed = Array.from(viewedReelIds).slice(0, 100);
+          const viewedPosts = await prisma.post.findMany({
+            where: { id: { in: sampleViewed } },
+            select: { mediaUrls: true }
+          });
+          for (const vp of viewedPosts) {
+            const fp = extractVideoFingerprint(vp.mediaUrls);
+            if (fp) viewedVideoFingerprints.add(fp);
+          }
+        }
       } catch (err) {
         // Fallback silently if views query fails
       }
     }
 
-    // 2. Query candidates from Neon DB
-    const poolSize = cursor ? limit + 1 : 50;
-    const posts = await prisma.post.findMany({
+    // 3. Also register fingerprints of reels currently displayed in the client's feed
+    const sessionVideoFingerprints = new Set<string>();
+    if (excludeIdSet.size > 0) {
+      const displayedPosts = await prisma.post.findMany({
+        where: { id: { in: Array.from(excludeIdSet).slice(0, 60) } },
+        select: { mediaUrls: true }
+      });
+      for (const dp of displayedPosts) {
+        const fp = extractVideoFingerprint(dp.mediaUrls);
+        if (fp) sessionVideoFingerprints.add(fp);
+      }
+    }
+
+    // 4. Query candidate reels from Neon DB (Step 17, 33)
+    const candidatePosts = await prisma.post.findMany({
       where: {
         postType: 'reel',
         status: 'published',
@@ -49,10 +104,10 @@ export async function GET(req: NextRequest) {
         mediaTypes: 'video',
         mediaUrls: { not: null },
         visibility: 'public',
-        ...(cursor ? { createdAt: { lt: new Date(cursor) } } : {})
+        ...(excludeIdSet.size > 0 ? { id: { notIn: Array.from(excludeIdSet) } } : {})
       },
       orderBy: { createdAt: 'desc' },
-      take: poolSize,
+      take: 250, // Large candidate pool ensuring diversity across all 650+ DB reels
       include: {
         author: {
           select: {
@@ -82,44 +137,59 @@ export async function GET(req: NextRequest) {
       }
     });
 
-    let items: typeof posts = [];
-    let nextCursor: string | null = null;
-    let hasMore = false;
+    // 5. Partition candidates into NEVER SEEN vs ALREADY SEEN with video deduplication (Step 14, 15, 30)
+    const unseenCandidates: any[] = [];
+    const seenCandidates: any[] = [];
+    const localVideoFingerprints = new Set<string>();
 
-    if (!cursor) {
-      // STEPS 14, 15, 30, 31: Split into NEVER SEEN vs ALREADY SEEN
-      const unseen = (posts as any[]).filter((p: any) => !viewedReelIds.has(p.id));
-      const seen = (posts as any[]).filter((p: any) => viewedReelIds.has(p.id));
+    for (const post of candidatePosts) {
+      const fp = extractVideoFingerprint(post.mediaUrls);
+      
+      // Skip if this video was already displayed in this user's current feed session
+      if (fp && sessionVideoFingerprints.has(fp)) continue;
+      // Skip if this video was already included in the current batch
+      if (fp && localVideoFingerprints.has(fp)) continue;
 
-      // Controlled shuffle of the top unseen candidates so returning users never see identical order
-      const sortedUnseen = unseen.sort((a: any, b: any) => {
-        const aIsDrive = a.mediaUrls && (a.mediaUrls.includes('drive.usercontent.google.com') || a.mediaUrls.includes('drive.google.com'));
-        const bIsDrive = b.mediaUrls && (b.mediaUrls.includes('drive.usercontent.google.com') || b.mediaUrls.includes('drive.google.com'));
-        // Fast CDN reels take top priority
-        if (aIsDrive && !bIsDrive) return 1;
-        if (!aIsDrive && bIsDrive) return -1;
-        // Micro-randomization within same tier to keep fresh experience
-        return 0.5 - Math.random();
-      });
+      if (fp) localVideoFingerprints.add(fp);
 
-      // If unseen is sufficient, use unseen; otherwise backfill with least recently seen (Step 31)
-      const selected = sortedUnseen.slice(0, limit);
-      if (selected.length < limit && seen.length > 0) {
-        const remaining = limit - selected.length;
-        selected.push(...seen.slice(0, remaining));
+      const isViewed = viewedReelIds.has(post.id) || (fp && viewedVideoFingerprints.has(fp));
+      if (isViewed) {
+        seenCandidates.push(post);
+      } else {
+        unseenCandidates.push(post);
       }
-
-      items = selected.length > 0 ? selected : posts.slice(0, limit);
-      hasMore = posts.length > items.length;
-      nextCursor = items.length > 0 ? items[items.length - 1].createdAt.toISOString() : null;
-    } else {
-      // Normal cursor pagination
-      hasMore = posts.length > limit;
-      items = hasMore ? posts.slice(0, limit) : posts;
-      nextCursor = hasMore && items.length > 0 ? items[items.length - 1].createdAt.toISOString() : null;
     }
 
-    const data = (items as any[]).map((post: any) => {
+    // 6. Controlled prioritization: CDN videos first + micro-randomization (Step 14, 30)
+    const sortedUnseen = unseenCandidates.sort((a, b) => {
+      const aIsDrive = a.mediaUrls && (a.mediaUrls.includes('drive.usercontent.google.com') || a.mediaUrls.includes('drive.google.com'));
+      const bIsDrive = b.mediaUrls && (b.mediaUrls.includes('drive.usercontent.google.com') || b.mediaUrls.includes('drive.google.com'));
+      if (aIsDrive && !bIsDrive) return 1;
+      if (!aIsDrive && bIsDrive) return -1;
+      return 0.5 - Math.random();
+    });
+
+    const selected: any[] = [];
+    for (const post of sortedUnseen) {
+      if (selected.length >= limit) break;
+      selected.push(post);
+    }
+
+    // 7. Step 31: Content exhaustion fallback:
+    // If unseen content is fewer than limit, recycle oldest seen content (NOT recently seen)
+    if (selected.length < limit && seenCandidates.length > 0) {
+      const recycled = seenCandidates.reverse(); // oldest first
+      for (const post of recycled) {
+        if (selected.length >= limit) break;
+        selected.push(post);
+      }
+    }
+
+    const hasMore = (unseenCandidates.length - selected.length) > 0 || (seenCandidates.length > (limit - selected.length));
+    const nextCursor = selected.length > 0 ? selected[selected.length - 1].createdAt.toISOString() : null;
+
+    // 8. Build final stream response data
+    const data = selected.map((post: any) => {
       const firstTolee = post.tolees?.[0]?.tolee;
       return {
         id: post.id,
@@ -158,9 +228,11 @@ export async function GET(req: NextRequest) {
     });
 
     return NextResponse.json({
+      success: true,
       data,
       nextCursor,
-      hasMore
+      hasMore,
+      unseenCount: unseenCandidates.length
     });
   } catch (err: any) {
     console.error('[GET /api/reels Error]:', err);
