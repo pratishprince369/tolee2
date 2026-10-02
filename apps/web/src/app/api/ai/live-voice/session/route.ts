@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    const userId = session?.user?.id;
+    const userId = (session?.user as any)?.id;
 
     const body = await req.json().catch(() => ({}));
     const { personaId, voiceName = 'Puck', model = 'gemini-2.0-flash' } = body;

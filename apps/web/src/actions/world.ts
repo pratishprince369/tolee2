@@ -160,9 +160,9 @@ export async function createWorldProject(data: {
         });
 
         if (members.length > 0) {
-          const uniqueMemberIds = Array.from(new Set(members.map(m => m.userId)));
+          const uniqueMemberIds = Array.from(new Set((members as any[]).map((m: any) => m.userId)));
           const creatorName = session.user.name || "A creator";
-          const toleeNameList = Array.from(new Set(members.map(m => m.tolee.name))).join(', ');
+          const toleeNameList = Array.from(new Set((members as any[]).map((m: any) => m.tolee?.name || 'Community'))).join(', ');
           const messageText = `${creatorName} launched a new Tolee World ${project.type.toLowerCase()} in ${toleeNameList}: "${project.name}"`;
 
           await prisma.notification.createMany({
@@ -559,7 +559,7 @@ export async function getUserCreatorStats() {
     });
 
     const maxReelLikes = userReels.length > 0
-      ? Math.max(...userReels.map(r => r._count.likes))
+      ? Math.max(...(userReels as any[]).map((r: any) => r._count.likes))
       : 0;
 
     return {

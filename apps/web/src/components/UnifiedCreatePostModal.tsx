@@ -227,7 +227,7 @@ export function UnifiedCreatePostModal({
         setIsLoadingMusic(true);
         searchSongsAction(q, selectedMusicGenre !== 'All' ? selectedMusicGenre : undefined)
           .then((res) => {
-            if (res.success && res.songs?.length > 0) {
+            if (res.success && res.songs && res.songs.length > 0) {
               const tracks: AudioTrack[] = res.songs.map((s: any) => ({
                 id: s.id,
                 title: s.title,

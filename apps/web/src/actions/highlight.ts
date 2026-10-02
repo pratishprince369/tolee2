@@ -107,7 +107,7 @@ export async function createHighlight(name: string, storyIds: string[], coverUrl
       }
     });
 
-    revalidatePath(`/u/${session.user.username}`);
+    revalidatePath(`/u/${(session.user as any).username}`);
     return { success: true, highlight };
   } catch (error) {
     console.error("Error creating highlight:", error);
@@ -166,7 +166,7 @@ export async function editHighlight(highlightId: string, name: string, storyIds:
       })
     ]);
 
-    revalidatePath(`/u/${session.user.username}`);
+    revalidatePath(`/u/${(session.user as any).username}`);
     return { success: true };
   } catch (error) {
     console.error("Error editing highlight:", error);
@@ -194,7 +194,7 @@ export async function deleteHighlight(highlightId: string) {
       where: { id: highlightId }
     });
 
-    revalidatePath(`/u/${session.user.username}`);
+    revalidatePath(`/u/${(session.user as any).username}`);
     return { success: true };
   } catch (error) {
     console.error("Error deleting highlight:", error);

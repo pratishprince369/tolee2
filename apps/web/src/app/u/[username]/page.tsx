@@ -1,4 +1,5 @@
 import React from 'react';
+import type { Metadata } from 'next';
 import { prisma } from '@/lib/prisma';
 import { notFound, redirect } from 'next/navigation';
 import { getServerSession } from 'next-auth/next';
@@ -472,7 +473,7 @@ export default async function UserProfile({ params }: PageProps) {
   );
 }
 
-export async function generateMetadata({ params }: PageProps) {
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const resolvedParams = params instanceof Promise ? await params : params;
   const rawUsername = resolvedParams?.username === 'me' ? null : resolvedParams?.username;
   if (!rawUsername) return {};
@@ -539,7 +540,7 @@ export async function generateMetadata({ params }: PageProps) {
         googleBot: {
           index: true,
           follow: true,
-          'max-image-preview': 'large',
+          'max-image-preview': 'large' as const,
           'max-snippet': -1,
         }
       }

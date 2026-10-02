@@ -44,12 +44,12 @@ export async function GET(req: NextRequest) {
     ]);
 
     const apiConfigsList = apiConfig as any[] || [];
-    const thesportsdbConfig = apiConfigsList.find(c => c.provider === 'thesportsdb') || null;
-    const cricketdataConfig = apiConfigsList.find(c => c.provider === 'cricketdata') || null;
+    const thesportsdbConfig = apiConfigsList.find((c: any) => c.provider === 'thesportsdb') || null;
+    const cricketdataConfig = apiConfigsList.find((c: any) => c.provider === 'cricketdata') || null;
 
     return NextResponse.json({
       success: true,
-      categories: categories.map(c => ({
+      categories: (categories as any[]).map((c: any) => ({
         ...c,
         eventsCount: c._count.events
       })),

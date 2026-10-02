@@ -257,3 +257,6 @@ export function validateFileUpload(
   
   return { valid: true };
 }
+
+export const sanitizeHtml = sanitizeHTML;
+export const sanitizeInput = sanitizeText;

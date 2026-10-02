@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import {
   Star, Zap, TrendingUp, Award, Gift, Users, ArrowRight, CheckCircle2,
-  Instagram, Youtube, Share2, ChevronRight, Sparkles, Crown, Shield,
+  Share2, ChevronRight, Sparkles, Crown, Shield,
   DollarSign, Rocket, Heart, Globe, Play, Video
 } from 'lucide-react';
 

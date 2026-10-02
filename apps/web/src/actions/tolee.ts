@@ -23,7 +23,7 @@ export async function getTolees(includeInvisible: boolean = false) {
       }
     });
 
-    const mappedTolees = tolees.map(t => {
+    const mappedTolees = (tolees as any[]).map((t: any) => {
       const realCount = t.members.length;
       const count = getGroupMemberCount(t.id, t.name, realCount, isSimOn, simSettings.minGroupMembers, simSettings.maxGroupMembers);
       return {
@@ -547,7 +547,7 @@ export async function getTrendingTolees() {
 
     return {
       success: true,
-      tolees: tolees.map(t => ({
+      tolees: (tolees as any[]).map((t: any) => ({
         ...t,
         membersCount: t._count?.members || 0,
         adminName: t.owner?.name || t.owner?.username || 'Community'
@@ -817,11 +817,11 @@ export async function deleteTolee(id: string, confirmationText?: string) {
 
     // Delete course-related entries
     const courses = await prisma.course.findMany({ where: { toleeId: id }, select: { id: true } });
-    const courseIds = courses.map(c => c.id);
+    const courseIds = (courses as any[]).map((c: any) => c.id);
     const modules = await prisma.module.findMany({ where: { courseId: { in: courseIds } }, select: { id: true } });
-    const moduleIds = modules.map(m => m.id);
+    const moduleIds = (modules as any[]).map((m: any) => m.id);
     const lessons = await prisma.lesson.findMany({ where: { moduleId: { in: moduleIds } }, select: { id: true } });
-    const lessonIds = lessons.map(l => l.id);
+    const lessonIds = (lessons as any[]).map((l: any) => l.id);
 
     await prisma.$transaction([
       prisma.lessonProgress.deleteMany({ where: { lessonId: { in: lessonIds } } }),
@@ -1182,7 +1182,7 @@ export async function updateGroupSettings(toleeId: string, settingsData: {
     if (!tolee) return { success: false, error: 'Group not found' };
 
     const isOwner = tolee.ownerId === userId;
-    const member = tolee.members.find(m => m.userId === userId && m.status === 'approved');
+    const member = (tolee.members as any[]).find((m: any) => m.userId === userId && m.status === 'approved');
     const isAdmin = member?.role === 'admin' || isOwner;
 
     if (!isAdmin) {
@@ -1203,8 +1203,8 @@ export async function updateGroupSettings(toleeId: string, settingsData: {
 
     if (settingsData.isSearchable !== undefined) {
       updatePayload.isPublicVisible = settingsData.isSearchable;
-    } else if (settingsData.isPublicVisible !== undefined) {
-      updatePayload.isPublicVisible = settingsData.isPublicVisible;
+    } else if ((settingsData as any).isPublicVisible !== undefined) {
+      updatePayload.isPublicVisible = (settingsData as any).isPublicVisible;
     }
 
     const updated = await prisma.tolee.update({
@@ -1349,23 +1349,25 @@ export async function sendEmergencyGroupBroadcast(toleeId: string, broadcastMess
     if (!tolee) return { success: false, error: 'Group not found' };
 
     const isOwner = tolee.ownerId === userId;
-    const callerMember = tolee.members.find(m => m.userId === userId);
+    const callerMember = (tolee.members as any[]).find((m: any) => m.userId === userId);
     const isAdmin = callerMember || isOwner;
 
     if (!isAdmin) {
       return { success: false, error: 'Only admins can send emergency broadcasts.' };
     }
 
-    const memberIds = tolee.members.map(m => m.userId).filter(id => id !== userId);
+    const memberIds = (tolee.members as any[]).map((m: any) => m.userId).filter((id: string) => id !== userId);
 
     if (memberIds.length > 0) {
-      await createSystemNotificationsMany({
-        userIds: memberIds,
-        type: 'TOLEE_EMERGENCY_BROADCAST',
-        title: `🚨 Emergency Announcement: ${tolee.name}`,
-        message: broadcastMessage,
-        link: `/t/${tolee.slug}`
-      });
+      await createSystemNotificationsMany(
+        memberIds.map(uid => ({
+          userId: uid,
+          type: 'TOLEE_EMERGENCY_BROADCAST',
+          title: `🚨 Emergency Announcement: ${tolee.name}`,
+          message: broadcastMessage,
+          link: `/t/${tolee.slug}`
+        }))
+      );
     }
 
     return { success: true, count: memberIds.length };
@@ -1412,7 +1414,7 @@ export async function getPendingGroupRequests(toleeId: string) {
 
     return {
       success: true,
-      requests: requests.map(r => ({
+      requests: (requests as any[]).map((r: any) => ({
         id: r.id,
         userId: r.userId,
         name: r.user.name || r.user.username || 'Anonymous User',

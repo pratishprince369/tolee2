@@ -156,7 +156,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ message: "Request has already been processed." }, { status: 400 });
       }
 
-      const result = await prisma.$transaction(async (tx) => {
+      const result = await prisma.$transaction(async (tx: any) => {
         if (approve) {
           // Approve: move from pending to paid
           const updatedFranchise = await tx.franchise.update({
@@ -272,7 +272,7 @@ export async function POST(req: Request) {
 
       const amount = Number(overrideAmount);
 
-      const result = await prisma.$transaction(async (tx) => {
+      const result = await prisma.$transaction(async (tx: any) => {
         const updatedFranchise = await tx.franchise.update({
           where: { id: franchiseId },
           data: {

@@ -97,8 +97,8 @@ export default async function LocationLandingPage({ params }: LocationPageProps)
     description: `Local communities, reels, and marketplace listings in ${cityName}`,
     url: `/location/${rawSlug}`,
     items: [
-      ...tolees.map((t) => ({ name: t.name, url: `/t/${t.slug}`, description: t.description || undefined })),
-      ...listings.map((l) => ({ name: l.title, url: `/marketplace/listing/${l.id}` })),
+      ...tolees.map((t: any) => ({ name: t.name, url: `/t/${t.slug}`, description: t.description || undefined })),
+      ...listings.map((l: any) => ({ name: l.title, url: `/marketplace/listing/${l.id}` })),
     ],
   });
 
@@ -159,7 +159,7 @@ export default async function LocationLandingPage({ params }: LocationPageProps)
 
           {tolees.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {tolees.map((group) => (
+              {tolees.map((group: any) => (
                 <Link
                   key={group.id}
                   href={`/t/${group.slug}`}
@@ -206,7 +206,7 @@ export default async function LocationLandingPage({ params }: LocationPageProps)
               </Link>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
-              {listings.map((item) => (
+              {listings.map((item: any) => (
                 <Link
                   key={item.id}
                   href={`/marketplace/listing/${item.id}`}
@@ -243,7 +243,7 @@ export default async function LocationLandingPage({ params }: LocationPageProps)
               <span>Trending Reels in {cityName}</span>
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {reels.map((reel) => (
+              {reels.map((reel: any) => (
                 <Link
                   key={reel.id}
                   href={`/reel/${reel.id}`}

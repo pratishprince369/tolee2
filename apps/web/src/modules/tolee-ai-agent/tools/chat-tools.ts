@@ -53,7 +53,7 @@ export const getLatestMessagesTool: ToolDefinition = {
         };
       }
 
-      const formatted = messages.map((m) => ({
+      const formatted = messages.map((m: any) => ({
         id: m.id,
         senderName: m.sender.name || m.sender.username || 'User',
         senderUsername: m.sender.username,

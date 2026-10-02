@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
 
       const info = await egressClient.startRoomCompositeEgress(meeting.meetingCode, {
         file: output
-      });
+      } as any);
 
       const recording = await prisma.meetingRecording.create({
         data: {

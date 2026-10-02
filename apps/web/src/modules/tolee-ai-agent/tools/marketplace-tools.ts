@@ -34,7 +34,7 @@ export const getMarketplaceEnquiriesTool: ToolDefinition = {
 
       return {
         success: true,
-        data: listings.map((l) => ({
+        data: listings.map((l: any) => ({
           listingId: l.id,
           title: l.title,
           price: `₹${l.price}`,

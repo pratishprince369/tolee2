@@ -185,6 +185,7 @@ interface PostType {
   isVerified?: boolean;
   reposts?: number;
   repostedByMe?: boolean;
+  reelAudio?: any;
 }
 
 interface UserType {

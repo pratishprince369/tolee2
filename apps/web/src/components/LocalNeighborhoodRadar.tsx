@@ -63,6 +63,7 @@ export interface LocalRadarPost {
   imageUrl?: string;
   isDbPost?: boolean;
   expiresAt?: Date | string | null;
+  isExpired?: boolean;
   createdAt?: Date | string | null;
   status?: string;
   confirmationsCount?: number;

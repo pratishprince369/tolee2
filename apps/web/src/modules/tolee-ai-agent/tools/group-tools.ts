@@ -48,7 +48,7 @@ export const getToleeGroupsTool: ToolDefinition = {
 
       return {
         success: true,
-        data: groups.map((g) => ({
+        data: groups.map((g: any) => ({
           name: g.name,
           slug: g.slug,
           category: g.category,

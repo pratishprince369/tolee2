@@ -187,7 +187,7 @@ export async function getPendingFollowRequests() {
       }
     });
 
-    return { success: true, requests: requests.map(r => r.follower) };
+    return { success: true, requests: (requests as any[]).map((r: any) => r.follower) };
   } catch (error) {
     console.error("Error fetching pending follow requests:", error);
     return { success: false, error: 'Failed to fetch pending follow requests', requests: [] };
@@ -333,7 +333,7 @@ export async function getFriendsList(profileUserId: string) {
       orderBy: { createdAt: 'desc' }
     });
 
-    const friendsList = friendships.map(f => f.friendUser);
+    const friendsList = (friendships as any[]).map((f: any) => f.friendUser);
 
     // If logged in, find which of these friends the current user is following
     let followingIds: string[] = [];
@@ -341,16 +341,16 @@ export async function getFriendsList(profileUserId: string) {
       const follows = await prisma.follow.findMany({
         where: {
           followerId: currentUserId,
-          followingId: { in: friendsList.map(u => u.id) }
+          followingId: { in: friendsList.map((u: any) => u.id) }
         },
         select: { followingId: true }
       });
-      followingIds = follows.map(f => f.followingId);
+      followingIds = (follows as any[]).map((f: any) => f.followingId);
     }
 
     return {
       success: true,
-      friends: friendsList.map(u => ({
+      friends: friendsList.map((u: any) => ({
         ...u,
         isFollowing: followingIds.includes(u.id)
       }))
@@ -490,7 +490,7 @@ export async function getSidebarData() {
     return {
       success: true,
       managedTolees,
-      joinedTolees: joinedTolees.map(m => m.tolee),
+      joinedTolees: (joinedTolees as any[]).map((m: any) => m.tolee),
       unreadNotifications,
       unreadMessages,
       franchiseStatus: franchise?.status || null,
@@ -1238,11 +1238,11 @@ export async function syncContacts(phones: string[]) {
     });
 
     // Filter DB users matching any of the normalized input numbers
-    const matchedUsers = dbUsers
-      .filter((u) => {
+    const matchedUsers = (dbUsers as any[])
+      .filter((u: any) => {
         if (!u.phone) return false;
         const normDbPhone = u.phone.replace(/\D/g, '');
-        return normalizedPhones.some((p) => {
+        return normalizedPhones.some((p: string) => {
           if (p === normDbPhone) return true;
           // Compare last 10 digits to ignore country codes
           return (
@@ -1250,7 +1250,7 @@ export async function syncContacts(phones: string[]) {
           );
         });
       })
-      .map((u) => ({
+      .map((u: any) => ({
         id: u.id,
         username: u.username,
         name: u.name,
@@ -1366,7 +1366,7 @@ export async function getFollowersList(profileUserId: string) {
       orderBy: { createdAt: 'desc' }
     });
 
-    const followersList = follows.map(f => f.follower);
+    const followersList = (follows as any[]).map((f: any) => f.follower);
 
     // If logged in, find which of these followers the current user is following
     let followingIds: string[] = [];
@@ -1374,17 +1374,17 @@ export async function getFollowersList(profileUserId: string) {
       const currentFollows = await prisma.follow.findMany({
         where: {
           followerId: currentUserId,
-          followingId: { in: followersList.map(u => u.id) },
+          followingId: { in: followersList.map((u: any) => u.id) },
           status: 'approved'
         },
         select: { followingId: true }
       });
-      followingIds = currentFollows.map(f => f.followingId);
+      followingIds = (currentFollows as any[]).map((f: any) => f.followingId);
     }
 
     return {
       success: true,
-      followers: followersList.map(u => ({
+      followers: followersList.map((u: any) => ({
         ...u,
         isFollowing: followingIds.includes(u.id)
       }))
@@ -1417,7 +1417,7 @@ export async function getFollowingList(profileUserId: string) {
       orderBy: { createdAt: 'desc' }
     });
 
-    const followingList = follows.map(f => f.following);
+    const followingList = (follows as any[]).map((f: any) => f.following);
 
     // If logged in, find which of these users the current user is following
     let followingIds: string[] = [];
@@ -1425,17 +1425,17 @@ export async function getFollowingList(profileUserId: string) {
       const currentFollows = await prisma.follow.findMany({
         where: {
           followerId: currentUserId,
-          followingId: { in: followingList.map(u => u.id) },
+          followingId: { in: followingList.map((u: any) => u.id) },
           status: 'approved'
         },
         select: { followingId: true }
       });
-      followingIds = currentFollows.map(f => f.followingId);
+      followingIds = (currentFollows as any[]).map((f: any) => f.followingId);
     }
 
     return {
       success: true,
-      following: followingList.map(u => ({
+      following: followingList.map((u: any) => ({
         ...u,
         isFollowing: followingIds.includes(u.id)
       }))

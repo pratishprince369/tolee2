@@ -423,16 +423,15 @@ export function AIImageGeneratorModal({ onSelectImage, triggerButton, isOpen, se
 
         {/* Modal Footer */}
         <div className="p-6 border-t border-zinc-100 dark:border-zinc-900 bg-zinc-50/50 dark:bg-zinc-950/20 flex gap-3 shrink-0">
-          <DialogClose asChild>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={isSaving}
-              className="flex-1 h-12 rounded-xl text-zinc-600 dark:text-zinc-400 dark:hover:bg-zinc-900"
-            >
-              Cancel
-            </Button>
-          </DialogClose>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setIsOpen?.(false)}
+            disabled={isSaving}
+            className="flex-1 h-12 rounded-xl text-zinc-600 dark:text-zinc-400 dark:hover:bg-zinc-900"
+          >
+            Cancel
+          </Button>
           <Button
             type="button"
             onClick={handleUseImage}

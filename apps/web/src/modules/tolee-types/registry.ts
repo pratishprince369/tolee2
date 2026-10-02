@@ -454,32 +454,6 @@ export const TOLEE_TYPE_REGISTRY: Record<string, ToleeTypeConfig> = {
       systemPrompt: 'You are the Temple Trust AI Assistant. Draft respectful devotional greetings and festival information.',
       suggestedPrompts: ['Write thank you message for Annadan donor', 'Draft Aarti schedule notice for Janmashtami', 'Devotional invitation message']
     }
-  },
-  general: {
-    id: 'general',
-    slug: 'general',
-    title: 'General Community',
-    icon: 'Users',
-    description: 'Standard open social group for discussion, sharing posts, chat, and media.',
-    estimatedMembers: 'Unlimited',
-    categoryTag: 'Community',
-    defaultPrivacy: 'public',
-    defaultSearchable: true,
-    roles: [
-      { id: 'admin', name: 'Group Admin', description: 'Group Creator', canManageSettings: true, canManageMembers: true },
-      { id: 'moderator', name: 'Moderator', description: 'Content Reviewer' },
-      { id: 'member', name: 'Member', description: 'Community Member', isDefault: true, canPostContent: true }
-    ],
-    features: [
-      { id: 'group_posts', name: 'Feed & Discussions', iconName: 'MessageSquare', description: 'Share images, videos, and thoughts', enabledByDefault: true, category: 'core' },
-      { id: 'group_chat', name: 'Group Chat Room', iconName: 'Send', description: 'Real-time group chat and media sharing', enabledByDefault: true, category: 'core' }
-    ],
-    aiAssistant: {
-      name: 'Community Assistant AI',
-      roleDescription: 'General AI Assistant for group discussions, topic suggestions, and post creation.',
-      systemPrompt: 'You are the General Community AI Assistant. Help members write engaging posts and answer queries.',
-      suggestedPrompts: ['Suggest discussion topic for group', 'Write welcome post for new members', 'Draft a weekend group poll']
-    }
   }
 };
 

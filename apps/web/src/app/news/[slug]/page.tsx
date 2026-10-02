@@ -25,8 +25,8 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   }
 
   const post = news.post;
-  const isPrivateAuthor = post.author?.isPrivate;
-  const isPrivateGroup = post.tolees?.some((t: any) => t.tolee?.isPrivate);
+  const isPrivateAuthor = (post.author as any)?.isPrivate;
+  const isPrivateGroup = (post as any).tolees?.some((t: any) => t.tolee?.isPrivate);
 
   if (isPrivateAuthor || isPrivateGroup) {
     return {

@@ -306,7 +306,7 @@ export async function createPost(data: {
       : [];
 
     revalidatePath('/feed');
-    tolees.forEach(t => {
+    tolees.forEach((t: any) => {
        revalidatePath(`/t/${t.slug}`);
     });
     
@@ -340,7 +340,7 @@ export async function getPosts(options?: { mediaType?: string; postType?: string
           where: { userId: currentUserId, status: 'approved' },
           select: { toleeId: true }
         });
-        userJoinedToleeIds = memberships.map(m => m.toleeId);
+        userJoinedToleeIds = memberships.map((m: any) => m.toleeId);
       } catch {}
     }
 
@@ -358,7 +358,7 @@ export async function getPosts(options?: { mediaType?: string; postType?: string
           select: { contentId: true },
           take: 1000
         });
-        viewedPostIds = Array.from(new Set(recentViews.map(v => v.contentId).filter(Boolean)));
+        viewedPostIds = Array.from(new Set(recentViews.map((v: any) => v.contentId).filter(Boolean))) as string[];
       } catch {}
     }
 
@@ -898,22 +898,22 @@ export async function getPosts(options?: { mediaType?: string; postType?: string
       const likedPostIds = currentUserId ? (await prisma.like.findMany({
         where: { userId: currentUserId },
         select: { postId: true }
-      })).map(l => l.postId) : [];
+      })).map((l: any) => l.postId) : [];
 
       const savedPostIds = currentUserId ? (await prisma.savedPost.findMany({
         where: { userId: currentUserId },
         select: { postId: true }
-      })).map(s => s.postId) : [];
+      })).map((s: any) => s.postId) : [];
 
       const followedAuthorIds = currentUserId ? (await prisma.follow.findMany({
         where: { followerId: currentUserId, status: 'approved' },
         select: { followingId: true }
-      })).map(f => f.followingId) : [];
+      })).map((f: any) => f.followingId) : [];
 
       const joinedToleeCategories = currentUserId ? (await prisma.toleeMember.findMany({
         where: { userId: currentUserId, status: 'approved' },
         select: { tolee: { select: { category: true } } }
-      })).map(m => m.tolee?.category).filter(Boolean) as string[] : [];
+      })).map((m: any) => m.tolee?.category).filter(Boolean) as string[] : [];
 
       // ANTI-REPETITION FILTER: Strictly prioritize unviewed posts over viewed posts
       const unviewed = combinedPosts.filter(p => !viewedPostIds.includes(p.id));
@@ -1283,7 +1283,7 @@ export async function addComment(postId: string, content: string, parentId?: str
             },
             select: { authorId: true }
           });
-          const uniqueOtherUserIds = Array.from(new Set(otherReplies.map(r => r.authorId)));
+          const uniqueOtherUserIds: string[] = Array.from(new Set(otherReplies.map((r: any) => r.authorId as string)));
           for (const otherUserId of uniqueOtherUserIds) {
             await createSystemNotification({
               userId: otherUserId,
@@ -1306,7 +1306,7 @@ export async function addComment(postId: string, content: string, parentId?: str
       // 3. Notify Tagged Mentions (@username)
       const mentions = safeContent.match(/@(\w+)/g);
       if (mentions) {
-        const mentionedUsernames = mentions.map(m => m.slice(1));
+        const mentionedUsernames = mentions.map((m: string) => m.slice(1));
         const usersToNotify = await prisma.user.findMany({
           where: {
             username: { in: mentionedUsernames },
@@ -1392,7 +1392,7 @@ export async function getLikes(postId: string) {
         }
       }
     });
-    return { success: true, likes: likes.map(l => l.user) };
+    return { success: true, likes: likes.map((l: any) => l.user) };
   } catch (error) {
     console.error("Error fetching likes:", error);
     return { success: false, error: 'Failed to fetch likes' };
@@ -1526,7 +1526,7 @@ export async function getJoinedTolees() {
       }
     });
 
-    const tolees = memberships.map(m => m.tolee).filter(Boolean);
+    const tolees = memberships.map((m: any) => m.tolee).filter(Boolean);
     return { success: true, tolees };
   } catch (error) {
     console.error("Error fetching joined tolees:", error);
@@ -1609,7 +1609,7 @@ export async function resharePostToTolees(postId: string, toleeIds: string[]) {
     });
 
     revalidatePath('/feed');
-    tolees.forEach(t => {
+    tolees.forEach((t: any) => {
       revalidatePath(`/t/${t.slug}`);
     });
 
@@ -1636,7 +1636,7 @@ export async function getReposts(postId: string) {
         }
       }
     });
-    return { success: true, reposts: reposts.map(r => ({ ...r.user, repostedAt: r.createdAt })) };
+    return { success: true, reposts: reposts.map((r: any) => ({ ...r.user, repostedAt: r.createdAt })) };
   } catch (error) {
     console.error("Error fetching reposts:", error);
     return { success: false, error: 'Failed to fetch reposts' };
@@ -1683,7 +1683,7 @@ export async function recordView(contentId: string, contentType: 'post' | 'reel'
       await prisma.screenVideo.update({
         where: { id: contentId },
         data: { viewsCount: { increment: 1 } }
-      }).catch(err => console.error("Error incrementing ScreenVideo viewsCount:", err));
+      }).catch((err: any) => console.error("Error incrementing ScreenVideo viewsCount:", err));
     }
 
     return { success: true };
@@ -1907,7 +1907,7 @@ export async function updatePostVisibility(postId: string, visibility: string) {
       where: { postId },
       include: { tolee: { select: { slug: true } } }
     });
-    postTolees.forEach(pt => {
+    postTolees.forEach((pt: any) => {
       revalidatePath(`/t/${pt.tolee.slug}`);
     });
 
@@ -1953,7 +1953,7 @@ export async function editPostCaption(postId: string, caption: string) {
       where: { postId },
       include: { tolee: { select: { slug: true } } }
     });
-    postTolees.forEach(pt => {
+    postTolees.forEach((pt: any) => {
       revalidatePath(`/t/${pt.tolee.slug}`);
     });
 
@@ -1998,15 +1998,15 @@ export async function deletePostPermanently(postId: string) {
       let typesToDestroy: string[] = [];
       
       if (post.mediaPublicIds) {
-        idsToDestroy = post.mediaPublicIds.split(',').map(s => s.trim()).filter(Boolean);
+        idsToDestroy = post.mediaPublicIds.split(',').map((s: string) => s.trim()).filter(Boolean);
         if (post.mediaResourceTypes) {
-          typesToDestroy = post.mediaResourceTypes.split(',').map(s => s.trim());
+          typesToDestroy = post.mediaResourceTypes.split(',').map((s: string) => s.trim());
         }
       } else if (post.mediaUrls) {
         // Fallback for legacy posts: extract from URLs
-        const urls = post.mediaUrls.split(/,(?=https?:\/\/)/).map(s => s.trim()).filter(Boolean);
-        idsToDestroy = urls.map(url => extractPublicIdFromUrl(url)).filter(Boolean) as string[];
-        typesToDestroy = urls.map(url => extractResourceTypeFromUrl(url));
+        const urls = post.mediaUrls.split(/,(?=https?:\/\/)/).map((s: string) => s.trim()).filter(Boolean);
+        idsToDestroy = urls.map((url: string) => extractPublicIdFromUrl(url)).filter(Boolean) as string[];
+        typesToDestroy = urls.map((url: string) => extractResourceTypeFromUrl(url));
       }
       
       if (idsToDestroy.length > 0) {
@@ -2022,7 +2022,7 @@ export async function deletePostPermanently(postId: string) {
     });
 
     // Execute deletion inside transaction
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: any) => {
       // 1. Delete comments child replies first to avoid recursive key violation
       await tx.comment.deleteMany({
         where: {
@@ -2071,7 +2071,7 @@ export async function deletePostPermanently(postId: string) {
     });
 
     revalidatePath('/feed');
-    postTolees.forEach(pt => {
+    postTolees.forEach((pt: any) => {
       revalidatePath(`/t/${pt.tolee.slug}`);
     });
 
@@ -2107,7 +2107,7 @@ export async function incrementShareCount(postId: string) {
         where: { postId },
         include: { tolee: { select: { slug: true } } }
       });
-      postTolees.forEach(pt => {
+      postTolees.forEach((pt: any) => {
         if (pt.tolee?.slug) {
           revalidatePath(`/t/${pt.tolee.slug}`);
         }
@@ -2361,8 +2361,8 @@ export async function sharePostToFriends(
           }
         });
 
-        const targetChat = existingDms.find(chat => 
-          chat.participants.some(p => p.userId === friendId)
+        const targetChat = (existingDms as any[]).find((chat: any) => 
+          chat.participants.some((p: any) => p.userId === friendId)
         );
 
         if (targetChat) {
@@ -2493,7 +2493,7 @@ export async function sharePostToFriends(
       where: { postId },
       include: { tolee: { select: { slug: true } } }
     });
-    postTolees.forEach(pt => {
+    postTolees.forEach((pt: any) => {
       revalidatePath(`/t/${pt.tolee.slug}`);
     });
 
@@ -2540,7 +2540,7 @@ export async function archivePost(postId: string) {
       where: { postId },
       include: { tolee: { select: { slug: true } } }
     });
-    postTolees.forEach(pt => {
+    postTolees.forEach((pt: any) => {
       revalidatePath(`/t/${pt.tolee.slug}`);
     });
 
@@ -2587,7 +2587,7 @@ export async function restorePost(postId: string) {
       where: { postId },
       include: { tolee: { select: { slug: true } } }
     });
-    postTolees.forEach(pt => {
+    postTolees.forEach((pt: any) => {
       revalidatePath(`/t/${pt.tolee.slug}`);
     });
 
@@ -2721,7 +2721,7 @@ export async function publishDraftPost(postId: string) {
     });
 
     revalidatePath('/feed');
-    existingPost.tolees.forEach(t => {
+    existingPost.tolees.forEach((t: any) => {
       revalidatePath(`/t/${t.slug}`);
     });
 
@@ -2861,7 +2861,7 @@ export async function getReels(skip = 0, take = 20) {
       }
     });
 
-    const authorIds = posts.map(p => p.author.id);
+    const authorIds = posts.map((p: any) => p.author.id);
 
     // Query follow statuses of these authors for the current user
     let followedAuthorIds: string[] = [];
@@ -2874,8 +2874,8 @@ export async function getReels(skip = 0, take = 20) {
         },
         select: { followingId: true, status: true }
       });
-      followedAuthorIds = follows.filter(f => f.status === 'approved').map(f => f.followingId);
-      pendingFollowAuthorIds = follows.filter(f => f.status === 'pending').map(f => f.followingId);
+      followedAuthorIds = follows.filter((f: any) => f.status === 'approved').map((f: any) => f.followingId);
+      pendingFollowAuthorIds = follows.filter((f: any) => f.status === 'pending').map((f: any) => f.followingId);
     }
 
     // Query active stories for these authors
@@ -2888,10 +2888,10 @@ export async function getReels(skip = 0, take = 20) {
         },
         select: { authorId: true }
       });
-      authorsWithActiveStories = activeStories.map(s => s.authorId);
+      authorsWithActiveStories = activeStories.map((s: any) => s.authorId);
     }
 
-    const reels = posts.map(post => {
+    const reels = posts.map((post: any) => {
       const firstTolee = post.tolees?.[0]?.tolee;
       const likedByMe = currentUserId ? post.likes.some((like: any) => like.userId === currentUserId) : false;
       const savedByMe = currentUserId ? post.savedBy.some((save: any) => save.userId === currentUserId) : false;
@@ -3062,7 +3062,7 @@ export async function getPostStoryAnalytics(postId: string) {
  */
 export async function getPostInsightsAction(postId: string) {
   try {
-    const session = await auth();
+    const session = await getServerSession(authOptions);
     const userId = (session?.user as any)?.id;
     if (!userId) {
       return { success: false, error: 'Unauthorized' };
@@ -3131,7 +3131,7 @@ export async function getPostInsightsAction(postId: string) {
 
     let boostMetrics = null;
     if (boostCampaign) {
-      const adIds = boostCampaign.adSets.flatMap(adSet => adSet.ads.map(a => a.id));
+      const adIds = boostCampaign.adSets.flatMap((adSet: any) => adSet.ads.map((a: any) => a.id));
       
       // Real ad analytics counts from tracking table
       const [realImpressions, realClicks] = await Promise.all([

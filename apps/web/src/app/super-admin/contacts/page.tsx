@@ -344,7 +344,7 @@ export default function SuperAdminContactsPage() {
                               background: '#070709', border: '1px solid #1c1c1e', borderRadius: 12, padding: 16,
                               color: '#a1a1aa', fontSize: 13, lineHeight: 1.6
                             }}>
-                              <div style={{ color: '#fff', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, color: '#71717a' }}>
+                              <div style={{ color: '#71717a', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
                                 Message Body
                               </div>
                               <p style={{ whiteSpace: 'pre-wrap', color: '#e4e4e7' }}>

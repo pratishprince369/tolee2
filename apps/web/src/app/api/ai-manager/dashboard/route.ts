@@ -61,7 +61,7 @@ export async function GET(request: Request) {
       }
     });
 
-    const groupsList = userTolees.map(ut => ({
+    const groupsList = (userTolees as any[]).map((ut: any) => ({
       id: ut.tolee.id,
       name: ut.tolee.name,
       slug: ut.tolee.slug
@@ -73,7 +73,7 @@ export async function GET(request: Request) {
 
     if (rerankApiKey && userComments.length > 0) {
       try {
-        const passages = userComments.map(c => ({ text: c.content }));
+        const passages = (userComments as any[]).map((c: any) => ({ text: c.content }));
 
         // Pass 1: Rerank against Buying/Purchase Inquiry Intent
         const leadResponse = await fetch('https://ai.api.nvidia.com/v1/retrieval/nvidia/reranking', {
@@ -127,7 +127,7 @@ export async function GET(request: Request) {
             }
           }
 
-          semanticCategorizedComments = userComments.map((comment, index) => {
+          semanticCategorizedComments = (userComments as any[]).map((comment: any, index: number) => {
             const leadScore = leadScores.get(index) ?? -999;
             const spamScore = spamScores.get(index) ?? -999;
 
@@ -176,7 +176,7 @@ export async function GET(request: Request) {
     // Standardized rule-based fallback analyzer if semantic API is not configured or failed
     const categorizedComments = semanticCategorizedComments.length > 0 
       ? semanticCategorizedComments 
-      : userComments.map(comment => {
+      : (userComments as any[]).map((comment: any) => {
           const content = comment.content.toLowerCase();
           let priority: 'high' | 'medium' | 'low' = 'low';
           let isLead = false;
@@ -235,10 +235,10 @@ export async function GET(request: Request) {
         });
 
     // Extract leads
-    const leadsList = categorizedComments.filter(c => c.isLead);
+    const leadsList = (categorizedComments as any[]).filter((c: any) => c.isLead);
 
     // Extract spams
-    const spamsList = categorizedComments.filter(c => c.isSpam);
+    const spamsList = (categorizedComments as any[]).filter((c: any) => c.isSpam);
 
     // Mock dashboard metrics (Growth parameters)
     const metrics = {
@@ -270,7 +270,7 @@ export async function GET(request: Request) {
     if (apiKey) {
       try {
         const prompt = `You are a social media growth coach. Analyze this metadata:
-- Total groups joined: ${groupsList.length} (${groupsList.map(g => g.name).join(', ')})
+- Total groups joined: ${groupsList.length} (${(groupsList as any[]).map((g: any) => g.name).join(', ')})
 - Pending Leads: ${leadsList.length}
 - Recent notifications count: ${dbNotifications.length}
 

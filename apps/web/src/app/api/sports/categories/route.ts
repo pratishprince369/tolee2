@@ -18,7 +18,7 @@ export async function GET() {
       }
     });
 
-    const formatted = categories.map(c => ({
+    const formatted = (categories as any[]).map((c: any) => ({
       id: c.id,
       name: c.name,
       slug: c.slug,

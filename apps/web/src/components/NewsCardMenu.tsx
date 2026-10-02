@@ -52,13 +52,11 @@ export function NewsCardMenu({ postId, slug, canEdit }: NewsCardMenuProps) {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button 
-          onClick={(e) => e.stopPropagation()} 
-          className="h-8 w-8 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-sm flex items-center justify-center text-white focus:outline-none transition-colors"
-        >
-          <MoreVertical className="w-4.5 h-4.5" />
-        </button>
+      <DropdownMenuTrigger
+        onClick={(e) => e.stopPropagation()} 
+        className="h-8 w-8 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-sm flex items-center justify-center text-white focus:outline-none transition-colors"
+      >
+        <MoreVertical className="w-4.5 h-4.5" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48 bg-white dark:bg-[#121212] border border-gray-150 dark:border-zinc-850 rounded-xl shadow-lg p-1">
         {canEdit && (

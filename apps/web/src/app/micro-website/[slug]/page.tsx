@@ -157,7 +157,7 @@ export default async function PublicMicroWebsitePage({ params }: PageProps) {
                 </h3>
                 <p className="text-xs text-zinc-400 leading-relaxed">Leave your contact details and the creator will respond shortly.</p>
                 
-                <form action="#" onSubmit="alert('Thank you! Your details have been securely logged.'); return false;" className="space-y-3">
+                <form action="#" className="space-y-3">
                   <input 
                     type="text" 
                     placeholder="Your Name" 
@@ -195,7 +195,7 @@ export default async function PublicMicroWebsitePage({ params }: PageProps) {
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2 pt-2">
-                <Button variant="outline" className="border-zinc-850 hover:bg-zinc-900 text-zinc-300 text-xs rounded-xl h-9" onClick="navigator.clipboard.writeText(window.location.href); alert('Link copied to clipboard!');">
+                <Button variant="outline" className="border-zinc-850 hover:bg-zinc-900 text-zinc-300 text-xs rounded-xl h-9">
                   Copy Link
                 </Button>
                 <Button variant="outline" className="border-zinc-850 hover:bg-zinc-900 text-zinc-300 text-xs rounded-xl h-9">

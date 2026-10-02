@@ -6,6 +6,7 @@ export interface CreateNotificationParams {
   type: string;
   message: string;
   link?: string;
+  title?: string;
   data?: Record<string, string>;
 }
 
@@ -101,7 +102,7 @@ export async function createSystemNotification(params: CreateNotificationParams,
         console.log(`[DEBUG] [Notification Delivered] Sending FCM Push to User: ${params.userId} -> Title: "${title}", Body: "${params.message}"`);
         await sendPushNotification(
           params.userId,
-          title,
+          params.title || title,
           params.message,
           {
             url: params.link || '',
@@ -174,7 +175,7 @@ export async function createSystemNotificationsMany(
             console.log(`[DEBUG] [Notification Delivered] Sending FCM Push to User: ${n.userId} -> Title: "${title}", Body: "${n.message}"`);
             await sendPushNotification(
               n.userId,
-              title,
+              n.title || title,
               n.message,
               {
                 url: n.link || '',

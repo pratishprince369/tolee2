@@ -23,7 +23,7 @@ export async function GET() {
 
     return NextResponse.json({
       providers: liveStatus.map((p) => {
-        const stored = dbConfigs.find((c) => c.providerType === p.type);
+        const stored = (dbConfigs as any[]).find((c: any) => c.providerType === p.type);
         return {
           ...p,
           apiKeyMasked: stored?.apiKey ? maskApiKey(stored.apiKey) : undefined,
@@ -42,7 +42,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    if (!(session?.user as any)?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

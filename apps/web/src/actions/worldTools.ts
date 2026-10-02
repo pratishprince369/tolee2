@@ -25,8 +25,8 @@ export interface WorldToolItem {
   freeTrialDays?: number | null;
   freeUntil?: string | null;
   order: number;
-  createdAt?: string;
-  updatedAt?: string;
+  createdAt?: string | null;
+  updatedAt?: string | null;
   // Computed client fields
   isFreeTrialActive?: boolean;
   daysRemaining?: number;

@@ -35,7 +35,7 @@ export const getNotificationsTool: ToolDefinition = {
         };
       }
 
-      const formatted = notifications.map((n) => ({
+      const formatted = notifications.map((n: any) => ({
         id: n.id,
         type: n.type,
         message: n.content || `${n.sender?.name || n.sender?.username || 'Kisi'} ne interact kiya.`,

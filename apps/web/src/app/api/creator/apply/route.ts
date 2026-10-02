@@ -177,7 +177,7 @@ export async function POST(req: NextRequest) {
         action: 'CREATOR_APPLICATION_SUBMITTED',
         details: `Creator application from ${fullName} (@${finalUsername}) — ${followersRange} followers — Niche: ${niche}`,
       }
-    }).catch((err) => {
+    }).catch((err: any) => {
       console.error('AuditLog error in creator apply:', err);
     });
 

@@ -64,7 +64,7 @@ export async function GET(req: Request) {
     });
 
     // 4. Calculate Active vs Pending Users based on engagement validation
-    const activeReferees = referrals.filter(r => {
+    const activeReferees = (referrals as any[]).filter((r: any) => {
       const u = r.referee;
       if (!u) return false;
       const isVerified = u.email_verified || u.phoneVerified || u.isMobileVerified;
@@ -77,17 +77,17 @@ export async function GET(req: Request) {
 
     // 5. Daily, Weekly, Monthly Joins
     const now = Date.now();
-    const dailyJoins = referrals.filter(r => (now - new Date(r.createdAt).getTime()) < 24 * 60 * 60 * 1000).length;
-    const weeklyJoins = referrals.filter(r => (now - new Date(r.createdAt).getTime()) < 7 * 24 * 60 * 60 * 1000).length;
-    const monthlyJoins = referrals.filter(r => (now - new Date(r.createdAt).getTime()) < 30 * 24 * 60 * 60 * 1000).length;
+    const dailyJoins = (referrals as any[]).filter((r: any) => (now - new Date(r.createdAt).getTime()) < 24 * 60 * 60 * 1000).length;
+    const weeklyJoins = (referrals as any[]).filter((r: any) => (now - new Date(r.createdAt).getTime()) < 7 * 24 * 60 * 60 * 1000).length;
+    const monthlyJoins = (referrals as any[]).filter((r: any) => (now - new Date(r.createdAt).getTime()) < 30 * 24 * 60 * 60 * 1000).length;
 
     // 6. Total referred users ad spend volume
-    const refereeIds = referrals.map(r => r.refereeId);
+    const refereeIds = (referrals as any[]).map((r: any) => r.refereeId);
     const wallets = await prisma.wallet.findMany({
       where: { userId: { in: refereeIds } },
       select: { totalSpent: true }
     });
-    const totalAdVolume = wallets.reduce((sum, w) => sum + w.totalSpent, 0);
+    const totalAdVolume = (wallets as any[]).reduce((sum: number, w: any) => sum + (w.totalSpent || 0), 0);
 
     // 7. Withdrawals Stats
     const withdrawals = await prisma.franchiseWithdrawal.findMany({
@@ -112,7 +112,7 @@ export async function GET(req: Request) {
         }
       });
 
-      const signupsCount = referrals.filter(r => {
+      const signupsCount = (referrals as any[]).filter((r: any) => {
         const t = new Date(r.createdAt).getTime();
         return t >= start.getTime() && t <= end.getTime();
       }).length;
@@ -167,7 +167,7 @@ export async function GET(req: Request) {
         totalAdVolume,
         currentSlabPercent
       },
-      referrals: referrals.map(r => ({
+      referrals: (referrals as any[]).map((r: any) => ({
         id: r.id,
         createdAt: r.createdAt,
         device: r.device,

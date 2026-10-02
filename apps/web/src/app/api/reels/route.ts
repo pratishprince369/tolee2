@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
           take: 500,
           orderBy: { createdAt: 'desc' }
         });
-        viewedReelIds = new Set(recentViews.map(v => v.contentId));
+        viewedReelIds = new Set((recentViews as any[]).map((v: any) => v.contentId));
       } catch (err) {
         // Fallback silently if views query fails
       }
@@ -88,11 +88,11 @@ export async function GET(req: NextRequest) {
 
     if (!cursor) {
       // STEPS 14, 15, 30, 31: Split into NEVER SEEN vs ALREADY SEEN
-      const unseen = posts.filter(p => !viewedReelIds.has(p.id));
-      const seen = posts.filter(p => viewedReelIds.has(p.id));
+      const unseen = (posts as any[]).filter((p: any) => !viewedReelIds.has(p.id));
+      const seen = (posts as any[]).filter((p: any) => viewedReelIds.has(p.id));
 
       // Controlled shuffle of the top unseen candidates so returning users never see identical order
-      const sortedUnseen = unseen.sort((a, b) => {
+      const sortedUnseen = unseen.sort((a: any, b: any) => {
         const aIsDrive = a.mediaUrls && (a.mediaUrls.includes('drive.usercontent.google.com') || a.mediaUrls.includes('drive.google.com'));
         const bIsDrive = b.mediaUrls && (b.mediaUrls.includes('drive.usercontent.google.com') || b.mediaUrls.includes('drive.google.com'));
         // Fast CDN reels take top priority
@@ -119,7 +119,7 @@ export async function GET(req: NextRequest) {
       nextCursor = hasMore && items.length > 0 ? items[items.length - 1].createdAt.toISOString() : null;
     }
 
-    const data = items.map(post => {
+    const data = (items as any[]).map((post: any) => {
       const firstTolee = post.tolees?.[0]?.tolee;
       return {
         id: post.id,

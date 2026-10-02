@@ -59,7 +59,6 @@ export default async function GlobalFeedPage() {
       select: {
         id: true, caption: true, postType: true, mediaUrls: true, mediaTypes: true,
         visibility: true, createdAt: true, isAnonymous: true, location: true, subLocation: true,
-        title: true, price: true, currency: true, category: true, condition: true, locationText: true,
         newsRelation: { select: { id: true, headline: true, slug: true, summary: true, category: true, readingTime: true, language: true, sourceUrl: true, viewsCount: true } },
         author: { select: { id: true, name: true, username: true, avatar: true } },
         tolees: { select: { tolee: { select: { name: true, slug: true, ownerId: true } } } },

@@ -441,7 +441,7 @@ export async function getSongsFeedAction() {
         for (const hit of liveHits) {
           syncTrackToPrisma(hit).catch(() => {});
         }
-        const seenIds = new Set(trendingSongs.map((s) => s.id));
+        const seenIds = new Set(trendingSongs.map((s: any) => s.id));
         for (const hit of liveHits) {
           if (!seenIds.has(hit.id)) {
             trendingSongs.push(hit as any);
@@ -464,7 +464,7 @@ export async function getSongsFeedAction() {
     // Fallback popular artists if needed
     if (popularArtists.length < 6) {
       for (const a of POPULAR_TOLEE_ARTISTS) {
-        if (!popularArtists.some((x) => x.name.toLowerCase() === a.name.toLowerCase())) {
+        if (!popularArtists.some((x: any) => x.name.toLowerCase() === a.name.toLowerCase())) {
           popularArtists.push(a as any);
         }
       }
@@ -491,9 +491,9 @@ export async function getSongsFeedAction() {
         }),
       ]);
 
-      userLikedSongIds = likedSongs.map((l) => l.songId);
-      userLikedAlbumIds = likedAlbums.map((l) => l.albumId);
-      userFollowedArtistIds = followedArtists.map((l) => l.artistId);
+      userLikedSongIds = likedSongs.map((l: any) => l.songId);
+      userLikedAlbumIds = likedAlbums.map((l: any) => l.albumId);
+      userFollowedArtistIds = followedArtists.map((l: any) => l.artistId);
     }
 
     return {
@@ -504,7 +504,7 @@ export async function getSongsFeedAction() {
       popularArtists,
       featuredAlbums,
       podcasts,
-      genres: allGenres.map((g) => g.genre),
+      genres: allGenres.map((g: any) => g.genre),
       userLikedSongIds,
       userLikedAlbumIds,
       userFollowedArtistIds,
@@ -912,10 +912,10 @@ export async function getUserMusicAction() {
 
     return {
       success: true,
-      likedSongs: likedSongs.map((l) => l.song),
-      likedAlbums: likedAlbums.map((l) => l.album),
-      followedArtists: followedArtists.map((f) => f.artist),
-      recentlyPlayed: recentlyPlayed.map((r) => r.song),
+      likedSongs: (likedSongs as any[]).map((l: any) => l.song),
+      likedAlbums: (likedAlbums as any[]).map((l: any) => l.album),
+      followedArtists: (followedArtists as any[]).map((f: any) => f.artist),
+      recentlyPlayed: (recentlyPlayed as any[]).map((r: any) => r.song),
       playlists,
       uploadedSongs,
       uploadedAlbums,
@@ -1057,7 +1057,7 @@ export async function adminGetMusicStatsAction() {
       prisma.reelAudio.count(),
     ]);
 
-    const totalPlays = songs.reduce((sum, s) => sum + s.playCount, 0);
+    const totalPlays = songs.reduce((sum: number, s: any) => sum + s.playCount, 0);
 
     return {
       success: true,

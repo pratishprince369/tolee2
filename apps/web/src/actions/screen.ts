@@ -247,7 +247,7 @@ export async function getScreenVideoDetails(id: string) {
     let bellPreference: string | null = null;
 
     if (currentUserId) {
-      const likeRecord = video.likes.find(l => l.userId === currentUserId);
+      const likeRecord = video.likes.find((l: any) => l.userId === currentUserId);
       if (likeRecord) {
         userLikeStatus = likeRecord.isDislike ? 'dislike' : 'like';
       }
@@ -265,8 +265,8 @@ export async function getScreenVideoDetails(id: string) {
     }
 
     // Get likes / dislikes count
-    const likesCount = video.likes.filter(l => !l.isDislike).length;
-    const dislikesCount = video.likes.filter(l => l.isDislike).length;
+    const likesCount = video.likes.filter((l: any) => !l.isDislike).length;
+    const dislikesCount = video.likes.filter((l: any) => l.isDislike).length;
 
     // recommended videos (excluding the current one)
     const recommended = await prisma.screenVideo.findMany({
@@ -491,7 +491,7 @@ export async function addScreenVideoComment(videoId: string, text: string, paren
             },
             select: { userId: true }
           });
-          const uniqueOtherUserIds = Array.from(new Set(otherReplies.map(r => r.userId)));
+          const uniqueOtherUserIds: string[] = Array.from(new Set(otherReplies.map((r: any) => r.userId as string)));
           for (const otherUserId of uniqueOtherUserIds) {
             await createSystemNotification({
               userId: otherUserId,
@@ -753,8 +753,8 @@ export async function getCreatorAnalytics(userIdParam?: string) {
     });
 
     const subscriberCount = user?.followers.length || 0;
-    const totalViews = user?.screenVideos.reduce((acc, v) => acc + v.viewsCount, 0) || 0;
-    const totalLikes = user?.screenVideos.reduce((acc, v) => acc + v.likesCount, 0) || 0;
+    const totalViews = user?.screenVideos.reduce((acc: number, v: any) => acc + v.viewsCount, 0) || 0;
+    const totalLikes = user?.screenVideos.reduce((acc: number, v: any) => acc + v.likesCount, 0) || 0;
 
     // Compute estimated financial metrics
     const rpm = 2.45; // Revenue Per Mille (1000 views)

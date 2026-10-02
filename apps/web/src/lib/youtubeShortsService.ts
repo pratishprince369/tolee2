@@ -223,7 +223,7 @@ export async function getTrendingYouTubeShorts(limit: number = 20): Promise<Tole
                 channelTitle: item.snippet?.channelTitle || 'YouTube Creator',
               });
             })
-            .filter((r): r is ToleeReelItem => Boolean(r));
+            .filter((r: any): r is ToleeReelItem => Boolean(r));
 
           if (freshReels.length > 0) {
             cachedShorts = freshReels;

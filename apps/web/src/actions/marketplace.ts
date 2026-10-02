@@ -270,16 +270,16 @@ export async function createListing(data: {
         });
 
         if (members.length > 0) {
-          const uniqueMemberIds = Array.from(new Set(members.map(m => m.userId)));
+          const uniqueMemberIds: string[] = Array.from(new Set(members.map((m: any) => m.userId as string)));
           const seller = await prisma.user.findUnique({
             where: { id: userId },
             select: { name: true, username: true }
           });
           const sellerName = seller?.name || seller?.username || "A user";
-          const toleeNameList = Array.from(new Set(members.map(m => m.tolee.name))).join(', ');
+          const toleeNameList = Array.from(new Set(members.map((m: any) => m.tolee.name))).join(', ');
           const messageText = `${sellerName} shared a new Marketplace listing in ${toleeNameList}: "${safeTitle}"`;
 
-          await createSystemNotificationsMany(uniqueMemberIds.map(memberId => ({
+          await createSystemNotificationsMany(uniqueMemberIds.map((memberId: string) => ({
             userId: memberId,
             type: 'marketplace',
             message: messageText.length > 250 ? messageText.substring(0, 247) + '...' : messageText,
@@ -299,11 +299,11 @@ export async function createListing(data: {
         });
 
         if (shopFollowers.length > 0) {
-          const followerIds = shopFollowers.map(f => f.userId);
+          const followerIds: string[] = shopFollowers.map((f: any) => f.userId as string);
           const shopName = sellerShop.name;
           const followerMessage = `🏪 ${shopName} has posted a new product: "${safeTitle}" for ₹${data.price}!`;
 
-          await createSystemNotificationsMany(followerIds.map(followerId => ({
+          await createSystemNotificationsMany(followerIds.map((followerId: string) => ({
             userId: followerId,
             type: 'marketplace',
             message: followerMessage,
@@ -412,15 +412,15 @@ export async function updateListing(
     let oldResourceTypesList: string[] = [];
 
     if (existingListing.imagePublicIds) {
-      oldPublicIdsList = existingListing.imagePublicIds.split(',').map(s => s.trim()).filter(Boolean);
+      oldPublicIdsList = existingListing.imagePublicIds.split(',').map((s: string) => s.trim()).filter(Boolean);
       if (existingListing.imageResourceTypes) {
-        oldResourceTypesList = existingListing.imageResourceTypes.split(',').map(s => s.trim());
+        oldResourceTypesList = existingListing.imageResourceTypes.split(',').map((s: string) => s.trim());
       }
     } else if (existingListing.images) {
       // Fallback for legacy listings: parse public IDs from existing URLs
-      const urls = existingListing.images.split(',').map(url => url.trim()).filter(Boolean);
-      oldPublicIdsList = urls.map(url => extractPublicIdFromUrl(url)).filter(Boolean) as string[];
-      oldResourceTypesList = urls.map(url => extractResourceTypeFromUrl(url));
+      const urls = existingListing.images.split(',').map((url: string) => url.trim()).filter(Boolean);
+      oldPublicIdsList = urls.map((url: string) => extractPublicIdFromUrl(url)).filter(Boolean) as string[];
+      oldResourceTypesList = urls.map((url: string) => extractResourceTypeFromUrl(url));
     }
 
     // 3. Find removed images
@@ -507,14 +507,14 @@ export async function deleteListing(id: string) {
       let typesToDestroy: string[] = [];
 
       if (listing.imagePublicIds) {
-        idsToDestroy = listing.imagePublicIds.split(',').map(s => s.trim()).filter(Boolean);
+        idsToDestroy = listing.imagePublicIds.split(',').map((s: string) => s.trim()).filter(Boolean);
         if (listing.imageResourceTypes) {
-          typesToDestroy = listing.imageResourceTypes.split(',').map(s => s.trim());
+          typesToDestroy = listing.imageResourceTypes.split(',').map((s: string) => s.trim());
         }
       } else if (listing.images) {
-        const urls = listing.images.split(',').map(s => s.trim()).filter(Boolean);
-        idsToDestroy = urls.map(url => extractPublicIdFromUrl(url)).filter(Boolean) as string[];
-        typesToDestroy = urls.map(url => extractResourceTypeFromUrl(url));
+        const urls = listing.images.split(',').map((s: string) => s.trim()).filter(Boolean);
+        idsToDestroy = urls.map((url: string) => extractPublicIdFromUrl(url)).filter(Boolean) as string[];
+        typesToDestroy = urls.map((url: string) => extractResourceTypeFromUrl(url));
       }
 
       if (idsToDestroy.length > 0) {

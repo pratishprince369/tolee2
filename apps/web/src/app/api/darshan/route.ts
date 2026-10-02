@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
       liveOnly
     });
 
-    const liveCount = temples.filter(t => t.liveStatus === 'live').length;
+    const liveCount = (temples as any[]).filter((t: any) => t.liveStatus === 'live').length;
 
     return NextResponse.json({
       success: true,

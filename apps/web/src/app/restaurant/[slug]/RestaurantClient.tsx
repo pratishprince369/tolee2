@@ -34,7 +34,7 @@ export default function RestaurantClient({ project }: RestaurantClientProps) {
   const hours = content.hours || '11:00 AM - 11:00 PM';
 
   // Group dishes by category
-  const categories = Array.from(new Set(dishes.map((d: any) => d.category || 'Specialities')));
+  const categories: string[] = Array.from(new Set(dishes.map((d: any) => String(d.category || 'Specialities'))));
   const [activeCategory, setActiveCategory] = React.useState<string>(categories[0] || 'Specialities');
   
   // Cart state: key is dish.id, value is quantity

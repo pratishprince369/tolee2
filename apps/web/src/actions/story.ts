@@ -24,7 +24,7 @@ export async function fetchFeedStories() {
         followingId: true
       }
     });
-    const followedIds = follows.map(f => f.followingId);
+    const followedIds = (follows as any[]).map((f: any) => f.followingId);
 
     // 2. Find all friends of the current user
     const friendships = await prisma.friendship.findMany({
@@ -35,7 +35,7 @@ export async function fetchFeedStories() {
         friendUserId: true
       }
     });
-    const friendIds = friendships.map(fr => fr.friendUserId);
+    const friendIds = (friendships as any[]).map((fr: any) => fr.friendUserId);
 
     // Combine all relevant user IDs: followed + friends + current user
     const allUserIds = Array.from(new Set([...followedIds, ...friendIds, currentUserId]));
@@ -235,7 +235,7 @@ export async function fetchUserActiveStories(userId: string) {
       }
     });
 
-    const formattedStories = stories.map(s => ({
+    const formattedStories = (stories as any[]).map((s: any) => ({
       id: s.id,
       mediaUrl: s.mediaUrl,
       mediaType: s.mediaType,
@@ -251,7 +251,7 @@ export async function fetchUserActiveStories(userId: string) {
     return {
       success: true,
       stories: formattedStories,
-      hasUnviewed: formattedStories.some(s => !s.viewed)
+      hasUnviewed: formattedStories.some((s: any) => !s.viewed)
     };
   } catch (error) {
     console.error('Error fetching user stories:', error);
@@ -298,7 +298,7 @@ export async function fetchStoryViewers(storyId: string) {
     //   @@id([storyId, userId])
     // }
     // Ah, it does NOT have a direct named relation to User in the schema. But we can fetch users by ID.
-    const userIds = views.map(v => v.userId);
+    const userIds = (views as any[]).map((v: any) => v.userId);
     const users = await prisma.user.findMany({
       where: {
         id: { in: userIds }

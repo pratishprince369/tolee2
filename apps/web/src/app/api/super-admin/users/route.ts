@@ -213,7 +213,7 @@ export async function POST(req: NextRequest) {
           where: { ownerId: { in: userIds } },
           select: { id: true }
         });
-        const ownedToleeIds = ownedTolees.map(t => t.id);
+        const ownedToleeIds = (ownedTolees as any[]).map((t: any) => t.id);
         if (ownedToleeIds.length > 0) {
           await prisma.postTolee.deleteMany({ where: { toleeId: { in: ownedToleeIds } } });
           await prisma.listingTolee.deleteMany({ where: { toleeId: { in: ownedToleeIds } } });

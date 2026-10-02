@@ -43,7 +43,7 @@ export async function POST(req: Request) {
     }
 
     // Execute wallet balance updates transactionally
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: any) => {
       // 1. Deduct from available balance and move to pending payouts
       const updatedFranchise = await tx.franchise.update({
         where: { id: franchise.id },

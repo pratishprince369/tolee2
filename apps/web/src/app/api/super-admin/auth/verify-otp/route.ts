@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     const { email, otp } = await req.json();
     const ip = req.headers.get('x-forwarded-for') || 'unknown';
 
-    if (!email || email.toLowerCase().trim() !== SUPER_ADMIN_EMAIL.toLowerCase()) {
+    if (!email || !SUPER_ADMIN_EMAIL || email.toLowerCase().trim() !== SUPER_ADMIN_EMAIL.toLowerCase()) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 

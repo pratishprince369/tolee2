@@ -132,7 +132,7 @@ export default async function PublicBlogPage({ params }: PageProps) {
                 </div>
                 <div className="pt-2">
                   <p className="text-xs text-zinc-500 leading-relaxed mb-3">Targeting local readers in your neighbourhood group networks.</p>
-                  <Button variant="outline" className="w-full border-zinc-800 text-zinc-300 hover:text-white rounded-xl h-10 text-xs font-bold" onClick="navigator.clipboard.writeText(window.location.href); alert('Article link copied to clipboard!');">
+                  <Button variant="outline" className="w-full border-zinc-800 text-zinc-300 hover:text-white rounded-xl h-10 text-xs font-bold">
                     Share Link
                   </Button>
                 </div>
@@ -145,7 +145,7 @@ export default async function PublicBlogPage({ params }: PageProps) {
                   <p className="text-xs font-bold text-white mb-1">Follow this Blog</p>
                   <span className="text-[10px] text-zinc-500 leading-relaxed block">Get immediate alerts inside notifications when creator publishes next article.</span>
                 </div>
-                <form action="#" onSubmit="alert('Subscribed to creator updates!'); return false;" className="space-y-2 pt-1">
+                <form action="#" className="space-y-2 pt-1">
                   <input 
                     type="email" 
                     placeholder="Enter email / username" 

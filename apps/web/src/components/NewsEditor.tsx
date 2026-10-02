@@ -52,7 +52,7 @@ export function NewsEditor({ initialData }: { initialData?: any }) {
     if (initialData?.post?.mediaUrls) {
       const urls = initialData.post.mediaUrls.split(/,(?=https?:\/\/)/).map((u: string) => u.trim()).filter(Boolean);
       const types = initialData.post.mediaTypes ? initialData.post.mediaTypes.split(',').map((t: string) => t.trim()).filter(Boolean) : [];
-      return urls.map((url, idx) => ({
+      return urls.map((url: string, idx: number) => ({
         id: `existing-${idx}-${Date.now()}`,
         url,
         type: (types[idx] === 'video' ? 'video' : 'image') as 'image' | 'video',

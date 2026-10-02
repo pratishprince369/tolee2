@@ -84,8 +84,8 @@ export default async function TopicLandingPage({ params }: TopicPageProps) {
     description: `Discussions and updates on ${topicTitle}`,
     url: `/topic/${rawSlug}`,
     items: [
-      ...tolees.map((t) => ({ name: t.name, url: `/t/${t.slug}`, description: t.description || undefined })),
-      ...posts.map((p) => ({ name: (p.caption || 'Discussion').slice(0, 60), url: `/post/${p.id}` })),
+      ...tolees.map((t: any) => ({ name: t.name, url: `/t/${t.slug}`, description: t.description || undefined })),
+      ...posts.map((p: any) => ({ name: (p.caption || 'Discussion').slice(0, 60), url: `/post/${p.id}` })),
     ],
   });
 
@@ -136,7 +136,7 @@ export default async function TopicLandingPage({ params }: TopicPageProps) {
               <span>Related Communities</span>
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {tolees.map((group) => (
+              {tolees.map((group: any) => (
                 <Link
                   key={group.id}
                   href={`/t/${group.slug}`}
@@ -172,7 +172,7 @@ export default async function TopicLandingPage({ params }: TopicPageProps) {
 
           {posts.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {posts.map((post) => (
+              {posts.map((post: any) => (
                 <Link
                   key={post.id}
                   href={post.postType === 'reel' ? `/reel/${post.id}` : `/post/${post.id}`}

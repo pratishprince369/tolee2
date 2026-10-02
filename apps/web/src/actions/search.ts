@@ -233,11 +233,11 @@ export async function performSearch(
         })
       ]);
 
-      const toleeCats = joinedTolees.map(m => m.tolee.category).filter(Boolean) as string[];
-      const postTags = likedPosts
-        .map(l => l.post?.visualTags)
+      const toleeCats = (joinedTolees as any[]).map((m: any) => m.tolee.category).filter(Boolean) as string[];
+      const postTags = (likedPosts as any[])
+        .map((l: any) => l.post?.visualTags)
         .filter(Boolean)
-        .flatMap(tags => tags!.split(',').map(t => t.trim().toLowerCase()));
+        .flatMap((tags: any) => tags!.split(',').map((t: string) => t.trim().toLowerCase()));
 
       preferredCategories = [...new Set([...toleeCats, ...postTags])];
     }
@@ -300,7 +300,7 @@ export async function performSearch(
         score += engagementVelocity;
       } else if (type === 'group') {
         const memberCount = item.members?.length || 0;
-        score += Math.log15(memberCount + 1) * 3.0; // Log scale boost for popular groups
+        score += Math.log10(memberCount + 1) * 3.0; // Log scale boost for popular groups
       } else if (type === 'listing') {
         const viewCount = item.viewCount || 0;
         score += Math.min(5.0, viewCount * 0.2);
@@ -674,7 +674,7 @@ export async function getSearchHistory(): Promise<any[]> {
 }
 
 // 6. CLEAR SEARCH HISTORY
-export async function clearSearchHistory(id?: string): Promise<{ success: boolean }> {
+export async function clearSearchHistory(id?: string): Promise<{ success: boolean; error?: string }> {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user || !(session.user as any).id) {
@@ -730,12 +730,12 @@ export async function getTrendingContent(): Promise<{
     });
 
     // Sort reels based on engagement score
-    const scoredReels = reels
-      .map(r => {
+    const scoredReels = (reels as any[])
+      .map((r: any) => {
         const score = (r.likes.length * 2) + (r.comments.length * 3) + (r.views.length * 0.5) + (r.shareCount * 5);
         return { ...r, score };
       })
-      .sort((a, b) => b.score - a.score)
+      .sort((a: any, b: any) => b.score - a.score)
       .slice(0, 6);
 
     // 2. Extract trending hashtags from recent posts
@@ -775,8 +775,8 @@ export async function getTrendingContent(): Promise<{
       take: 20
     });
 
-    const sortedTolees = tolees
-      .sort((a, b) => b.members.length - a.members.length)
+    const sortedTolees = (tolees as any[])
+      .sort((a: any, b: any) => b.members.length - a.members.length)
       .slice(0, 6);
 
     // 4. Trending Marketplace Listings: active listings with high views
@@ -849,7 +849,7 @@ export async function getHashtagDetails(tag: string): Promise<{
     });
 
     // Score and divide into Top and Recent
-    const scoredPosts = posts.map(p => {
+    const scoredPosts = (posts as any[]).map((p: any) => {
       const likesCount = p.likes?.length || 0;
       const commentsCount = p.comments?.length || 0;
       const savesCount = p.savedBy?.length || 0;
@@ -946,7 +946,7 @@ export async function getSuperAdminSearchAnalytics(): Promise<{
     });
 
     const topKeywords = await Promise.all(
-      topKeywordsRaw.map(async tk => {
+      (topKeywordsRaw as any[]).map(async (tk: any) => {
         // Find clicks for this keyword
         const clicksCount = await prisma.searchClickLog.count({
           where: { query: tk.query }
@@ -973,7 +973,7 @@ export async function getSuperAdminSearchAnalytics(): Promise<{
       take: 15
     });
 
-    const clickLogs = clickLogsRaw.map(log => ({
+    const clickLogs = (clickLogsRaw as any[]).map((log: any) => ({
       id: log.id,
       query: log.query,
       clickedId: log.clickedId,
@@ -1024,8 +1024,8 @@ export async function getExploreFeed(page: number = 1, limit: number = 24) {
       skip,
     });
 
-    const items = posts
-      .map((p) => {
+    const items = (posts as any[])
+      .map((p: any) => {
         const ytId = extractYouTubeVideoId(p.mediaUrls) || extractYouTubeVideoId(p.sourceUrl);
         const isYouTube = Boolean(ytId);
         const isReel = p.postType === 'reel' || isYouTube || p.mediaTypes === 'video' || Boolean(p.mediaUrls && (p.mediaUrls.includes('.m3u8') || p.mediaUrls.includes('.mp4')));
@@ -1051,7 +1051,7 @@ export async function getExploreFeed(page: number = 1, limit: number = 24) {
           },
         };
       })
-      .filter((item): item is NonNullable<typeof item> => Boolean(item && item.mediaUrl))
+      .filter((item: any): item is NonNullable<typeof item> => Boolean(item && item.mediaUrl))
       .slice(0, limit);
 
     return {

@@ -281,7 +281,7 @@ export default function SuperAdminShootsPage() {
                       {/* Sender details */}
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <div style={{ width: 32, height: 32, borderRadius: '50%', overflow: 'hidden', bg: '#27272a', flexShrink: 0 }}>
+                          <div style={{ width: 32, height: 32, borderRadius: '50%', overflow: 'hidden', background: '#27272a', flexShrink: 0 }}>
                             {sender.avatar ? (
                               <img src={sender.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                             ) : (
@@ -363,7 +363,7 @@ export default function SuperAdminShootsPage() {
                         {reports.length === 0 ? (
                           <span style={{ fontSize: 11, color: '#52525b' }}>No reports logged</span>
                         ) : (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxH: 140, overflowY: 'auto' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 140, overflowY: 'auto' }}>
                             <div style={{ fontSize: 11, fontWeight: 700, color: '#ef4444' }}>🚩 Flagged {reports.length} time(s):</div>
                             {reports.map((rep: any, idx: number) => (
                               <div key={idx} style={{ fontSize: 11, background: '#1c1c1e', border: '1px solid #27272a', padding: '6px 10px', borderRadius: 8, color: '#a1a1aa' }}>

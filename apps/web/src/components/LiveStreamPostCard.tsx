@@ -24,7 +24,7 @@ interface LiveStreamPostCardProps {
 }
 
 export function LiveStreamPostCard({ post, currentUserId }: LiveStreamPostCardProps) {
-  const [likesCount, setLikesCount] = useState(post._count?.likes || 12);
+  const [likesCount, setLikesCount] = useState<number>(post._count?.likes || 12);
   const [hasLiked, setHasLiked] = useState(false);
   const [showHeartAnim, setShowHeartAnim] = useState(false);
 
@@ -34,7 +34,7 @@ export function LiveStreamPostCard({ post, currentUserId }: LiveStreamPostCardPr
 
   const handleQuickLike = () => {
     if (!hasLiked) {
-      setLikesCount(prev => prev + 1);
+      setLikesCount((prev: number) => prev + 1);
       setHasLiked(true);
       setShowHeartAnim(true);
       setTimeout(() => setShowHeartAnim(false), 1200);

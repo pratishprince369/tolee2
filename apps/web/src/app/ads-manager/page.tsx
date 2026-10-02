@@ -1046,7 +1046,7 @@ export default function AdsManagerPage() {
               <div className="flex justify-between items-end border-t border-white/10 pt-4 z-10">
                 <div>
                   <p className="text-[8px] text-zinc-400 uppercase tracking-widest">Card Holder</p>
-                  <p className="text-xs font-bold text-slate-100 mt-0.5">{session.user.name || 'Tolee Member'}</p>
+                  <p className="text-xs font-bold text-slate-100 mt-0.5">{session?.user?.name || 'Tolee Member'}</p>
                 </div>
                 <div>
                   <p className="text-[8px] text-zinc-400 uppercase tracking-widest text-right">Validity</p>

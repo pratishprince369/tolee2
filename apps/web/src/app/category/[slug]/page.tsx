@@ -214,8 +214,8 @@ export default async function CategoryLandingPage({ params }: CategoryPageProps)
     description: info.description,
     url: `/category/${rawSlug}`,
     items: [
-      ...tolees.map((t) => ({ name: t.name, url: `/t/${t.slug}`, description: t.description || undefined })),
-      ...posts.map((p) => ({ name: (p.caption || 'Community Post').slice(0, 60), url: `/post/${p.id}` })),
+      ...tolees.map((t: any) => ({ name: t.name, url: `/t/${t.slug}`, description: t.description || undefined })),
+      ...posts.map((p: any) => ({ name: (p.caption || 'Community Post').slice(0, 60), url: `/post/${p.id}` })),
     ],
   });
 
@@ -267,7 +267,7 @@ export default async function CategoryLandingPage({ params }: CategoryPageProps)
 
           {tolees.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {tolees.map((group) => (
+              {tolees.map((group: any) => (
                 <Link
                   key={group.id}
                   href={`/t/${group.slug}`}
@@ -317,7 +317,7 @@ export default async function CategoryLandingPage({ params }: CategoryPageProps)
               <span>Trending Discussions in {info.name}</span>
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {posts.map((post) => (
+              {posts.map((post: any) => (
                 <Link
                   key={post.id}
                   href={`/post/${post.id}`}
@@ -359,7 +359,7 @@ export default async function CategoryLandingPage({ params }: CategoryPageProps)
               </Link>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
-              {listings.map((item) => (
+              {listings.map((item: any) => (
                 <Link
                   key={item.id}
                   href={`/marketplace/listing/${item.id}`}

@@ -383,7 +383,7 @@ export default function SearchAnalyticsPage() {
       )}
 
       {/* Tables Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', lgGridTemplateColumns: '2fr 1fr', gap: 24 }}>
+      <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
         {/* Main Content Layout Wrapper */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
           {/* Top Keywords Table */}

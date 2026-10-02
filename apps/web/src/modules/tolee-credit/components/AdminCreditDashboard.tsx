@@ -63,7 +63,7 @@ export function AdminCreditDashboard({ overview, initialConfig, initialWithdrawa
   const handleRunSettlement = async () => {
     setRunningSettlement(true);
     setSettlementResult(null);
-    const res = await runSettlementCycleAction();
+    const res = (await runSettlementCycleAction()) as any;
     setRunningSettlement(false);
     if (res.success) {
       setSettlementResult(`Settled ${res.settledCount} transactions (Total: ₹${(res.totalSettledAmount || 0).toFixed(2)})`);

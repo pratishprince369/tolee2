@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Action is required' }, { status: 400 });
     }
 
-    const response = await aiGateway.executeGroupAction(body);
+    const response = await aiGateway.executeGroupAIAction(body);
 
     return NextResponse.json({ result: response, action: body.action });
   } catch (error: any) {

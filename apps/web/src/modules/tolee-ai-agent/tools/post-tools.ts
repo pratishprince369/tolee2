@@ -38,7 +38,7 @@ export const getUserPostsTool: ToolDefinition = {
 
       return {
         success: true,
-        data: posts.map((p) => ({
+        data: posts.map((p: any) => ({
           id: p.id,
           caption: p.caption,
           likesCount: p._count.likes,

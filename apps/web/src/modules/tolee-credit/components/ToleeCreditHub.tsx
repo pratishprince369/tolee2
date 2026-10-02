@@ -49,7 +49,7 @@ export function ToleeCreditHub({
   };
 
   const handleAddBankAccount = async (data: any) => {
-    const res = await addBankAccountAction(data);
+    const res = (await addBankAccountAction(data)) as any;
     if (res.success && res.bankAccount) {
       setBankAccounts((prev) => [res.bankAccount!, ...prev]);
     }
@@ -57,7 +57,7 @@ export function ToleeCreditHub({
   };
 
   const handleRequestWithdrawal = async (amount: number, bankAccountId?: string) => {
-    const res = await requestWithdrawalAction(amount, bankAccountId);
+    const res = (await requestWithdrawalAction(amount, bankAccountId)) as any;
     if (res.success && res.withdrawal) {
       setWallet((w) => ({
         ...w,

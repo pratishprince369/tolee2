@@ -109,17 +109,17 @@ export async function sendToleeShootBroadcast(params: {
         where: { toleeId: { in: params.targetGroups }, status: 'approved' },
         select: { userId: true }
       });
-      targetIds = members.map(m => m.userId);
+      targetIds = (members as any[]).map((m: any) => m.userId);
     } else if (params.targetingType === 'LOCATION' && params.targetLocations && params.targetLocations.length > 0) {
       const matched = await prisma.user.findMany({
         where: {
-          OR: params.targetLocations.map(loc => ({
+          OR: params.targetLocations.map((loc: string) => ({
             location: { contains: loc, mode: 'insensitive' }
           }))
         },
         select: { id: true }
       });
-      targetIds = matched.map(u => u.id);
+      targetIds = (matched as any[]).map((u: any) => u.id);
     } else if (params.targetingType === 'PINCODE' && params.targetPincodes && params.targetPincodes.length > 0) {
       const matched = await prisma.user.findMany({
         where: {
@@ -127,7 +127,7 @@ export async function sendToleeShootBroadcast(params: {
         },
         select: { id: true }
       });
-      targetIds = matched.map(u => u.id);
+      targetIds = (matched as any[]).map((u: any) => u.id);
     }
 
     // Deduplicate
@@ -143,7 +143,7 @@ export async function sendToleeShootBroadcast(params: {
       },
       select: { id: true }
     });
-    let filteredTargetIds = validReceivers.map(r => r.id);
+    let filteredTargetIds: string[] = (validReceivers as any[]).map((r: any) => r.id as string);
 
     // Filter out mutes/blocks
     const mutes = await prisma.promotionalMute.findMany({
@@ -153,8 +153,8 @@ export async function sendToleeShootBroadcast(params: {
       },
       select: { userId: true }
     });
-    const mutedUserIds = new Set(mutes.map(m => m.userId));
-    filteredTargetIds = filteredTargetIds.filter(id => !mutedUserIds.has(id));
+    const mutedUserIds = new Set((mutes as any[]).map((m: any) => m.userId));
+    filteredTargetIds = filteredTargetIds.filter((id: string) => !mutedUserIds.has(id));
 
     // Enforce target capacity limit
     if (filteredTargetIds.length > maxTargets) {
@@ -195,7 +195,7 @@ export async function sendToleeShootBroadcast(params: {
           include: { participants: true }
         });
 
-        let chat = dms.find(c => c.participants.some(p => p.userId === targetId));
+        let chat = (dms as any[]).find((c: any) => c.participants.some((p: any) => p.userId === targetId));
 
         if (!chat) {
           chat = await prisma.chat.create({
@@ -287,9 +287,9 @@ export async function getToleeShootAnalytics() {
 
     // Aggregate counts
     const totalShoots = shoots.length;
-    const totalDelivered = shoots.reduce((sum, s) => sum + s.deliveredCount, 0);
-    const totalClicks = shoots.reduce((sum, s) => sum + s.clickCount, 0);
-    const totalSeen = shoots.reduce((sum, s) => sum + s.seenCount, 0);
+    const totalDelivered = shoots.reduce((sum: number, s: any) => sum + s.deliveredCount, 0);
+    const totalClicks = shoots.reduce((sum: number, s: any) => sum + s.clickCount, 0);
+    const totalSeen = shoots.reduce((sum: number, s: any) => sum + s.seenCount, 0);
 
     return {
       success: true,

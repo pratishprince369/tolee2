@@ -330,7 +330,7 @@ export default function SportsPage() {
             </button>
 
             {session?.user ? (
-              <Link href={`/u/${session.user.username || session.user.id || 'profile'}`} className="flex items-center gap-2 pl-1 group cursor-pointer">
+              <Link href={`/u/${(session.user as any).username || (session.user as any).id || 'profile'}`} className="flex items-center gap-2 pl-1 group cursor-pointer">
                 <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-emerald-500 to-cyan-500 flex items-center justify-center text-xs font-bold text-zinc-950 overflow-hidden ring-1 ring-emerald-500/40">
                   {session.user.image ? (
                     <img src={session.user.image} alt="User" className="w-full h-full object-cover" />

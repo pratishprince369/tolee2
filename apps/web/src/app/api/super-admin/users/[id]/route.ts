@@ -173,7 +173,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
             where: { ownerId: { in: uIds } },
             select: { id: true }
           });
-          const ownedToleeIds = ownedTolees.map(t => t.id);
+          const ownedToleeIds = ownedTolees.map((t: any) => t.id);
           if (ownedToleeIds.length > 0) {
             await prisma.postTolee.deleteMany({ where: { toleeId: { in: ownedToleeIds } } });
             await prisma.listingTolee.deleteMany({ where: { toleeId: { in: ownedToleeIds } } });
@@ -225,7 +225,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         action: auditAction,
         target: userId,
         targetType: 'user',
-        details: JSON.stringify({ reason: reason || suspensionReason || body.reason || body.suspensionReason, ...updateData }),
+        details: JSON.stringify({ reason: reason || body.reason || body.suspensionReason, ...updateData }),
         ipAddress: ip
       }
     });

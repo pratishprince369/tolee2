@@ -67,11 +67,11 @@ export async function DELETE(req: NextRequest) {
 
     // Retrieve course, module, and lesson hierarchies for safe deletion
     const courses = await prisma.course.findMany({ where: { toleeId: id }, select: { id: true } });
-    const courseIds = courses.map(c => c.id);
+    const courseIds = courses.map((c: any) => c.id);
     const modules = await prisma.module.findMany({ where: { courseId: { in: courseIds } }, select: { id: true } });
-    const moduleIds = modules.map(m => m.id);
+    const moduleIds = modules.map((m: any) => m.id);
     const lessons = await prisma.lesson.findMany({ where: { moduleId: { in: moduleIds } }, select: { id: true } });
-    const lessonIds = lessons.map(l => l.id);
+    const lessonIds = lessons.map((l: any) => l.id);
 
     await prisma.$transaction([
       prisma.lessonProgress.deleteMany({ where: { lessonId: { in: lessonIds } } }),

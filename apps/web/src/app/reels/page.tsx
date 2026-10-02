@@ -359,7 +359,7 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
 
               if (listing) {
                 const isAuthorized = listing.status === 'active';
-                const videoUrl = listing.images?.split(',').find(url => url.includes('.mp4') || url.includes('.m3u8') || url.includes('video') || url.includes('.mov') || url.includes('.webm'));
+                const videoUrl = listing.images?.split(',').find((url: string) => url.includes('.mp4') || url.includes('.m3u8') || url.includes('video') || url.includes('.mov') || url.includes('.webm'));
 
                 if (!isAuthorized || !videoUrl) {
                   dbReels.unshift({

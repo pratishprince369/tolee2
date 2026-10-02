@@ -520,7 +520,7 @@ export function LaunchMusicModal({ isOpen, onClose, onSuccess }: LaunchMusicModa
                           Audio
                         </button>
                         <input
-                          ref={(el) => (trackAudioInputRefs.current[track.id] = el)}
+                          ref={(el) => { trackAudioInputRefs.current[track.id] = el; }}
                           type="file"
                           accept="audio/*"
                           className="hidden"

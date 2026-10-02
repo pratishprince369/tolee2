@@ -397,7 +397,7 @@ export class SportsSyncService {
     try {
       // 1. Fetch categories map for slug matching
       const categories = await prisma.sportsCategory.findMany();
-      const catMap = new Map(categories.map(c => [c.slug, c.id]));
+      const catMap = new Map((categories as any[]).map((c: any) => [c.slug, c.id]));
       const defaultCatId = catMap.get('other-sports') || catMap.get('football') || categories[0]?.id;
 
       if (!defaultCatId) {

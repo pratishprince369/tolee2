@@ -408,7 +408,16 @@ export async function publishDailyBundleReelsBatch(maxLimitPerRun = 5): Promise<
       return { success: false, count: 0, userStats: {}, log: logs };
     }
 
-    const userMap = new Map(dbUsers.map(u => [u.email, u]));
+    interface AutoPostingUser {
+      id: string;
+      email: string;
+      username: string;
+    }
+
+    const userMap = new Map<string, AutoPostingUser>();
+    (dbUsers as any[]).forEach((u: any) => {
+      if (u?.email) userMap.set(u.email, u as AutoPostingUser);
+    });
     const defaultTolee = await prisma.tolee.findFirst({ select: { id: true } });
 
     // 2. Check 24-hour quota per account (target: up to 10 reels/user/day)
@@ -459,7 +468,7 @@ export async function publishDailyBundleReelsBatch(maxLimitPerRun = 5): Promise<
     const usedFileIds = new Set<string>();
     for (const p of recentPosts) {
       if (p.mediaPublicIds) {
-        p.mediaPublicIds.split(',').forEach(id => usedFileIds.add(id.trim()));
+        p.mediaPublicIds.split(',').forEach((id: string) => usedFileIds.add(id.trim()));
       }
       if (p.mediaUrls) {
         const match = p.mediaUrls.match(/[?&]id=([a-zA-Z0-9_-]+)/) || p.mediaUrls.match(/\/d\/([a-zA-Z0-9_-]+)/);

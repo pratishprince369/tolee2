@@ -57,6 +57,15 @@ interface Metrics {
     cloudinaryBandwidthGB: number;
     vercelBandwidthGB: number;
     vercelServerlessSeconds: number;
+    dualDbActive?: boolean;
+    transferStatus?: string;
+    databaseTransferGB?: number;
+    transferPercentage?: number;
+    aiDatabaseTransferGB?: number;
+    aiDbPostCount?: number;
+    todayNewsCount?: number;
+    dailyNewsLimit?: number;
+    monthlyNewsCount?: number;
   };
   emailAnalytics?: {
     totalSent: number;
@@ -610,7 +619,7 @@ export default function SuperAdminOverview() {
     <div style={{ color: '#fca5a5', background: '#450a0a', border: '1px solid #7f1d1d', borderRadius: 12, padding: 20 }}>
       <h3 style={{ margin: '0 0 8px 0', fontSize: 16 }}>⚠️ API Load Failure</h3>
       <p style={{ margin: '0 0 16px 0', fontSize: 13 }}>{error}</p>
-      <button onClick={fetchMetrics} style={{ background: '#7f1d1d', border: '1px solid #b91c1c', color: '#fff', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 600 }}>
+      <button onClick={() => fetchMetrics()} style={{ background: '#7f1d1d', border: '1px solid #b91c1c', color: '#fff', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 600 }}>
         Retry Loading
       </button>
     </div>

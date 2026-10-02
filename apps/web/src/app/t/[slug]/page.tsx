@@ -108,11 +108,11 @@ export default async function ToleePage({ params }: ToleePageProps) {
   let dbTolee = res.tolee;
   
   // Demo Mode for landing page links
-  if (!dbTolee && ['tech-titans', 'music-soul', 'artist-hub', 'qa-test-tolee'].includes(params.slug)) {
+  if (!dbTolee && ['tech-titans', 'music-soul', 'artist-hub', 'qa-test-tolee'].includes(slug)) {
     dbTolee = {
-      id: 'demo-' + params.slug,
-      name: params.slug.split('-').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' '),
-      slug: params.slug,
+      id: 'demo-' + slug,
+      name: slug.split('-').map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join(' '),
+      slug: slug,
       description: 'This is a curated demo community to show you the power of Tolee.',
       _count: { members: 1200 },
       price: 0,

@@ -22,7 +22,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const suggestions = await aiGateway.generateSmartReplies(messages, personaName);
+    const lastMsg = typeof messages[messages.length - 1] === 'string'
+      ? messages[messages.length - 1]
+      : messages[messages.length - 1]?.content || '';
+    const formattedRecent = messages.slice(-5).map((m: any) => ({
+      role: typeof m === 'string' ? 'user' : (m.role || 'user'),
+      content: typeof m === 'string' ? m : (m.content || '')
+    }));
+
+    const suggestions = await aiGateway.generateSmartReplies({
+      lastMessage: lastMsg,
+      recentMessages: formattedRecent,
+      personaTone: personaName
+    });
 
     return NextResponse.json({ suggestions });
   } catch (error: any) {

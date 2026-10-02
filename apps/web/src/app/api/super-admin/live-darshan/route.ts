@@ -22,8 +22,8 @@ export async function GET(req: NextRequest) {
     });
 
     const total = temples.length;
-    const liveCount = temples.filter(t => t.liveStatus === 'live').length;
-    const activeCount = temples.filter(t => t.isActive).length;
+    const liveCount = (temples as any[]).filter((t: any) => t.liveStatus === 'live').length;
+    const activeCount = (temples as any[]).filter((t: any) => t.isActive).length;
 
     return NextResponse.json({
       success: true,
