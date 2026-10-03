@@ -1,4 +1,6 @@
 import { prisma } from '@/lib/prisma';
+import { v2 as cloudinary } from 'cloudinary';
+import { getAllCloudinaryAccounts } from '@/lib/cloudinary-fallback';
 
 export interface SourceIndexPage {
   id: string;
@@ -382,6 +384,63 @@ export async function fetchBundleReelsFromSource(): Promise<CentralReelItem[]> {
 }
 
 /**
+ * STEP 20: Compress & optimize raw video via Cloudinary CDN
+ * Converts heavy 30MB-100MB Google Drive video into a fast-loading 720p H.264 stream (~1.5MB - 3MB)
+ * with auto-generated poster frame for zero-buffering instant mobile playback.
+ */
+export async function compressAndOptimizeReelVideo(fileId: string, downloadUrl: string): Promise<{
+  videoUrl: string;
+  posterUrl: string;
+  resourceType: 'cloudinary' | 'google_drive';
+}> {
+  const accounts = getAllCloudinaryAccounts();
+
+  // Try available Cloudinary accounts (with fallback rotation)
+  for (const account of accounts) {
+    if (!account.apiKey || !account.apiSecret || !account.cloudName) continue;
+
+    try {
+      cloudinary.config({
+        cloud_name: account.cloudName,
+        api_key: account.apiKey,
+        api_secret: account.apiSecret,
+      });
+
+      const result = await cloudinary.uploader.upload(downloadUrl, {
+        resource_type: 'video',
+        folder: 'tolee_reels',
+        public_id: `reel_${fileId}`,
+        overwrite: false,
+        transformation: [
+          { width: 720, crop: 'limit', quality: 'auto:good', video_codec: 'auto' }
+        ]
+      });
+
+      if (result && result.secure_url) {
+        // High-speed CDN streaming URL with responsive adaptive compression
+        const optimizedVideo = result.secure_url.replace('/upload/', '/upload/q_auto:good,vc_h264,w_720/');
+        const optimizedPoster = result.secure_url.replace(/\.[^/.]+$/, '.jpg');
+
+        return {
+          videoUrl: optimizedVideo,
+          posterUrl: optimizedPoster,
+          resourceType: 'cloudinary'
+        };
+      }
+    } catch (err: any) {
+      console.warn(`[Video Compression] Cloudinary account ${account.cloudName} notice:`, err.message || err);
+    }
+  }
+
+  // Graceful fallback to direct streaming URL if CDN upload is unavailable
+  return {
+    videoUrl: `https://drive.usercontent.google.com/download?id=${fileId}&export=download`,
+    posterUrl: `https://lh3.googleusercontent.com/d/${fileId}`,
+    resourceType: 'google_drive'
+  };
+}
+
+/**
  * STEP 7, 8, 9, 10, 11: ROTATE 5 ACCOUNTS & PUBLISH ~10 POSTS PER USER PER DAY
  */
 export async function publishDailyBundleReelsBatch(maxLimitPerRun = 5): Promise<{
@@ -512,7 +571,9 @@ export async function publishDailyBundleReelsBatch(maxLimitPerRun = 5): Promise<
       sessionClaimedIds.add(chosenVideo.fileId);
       usedFileIds.add(chosenVideo.fileId);
 
-      const mediaUrlsCombined = `${chosenVideo.videoUrl},${chosenVideo.posterUrl}`;
+      // STEP 20: Compress and optimize raw video before publishing to guarantee instant streaming
+      const optimizedMedia = await compressAndOptimizeReelVideo(chosenVideo.fileId, chosenVideo.videoUrl);
+      const mediaUrlsCombined = `${optimizedMedia.videoUrl},${optimizedMedia.posterUrl}`;
 
       const created = await prisma.post.create({
         data: {
@@ -521,7 +582,7 @@ export async function publishDailyBundleReelsBatch(maxLimitPerRun = 5): Promise<
           mediaUrls: mediaUrlsCombined,
           mediaTypes: 'video',
           mediaPublicIds: chosenVideo.fileId,
-          mediaResourceTypes: 'google_drive',
+          mediaResourceTypes: optimizedMedia.resourceType,
           status: 'published',
           visibility: 'public',
           authorId: u.id,

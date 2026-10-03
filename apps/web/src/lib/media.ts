@@ -41,6 +41,10 @@ export function getStreamableVideoUrl(url: string | null | undefined): string {
       return `https://drive.usercontent.google.com/download?id=${match[1]}&export=download`;
     }
   }
+  // Cloudinary automatic video streaming compression & fast-load optimization
+  if (trimmed.includes('res.cloudinary.com') && trimmed.includes('/video/upload/') && !trimmed.includes('q_auto')) {
+    return trimmed.replace('/video/upload/', '/video/upload/q_auto:good,vc_h264,w_720/');
+  }
   return trimmed;
 }
 
