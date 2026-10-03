@@ -73,18 +73,22 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
       } catch {}
     }
 
-    // 2. Fetch candidates: genuine video reels (exclude static image uploads)
-    const candidatePosts = await prisma.post.findMany({
+    // 2. Fetch candidates: real creator & automated reels (Google Drive bundles, Apify Instagram, Cloudinary).
+    // Exclude static images and suppress generic Pexels stock video footage.
+    let candidatePosts = await prisma.post.findMany({
       where: {
         postType: 'reel',
         status: 'published',
         isArchived: false,
         visibility: 'public',
         mediaUrls: { not: null },
-        NOT: { mediaUrls: { contains: '/image/upload/' } }
+        NOT: [
+          { mediaUrls: { contains: '/image/upload/' } },
+          { mediaUrls: { contains: 'pexels.com' } }
+        ]
       },
       orderBy: { createdAt: 'desc' },
-      take: 120,
+      take: 150,
       include: {
         author: {
           select: {
@@ -117,6 +121,31 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
       }
     });
 
+    // Fallback if real reels pool is unexpectedly low
+    if (candidatePosts.length < 10) {
+      const fallbackPosts = await prisma.post.findMany({
+        where: {
+          postType: 'reel',
+          status: 'published',
+          isArchived: false,
+          visibility: 'public',
+          mediaUrls: { not: null },
+          NOT: { mediaUrls: { contains: '/image/upload/' } }
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 30,
+        include: {
+          author: { select: { id: true, name: true, username: true, avatar: true, isPrivate: true, isVerified: true } },
+          tolees: { include: { tolee: { select: { id: true, name: true, slug: true, ownerId: true } } } },
+          likes: currentUserId ? { where: { userId: currentUserId }, select: { userId: true } } : false,
+          savedBy: currentUserId ? { where: { userId: currentUserId }, select: { userId: true } } : false,
+          reposts: { orderBy: { createdAt: 'desc' }, take: 1, select: { userId: true, user: { select: { id: true, name: true, username: true, avatar: true } } } },
+          _count: { select: { likes: true, comments: true, reposts: true, views: true } }
+        }
+      });
+      candidatePosts = [...candidatePosts, ...fallbackPosts];
+    }
+
     // 3. Deduplicate by canonical video stream URL (Step 4 & 16)
     const seenVideoKeys = new Set<string>();
     const unseenPosts: any[] = [];
@@ -136,13 +165,25 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
     }
 
     // 4. Controlled ranking / shuffle (Step 14 & 15):
-    // Prioritize unseen reels, randomized so users never see the exact same 4-5 posts repeatedly!
-    const shuffledUnseen = unseenPosts.sort(() => 0.5 - Math.random());
+    // Prioritize unseen reels, demote stock pexels footage behind real bundle/IG reels, randomized dynamically
+    const shuffledUnseen = unseenPosts.sort((a, b) => {
+      const aIsStock = a.mediaUrls?.includes('pexels.com');
+      const bIsStock = b.mediaUrls?.includes('pexels.com');
+      if (aIsStock && !bIsStock) return 1;
+      if (!aIsStock && bIsStock) return -1;
+      return 0.5 - Math.random();
+    });
     const selectedPosts: any[] = shuffledUnseen.slice(0, 10);
 
     // If unseen pool is exhausted, backfill with shuffled seen posts (never static order)
     if (selectedPosts.length < 10 && seenPosts.length > 0) {
-      const shuffledSeen = seenPosts.sort(() => 0.5 - Math.random());
+      const shuffledSeen = seenPosts.sort((a, b) => {
+        const aIsStock = a.mediaUrls?.includes('pexels.com');
+        const bIsStock = b.mediaUrls?.includes('pexels.com');
+        if (aIsStock && !bIsStock) return 1;
+        if (!aIsStock && bIsStock) return -1;
+        return 0.5 - Math.random();
+      });
       for (const sp of shuffledSeen) {
         if (selectedPosts.length >= 10) break;
         selectedPosts.push(sp);

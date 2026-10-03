@@ -411,6 +411,7 @@ export async function compressAndOptimizeReelVideo(fileId: string, downloadUrl: 
         folder: 'tolee_reels',
         public_id: `reel_${fileId}`,
         overwrite: false,
+        timeout: 25000,
         transformation: [
           { width: 720, crop: 'limit', quality: 'auto:good', video_codec: 'auto' }
         ]

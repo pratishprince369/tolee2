@@ -9,33 +9,33 @@ const APIFY_TOKEN = process.env.APIFY_API_TOKEN || '';
 export const INSTAGRAM_ACCOUNT_TARGETS: Record<string, string[]> = {
   // 1. vadapavwaledada@gmail.com (@vsdapav) -> Animation & Comedy
   'vadapavwaledada@gmail.com': [
-    'https://www.instagram.com/explore/tags/animationreels/',
-    'https://www.instagram.com/explore/tags/funnycartoons/',
-    'https://www.instagram.com/explore/tags/2danimation/'
+    'https://www.instagram.com/cartoonnetworkofficial/reels/',
+    'https://www.instagram.com/animation_reels/reels/',
+    'https://www.instagram.com/explore/tags/animationreels/'
   ],
   // 2. loktimes369@gmail.com (@suman_kumar) -> Movies & Cinema
   'loktimes369@gmail.com': [
-    'https://www.instagram.com/explore/tags/movieclips/',
-    'https://www.instagram.com/explore/tags/cinematicvideo/',
-    'https://www.instagram.com/explore/tags/bollywoodscenes/'
+    'https://www.instagram.com/filmfare/reels/',
+    'https://www.instagram.com/cinema.magic/reels/',
+    'https://www.instagram.com/explore/tags/movieclips/'
   ],
   // 3. adsvidia369@gmail.com (@adsvia) -> AI & Technology
   'adsvidia369@gmail.com': [
-    'https://www.instagram.com/explore/tags/aitechnology/',
-    'https://www.instagram.com/explore/tags/techtrends/',
-    'https://www.instagram.com/explore/tags/futuristicai/'
+    'https://www.instagram.com/techinsider/reels/',
+    'https://www.instagram.com/gadgets360/reels/',
+    'https://www.instagram.com/explore/tags/aitechnology/'
   ],
   // 4. updatesontimes@gmail.com (@updatesontimes) -> Motivation & Finance
   'updatesontimes@gmail.com': [
-    'https://www.instagram.com/explore/tags/motivationreels/',
-    'https://www.instagram.com/explore/tags/successmindset/',
-    'https://www.instagram.com/explore/tags/businessgrowth/'
+    'https://www.instagram.com/thegoodquote/reels/',
+    'https://www.instagram.com/mindset.therapy/reels/',
+    'https://www.instagram.com/explore/tags/motivationreels/'
   ],
   // 5. rinkugupta90282@gmail.com (@rinku_sharma) -> Lifestyle & Travel
   'rinkugupta90282@gmail.com': [
-    'https://www.instagram.com/explore/tags/travelreels/',
-    'https://www.instagram.com/explore/tags/lifestylevlog/',
-    'https://www.instagram.com/explore/tags/wanderlustreels/'
+    'https://www.instagram.com/beautifuldestinations/reels/',
+    'https://www.instagram.com/voyaged/reels/',
+    'https://www.instagram.com/explore/tags/travelreels/'
   ]
 };
 

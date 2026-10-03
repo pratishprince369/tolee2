@@ -96,7 +96,8 @@ export async function GET(req: NextRequest) {
     }
 
     // 4. Query candidate reels from Neon DB (Step 17, 33)
-    const candidatePosts = await prisma.post.findMany({
+    // Prioritize real reels (Google Drive bundles, Apify Instagram, Cloudinary), exclude generic Pexels stock footage
+    let candidatePosts = await prisma.post.findMany({
       where: {
         postType: 'reel',
         status: 'published',
@@ -104,10 +105,14 @@ export async function GET(req: NextRequest) {
         mediaTypes: 'video',
         mediaUrls: { not: null },
         visibility: 'public',
+        NOT: [
+          { mediaUrls: { contains: '/image/upload/' } },
+          { mediaUrls: { contains: 'pexels.com' } }
+        ],
         ...(excludeIdSet.size > 0 ? { id: { notIn: Array.from(excludeIdSet) } } : {})
       },
       orderBy: { createdAt: 'desc' },
-      take: 250, // Large candidate pool ensuring diversity across all 650+ DB reels
+      take: 250, // Large candidate pool ensuring diversity across real bundle & IG reels
       include: {
         author: {
           select: {
@@ -137,6 +142,30 @@ export async function GET(req: NextRequest) {
       }
     });
 
+    // Fallback if real reels pool is unexpectedly low
+    if (candidatePosts.length < limit) {
+      const fallbackPosts = await prisma.post.findMany({
+        where: {
+          postType: 'reel',
+          status: 'published',
+          isArchived: false,
+          mediaTypes: 'video',
+          mediaUrls: { not: null },
+          visibility: 'public',
+          NOT: { mediaUrls: { contains: '/image/upload/' } },
+          ...(excludeIdSet.size > 0 ? { id: { notIn: Array.from(excludeIdSet) } } : {})
+        },
+        orderBy: { createdAt: 'desc' },
+        take: limit * 2,
+        include: {
+          author: { select: { id: true, name: true, username: true, avatar: true, isPrivate: true, isVerified: true } },
+          tolees: { include: { tolee: { select: { id: true, name: true, slug: true, ownerId: true } } } },
+          _count: { select: { likes: true, comments: true, reposts: true, views: true } }
+        }
+      });
+      candidatePosts = [...candidatePosts, ...fallbackPosts];
+    }
+
     // 5. Partition candidates into NEVER SEEN vs ALREADY SEEN with video deduplication (Step 14, 15, 30)
     const unseenCandidates: any[] = [];
     const seenCandidates: any[] = [];
@@ -160,12 +189,12 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // 6. Controlled prioritization: CDN videos first + micro-randomization (Step 14, 30)
+    // 6. Controlled prioritization: Demote Pexels stock footage behind real reels + micro-randomization
     const sortedUnseen = unseenCandidates.sort((a, b) => {
-      const aIsDrive = a.mediaUrls && (a.mediaUrls.includes('drive.usercontent.google.com') || a.mediaUrls.includes('drive.google.com'));
-      const bIsDrive = b.mediaUrls && (b.mediaUrls.includes('drive.usercontent.google.com') || b.mediaUrls.includes('drive.google.com'));
-      if (aIsDrive && !bIsDrive) return 1;
-      if (!aIsDrive && bIsDrive) return -1;
+      const aIsPexels = a.mediaUrls && a.mediaUrls.includes('pexels.com');
+      const bIsPexels = b.mediaUrls && b.mediaUrls.includes('pexels.com');
+      if (aIsPexels && !bIsPexels) return 1;
+      if (!aIsPexels && bIsPexels) return -1;
       return 0.5 - Math.random();
     });
 
