@@ -51,119 +51,191 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
 
 
 
-  // Fetch real posts from DB (lean initial batch for instant page load)
+  // Fetch candidate posts with Unseen Prioritization and Dynamic Rotation (Steps 14 & 15)
   let dbReels: any[] = [];
   try {
-    const res = await getPosts({ mediaType: 'video', postType: 'reel', limit: 30 });
-    if (res.success && res.posts) {
-      // Step 4 & 16: Deduplicate by post ID and clean video URL
-      const seenVideoKeys = new Set<string>();
-      const videoPosts: any[] = [];
-      for (const post of res.posts) {
-        if (post.postType !== 'reel' || !post.mediaUrls) continue;
-        const cleanV = (post.mediaUrls.split(/,(?=https?:\/\/)/)[0] || '').split('?')[0].toLowerCase();
-        if (cleanV && seenVideoKeys.has(cleanV)) continue;
-        if (cleanV) seenVideoKeys.add(cleanV);
-        videoPosts.push(post);
-        if (videoPosts.length >= 10) break;
-      }
-      const authorIds = videoPosts.map(p => p.author.id);
-
-      // Query follow statuses of these authors for the current user
-      let followedAuthorIds: string[] = [];
-      let pendingFollowAuthorIds: string[] = [];
-      if (currentUserId && authorIds.length > 0) {
-        const follows = await prisma.follow.findMany({
+    // 1. Fetch user watch history for anti-repetition (Step 14 & 15)
+    const viewedReelIds = new Set<string>();
+    if (currentUserId) {
+      try {
+        const recentViews = await prisma.view.findMany({
           where: {
-            followerId: currentUserId,
-            followingId: { in: authorIds }
+            contentType: 'reel',
+            viewer_user_id: currentUserId,
           },
-          select: { followingId: true, status: true }
+          select: { contentId: true },
+          take: 500,
+          orderBy: { createdAt: 'desc' }
         });
-        followedAuthorIds = follows.filter((f: any) => f.status === 'approved').map((f: any) => f.followingId);
-        pendingFollowAuthorIds = follows.filter((f: any) => f.status === 'pending').map((f: any) => f.followingId);
-      }
-
-      // Query active stories for these authors
-      let authorsWithActiveStories: string[] = [];
-      if (authorIds.length > 0) {
-        const activeStories = await prisma.story.findMany({
-          where: {
-            authorId: { in: authorIds },
-            expiresAt: { gte: new Date() }
-          },
-          select: { authorId: true }
+        recentViews.forEach((v: any) => {
+          if (v.contentId) viewedReelIds.add(v.contentId);
         });
-        authorsWithActiveStories = activeStories.map((s: any) => s.authorId);
-      }
-
-      dbReels = videoPosts.map(post => {
-        const firstTolee = post.tolees?.[0]?.tolee;
-        const likedByMe = currentUserId ? post.likes.some((like: any) => like.userId === currentUserId) : false;
-        const savedByMe = currentUserId ? post.savedBy.some((save: any) => save.userId === currentUserId) : false;
-        const repostedByMe = currentUserId ? post.reposts.some((rep: any) => rep.userId === currentUserId) : false;
-        const repostsCount = post._count?.reposts || 0;
-
-        const mostRecentRepost = post.reposts?.[0];
-        const resharedByUser = mostRecentRepost ? {
-          username: mostRecentRepost.user.username,
-          name: mostRecentRepost.user.name,
-          avatar: mostRecentRepost.user.avatar || '/default-user-avatar.svg'
-        } : null;
-
-        const isFollowing = followedAuthorIds.includes(post.author.id);
-        const followStatus = pendingFollowAuthorIds.includes(post.author.id) 
-          ? 'pending' 
-          : (isFollowing ? 'approved' : null);
-
-        const hasActiveStory = authorsWithActiveStories.includes(post.author.id);
-        
-        return {
-          id: post.id,
-          authorId: post.author.id,
-          authorIsPrivate: post.author.isPrivate || false,
-          visibility: post.visibility,
-          video: getStreamableVideoUrl(post.mediaUrls.split(/,(?=https?:\/\/)/)[0]),
-          author: post.author.username,
-          authorAvatar: post.author.avatar || '/default-user-avatar.svg',
-          toleeName: firstTolee?.name || null,
-          toleeSlug: firstTolee?.slug || null,
-          toleeId: firstTolee?.id || null,
-          role: firstTolee?.ownerId === post.author.id ? 'Admin' : 'Member',
-          caption: post.caption || '',
-          likes: post.likes?.length || 0,
-          comments: post.comments?.length || 0,
-          views: post._count?.views || 0,
-          shares: '0',
-          reposts: repostsCount,
-          audio: 'Original Audio',
-          isVerified: false,
-          likedByMe,
-          savedByMe,
-          repostedByMe,
-          resharedByUser,
-          isFollowing,
-          followStatus,
-          hasActiveStory,
-          location: post.location || null,
-          poster: getPosterUrl(post.mediaUrls.split(/,(?=https?:\/\/)/)[0]),
-          createdAt: post.createdAt,
-          duration: 15,
-          aspectRatio: '9:16',
-          videoType: 'hls',
-          audioInfo: 'Original Audio',
-        };
-      });
-
-      // Priority sort: CDN streams first, legacy Google Drive streams as fallback
-      dbReels.sort((a, b) => {
-        const aIsDrive = isGoogleDriveUrl(a.video);
-        const bIsDrive = isGoogleDriveUrl(b.video);
-        if (aIsDrive && !bIsDrive) return 1;
-        if (!aIsDrive && bIsDrive) return -1;
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      });
+      } catch {}
     }
+
+    // 2. Fetch candidates: genuine video reels (exclude static image uploads)
+    const candidatePosts = await prisma.post.findMany({
+      where: {
+        postType: 'reel',
+        status: 'published',
+        isArchived: false,
+        visibility: 'public',
+        mediaUrls: { not: null },
+        NOT: { mediaUrls: { contains: '/image/upload/' } }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 120,
+      include: {
+        author: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+            avatar: true,
+            isPrivate: true,
+            isVerified: true
+          }
+        },
+        tolees: {
+          include: {
+            tolee: { select: { id: true, name: true, slug: true, ownerId: true } }
+          }
+        },
+        likes: currentUserId ? { where: { userId: currentUserId }, select: { userId: true } } : false,
+        savedBy: currentUserId ? { where: { userId: currentUserId }, select: { userId: true } } : false,
+        reposts: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: {
+            userId: true,
+            user: { select: { id: true, name: true, username: true, avatar: true } }
+          }
+        },
+        _count: {
+          select: { likes: true, comments: true, reposts: true, views: true }
+        }
+      }
+    });
+
+    // 3. Deduplicate by canonical video stream URL (Step 4 & 16)
+    const seenVideoKeys = new Set<string>();
+    const unseenPosts: any[] = [];
+    const seenPosts: any[] = [];
+
+    for (const post of candidatePosts) {
+      if (!post.mediaUrls) continue;
+      const cleanV = (post.mediaUrls.split(/,(?=https?:\/\/)/)[0] || '').split('?')[0].toLowerCase();
+      if (cleanV && seenVideoKeys.has(cleanV)) continue;
+      if (cleanV) seenVideoKeys.add(cleanV);
+
+      if (viewedReelIds.has(post.id)) {
+        seenPosts.push(post);
+      } else {
+        unseenPosts.push(post);
+      }
+    }
+
+    // 4. Controlled ranking / shuffle (Step 14 & 15):
+    // Prioritize unseen reels, randomized so users never see the exact same 4-5 posts repeatedly!
+    const shuffledUnseen = unseenPosts.sort(() => 0.5 - Math.random());
+    const selectedPosts: any[] = shuffledUnseen.slice(0, 10);
+
+    // If unseen pool is exhausted, backfill with shuffled seen posts (never static order)
+    if (selectedPosts.length < 10 && seenPosts.length > 0) {
+      const shuffledSeen = seenPosts.sort(() => 0.5 - Math.random());
+      for (const sp of shuffledSeen) {
+        if (selectedPosts.length >= 10) break;
+        selectedPosts.push(sp);
+      }
+    }
+
+    const authorIds = selectedPosts.map(p => p.author?.id).filter(Boolean);
+
+    // Query follow statuses of these authors for the current user
+    let followedAuthorIds: string[] = [];
+    let pendingFollowAuthorIds: string[] = [];
+    if (currentUserId && authorIds.length > 0) {
+      const follows = await prisma.follow.findMany({
+        where: {
+          followerId: currentUserId,
+          followingId: { in: authorIds }
+        },
+        select: { followingId: true, status: true }
+      });
+      followedAuthorIds = follows.filter((f: any) => f.status === 'approved').map((f: any) => f.followingId);
+      pendingFollowAuthorIds = follows.filter((f: any) => f.status === 'pending').map((f: any) => f.followingId);
+    }
+
+    // Query active stories for these authors
+    let authorsWithActiveStories: string[] = [];
+    if (authorIds.length > 0) {
+      const activeStories = await prisma.story.findMany({
+        where: {
+          authorId: { in: authorIds },
+          expiresAt: { gte: new Date() }
+        },
+        select: { authorId: true }
+      });
+      authorsWithActiveStories = activeStories.map((s: any) => s.authorId);
+    }
+
+    dbReels = selectedPosts.map(post => {
+      const firstTolee = post.tolees?.[0]?.tolee;
+      const likedByMe = currentUserId ? (post.likes?.length > 0) : false;
+      const savedByMe = currentUserId ? (post.savedBy?.length > 0) : false;
+      const repostedByMe = currentUserId ? (post.reposts?.[0]?.userId === currentUserId) : false;
+      const repostsCount = post._count?.reposts || 0;
+
+      const mostRecentRepost = post.reposts?.[0];
+      const resharedByUser = mostRecentRepost ? {
+        username: mostRecentRepost.user.username,
+        name: mostRecentRepost.user.name,
+        avatar: mostRecentRepost.user.avatar || '/default-user-avatar.svg'
+      } : null;
+
+      const isFollowing = followedAuthorIds.includes(post.author?.id);
+      const followStatus = pendingFollowAuthorIds.includes(post.author?.id) 
+        ? 'pending' 
+        : (isFollowing ? 'approved' : null);
+
+      const hasActiveStory = authorsWithActiveStories.includes(post.author?.id);
+      
+      return {
+        id: post.id,
+        authorId: post.author?.id || 'unknown',
+        authorIsPrivate: post.author?.isPrivate || false,
+        visibility: post.visibility,
+        video: getStreamableVideoUrl(post.mediaUrls.split(/,(?=https?:\/\/)/)[0]),
+        author: post.author?.username || 'creator',
+        authorAvatar: post.author?.avatar || '/default-user-avatar.svg',
+        toleeName: firstTolee?.name || null,
+        toleeSlug: firstTolee?.slug || null,
+        toleeId: firstTolee?.id || null,
+        role: firstTolee?.ownerId === post.author?.id ? 'Admin' : 'Member',
+        caption: post.caption || '',
+        likes: post._count?.likes || 0,
+        comments: post._count?.comments || 0,
+        views: post._count?.views || 0,
+        shares: '0',
+        reposts: repostsCount,
+        audio: 'Original Audio',
+        isVerified: (post.author as any)?.isVerified || false,
+        likedByMe,
+        savedByMe,
+        repostedByMe,
+        resharedByUser,
+        isFollowing,
+        followStatus,
+        hasActiveStory,
+        location: post.location || null,
+        poster: getPosterUrl(post.mediaUrls.split(/,(?=https?:\/\/)/)[0]),
+        createdAt: post.createdAt,
+        duration: 15,
+        aspectRatio: '9:16',
+        videoType: 'hls',
+        audioInfo: 'Original Audio',
+      };
+    });
 
     // Direct target video arrangement
     const targetVideoId = searchParams?.videoId;
