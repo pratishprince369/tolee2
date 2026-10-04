@@ -37,8 +37,8 @@ export function getStreamableVideoUrl(url: string | null | undefined): string {
   if (trimmed.includes('drive.usercontent.google.com') || trimmed.includes('drive.google.com')) {
     const match = trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/) || trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || trimmed.match(/\/d\/([a-zA-Z0-9_-]+)/);
     if (match && match[1]) {
-      // Direct high-performance byte-range URL with CORS * bypassing Vercel server proxy
-      return `https://drive.usercontent.google.com/download?id=${match[1]}&export=download`;
+      // Use drive-stream proxy to bypass Google Drive's 'cross-origin-resource-policy: same-site' restriction
+      return `/api/video/drive-stream?id=${match[1]}`;
     }
   }
   // Cloudinary automatic video streaming compression & fast-load optimization

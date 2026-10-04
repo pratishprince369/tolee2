@@ -16,6 +16,7 @@ function buildStreamHeaders(upstreamRes: Response): Headers {
   headers.set('Access-Control-Allow-Origin', '*');
   headers.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
   headers.set('Access-Control-Allow-Headers', 'Range, Content-Range, Accept-Ranges');
+  headers.set('Cross-Origin-Resource-Policy', 'cross-origin');
 
   const contentLength = upstreamRes.headers.get('content-length');
   if (contentLength) headers.set('Content-Length', contentLength);

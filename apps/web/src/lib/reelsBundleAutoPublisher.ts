@@ -433,9 +433,9 @@ export async function compressAndOptimizeReelVideo(fileId: string, downloadUrl: 
     }
   }
 
-  // Graceful fallback to direct streaming URL if CDN upload is unavailable
+  // Graceful fallback to drive-stream proxy if CDN upload is unavailable
   return {
-    videoUrl: `https://drive.usercontent.google.com/download?id=${fileId}&export=download`,
+    videoUrl: `/api/video/drive-stream?id=${fileId}`,
     posterUrl: `https://lh3.googleusercontent.com/d/${fileId}`,
     resourceType: 'google_drive'
   };
