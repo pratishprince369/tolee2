@@ -69,13 +69,27 @@ function extractMediaThumbnail(mediaUrls?: string | null, mediaTypes?: string | 
   const first = urls[0];
 
   // 3. Cloudinary Video (.m3u8, .mp4, .mov, etc.)
-  if (first.includes('cloudinary.com') && (first.includes('/video/upload/') || /\.(m3u8|mp4|webm|mov|mkv)($|\?)/i.test(first))) {
-    let clean = first.replace(/\.(m3u8|mp4|webm|mov|mkv|avi)($|\?.*)/i, '.jpg');
-    clean = clean.replace(/\/video\/upload\/(sp_[a-zA-Z0-9_-]+\/)?/, '/video/upload/so_0,f_jpg,q_auto,w_600/');
-    return clean;
+  if (first.includes('cloudinary.com')) {
+    return first.replace(/\.(mp4|m3u8|webm|mov|mkv|avi)(?:\?.*)?$/i, '.jpg');
   }
 
-  // 4. Check if any secondary URL is a thumbnail (e.g. Coverr, custom poster)
+  // 4. Google Drive video thumbnail
+  if (first.includes('drive.usercontent.google.com') || first.includes('drive.google.com') || first.includes('/api/video/drive-stream')) {
+    const match = first.match(/[?&]id=([a-zA-Z0-9_-]+)/) || first.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || first.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (match && match[1]) {
+      return `https://lh3.googleusercontent.com/d/${match[1]}`;
+    }
+  }
+
+  // 5. Pexels video poster
+  if (first.includes('pexels.com')) {
+    const match = first.match(/\/video-files\/(\d+)\//i) || first.match(/\/videos\/(\d+)\//i) || first.match(/\/(\d+)-/i);
+    if (match && match[1]) {
+      return `https://images.pexels.com/videos/${match[1]}/pexels-photo-${match[1]}.jpeg?auto=compress&cs=tinysrgb&h=1000`;
+    }
+  }
+
+  // 6. Check if any secondary URL is a thumbnail (e.g. Coverr, custom poster)
   const thumbCandidate = urls.find(u => u.includes('thumbnail') || u.includes('poster') || u.includes('/preview/'));
   if (thumbCandidate) return thumbCandidate;
 

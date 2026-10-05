@@ -411,10 +411,10 @@ export default function SearchPage() {
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto px-2 sm:px-4 lg:px-6 pt-0 pb-24 min-h-screen">
+    <div className="w-full max-w-4xl mx-auto pt-0 pb-24 min-h-screen">
       
       {/* 1. TOP STICKY SEARCH BAR CARD */}
-      <div className="sticky top-16 z-30 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md pt-2 pb-2.5 border-b border-slate-200/80 dark:border-zinc-800/80 shadow-2xs">
+      <div className="sticky top-16 z-30 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md px-3 sm:px-4 lg:px-6 pt-2 pb-2.5 border-b border-slate-200/80 dark:border-zinc-800/80 shadow-2xs">
         <form onSubmit={handleLocalSubmit} className="relative w-full group">
           <div className="relative flex items-center">
             <Search className="absolute left-3.5 w-4.5 h-4.5 text-slate-400 group-focus-within:text-primary transition-colors pointer-events-none" />
@@ -493,10 +493,10 @@ export default function SearchPage() {
 
       {/* 2. LOADING SKELETON */}
       {(isLoading || isExploreLoading) && (
-        <div className="pt-4">
-          <div className="grid grid-cols-3 gap-1 sm:gap-2 md:gap-3">
-            {[...Array(12)].map((_, i) => (
-              <Skeleton key={i} className="aspect-square rounded-lg sm:rounded-xl bg-slate-200 dark:bg-zinc-850" />
+        <div className="pt-2 px-0 sm:px-4 lg:px-6">
+          <div className="grid grid-cols-3 gap-[1.5px] sm:gap-[2px]">
+            {[...Array(15)].map((_, i) => (
+              <Skeleton key={i} className="aspect-[4/5] rounded-none bg-slate-200 dark:bg-zinc-850" />
             ))}
           </div>
         </div>
@@ -509,59 +509,69 @@ export default function SearchPage() {
               A. HASHTAG VIEW (When user clicks #tag or searches #...)
              ======================================================== */}
           {isHashtagView && hashtagData && (
-            <div className="space-y-6 pt-4 animate-in fade-in duration-200">
-              <div className="flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-r from-primary/10 via-teal-500/10 to-primary/5 border border-primary/20">
-                <div className="w-14 h-14 bg-primary text-white rounded-2xl flex items-center justify-center shadow-md shadow-primary/20 flex-shrink-0">
-                  <Hash className="w-7 h-7" />
+            <div className="space-y-6 pt-3 animate-in fade-in duration-200">
+              <div className="px-3 sm:px-4 lg:px-6">
+                <div className="flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-r from-primary/10 via-teal-500/10 to-primary/5 border border-primary/20">
+                  <div className="w-14 h-14 bg-primary text-white rounded-2xl flex items-center justify-center shadow-md shadow-primary/20 flex-shrink-0">
+                    <Hash className="w-7 h-7" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-zinc-100">{hashtagData.tag}</h2>
+                    <p className="text-xs font-semibold text-primary mt-0.5 uppercase tracking-wider">
+                      {hashtagData.topPosts.length + hashtagData.recentPosts.length}+ active posts
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-zinc-100">{hashtagData.tag}</h2>
-                  <p className="text-xs font-semibold text-primary mt-0.5 uppercase tracking-wider">
-                    {hashtagData.topPosts.length + hashtagData.recentPosts.length}+ active posts
-                  </p>
-                </div>
+
+                {/* Related tags */}
+                {hashtagData.relatedHashtags?.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5 mt-4">
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mr-1">Related:</span>
+                    {hashtagData.relatedHashtags.map((tag: string) => (
+                      <Link href={`/search?q=${encodeURIComponent(tag)}`} key={tag}>
+                        <Badge className="bg-slate-100 hover:bg-primary/10 hover:text-primary transition-colors text-slate-600 dark:bg-zinc-900 dark:text-zinc-400 py-1 px-2.5 text-xs font-bold border border-slate-200 dark:border-zinc-800 cursor-pointer">
+                          {tag}
+                        </Badge>
+                      </Link>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              {/* Related tags */}
-              {hashtagData.relatedHashtags?.length > 0 && (
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mr-1">Related:</span>
-                  {hashtagData.relatedHashtags.map((tag: string) => (
-                    <Link href={`/search?q=${encodeURIComponent(tag)}`} key={tag}>
-                      <Badge className="bg-slate-100 hover:bg-primary/10 hover:text-primary transition-colors text-slate-600 dark:bg-zinc-900 dark:text-zinc-400 py-1 px-2.5 text-xs font-bold border border-slate-200 dark:border-zinc-800 cursor-pointer">
-                        {tag}
-                      </Badge>
-                    </Link>
+              {/* Top Posts in Hashtag (Instagram 3-Column Discovery Grid) */}
+              <div className="px-0 sm:px-4 lg:px-6">
+                <div className="grid grid-cols-3 gap-[1.5px] sm:gap-[2px]">
+                  {hashtagData.topPosts.map((post: any) => (
+                    <div
+                      key={post.id}
+                      onClick={() => router.push(`/post/${post.id}`)}
+                      className="group relative aspect-[4/5] rounded-none overflow-hidden bg-zinc-900 cursor-pointer active:opacity-90 transition-all select-none"
+                    >
+                      {post.mediaUrls ? (
+                        <img
+                          src={post.mediaUrls.split(/,(?=https?:\/\/)/)[0]}
+                          alt="Hashtag media"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="w-full h-full p-3 flex flex-col justify-between bg-gradient-to-br from-zinc-800 to-zinc-950 text-white">
+                          <span className="text-xs line-clamp-3 font-semibold">{post.caption}</span>
+                        </div>
+                      )}
+                      {post.views?.length > 0 && (
+                        <div className="absolute bottom-1.5 left-1.5 sm:bottom-2 sm:left-2 flex items-center gap-1 text-[11px] sm:text-xs font-bold text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] pointer-events-none select-none z-10">
+                          <Eye className="w-3.5 h-3.5 text-white stroke-[2.5]" />
+                          <span>{formatCount(post.views.length)}</span>
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-3 transition-opacity text-white text-xs font-bold pointer-events-none z-10">
+                        <span className="flex items-center gap-1"><Heart className="w-3.5 h-3.5 fill-white" /> {formatCount(post.likes?.length || 0)}</span>
+                        <span className="flex items-center gap-1"><MessageCircle className="w-3.5 h-3.5 fill-white" /> {formatCount(post.comments?.length || 0)}</span>
+                      </div>
+                    </div>
                   ))}
                 </div>
-              )}
-
-              {/* Top Posts in Hashtag (3-Column Discovery Grid) */}
-              <div className="grid grid-cols-3 gap-1 sm:gap-2 md:gap-3">
-                {hashtagData.topPosts.map((post: any) => (
-                  <div
-                    key={post.id}
-                    onClick={() => router.push(`/post/${post.id}`)}
-                    className="group relative aspect-square rounded-lg sm:rounded-xl overflow-hidden bg-zinc-900 cursor-pointer border border-black/5 dark:border-zinc-800/80 active:scale-[0.98] transition-all"
-                  >
-                    {post.mediaUrls ? (
-                      <img
-                        src={post.mediaUrls.split(/,(?=https?:\/\/)/)[0]}
-                        alt="Hashtag media"
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="w-full h-full p-3 flex flex-col justify-between bg-gradient-to-br from-zinc-800 to-zinc-950 text-white">
-                        <span className="text-xs line-clamp-3 font-semibold">{post.caption}</span>
-                      </div>
-                    )}
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-3 transition-opacity text-white text-xs font-bold">
-                      <span className="flex items-center gap-1"><Heart className="w-3.5 h-3.5 fill-white" /> {post.likes?.length || 0}</span>
-                      <span className="flex items-center gap-1"><MessageCircle className="w-3.5 h-3.5 fill-white" /> {post.comments?.length || 0}</span>
-                    </div>
-                  </div>
-                ))}
               </div>
             </div>
           )}
@@ -571,11 +581,11 @@ export default function SearchPage() {
                  Rendered when query is empty and tab is 'all'
              ======================================================== */}
           {!query && !isHashtagView && activeTab === 'all' && (
-            <div className="pt-3 space-y-6 animate-in fade-in duration-200">
+            <div className="pt-2 space-y-3 animate-in fade-in duration-200">
               
               {/* Trending Tag Chips */}
               {trendingData?.hashtags?.length > 0 && (
-                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
+                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 px-3 sm:px-4 lg:px-6">
                   <div className="flex items-center gap-1 text-xs font-bold text-slate-400 mr-1 shrink-0">
                     <TrendingUp className="w-3.5 h-3.5 text-primary" />
                     <span>Trending:</span>
@@ -591,14 +601,14 @@ export default function SearchPage() {
               )}
 
               {/* Instagram-style 3-Column Mixed Content Discovery Grid */}
-              <div>
+              <div className="px-0 sm:px-4 lg:px-6">
                 {exploreItems.length === 0 ? (
                   <div className="text-center py-16 text-slate-400">
                     <Compass className="w-10 h-10 mx-auto mb-2 text-slate-300 dark:text-zinc-700 animate-pulse" />
                     <p className="text-sm font-semibold">Discovering fresh public content...</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-3 gap-1 sm:gap-2 md:gap-3">
+                  <div className="grid grid-cols-3 gap-[1.5px] sm:gap-[2px]">
                     {exploreItems.map((item) => {
                       const isReel = item.type === 'reel';
                       const href = getItemHref(item);
@@ -609,7 +619,7 @@ export default function SearchPage() {
                           href={href}
                           onClick={() => handleItemClick(item)}
                           prefetch={true}
-                          className="group relative aspect-square rounded-lg sm:rounded-xl overflow-hidden bg-zinc-900 border border-black/5 dark:border-zinc-800/80 active:scale-[0.97] transition-all duration-200 shadow-2xs block cursor-pointer"
+                          className="group relative aspect-[4/5] rounded-none overflow-hidden bg-zinc-900 active:opacity-90 transition-all block cursor-pointer select-none"
                         >
                           {/* Resilient Media Thumbnail */}
                           <DiscoveryThumbnail
@@ -621,21 +631,21 @@ export default function SearchPage() {
 
                           {/* Reel / Video Indicator Badge (Top-Right) */}
                           {isReel && (
-                            <div className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 bg-black/60 backdrop-blur-xs text-white p-1 sm:p-1.5 rounded-md flex items-center justify-center pointer-events-none shadow-sm">
-                              <Video className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                            <div className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] pointer-events-none z-10">
+                              <Video className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
                             </div>
                           )}
 
-                          {/* Views Count Badge (Bottom-Left on mobile) */}
-                          {isReel && item.viewsCount > 0 && (
-                            <div className="absolute bottom-1.5 left-1.5 sm:bottom-2 sm:left-2 flex items-center gap-1 text-[10px] sm:text-xs font-bold text-white drop-shadow-md bg-black/40 backdrop-blur-xs px-1.5 py-0.5 rounded-md pointer-events-none">
-                              <Play className="w-2.5 h-2.5 fill-white" />
+                          {/* Instagram-style Views Count Badge (Bottom-Left) */}
+                          {item.viewsCount > 0 && (
+                            <div className="absolute bottom-1.5 left-1.5 sm:bottom-2 sm:left-2 flex items-center gap-1 text-[11px] sm:text-xs font-bold text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] pointer-events-none select-none z-10">
+                              <Eye className="w-3.5 h-3.5 text-white stroke-[2.5]" />
                               <span>{formatCount(item.viewsCount)}</span>
                             </div>
                           )}
 
                           {/* Hover Desktop Overlay */}
-                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-4 transition-opacity duration-200 text-white text-xs sm:text-sm font-bold pointer-events-none">
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-4 transition-opacity duration-200 text-white text-xs sm:text-sm font-bold pointer-events-none z-10">
                             <span className="flex items-center gap-1">
                               <Heart className="w-4 h-4 fill-white" />
                               {formatCount(item.likesCount)}
@@ -695,175 +705,187 @@ export default function SearchPage() {
                     <span className="capitalize">{activeTab} results</span>
                   </div>
 
-                  {/* 1. ALL / REELS TAB -> 3-Column Visual Grid */}
+                  {/* 1. ALL / REELS TAB -> Instagram 3-Column Visual Grid */}
                   {(activeTab === 'all' || activeTab === 'reels') && (
-                    <div className="grid grid-cols-3 gap-1 sm:gap-2 md:gap-3">
-                      {results.map((item) => {
-                        const isReel = item.type === 'reel';
-                        const href = getItemHref(item);
+                    <div className="px-0 sm:px-4 lg:px-6">
+                      <div className="grid grid-cols-3 gap-[1.5px] sm:gap-[2px]">
+                        {results.map((item) => {
+                          const isReel = item.type === 'reel';
+                          const href = getItemHref(item);
 
-                        return (
+                          return (
+                            <Link
+                              key={item.id}
+                              href={href}
+                              onClick={() => handleItemClick(item)}
+                              prefetch={true}
+                              className="group relative aspect-[4/5] rounded-none overflow-hidden bg-zinc-900 active:opacity-90 transition-all block cursor-pointer select-none"
+                            >
+                              <DiscoveryThumbnail
+                                src={item.mediaUrl}
+                                alt={item.title || 'Result item'}
+                                isVideo={isReel}
+                                fallbackText={item.description || item.title}
+                              />
+
+                              {/* Video Indicator */}
+                              {isReel && (
+                                <div className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] pointer-events-none z-10">
+                                  <Video className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
+                                </div>
+                              )}
+
+                              {/* Instagram-style Views Count */}
+                              {(item.meta?.viewsCount || 0) > 0 && (
+                                <div className="absolute bottom-1.5 left-1.5 sm:bottom-2 sm:left-2 flex items-center gap-1 text-[11px] sm:text-xs font-bold text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] pointer-events-none select-none z-10">
+                                  <Eye className="w-3.5 h-3.5 text-white stroke-[2.5]" />
+                                  <span>{formatCount(item.meta?.viewsCount || 0)}</span>
+                                </div>
+                              )}
+
+                              {/* Hover Overlay */}
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-3 transition-opacity duration-200 text-white text-xs font-bold pointer-events-none z-10">
+                                <span className="flex items-center gap-1">
+                                  <Heart className="w-3.5 h-3.5 fill-white" />
+                                  {formatCount(item.meta?.likesCount || 0)}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <MessageCircle className="w-3.5 h-3.5 fill-white" />
+                                  {formatCount(item.meta?.commentsCount || 0)}
+                                </span>
+                              </div>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="px-3 sm:px-4 lg:px-6 space-y-6">
+                    {/* 2. CREATORS / PEOPLE TAB */}
+                    {activeTab === 'users' && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {results.map((item) => (
                           <Link
                             key={item.id}
-                            href={href}
+                            href={getItemHref(item)}
                             onClick={() => handleItemClick(item)}
                             prefetch={true}
-                            className="group relative aspect-square rounded-lg sm:rounded-xl overflow-hidden bg-zinc-900 border border-black/5 dark:border-zinc-800/80 active:scale-[0.97] transition-all duration-200 shadow-2xs block cursor-pointer"
+                            className="flex items-center justify-between p-3.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl hover:border-primary/30 active:scale-[0.98] transition-all shadow-2xs block cursor-pointer"
                           >
-                            <DiscoveryThumbnail
-                              src={item.mediaUrl}
-                              alt={item.title || 'Result item'}
-                              isVideo={isReel}
-                              fallbackText={item.description || item.title}
-                            />
-
-                            {/* Badge */}
-                            {isReel && (
-                              <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs text-white p-1 rounded-md pointer-events-none">
-                                <Video className="w-3 h-3" />
+                            <div className="flex items-center gap-3 min-w-0">
+                              <Avatar className="w-12 h-12 rounded-full border border-slate-200 dark:border-zinc-700">
+                                <AvatarImage src={item.mediaUrl || '/default-user-avatar.svg'} />
+                                <AvatarFallback className="font-bold">{item.title[0]}</AvatarFallback>
+                              </Avatar>
+                              <div className="flex flex-col min-w-0">
+                                <span className="text-sm font-bold text-slate-800 dark:text-zinc-100 truncate">{item.title}</span>
+                                <span className="text-xs text-slate-400 dark:text-zinc-500 truncate">{item.subtitle}</span>
+                                {item.location && (
+                                  <span className="text-[10px] text-slate-400 flex items-center gap-0.5 mt-0.5">
+                                    <MapPin className="w-3 h-3 text-primary" /> {item.location}
+                                  </span>
+                                )}
                               </div>
-                            )}
+                            </div>
+                            <Button size="sm" variant="outline" className="rounded-full text-xs font-bold px-4 shrink-0 text-primary border-primary hover:bg-primary/5 pointer-events-none">
+                              View
+                            </Button>
+                          </Link>
+                        ))}
+                      </div>
+                    )}
 
-                            {/* Hover Overlay */}
-                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-3 transition-opacity duration-200 text-white text-xs font-bold pointer-events-none">
-                              <span className="flex items-center gap-1">
-                                <Heart className="w-3.5 h-3.5 fill-white" />
-                                {formatCount(item.meta?.likesCount || 0)}
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <MessageCircle className="w-3.5 h-3.5 fill-white" />
-                                {formatCount(item.meta?.commentsCount || 0)}
-                              </span>
+                    {/* 3. GROUPS / TOLEES TAB */}
+                    {activeTab === 'groups' && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {results.map((item) => (
+                          <Link
+                            key={item.id}
+                            href={getItemHref(item)}
+                            onClick={() => handleItemClick(item)}
+                            prefetch={true}
+                            className="flex items-center justify-between p-3.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl hover:border-primary/30 active:scale-[0.98] transition-all shadow-2xs block cursor-pointer"
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <Avatar className="w-12 h-12 rounded-xl border border-slate-200 dark:border-zinc-700">
+                                <AvatarImage src={item.mediaUrl || '/default-tolee-avatar.svg'} />
+                                <AvatarFallback className="font-bold text-primary">{item.title[0]}</AvatarFallback>
+                              </Avatar>
+                              <div className="flex flex-col min-w-0">
+                                <span className="text-sm font-bold text-slate-800 dark:text-zinc-100 truncate">{item.title}</span>
+                                <span className="text-xs text-slate-400 dark:text-zinc-500 truncate">{item.description || 'Tolee Group'}</span>
+                              </div>
+                            </div>
+                            <Badge className="bg-primary/10 text-primary text-[10px] font-bold py-1 px-2.5 rounded-full shrink-0">
+                              {item.meta?.memberCount || 0} members
+                            </Badge>
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* 4. MARKETPLACE TAB */}
+                    {activeTab === 'marketplace' && (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {results.map((item) => (
+                          <Link
+                            key={item.id}
+                            href={getItemHref(item)}
+                            onClick={() => handleItemClick(item)}
+                            prefetch={true}
+                            className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl overflow-hidden hover:shadow-md active:scale-[0.98] transition-all flex flex-col justify-between block cursor-pointer"
+                          >
+                            <div className="aspect-[4/3] w-full overflow-hidden bg-slate-100 dark:bg-zinc-800 relative">
+                              {item.mediaUrl ? (
+                                <img src={item.mediaUrl} alt={item.title} className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-xs text-slate-400">No Image</div>
+                              )}
+                              <div className="absolute bottom-2 left-2 bg-black/70 text-white font-extrabold text-xs px-2 py-0.5 rounded-md">
+                                ₹{item.meta?.price}
+                              </div>
+                            </div>
+                            <div className="p-3">
+                              <span className="text-xs font-bold text-slate-800 dark:text-zinc-100 line-clamp-1">{item.title}</span>
+                              <span className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">{item.description}</span>
                             </div>
                           </Link>
-                        );
-                      })}
-                    </div>
-                  )}
+                        ))}
+                      </div>
+                    )}
 
-                  {/* 2. CREATORS / PEOPLE TAB */}
-                  {activeTab === 'users' && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {results.map((item) => (
-                        <Link
-                          key={item.id}
-                          href={getItemHref(item)}
-                          onClick={() => handleItemClick(item)}
-                          prefetch={true}
-                          className="flex items-center justify-between p-3.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl hover:border-primary/30 active:scale-[0.98] transition-all shadow-2xs block cursor-pointer"
-                        >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <Avatar className="w-12 h-12 rounded-full border border-slate-200 dark:border-zinc-700">
-                              <AvatarImage src={item.mediaUrl || '/default-user-avatar.svg'} />
-                              <AvatarFallback className="font-bold">{item.title[0]}</AvatarFallback>
-                            </Avatar>
-                            <div className="flex flex-col min-w-0">
-                              <span className="text-sm font-bold text-slate-800 dark:text-zinc-100 truncate">{item.title}</span>
-                              <span className="text-xs text-slate-400 dark:text-zinc-500 truncate">{item.subtitle}</span>
-                              {item.location && (
-                                <span className="text-[10px] text-slate-400 flex items-center gap-0.5 mt-0.5">
-                                  <MapPin className="w-3 h-3 text-primary" /> {item.location}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <Button size="sm" variant="outline" className="rounded-full text-xs font-bold px-4 shrink-0 text-primary border-primary hover:bg-primary/5 pointer-events-none">
-                            View
-                          </Button>
-                        </Link>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* 3. GROUPS / TOLEES TAB */}
-                  {activeTab === 'groups' && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {results.map((item) => (
-                        <Link
-                          key={item.id}
-                          href={getItemHref(item)}
-                          onClick={() => handleItemClick(item)}
-                          prefetch={true}
-                          className="flex items-center justify-between p-3.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl hover:border-primary/30 active:scale-[0.98] transition-all shadow-2xs block cursor-pointer"
-                        >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <Avatar className="w-12 h-12 rounded-xl border border-slate-200 dark:border-zinc-700">
-                              <AvatarImage src={item.mediaUrl || '/default-tolee-avatar.svg'} />
-                              <AvatarFallback className="font-bold text-primary">{item.title[0]}</AvatarFallback>
-                            </Avatar>
-                            <div className="flex flex-col min-w-0">
-                              <span className="text-sm font-bold text-slate-800 dark:text-zinc-100 truncate">{item.title}</span>
-                              <span className="text-xs text-slate-400 dark:text-zinc-500 truncate">{item.description || 'Tolee Group'}</span>
-                            </div>
-                          </div>
-                          <Badge className="bg-primary/10 text-primary text-[10px] font-bold py-1 px-2.5 rounded-full shrink-0">
-                            {item.meta?.memberCount || 0} members
-                          </Badge>
-                        </Link>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* 4. MARKETPLACE TAB */}
-                  {activeTab === 'marketplace' && (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                      {results.map((item) => (
-                        <Link
-                          key={item.id}
-                          href={getItemHref(item)}
-                          onClick={() => handleItemClick(item)}
-                          prefetch={true}
-                          className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl overflow-hidden hover:shadow-md active:scale-[0.98] transition-all flex flex-col justify-between block cursor-pointer"
-                        >
-                          <div className="aspect-[4/3] w-full overflow-hidden bg-slate-100 dark:bg-zinc-800 relative">
-                            {item.mediaUrl ? (
-                              <img src={item.mediaUrl} alt={item.title} className="w-full h-full object-cover" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-xs text-slate-400">No Image</div>
-                            )}
-                            <div className="absolute bottom-2 left-2 bg-black/70 text-white font-extrabold text-xs px-2 py-0.5 rounded-md">
-                              ₹{item.meta?.price}
-                            </div>
-                          </div>
-                          <div className="p-3">
-                            <span className="text-xs font-bold text-slate-800 dark:text-zinc-100 line-clamp-1">{item.title}</span>
-                            <span className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">{item.description}</span>
-                          </div>
-                        </Link>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* 5. POSTS / NEWS TAB */}
-                  {(activeTab === 'posts' || activeTab === 'news') && (
-                    <div className="space-y-3">
-                      {results.map((item) => (
-                        <Link
-                          key={item.id}
-                          href={getItemHref(item)}
-                          onClick={() => handleItemClick(item)}
-                          prefetch={true}
-                          className="block cursor-pointer"
-                        >
-                          <Card className="hover:border-primary/30 active:scale-[0.99] transition-all rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-2xs">
-                            <CardContent className="p-4 flex flex-col gap-2.5">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2.5">
-                                  <Avatar className="w-8 h-8">
-                                    <AvatarImage src={item.meta?.avatar || '/default-user-avatar.svg'} />
-                                    <AvatarFallback>{item.title[0]}</AvatarFallback>
-                                  </Avatar>
-                                  <span className="font-bold text-xs sm:text-sm text-slate-800 dark:text-zinc-200">{item.title}</span>
+                    {/* 5. POSTS / NEWS TAB */}
+                    {(activeTab === 'posts' || activeTab === 'news') && (
+                      <div className="space-y-3">
+                        {results.map((item) => (
+                          <Link
+                            key={item.id}
+                            href={getItemHref(item)}
+                            onClick={() => handleItemClick(item)}
+                            prefetch={true}
+                            className="block cursor-pointer"
+                          >
+                            <Card className="hover:border-primary/30 active:scale-[0.99] transition-all rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-2xs">
+                              <CardContent className="p-4 flex flex-col gap-2.5">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2.5">
+                                    <Avatar className="w-8 h-8">
+                                      <AvatarImage src={item.meta?.avatar || '/default-user-avatar.svg'} />
+                                      <AvatarFallback>{item.title[0]}</AvatarFallback>
+                                    </Avatar>
+                                    <span className="font-bold text-xs sm:text-sm text-slate-800 dark:text-zinc-200">{item.title}</span>
+                                  </div>
+                                  <span className="text-[10px] text-slate-400">{new Date(item.createdAt).toLocaleDateString()}</span>
                                 </div>
-                                <span className="text-[10px] text-slate-400">{new Date(item.createdAt).toLocaleDateString()}</span>
-                              </div>
-                              <p className="text-xs sm:text-sm text-slate-700 dark:text-zinc-300 line-clamp-3">{item.description}</p>
-                            </CardContent>
-                          </Card>
-                        </Link>
-                      ))}
-                    </div>
-                  )}
+                                <p className="text-xs sm:text-sm text-slate-700 dark:text-zinc-300 line-clamp-3">{item.description}</p>
+                              </CardContent>
+                            </Card>
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
 
                   {/* Load More Button */}
                   {total > results.length && (
