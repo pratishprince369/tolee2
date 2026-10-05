@@ -414,7 +414,7 @@ export default function SearchPage() {
     <div className="w-full max-w-4xl mx-auto pt-0 pb-24 min-h-screen">
       
       {/* 1. TOP STICKY SEARCH BAR CARD */}
-      <div className="sticky top-16 z-30 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md px-3 sm:px-4 lg:px-6 pt-2 pb-2.5 border-b border-slate-200/80 dark:border-zinc-800/80 shadow-2xs">
+      <div className="sticky top-14 sm:top-16 z-30 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md px-3 sm:px-4 lg:px-6 pt-2 pb-2.5 border-b border-slate-200/80 dark:border-zinc-800/80 shadow-2xs">
         <form onSubmit={handleLocalSubmit} className="relative w-full group">
           <div className="relative flex items-center">
             <Search className="absolute left-3.5 w-4.5 h-4.5 text-slate-400 group-focus-within:text-primary transition-colors pointer-events-none" />

@@ -41,7 +41,7 @@ export function MainLayoutWrapper({
     <div className={cn(
       "flex flex-1 w-full relative",
       isReels ? "p-0 m-0 h-[100dvh] overflow-hidden" : (isChat ? "pb-0" : "pb-16 lg:pb-0"),
-      isReels ? "pt-0" : (hideMobileHeader ? "pt-0 md:pt-16" : "pt-16")
+      isReels ? "pt-0" : (hideMobileHeader ? "pt-0 md:pt-16" : "pt-14 sm:pt-16")
     )}>
       {!isReels && sidebar}
       <div className={cn("flex-grow w-full min-w-0 overflow-x-clip", !isReels && isAuthenticated && "lg:pl-64")}>
