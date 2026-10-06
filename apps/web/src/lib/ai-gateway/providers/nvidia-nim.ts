@@ -72,11 +72,11 @@ export class NvidiaNIMProvider implements AIProvider {
     const keys = this.getKeyPool();
     let lastError: any = null;
 
-    for (const model of candidateModels) {
-      for (const apiKey of keys.slice(0, 4)) {
+    for (const model of candidateModels.slice(0, 2)) {
+      for (const apiKey of keys.slice(0, 2)) {
         try {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 20000);
+          const timeoutId = setTimeout(() => controller.abort(), 7000); // Fail-fast: 7 seconds per attempt
 
           const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
             method: 'POST',

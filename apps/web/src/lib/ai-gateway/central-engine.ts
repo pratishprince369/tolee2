@@ -7,6 +7,7 @@ import { FreeLLMAPIProvider } from './providers/freellmapi';
 import { SYSTEM_PROMPTS } from '@/modules/tolee-ai-manager/Core/prompt-manager';
 import { AgentOrchestrator } from '@/modules/tolee-ai-agent/core/agent-orchestrator';
 import { ToleeRealityValidator } from './reality-validator';
+import { ToleeFastPath } from './fast-path';
 
 // -------------------------------------------------------------
 // TYPES & INTERFACES
@@ -592,6 +593,33 @@ export class CentralAIEngine {
 
     // 🧠 2. Intent Classification
     const intent = classifyIntelligenceIntent(rawMessage, hasMedia, mediaType);
+
+    // ⚡ 2b. FAST PATH: Instant Direct LLM for General Knowledge & Conversational Queries
+    // If not media, not platform action, and query does not require DB tools -> Execute fast path (1-3s)
+    if (!hasMedia && intent !== 'image_generation' && intent !== 'document_analysis' && intent !== 'platform_action' && ToleeFastPath.isFastPathCandidate(rawMessage)) {
+      try {
+        const fastResult = await ToleeFastPath.executeFastChat(rawMessage, history, options.userName || 'User');
+        if (fastResult.success && fastResult.text) {
+          return {
+            success: true,
+            type: 'text',
+            content: fastResult.text,
+            model: fastResult.model,
+            provider: fastResult.provider,
+            toolUsed: null,
+            image: null,
+            files: [],
+            metadata: {
+              latencyMs: Date.now() - startTime,
+              intent: 'fast_chat',
+              fallbackUsed: false,
+            },
+          };
+        }
+      } catch (fastErr: any) {
+        console.warn('[CentralAIEngine] FastPath notice:', fastErr?.message);
+      }
+    }
 
     // 🎨 3. Real Image Generation & Creative Posters
     if (intent === 'image_generation') {

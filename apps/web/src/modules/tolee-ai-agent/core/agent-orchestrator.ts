@@ -60,7 +60,35 @@ CORE PERSONALITY & TONE:
     try {
       // Helper function to dispatch OpenAI-compatible tool calling
       const callLLM = async (callMessages: any[], maxTokens = 1024) => {
-        // 1. Try FreeLLMAPI Unified Gateway first
+        // 1. Primary: NVIDIA NIM (Active Model: meta/llama-3.2-11b-vision-instruct)
+        if (apiKey) {
+          try {
+            const c = new AbortController();
+            const t = setTimeout(() => c.abort(), 8000);
+            const res = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${apiKey}`,
+              },
+              body: JSON.stringify({
+                model: 'meta/llama-3.2-11b-vision-instruct',
+                messages: callMessages,
+                tools,
+                tool_choice: 'auto',
+                temperature: 0.3,
+                max_tokens: maxTokens,
+              }),
+              signal: c.signal,
+            });
+            clearTimeout(t);
+            if (res.ok) return await res.json();
+          } catch (nErr: any) {
+            console.warn('[AgentOrchestrator] NVIDIA NIM primary attempt failed:', nErr?.message);
+          }
+        }
+
+        // 2. High-speed Fallback: FreeLLMAPI Unified Gateway
         try {
           const c = new AbortController();
           const t = setTimeout(() => c.abort(), 6000);
@@ -84,27 +112,7 @@ CORE PERSONALITY & TONE:
           if (fRes.ok) return await fRes.json();
         } catch {}
 
-        // 2. Fallback to NVIDIA NIM
-        const res = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify({
-            model: 'nvidia/llama-3.1-nemotron-70b-instruct',
-            messages: callMessages,
-            tools,
-            tool_choice: 'auto',
-            temperature: 0.3,
-            max_tokens: maxTokens,
-          }),
-        });
-
-        if (!res.ok) {
-          throw new Error(`AI API responded with ${res.status}`);
-        }
-        return await res.json();
+        throw new Error('AI providers currently unavailable.');
       };
 
       // 1. First Call: Let LLM decide whether to speak or call a tool

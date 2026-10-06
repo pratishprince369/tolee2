@@ -50,8 +50,8 @@ class AIGatewayRouter {
       return [this.web2api, this.freellmapi, this.nvidia, this.geminiOfficial, this.fallback];
     }
 
-    // 3. Default Capability-based Order: FreeLLMAPI -> NVIDIA NIM -> Google Gemini -> Claude/OpenAI -> Web2API -> Fallback
-    return [this.freellmapi, this.nvidia, this.geminiOfficial, this.clod, this.web2api, this.fallback];
+    // 3. Default Capability-based Order: NVIDIA NIM (Fastest 1s) -> FreeLLMAPI -> Google Gemini -> Fallback
+    return [this.nvidia, this.freellmapi, this.geminiOfficial, this.fallback];
   }
 
   async checkProvidersStatus() {

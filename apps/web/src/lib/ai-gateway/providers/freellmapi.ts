@@ -15,15 +15,17 @@ export class FreeLLMAPIProvider implements AIProvider {
   private getTargets(optionsModel?: string): FreeLLMTarget[] {
     const targets: FreeLLMTarget[] = [];
 
-    // 1. Dedicated / Self-hosted FreeLLMAPI instance (from tools/freellmapi or local Docker)
-    const baseGateway = (process.env.FREELLMAPI_URL || process.env.FREELLMAPI_BASE_URL || 'http://localhost:8080/v1').replace(/\/+$/, '');
-    const gatewayKey = process.env.FREELLMAPI_API_KEY || 'freellmapi-root';
-    targets.push({
-      name: 'FreeLLMAPI Self-Hosted Instance',
-      url: `${baseGateway}/chat/completions`,
-      apiKey: gatewayKey,
-      model: optionsModel || 'auto',
-    });
+    // 1. Dedicated / Self-hosted FreeLLMAPI instance (Only if explicitly configured in env)
+    const baseGateway = process.env.FREELLMAPI_URL || process.env.FREELLMAPI_BASE_URL;
+    if (baseGateway) {
+      const gatewayKey = process.env.FREELLMAPI_API_KEY || 'freellmapi-root';
+      targets.push({
+        name: 'FreeLLMAPI Self-Hosted Instance',
+        url: `${baseGateway.replace(/\/+$/, '')}/chat/completions`,
+        apiKey: gatewayKey,
+        model: optionsModel || 'auto',
+      });
+    }
 
     // 2. Groq Free Tier (Ultra fast Llama 3.3 / 3.1)
     if (process.env.GROQ_API_KEY) {
@@ -71,7 +73,6 @@ export class FreeLLMAPIProvider implements AIProvider {
   }
 
   async isAvailable(): Promise<boolean> {
-    // Pollinations and FreeLLMAPI always provide active public/local fallbacks
     return true;
   }
 
@@ -83,7 +84,7 @@ export class FreeLLMAPIProvider implements AIProvider {
     for (const target of targets) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 20000);
+        const timeoutId = setTimeout(() => controller.abort(), 6000); // Fail-fast: 6 seconds per target
 
         const response = await fetch(target.url, {
           method: 'POST',
