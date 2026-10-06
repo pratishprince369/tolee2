@@ -71,7 +71,7 @@ export function DownloadLandingPage() {
           {/* ========================================================================= */}
           {/* LEFT COLUMN: Headline, Highlights & Creative Poster Artwork               */}
           {/* ========================================================================= */}
-          <div className="lg:col-span-7 flex flex-col items-center lg:items-start text-center lg:text-left">
+          <div className="order-2 lg:order-1 lg:col-span-7 flex flex-col items-center lg:items-start text-center lg:text-left">
             
             {/* Tag badge */}
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800/60 text-xs font-black text-red-600 dark:text-red-400 mb-4 animate-bounce">
@@ -161,9 +161,9 @@ export function DownloadLandingPage() {
           </div>
 
           {/* ========================================================================= */}
-          {/* RIGHT COLUMN: Direct Download / CTA Action Box                           */}
+          {/* RIGHT COLUMN: Direct Download / CTA Action Box (First on mobile)           */}
           {/* ========================================================================= */}
-          <div className="lg:col-span-5 w-full max-w-md mx-auto">
+          <div className="order-1 lg:order-2 lg:col-span-5 w-full max-w-md mx-auto">
             <div className="bg-white dark:bg-[#121212] rounded-3xl border border-slate-200/90 dark:border-zinc-800 shadow-xl shadow-slate-200/40 dark:shadow-none p-6 sm:p-8">
               
               <div className="text-center sm:text-left mb-6">
