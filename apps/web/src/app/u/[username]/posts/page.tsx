@@ -38,6 +38,7 @@ export default async function UserProfileFeed({ params }: PageProps) {
     trustScore: true,
     isPrivate: true,
     showActivityStatus: true,
+    lastActiveAt: true,
     searchEngineIndexable: true,
     _count: {
       select: {

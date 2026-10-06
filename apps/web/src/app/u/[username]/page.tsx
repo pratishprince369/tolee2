@@ -39,6 +39,7 @@ export default async function UserProfile({ params }: PageProps) {
     trustScore: true,
     isPrivate: true,
     showActivityStatus: true,
+    lastActiveAt: true,
     searchEngineIndexable: true,
     _count: {
       select: {

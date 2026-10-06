@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import { formatViewCount } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { isUserOnline } from '@/lib/presence';
 import { ProfileReferralsPanel } from '@/components/ProfileReferralsPanel';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -200,6 +201,8 @@ interface UserType {
   createdAt: any;
   isVerified: boolean;
   isPrivate?: boolean;
+  showActivityStatus?: boolean;
+  lastActiveAt?: any;
   level?: number;
   trustScore?: number;
   _count: {
@@ -587,6 +590,31 @@ export function InstagramProfileView({
     } catch (error) {
       console.error("Error fetching user stories:", error);
     }
+  }, [user.id]);
+
+  // Realtime Online / Offline status
+  const [isOnline, setIsOnline] = useState<boolean>(() => {
+    return isUserOnline(user.lastActiveAt, undefined, user.showActivityStatus !== false);
+  });
+
+  useEffect(() => {
+    setIsOnline(isUserOnline(user.lastActiveAt, undefined, user.showActivityStatus !== false));
+  }, [user.lastActiveAt, user.showActivityStatus]);
+
+  useEffect(() => {
+    // Listen to global realtime user status changes from socket/chat
+    const handleStatusChange = (e: any) => {
+      const detail = e.detail;
+      if (detail && detail.userId === user.id) {
+        const nextOnline = detail.isOnline !== undefined ? detail.isOnline : (detail.status === 'online');
+        setIsOnline(nextOnline);
+      }
+    };
+
+    window.addEventListener('user-status-changed', handleStatusChange);
+    return () => {
+      window.removeEventListener('user-status-changed', handleStatusChange);
+    };
   }, [user.id]);
 
   useEffect(() => {
@@ -1042,8 +1070,15 @@ export function InstagramProfileView({
                   />
                 </div>
               </div>
-              {/* Online status green dot */}
-              <div className="absolute bottom-1 right-1 w-4 h-4 bg-[#22C55E] rounded-full border-2 border-white z-20 pointer-events-none" />
+              {/* Online / Offline status dot (Green if online, Gray if offline) */}
+              {user.showActivityStatus !== false && (
+                <div 
+                  className={`absolute bottom-1 right-1 w-4 h-4 rounded-full border-2 border-white z-20 pointer-events-none transition-colors duration-300 ${
+                    isOnline ? 'bg-[#22C55E]' : 'bg-gray-400 dark:bg-zinc-500'
+                  }`} 
+                  title={isOnline ? 'Online' : 'Offline'}
+                />
+              )}
               {isMe && (
                 <>
                   <input

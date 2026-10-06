@@ -105,6 +105,11 @@ export default function AnalyticsTracker() {
           location: 'India',
           currentPage: pathname || '/'
         });
+        socket.on('user-status-changed', (data: any) => {
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('user-status-changed', { detail: data }));
+          }
+        });
       });
 
       socket.on('connect_error', (err) => {
