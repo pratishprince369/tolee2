@@ -58,6 +58,9 @@ export async function fetchFeedStories() {
             avatar: true
           }
         },
+        _count: {
+          select: { views: true }
+        },
         views: {
           where: {
             userId: currentUserId
@@ -120,6 +123,7 @@ export async function fetchFeedStories() {
         createdAt: story.createdAt,
         expiresAt: story.expiresAt,
         viewed,
+        viewsCount: story._count?.views || 0,
         caption: story.caption || null,
         overlays: story.overlays || null,
         closeFriends: story.closeFriends || false
@@ -227,6 +231,9 @@ export async function fetchUserActiveStories(userId: string) {
         createdAt: 'asc'
       },
       include: {
+        _count: {
+          select: { views: true }
+        },
         views: currentUserId ? {
           where: {
             userId: currentUserId
@@ -243,6 +250,7 @@ export async function fetchUserActiveStories(userId: string) {
       createdAt: s.createdAt,
       expiresAt: s.expiresAt,
       viewed: currentUserId ? s.views.length > 0 : false,
+      viewsCount: s._count?.views || 0,
       caption: s.caption || null,
       overlays: s.overlays || null,
       closeFriends: s.closeFriends || false
@@ -263,7 +271,7 @@ export async function fetchStoryViewers(storyId: string) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user || !(session.user as any).id) {
-      return { success: false, error: 'Unauthorized', viewers: [] };
+      return { success: false, error: 'Unauthorized', viewers: [], count: 0 };
     }
     const currentUserId = (session.user as any).id;
 
@@ -274,31 +282,19 @@ export async function fetchStoryViewers(storyId: string) {
     });
 
     if (!story || story.authorId !== currentUserId) {
-      return { success: false, error: 'Unauthorized to view story viewers', viewers: [] };
+      return { success: false, error: 'Unauthorized to view story viewers', viewers: [], count: 0 };
     }
 
     const views = await prisma.storyView.findMany({
       where: { storyId },
-      include: {
-        story: false,
-        storyId: false,
-        // Wait, storyId is a field, not model. Let's include user
-        // wait, in the schema, StoryView has fields: storyId, userId, viewedAt
-        // Let's check relation to User if it exists
-      }
+      orderBy: { viewedAt: 'desc' }
     });
 
-    // Wait, let's verify if StoryView has relation to User in schema.prisma!
-    // Let's check lines 416-422 of schema.prisma:
-    // model StoryView {
-    //   storyId   String
-    //   userId    String
-    //   viewedAt  DateTime @default(now())
-    //   story     Story @relation(fields: [storyId], references: [id])
-    //   @@id([storyId, userId])
-    // }
-    // Ah, it does NOT have a direct named relation to User in the schema. But we can fetch users by ID.
     const userIds = (views as any[]).map((v: any) => v.userId);
+    if (userIds.length === 0) {
+      return { success: true, viewers: [], count: 0 };
+    }
+
     const users = await prisma.user.findMany({
       where: {
         id: { in: userIds }
@@ -311,10 +307,22 @@ export async function fetchStoryViewers(storyId: string) {
       }
     });
 
-    return { success: true, viewers: users };
+    const userMap = new Map<string, any>(users.map(u => [u.id, u]));
+    const formattedViewers = views.map(v => {
+      const u = userMap.get(v.userId);
+      return {
+        id: v.userId,
+        username: u?.username || 'user',
+        name: u?.name || u?.username || 'User',
+        avatar: u?.avatar || '/default-user-avatar.svg',
+        viewedAt: v.viewedAt
+      };
+    });
+
+    return { success: true, viewers: formattedViewers, count: formattedViewers.length };
   } catch (error) {
     console.error('Error fetching story viewers:', error);
-    return { success: false, error: 'Failed to fetch story viewers', viewers: [] };
+    return { success: false, error: 'Failed to fetch story viewers', viewers: [], count: 0 };
   }
 }
 

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
-import { X, ChevronLeft, ChevronRight, Volume2, VolumeX, Pause, Play, Send, MoreVertical, Trash2, Download, AlertTriangle, Music, Plus } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Volume2, VolumeX, Pause, Play, Send, MoreVertical, Trash2, Download, AlertTriangle, Music, Plus, Eye, Share2, Copy, Check, MessageCircle } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { HLSVideo } from '@/components/HLSVideo';
 // Server actions replaced with API fetch calls to avoid pulling massive
@@ -17,6 +17,7 @@ interface Story {
   createdAt: Date | string;
   expiresAt: Date | string;
   viewed: boolean;
+  viewsCount?: number;
   caption?: string | null;
   overlays?: string | null;
 }
@@ -86,13 +87,23 @@ export function StoryViewer({
   const [isDeletingStory, setIsDeletingStory] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  // WhatsApp-style Viewers Bottom Sheet & Stats
+  const [showViewersSheet, setShowViewersSheet] = useState(false);
+  const [storyViewersList, setStoryViewersList] = useState<any[]>([]);
+  const [isLoadingViewers, setIsLoadingViewers] = useState(false);
+  const [currentViewsCount, setCurrentViewsCount] = useState<number>(0);
+
+  // WhatsApp-style Forward / Share Drawer
+  const [showForwardModal, setShowForwardModal] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+
   // Shared post status tracking
   const [sharedPostStatus, setSharedPostStatus] = useState<'loading' | 'active' | 'deleted' | 'private'>('loading');
 
   const activeGroup = storyGroups[groupIndex];
   const activeStory = activeGroup?.stories[slideIndex];
-  // Pause when menu/confirm is open
-  const isAnyDialogOpen = showOwnerMenu || showDeleteConfirm;
+  // Pause when menu/confirm/viewers/forward is open
+  const isAnyDialogOpen = showOwnerMenu || showDeleteConfirm || showViewersSheet || showForwardModal;
 
   const totalSlides = activeGroup?.stories.length || 0;
   const isOwner = !!currentUserId && !!activeGroup && currentUserId === activeGroup.user.id;
@@ -225,7 +236,27 @@ export function StoryViewer({
     setReplyStatus('idle');
     setShowOwnerMenu(false);
     setShowDeleteConfirm(false);
+    setShowViewersSheet(false);
+    setShowForwardModal(false);
     setDeleteError(null);
+    setCurrentViewsCount(activeStory.viewsCount || 0);
+
+    // If owner, fetch latest viewers and count from API
+    if (isOwner) {
+      fetch('/api/story/viewers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ storyId: activeStory.id })
+      })
+        .then(r => r.json())
+        .then((res) => {
+          if (res.success) {
+            setStoryViewersList(res.viewers || []);
+            setCurrentViewsCount(res.count ?? (res.viewers?.length || 0));
+          }
+        })
+        .catch(() => {});
+    }
 
     if (activeStory?.mediaType === 'video') {
       durationRef.current = 15000;
@@ -244,7 +275,7 @@ export function StoryViewer({
         }
       });
     }
-  }, [isOpen, slideIndex, groupIndex, activeStory?.id]);
+  }, [isOpen, slideIndex, groupIndex, activeStory?.id, isOwner]);
 
   useEffect(() => {
     if (!isOpen || !activeStory) return;
@@ -328,8 +359,15 @@ export function StoryViewer({
     const diffX = touchStartX.current - touchEndX;
     const diffY = touchStartY.current - touchEndY;
 
+    // Swipe Down: Close
     if (diffY < -70 && Math.abs(diffY) > Math.abs(diffX)) {
       onClose();
+      return;
+    }
+
+    // Swipe Up: If owner, open viewers list (Instagram / WhatsApp gesture)
+    if (diffY > 70 && Math.abs(diffY) > Math.abs(diffX) && isOwner) {
+      handleOpenViewers();
       return;
     }
 
@@ -345,6 +383,38 @@ export function StoryViewer({
           setGroupIndex(groupIndex - 1);
         }
       }
+    }
+  };
+
+  const handleOpenViewers = async () => {
+    setShowViewersSheet(true);
+    setIsPaused(true);
+    setIsLoadingViewers(true);
+    try {
+      const res = await fetch('/api/story/viewers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ storyId: activeStory.id })
+      }).then(r => r.json());
+
+      if (res.success) {
+        setStoryViewersList(res.viewers || []);
+        setCurrentViewsCount(res.count ?? (res.viewers?.length || 0));
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsLoadingViewers(false);
+    }
+  };
+
+  const handleCopyStoryLink = () => {
+    const url = `${window.location.origin}/u/${activeGroup.user.username}?storyId=${activeStory.id}`;
+    if (navigator?.clipboard) {
+      navigator.clipboard.writeText(url).then(() => {
+        setCopiedLink(true);
+        setTimeout(() => setCopiedLink(false), 2000);
+      });
     }
   };
 
@@ -830,19 +900,88 @@ export function StoryViewer({
                   </button>
                 )}
 
-                {/* Owner: 3-dot menu */}
+                {/* Owner: 3-dot menu button & WhatsApp-style dropdown menu */}
                 {isOwner && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowOwnerMenu(true);
-                      setIsPaused(true);
-                    }}
-                    className="p-2 rounded-full bg-black/25 hover:bg-black/55 text-white transition-all active:scale-95 flex items-center justify-center backdrop-blur-sm"
-                    aria-label="Story options"
-                  >
-                    <MoreVertical className="w-4 h-4" />
-                  </button>
+                  <div className="relative">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowOwnerMenu(!showOwnerMenu);
+                        setIsPaused(true);
+                      }}
+                      className="p-2 rounded-full bg-black/25 hover:bg-black/55 text-white transition-all active:scale-95 flex items-center justify-center backdrop-blur-sm"
+                      aria-label="Story options"
+                    >
+                      <MoreVertical className="w-4 h-4" />
+                    </button>
+
+                    {/* WhatsApp-style Popup Menu right under 3 dots */}
+                    {showOwnerMenu && (
+                      <div
+                        className="absolute right-0 top-11 w-48 bg-zinc-900 border border-zinc-700/80 rounded-2xl shadow-2xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-150"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          onClick={() => {
+                            setShowOwnerMenu(false);
+                            setShowForwardModal(true);
+                          }}
+                          className="w-full text-left px-4 py-2.5 text-xs font-bold text-white hover:bg-zinc-800 transition-colors flex items-center gap-2.5"
+                        >
+                          <Share2 className="w-3.5 h-3.5 text-zinc-300" />
+                          <span>Forward</span>
+                        </button>
+                        <a
+                          href={activeStory.mediaUrl}
+                          download
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={() => {
+                            setShowOwnerMenu(false);
+                            if (!isManuallyPaused) setIsPaused(false);
+                          }}
+                          className="w-full text-left px-4 py-2.5 text-xs font-bold text-white hover:bg-zinc-800 transition-colors flex items-center gap-2.5"
+                        >
+                          <Download className="w-3.5 h-3.5 text-zinc-300" />
+                          <span>Save</span>
+                        </a>
+                        <button
+                          onClick={() => {
+                            setShowOwnerMenu(false);
+                            const shareUrl = encodeURIComponent(`${window.location.origin}/u/${activeGroup.user.username}?storyId=${activeStory.id}`);
+                            window.open(`https://www.facebook.com/sharer/sharer.php?u=${shareUrl}`, '_blank');
+                          }}
+                          className="w-full text-left px-4 py-2.5 text-xs font-bold text-white hover:bg-zinc-800 transition-colors flex items-center gap-2.5"
+                        >
+                          <span className="w-3.5 h-3.5 text-center font-black leading-none text-blue-400">f</span>
+                          <span>Share to Facebook</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowOwnerMenu(false);
+                            const shareUrl = encodeURIComponent(`${window.location.origin}/u/${activeGroup.user.username}?storyId=${activeStory.id}`);
+                            const text = encodeURIComponent(`Check out my story on Tolee! ${window.location.origin}/u/${activeGroup.user.username}?storyId=${activeStory.id}`);
+                            window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
+                          }}
+                          className="w-full text-left px-4 py-2.5 text-xs font-bold text-white hover:bg-zinc-800 transition-colors flex items-center gap-2.5"
+                        >
+                          <MessageCircle className="w-3.5 h-3.5 text-green-400" />
+                          <span>Share to WhatsApp</span>
+                        </button>
+                        <div className="h-px bg-zinc-800 my-1" />
+                        <button
+                          onClick={() => {
+                            setShowOwnerMenu(false);
+                            setShowDeleteConfirm(true);
+                          }}
+                          className="w-full text-left px-4 py-2.5 text-xs font-bold text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-2.5"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Delete</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 )}
 
                 {/* Mobile Close */}
@@ -919,137 +1058,249 @@ export function StoryViewer({
             </div>
           )}
 
-          {/* Owner Bottom Bar — Add Story, Download, Delete */}
+          {/* Owner Bottom Bar — WhatsApp-style Eye Views count, Forward, and Share */}
           {isOwner && (
             <div
-              className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-black/80 via-black/40 to-transparent flex items-center justify-center gap-3 z-20"
+              className="absolute inset-x-0 bottom-0 p-4 pb-6 bg-gradient-to-t from-black/90 via-black/50 to-transparent flex items-center justify-between gap-3 z-20 pointer-events-auto"
               onMouseDown={(e) => e.stopPropagation()}
               onMouseUp={(e) => e.stopPropagation()}
               onTouchStart={(e) => e.stopPropagation()}
               onTouchEnd={(e) => e.stopPropagation()}
             >
-              {onAddStory && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onClose();
-                    onAddStory();
-                  }}
-                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold backdrop-blur-sm shadow-lg transition-all active:scale-95"
-                >
-                  <Plus className="w-4 h-4 stroke-[2.5]" />
-                  <span>+ Add Story</span>
-                </button>
-              )}
-              <a
-                href={activeStory.mediaUrl}
-                download
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white text-xs font-bold backdrop-blur-sm border border-white/10 transition-all active:scale-95"
-              >
-                <Download className="w-3.5 h-3.5" />
-                Save Story
-              </a>
+              {/* WhatsApp-style Eye Views Button (Click to open who viewed my story) */}
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  setShowDeleteConfirm(true);
-                  setIsPaused(true);
-                  setShowOwnerMenu(false);
+                  handleOpenViewers();
                 }}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-red-500/20 hover:bg-red-500/40 text-red-400 hover:text-red-300 text-xs font-bold backdrop-blur-sm border border-red-500/20 transition-all active:scale-95"
+                className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-zinc-900/85 hover:bg-zinc-800 text-white text-xs font-black backdrop-blur-md border border-white/15 shadow-xl transition-all active:scale-95 group"
+                title="Viewers who saw your story"
               >
-                <Trash2 className="w-3.5 h-3.5" />
-                Delete Story
+                <div className="w-5 h-5 rounded-full bg-indigo-600/30 flex items-center justify-center text-indigo-400 group-hover:text-indigo-300">
+                  <Eye className="w-3.5 h-3.5" />
+                </div>
+                <span>{currentViewsCount}</span>
+                <span className="hidden sm:inline text-[11px] text-zinc-400 font-semibold">{currentViewsCount === 1 ? 'view' : 'views'}</span>
               </button>
+
+              {/* Action buttons on the right: Forward, Share, Delete */}
+              <div className="flex items-center gap-2">
+                {/* Forward / Share Button */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowForwardModal(true);
+                    setIsPaused(true);
+                  }}
+                  className="w-10 h-10 rounded-full bg-zinc-900/85 hover:bg-zinc-800 text-white flex items-center justify-center backdrop-blur-md border border-white/15 shadow-xl transition-all active:scale-95"
+                  title="Forward / Share story"
+                >
+                  <Share2 className="w-4 h-4" />
+                </button>
+
+                {/* Direct Delete Button */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowDeleteConfirm(true);
+                    setIsPaused(true);
+                  }}
+                  className="w-10 h-10 rounded-full bg-red-600/20 hover:bg-red-600/30 text-red-400 flex items-center justify-center backdrop-blur-md border border-red-500/20 shadow-xl transition-all active:scale-95"
+                  title="Delete story"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           )}
 
-          {/* ── OWNER MENU BOTTOM SHEET ── */}
-          {showOwnerMenu && (
+          {/* ── WHATSAPP-STYLE STORY VIEWERS BOTTOM SHEET (WHO VIEWED MY STORY) ── */}
+          {showViewersSheet && (
             <div
-              className="absolute inset-0 z-30 flex flex-col justify-end"
+              className="absolute inset-0 z-40 flex flex-col justify-end"
               onMouseDown={(e) => e.stopPropagation()}
               onTouchStart={(e) => e.stopPropagation()}
             >
               {/* Scrim */}
               <div
-                className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+                className="absolute inset-0 bg-black/60 backdrop-blur-sm"
                 onClick={() => {
-                  setShowOwnerMenu(false);
+                  setShowViewersSheet(false);
                   if (!isManuallyPaused) setIsPaused(false);
                 }}
               />
-              {/* Sheet */}
-              <div className="relative z-10 bg-zinc-900 rounded-t-3xl border-t border-zinc-700/50 p-2 pb-8 animate-in slide-in-from-bottom duration-200">
-                {/* Handle */}
-                <div className="w-10 h-1 rounded-full bg-zinc-600 mx-auto mb-4 mt-2" />
+              {/* Sheet container */}
+              <div className="relative z-10 bg-zinc-950 rounded-t-[2rem] border-t border-zinc-800 p-4 pb-8 max-h-[70vh] flex flex-col animate-in slide-in-from-bottom duration-200">
+                {/* Drag Handle */}
+                <div className="w-10 h-1 rounded-full bg-zinc-700 mx-auto mb-3" />
 
-                {onAddStory && (
+                {/* Header */}
+                <div className="flex items-center justify-between pb-3 border-b border-zinc-850 px-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full bg-indigo-600/20 text-indigo-400 flex items-center justify-center">
+                      <Eye className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-black text-white leading-tight">Viewed by {currentViewsCount}</h4>
+                      <p className="text-[10px] text-zinc-400">People who viewed your story</p>
+                    </div>
+                  </div>
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowOwnerMenu(false);
-                      onClose();
-                      onAddStory();
+                    onClick={() => {
+                      setShowViewersSheet(false);
+                      if (!isManuallyPaused) setIsPaused(false);
                     }}
-                    className="w-full flex items-center gap-3.5 px-5 py-4 rounded-2xl hover:bg-indigo-500/10 active:bg-indigo-500/20 transition-colors text-white group mb-1"
+                    className="p-1.5 rounded-full bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white"
                   >
-                    <div className="w-9 h-9 rounded-full bg-indigo-500/20 group-hover:bg-indigo-500/30 text-indigo-400 flex items-center justify-center transition-colors">
-                      <Plus className="w-4.5 h-4.5 stroke-[2.5]" />
-                    </div>
-                    <div className="text-left">
-                      <div className="text-sm font-bold">Add to Your Story</div>
-                      <div className="text-[11px] text-zinc-400">Share another photo, video or text</div>
-                    </div>
+                    <X className="w-4 h-4" />
                   </button>
-                )}
+                </div>
 
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowOwnerMenu(false);
-                    setShowDeleteConfirm(true);
-                  }}
-                  className="w-full flex items-center gap-3.5 px-5 py-4 rounded-2xl hover:bg-red-500/10 active:bg-red-500/20 transition-colors text-red-400 group"
-                >
-                  <div className="w-9 h-9 rounded-full bg-red-500/15 group-hover:bg-red-500/25 flex items-center justify-center transition-colors">
-                    <Trash2 className="w-4.5 h-4.5" />
-                  </div>
-                  <div className="text-left">
-                    <div className="text-sm font-bold">Delete Story</div>
-                    <div className="text-[11px] text-red-400/70">This cannot be undone</div>
-                  </div>
-                </button>
+                {/* Viewers List */}
+                <div className="flex-1 overflow-y-auto no-scrollbar space-y-2.5 py-3 min-h-[140px]">
+                  {isLoadingViewers ? (
+                    <div className="flex flex-col items-center justify-center py-10 gap-2 text-zinc-500">
+                      <div className="w-6 h-6 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin" />
+                      <span className="text-xs font-semibold">Loading viewers...</span>
+                    </div>
+                  ) : storyViewersList.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-10 text-center gap-2">
+                      <div className="w-12 h-12 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-500">
+                        <Eye className="w-5 h-5 opacity-60" />
+                      </div>
+                      <span className="text-xs font-bold text-zinc-300">No views yet</span>
+                      <p className="text-[11px] text-zinc-500 max-w-[200px]">When someone views your story, they will show up here.</p>
+                    </div>
+                  ) : (
+                    storyViewersList.map((viewer) => (
+                      <Link
+                        key={viewer.id}
+                        href={`/u/${viewer.username}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onClose();
+                        }}
+                        className="flex items-center justify-between p-2.5 rounded-2xl bg-zinc-900/60 hover:bg-zinc-850/80 border border-zinc-850 transition-colors group cursor-pointer"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <Avatar className="w-10 h-10 border border-white/10 shrink-0">
+                            <AvatarImage src={viewer.avatar || '/default-user-avatar.svg'} />
+                            <AvatarFallback className="bg-zinc-800 text-white font-bold text-xs">
+                              {viewer.name?.charAt(0) || viewer.username?.charAt(0) || 'U'}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="min-w-0 flex-1">
+                            <span className="font-bold text-xs text-white group-hover:underline truncate block">
+                              {viewer.name || viewer.username}
+                            </span>
+                            <span className="text-[10px] text-zinc-400 truncate block">
+                              @{viewer.username}
+                            </span>
+                          </div>
+                        </div>
 
-                <a
-                  href={activeStory.mediaUrl}
-                  download
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(e) => { e.stopPropagation(); setShowOwnerMenu(false); if (!isManuallyPaused) setIsPaused(false); }}
-                  className="w-full flex items-center gap-3.5 px-5 py-4 rounded-2xl hover:bg-white/5 active:bg-white/10 transition-colors text-white group"
-                >
-                  <div className="w-9 h-9 rounded-full bg-white/10 group-hover:bg-white/15 flex items-center justify-center transition-colors">
-                    <Download className="w-4.5 h-4.5" />
-                  </div>
-                  <div className="text-left">
-                    <div className="text-sm font-bold">Save to Device</div>
-                    <div className="text-[11px] text-zinc-400">Download this story</div>
-                  </div>
-                </a>
+                        {viewer.viewedAt && (
+                          <span className="text-[10px] text-zinc-500 font-medium shrink-0 ml-2">
+                            {getStoryTime(viewer.viewedAt)}
+                          </span>
+                        )}
+                      </Link>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
-                <button
-                  onClick={() => {
-                    setShowOwnerMenu(false);
-                    if (!isManuallyPaused) setIsPaused(false);
-                  }}
-                  className="w-full mt-1 py-3 rounded-2xl bg-zinc-800 hover:bg-zinc-750 text-zinc-400 text-sm font-bold transition-colors active:scale-[0.98]"
-                >
-                  Cancel
-                </button>
+          {/* ── WHATSAPP-STYLE FORWARD / SHARE MODAL ── */}
+          {showForwardModal && (
+            <div
+              className="absolute inset-0 z-40 flex flex-col justify-end"
+              onMouseDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+            >
+              {/* Scrim */}
+              <div
+                className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                onClick={() => {
+                  setShowForwardModal(false);
+                  if (!isManuallyPaused) setIsPaused(false);
+                }}
+              />
+              {/* Modal container */}
+              <div className="relative z-10 bg-zinc-950 rounded-t-[2rem] border-t border-zinc-800 p-5 pb-8 flex flex-col gap-4 animate-in slide-in-from-bottom duration-200">
+                <div className="w-10 h-1 rounded-full bg-zinc-700 mx-auto" />
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-black text-white">Share / Forward Story</h4>
+                  <button
+                    onClick={() => {
+                      setShowForwardModal(false);
+                      if (!isManuallyPaused) setIsPaused(false);
+                    }}
+                    className="p-1.5 rounded-full bg-zinc-900 text-zinc-400 hover:text-white"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Share Options Grid */}
+                <div className="grid grid-cols-4 gap-3 py-2">
+                  {/* Copy Link */}
+                  <button
+                    onClick={handleCopyStoryLink}
+                    className="flex flex-col items-center gap-2 group"
+                  >
+                    <div className="w-13 h-13 rounded-2xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 flex items-center justify-center text-white transition-all active:scale-95 shadow-md">
+                      {copiedLink ? <Check className="w-5 h-5 text-green-400" /> : <Copy className="w-5 h-5" />}
+                    </div>
+                    <span className="text-[11px] font-bold text-zinc-300">
+                      {copiedLink ? 'Copied! ✓' : 'Copy Link'}
+                    </span>
+                  </button>
+
+                  {/* Share to WhatsApp */}
+                  <button
+                    onClick={() => {
+                      const shareUrl = encodeURIComponent(`${window.location.origin}/u/${activeGroup.user.username}?storyId=${activeStory.id}`);
+                      const text = encodeURIComponent(`Check out my story on Tolee! ${window.location.origin}/u/${activeGroup.user.username}?storyId=${activeStory.id}`);
+                      window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
+                    }}
+                    className="flex flex-col items-center gap-2 group"
+                  >
+                    <div className="w-13 h-13 rounded-2xl bg-green-600/20 hover:bg-green-600/30 border border-green-500/30 flex items-center justify-center text-green-400 transition-all active:scale-95 shadow-md">
+                      <MessageCircle className="w-5 h-5" />
+                    </div>
+                    <span className="text-[11px] font-bold text-zinc-300">WhatsApp</span>
+                  </button>
+
+                  {/* Share to Facebook */}
+                  <button
+                    onClick={() => {
+                      const shareUrl = encodeURIComponent(`${window.location.origin}/u/${activeGroup.user.username}?storyId=${activeStory.id}`);
+                      window.open(`https://www.facebook.com/sharer/sharer.php?u=${shareUrl}`, '_blank');
+                    }}
+                    className="flex flex-col items-center gap-2 group"
+                  >
+                    <div className="w-13 h-13 rounded-2xl bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 flex items-center justify-center text-blue-400 transition-all active:scale-95 shadow-md">
+                      <span className="text-base font-black">f</span>
+                    </div>
+                    <span className="text-[11px] font-bold text-zinc-300">Facebook</span>
+                  </button>
+
+                  {/* Save to Device */}
+                  <a
+                    href={activeStory.mediaUrl}
+                    download
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex flex-col items-center gap-2 group"
+                  >
+                    <div className="w-13 h-13 rounded-2xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 flex items-center justify-center text-white transition-all active:scale-95 shadow-md">
+                      <Download className="w-5 h-5" />
+                    </div>
+                    <span className="text-[11px] font-bold text-zinc-300">Save</span>
+                  </a>
+                </div>
               </div>
             </div>
           )}
