@@ -261,7 +261,13 @@ export async function deleteStory(storyId: string) {
     if (!story) return { success: false, error: 'Story not found' };
     if (story.authorId !== userId) return { success: false, error: 'Unauthorized' };
 
-    // Delete DB record (HighlightStory entries cascade automatically)
+    // Delete associated StoryView records first to prevent foreign key constraint violation
+    await prisma.storyView.deleteMany({ where: { storyId } });
+
+    // Delete associated HighlightStory records if any
+    await prisma.highlightStory.deleteMany({ where: { storyId } });
+
+    // Delete DB record
     await prisma.story.delete({ where: { id: storyId } });
 
     // Best-effort Cloudinary asset deletion (non-blocking)
