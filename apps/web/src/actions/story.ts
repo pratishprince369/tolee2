@@ -84,8 +84,8 @@ export async function fetchFeedStories() {
       groupsMap.set(currentUserId, {
         user: {
           id: currentUserInfo.id,
-          username: currentUserInfo.username || currentUserInfo.name,
-          name: currentUserInfo.name,
+          username: currentUserInfo.username || currentUserInfo.name || 'User',
+          name: currentUserInfo.name || currentUserInfo.username || 'User',
           avatar: currentUserInfo.avatar || '/default-user-avatar.svg'
         },
         stories: [],
@@ -102,8 +102,8 @@ export async function fetchFeedStories() {
         groupsMap.set(authorId, {
           user: {
             id: story.author.id,
-            username: story.author.username || story.author.name,
-            name: story.author.name,
+            username: story.author.username || story.author.name || 'User',
+            name: story.author.name || story.author.username || 'User',
             avatar: story.author.avatar || '/default-user-avatar.svg'
           },
           stories: [],

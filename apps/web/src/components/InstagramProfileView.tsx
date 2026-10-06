@@ -2724,43 +2724,47 @@ export function InstagramProfileView({
       </Dialog>
 
       {/* Story Viewer Dialog */}
-      <StoryViewer
-        isOpen={isStoryViewerOpen}
-        onClose={() => setIsStoryViewerOpen(false)}
-        storyGroups={[
-          {
-            user: {
-              id: user.id,
-              username: user.username || user.name,
-              name: user.name,
-              avatar: getValidAvatarUrl(user.avatar)
-            },
-            stories: userActiveStories,
-            hasUnviewed: hasUnviewedUserStory
-          }
-        ]}
-        initialGroupIndex={0}
-        currentUserId={(session?.user as any)?.id}
-        onStoryViewed={(storyId) => handleStoryViewed(storyId)}
-        onStoryDeleted={(storyId) => handleStoryDeleted(storyId)}
-      />
+      {isStoryViewerOpen && (
+        <StoryViewer
+          isOpen={isStoryViewerOpen}
+          onClose={() => setIsStoryViewerOpen(false)}
+          storyGroups={[
+            {
+              user: {
+                id: user.id,
+                username: user.username || user.name,
+                name: user.name,
+                avatar: getValidAvatarUrl(user.avatar)
+              },
+              stories: userActiveStories,
+              hasUnviewed: hasUnviewedUserStory
+            }
+          ]}
+          initialGroupIndex={0}
+          currentUserId={(session?.user as any)?.id}
+          onStoryViewed={(storyId) => handleStoryViewed(storyId)}
+          onStoryDeleted={(storyId) => handleStoryDeleted(storyId)}
+        />
+      )}
 
       {/* Story Editor Dialog */}
-      <StoryEditor
-        isOpen={isStoryEditorOpen}
-        onClose={() => setIsStoryEditorOpen(false)}
-        mediaUrl={storyMediaUrl}
-        mediaType={storyMediaType}
-        userAvatar={session?.user?.image || undefined}
-        userName={session?.user?.name || undefined}
-        onStoryPublished={() => {
-          setStoryMediaUrl('');
-          fetchUserStories();
-          if (isCreatingHighlight || isEditingHighlight) {
-            loadStoriesArchive();
-          }
-        }}
-      />
+      {isStoryEditorOpen && (
+        <StoryEditor
+          isOpen={isStoryEditorOpen}
+          onClose={() => setIsStoryEditorOpen(false)}
+          mediaUrl={storyMediaUrl}
+          mediaType={storyMediaType}
+          userAvatar={session?.user?.image || undefined}
+          userName={session?.user?.name || undefined}
+          onStoryPublished={() => {
+            setStoryMediaUrl('');
+            fetchUserStories();
+            if (isCreatingHighlight || isEditingHighlight) {
+              loadStoriesArchive();
+            }
+          }}
+        />
+      )}
 
       {/* ===== STORY CREATOR DIALOG ===== */}
       <Dialog open={isStoryCreatorOpen} onOpenChange={setIsStoryCreatorOpen}>

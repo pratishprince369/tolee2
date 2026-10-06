@@ -95,39 +95,38 @@ export function StoryViewer({
   const isOwner = !!currentUserId && !!activeGroup && currentUserId === activeGroup.user.id;
 
   useEffect(() => {
-    if (activeStory?.overlays) {
-      try {
-        const parsed = JSON.parse(activeStory.overlays);
-        if (parsed?.sharedPost?.id) {
-          setSharedPostStatus('loading');
-          fetch('/api/post/check-status', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ postId: parsed.sharedPost.id })
-          }).then(r => r.json()).then((res) => {
-            if (res.success) {
-              setSharedPostStatus(res.status as any);
-            } else {
-              setSharedPostStatus('deleted');
-            }
-          }).catch(() => setSharedPostStatus('deleted'));
-          return;
-        }
-      } catch (e) {
-        console.error(e);
+    if (!isOpen || !activeStory?.overlays) return;
+    try {
+      const parsed = typeof activeStory.overlays === 'object' ? activeStory.overlays : JSON.parse(activeStory.overlays);
+      if (parsed?.sharedPost?.id) {
+        setSharedPostStatus('loading');
+        fetch('/api/post/check-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ postId: parsed.sharedPost.id })
+        }).then(r => r.json()).then((res) => {
+          if (res.success) {
+            setSharedPostStatus(res.status as any);
+          } else {
+            setSharedPostStatus('deleted');
+          }
+        }).catch(() => setSharedPostStatus('deleted'));
+        return;
       }
+    } catch (e) {
+      console.error(e);
     }
     setSharedPostStatus('active');
-  }, [activeStory?.id]);
+  }, [isOpen, activeStory?.id]);
 
   const parsedStoryOverlays = React.useMemo(() => {
-    if (!activeStory?.overlays) return null;
+    if (!isOpen || !activeStory?.overlays) return null;
     try {
-      return JSON.parse(activeStory.overlays);
+      return typeof activeStory.overlays === 'object' ? activeStory.overlays : JSON.parse(activeStory.overlays);
     } catch {
       return null;
     }
-  }, [activeStory?.overlays]);
+  }, [isOpen, activeStory?.overlays]);
 
   const storyAudioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -193,6 +192,7 @@ export function StoryViewer({
   }, [groupIndex]);
 
   useEffect(() => {
+    if (!isOpen || !activeStory) return;
     setProgress(0);
     accumulatedProgressRef.current = 0;
     setIsPaused(false);
@@ -209,18 +209,18 @@ export function StoryViewer({
       durationRef.current = 5000;
     }
 
-    if (activeStory && !activeStory.viewed) {
+    if (!activeStory.viewed) {
       fetch('/api/story/mark-viewed', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ storyId: activeStory.id })
       }).then(r => r.json()).then((res) => {
-        if (res.success && onStoryViewed) {
+        if (res.success && onStoryViewed && activeGroup?.user?.id) {
           onStoryViewed(activeStory.id, activeGroup.user.id);
         }
       });
     }
-  }, [slideIndex, groupIndex, activeStory]);
+  }, [isOpen, slideIndex, groupIndex, activeStory?.id]);
 
   useEffect(() => {
     if (!isOpen || !activeStory) return;
@@ -471,13 +471,13 @@ export function StoryViewer({
               <div className={`w-15 h-15 rounded-full flex items-center justify-center p-[2.5px] ${storyGroups[groupIndex - 1].hasUnviewed ? 'bg-gradient-to-tr from-yellow-500 via-pink-500 to-purple-600' : 'border border-zinc-700'}`}>
                 <div className="w-full h-full rounded-full bg-zinc-950 p-[2px] overflow-hidden">
                   <Avatar className="w-full h-full">
-                    <AvatarImage src={storyGroups[groupIndex - 1].user.avatar} />
-                    <AvatarFallback className="bg-zinc-800 text-white text-xs font-bold">{storyGroups[groupIndex - 1].user.name.charAt(0)}</AvatarFallback>
+                    <AvatarImage src={storyGroups[groupIndex - 1]?.user?.avatar} />
+                    <AvatarFallback className="bg-zinc-800 text-white text-xs font-bold">{storyGroups[groupIndex - 1]?.user?.name?.charAt(0) || storyGroups[groupIndex - 1]?.user?.username?.charAt(0) || 'U'}</AvatarFallback>
                   </Avatar>
                 </div>
               </div>
               <span className="text-xs font-bold text-zinc-300 group-hover:text-white transition-colors truncate max-w-[120px]">
-                {storyGroups[groupIndex - 1].user.username || storyGroups[groupIndex - 1].user.name}
+                {storyGroups[groupIndex - 1]?.user?.username || storyGroups[groupIndex - 1]?.user?.name || 'User'}
               </span>
             </div>
           </div>
@@ -558,11 +558,11 @@ export function StoryViewer({
                           {/* Header */}
                           <div className="flex items-center gap-2">
                             <Avatar className="w-8 h-8 border border-white/20">
-                              <AvatarImage src={parsedOverlays.sharedPost.authorAvatar || '/default-user-avatar.svg'} />
-                              <AvatarFallback>{parsedOverlays.sharedPost.author[0]}</AvatarFallback>
+                              <AvatarImage src={parsedOverlays?.sharedPost?.authorAvatar || '/default-user-avatar.svg'} />
+                              <AvatarFallback>{parsedOverlays?.sharedPost?.author?.[0] || 'U'}</AvatarFallback>
                             </Avatar>
                             <div className="flex flex-col">
-                              <span className="text-[13px] font-bold text-white leading-none">@{parsedOverlays.sharedPost.author}</span>
+                              <span className="text-[13px] font-bold text-white leading-none">@{parsedOverlays?.sharedPost?.author || 'user'}</span>
                               <span className="text-[9px] text-zinc-400 font-semibold leading-none mt-1">Shared from Tolee</span>
                             </div>
                           </div>
@@ -764,14 +764,14 @@ export function StoryViewer({
                 className="flex items-center gap-2.5 group cursor-pointer"
               >
                 <Avatar className="w-8.5 h-8.5 border border-white/20 transition-transform group-hover:scale-105">
-                  <AvatarImage src={activeGroup.user.avatar} />
+                  <AvatarImage src={activeGroup?.user?.avatar} />
                   <AvatarFallback className="text-xs bg-zinc-800 text-white font-black">
-                    {activeGroup.user.name.charAt(0)}
+                    {activeGroup?.user?.name?.charAt(0) || activeGroup?.user?.username?.charAt(0) || 'U'}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex flex-col">
                   <span className="text-[13px] font-bold text-white hover:underline leading-tight">
-                    {activeGroup.user.username || activeGroup.user.name}
+                    {activeGroup?.user?.username || activeGroup?.user?.name || 'User'}
                   </span>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className="text-[10px] text-zinc-300 leading-none">
@@ -1139,13 +1139,13 @@ export function StoryViewer({
               <div className={`w-15 h-15 rounded-full flex items-center justify-center p-[2.5px] ${storyGroups[groupIndex + 1].hasUnviewed ? 'bg-gradient-to-tr from-yellow-500 via-pink-500 to-purple-600' : 'border border-zinc-700'}`}>
                 <div className="w-full h-full rounded-full bg-zinc-950 p-[2px] overflow-hidden">
                   <Avatar className="w-full h-full">
-                    <AvatarImage src={storyGroups[groupIndex + 1].user.avatar} />
-                    <AvatarFallback className="bg-zinc-800 text-white text-xs font-bold">{storyGroups[groupIndex + 1].user.name.charAt(0)}</AvatarFallback>
+                    <AvatarImage src={storyGroups[groupIndex + 1]?.user?.avatar} />
+                    <AvatarFallback className="bg-zinc-800 text-white text-xs font-bold">{storyGroups[groupIndex + 1]?.user?.name?.charAt(0) || storyGroups[groupIndex + 1]?.user?.username?.charAt(0) || 'U'}</AvatarFallback>
                   </Avatar>
                 </div>
               </div>
               <span className="text-xs font-bold text-zinc-300 group-hover:text-white transition-colors truncate max-w-[120px]">
-                {storyGroups[groupIndex + 1].user.username || storyGroups[groupIndex + 1].user.name}
+                {storyGroups[groupIndex + 1]?.user?.username || storyGroups[groupIndex + 1]?.user?.name || 'User'}
               </span>
             </div>
           </div>

@@ -1053,8 +1053,8 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
             <div className="flex gap-4 overflow-x-auto pb-4 pt-2 shrink-0 border border-gray-100 dark:border-zinc-900 bg-white dark:bg-[#121212] p-4 rounded-3xl shadow-sm select-none scrollbar-none scroll-smooth">
               {/* Render Own Story Bubble First */}
               {(() => {
-                const myGroup = mounted ? storyGroups.find(g => g.user.id === (session?.user as any)?.id) : undefined;
-                const hasMyStories = myGroup && myGroup.stories.length > 0;
+                const myGroup = mounted && session?.user ? storyGroups.find(g => g?.user?.id === (session.user as any)?.id) : undefined;
+                const hasMyStories = myGroup && myGroup.stories?.length > 0;
                 
                 return (
                   <div className="flex flex-col items-center flex-shrink-0 relative group">
@@ -1062,7 +1062,7 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                       onClick={() => {
                         if (!mounted) return;
                         if (hasMyStories) {
-                          const idx = storyGroups.findIndex(g => g.user.id === (session?.user as any)?.id);
+                          const idx = storyGroups.findIndex(g => g?.user?.id === (session?.user as any)?.id);
                           if (idx !== -1) {
                             setActiveStoryGroupIndex(idx);
                             setIsStoryViewerOpen(true);
@@ -1113,14 +1113,15 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
 
               {/* Render Other Followed Users' Stories */}
               {storyGroups
-                .filter(group => !mounted || !session?.user || group.user.id !== (session.user as any).id)
+                .filter(group => group?.user && (!mounted || !session?.user || group.user.id !== (session.user as any).id))
                 .map((group) => {
-                  const globalIdx = storyGroups.findIndex(g => g.user.id === group.user.id);
+                  const globalIdx = storyGroups.findIndex(g => g?.user?.id === group.user.id);
+                  const displayName = group.user.name || group.user.username || 'User';
                   return (
                     <div key={group.user.id} className="flex flex-col items-center flex-shrink-0">
                       <div
                         onClick={() => {
-                          setActiveStoryGroupIndex(globalIdx);
+                          setActiveStoryGroupIndex(globalIdx >= 0 ? globalIdx : 0);
                           setIsStoryViewerOpen(true);
                         }}
                         className="relative cursor-pointer transition-transform duration-200 active:scale-95"
@@ -1132,16 +1133,16 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                         }`}>
                           <div className="w-full h-full rounded-full bg-white dark:bg-[#121212] p-[2.5px]">
                             <Avatar className="w-full h-full">
-                              <AvatarImage src={group.user.avatar} />
+                              <AvatarImage src={group.user.avatar || undefined} />
                               <AvatarFallback className="bg-zinc-200 dark:bg-zinc-800 text-sm font-bold">
-                                {group.user.name.charAt(0)}
+                                {displayName.charAt(0).toUpperCase()}
                               </AvatarFallback>
                             </Avatar>
                           </div>
                         </div>
                       </div>
                       <span className="text-[10px] font-semibold text-gray-600 dark:text-zinc-300 mt-1.5 max-w-[70px] truncate font-medium">
-                        {group.user.username || group.user.name}
+                        {displayName}
                       </span>
                     </div>
                   );
@@ -3413,43 +3414,51 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
       />
 
       {/* Story Viewer Dialog */}
-      <StoryViewer
-        isOpen={isStoryViewerOpen}
-        onClose={() => setIsStoryViewerOpen(false)}
-        storyGroups={storyGroups}
-        initialGroupIndex={activeStoryGroupIndex || 0}
-        currentUserId={mounted ? (session?.user as any)?.id : undefined}
-        onStoryViewed={handleStoryViewed}
-        onStoryDeleted={handleStoryDeleted}
-        onAddStory={() => setIsStoryCreatorOpen(true)}
-      />
+      {isStoryViewerOpen && (
+        <StoryViewer
+          isOpen={isStoryViewerOpen}
+          onClose={() => setIsStoryViewerOpen(false)}
+          storyGroups={storyGroups}
+          initialGroupIndex={activeStoryGroupIndex || 0}
+          currentUserId={mounted ? (session?.user as any)?.id : undefined}
+          onStoryViewed={handleStoryViewed}
+          onStoryDeleted={handleStoryDeleted}
+          onAddStory={() => setIsStoryCreatorOpen(true)}
+        />
+      )}
 
       {/* Story Editor Dialog */}
-      <StoryEditor
-        isOpen={isStoryEditorOpen}
-        onClose={() => setIsStoryEditorOpen(false)}
-        mediaUrl={storyMediaUrl}
-        mediaType={storyMediaType}
-        userAvatar={mounted ? (session?.user?.image || undefined) : undefined}
-        userName={mounted ? (session?.user?.name || undefined) : undefined}
-        onStoryPublished={() => {
-          setStoryMediaUrl('');
-          setStoryThumbnailUrl(undefined);
-          loadStories();
-        }}
-      />
+      {isStoryEditorOpen && (
+        <StoryEditor
+          isOpen={isStoryEditorOpen}
+          onClose={() => setIsStoryEditorOpen(false)}
+          mediaUrl={storyMediaUrl}
+          mediaType={storyMediaType}
+          userAvatar={mounted ? (session?.user?.image || undefined) : undefined}
+          userName={mounted ? (session?.user?.name || undefined) : undefined}
+          onStoryPublished={() => {
+            setStoryMediaUrl('');
+            setStoryThumbnailUrl(undefined);
+            setIsStoryEditorOpen(false);
+            loadStories();
+          }}
+        />
+      )}
 
       {/* Story Creator / Composer Dialog */}
-      <StoryComposerModal
-        isOpen={isStoryCreatorOpen}
-        onClose={() => setIsStoryCreatorOpen(false)}
-        onMediaSelected={(mediaUrl, mediaType, thumbnailUrl) => {
-          setStoryMediaUrl(mediaUrl);
-          setStoryMediaType(mediaType);
-          setStoryThumbnailUrl(thumbnailUrl);
-          setIsStoryEditorOpen(true);
-        }}
-      />
+      {isStoryCreatorOpen && (
+        <StoryComposerModal
+          isOpen={isStoryCreatorOpen}
+          onClose={() => setIsStoryCreatorOpen(false)}
+          onMediaSelected={(mediaUrl, mediaType, thumbnailUrl) => {
+            setStoryMediaUrl(mediaUrl);
+            setStoryMediaType(mediaType);
+            setStoryThumbnailUrl(thumbnailUrl);
+            setIsStoryCreatorOpen(false);
+            setIsStoryEditorOpen(true);
+          }}
+        />
+      )}
 
     </div>
   );
