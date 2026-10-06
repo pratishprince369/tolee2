@@ -933,23 +933,36 @@ export function StoryEditor({
             </div>
           )}
 
-          {/* Video state overlays */}
-          {mediaType === 'video' && (
-            <div className="flex gap-2 pointer-events-auto">
-              <button
-                onClick={handleTogglePlayVideo}
-                className="p-2 rounded-full bg-black/35 hover:bg-black/60 text-white backdrop-blur-sm transition-transform active:scale-95"
-              >
-                {videoPlaying ? <Pause className="w-4.5 h-4.5 fill-white" /> : <Play className="w-4.5 h-4.5 fill-white" />}
-              </button>
-              <button
-                onClick={handleToggleMuteVideo}
-                className="p-2 rounded-full bg-black/35 hover:bg-black/60 text-white backdrop-blur-sm transition-transform active:scale-95"
-              >
-                {videoMuted ? <VolumeX className="w-4.5 h-4.5" /> : <Volume2 className="w-4.5 h-4.5" />}
-              </button>
-            </div>
-          )}
+          {/* Right Top Actions (Next / Share button & Video controls) */}
+          <div className="flex items-center gap-2 pointer-events-auto">
+            {/* Video state overlays */}
+            {mediaType === 'video' && (
+              <div className="flex gap-2">
+                <button
+                  onClick={handleTogglePlayVideo}
+                  className="p-2 rounded-full bg-black/35 hover:bg-black/60 text-white backdrop-blur-sm transition-transform active:scale-95"
+                >
+                  {videoPlaying ? <Pause className="w-4.5 h-4.5 fill-white" /> : <Play className="w-4.5 h-4.5 fill-white" />}
+                </button>
+                <button
+                  onClick={handleToggleMuteVideo}
+                  className="p-2 rounded-full bg-black/35 hover:bg-black/60 text-white backdrop-blur-sm transition-transform active:scale-95"
+                >
+                  {videoMuted ? <VolumeX className="w-4.5 h-4.5" /> : <Volume2 className="w-4.5 h-4.5" />}
+                </button>
+              </div>
+            )}
+
+            {/* Direct Top-Right "Next / Share" Button */}
+            <button
+              disabled={isPublishing}
+              onClick={() => { setCloseFriends(false); handlePublishSubmit(); }}
+              className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-indigo-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white rounded-full font-black text-xs shadow-lg shadow-indigo-600/30 transition-transform active:scale-95 disabled:opacity-50"
+            >
+              <span>Next</span>
+              <ArrowRight className="w-3.5 h-3.5 stroke-[3]" />
+            </button>
+          </div>
         </div>
 
         {/* ── RIGHT VERTICAL INSTAGRAM-STYLE TOOLBAR ── */}
@@ -1619,53 +1632,45 @@ export function StoryEditor({
 
         {/* ── BOTTOM PUBLISH PANEL (CAPTION & BUTTONS) ── */}
         {activeTool === 'none' && !isTextEditing && (
-          <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-black/95 via-black/60 to-transparent flex flex-col gap-4 z-20 pointer-events-auto">
+          <div className="absolute inset-x-0 bottom-0 p-4 pb-8 sm:pb-5 bg-gradient-to-t from-black/95 via-black/75 to-transparent flex flex-col gap-3.5 z-30 pointer-events-auto">
             {/* Caption text bar */}
             <input
               type="text"
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
               placeholder="Add a caption..."
-              className="w-full bg-black/45 border border-white/10 rounded-full px-5 py-3 text-xs text-white placeholder-zinc-400 font-semibold focus:outline-none focus:ring-1 focus:ring-white/20 transition-all"
+              className="w-full bg-zinc-900/80 border border-white/15 rounded-full px-5 py-3 text-xs text-white placeholder-zinc-400 font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all"
             />
 
             {/* Publish controls Row */}
-            <div className="flex items-center justify-between gap-3">
-              {/* Your Story button */}
+            <div className="flex items-center gap-2.5">
+              {/* Primary "Share Story Now" button */}
               <button
                 disabled={isPublishing}
                 onClick={() => { setCloseFriends(false); handlePublishSubmit(); }}
-                className="flex-grow flex items-center justify-center gap-2 px-4 py-3 bg-zinc-900/90 border border-zinc-800 text-white rounded-full hover:bg-zinc-800 transition-all active:scale-95 text-xs font-black shadow-md disabled:opacity-50"
+                className="flex-[2] flex items-center justify-center gap-2 px-4 py-3.5 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white rounded-full transition-all active:scale-95 text-xs font-black shadow-lg shadow-indigo-600/30 disabled:opacity-50"
               >
-                <Avatar className="w-5 h-5 border border-white/20">
+                <Avatar className="w-5 h-5 border border-white/40">
                   <AvatarImage src={userAvatar || '/default-user-avatar.svg'} />
                   <AvatarFallback>{userName ? userName.charAt(0) : 'U'}</AvatarFallback>
                 </Avatar>
-                Your stories
+                <span>Share Story Now</span>
+                <ArrowRight className="w-4 h-4 stroke-[2.5]" />
               </button>
 
               {/* Close Friends button */}
               <button
                 disabled={isPublishing}
                 onClick={() => { setCloseFriends(true); handlePublishSubmit(); }}
-                className={`flex-grow flex items-center justify-center gap-2 px-4 py-3 rounded-full transition-all active:scale-95 text-xs font-black shadow-md disabled:opacity-50 ${
+                className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-3.5 rounded-full transition-all active:scale-95 text-xs font-black shadow-md disabled:opacity-50 ${
                   closeFriends 
-                    ? 'bg-green-600/90 text-white border border-green-500' 
-                    : 'bg-zinc-900/90 border border-zinc-800 text-white hover:bg-zinc-800'
+                    ? 'bg-green-600 text-white border border-green-400 shadow-green-600/30' 
+                    : 'bg-zinc-900/90 border border-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-800'
                 }`}
+                title="Share only with close friends"
               >
-                <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center text-white text-[10px] font-black">★</div>
-                Close Friends
-              </button>
-
-              {/* Publish icon arrow circle */}
-              <button
-                disabled={isPublishing}
-                onClick={() => { setCloseFriends(false); handlePublishSubmit(); }}
-                className="w-11 h-11 bg-white hover:bg-zinc-100 text-black rounded-full flex items-center justify-center shrink-0 transition-transform active:scale-90 disabled:opacity-50"
-                aria-label="Publish story"
-              >
-                <ArrowRight className="w-5 h-5 stroke-[2.5]" />
+                <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center text-white text-[10px] font-black">★</div>
+                <span className="truncate">Close Friends</span>
               </button>
             </div>
           </div>
