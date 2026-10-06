@@ -91,8 +91,35 @@ export function StoryViewer({
 
   const activeGroup = storyGroups[groupIndex];
   const activeStory = activeGroup?.stories[slideIndex];
+  // Pause when menu/confirm is open
+  const isAnyDialogOpen = showOwnerMenu || showDeleteConfirm;
+
   const totalSlides = activeGroup?.stories.length || 0;
   const isOwner = !!currentUserId && !!activeGroup && currentUserId === activeGroup.user.id;
+
+  const handleNext = React.useCallback(() => {
+    if (slideIndex < totalSlides - 1) {
+      setSlideIndex(prev => prev + 1);
+    } else if (groupIndex < storyGroups.length - 1) {
+      setGroupIndex(prev => prev + 1);
+    } else {
+      onClose();
+    }
+  }, [slideIndex, totalSlides, groupIndex, storyGroups.length, onClose]);
+
+  const handlePrev = React.useCallback(() => {
+    if (slideIndex > 0) {
+      setSlideIndex(prev => prev - 1);
+    } else if (groupIndex > 0) {
+      const prevGroup = storyGroups[groupIndex - 1];
+      setGroupIndex(prev => prev - 1);
+      setTimeout(() => {
+        setSlideIndex((prevGroup?.stories.length || 1) - 1);
+      }, 50);
+    } else {
+      setProgress(0);
+    }
+  }, [slideIndex, groupIndex, storyGroups]);
 
   useEffect(() => {
     if (!isOpen || !activeStory?.overlays) return;
@@ -161,9 +188,6 @@ export function StoryViewer({
   // Gesture detection refs
   const touchStartX = useRef<number>(0);
   const touchStartY = useRef<number>(0);
-
-  // Pause when menu/confirm is open
-  const isAnyDialogOpen = showOwnerMenu || showDeleteConfirm;
 
   useEffect(() => {
     if (isOpen) {
@@ -255,33 +279,9 @@ export function StoryViewer({
         clearInterval(progressIntervalRef.current);
       }
     };
-  }, [isOpen, activeStory, isPaused, slideIndex, groupIndex, isAnyDialogOpen]);
+  }, [isOpen, activeStory, isPaused, slideIndex, groupIndex, isAnyDialogOpen, handleNext]);
 
   if (!isOpen || !activeGroup || !activeStory) return null;
-
-  const handleNext = () => {
-    if (slideIndex < totalSlides - 1) {
-      setSlideIndex(slideIndex + 1);
-    } else if (groupIndex < storyGroups.length - 1) {
-      setGroupIndex(groupIndex + 1);
-    } else {
-      onClose();
-    }
-  };
-
-  const handlePrev = () => {
-    if (slideIndex > 0) {
-      setSlideIndex(slideIndex - 1);
-    } else if (groupIndex > 0) {
-      const prevGroup = storyGroups[groupIndex - 1];
-      setGroupIndex(groupIndex - 1);
-      setTimeout(() => {
-        setSlideIndex(prevGroup.stories.length - 1);
-      }, 50);
-    } else {
-      setProgress(0);
-    }
-  };
 
   const handleVideoMetadata = (e: React.SyntheticEvent<HTMLVideoElement>) => {
     const video = e.currentTarget;
