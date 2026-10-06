@@ -45,6 +45,7 @@ const PostInsightsModal = dynamic(() => import('@/components/PostInsightsModal')
 const ShareModal = dynamic(() => import('@/components/ShareModal').then(m => m.ShareModal), { ssr: false });
 const StoryViewer = dynamic(() => import('@/components/StoryViewer').then(m => m.StoryViewer), { ssr: false });
 const StoryEditor = dynamic(() => import('@/components/StoryEditor').then(m => m.StoryEditor), { ssr: false });
+const StoryComposerModal = dynamic(() => import('@/components/StoryComposerModal').then(m => m.StoryComposerModal), { ssr: false });
 import { savePostsToOfflinePocket } from '@/lib/offlineSmartPocket';
 import { LiveStreamPostCard } from '@/components/LiveStreamPostCard';
 
@@ -1090,12 +1091,18 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                         </div>
                       </div>
 
-                      {/* "+" Add icon overlay if no active story */}
-                      {!hasMyStories && (
-                        <div className="absolute bottom-0 right-0 bg-indigo-500 hover:bg-indigo-600 text-white rounded-full p-[3px] ring-2 ring-white dark:ring-black">
-                          <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                        </div>
-                      )}
+                      {/* "+" Add icon overlay: always clickable to directly compose story */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsStoryCreatorOpen(true);
+                        }}
+                        title="Add to story"
+                        className="absolute bottom-0 right-0 bg-indigo-500 hover:bg-indigo-600 active:scale-90 text-white rounded-full p-[3px] ring-2 ring-white dark:ring-black shadow-md cursor-pointer transition-transform"
+                      >
+                        <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                      </button>
                     </div>
                     <span className="text-[10px] font-semibold text-gray-500 dark:text-zinc-400 mt-1.5 max-w-[70px] truncate">
                       Your story
@@ -3414,6 +3421,7 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
         currentUserId={mounted ? (session?.user as any)?.id : undefined}
         onStoryViewed={handleStoryViewed}
         onStoryDeleted={handleStoryDeleted}
+        onAddStory={() => setIsStoryCreatorOpen(true)}
       />
 
       {/* Story Editor Dialog */}
@@ -3431,59 +3439,17 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
         }}
       />
 
-      {/* Story Creator Dialog */}
-      <Dialog open={isStoryCreatorOpen} onOpenChange={setIsStoryCreatorOpen}>
-        <DialogContent className="max-w-sm w-[90vw] bg-white dark:bg-[#121212] p-0 flex flex-col overflow-hidden rounded-3xl shadow-2xl border border-gray-100 dark:border-zinc-800 gap-0">
-          <DialogHeader className="p-4 border-b border-gray-100 dark:border-zinc-800/80 flex flex-row items-center justify-between shrink-0 bg-gray-50/50 dark:bg-zinc-900/20">
-            <div>
-              <DialogTitle className="text-lg font-black text-slate-800 dark:text-zinc-100 tracking-tight flex items-center gap-1.5">
-                <Camera className="w-5 h-5 text-indigo-500" />
-                <span>Add Story/Status</span>
-              </DialogTitle>
-              <p className="text-[11px] text-gray-400 mt-0.5">Share a photo or video for 24 hours</p>
-            </div>
-            <button onClick={() => setIsStoryCreatorOpen(false)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full transition-colors mr-6 md:mr-0">
-              <X className="w-4 h-4 text-gray-400 dark:text-zinc-500" />
-            </button>
-          </DialogHeader>
-
-          <div className="p-6">
-            {/* Story upload field */}
-            <div className="relative group border-2 border-dashed border-slate-200 dark:border-zinc-800 hover:border-indigo-500 dark:hover:border-indigo-400 rounded-3xl p-10 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-300 bg-slate-50/50 dark:bg-zinc-900/30 hover:bg-indigo-50/10 dark:hover:bg-indigo-950/5 min-h-[220px]">
-              <input
-                type="file"
-                accept="image/*,video/*"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleStoryUpload(file);
-                }}
-                className="absolute inset-0 opacity-0 cursor-pointer z-10"
-              />
-              {isUploadingStory ? (
-                <div className="flex flex-col items-center gap-3 animate-pulse">
-                  <div className="p-4 bg-indigo-500/10 rounded-full">
-                    <Loader2 className="w-8 h-8 animate-spin text-indigo-600 dark:text-indigo-400" />
-                  </div>
-                  <div>
-                    <span className="text-sm font-bold text-slate-800 dark:text-zinc-100">Uploading Media...</span>
-                    <p className="text-[11px] text-slate-400 mt-1">Applying smart compression & optimization</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center gap-4">
-                  <div className="p-4 bg-indigo-500/10 dark:bg-indigo-500/5 rounded-full group-hover:scale-110 transition-transform duration-300">
-                    <Camera className="w-8 h-8 text-indigo-600 dark:text-indigo-400" />
-                  </div>
-                  <div>
-                    <span className="text-sm font-black text-slate-800 dark:text-zinc-100 tracking-tight block">Drag & Drop OR Click to Upload</span>
-                    <p className="text-[11px] text-slate-400 mt-1 max-w-[220px] mx-auto font-medium">Select any photo or video. Media type will be auto-detected.</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Story Creator / Composer Dialog */}
+      <StoryComposerModal
+        isOpen={isStoryCreatorOpen}
+        onClose={() => setIsStoryCreatorOpen(false)}
+        onMediaSelected={(mediaUrl, mediaType, thumbnailUrl) => {
+          setStoryMediaUrl(mediaUrl);
+          setStoryMediaType(mediaType);
+          setStoryThumbnailUrl(thumbnailUrl);
+          setIsStoryEditorOpen(true);
+        }}
+      />
 
     </div>
   );

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
-import { X, ChevronLeft, ChevronRight, Volume2, VolumeX, Pause, Play, Send, MoreVertical, Trash2, Download, AlertTriangle, Music } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Volume2, VolumeX, Pause, Play, Send, MoreVertical, Trash2, Download, AlertTriangle, Music, Plus } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { HLSVideo } from '@/components/HLSVideo';
 // Server actions replaced with API fetch calls to avoid pulling massive
@@ -51,6 +51,7 @@ interface StoryViewerProps {
   currentUserId?: string; // owner check — only show management controls to author
   onStoryViewed?: (storyId: string, userId: string) => void;
   onStoryDeleted?: (storyId: string, userId: string) => void; // callback after delete
+  onAddStory?: () => void; // callback to open Create Story screen
 }
 
 const QUICK_EMOJIS = ['❤️', '😂', '😮', '😢', '👏', '🔥'];
@@ -64,6 +65,7 @@ export function StoryViewer({
   currentUserId,
   onStoryViewed,
   onStoryDeleted,
+  onAddStory,
 }: StoryViewerProps) {
   const router = useRouter();
   const [groupIndex, setGroupIndex] = useState(initialGroupIndex);
@@ -747,6 +749,22 @@ export function StoryViewer({
                   </button>
                 )}
 
+                {/* Owner: Add Story */}
+                {isOwner && onAddStory && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onClose();
+                      onAddStory();
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all active:scale-95 shadow-md"
+                    title="Add to story"
+                  >
+                    <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                    <span className="hidden sm:inline">Add Story</span>
+                  </button>
+                )}
+
                 {/* Owner: 3-dot menu */}
                 {isOwner && (
                   <button
@@ -836,15 +854,28 @@ export function StoryViewer({
             </div>
           )}
 
-          {/* Owner Bottom Bar — Download */}
+          {/* Owner Bottom Bar — Add Story, Download, Delete */}
           {isOwner && (
             <div
-              className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-black/80 via-black/40 to-transparent flex items-center justify-center gap-4 z-20"
+              className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-black/80 via-black/40 to-transparent flex items-center justify-center gap-3 z-20"
               onMouseDown={(e) => e.stopPropagation()}
               onMouseUp={(e) => e.stopPropagation()}
               onTouchStart={(e) => e.stopPropagation()}
               onTouchEnd={(e) => e.stopPropagation()}
             >
+              {onAddStory && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onClose();
+                    onAddStory();
+                  }}
+                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold backdrop-blur-sm shadow-lg transition-all active:scale-95"
+                >
+                  <Plus className="w-4 h-4 stroke-[2.5]" />
+                  <span>+ Add Story</span>
+                </button>
+              )}
               <a
                 href={activeStory.mediaUrl}
                 download
@@ -890,6 +921,26 @@ export function StoryViewer({
               <div className="relative z-10 bg-zinc-900 rounded-t-3xl border-t border-zinc-700/50 p-2 pb-8 animate-in slide-in-from-bottom duration-200">
                 {/* Handle */}
                 <div className="w-10 h-1 rounded-full bg-zinc-600 mx-auto mb-4 mt-2" />
+
+                {onAddStory && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowOwnerMenu(false);
+                      onClose();
+                      onAddStory();
+                    }}
+                    className="w-full flex items-center gap-3.5 px-5 py-4 rounded-2xl hover:bg-indigo-500/10 active:bg-indigo-500/20 transition-colors text-white group mb-1"
+                  >
+                    <div className="w-9 h-9 rounded-full bg-indigo-500/20 group-hover:bg-indigo-500/30 text-indigo-400 flex items-center justify-center transition-colors">
+                      <Plus className="w-4.5 h-4.5 stroke-[2.5]" />
+                    </div>
+                    <div className="text-left">
+                      <div className="text-sm font-bold">Add to Your Story</div>
+                      <div className="text-[11px] text-zinc-400">Share another photo, video or text</div>
+                    </div>
+                  </button>
+                )}
 
                 <button
                   onClick={(e) => {
