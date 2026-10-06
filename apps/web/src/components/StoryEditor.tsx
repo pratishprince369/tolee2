@@ -20,10 +20,14 @@ import {
   Trash2, 
   Compass, 
   Hash, 
-  AlertTriangle 
+  AlertTriangle,
+  Search,
+  Loader2,
+  Disc
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useSession } from 'next-auth/react';
+import { CURATED_AUDIO_LIBRARY } from '@/lib/audioLibrary';
 
 interface StoryEditorProps {
   isOpen: boolean;
@@ -85,11 +89,13 @@ const CURATED_STICKERS = [
   { type: 'hashtag', label: '# Hashtag', placeholder: 'Enter Hashtag...' }
 ];
 
+const MUSIC_GENRES = ['All', 'Bollywood', 'Punjabi', 'Lo-Fi', 'Devotional', 'Indie', 'Marathi', 'Trending'];
+
 const POPULAR_SONGS = [
-  { id: '1', title: 'Summer Breeze', artist: 'H1 Music', cover: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?q=80&w=150' },
-  { id: '2', title: 'Good Vibes Only', artist: 'The Shakes', cover: 'https://images.unsplash.com/photo-1511192336575-5a79af67a629?q=80&w=150' },
-  { id: '3', title: 'Midnight City', artist: 'Outrun', cover: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?q=80&w=150' },
-  { id: '4', title: 'Chill Chill', artist: 'Lofi Beats', cover: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?q=80&w=150' }
+  { id: 'lofi-1', title: 'Lofi Midnight Chai', artist: 'Tolee Vibes', cover: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=300&auto=format&fit=crop&q=80', url: 'https://cdn.freesound.org/previews/612/612644_5674468-lq.mp3' },
+  { id: 'acoustic-2', title: 'Acoustic Morning Breeze', artist: 'Indie Collective', cover: 'https://images.unsplash.com/photo-1445985543470-41fdd5c31447?w=300&auto=format&fit=crop&q=80', url: 'https://cdn.freesound.org/previews/612/612644_5674468-lq.mp3' },
+  { id: 'bhangra-3', title: 'Dhol Beats Punjabi', artist: 'Punjab Beats', cover: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300&auto=format&fit=crop&q=80', url: 'https://cdn.freesound.org/previews/612/612644_5674468-lq.mp3' },
+  { id: 'bollywood-4', title: 'Bollywood Romance', artist: 'Arijit & Neha', cover: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&auto=format&fit=crop&q=80', url: 'https://cdn.freesound.org/previews/612/612644_5674468-lq.mp3' }
 ];
 
 const STYLES_FILTERS = [
@@ -153,6 +159,12 @@ export function StoryEditor({
   // Music tool states
   const [selectedSong, setSelectedSong] = useState<any | null>(null);
   const [isMusicPlaying, setIsMusicPlaying] = useState(false);
+  const [musicSearchQuery, setMusicSearchQuery] = useState('');
+  const [selectedMusicGenre, setSelectedMusicGenre] = useState('All');
+  const [songsList, setSongsList] = useState<any[]>(POPULAR_SONGS);
+  const [isLoadingMusic, setIsLoadingMusic] = useState(false);
+  const [previewingSongId, setPreviewingSongId] = useState<string | null>(null);
+  const previewAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // Video playback preview state
   const [videoPlaying, setVideoPlaying] = useState(true);
@@ -168,9 +180,10 @@ export function StoryEditor({
   const dragInfo = useRef<{ id: string; startX: number; startY: number; initialX: number; initialY: number } | null>(null);
   const isDrawing = useRef(false);
 
-  // Pre-load draft state if saved
+  // Pre-load draft state if saved & reset active tools
   useEffect(() => {
     if (isOpen && mediaUrl) {
+      setActiveTool('none');
       const draft = localStorage.getItem(`story_draft_${mediaUrl}`);
       if (draft) {
         try {
@@ -187,8 +200,93 @@ export function StoryEditor({
           console.error("Failed to load draft story", e);
         }
       }
+    } else if (!isOpen) {
+      setActiveTool('none');
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = '';
+      }
+      if (previewAudioRef.current) {
+        previewAudioRef.current.pause();
+        previewAudioRef.current.src = '';
+      }
+      setPreviewingSongId(null);
+      setIsMusicPlaying(false);
     }
   }, [isOpen, mediaUrl]);
+
+  // Fetch songs dynamically from Tolee Songs API
+  useEffect(() => {
+    if (activeTool !== 'music') {
+      if (previewAudioRef.current) {
+        previewAudioRef.current.pause();
+      }
+      setPreviewingSongId(null);
+      return;
+    }
+
+    let isMounted = true;
+    setIsLoadingMusic(true);
+
+    const timer = setTimeout(async () => {
+      try {
+        if (musicSearchQuery.trim()) {
+          const res = await fetch(`/api/songs/search?q=${encodeURIComponent(musicSearchQuery.trim())}`);
+          const data = await res.json();
+          if (isMounted) {
+            if (data.success && Array.isArray(data.songs) && data.songs.length > 0) {
+              setSongsList(data.songs.map((s: any) => ({
+                id: s.id,
+                title: s.title,
+                artist: s.artist?.name || s.artistName || 'Tolee Artist',
+                url: s.audioUrl || s.url,
+                cover: s.coverUrl || s.cover || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300',
+                genre: s.genre,
+                duration: s.duration,
+              })));
+            } else {
+              const filtered = [...POPULAR_SONGS, ...CURATED_AUDIO_LIBRARY].filter(s =>
+                s.title.toLowerCase().includes(musicSearchQuery.toLowerCase()) ||
+                s.artist.toLowerCase().includes(musicSearchQuery.toLowerCase())
+              );
+              setSongsList(filtered);
+            }
+          }
+        } else {
+          const genreParam = selectedMusicGenre !== 'All' ? `?genre=${encodeURIComponent(selectedMusicGenre)}` : '';
+          const res = await fetch(`/api/songs${genreParam}`);
+          const data = await res.json();
+          if (isMounted) {
+            if (data.success && Array.isArray(data.songs) && data.songs.length > 0) {
+              setSongsList(data.songs.map((s: any) => ({
+                id: s.id,
+                title: s.title,
+                artist: s.artist?.name || s.artistName || 'Tolee Artist',
+                url: s.audioUrl || s.url,
+                cover: s.coverUrl || s.cover || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300',
+                genre: s.genre,
+                duration: s.duration,
+              })));
+            } else {
+              const libraryFiltered = selectedMusicGenre === 'All'
+                ? [...POPULAR_SONGS, ...CURATED_AUDIO_LIBRARY]
+                : CURATED_AUDIO_LIBRARY.filter(s => s.genre?.toLowerCase() === selectedMusicGenre.toLowerCase());
+              setSongsList(libraryFiltered.length > 0 ? libraryFiltered : POPULAR_SONGS);
+            }
+          }
+        }
+      } catch (err) {
+        if (isMounted) setSongsList(POPULAR_SONGS);
+      } finally {
+        if (isMounted) setIsLoadingMusic(false);
+      }
+    }, 200);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, [activeTool, musicSearchQuery, selectedMusicGenre]);
 
   // Auto-save draft on every modification
   const saveStoryDraft = useCallback(() => {
@@ -509,22 +607,54 @@ export function StoryEditor({
     setActiveTool('none');
   };
 
+  const togglePreviewSong = (song: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const songUrl = song.audioUrl || song.url;
+    if (!songUrl) return;
+
+    if (previewingSongId === song.id) {
+      if (previewAudioRef.current) previewAudioRef.current.pause();
+      setPreviewingSongId(null);
+    } else {
+      if (previewAudioRef.current) {
+        previewAudioRef.current.src = songUrl;
+        previewAudioRef.current.play().catch(() => {});
+        setPreviewingSongId(song.id);
+      }
+    }
+  };
+
   // Add background music
   const handleSelectSong = (song: any) => {
-    setSelectedSong(song);
-    // Play synthetic chime track for visual presentation
-    setIsMusicPlaying(true);
+    if (previewAudioRef.current) previewAudioRef.current.pause();
+    setPreviewingSongId(null);
+
+    const songData = {
+      id: song.id,
+      title: song.title,
+      artist: song.artist?.name || song.artistName || song.artist || 'Tolee Artist',
+      cover: song.coverUrl || song.cover || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300',
+      url: song.audioUrl || song.url,
+    };
+    setSelectedSong(songData);
+
+    // Play in editor background audio
+    if (audioRef.current && songData.url) {
+      audioRef.current.src = songData.url;
+      audioRef.current.play().catch(() => {});
+      setIsMusicPlaying(true);
+    }
     
     // Add Music Sticker to Canvas
     const exists = elements.some(el => el.type === 'music');
     if (!exists) {
       const newMusicSticker: FloatingElement = {
-        id: Math.random().toString(),
+        id: 'music-sticker-' + Date.now(),
         type: 'music',
-        songTitle: song.title,
-        artist: song.artist,
-        x: 35,
-        y: 65,
+        songTitle: songData.title,
+        artist: songData.artist,
+        x: 50,
+        y: 75,
         size: 1.0,
         rotation: 0
       };
@@ -532,12 +662,22 @@ export function StoryEditor({
     } else {
       setElements(prev => prev.map(el => {
         if (el.type === 'music') {
-          return { ...el, songTitle: song.title, artist: song.artist };
+          return { ...el, songTitle: songData.title, artist: songData.artist };
         }
         return el;
       }));
     }
     setActiveTool('none');
+  };
+
+  const handleRemoveSong = () => {
+    setSelectedSong(null);
+    setIsMusicPlaying(false);
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = '';
+    }
+    setElements(prev => prev.filter(el => el.type !== 'music'));
   };
 
   // Direct Publish flow
@@ -554,7 +694,13 @@ export function StoryEditor({
         rotation,
         offsetX,
         offsetY,
-        music: selectedSong ? { id: selectedSong.id, title: selectedSong.title, artist: selectedSong.artist } : null,
+        music: selectedSong ? {
+          id: selectedSong.id,
+          title: selectedSong.title,
+          artist: selectedSong.artist,
+          url: selectedSong.url,
+          coverUrl: selectedSong.cover
+        } : null,
         sharedPost: sharedPost || null
       });
 
@@ -754,6 +900,39 @@ export function StoryEditor({
             <X className="w-5 h-5" />
           </button>
 
+          {/* Selected Music Soundtrack badge */}
+          {selectedSong && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/65 backdrop-blur-md border border-white/20 text-white pointer-events-auto max-w-[55%] shadow-lg">
+              <button
+                type="button"
+                onClick={() => {
+                  if (audioRef.current) {
+                    if (isMusicPlaying) {
+                      audioRef.current.pause();
+                      setIsMusicPlaying(false);
+                    } else {
+                      audioRef.current.play().catch(() => {});
+                      setIsMusicPlaying(true);
+                    }
+                  }
+                }}
+                className="text-indigo-400 shrink-0 hover:scale-110 transition-transform"
+                title={isMusicPlaying ? 'Pause soundtrack' : 'Play soundtrack'}
+              >
+                {isMusicPlaying ? <Pause className="w-3.5 h-3.5 fill-current" /> : <Play className="w-3.5 h-3.5 fill-current" />}
+              </button>
+              <span className="text-[11px] font-bold truncate flex-1">{selectedSong.title}</span>
+              <button
+                type="button"
+                onClick={handleRemoveSong}
+                className="p-0.5 rounded-full hover:bg-white/20 text-zinc-400 hover:text-white shrink-0"
+                title="Remove Music"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
           {/* Video state overlays */}
           {mediaType === 'video' && (
             <div className="flex gap-2 pointer-events-auto">
@@ -801,9 +980,13 @@ export function StoryEditor({
             {/* Music */}
             <button
               onClick={() => setActiveTool('music')}
-              className="flex flex-col items-center gap-1 group"
+              className="flex flex-col items-center gap-1 group relative"
             >
-              <div className="w-12 h-12 rounded-full bg-black/30 backdrop-blur-md border border-white/10 flex items-center justify-center text-white hover:bg-white/15 transition-all group-active:scale-90">
+              <div className={`w-12 h-12 rounded-full backdrop-blur-md border flex items-center justify-center transition-all group-active:scale-90 ${
+                selectedSong
+                  ? 'bg-indigo-600/80 border-indigo-400 text-white shadow-lg shadow-indigo-500/30'
+                  : 'bg-black/30 border-white/10 text-white hover:bg-white/15'
+              }`}>
                 <Music className="w-5.5 h-5.5 stroke-[2.2]" />
               </div>
               <span className="text-[10px] text-zinc-200 font-bold text-shadow">Music</span>
@@ -942,17 +1125,36 @@ export function StoryEditor({
           </div>
         )}
 
-        {/* ── SUB-TOOL CONTROL PANELS (STSTICKERS / RESTYLE / RESIZE etc.) ── */}
+        {/* ── BACKDROP SCRIM FOR DRAWERS (TAP ANYWHERE OUTSIDE TO CLOSE) ── */}
+        {activeTool !== 'none' && (
+          <div
+            className="absolute inset-0 z-25 bg-black/60 backdrop-blur-[2px]"
+            onClick={() => {
+              if (previewAudioRef.current) previewAudioRef.current.pause();
+              setPreviewingSongId(null);
+              setActiveTool('none');
+            }}
+          />
+        )}
+
+        {/* ── SUB-TOOL CONTROL PANELS (STICKERS / RESTYLE / RESIZE / MUSIC) ── */}
         
         {/* Restyle (Drawing Brush / Neon / Highlighter) */}
         {activeTool === 'restyle' && (
-          <div className="absolute inset-x-0 bottom-0 z-30 bg-zinc-950/95 rounded-t-[2rem] border-t border-zinc-800 p-4 pb-8 space-y-4 animate-in slide-in-from-bottom duration-200">
-            <div className="flex items-center justify-between">
+          <div className="absolute inset-x-0 bottom-0 z-30 bg-zinc-950/95 rounded-t-[2rem] border-t border-zinc-800 p-4 pb-8 space-y-4 max-h-[75vh] overflow-y-auto no-scrollbar animate-in slide-in-from-bottom duration-200">
+            <div className="flex items-center justify-between pb-1 border-b border-zinc-800">
               <span className="text-xs font-black text-white uppercase tracking-wider">Restyle & Draw</span>
-              <div className="flex gap-2">
-                <button onClick={undoLastPath} className="p-1.5 bg-zinc-900 rounded-lg hover:bg-zinc-800 text-white text-xs font-bold"><CornerUpLeft className="w-4 h-4" /></button>
-                <button onClick={redoLastPath} className="p-1.5 bg-zinc-900 rounded-lg hover:bg-zinc-800 text-white text-xs font-bold"><CornerUpRight className="w-4 h-4" /></button>
+              <div className="flex items-center gap-2">
+                <button onClick={undoLastPath} className="p-1.5 bg-zinc-900 rounded-lg hover:bg-zinc-800 text-white text-xs font-bold" title="Undo"><CornerUpLeft className="w-4 h-4" /></button>
+                <button onClick={redoLastPath} className="p-1.5 bg-zinc-900 rounded-lg hover:bg-zinc-800 text-white text-xs font-bold" title="Redo"><CornerUpRight className="w-4 h-4" /></button>
                 <button onClick={() => { setDrawingPaths([]); setUndonePaths([]); setTimeout(redrawCanvas, 50); }} className="p-1.5 bg-zinc-900 rounded-lg hover:bg-zinc-800 text-red-400 text-xs font-bold">Clear</button>
+                <button
+                  onClick={() => setActiveTool('none')}
+                  className="w-7 h-7 rounded-full bg-zinc-900 hover:bg-zinc-800 flex items-center justify-center text-zinc-300 hover:text-white ml-1"
+                  aria-label="Close"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
             </div>
 
@@ -1011,15 +1213,24 @@ export function StoryEditor({
               onClick={() => setActiveTool('none')}
               className="w-full py-3 bg-zinc-850 hover:bg-zinc-800 text-white rounded-xl text-xs font-bold uppercase transition-all"
             >
-              Done Drawing
+              Done Drawing ✓
             </button>
           </div>
         )}
 
         {/* Stickers Grid */}
         {activeTool === 'stickers' && (
-          <div className="absolute inset-x-0 bottom-0 z-30 bg-zinc-950/95 rounded-t-[2rem] border-t border-zinc-800 p-4 pb-8 space-y-4 max-h-[60vh] overflow-y-auto no-scrollbar animate-in slide-in-from-bottom duration-200">
-            <span className="block text-xs font-black text-white uppercase tracking-wider mb-2">Add Stickers & Emojis</span>
+          <div className="absolute inset-x-0 bottom-0 z-30 bg-zinc-950/95 rounded-t-[2rem] border-t border-zinc-800 p-4 pb-8 space-y-4 max-h-[65vh] overflow-y-auto no-scrollbar animate-in slide-in-from-bottom duration-200">
+            <div className="flex items-center justify-between pb-1 border-b border-zinc-800">
+              <span className="text-xs font-black text-white uppercase tracking-wider">Add Stickers & Emojis</span>
+              <button
+                onClick={() => setActiveTool('none')}
+                className="w-7 h-7 rounded-full bg-zinc-900 hover:bg-zinc-800 flex items-center justify-center text-zinc-300 hover:text-white"
+                aria-label="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
 
             {/* Custom Tag Buttons (Hashtag/Location) */}
             <div className="grid grid-cols-2 gap-2.5">
@@ -1065,13 +1276,13 @@ export function StoryEditor({
             <div className="space-y-1.5">
               <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block mb-2">Emojis</span>
               <div className="grid grid-cols-8 gap-2.5 text-2xl py-1 select-none">
-                {['❤️', '🔥', '😂', '🔥', '👏', '😍', '🎉', '🌟', 
-                  '💯', '✨', '🎈', '🍕', '🐱', '🕶️', '🚀', '🌈',
-                  '📍', '💡', '🎵', '👀', '💯', '🎨', '💼', '🏡'].map(emoji => (
+                {['❤️', '🔥', '😂', '👏', '😍', '🎉', '🌟', '💯', 
+                  '✨', '🎈', '🍕', '🐱', '🕶️', '🚀', '🌈', '📍', 
+                  '💡', '🎵', '👀', '🌺', '🎨', '💼', '🏡', '☕'].map(emoji => (
                   <button
                     key={emoji}
                     onClick={() => handleAddEmojiSticker(emoji)}
-                    className="hover:scale-125 transition-transform active:scale-95"
+                    className="hover:scale-125 transition-transform active:scale-95 text-center"
                   >
                     {emoji}
                   </button>
@@ -1083,48 +1294,191 @@ export function StoryEditor({
               onClick={() => setActiveTool('none')}
               className="w-full py-3 bg-zinc-850 hover:bg-zinc-800 text-white rounded-xl text-xs font-bold uppercase transition-all"
             >
-              Close Stickers
+              Done ✓
             </button>
           </div>
         )}
 
-        {/* Music list Selection */}
+        {/* Music list Selection with full search & Tolee integration */}
         {activeTool === 'music' && (
-          <div className="absolute inset-x-0 bottom-0 z-30 bg-zinc-950/95 rounded-t-[2rem] border-t border-zinc-800 p-4 pb-8 space-y-4 max-h-[60vh] overflow-y-auto no-scrollbar animate-in slide-in-from-bottom duration-200">
-            <span className="block text-xs font-black text-white uppercase tracking-wider mb-2">Select Soundtrack</span>
+          <div className="absolute inset-x-0 bottom-0 z-30 bg-zinc-950/95 rounded-t-[2rem] border-t border-zinc-800 p-4 pb-8 space-y-3.5 max-h-[75vh] flex flex-col animate-in slide-in-from-bottom duration-200">
+            {/* Header with Title & Close button */}
+            <div className="flex items-center justify-between pb-1 border-b border-zinc-800">
+              <div className="flex items-center gap-2">
+                <Music className="w-4 h-4 text-indigo-400" />
+                <span className="text-xs font-black text-white uppercase tracking-wider">Select Soundtrack</span>
+              </div>
+              <button
+                onClick={() => {
+                  if (previewAudioRef.current) previewAudioRef.current.pause();
+                  setPreviewingSongId(null);
+                  setActiveTool('none');
+                }}
+                className="w-7 h-7 rounded-full bg-zinc-900 hover:bg-zinc-800 flex items-center justify-center text-zinc-300 hover:text-white"
+                aria-label="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
 
-            <div className="flex flex-col gap-2.5">
-              {POPULAR_SONGS.map(song => (
-                <div
-                  key={song.id}
-                  onClick={() => handleSelectSong(song)}
-                  className="flex items-center gap-3.5 p-2 rounded-2xl hover:bg-white/5 active:bg-white/10 cursor-pointer transition-colors group"
+            {/* Search Input */}
+            <div className="relative">
+              <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={musicSearchQuery}
+                onChange={(e) => setMusicSearchQuery(e.target.value)}
+                placeholder="Search Bollywood, Punjabi, Lo-Fi songs..."
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-full pl-10 pr-9 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+              {musicSearchQuery && (
+                <button
+                  onClick={() => setMusicSearchQuery('')}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white"
                 >
-                  <img src={song.cover} alt={song.title} className="w-12 h-12 rounded-xl object-cover" />
-                  <div className="flex-grow flex flex-col">
-                    <span className="text-sm font-bold text-white group-hover:text-indigo-400 transition-colors">{song.title}</span>
-                    <span className="text-[11px] text-zinc-400">{song.artist}</span>
-                  </div>
-                  <div className="w-8 h-8 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-white">
-                    <Play className="w-3.5 h-3.5 fill-white" />
-                  </div>
-                </div>
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Genre Filter Pills */}
+            <div className="flex gap-2 overflow-x-auto no-scrollbar py-1 shrink-0">
+              {MUSIC_GENRES.map((genre) => (
+                <button
+                  key={genre}
+                  onClick={() => setSelectedMusicGenre(genre)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-bold shrink-0 transition-all ${
+                    selectedMusicGenre === genre
+                      ? 'bg-indigo-600 text-white shadow-md'
+                      : 'bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800'
+                  }`}
+                >
+                  {genre}
+                </button>
               ))}
             </div>
 
+            {/* Songs List */}
+            <div className="flex-1 overflow-y-auto no-scrollbar space-y-2 min-h-[160px] max-h-[35vh]">
+              {isLoadingMusic ? (
+                <div className="flex flex-col items-center justify-center py-10 gap-2 text-zinc-500">
+                  <Loader2 className="w-6 h-6 animate-spin text-indigo-400" />
+                  <span className="text-xs font-bold">Loading tracks...</span>
+                </div>
+              ) : songsList.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 text-center text-zinc-500 gap-1">
+                  <Disc className="w-8 h-8 opacity-40" />
+                  <span className="text-xs font-bold text-zinc-400">No songs found</span>
+                  <span className="text-[10px]">Try searching for another song or artist</span>
+                </div>
+              ) : (
+                songsList.map((song) => {
+                  const isSelected = selectedSong?.id === song.id;
+                  const isPreviewPlaying = previewingSongId === song.id;
+
+                  return (
+                    <div
+                      key={song.id}
+                      onClick={() => handleSelectSong(song)}
+                      className={`flex items-center justify-between p-2.5 rounded-2xl cursor-pointer transition-all border ${
+                        isSelected
+                          ? 'bg-indigo-950/40 border-indigo-500/80 shadow-md'
+                          : 'bg-zinc-900/60 border-zinc-800/80 hover:bg-zinc-850/80'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        {/* Play / Preview toggle button */}
+                        <button
+                          type="button"
+                          onClick={(e) => togglePreviewSong(song, e)}
+                          className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-all ${
+                            isPreviewPlaying
+                              ? 'bg-indigo-600 text-white scale-105 shadow-md'
+                              : 'bg-zinc-800 hover:bg-zinc-700 text-white'
+                          }`}
+                          title={isPreviewPlaying ? 'Pause' : 'Play preview'}
+                        >
+                          {isPreviewPlaying ? (
+                            <Pause className="w-4 h-4 fill-current" />
+                          ) : (
+                            <Play className="w-4 h-4 fill-current ml-0.5" />
+                          )}
+                        </button>
+
+                        {/* Song Cover / Icon */}
+                        {song.cover ? (
+                          <img
+                            src={song.cover}
+                            alt={song.title}
+                            className="w-10 h-10 rounded-xl object-cover shrink-0"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-xl bg-zinc-800 flex items-center justify-center shrink-0 text-zinc-400">
+                            <Music className="w-4 h-4" />
+                          </div>
+                        )}
+
+                        <div className="min-w-0 flex-1">
+                          <h5 className="font-bold text-xs text-white truncate">{song.title}</h5>
+                          <p className="text-[10px] text-zinc-400 truncate">{song.artist}</p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (isSelected) {
+                            handleRemoveSong();
+                          } else {
+                            handleSelectSong(song);
+                          }
+                        }}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all ml-2 ${
+                          isSelected
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'
+                        }`}
+                      >
+                        {isSelected ? 'Selected ✓' : 'Use'}
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Bottom Done button */}
             <button
-              onClick={() => setActiveTool('none')}
+              onClick={() => {
+                if (previewAudioRef.current) previewAudioRef.current.pause();
+                setPreviewingSongId(null);
+                setActiveTool('none');
+              }}
               className="w-full py-3 bg-zinc-850 hover:bg-zinc-800 text-white rounded-xl text-xs font-bold uppercase transition-all"
             >
-              Cancel
+              Done
             </button>
           </div>
         )}
 
         {/* Resize (Crop, Rotate, Zoom) */}
         {activeTool === 'resize' && (
-          <div className="absolute inset-x-0 bottom-0 z-30 bg-zinc-950/95 rounded-t-[2rem] border-t border-zinc-800 p-4 pb-8 space-y-4 animate-in slide-in-from-bottom duration-200">
-            <span className="block text-xs font-black text-white uppercase tracking-wider">Resize / Zoom / Position</span>
+          <div className="absolute inset-x-0 bottom-0 z-30 bg-zinc-950/95 rounded-t-[2rem] border-t border-zinc-800 p-4 pb-6 space-y-3.5 max-h-[75vh] overflow-y-auto no-scrollbar animate-in slide-in-from-bottom duration-200">
+            {/* Header with Title and Close X button */}
+            <div className="flex items-center justify-between pb-1 border-b border-zinc-800">
+              <div className="flex items-center gap-2">
+                <Maximize2 className="w-4 h-4 text-indigo-400" />
+                <span className="text-xs font-black text-white uppercase tracking-wider">Resize / Zoom / Position</span>
+              </div>
+              <button
+                onClick={() => setActiveTool('none')}
+                className="w-7 h-7 rounded-full bg-zinc-900 hover:bg-zinc-800 flex items-center justify-center text-zinc-300 hover:text-white"
+                aria-label="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
 
             {/* Rotation controls */}
             <div className="grid grid-cols-2 gap-2.5">
@@ -1155,31 +1509,33 @@ export function StoryEditor({
                 step="0.1"
                 value={scale}
                 onChange={(e) => setScale(parseFloat(e.target.value))}
-                className="w-full accent-indigo-500 bg-zinc-800 h-1 rounded-full cursor-pointer"
+                className="w-full accent-indigo-500 bg-zinc-800 h-1.5 rounded-full cursor-pointer"
               />
             </div>
 
             {/* Free X/Y Position offsets */}
             <div className="grid grid-cols-4 gap-2">
-              <button onClick={() => setOffsetX(x => x - 25)} className="py-2.5 bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 text-white text-xs font-bold rounded-xl">◀ Left</button>
-              <button onClick={() => setOffsetY(y => y - 25)} className="py-2.5 bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 text-white text-xs font-bold rounded-xl">▲ Up</button>
-              <button onClick={() => setOffsetY(y => y + 25)} className="py-2.5 bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 text-white text-xs font-bold rounded-xl">▼ Down</button>
-              <button onClick={() => setOffsetX(x => x + 25)} className="py-2.5 bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 text-white text-xs font-bold rounded-xl">Right ▶</button>
+              <button onClick={() => setOffsetX(x => x - 25)} className="py-2 bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 text-white text-xs font-bold rounded-xl">◀ Left</button>
+              <button onClick={() => setOffsetY(y => y - 25)} className="py-2 bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 text-white text-xs font-bold rounded-xl">▲ Up</button>
+              <button onClick={() => setOffsetY(y => y + 25)} className="py-2 bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 text-white text-xs font-bold rounded-xl">▼ Down</button>
+              <button onClick={() => setOffsetX(x => x + 25)} className="py-2 bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 text-white text-xs font-bold rounded-xl">Right ▶</button>
             </div>
 
-            <button
-              onClick={() => { setScale(1.0); setRotation(0); setOffsetX(0); setOffsetY(0); }}
-              className="w-full py-2 bg-zinc-900 border border-zinc-800 text-red-400 hover:bg-zinc-850 text-[11px] font-bold uppercase rounded-xl transition-all"
-            >
-              Reset Position
-            </button>
-
-            <button
-              onClick={() => setActiveTool('none')}
-              className="w-full py-3 bg-zinc-850 hover:bg-zinc-800 text-white rounded-xl text-xs font-bold uppercase transition-all"
-            >
-              Done Resizing
-            </button>
+            {/* Bottom Actions: Side-by-side Reset and Done buttons */}
+            <div className="flex items-center gap-2.5 pt-1">
+              <button
+                onClick={() => { setScale(1.0); setRotation(0); setOffsetX(0); setOffsetY(0); }}
+                className="flex-1 py-2.5 bg-zinc-900 border border-zinc-800 text-red-400 hover:bg-zinc-850 text-xs font-bold uppercase rounded-xl transition-all"
+              >
+                Reset
+              </button>
+              <button
+                onClick={() => setActiveTool('none')}
+                className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold uppercase transition-all shadow-lg font-black"
+              >
+                Done Resizing ✓
+              </button>
+            </div>
           </div>
         )}
 
@@ -1331,6 +1687,10 @@ export function StoryEditor({
             )}
           </div>
         )}
+
+        {/* ── HIDDEN AUDIO PLAYBACK & PREVIEW ELEMENTS ── */}
+        <audio ref={audioRef} loop />
+        <audio ref={previewAudioRef} />
       </div>
     </div>
   );

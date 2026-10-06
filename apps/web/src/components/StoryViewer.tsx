@@ -120,6 +120,41 @@ export function StoryViewer({
     setSharedPostStatus('active');
   }, [activeStory?.id]);
 
+  const parsedStoryOverlays = React.useMemo(() => {
+    if (!activeStory?.overlays) return null;
+    try {
+      return JSON.parse(activeStory.overlays);
+    } catch {
+      return null;
+    }
+  }, [activeStory?.overlays]);
+
+  const storyAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Play background music if active story has soundtrack
+  useEffect(() => {
+    if (!isOpen || !activeStory) {
+      if (storyAudioRef.current) {
+        storyAudioRef.current.pause();
+        storyAudioRef.current.src = '';
+      }
+      return;
+    }
+
+    const musicUrl = parsedStoryOverlays?.music?.url;
+    if (storyAudioRef.current) {
+      if (musicUrl && !isPaused && !isAnyDialogOpen) {
+        if (storyAudioRef.current.src !== musicUrl) {
+          storyAudioRef.current.src = musicUrl;
+        }
+        storyAudioRef.current.muted = isMuted;
+        storyAudioRef.current.play().catch(() => {});
+      } else {
+        storyAudioRef.current.pause();
+      }
+    }
+  }, [isOpen, activeStory?.id, parsedStoryOverlays?.music?.url, isPaused, isMuted, isAnyDialogOpen]);
+
   const progressIntervalRef = useRef<any>(null);
   const durationRef = useRef<number>(5000);
   const accumulatedProgressRef = useRef<number>(0);
@@ -738,9 +773,17 @@ export function StoryViewer({
                   <span className="text-[13px] font-bold text-white hover:underline leading-tight">
                     {activeGroup.user.username || activeGroup.user.name}
                   </span>
-                  <span className="text-[10px] text-zinc-300 leading-none mt-0.5">
-                    {getStoryTime(activeStory.createdAt)}
-                  </span>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-[10px] text-zinc-300 leading-none">
+                      {getStoryTime(activeStory.createdAt)}
+                    </span>
+                    {parsedStoryOverlays?.music?.title && (
+                      <span className="flex items-center gap-1 text-[10px] text-indigo-300 font-semibold truncate max-w-[130px] leading-none">
+                        <Music className="w-3 h-3 text-indigo-400 shrink-0 animate-pulse" />
+                        <span className="truncate">{parsedStoryOverlays.music.title}</span>
+                      </span>
+                    )}
+                  </div>
                 </div>
               </Link>
 
@@ -760,8 +803,8 @@ export function StoryViewer({
                   {isPaused ? <Play className="w-4 h-4 fill-white" /> : <Pause className="w-4 h-4 fill-white" />}
                 </button>
 
-                {/* Sound (videos only) */}
-                {activeStory.mediaType === 'video' && (
+                {/* Sound (videos or stories with background music) */}
+                {(activeStory.mediaType === 'video' || !!parsedStoryOverlays?.music?.url) && (
                   <button
                     onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); }}
                     className="p-2 rounded-full bg-black/25 hover:bg-black/55 text-white transition-all active:scale-95 flex items-center justify-center backdrop-blur-sm"
@@ -1109,6 +1152,9 @@ export function StoryViewer({
         ) : (
           <div className="hidden lg:block w-[160px] ml-10 shrink-0" />
         )}
+
+        {/* Background audio playback for stories with soundtrack */}
+        <audio ref={storyAudioRef} loop />
 
       </DialogContent>
     </Dialog>
