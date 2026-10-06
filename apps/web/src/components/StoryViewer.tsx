@@ -582,6 +582,28 @@ export function StoryViewer({
                     />
                   )}
 
+                  {/* Render Drawing Paths */}
+                  {parsedOverlays?.drawingPaths && parsedOverlays.drawingPaths.length > 0 && (
+                    <svg className="absolute inset-0 w-full h-full pointer-events-none z-10" viewBox="0 0 1080 1920">
+                      {parsedOverlays.drawingPaths.map((path: any, pIdx: number) => {
+                        if (!path.points || path.points.length < 2) return null;
+                        const d = path.points.reduce((acc: string, pt: any, i: number) => `${acc} ${i === 0 ? 'M' : 'L'} ${pt.x} ${pt.y}`, '');
+                        return (
+                          <path
+                            key={pIdx}
+                            d={d}
+                            fill="none"
+                            stroke={path.color || '#FF2A7A'}
+                            strokeWidth={path.size ? path.size * 2 : 6}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            opacity={path.type === 'highlighter' ? 0.4 : 1}
+                          />
+                        );
+                      })}
+                    </svg>
+                  )}
+
                   {/* Render Custom Draggable Floating elements */}
                   {parsedOverlays?.elements && parsedOverlays.elements.length > 0 && (
                     <div className="absolute inset-0 z-10 pointer-events-none select-none overflow-hidden">

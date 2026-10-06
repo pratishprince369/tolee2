@@ -24,9 +24,6 @@ import {
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useSession } from 'next-auth/react';
-import { createTestStory } from '@/actions/highlight';
-import { incrementStoryShare } from '@/actions/post';
-import { uploadFile } from '@/lib/upload';
 
 interface StoryEditorProps {
   isOpen: boolean;
@@ -549,228 +546,35 @@ export function StoryEditor({
     setIsPublishing(true);
 
     try {
-      let finalComposedUrl = mediaUrl;
-      let finalOverlaysJson: string | undefined = undefined;
+      const finalOverlaysJson = JSON.stringify({
+        elements,
+        drawingPaths,
+        activeFilter,
+        scale,
+        rotation,
+        offsetX,
+        offsetY,
+        music: selectedSong ? { id: selectedSong.id, title: selectedSong.title, artist: selectedSong.artist } : null,
+        sharedPost: sharedPost || null
+      });
 
-      if (mediaType === 'image') {
-        // Compose image canvas client-side to bake filters, texts, emojis, and drawings!
-        const canvas = document.createElement('canvas');
-        canvas.width = 1080;
-        canvas.height = 1920;
-        const ctx = canvas.getContext('2d');
+      // Submit story creation to dedicated API route
+      const apiRes = await fetch('/api/story/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mediaUrl,
+          mediaType,
+          thumbnailUrl: mediaType === 'video' ? mediaUrl.replace(/\.[^/.]+$/, '.jpg') : mediaUrl,
+          caption: caption || undefined,
+          overlays: finalOverlaysJson,
+          closeFriends
+        })
+      });
 
-        if (ctx) {
-          // 1. Draw base image
-          const baseImg = new Image();
-          baseImg.crossOrigin = 'anonymous';
-          
-          await new Promise<void>((resolve, reject) => {
-            baseImg.onload = () => resolve();
-            baseImg.onerror = () => reject(new Error("Failed to load base image"));
-            baseImg.src = mediaUrl;
-          });
-
-          // Draw image respecting scale, offset, and filter
-          ctx.save();
-          
-          // Apply active filter
-          if (activeFilter === 'vintage') {
-            ctx.filter = 'sepia(0.5) contrast(1.1) brightness(0.95)';
-          } else if (activeFilter === 'bw') {
-            ctx.filter = 'grayscale(1) contrast(1.15)';
-          } else if (activeFilter === 'vivid') {
-            ctx.filter = 'saturate(1.5) contrast(1.1)';
-          } else if (activeFilter === 'blur') {
-            ctx.filter = 'blur(6px) brightness(1.05)';
-          }
-          
-          // Draw image filled to viewport
-          ctx.translate(canvas.width / 2 + (offsetX * 10), canvas.height / 2 + (offsetY * 10));
-          ctx.rotate((rotation * Math.PI) / 180);
-          ctx.scale(scale, scale);
-          
-          // Compute draw dimensions (center cropped)
-          const imgRatio = baseImg.width / baseImg.height;
-          const canvasRatio = canvas.width / canvas.height;
-          let drawW = canvas.width;
-          let drawH = canvas.height;
-          if (imgRatio > canvasRatio) {
-            drawW = canvas.height * imgRatio;
-          } else {
-            drawH = canvas.width / imgRatio;
-          }
-
-          ctx.drawImage(baseImg, -drawW / 2, -drawH / 2, drawW, drawH);
-          ctx.restore();
-
-          // 2. Comport brush drawings (re-scaling brush canvas to high resolution viewport)
-          if (drawingPaths.length > 0 && drawingCanvasRef.current) {
-            const tempCanvas = drawingCanvasRef.current;
-            const wRatio = canvas.width / tempCanvas.width;
-            const hRatio = canvas.height / tempCanvas.height;
-
-            drawingPaths.forEach(path => {
-              if (path.points.length < 2) return;
-              ctx.beginPath();
-              ctx.globalAlpha = path.type === 'highlighter' ? 0.4 : 1.0;
-              ctx.lineWidth = (path.type === 'highlighter' ? path.size * 2 : path.size) * wRatio;
-              ctx.lineCap = 'round';
-              ctx.lineJoin = 'round';
-
-              if (path.type === 'eraser') {
-                ctx.globalCompositeOperation = 'destination-out';
-              } else {
-                ctx.globalCompositeOperation = 'source-over';
-                ctx.strokeStyle = path.color;
-                if (path.type === 'neon') {
-                  ctx.shadowColor = path.color;
-                  ctx.shadowBlur = 15 * wRatio;
-                } else {
-                  ctx.shadowBlur = 0;
-                }
-              }
-
-              ctx.moveTo(path.points[0].x * wRatio, path.points[0].y * hRatio);
-              for (let i = 1; i < path.points.length; i++) {
-                ctx.lineTo(path.points[i].x * wRatio, path.points[i].y * hRatio);
-              }
-              ctx.stroke();
-            });
-            
-            ctx.globalCompositeOperation = 'source-over';
-            ctx.shadowBlur = 0;
-            ctx.globalAlpha = 1.0;
-          }
-
-          // 3. Draw each floating element
-          elements.forEach(el => {
-            ctx.save();
-            // Convert percentages to absolute X,Y
-            const absX = (el.x / 100) * canvas.width;
-            const absY = (el.y / 100) * canvas.height;
-            
-            ctx.translate(absX, absY);
-            ctx.rotate((el.rotation * Math.PI) / 180);
-            
-            const fontSize = Math.floor(40 * el.size);
-            
-            if (el.type === 'text' && el.text) {
-              ctx.font = `${fontSize}px ${el.font?.includes('serif') ? 'Georgia' : el.font?.includes('mono') ? 'Courier New' : 'Arial'}`;
-              ctx.textAlign = 'center';
-              ctx.textBaseline = 'middle';
-              
-              const lines = el.text.split('\n');
-              const lineHeight = fontSize * 1.25;
-              
-              lines.forEach((line, idx) => {
-                const textWidth = ctx.measureText(line).width;
-                const offsetLineY = (idx - (lines.length - 1) / 2) * lineHeight;
-
-                if (el.highlight) {
-                  ctx.fillStyle = el.color === '#FFFFFF' ? '#000000' : '#FFFFFF';
-                  ctx.fillRect(-textWidth / 2 - 12, offsetLineY - fontSize / 2 - 6, textWidth + 24, fontSize + 12);
-                }
-                
-                ctx.fillStyle = el.color || '#FFFFFF';
-                ctx.fillText(line, 0, offsetLineY);
-              });
-
-            } else if (el.type === 'emoji' && el.emoji) {
-              const emojiSize = Math.floor(64 * el.size);
-              ctx.font = `${emojiSize}px Apple Color Emoji, Segoe UI Emoji, sans-serif`;
-              ctx.textAlign = 'center';
-              ctx.textBaseline = 'middle';
-              ctx.fillText(el.emoji, 0, 0);
-
-            } else if (el.type === 'sticker' && el.text) {
-              // Location or Hashtag sticker card
-              const tagWidth = ctx.measureText(el.text).width + 36;
-              const tagHeight = fontSize + 24;
-
-              ctx.fillStyle = el.stickerType === 'location' ? '#EAEAEA' : '#6366F1';
-              ctx.strokeStyle = '#FFFFFF';
-              ctx.lineWidth = 3;
-              
-              // Draw rounded rect
-              ctx.beginPath();
-              ctx.roundRect(-tagWidth / 2, -tagHeight / 2, tagWidth, tagHeight, 16);
-              ctx.fill();
-              ctx.stroke();
-
-              ctx.fillStyle = el.stickerType === 'location' ? '#000000' : '#FFFFFF';
-              ctx.font = `bold ${fontSize}px sans-serif`;
-              ctx.textAlign = 'center';
-              ctx.textBaseline = 'middle';
-              ctx.fillText(el.text, 0, 0);
-
-            } else if (el.type === 'music' && el.songTitle) {
-              // Music badge
-              const label = `🎵 ${el.songTitle} - ${el.artist || 'Artist'}`;
-              ctx.font = `bold ${fontSize}px sans-serif`;
-              const tagWidth = ctx.measureText(label).width + 36;
-              const tagHeight = fontSize + 24;
-
-              ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-              ctx.beginPath();
-              ctx.roundRect(-tagWidth / 2, -tagHeight / 2, tagWidth, tagHeight, 16);
-              ctx.fill();
-
-              ctx.fillStyle = '#FFFFFF';
-              ctx.textAlign = 'center';
-              ctx.textBaseline = 'middle';
-              ctx.fillText(label, 0, 0);
-            }
-
-            ctx.restore();
-          });
-        }
-
-        // 4. Export Canvas to Cloudinary direct upload
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-        const base64Blob = await (await fetch(dataUrl)).blob();
-        
-        // Convert blob to File object to pass to uploadFile
-        const file = new File([base64Blob], "story_composed.jpg", { type: "image/jpeg" });
-        const uploadResult = await uploadFile(file);
-        finalComposedUrl = uploadResult.secure_url;
-
-      } else {
-        // Video story: Serialize overlays elements as metadata JSON object
-        finalOverlaysJson = JSON.stringify({
-          elements,
-          activeFilter,
-          scale,
-          rotation,
-          offsetX,
-          offsetY,
-          music: selectedSong ? { id: selectedSong.id, title: selectedSong.title, artist: selectedSong.artist } : null,
-          sharedPost: sharedPost || null
-        });
-      }
-
-      // If it's an image story and we have sharedPost, serialize it as overlays json too
-      if (mediaType === 'image' && sharedPost) {
-        finalOverlaysJson = JSON.stringify({
-          sharedPost: sharedPost || null
-        });
-      }
-
-      // 5. Submit story creation to Next.js API/action
-      const res = await createTestStory(
-        finalComposedUrl,
-        mediaType,
-        undefined, // auto-generated
-        caption || undefined,
-        finalOverlaysJson,
-        closeFriends
-      );
+      const res = await apiRes.json();
 
       if (res.success) {
-        // Call incrementStoryShare server action to log analytic event
-        if (sharedPost) {
-          await incrementStoryShare(sharedPost.id);
-        }
-
         clearStoryDraft();
         setPublishSuccess(true);
         setTimeout(() => {
@@ -778,7 +582,7 @@ export function StoryEditor({
           setIsPublishing(false);
           onClose();
           if (onStoryPublished) onStoryPublished();
-        }, 1500);
+        }, 1200);
       } else {
         alert(res.error || "Failed to publish story.");
         setIsPublishing(false);
