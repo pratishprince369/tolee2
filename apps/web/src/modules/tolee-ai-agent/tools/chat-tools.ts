@@ -21,10 +21,26 @@ export const getLatestMessagesTool: ToolDefinition = {
   execute: async (args, context) => {
     try {
       const { limit = 5, senderName } = args || {};
-      
+
+      // Find all chats the current user participates in
+      const userChats = await prisma.chatParticipant.findMany({
+        where: { userId: context.userId },
+        select: { chatId: true },
+      });
+
+      const chatIds = userChats.map((c: any) => c.chatId);
+      if (chatIds.length === 0) {
+        return {
+          success: true,
+          data: [],
+          message: 'Aapke paas abhi koi active chat conversation nahi hai.',
+        };
+      }
+
       const messages = await prisma.message.findMany({
         where: {
-          receiverId: context.userId,
+          chatId: { in: chatIds },
+          senderId: { not: context.userId },
           ...(senderName
             ? {
                 sender: {
@@ -49,14 +65,15 @@ export const getLatestMessagesTool: ToolDefinition = {
           data: [],
           message: senderName
             ? `Aapko ${senderName} se koi naya message nahi mila hai.`
-            : 'Aapke inbox me koi naya unread message nahi hai.',
+            : 'Aapke inbox me koi naya message nahi mila.',
         };
       }
 
       const formatted = messages.map((m: any) => ({
         id: m.id,
-        senderName: m.sender.name || m.sender.username || 'User',
-        senderUsername: m.sender.username,
+        chatId: m.chatId,
+        senderName: m.sender?.name || m.sender?.username || 'User',
+        senderUsername: m.sender?.username,
         text: m.content,
         sentAt: m.createdAt,
         isRead: m.isRead,
@@ -118,11 +135,39 @@ export const sendMessageTool: ToolDefinition = {
         };
       }
 
+      // Find or create direct 1-on-1 chat
+      const existingParticipant = await prisma.chatParticipant.findFirst({
+        where: {
+          userId: context.userId,
+          chat: {
+            isGroupChat: false,
+            participants: { some: { userId: recipient.id } },
+          },
+        },
+        select: { chatId: true },
+      });
+
+      let targetChatId = existingParticipant?.chatId;
+      if (!targetChatId) {
+        const newChat = await prisma.chat.create({
+          data: {
+            isGroupChat: false,
+            participants: {
+              create: [
+                { userId: context.userId },
+                { userId: recipient.id },
+              ],
+            },
+          },
+        });
+        targetChatId = newChat.id;
+      }
+
       // Create message in DB
       const newMsg = await prisma.message.create({
         data: {
+          chatId: targetChatId,
           senderId: context.userId,
-          receiverId: recipient.id,
           content: messageContent,
         },
       });
@@ -131,6 +176,7 @@ export const sendMessageTool: ToolDefinition = {
         success: true,
         data: {
           messageId: newMsg.id,
+          chatId: targetChatId,
           recipientName: recipient.name || recipient.username,
           sentText: messageContent,
         },

@@ -5,6 +5,8 @@ import cloudinary from '@/lib/cloudinary';
 import { NvidiaNIMProvider } from './providers/nvidia-nim';
 import { FreeLLMAPIProvider } from './providers/freellmapi';
 import { SYSTEM_PROMPTS } from '@/modules/tolee-ai-manager/Core/prompt-manager';
+import { AgentOrchestrator } from '@/modules/tolee-ai-agent/core/agent-orchestrator';
+import { ToleeRealityValidator } from './reality-validator';
 
 // -------------------------------------------------------------
 // TYPES & INTERFACES
@@ -712,6 +714,41 @@ export class CentralAIEngine {
       }
     }
 
+    // 🤖 5b. Agentic Tool Execution Loop (Real Tolee Database Queries & Action Tool Calling)
+    if (options.userId) {
+      try {
+        const agentResult = await AgentOrchestrator.process({
+          userMessage: rawMessage,
+          conversationHistory: history as any,
+          context: {
+            userId: options.userId,
+            userName: options.userName || 'User',
+            userEmail: options.userEmail,
+          },
+        });
+
+        if (agentResult.executedTool || (agentResult.replyText && agentResult.replyText.length > 5 && !agentResult.replyText.includes('Main aapki kya madad kar sakta hoon?'))) {
+          return {
+            success: true,
+            type: agentResult.executedTool ? 'tool_result' : 'text',
+            content: agentResult.replyText,
+            model: 'tolee-agent-orchestrator',
+            provider: 'freellmapi+nvidia',
+            toolUsed: agentResult.executedTool || null,
+            image: null,
+            files: [],
+            metadata: {
+              latencyMs: Date.now() - startTime,
+              intent: agentResult.executedTool ? 'tool_action' : intent,
+              fallbackUsed: false,
+            },
+          };
+        }
+      } catch (agentErr: any) {
+        console.warn('[CentralAIEngine AgentOrchestrator Notice]', agentErr?.message);
+      }
+    }
+
     // 🌐 6. Multi-Provider Cloud AI Router (FreeLLMAPI / NVIDIA NIM / Gemini / OpenAI / Groq)
     // 6a. FreeLLMAPI Unified Multi-Model Gateway (DeepSeek, Llama-3.3, Qwen, Cerebras, Pollinations)
     try {
@@ -726,10 +763,17 @@ export class CentralAIEngine {
       });
 
       if (freellmResult.text && freellmResult.text.trim()) {
+        const validatedText = ToleeRealityValidator.validate(freellmResult.text.trim(), {
+          userId: options.userId || 'guest',
+          userMessage: rawMessage,
+          toolUsed: null,
+          toolResultSuccess: false,
+        }).sanitizedContent;
+
         return {
           success: true,
           type: 'text',
-          content: freellmResult.text.trim(),
+          content: validatedText,
           model: freellmResult.model,
           provider: freellmResult.provider,
           toolUsed: null,

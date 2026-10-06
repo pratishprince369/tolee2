@@ -1,6 +1,7 @@
 import { ToolRegistry } from '../tools/registry';
 import { ToolExecutionContext } from '../tools/types';
 import { CentralAIEngine } from '@/lib/ai-gateway/central-engine';
+import { ToleeRealityValidator } from '@/lib/ai-gateway/reality-validator';
 
 const NVIDIA_API_KEYS = [
   process.env.NVIDIA_API_KEY,
@@ -138,9 +139,18 @@ CORE PERSONALITY & TONE:
 
         try {
           const followUpData = await callLLM(followUpMessages, 512);
-          const finalReply = followUpData?.choices?.[0]?.message?.content || toolResult.message || 'Action complete ho gaya.';
+          const rawReply = followUpData?.choices?.[0]?.message?.content || toolResult.message || 'Action complete ho gaya.';
+          
+          // Anti-hallucination validation check
+          const validation = ToleeRealityValidator.validate(rawReply, {
+            userId: context.userId,
+            userMessage,
+            toolUsed: toolName,
+            toolResultSuccess: toolResult.success,
+          });
+
           return {
-            replyText: finalReply,
+            replyText: validation.sanitizedContent,
             executedTool: toolName,
             toolData: toolResult.data,
           };
@@ -153,9 +163,17 @@ CORE PERSONALITY & TONE:
         }
       }
 
-      // No tool needed, direct conversational response
+      // No tool called: validate that the raw conversational reply does not claim false actions
+      const directReply = message?.content || 'Main aapki kya madad kar sakta hoon?';
+      const validation = ToleeRealityValidator.validate(directReply, {
+        userId: context.userId,
+        userMessage,
+        toolUsed: null,
+        toolResultSuccess: false,
+      });
+
       return {
-        replyText: message?.content || 'Main aapki kya madad kar sakta hoon?',
+        replyText: validation.sanitizedContent,
       };
     } catch (err: any) {
       console.warn('[AgentOrchestrator] Primary provider error, falling back to CentralAIEngine:', err.message);

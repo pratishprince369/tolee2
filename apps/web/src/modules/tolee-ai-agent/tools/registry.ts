@@ -4,6 +4,14 @@ import { getUserPostsTool, createPostTool } from './post-tools';
 import { getNotificationsTool } from './notification-tools';
 import { getMarketplaceEnquiriesTool } from './marketplace-tools';
 import { getToleeGroupsTool } from './group-tools';
+import {
+  getUserProfileTool,
+  getRadarAlertsTool,
+  getStoriesTool,
+  getWalletBalanceTool,
+  getScheduleTool,
+  createReminderTool,
+} from './extended-tools';
 
 export class ToolRegistry {
   private static tools: Map<string, ToolDefinition> = new Map();
@@ -17,6 +25,14 @@ export class ToolRegistry {
     this.register(getNotificationsTool);
     this.register(getMarketplaceEnquiriesTool);
     this.register(getToleeGroupsTool);
+
+    // Register extended live Tolee tools
+    this.register(getUserProfileTool);
+    this.register(getRadarAlertsTool);
+    this.register(getStoriesTool);
+    this.register(getWalletBalanceTool);
+    this.register(getScheduleTool);
+    this.register(createReminderTool);
   }
 
   public static register(tool: ToolDefinition) {

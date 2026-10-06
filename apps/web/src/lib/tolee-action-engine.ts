@@ -927,16 +927,16 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
     trimmed.includes('लीड') ||
     trimmed.includes('क्लाइंट')
   ) {
-    const leads = await prisma.aICRMLead.findMany({
-      where: { userId },
+    const leads = await (prisma as any).aITask.findMany({
+      where: { userId, category: 'crm' },
       take: 5,
-      orderBy: { updatedAt: 'desc' },
-      select: { name: true, phone: true, stage: true, dealValue: true },
+      orderBy: { createdAt: 'desc' },
+      select: { title: true, description: true, status: true },
     });
 
     if (leads.length > 0) {
       const leadStr = leads
-        .map((l: any, i: number) => `   ${i + 1}. 👤 **${l.name}** — Stage: \`${l.stage}\`${l.dealValue ? ` | Value: ₹${l.dealValue}` : ''}`)
+        .map((l: any, i: number) => `   ${i + 1}. 👤 **${l.title}** — Status: \`${l.status}\`${l.description ? ` (${l.description})` : ''}`)
         .join('\n');
 
       logAIAction(userId, 'CHECK_CRM_LEADS', command, 'SUCCESS', { count: leads.length });
