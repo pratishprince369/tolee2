@@ -170,10 +170,13 @@ export function DownloadLandingPage() {
                 <div className="w-14 h-14 rounded-2xl bg-[#0E9F9A]/10 border border-[#0E9F9A]/20 flex items-center justify-center mb-4 mx-auto sm:mx-0">
                   <span className="text-3xl font-black text-[#0E9F9A]">t</span>
                 </div>
-                <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
-                  Download Tolee App
+                <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-snug">
+                  Download Tolee App Now
                 </h2>
-                <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 mt-1.5 font-medium">
+                <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-gradient-to-r from-red-500/10 via-amber-500/10 to-emerald-500/10 border border-red-500/20 text-red-600 dark:text-red-400 font-extrabold text-xs sm:text-sm">
+                  <span>🎉 Get 6 Month Boosting on Tolee Free!</span>
+                </div>
+                <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 mt-2 font-medium">
                   Connect. Create. Belong. Claim your 6-month free boost directly inside the app.
                 </p>
               </div>
