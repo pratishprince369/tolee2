@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import WorldToolsManager from '@/components/super-admin/WorldToolsManager';
 import { OnlineUsersModal } from '@/components/super-admin/OnlineUsersModal';
+import { ActiveMeetingsModal } from '@/components/super-admin/ActiveMeetingsModal';
 
 interface Metrics {
   users: { 
@@ -530,6 +531,40 @@ export default function SuperAdminOverview() {
     fetchOnlineUsers();
   };
 
+  // Active Meetings Management States
+  const [isActiveMeetingsModalOpen, setIsActiveMeetingsModalOpen] = useState(false);
+  const [activeMeetingsList, setActiveMeetingsList] = useState<any[]>([]);
+  const [isLoadingMeetings, setIsLoadingMeetings] = useState(false);
+
+  const fetchActiveMeetings = async () => {
+    setIsLoadingMeetings(true);
+    try {
+      const res = await fetch('/api/super-admin/meetings');
+      if (res.ok) {
+        const json = await res.json();
+        setActiveMeetingsList(json.meetings || []);
+        if (metrics && typeof json.count === 'number') {
+          setMetrics((prev) => prev ? {
+            ...prev,
+            meetingStorage: {
+              ...prev.meetingStorage,
+              activeMeetings: json.count,
+              totalTemporaryStorageMB: json.count * 24.5,
+            }
+          } : null);
+        }
+      }
+    } catch {
+    } finally {
+      setIsLoadingMeetings(false);
+    }
+  };
+
+  const handleOpenActiveMeetings = () => {
+    setIsActiveMeetingsModalOpen(true);
+    fetchActiveMeetings();
+  };
+
   // Connect to realtime presence signaling socket
   useEffect(() => {
     const SOCKET_URL = getSocketUrl();
@@ -1025,7 +1060,15 @@ export default function SuperAdminOverview() {
           <p style={{ color: '#71717a', fontSize: 12, margin: '4px 0 0' }}>Real-time status of active meeting streams, temporary data allocations, S3/Cloudinary recordings storage, and auto-cleaned files count.</p>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 16 }}>
-          <StatCard icon="📞" label="Active Meetings" value={m.meetingStorage?.activeMeetings || 0} sub="Ongoing live sessions" color="#3b82f6" />
+          <StatCard
+            icon="📞"
+            label="Active Meetings"
+            value={m.meetingStorage?.activeMeetings || 0}
+            sub="Ongoing live sessions"
+            color="#3b82f6"
+            pulse={Boolean(m.meetingStorage?.activeMeetings && m.meetingStorage.activeMeetings > 0)}
+            onClick={handleOpenActiveMeetings}
+          />
           <StatCard icon="🗑️" label="Temporary Storage" value={`${(m.meetingStorage?.totalTemporaryStorageMB || 0).toFixed(1)} MB`} sub="WebRTC buffers & cache" color="#ec4899" />
           <StatCard icon="💾" label="Recordings Storage" value={`${(m.meetingStorage?.totalRecordingsStorageMB || 0).toLocaleString()} MB`} sub="Permanent MP4 files" color="#10b981" />
           <StatCard icon="✨" label="Auto-Cleaned Files" value={m.meetingStorage?.autoCleanedFilesCount || 0} sub="Temp chunks garbage collected" color="#a78bfa" />
@@ -1453,6 +1496,19 @@ export default function SuperAdminOverview() {
         users={onlineUsersList.length > 0 ? onlineUsersList : activeRealtimeSessions}
         loading={isLoadingOnlineList}
         onRefresh={fetchOnlineUsers}
+      />
+
+      {/* ─── LIVE ACTIVE MEETINGS TERMINATION MODAL ──────────────────────── */}
+      <ActiveMeetingsModal
+        isOpen={isActiveMeetingsModalOpen}
+        onClose={() => setIsActiveMeetingsModalOpen(false)}
+        meetings={activeMeetingsList}
+        loading={isLoadingMeetings}
+        onRefresh={fetchActiveMeetings}
+        onMeetingEnded={() => {
+          fetchActiveMeetings();
+          fetchMetrics(dataType);
+        }}
       />
 
     </div>
