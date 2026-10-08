@@ -398,3 +398,47 @@ export const createReminderTool: ToolDefinition = {
     }
   },
 };
+
+// ==========================================
+// 7. LIVE WEB SEARCH & FACT VERIFICATION SKILL
+// ==========================================
+import { searchLiveWeb } from '@/lib/web-search';
+
+export const liveWebSearchTool: ToolDefinition = {
+  name: 'live_web_search',
+  description: 'Searches the live internet for verified real-time information, current facts, politicians, cricket/sports scores, weather, stock rates, and recent events.',
+  riskLevel: 'LOW',
+  parameters: {
+    type: 'object',
+    properties: {
+      query: {
+        type: 'string',
+        description: 'Specific topic or search query to look up on the live internet.',
+      },
+    },
+    required: ['query'],
+  },
+  execute: async (args) => {
+    try {
+      const q = (args?.query || '').trim();
+      if (!q) {
+        return { success: false, error: 'Search query is required.' };
+      }
+      const snippets = await searchLiveWeb(q, 4);
+      if (!snippets || snippets.trim().length === 0) {
+        return {
+          success: true,
+          data: { query: q, snippets: 'No immediate internet search results found.' },
+          message: `Internet par "${q}" se sambandhit turant koi naya lekh nahi mila.`,
+        };
+      }
+      return {
+        success: true,
+        data: { query: q, snippets },
+        message: `Verified live internet facts retrieved for "${q}".`,
+      };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Web search failed.' };
+    }
+  },
+};

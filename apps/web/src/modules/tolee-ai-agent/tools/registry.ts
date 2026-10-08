@@ -11,6 +11,7 @@ import {
   getWalletBalanceTool,
   getScheduleTool,
   createReminderTool,
+  liveWebSearchTool,
 } from './extended-tools';
 
 export class ToolRegistry {
@@ -33,6 +34,7 @@ export class ToolRegistry {
     this.register(getWalletBalanceTool);
     this.register(getScheduleTool);
     this.register(createReminderTool);
+    this.register(liveWebSearchTool);
   }
 
   public static register(tool: ToolDefinition) {
