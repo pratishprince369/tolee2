@@ -363,7 +363,69 @@ export function AIDashboard() {
                     {/* Rich Markdown & Code-Block Formatted Message */}
                     <AIMessageRenderer content={msg.text} isAI={msg.isAI} />
 
-                    {msg.interactiveAction && (
+                    {/* Interactive Music Player Card */}
+                    {msg.interactiveAction?.type === 'MUSIC_PLAYER' && msg.interactiveAction.payload?.song && (
+                      <div className="mt-3 p-3.5 bg-gradient-to-br from-violet-900/10 via-purple-900/5 to-slate-900/10 dark:from-violet-950/40 dark:to-zinc-900/60 rounded-2xl border border-violet-300 dark:border-violet-700/60 shadow-sm space-y-3">
+                        <div className="flex items-center gap-3">
+                          {msg.interactiveAction.payload.song.coverUrl && (
+                            <img
+                              src={msg.interactiveAction.payload.song.coverUrl}
+                              alt={msg.interactiveAction.payload.song.title}
+                              className="w-14 h-14 rounded-xl object-cover shadow-md border border-violet-400/40"
+                            />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-extrabold text-xs sm:text-sm text-slate-900 dark:text-white truncate">
+                              {msg.interactiveAction.payload.song.title}
+                            </h4>
+                            <p className="text-[11px] text-slate-500 dark:text-zinc-400 truncate">
+                              {msg.interactiveAction.payload.song.artistName || 'Tolee Songs'}
+                            </p>
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-violet-600 dark:text-violet-400 mt-0.5">
+                              🎵 Tolee Songs Audio Stream
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Direct HTML5 Audio Player for Instant Streaming */}
+                        {msg.interactiveAction.payload.song.audioUrl && (
+                          <div className="w-full pt-1">
+                            <audio
+                              controls
+                              autoPlay
+                              className="w-full h-8 rounded-lg accent-violet-600"
+                              src={msg.interactiveAction.payload.song.audioUrl}
+                            >
+                              Your browser does not support audio playback.
+                            </audio>
+                          </div>
+                        )}
+
+                        <a
+                          href={msg.interactiveAction.payload.url || `/songs/audio/${msg.interactiveAction.payload.song.id}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center justify-center w-full py-2 px-3 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
+                        >
+                          ▶️ Open in Tolee Songs Full Player
+                        </a>
+                      </div>
+                    )}
+
+                    {/* Navigation Interactive Action */}
+                    {msg.interactiveAction?.type === 'NAVIGATE' && msg.interactiveAction.payload?.url && (
+                      <div className="mt-3">
+                        <a
+                          href={msg.interactiveAction.payload.url}
+                          className="inline-flex items-center gap-1.5 py-2 px-4 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
+                        >
+                          {msg.interactiveAction.label || 'Open Link →'}
+                        </a>
+                      </div>
+                    )}
+
+                    {/* Post Publishing & Creative Interactive Action */}
+                    {msg.interactiveAction && msg.interactiveAction.type !== 'MUSIC_PLAYER' && msg.interactiveAction.type !== 'NAVIGATE' && (
                       <div className="mt-3 p-3.5 bg-slate-50 dark:bg-zinc-950 rounded-2xl border border-violet-200 dark:border-violet-800/80 shadow-sm space-y-3">
                         {msg.interactiveAction.payload?.imageUrl && (
                           <div className="space-y-2">

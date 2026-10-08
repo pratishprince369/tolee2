@@ -712,10 +712,10 @@ export class CentralAIEngine {
     }
 
     // ⚡ 5. Tolee Platform Actions (CRM, Tasks, Posts, Reminders, Moderation)
-    if (intent === 'platform_action' && options.userId) {
+    if (intent === 'platform_action') {
       try {
         const actionResult = await executeToleeAIAction({
-          userId: options.userId,
+          userId: options.userId || 'guest_user',
           userEmail: options.userEmail,
           command: rawMessage,
           history

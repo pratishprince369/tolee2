@@ -128,11 +128,18 @@ export function classifyIntelligenceIntent(input: string, hasMedia: boolean = fa
       query.includes('mere groups') ||
       query.includes('my groups') ||
       query.includes('tolee group') ||
-      query.includes('group me share') ||
       query.includes('टास्क बनाओ') ||
       query.includes('शेड्यूल करो') ||
       query.includes('रिमाइंडर लगाओ') ||
-      query.includes('लीड जोड़ो')
+      query.includes('लीड जोड़ो') ||
+      // 🎵 Music & Songs Control (Tolee Songs)
+      query.includes('song') || query.includes('gana') || query.includes('gaana') ||
+      query.includes('music') || (query.includes('play') && (query.includes('kar') || query.includes('de') || query.includes('do'))) ||
+      query.includes('chalao') || query.includes('bajao') || query.includes('sunao') ||
+      query.includes('गाना') || query.includes('म्यूजिक') || query.includes('बजाओ') ||
+      // 📰 News & Headlines
+      query.includes('news') || query.includes('khabar') || query.includes('samachar') ||
+      query.includes('headline') || query.includes('breaking')
     );
 
   if (isPlatformAction) {

@@ -39,14 +39,18 @@ export class ToleeFastPath {
     const q = (message || '').toLowerCase().trim();
     if (!q) return false;
 
-    // Explicit Tolee specific keywords that REQUIRE tool/DB lookup
+    // Explicit Tolee specific keywords that REQUIRE tool/DB/Action lookup
     const toleeKeywords = [
       'my post', 'my posts', 'my story', 'my stories', 'my group', 'my groups',
       'my notification', 'my notifications', 'my messages', 'my chat', 'my wallet',
       'my balance', 'my leads', 'my tasks', 'my reminders',
       'post banao', 'post create', 'post publish', 'story create', 'story daalo',
       'message bhejo', 'send message', 'delete post', 'like post', 'comment karo',
-      'radar', 'near me', 'listing', 'marketplace create'
+      'radar', 'near me', 'listing', 'marketplace create',
+      // Music & Songs
+      'song', 'gana', 'gaana', 'music', 'bajao', 'chalao', 'sunao', 'play',
+      // News
+      'news', 'khabar', 'samachar', 'headline', 'breaking'
     ];
 
     const requiresToleeData = toleeKeywords.some(kw => q.includes(kw));

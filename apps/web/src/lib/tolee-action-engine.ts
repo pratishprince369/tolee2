@@ -1030,25 +1030,49 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
   if (isSongsIntent && !isImageOrCreativeIntent && !isVideoIntent) {
     try {
       const { searchToleeMusic } = await import('@/lib/toleeMusicApi');
-      const songQuery = trimmed
-        .replace(/song|gaana|gana|music|play|karo|chalao|bajao|suno|गाना|सॉन्ग|म्यूजिक|बजाओ|चलाओ/gi, '')
+      let songQuery = trimmed
+        .replace(/^(mujhe|hamko|humko|kripya|please)\s+/gi, '')
+        .replace(/\s+(play\s*karake\s*do|play\s*karke\s*do|play\s*karo|play\s*kar\s*do|play\s*kijiye|chala\s*do|chalao|bajao|sunao|suno)$/gi, '')
+        .replace(/\s+(ka|ki|ke)\s+(gana|gaana|song|music|track)\b/gi, '')
+        .replace(/\b(song|gaana|gana|music|track|play|karo|chalao|bajao|sunao|suno|गाना|सॉन्ग|म्यूजिक|बजाओ|चलाओ)\b/gi, '')
+        .replace(/\s+/g, ' ')
         .trim();
 
-      const results = await searchToleeMusic(songQuery || 'Arijit Singh');
+      if (!songQuery) songQuery = trimmed.replace(/play|karo|gana|song/gi, '').trim() || 'Tere Naam';
+
+      const results = await searchToleeMusic(songQuery);
       if (results && results.length > 0) {
         const topSong = results[0];
+        const artist = topSong.artistName || (topSong.artist && typeof topSong.artist === 'object' ? (topSong.artist as any).name : topSong.artist) || 'Tolee Artist';
         logAIAction(userId, 'PLAY_SONG', command, 'SUCCESS', { songId: topSong.id, title: topSong.title });
 
         return {
           success: true,
           action: 'PLAY_SONG',
-          message: `🎵 **Tolee Songs**: "${topSong.title}" by **${topSong.artist}** play kar diya gaya hai! Enjoy the music.`,
+          message: `🎵 **Tolee Songs**: "${topSong.title}" by **${artist}** play kar diya gaya hai! Enjoy the music.`,
           data: { song: topSong },
           interactiveAction: {
-            type: 'NAVIGATE',
-            label: `▶️ Listen "${topSong.title}" on Tolee Songs`,
-            payload: { url: `/songs/audio/${topSong.id}` }
-          }
+            type: 'MUSIC_PLAYER',
+            label: `▶️ Play "${topSong.title}" on Tolee Songs`,
+            payload: {
+              song: {
+                id: topSong.id,
+                title: topSong.title,
+                artistName: artist,
+                coverUrl: topSong.coverUrl,
+                audioUrl: topSong.audioUrl,
+                duration: topSong.duration,
+              },
+              url: `/songs/audio/${topSong.id}`,
+              allResults: results.slice(0, 3).map((r) => ({
+                id: r.id,
+                title: r.title,
+                artistName: r.artistName || (r.artist && typeof r.artist === 'object' ? (r.artist as any).name : r.artist) || 'Tolee Artist',
+                coverUrl: r.coverUrl,
+                audioUrl: r.audioUrl,
+              })),
+            },
+          },
         };
       }
     } catch (songErr: any) {
