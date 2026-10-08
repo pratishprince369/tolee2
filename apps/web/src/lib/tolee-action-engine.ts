@@ -76,11 +76,11 @@ export async function fetchLiveNewsForToleeAI(categoryQuery?: string): Promise<{
   }
 
   // 2. Fetch from GNews API
-  const gnewsKey = process.env.GNEWS_API_KEY || "84f1a26d7f0224151744b82143003028";
+  const gnewsKey = process.env.GNEWS_API_KEY || "7c9cbcae5f8b01d649ab17e1a4528dc9";
   if (gnewsKey) {
     try {
       const topic = categoryQuery || 'general';
-      const url = `https://gnews.io/api/v4/top-headlines?category=${topic}&lang=hi&country=in&max=5&apikey=${gnewsKey}`;
+      const url = `https://gnews.io/api/v4/top-headlines?category=${topic}&lang=hi&country=in&max=6&apikey=${gnewsKey}`;
       const res = await fetch(url, { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
@@ -90,7 +90,7 @@ export async function fetchLiveNewsForToleeAI(categoryQuery?: string): Promise<{
               results.push({
                 title: a.title,
                 source: a.source?.name || 'GNews India',
-                summary: a.description ? a.description.slice(0, 120) : undefined,
+                summary: a.description ? a.description.slice(0, 160) : undefined,
                 url: a.url
               });
             }
@@ -100,9 +100,57 @@ export async function fetchLiveNewsForToleeAI(categoryQuery?: string): Promise<{
     } catch (e) {}
   }
 
-  // 3. Fetch Stock Market & Financial News via Finnhub
+  // 3. Fetch from NewsAPI.org
+  const newsApiKey = process.env.NEWS_API_KEY || "bd92a188805e44e3b654a871e2ba1553";
+  if (newsApiKey && results.length < 6) {
+    try {
+      const url = `https://newsapi.org/v2/top-headlines?country=in&apiKey=${newsApiKey}&pageSize=5`;
+      const res = await fetch(url, { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.articles && Array.isArray(data.articles)) {
+          for (const a of data.articles) {
+            if (a.title && !results.some(r => r.title.toLowerCase() === a.title.toLowerCase())) {
+              results.push({
+                title: a.title,
+                source: a.source?.name || 'NewsAPI India',
+                summary: a.description ? a.description.slice(0, 160) : undefined,
+                url: a.url
+              });
+            }
+          }
+        }
+      }
+    } catch (e) {}
+  }
+
+  // 4. Fetch from NewsData.io
+  const newsDataKey = process.env.NEWSDATA_API_KEY || "pub_080f52adf1114cc59f8201ad47eb64f8";
+  if (newsDataKey && results.length < 6) {
+    try {
+      const url = `https://newsdata.io/api/1/news?apikey=${newsDataKey}&country=in&language=hi,en&size=5`;
+      const res = await fetch(url, { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.results && Array.isArray(data.results)) {
+          for (const a of data.results) {
+            if (a.title && !results.some(r => r.title.toLowerCase() === a.title.toLowerCase())) {
+              results.push({
+                title: a.title,
+                source: a.source_id || 'NewsData India',
+                summary: a.description ? a.description.slice(0, 160) : undefined,
+                url: a.link
+              });
+            }
+          }
+        }
+      }
+    } catch (e) {}
+  }
+
+  // 5. Fetch Stock Market & Financial News via Finnhub
   const finnhubKey = process.env.FINNHUB_API_KEY || "d9r5t99r01qnlhcli2ngd9r5t99r01qnlhcli2o0";
-  if (finnhubKey && results.length < 5) {
+  if (finnhubKey && results.length < 8) {
     try {
       const url = `https://finnhub.io/api/v1/news?category=general&token=${finnhubKey}`;
       const res = await fetch(url, { cache: 'no-store' });
@@ -114,7 +162,7 @@ export async function fetchLiveNewsForToleeAI(categoryQuery?: string): Promise<{
               results.push({
                 title: a.headline,
                 source: 'Market & Finance',
-                summary: a.summary ? a.summary.slice(0, 120) : undefined,
+                summary: a.summary ? a.summary.slice(0, 160) : undefined,
                 url: a.url
               });
             }
@@ -124,7 +172,7 @@ export async function fetchLiveNewsForToleeAI(categoryQuery?: string): Promise<{
     } catch (e) {}
   }
 
-  return results.slice(0, 5);
+  return results.slice(0, 7);
 }
 
 /**
@@ -958,6 +1006,54 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
       action: 'CHECK_CRM_LEADS',
       message: `💼 **Tolee AI Manager**: Aapke CRM me abhi koi new lead added nahi hai. Aap "Add new lead [Name]" bolkar direct lead create kar sakte hain!`,
     };
+  }
+
+  // ==========================================
+  // 11. TOLEE SONGS MUSIC & AUDIO ACTION
+  // ==========================================
+  const isSongsIntent =
+    lower.includes('song') ||
+    lower.includes('gana') ||
+    lower.includes('gaana') ||
+    lower.includes('music') ||
+    lower.includes('play ') ||
+    lower.includes('play karo') ||
+    lower.includes('chalao') ||
+    lower.includes('bajao') ||
+    lower.includes('suno') ||
+    trimmed.includes('गाना') ||
+    trimmed.includes('सॉन्ग') ||
+    trimmed.includes('म्यूजिक') ||
+    trimmed.includes('बजाओ') ||
+    trimmed.includes('चलाओ');
+
+  if (isSongsIntent && !isImageOrCreativeIntent && !isVideoIntent) {
+    try {
+      const { searchToleeMusic } = await import('@/lib/toleeMusicApi');
+      const songQuery = trimmed
+        .replace(/song|gaana|gana|music|play|karo|chalao|bajao|suno|गाना|सॉन्ग|म्यूजिक|बजाओ|चलाओ/gi, '')
+        .trim();
+
+      const results = await searchToleeMusic(songQuery || 'Arijit Singh');
+      if (results && results.length > 0) {
+        const topSong = results[0];
+        logAIAction(userId, 'PLAY_SONG', command, 'SUCCESS', { songId: topSong.id, title: topSong.title });
+
+        return {
+          success: true,
+          action: 'PLAY_SONG',
+          message: `🎵 **Tolee Songs**: "${topSong.title}" by **${topSong.artist}** play kar diya gaya hai! Enjoy the music.`,
+          data: { song: topSong },
+          interactiveAction: {
+            type: 'NAVIGATE',
+            label: `▶️ Listen "${topSong.title}" on Tolee Songs`,
+            payload: { url: `/songs/audio/${topSong.id}` }
+          }
+        };
+      }
+    } catch (songErr: any) {
+      console.warn('Tolee songs action notice:', songErr?.message);
+    }
   }
 
   // ==========================================
