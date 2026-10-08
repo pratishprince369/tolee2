@@ -226,10 +226,16 @@ export function AIDashboard() {
             </div>
             <div className="flex flex-col">
               <span className="font-extrabold text-sm text-slate-900 dark:text-white hidden sm:inline">Tolee AI Manager</span>
-              <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 hidden sm:inline flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                {deviceStatus} Mode
-              </span>
+              <div className="hidden sm:flex items-center gap-2">
+                <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  {deviceStatus} Mode
+                </span>
+                <span className="text-[10px] font-bold text-sky-600 dark:text-sky-400 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-sky-500" />
+                  Agent-Reach Live
+                </span>
+              </div>
             </div>
           </div>
 

@@ -10,6 +10,7 @@
  */
 
 import { searchLiveWeb, requiresLiveWebSearch } from '@/lib/web-search';
+import { AgentReachConnector } from './agent-reach';
 
 const FAST_NVIDIA_KEYS = [
   process.env.NVIDIA_API_KEY,
@@ -62,9 +63,22 @@ export class ToleeFastPath {
   ): Promise<FastPathResult> {
     const startTime = Date.now();
 
+    // 👁️ Agent-Reach Multi-Platform Reader for URLs, GitHub, YouTube & Reddit
+    let reachContext = '';
+    if (AgentReachConnector.hasReachTarget(message)) {
+      try {
+        const reachRes = await AgentReachConnector.smartReach(message);
+        if (reachRes?.success && reachRes.summary) {
+          reachContext = `[Agent-Reach Platform: ${reachRes.platform.toUpperCase()}]\n${reachRes.summary}`;
+        }
+      } catch (reachErr) {
+        // Fallback gracefully
+      }
+    }
+
     // 🌐 Live Internet Grounding for current affairs / real-time queries
     let liveWebContext = '';
-    if (requiresLiveWebSearch(message)) {
+    if (!reachContext && requiresLiveWebSearch(message)) {
       try {
         liveWebContext = await searchLiveWeb(message, 3);
       } catch (searchErr) {
@@ -72,12 +86,14 @@ export class ToleeFastPath {
       }
     }
 
-    const systemPrompt = `You are Tolee AI Manager, a warm, intelligent personal AI employee and digital co-pilot with live internet search capability.
+    const groundingContext = [reachContext, liveWebContext].filter(Boolean).join('\n\n');
+
+    const systemPrompt = `You are Tolee AI Manager, a warm, intelligent personal AI employee and digital co-pilot with live internet search and Agent-Reach multi-platform web reading capability.
 Address the user respectfully.
-${liveWebContext ? 'Use the provided [Live Internet Search Context] to give verified, up-to-date facts (override any older training cutoff).' : ''}
+${groundingContext ? 'Use the provided [Live Internet / Agent-Reach Grounding Context] to give verified, up-to-date facts (override any older training cutoff).' : ''}
 CRITICAL ACCURACY RULE:
 - NEVER invent, guess, or hallucinate a person's political party, office, profession, or achievements.
-- If the exact facts are found in the Live Internet Search Context, rely strictly on them.
+- If the exact facts are found in the Grounding Context, rely strictly on them.
 - If information is not in the context and you are uncertain, honestly state what is known and clarify that you are retrieving live details rather than inventing false facts.
 Respond directly, accurately, and concisely in natural Hindi, Hinglish, or English matching the user's language. Keep responses helpful and under 3-4 paragraphs.`;
 
@@ -86,8 +102,8 @@ Respond directly, accurately, and concisely in natural Hindi, Hinglish, or Engli
       content: h.content,
     }));
 
-    const finalUserContent = liveWebContext
-      ? `[Live Internet Search Context]:\n${liveWebContext}\n\n[User Question]:\n${message.trim()}`
+    const finalUserContent = groundingContext
+      ? `[Live Grounding Context]:\n${groundingContext}\n\n[User Question]:\n${message.trim()}`
       : message.trim();
 
     const apiMessages = [

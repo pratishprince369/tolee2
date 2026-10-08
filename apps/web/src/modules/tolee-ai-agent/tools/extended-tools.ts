@@ -457,19 +457,19 @@ export const agentReachTool: ToolDefinition = {
     properties: {
       type: {
         type: 'string',
-        enum: ['web', 'youtube', 'github'],
-        description: 'Target platform to inspect.',
+        enum: ['auto', 'web', 'youtube', 'github', 'reddit'],
+        description: 'Target platform to inspect. Use "auto" to let Agent-Reach detect from link/text.',
       },
       target: {
         type: 'string',
-        description: 'URL, GitHub repo slug (owner/repo), or YouTube link/title.',
+        description: 'URL, GitHub repo slug (owner/repo), YouTube link/title, or subreddit/topic.',
       },
     },
-    required: ['type', 'target'],
+    required: ['target'],
   },
   execute: async (args) => {
     try {
-      const { type, target } = args;
+      const { type = 'auto', target } = args;
       if (type === 'github') {
         const res = await AgentReachConnector.inspectGitHub(target);
         return { success: res.success, data: res.data, message: res.summary, error: res.error };
@@ -477,6 +477,16 @@ export const agentReachTool: ToolDefinition = {
       if (type === 'youtube') {
         const res = await AgentReachConnector.inspectYouTube(target);
         return { success: res.success, data: res.data, message: res.summary, error: res.error };
+      }
+      if (type === 'reddit') {
+        const res = await AgentReachConnector.inspectReddit(target);
+        return { success: res.success, data: res.data, message: res.summary, error: res.error };
+      }
+      if (type === 'auto') {
+        const res = await AgentReachConnector.smartReach(target);
+        if (res) {
+          return { success: res.success, data: res.data, message: res.summary, error: res.error };
+        }
       }
       const res = await AgentReachConnector.readWebPage(target);
       return { success: res.success, data: res.data, message: res.summary, error: res.error };

@@ -182,4 +182,101 @@ export class AgentReachConnector {
       return { success: false, platform: 'youtube', data: null, summary: '', error: err.message };
     }
   }
+
+  /**
+   * 4. Inspect Public Reddit Discussions / Subreddits
+   */
+  public static async inspectReddit(queryOrUrl: string): Promise<AgentReachResponse> {
+    try {
+      let target = queryOrUrl.trim();
+      let fetchUrl = '';
+      if (target.startsWith('http')) {
+        fetchUrl = target.split('?')[0].replace(/\/+$/, '') + '.json';
+      } else {
+        const sub = target.replace(/^r\//, '').trim();
+        fetchUrl = `https://www.reddit.com/r/${sub}/hot.json?limit=3`;
+      }
+
+      return new Promise((resolve) => {
+        https.get(
+          fetchUrl,
+          {
+            headers: {
+              'User-Agent': 'ToleeAI-AgentReach/1.0 (Mozilla/5.0 compatible)',
+              Accept: 'application/json',
+            },
+            timeout: 5000,
+          },
+          (res) => {
+            let data = '';
+            res.on('data', (c) => { data += c; });
+            res.on('end', () => {
+              try {
+                const json = JSON.parse(data);
+                const listing = Array.isArray(json) ? json[0]?.data?.children : json?.data?.children;
+                if (!listing || listing.length === 0) {
+                  return resolve({ success: false, platform: 'reddit', data: null, summary: '', error: 'No Reddit discussions found.' });
+                }
+                const posts = listing.slice(0, 3).map((item: any) => {
+                  const d = item.data;
+                  return `💬 [${d.subreddit_name_prefixed || 'r/'}] **${d.title}** (👍 ${d.score} upvotes, 🗨️ ${d.num_comments} comments)\n${(d.selftext || '').slice(0, 250)}`;
+                }).join('\n\n');
+                resolve({
+                  success: true,
+                  platform: 'reddit',
+                  data: listing,
+                  summary: posts,
+                });
+              } catch {
+                resolve({ success: false, platform: 'reddit', data: null, summary: '', error: 'Failed to parse Reddit responses.' });
+              }
+            });
+          }
+        ).on('error', (err) => resolve({ success: false, platform: 'reddit', data: null, summary: '', error: err.message }));
+      });
+    } catch (err: any) {
+      return { success: false, platform: 'reddit', data: null, summary: '', error: err.message };
+    }
+  }
+
+  /**
+   * Fast check if query targets an external platform or URL
+   */
+  public static hasReachTarget(text: string): boolean {
+    const t = (text || '').toLowerCase();
+    return (
+      /https?:\/\/[^\s]+/.test(text) ||
+      t.includes('github.com') ||
+      t.includes('youtube.com') ||
+      t.includes('youtu.be') ||
+      t.includes('reddit.com') ||
+      /\br\/[a-zA-Z0-9_]+/.test(text)
+    );
+  }
+
+  /**
+   * 🌐 Smart Router: Auto-detects platform and reaches it cleanly
+   */
+  public static async smartReach(text: string): Promise<AgentReachResponse | null> {
+    const urlMatch = text.match(/https?:\/\/[^\s]+/i);
+    const targetUrl = urlMatch ? urlMatch[0] : '';
+    const lower = text.toLowerCase();
+
+    if (targetUrl.includes('github.com') || lower.includes('github.com')) {
+      const slug = targetUrl || text.split(/github\.com\//i)[1]?.trim() || text;
+      return await this.inspectGitHub(slug);
+    }
+    if (targetUrl.includes('youtube.com') || targetUrl.includes('youtu.be') || lower.includes('youtube.com')) {
+      return await this.inspectYouTube(targetUrl || text);
+    }
+    if (targetUrl.includes('reddit.com') || lower.includes('reddit.com') || /\br\/[a-zA-Z0-9_]+/.test(text)) {
+      const match = text.match(/\br\/([a-zA-Z0-9_]+)/);
+      const target = targetUrl || (match ? match[0] : text);
+      return await this.inspectReddit(target);
+    }
+    if (targetUrl) {
+      return await this.readWebPage(targetUrl);
+    }
+    return null;
+  }
 }
