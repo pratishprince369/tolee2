@@ -12,6 +12,10 @@ import {
   getScheduleTool,
   createReminderTool,
   liveWebSearchTool,
+  agentReachTool,
+  toleeSongsTool,
+  calendarAssistantTool,
+  emailAssistantTool,
 } from './extended-tools';
 
 export class ToolRegistry {
@@ -35,6 +39,10 @@ export class ToolRegistry {
     this.register(getScheduleTool);
     this.register(createReminderTool);
     this.register(liveWebSearchTool);
+    this.register(agentReachTool);
+    this.register(toleeSongsTool);
+    this.register(calendarAssistantTool);
+    this.register(emailAssistantTool);
   }
 
   public static register(tool: ToolDefinition) {

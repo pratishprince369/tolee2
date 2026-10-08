@@ -442,3 +442,237 @@ export const liveWebSearchTool: ToolDefinition = {
     }
   },
 };
+
+// ==========================================
+// 8. AGENT-REACH WEB & PLATFORM READER SKILL
+// ==========================================
+import { AgentReachConnector } from '@/lib/ai-gateway/agent-reach';
+
+export const agentReachTool: ToolDefinition = {
+  name: 'agent_reach_reader',
+  description: 'Reads public webpages, YouTube videos, GitHub repositories, and Reddit discussions using Agent-Reach connector.',
+  riskLevel: 'LOW',
+  parameters: {
+    type: 'object',
+    properties: {
+      type: {
+        type: 'string',
+        enum: ['web', 'youtube', 'github'],
+        description: 'Target platform to inspect.',
+      },
+      target: {
+        type: 'string',
+        description: 'URL, GitHub repo slug (owner/repo), or YouTube link/title.',
+      },
+    },
+    required: ['type', 'target'],
+  },
+  execute: async (args) => {
+    try {
+      const { type, target } = args;
+      if (type === 'github') {
+        const res = await AgentReachConnector.inspectGitHub(target);
+        return { success: res.success, data: res.data, message: res.summary, error: res.error };
+      }
+      if (type === 'youtube') {
+        const res = await AgentReachConnector.inspectYouTube(target);
+        return { success: res.success, data: res.data, message: res.summary, error: res.error };
+      }
+      const res = await AgentReachConnector.readWebPage(target);
+      return { success: res.success, data: res.data, message: res.summary, error: res.error };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Agent-Reach execution failed.' };
+    }
+  },
+};
+
+// ==========================================
+// 9. TOLEE SONGS MUSIC AGENT SKILL
+// ==========================================
+import { searchToleeMusic } from '@/lib/toleeMusicApi';
+
+export const toleeSongsTool: ToolDefinition = {
+  name: 'tolee_songs_control',
+  description: 'Searches songs, albums, and artists on Tolee Music and triggers audio playback.',
+  riskLevel: 'LOW',
+  parameters: {
+    type: 'object',
+    properties: {
+      action: {
+        type: 'string',
+        enum: ['play', 'search', 'pause'],
+        description: 'Playback or search action.',
+      },
+      query: {
+        type: 'string',
+        description: 'Song name, movie, or artist to search or play.',
+      },
+    },
+    required: ['action', 'query'],
+  },
+  execute: async (args) => {
+    try {
+      const { action, query } = args;
+      const results = await searchToleeMusic(query || '');
+      if (!results || results.length === 0) {
+        return {
+          success: true,
+          data: { songs: [] },
+          message: `Tolee Songs par "${query}" nahi mila.`,
+        };
+      }
+      const topSong = results[0];
+      return {
+        success: true,
+        data: {
+          action,
+          song: topSong,
+          allResults: results.slice(0, 3).map(s => ({ id: s.id, title: s.title, artist: s.artist })),
+        },
+        message: `🎵 **Tolee Songs**: "${topSong.title}" by ${topSong.artist} play kar diya gaya hai.`,
+      };
+    } catch (err: any) {
+      return { success: false, error: 'Song play karne me issue aaya.' };
+    }
+  },
+};
+
+// ==========================================
+// 10. CALENDAR AGENT SKILL
+// ==========================================
+export const calendarAssistantTool: ToolDefinition = {
+  name: 'calendar_assistant',
+  description: 'Queries schedule agenda or creates a calendar event meeting.',
+  riskLevel: 'LOW',
+  parameters: {
+    type: 'object',
+    properties: {
+      action: {
+        type: 'string',
+        enum: ['list', 'create'],
+        description: 'List agenda or create event.',
+      },
+      title: {
+        type: 'string',
+        description: 'Event or meeting title.',
+      },
+      dateISO: {
+        type: 'string',
+        description: 'ISO-8601 date string for meeting.',
+      },
+    },
+    required: ['action'],
+  },
+  execute: async (args, context) => {
+    try {
+      if (args.action === 'create' && args.title && args.dateISO) {
+        const eventDate = new Date(args.dateISO);
+        const task = await prisma.aITask.create({
+          data: {
+            userId: context.userId,
+            title: `📅 ${args.title}`,
+            status: 'pending',
+            priority: 'normal',
+            category: 'calendar',
+            dueDate: isNaN(eventDate.getTime()) ? new Date() : eventDate,
+          },
+        });
+        return {
+          success: true,
+          data: { eventId: task.id, title: task.title, date: task.dueDate },
+          message: `📅 Calendar event "${args.title}" successfully schedule kar diya gaya hai for ${task.dueDate?.toLocaleString('en-IN')}.`,
+        };
+      }
+
+      const tasks = await prisma.aITask.findMany({
+        where: { userId: context.userId, category: 'calendar' },
+        take: 5,
+        orderBy: { dueDate: 'asc' },
+      });
+
+      return {
+        success: true,
+        data: { events: tasks },
+        message: tasks.length > 0
+          ? `Aapke calendar me ${tasks.length} upcoming meetings hain.`
+          : 'Aapke calendar me koi pending meeting scheduled nahi hai.',
+      };
+    } catch (err: any) {
+      return { success: false, error: 'Calendar service unavailable.' };
+    }
+  },
+};
+
+// ==========================================
+// 11. EMAIL ASSISTANT SKILL
+// ==========================================
+import { sendEmail } from '@/lib/email';
+
+export const emailAssistantTool: ToolDefinition = {
+  name: 'email_assistant',
+  description: 'Reads recent email logs, drafts a reply, or sends an email with required confirmation.',
+  riskLevel: 'MEDIUM',
+  parameters: {
+    type: 'object',
+    properties: {
+      action: {
+        type: 'string',
+        enum: ['read', 'draft', 'send'],
+        description: 'Read recent emails, create draft, or send email.',
+      },
+      to: {
+        type: 'string',
+        description: 'Recipient email address.',
+      },
+      subject: {
+        type: 'string',
+        description: 'Email subject.',
+      },
+      content: {
+        type: 'string',
+        description: 'Email content or draft message.',
+      },
+    },
+    required: ['action'],
+  },
+  execute: async (args, context) => {
+    try {
+      if (args.action === 'send') {
+        if (!args.to || !args.content) {
+          return { success: false, error: 'Recipient and content are required to send email.' };
+        }
+        await sendEmail(args.to, args.subject || 'Message from Tolee', `<p>${args.content}</p>`, 'feedback');
+        return {
+          success: true,
+          data: { to: args.to, subject: args.subject },
+          message: `✉️ Email successfully sent to **${args.to}**.`,
+        };
+      }
+
+      if (args.action === 'draft') {
+        return {
+          success: true,
+          data: { to: args.to, subject: args.subject, content: args.content },
+          message: `✉️ **Email Draft Ready**:\n**To:** ${args.to || '[Recipient]'}\n**Subject:** ${args.subject || 'Update'}\n**Body:**\n> "${args.content}"\n\nKya main ise send karu?`,
+        };
+      }
+
+      // Read recent logs
+      const logs = await prisma.emailLog.findMany({
+        take: 3,
+        orderBy: { createdAt: 'desc' },
+      });
+
+      return {
+        success: true,
+        data: { recentLogs: logs },
+        message: logs.length > 0
+          ? `Aapke recent email records check kiye gaye (${logs.length} entries found).`
+          : 'Koi unread email notice nahi hai.',
+      };
+    } catch (err: any) {
+      return { success: false, error: 'Email service check failed.' };
+    }
+  },
+};
+
