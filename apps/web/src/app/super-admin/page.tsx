@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import WorldToolsManager from '@/components/super-admin/WorldToolsManager';
+import { OnlineUsersModal } from '@/components/super-admin/OnlineUsersModal';
 
 interface Metrics {
   users: { 
@@ -85,22 +86,34 @@ interface Metrics {
   };
 }
 
-function StatCard({ icon, label, value, sub, color = '#22c55e', trend, pulse }: any) {
+function StatCard({ icon, label, value, sub, color = '#22c55e', trend, pulse, onClick }: any) {
   return (
-    <div style={{
-      background: '#0d0d0f', border: '1px solid #1c1c1e', borderRadius: 16, padding: 20,
-      display: 'flex', flexDirection: 'column', gap: 8, position: 'relative', overflow: 'hidden',
-      transition: 'transform 0.2s ease, border-color 0.2s ease',
-      cursor: 'default',
-    }}
-    onMouseEnter={(e) => {
-      e.currentTarget.style.transform = 'translateY(-2px)';
-      e.currentTarget.style.borderColor = `${color}44`;
-    }}
-    onMouseLeave={(e) => {
-      e.currentTarget.style.transform = 'translateY(0)';
-      e.currentTarget.style.borderColor = '#1c1c1e';
-    }}>
+    <div
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
+      style={{
+        background: '#0d0d0f', border: '1px solid #1c1c1e', borderRadius: 16, padding: 20,
+        display: 'flex', flexDirection: 'column', gap: 8, position: 'relative', overflow: 'hidden',
+        transition: 'transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease',
+        cursor: onClick ? 'pointer' : 'default',
+        outline: 'none',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.transform = 'translateY(-2px)';
+        e.currentTarget.style.borderColor = `${color}66`;
+        if (onClick) {
+          e.currentTarget.style.boxShadow = `0 8px 24px ${color}1f`;
+        }
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = 'translateY(0)';
+        e.currentTarget.style.borderColor = '#1c1c1e';
+        if (onClick) {
+          e.currentTarget.style.boxShadow = 'none';
+        }
+      }}>
       <div style={{ position: 'absolute', top: 0, right: 0, width: 80, height: 80, background: `radial-gradient(circle, ${color}15 0%, transparent 70%)`, borderRadius: '0 16px' }} />
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span style={{ fontSize: 22, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
@@ -116,6 +129,12 @@ function StatCard({ icon, label, value, sub, color = '#22c55e', trend, pulse }: 
       <div style={{ color, fontSize: 32, fontWeight: 800, lineHeight: 1 }}>{typeof value === 'number' ? value.toLocaleString() : value}</div>
       <div style={{ color: '#fff', fontSize: 14, fontWeight: 600 }}>{label}</div>
       {sub && <div style={{ color: '#71717a', fontSize: 12 }}>{sub}</div>}
+      {onClick && (
+        <div style={{ fontSize: 11, color, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
+          <span>Click to view live list</span>
+          <span>→</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -480,6 +499,36 @@ export default function SuperAdminOverview() {
   const [realtimeLocations, setRealtimeLocations] = useState<any>({});
   const [nowTick, setNowTick] = useState(Date.now());
   const socketRef = useRef<Socket | null>(null);
+
+  // Online Users Modal States
+  const [isOnlineModalOpen, setIsOnlineModalOpen] = useState(false);
+  const [onlineUsersList, setOnlineUsersList] = useState<any[]>([]);
+  const [isLoadingOnlineList, setIsLoadingOnlineList] = useState(false);
+
+  const fetchOnlineUsers = async () => {
+    setIsLoadingOnlineList(true);
+    try {
+      const res = await fetch('/api/super-admin/online-users');
+      if (res.ok) {
+        const json = await res.json();
+        setOnlineUsersList(json.users || []);
+        if (typeof json.count === 'number' && json.count > 0) {
+          setRealtimeOnlineCount(json.count);
+        }
+      } else {
+        setOnlineUsersList(activeRealtimeSessions);
+      }
+    } catch {
+      setOnlineUsersList(activeRealtimeSessions);
+    } finally {
+      setIsLoadingOnlineList(false);
+    }
+  };
+
+  const handleOpenOnlineUsers = () => {
+    setIsOnlineModalOpen(true);
+    fetchOnlineUsers();
+  };
 
   // Connect to realtime presence signaling socket
   useEffect(() => {
@@ -936,7 +985,7 @@ export default function SuperAdminOverview() {
       {/* Stats Cards - Expanded Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16 }}>
         <StatCard icon="👥" label="Total Registered Users" value={m.users.totalUsers} sub={`Real: ${m.users.realUsersCount?.toLocaleString() || 0} · Simulated: ${m.users.simulatedUsersCount?.toLocaleString() || 0}`} color="#22c55e" trend={m.users.newToday} />
-        <StatCard icon="🟢" label="Users Online Now" value={realtimeOnlineCount} sub={`${realtimeOnlineCount} Users Active Now`} color="#22c55e" pulse={true} />
+        <StatCard icon="🟢" label="Users Online Now" value={realtimeOnlineCount} sub={`${realtimeOnlineCount} Users Active Now`} color="#22c55e" pulse={true} onClick={handleOpenOnlineUsers} />
         <StatCard icon="⚡" label="Active Users Today (DAU)" value={m.users.activeToday} sub={`WAU: ${m.users.activeWeek.toLocaleString()} · MAU: ${m.users.activeMonth.toLocaleString()}`} color="#3b82f6" />
         <StatCard icon="📱" label="App Installations" value={m.users.appInstalls || 0} sub={`+${m.users.appInstallsToday || 0} today from PWA prompt`} color="#10b981" trend={m.users.appInstallsToday || 0} />
         <StatCard icon="🏘️" label="Total Tolees (Groups)" value={m.communities.totalTolees} sub={`+${m.communities.toleeToday} groups today`} color="#f59e0b" trend={m.communities.toleeToday} />
@@ -1396,6 +1445,15 @@ export default function SuperAdminOverview() {
 
       {/* ─── CREATOR APPLICATIONS SECTION ─────────────────────────────── */}
       <CreatorApplicationsPanel />
+
+      {/* ─── LIVE ONLINE USERS MODAL ────────────────────────────────────── */}
+      <OnlineUsersModal
+        isOpen={isOnlineModalOpen}
+        onClose={() => setIsOnlineModalOpen(false)}
+        users={onlineUsersList.length > 0 ? onlineUsersList : activeRealtimeSessions}
+        loading={isLoadingOnlineList}
+        onRefresh={fetchOnlineUsers}
+      />
 
     </div>
   );
