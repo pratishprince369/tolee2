@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { apiRateLimiter } from '@/lib/rate-limit';
+import { searchLiveWeb, requiresLiveWebSearch } from '@/lib/web-search';
 
 export async function POST(request: Request) {
   try {
@@ -63,9 +64,22 @@ Respond with a JSON object:
 }
 If the user's query does not require a post/ad draft (e.g. general question, coding, math, general chat), set "draft": null.`;
 
-    // 4. Construct messages payload for the Llama model
+    // 4. Grounding with Live Web Search if real-time information is requested
+    const lastUserMessage = [...messages].reverse().find((m: any) => m.isMe)?.text || '';
+    let liveWebContext = '';
+    if (lastUserMessage && requiresLiveWebSearch(lastUserMessage)) {
+      try {
+        liveWebContext = await searchLiveWeb(lastUserMessage, 3);
+      } catch (err) {}
+    }
+
     const apiMessages = [
-      { role: 'system', content: systemPrompt },
+      { 
+        role: 'system', 
+        content: liveWebContext 
+          ? `${systemPrompt}\n\n[LIVE INTERNET SEARCH CONTEXT]:\n${liveWebContext}\n(Prioritize the above live verified internet context to answer the user accurately, overriding any older knowledge cutoff.)`
+          : systemPrompt 
+      },
       ...messages.map((m: any) => ({
         role: m.isMe ? 'user' : 'assistant',
         content: m.text

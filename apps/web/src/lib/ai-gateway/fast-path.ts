@@ -9,6 +9,8 @@
  * 4. Maximum execution deadline: 10 seconds. Response target: 1-3 seconds.
  */
 
+import { searchLiveWeb, requiresLiveWebSearch } from '@/lib/web-search';
+
 const FAST_NVIDIA_KEYS = [
   process.env.NVIDIA_API_KEY,
   process.env.NVIDIA_LLM_KEY,
@@ -59,18 +61,35 @@ export class ToleeFastPath {
     userName: string = 'User'
   ): Promise<FastPathResult> {
     const startTime = Date.now();
-    const systemPrompt = `You are Tolee AI Manager, a warm, intelligent personal AI employee.
-Address the user respectfully. Respond directly, accurately, and concisely in natural Hindi, Hinglish, or English matching the user's language. Keep responses helpful and under 3-4 paragraphs.`;
+
+    // 🌐 Live Internet Grounding for current affairs / real-time queries
+    let liveWebContext = '';
+    if (requiresLiveWebSearch(message)) {
+      try {
+        liveWebContext = await searchLiveWeb(message, 3);
+      } catch (searchErr) {
+        // Fallthrough if search times out
+      }
+    }
+
+    const systemPrompt = `You are Tolee AI Manager, a warm, intelligent personal AI employee and digital co-pilot with live internet search capability.
+Address the user respectfully.
+${liveWebContext ? 'Use the provided [Live Internet Search Context] to give verified, up-to-date facts (override any older training cutoff).' : ''}
+Respond directly, accurately, and concisely in natural Hindi, Hinglish, or English matching the user's language. Keep responses helpful and under 3-4 paragraphs.`;
 
     const trimmedHistory = history.slice(-6).map(h => ({
       role: h.role === 'assistant' ? 'assistant' : 'user',
       content: h.content,
     }));
 
+    const finalUserContent = liveWebContext
+      ? `[Live Internet Search Context]:\n${liveWebContext}\n\n[User Question]:\n${message.trim()}`
+      : message.trim();
+
     const apiMessages = [
       { role: 'system', content: systemPrompt },
       ...trimmedHistory,
-      { role: 'user', content: message.trim() },
+      { role: 'user', content: finalUserContent },
     ];
 
     // 1. Primary: NVIDIA NIM (Fastest frontier model)
