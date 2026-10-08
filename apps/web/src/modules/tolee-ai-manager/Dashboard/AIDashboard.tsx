@@ -20,6 +20,8 @@ import { AIFinance } from '../Finance/AIFinance';
 import { AIBirthdays } from '../Personal/AIBirthdays';
 import { OpenWorkAgentWorkspace } from '../Components/OpenWorkAgentWorkspace';
 import { AIMessageRenderer } from '../Components/AIMessageRenderer';
+import { OpenDotsApprovalCard } from '../Components/OpenDotsApprovalCard';
+import { PooledBrowserEngine } from '@/lib/ai-gateway/pooled-engine';
 import { getAIDashboardSummary, processAIPersonalMessage } from '@/actions/ai-manager';
 import { createPost } from '@/actions/post';
 import { Button } from '@/components/ui/button';
@@ -85,10 +87,16 @@ export function AIDashboard() {
     reminders: [],
     myGroups: []
   });
+  const [deviceStatus, setDeviceStatus] = useState<string>('Cloud Fast');
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadSummary();
+    PooledBrowserEngine.inspectClientCapabilities().then((cap) => {
+      if (cap.webGpuSupported) {
+        setDeviceStatus('WebGPU Local');
+      }
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -216,7 +224,13 @@ export function AIDashboard() {
             <div className="p-1.5 bg-violet-600 rounded-xl text-white">
               <Bot className="w-5 h-5" />
             </div>
-            <span className="font-extrabold text-sm text-slate-900 dark:text-white hidden sm:inline">Tolee AI Manager</span>
+            <div className="flex flex-col">
+              <span className="font-extrabold text-sm text-slate-900 dark:text-white hidden sm:inline">Tolee AI Manager</span>
+              <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 hidden sm:inline flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                {deviceStatus} Mode
+              </span>
+            </div>
           </div>
 
           <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-1">
