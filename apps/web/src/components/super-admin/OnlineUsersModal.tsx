@@ -394,7 +394,7 @@ export function OnlineUsersModal({
 
                       <div style={{ minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span style={{ color: '#fff', fontSize: '13px', fontWeight: 700, truncate: 'true' }}>
+                          <span style={{ color: '#fff', fontSize: '13px', fontWeight: 700, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
                             {user.name}
                           </span>
                           {user.role === 'super_admin' && (

@@ -34,6 +34,9 @@ class AIGatewayRouter {
     }
 
     // 2. Explicit provider preference
+    if (preferred === 'fcc' || preferred === 'fcc_proxy') {
+      return [this.clod, this.fallback, this.nvidia, this.freellmapi, this.geminiOfficial];
+    }
     if (preferred === 'freellmapi') {
       return [this.freellmapi, this.nvidia, this.geminiOfficial, this.clod, this.fallback];
     }
@@ -50,7 +53,10 @@ class AIGatewayRouter {
       return [this.web2api, this.freellmapi, this.nvidia, this.geminiOfficial, this.fallback];
     }
 
-    // 3. Default Capability-based Order: NVIDIA NIM (Fastest 1s) -> FreeLLMAPI -> Google Gemini -> Fallback
+    // 3. Default Capability-based Order (FCC proxy first if local gateway attached)
+    if (process.env.FCC_BASE_URL) {
+      return [this.clod, this.nvidia, this.freellmapi, this.geminiOfficial, this.fallback];
+    }
     return [this.nvidia, this.freellmapi, this.geminiOfficial, this.fallback];
   }
 
@@ -121,6 +127,16 @@ class AIGatewayRouter {
         type: 'nvidia',
         status: fallbackOk ? 'CONNECTED' : 'OFFLINE',
         defaultModel: 'meta/llama-3.2-11b-vision-instruct',
+        isVision: true,
+        isVoice: false,
+        isStreaming: true,
+      },
+      {
+        id: 'fcc_proxy',
+        name: 'Free Claude Code Gateway (59 Providers)',
+        type: 'fcc_proxy',
+        status: process.env.FCC_BASE_URL ? 'CONNECTED' : 'OFFLINE',
+        defaultModel: process.env.FCC_MODEL || 'nvidia_nim/nvidia/nemotron-3-super-120b-a12b',
         isVision: true,
         isVoice: false,
         isStreaming: true,

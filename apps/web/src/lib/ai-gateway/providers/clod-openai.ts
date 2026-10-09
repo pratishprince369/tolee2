@@ -4,6 +4,15 @@ export class ClodOpenAIProvider implements AIProvider {
   readonly name = 'Claude / OpenAI Intelligent Engine';
   readonly type = 'claude' as const;
 
+  // ponytail: Free Claude Code & OpenAI proxy support (ceiling: single proxy; upgrade: dynamic round-robin)
+  private getBaseUrl(): string {
+    return (process.env.FCC_BASE_URL || process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/+$/, '');
+  }
+
+  private getApiKey(): string {
+    return process.env.FCC_API_KEY || process.env.OPENAI_API_KEY || this.getClodKey();
+  }
+
   private getClodKey(): string {
     return (
       process.env.CLOD_API_KEY ||
@@ -21,11 +30,66 @@ export class ClodOpenAIProvider implements AIProvider {
   }
 
   async isAvailable(): Promise<boolean> {
-    return Boolean(this.getClodKey() || this.getOpenAIKeys().length > 0);
+    return Boolean(
+      process.env.FCC_BASE_URL ||
+      process.env.OPENAI_BASE_URL ||
+      this.getClodKey() ||
+      this.getOpenAIKeys().length > 0
+    );
   }
 
   async generateText(options: AIRequestOptions): Promise<AICompletionResult> {
     const startTime = Date.now();
+
+    // 0. Free Claude Code / Custom Proxy Endpoint (Highest priority if configured)
+    if (process.env.FCC_BASE_URL || process.env.OPENAI_BASE_URL) {
+      try {
+        const proxyUrl = `${this.getBaseUrl()}/chat/completions`;
+        const proxyModel = options.model || process.env.FCC_MODEL || process.env.OPENAI_MODEL || 'nvidia_nim/nvidia/nemotron-3-super-120b-a12b';
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 12000);
+
+        const res = await fetch(proxyUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${this.getApiKey()}`,
+          },
+          signal: options.signal || controller.signal,
+          body: JSON.stringify({
+            model: proxyModel,
+            messages: options.messages.map((m) => ({ role: m.role, content: m.content })),
+            temperature: options.temperature ?? 0.7,
+            max_tokens: options.maxTokens ?? 2048,
+          }),
+        });
+
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+          const data = await res.json();
+          const content = data.choices?.[0]?.message?.content;
+          if (content && content.trim()) {
+            return {
+              text: content,
+              provider: process.env.FCC_BASE_URL ? 'fcc-proxy' : 'openai-proxy',
+              model: proxyModel,
+              tokensUsed: data.usage
+                ? {
+                    promptTokens: data.usage.prompt_tokens || 0,
+                    completionTokens: data.usage.completion_tokens || 0,
+                    totalTokens: data.usage.total_tokens || 0,
+                  }
+                : undefined,
+              latencyMs: Date.now() - startTime,
+            };
+          }
+        }
+      } catch (proxyErr: any) {
+        console.warn('[AIGateway] Proxy endpoint failed:', proxyErr?.message);
+      }
+    }
+
     const clodKey = this.getClodKey();
 
     // 1. Try CLōD Engine (Claude 3.5 Sonnet / GPT-4o)

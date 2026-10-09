@@ -547,9 +547,11 @@ export default function SuperAdminOverview() {
           setMetrics((prev) => prev ? {
             ...prev,
             meetingStorage: {
-              ...prev.meetingStorage,
               activeMeetings: json.count,
               totalTemporaryStorageMB: json.count * 24.5,
+              totalRecordingsStorageMB: prev.meetingStorage?.totalRecordingsStorageMB ?? 0,
+              autoCleanedFilesCount: prev.meetingStorage?.autoCleanedFilesCount ?? 0,
+              failedCleanupJobs: prev.meetingStorage?.failedCleanupJobs ?? 0,
             }
           } : null);
         }

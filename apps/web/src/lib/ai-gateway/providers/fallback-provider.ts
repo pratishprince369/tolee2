@@ -5,6 +5,21 @@ export class FallbackProvider implements AIProvider {
   readonly type = 'nvidia' as const;
 
   private getEndpointAndKey(): { url: string; apiKey: string; model: string } | null {
+    // ponytail: Free Claude Code / Custom Proxy fallback (ceiling: single url; upgrade: multi-endpoint balancer)
+    if (process.env.FCC_BASE_URL) {
+      return {
+        url: `${process.env.FCC_BASE_URL.replace(/\/+$/, '')}/chat/completions`,
+        apiKey: process.env.FCC_API_KEY || 'fcc-local',
+        model: process.env.FCC_MODEL || 'nvidia_nim/nvidia/nemotron-3-super-120b-a12b',
+      };
+    }
+    if (process.env.OPENAI_BASE_URL) {
+      return {
+        url: `${process.env.OPENAI_BASE_URL.replace(/\/+$/, '')}/chat/completions`,
+        apiKey: process.env.OPENAI_API_KEY || 'default-proxy',
+        model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+      };
+    }
     if (process.env.NVIDIA_API_KEY) {
       return {
         url: 'https://integrate.api.nvidia.com/v1/chat/completions',

@@ -13,6 +13,16 @@ export interface ContextBuilderOptions {
   };
 }
 
+// ponytail: RTK output token compression (ceiling: regex truncation; upgrade path: AST-aware token parser)
+export function compressTokens(content: string, maxLen = 3000): string {
+  if (!content || content.length <= maxLen) return content;
+  const stripped = content.replace(/\u001b\[[0-9;]*[a-zA-Z]/g, '');
+  const cleaned = stripped.replace(/\n{3,}/g, '\n\n').replace(/[ \t]{2,}/g, ' ');
+  if (cleaned.length <= maxLen) return cleaned;
+  const half = Math.floor(maxLen / 2);
+  return `${cleaned.slice(0, half)}\n\n[... output compressed for token efficiency ...]\n\n${cleaned.slice(-half)}`;
+}
+
 export async function buildAIContext(options: ContextBuilderOptions): Promise<AIMessagePayload[]> {
   const { userId, persona, rawMessages, includeMemories = true, replyContext, groupContext } = options;
 
@@ -90,12 +100,12 @@ export async function buildAIContext(options: ContextBuilderOptions): Promise<AI
     });
   }
 
-  // Add history (limit to last 20 messages to protect context limit)
+  // Add history (limit to last 20 messages to protect context limit & RTK compressed)
   const recentMessages = rawMessages.slice(-20);
   for (const msg of recentMessages) {
     messages.push({
       role: msg.role,
-      content: msg.content,
+      content: compressTokens(msg.content),
       mediaUrl: msg.mediaUrl,
       mediaType: msg.mediaType,
     });

@@ -20,8 +20,9 @@ export interface ToolDefinition {
 export interface ToolExecutionContext {
   userId: string;
   userName?: string;
+  userEmail?: string;
   userRole?: string;
-  sessionId: string;
+  sessionId?: string;
   isVoiceMode?: boolean;
 }
 

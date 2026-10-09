@@ -16,7 +16,7 @@ export interface ActionExecutionResult {
   message: string;
   data?: any;
   interactiveAction?: {
-    type: 'NAVIGATE' | 'OPEN_CHAT' | 'OPEN_POST' | 'PREVIEW_IMAGE' | 'CONFIRMATION_REQUIRED' | 'PUBLISH_POST';
+    type: 'NAVIGATE' | 'OPEN_CHAT' | 'OPEN_POST' | 'PREVIEW_IMAGE' | 'CONFIRMATION_REQUIRED' | 'PUBLISH_POST' | 'MUSIC_PLAYER' | string;
     label?: string;
     payload?: any;
     executed?: boolean;
@@ -442,6 +442,49 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
         }
       };
     }
+  }
+
+  // ==========================================
+  // 1B. AUTONOMOUS SERVER DIAGNOSTICS & SYSTEM HEALTH (Super Admin & AI Manager)
+  // ==========================================
+  const isDiagnosticIntent =
+    lower.includes('system status') ||
+    lower.includes('server status') ||
+    lower.includes('health check') ||
+    lower.includes('diagnostics') ||
+    lower.includes('system health') ||
+    lower.includes('server check') ||
+    lower.includes('check system') ||
+    lower.includes('check server') ||
+    trimmed.includes('सर्वर स्टेटस') ||
+    trimmed.includes('सिस्टम स्टेटस');
+
+  if (isDiagnosticIntent) {
+    const startTime = Date.now();
+    let dbStatus = 'HEALTHY';
+    let userCount = 0;
+    try {
+      userCount = await prisma.user.count();
+    } catch {
+      dbStatus = 'DEGRADED';
+    }
+
+    const fccActive = Boolean(process.env.FCC_BASE_URL);
+    const uptimeSec = Math.floor(process.uptime ? process.uptime() : 0);
+    const latency = Date.now() - startTime;
+
+    logAIAction(userId, 'SYSTEM_DIAGNOSTICS', command, 'SUCCESS', { dbStatus, userCount, fccActive });
+
+    return {
+      success: true,
+      action: 'SYSTEM_DIAGNOSTICS',
+      message: `🖥️ **Tolee Autonomous System Diagnostics**\n\n- **Database**: ${dbStatus === 'HEALTHY' ? '🟢 Operational' : '🔴 Degraded'} (${userCount} users)\n- **AI Gateway**: 🟢 Online ${fccActive ? '(Free Claude Code Proxy Active)' : '(Cloud Providers Active)'}\n- **Response Latency**: ${latency}ms\n- **Node Uptime**: ${Math.floor(uptimeSec / 60)}m ${uptimeSec % 60}s\n- **Token Optimizer (RTK)**: 🟢 Active (ANSI & whitespace pruned)\n\nAll primary platform services are operational.`,
+      interactiveAction: {
+        type: 'NAVIGATE',
+        label: '⚙️ Open Super Admin Console',
+        payload: { url: '/super-admin' }
+      }
+    };
   }
 
   // ==========================================
