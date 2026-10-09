@@ -2,6 +2,7 @@ import { ToolRegistry } from '../tools/registry';
 import { ToolExecutionContext } from '../tools/types';
 import { CentralAIEngine } from '@/lib/ai-gateway/central-engine';
 import { ToleeRealityValidator } from '@/lib/ai-gateway/reality-validator';
+import { ToleeSpecialistRegistry, SpecialistId } from './specialists';
 
 const NVIDIA_API_KEYS = [
   process.env.NVIDIA_API_KEY,
@@ -17,22 +18,23 @@ export interface AgentProcessOptions {
   userMessage: string;
   conversationHistory?: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
   context: ToolExecutionContext;
+  specialistId?: SpecialistId;
 }
 
 export class AgentOrchestrator {
   /**
    * Generates the Master System Prompt ensuring native Indian conversational tone & tool awareness
    */
-  private static getSystemPrompt(userName: string = 'Sir / Ma\'am'): string {
+  private static getSystemPrompt(userName: string = 'Sir / Ma\'am', specialistInstructions?: string): string {
     return `You are Tolee AI Manager, the 24x7 Personal AI Employee and Digital Brain of the Tolee ecosystem (inspired by ChatGPT & Google Gemini Live).
-
+${specialistInstructions ? `\nSPECIALIST DIRECTIVES:\n${specialistInstructions}\n` : ''}
 CORE PERSONALITY & TONE:
 - Address the user respectfully as "${userName}".
 - Speak in a natural, polite, confident, conversational style in Hindi, Hinglish, or English based on what the user speaks.
 - CRITICAL: Never say "I am text only" or "I cannot perform actions". You have direct tool access to the user's Tolee account!
 - When the user asks you to check messages, read notifications, create posts, find groups, or check marketplace enquiries, ALWAYS call the corresponding tool.
+- For high-risk actions (creating posts, deleting items, spending budget), prepare draft details for user approval before mutating database.
 - After receiving tool results, explain the result clearly and naturally in 1-3 short, spoken sentences.
-- If an action was executed, confirm it clearly (e.g. "Ram ko message bhej diya gaya hai.").
 - If a tool fails, honestly tell the user what went wrong without hallucinating fake success.`;
   }
 
@@ -43,23 +45,33 @@ CORE PERSONALITY & TONE:
     replyText: string;
     executedTool?: string;
     toolData?: any;
+    approvalRequired?: boolean;
+    approvalPayload?: any;
+    specialistId?: SpecialistId;
   }> {
-    const { userMessage, conversationHistory = [], context } = options;
+    const { userMessage, conversationHistory = [], context, specialistId } = options;
+    const specialist = specialistId
+      ? ToleeSpecialistRegistry.get(specialistId)
+      : ToleeSpecialistRegistry.routeSpecialist(userMessage);
+
     const apiKey = NVIDIA_API_KEYS[0] || process.env.OPENAI_API_KEY || '';
 
     const messages = [
-      { role: 'system', content: this.getSystemPrompt(context.userName) },
+      { role: 'system', content: this.getSystemPrompt(context.userName, specialist.instructions) },
       ...conversationHistory.slice(-6),
       { role: 'user', content: userMessage },
     ];
 
-    const tools = ToolRegistry.toOpenAITools();
+    const allTools = ToolRegistry.toOpenAITools();
+    const tools = specialist.id === 'general_assistant'
+      ? allTools
+      : allTools.filter(t => specialist.allowedTools.includes(t.function.name));
     const freellmBase = (process.env.FREELLMAPI_URL || process.env.FREELLMAPI_BASE_URL || 'http://localhost:8080/v1').replace(/\/+$/, '');
     const freellmKey = process.env.FREELLMAPI_API_KEY || 'freellmapi-root';
 
     try {
       // Helper function to dispatch OpenAI-compatible tool calling
-      const callLLM = async (callMessages: any[], maxTokens = 1024) => {
+      const callLLM = async (callMessages: any[], maxTokens = specialist.maxTokens || 1024) => {
         // 1. Primary: NVIDIA NIM (Active Model: meta/llama-3.2-11b-vision-instruct)
         if (apiKey) {
           try {
@@ -74,9 +86,9 @@ CORE PERSONALITY & TONE:
               body: JSON.stringify({
                 model: 'meta/llama-3.2-11b-vision-instruct',
                 messages: callMessages,
-                tools,
-                tool_choice: 'auto',
-                temperature: 0.3,
+                tools: tools.length > 0 ? tools : undefined,
+                tool_choice: tools.length > 0 ? 'auto' : undefined,
+                temperature: specialist.temperature ?? 0.2,
                 max_tokens: maxTokens,
               }),
               signal: c.signal,
@@ -101,9 +113,9 @@ CORE PERSONALITY & TONE:
             body: JSON.stringify({
               model: 'auto',
               messages: callMessages,
-              tools,
-              tool_choice: 'auto',
-              temperature: 0.3,
+              tools: tools.length > 0 ? tools : undefined,
+              tool_choice: tools.length > 0 ? 'auto' : undefined,
+              temperature: specialist.temperature ?? 0.2,
               max_tokens: maxTokens,
             }),
             signal: c.signal,
@@ -116,7 +128,7 @@ CORE PERSONALITY & TONE:
       };
 
       // 1. First Call: Let LLM decide whether to speak or call a tool
-      const data = await callLLM(messages, 1024);
+      const data = await callLLM(messages, specialist.maxTokens);
       const choice = data?.choices?.[0];
       const message = choice?.message;
 
@@ -133,6 +145,18 @@ CORE PERSONALITY & TONE:
 
         // Execute Tool in DB
         const toolResult = await ToolRegistry.execute(toolName, args, context);
+
+        // 🛡️ OpenDots Human-in-the-Loop Interception
+        if (toolResult.requiresConfirmation && toolResult.confirmationDetails) {
+          return {
+            replyText: toolResult.message || 'Is action ko complete karne ke liye aapki approval ki zaroorat hai.',
+            executedTool: toolName,
+            toolData: toolResult.data,
+            approvalRequired: true,
+            approvalPayload: toolResult.confirmationDetails,
+            specialistId: specialist.id,
+          };
+        }
 
         // 3. Second Call: Feed tool result back to LLM for final conversational spoken response
         const followUpMessages = [
@@ -161,12 +185,14 @@ CORE PERSONALITY & TONE:
             replyText: validation.sanitizedContent,
             executedTool: toolName,
             toolData: toolResult.data,
+            specialistId: specialist.id,
           };
         } catch {
           return {
             replyText: toolResult.message || 'Task execute ho gaya.',
             executedTool: toolName,
             toolData: toolResult.data,
+            specialistId: specialist.id,
           };
         }
       }
@@ -182,6 +208,7 @@ CORE PERSONALITY & TONE:
 
       return {
         replyText: validation.sanitizedContent,
+        specialistId: specialist.id,
       };
     } catch (err: any) {
       console.warn('[AgentOrchestrator] Primary provider error, falling back to CentralAIEngine:', err.message);

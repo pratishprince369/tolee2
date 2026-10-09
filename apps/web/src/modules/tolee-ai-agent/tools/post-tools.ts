@@ -79,7 +79,28 @@ export const createPostTool: ToolDefinition = {
   },
   execute: async (args, context) => {
     try {
-      const { caption, imageUrl, toleeSlug } = args;
+      const { caption, imageUrl, toleeSlug, isApproved } = args;
+
+      // 🛡️ OpenDots Human-in-the-Loop Approval: High-risk mutation requires user approval
+      if (!isApproved) {
+        return {
+          success: true,
+          requiresConfirmation: true,
+          confirmationDetails: {
+            actionType: 'PUBLISH_POST',
+            title: 'Review Post Before Publishing',
+            description: 'AI has generated this social post draft. Please approve to publish live on your Tolee feed.',
+            summary: caption,
+            payload: {
+              caption,
+              imageUrl,
+              toleeSlug,
+              actionType: 'PUBLISH_POST',
+            },
+          },
+          message: 'Post draft taiyar hai. Kripya niche diye gaye card me review karke approve karein.',
+        };
+      }
 
       let toleeConnect = undefined;
       if (toleeSlug) {

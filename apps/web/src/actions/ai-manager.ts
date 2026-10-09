@@ -605,11 +605,69 @@ export async function executeConfirmedAIAction(
       }
     }
 
+    if (action === 'PUBLISH_POST') {
+      const caption = payload?.caption;
+      const imageUrl = payload?.imageUrl;
+      const toleeSlug = payload?.toleeSlug;
+
+      if (!caption) {
+        return { success: false, error: 'Caption is required to publish post.' };
+      }
+
+      let toleeConnect = undefined;
+      if (toleeSlug) {
+        const targetTolee = await prisma.tolee.findUnique({
+          where: { slug: toleeSlug },
+          select: { id: true },
+        });
+        if (targetTolee) {
+          toleeConnect = { create: [{ toleeId: targetTolee.id }] };
+        }
+      }
+
+      const post = await prisma.post.create({
+        data: {
+          authorId: userId,
+          caption,
+          mediaUrls: imageUrl || null,
+          mediaTypes: imageUrl ? 'image' : null,
+          postType: 'post',
+          visibility: 'public',
+          status: 'published',
+          tolees: toleeConnect,
+        },
+      });
+
+      await prisma.aIActionLog.create({
+        data: {
+          userId,
+          action: 'PUBLISH_POST',
+          command: `CONFIRMED_PUBLISH_POST_${post.id}`,
+          status: 'SUCCESS',
+          details: JSON.stringify({ postId: post.id, caption: caption.slice(0, 100) }),
+        },
+      }).catch(() => {});
+
+      return {
+        success: true,
+        message: 'Post successfully published to Tolee feed!',
+        postId: post.id,
+        url: `https://tolee.in/post/${post.id}`,
+      };
+    }
+
     return { success: false, error: `Unsupported AI action type: ${action}` };
   } catch (error: any) {
     console.error('Error executing confirmed AI action:', error);
     return { success: false, error: error.message || 'Operation failed.' };
   }
+}
+
+export async function executeOpenDotsApproval(approvalPayload: {
+  actionType: string;
+  data?: Record<string, any>;
+}) {
+  return await executeConfirmedAIAction(approvalPayload.actionType, undefined, approvalPayload.data || approvalPayload);
 }
 
 // ==========================================

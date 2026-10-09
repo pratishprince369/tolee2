@@ -22,7 +22,7 @@ import { OpenWorkAgentWorkspace } from '../Components/OpenWorkAgentWorkspace';
 import { AIMessageRenderer } from '../Components/AIMessageRenderer';
 import { OpenDotsApprovalCard } from '../Components/OpenDotsApprovalCard';
 import { PooledBrowserEngine } from '@/lib/ai-gateway/pooled-engine';
-import { getAIDashboardSummary, processAIPersonalMessage } from '@/actions/ai-manager';
+import { getAIDashboardSummary, processAIPersonalMessage, executeConfirmedAIAction } from '@/actions/ai-manager';
 import { createPost } from '@/actions/post';
 import { Button } from '@/components/ui/button';
 
@@ -51,6 +51,7 @@ interface Message {
     type?: string;
     name?: string;
   };
+  approvalPayload?: any;
   interactiveAction?: {
     type: string;
     label: string;
@@ -192,6 +193,7 @@ export function AIDashboard() {
         text: aiText,
         isAI: true,
         time: formatTime(),
+        approvalPayload: (result as any).approvalPayload || (result as any).interactiveAction?.approval,
         interactiveAction: (result as any).interactiveAction || (result as any).actionPayload
       };
 
@@ -362,6 +364,54 @@ export function AIDashboard() {
 
                     {/* Rich Markdown & Code-Block Formatted Message */}
                     <AIMessageRenderer content={msg.text} isAI={msg.isAI} />
+
+                    {/* 🛡️ OpenDots Human-in-the-Loop Action Approval Card */}
+                    {msg.approvalPayload && (
+                      <OpenDotsApprovalCard
+                        approval={msg.approvalPayload}
+                        isExecuting={publishingActionId === msg.id}
+                        isExecuted={Boolean(msg.interactiveAction?.executed)}
+                        onApprove={async (data) => {
+                          setPublishingActionId(msg.id);
+                          try {
+                            const res = await executeConfirmedAIAction(msg.approvalPayload.actionType, undefined, data);
+                            if (res.success) {
+                              setMessages((prev) =>
+                                prev.map((m) =>
+                                  m.id === msg.id
+                                    ? {
+                                        ...m,
+                                        text: `${m.text}\n\n✅ **Approved & Executed!** ${res.message || 'Action executed successfully.'}`,
+                                        interactiveAction: { type: 'EXECUTED', label: 'Executed', payload: data, executed: true },
+                                        approvalPayload: undefined,
+                                      }
+                                    : m
+                                )
+                              );
+                            } else {
+                              alert('Action execution failed: ' + (res.error || 'Unknown error'));
+                            }
+                          } catch (err: any) {
+                            alert('Execution error: ' + err.message);
+                          } finally {
+                            setPublishingActionId(null);
+                          }
+                        }}
+                        onReject={() => {
+                          setMessages((prev) =>
+                            prev.map((m) =>
+                              m.id === msg.id
+                                ? {
+                                    ...m,
+                                    text: `${m.text}\n\n❌ **Action Cancelled** by user.`,
+                                    approvalPayload: undefined,
+                                  }
+                                : m
+                            )
+                          );
+                        }}
+                      />
+                    )}
 
                     {/* Interactive Music Player Card */}
                     {msg.interactiveAction?.type === 'MUSIC_PLAYER' && msg.interactiveAction.payload?.song && (

@@ -34,8 +34,10 @@ export interface ToolExecutionResult {
   requiresConfirmation?: boolean;
   confirmationDetails?: {
     actionType: string;
+    title?: string;
     description: string;
     summary: string;
     payload: any;
+    cost?: string;
   };
 }
