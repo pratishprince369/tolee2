@@ -64,9 +64,8 @@ export class NvidiaNIMProvider implements AIProvider {
     const candidateModels = [
       options.model,
       'meta/llama-3.2-11b-vision-instruct',
-      'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning',
-      'nvidia/nemotron-3-super-120b-a12b',
-      'openai/gpt-oss-20b'
+      'mistralai/mistral-large-2-instruct',
+      'meta/llama-3.1-70b-instruct',
     ].filter(Boolean) as string[];
 
     const keys = this.getKeyPool();
@@ -88,7 +87,7 @@ export class NvidiaNIMProvider implements AIProvider {
             body: JSON.stringify({
               model,
               messages: options.messages.map((m) => ({ role: m.role, content: m.content })),
-              temperature: options.temperature ?? 0.4,
+              temperature: options.temperature ?? 0.2,
               top_p: 0.9,
               max_tokens: options.maxTokens ?? 2048,
               stream: false,

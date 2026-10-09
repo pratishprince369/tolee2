@@ -15,6 +15,7 @@ import { FallbackProvider } from './providers/fallback-provider';
 import { FreeLLMAPIProvider } from './providers/freellmapi';
 import { buildAIContext } from './context-builder';
 import { CentralAIEngine } from './central-engine';
+import { ToleeRealityValidator } from './reality-validator';
 
 class AIGatewayRouter {
   private freellmapi = new FreeLLMAPIProvider();
@@ -183,7 +184,16 @@ class AIGatewayRouter {
             .catch((e: any) => console.warn('[AIGateway] Usage log notice:', e));
         }
 
-        return result;
+        const lastUserMsg = [...(options.messages || [])].reverse().find((m) => m.role === 'user')?.content || '';
+        const validated = ToleeRealityValidator.validate(result.text, {
+          userId: options.userId,
+          userMessage: lastUserMsg,
+        });
+
+        return {
+          ...result,
+          text: validated.sanitizedContent,
+        };
       } catch (err: any) {
         console.warn(`[AIGateway] Provider ${provider.name} failed: ${err.message}. Retrying fallback...`);
         lastError = err;

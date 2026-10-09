@@ -12,22 +12,102 @@ export class FreeLLMAPIProvider implements AIProvider {
   readonly name = 'FreeLLMAPI Unified Gateway';
   readonly type = 'freellmapi' as const;
 
-  private getTargets(optionsModel?: string): FreeLLMTarget[] {
-    const targets: FreeLLMTarget[] = [];
+  private static cachedReadyModels: { models: string[]; timestamp: number } | null = null;
 
-    // 1. Dedicated / Self-hosted FreeLLMAPI instance (Only if explicitly configured in env)
-    const baseGateway = process.env.FREELLMAPI_URL || process.env.FREELLMAPI_BASE_URL;
+  /**
+   * Normalize FreeLLMAPI Base URL to ensure /v1 path
+   */
+  private getBaseGatewayUrl(): string | null {
+    const raw =
+      process.env.FREE_LLM_API_BASE_URL ||
+      process.env.FREELLMAPI_BASE_URL ||
+      process.env.FREELLMAPI_URL;
+    if (!raw) return null;
+    const trimmed = raw.replace(/\/+$/, '');
+    return trimmed.endsWith('/v1') ? trimmed : `${trimmed}/v1`;
+  }
+
+  private getGatewayApiKey(): string {
+    return (
+      process.env.FREE_LLM_API_KEY ||
+      process.env.FREELLMAPI_API_KEY ||
+      'freellmapi-root'
+    );
+  }
+
+  /**
+   * Discover ready models dynamically from configured FreeLLMAPI gateway
+   * GET /v1/models?execution_status=ready
+   */
+  public async discoverReadyModels(): Promise<string[]> {
+    const base = this.getBaseGatewayUrl();
+    if (!base) return [];
+
+    // Return cached if within 5 minutes
+    if (
+      FreeLLMAPIProvider.cachedReadyModels &&
+      Date.now() - FreeLLMAPIProvider.cachedReadyModels.timestamp < 300000
+    ) {
+      return FreeLLMAPIProvider.cachedReadyModels.models;
+    }
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+      const res = await fetch(`${base}/models?execution_status=ready`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${this.getGatewayApiKey()}`,
+          Accept: 'application/json',
+        },
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        const json = await res.json();
+        const models = Array.isArray(json.data)
+          ? json.data.map((m: any) => m.id || m.name).filter(Boolean)
+          : Array.isArray(json)
+          ? json.map((m: any) => m.id || m.name).filter(Boolean)
+          : [];
+
+        if (models.length > 0) {
+          FreeLLMAPIProvider.cachedReadyModels = {
+            models,
+            timestamp: Date.now(),
+          };
+          return models;
+        }
+      }
+    } catch {
+      // Gateway offline or unreachable
+    }
+
+    return [];
+  }
+
+  private async getTargets(optionsModel?: string): Promise<FreeLLMTarget[]> {
+    const targets: FreeLLMTarget[] = [];
+    const baseGateway = this.getBaseGatewayUrl();
+
+    // 1. Official FreeLLMAPI Gateway Instance (if configured in env)
     if (baseGateway) {
-      const gatewayKey = process.env.FREELLMAPI_API_KEY || 'freellmapi-root';
+      const readyModels = await this.discoverReadyModels();
+      const selectedModel =
+        optionsModel || (readyModels.length > 0 ? readyModels[0] : 'auto');
+
       targets.push({
-        name: 'FreeLLMAPI Self-Hosted Instance',
-        url: `${baseGateway.replace(/\/+$/, '')}/chat/completions`,
-        apiKey: gatewayKey,
-        model: optionsModel || 'auto',
+        name: 'FreeLLMAPI Gateway Instance',
+        url: `${baseGateway}/chat/completions`,
+        apiKey: this.getGatewayApiKey(),
+        model: selectedModel,
       });
     }
 
-    // 2. Groq Free Tier (Ultra fast Llama 3.3 / 3.1)
+    // 2. Groq Free Tier (Ultra fast Llama 3.3)
     if (process.env.GROQ_API_KEY) {
       targets.push({
         name: 'Groq Cloud Free Tier',
@@ -37,7 +117,7 @@ export class FreeLLMAPIProvider implements AIProvider {
       });
     }
 
-    // 3. Cerebras Free Tier (Fastest LLM inference in the world)
+    // 3. Cerebras Free Tier
     if (process.env.CEREBRAS_API_KEY) {
       targets.push({
         name: 'Cerebras Inference Free Tier',
@@ -61,9 +141,9 @@ export class FreeLLMAPIProvider implements AIProvider {
       });
     }
 
-    // 5. Pollinations OpenAI-Compatible Free Multi-Model Tier (Zero-auth public fallback)
+    // 5. Pollinations OpenAI-Compatible Free Tier
     targets.push({
-      name: 'Pollinations AI Free Tier',
+      name: 'Pollinations AI Gateway',
       url: 'https://gen.pollinations.ai/v1/chat/completions',
       apiKey: process.env.POLLINATIONS_API_KEY || 'public-free',
       model: optionsModel || 'openai',
@@ -73,18 +153,35 @@ export class FreeLLMAPIProvider implements AIProvider {
   }
 
   async isAvailable(): Promise<boolean> {
-    return true;
+    const base = this.getBaseGatewayUrl();
+    if (base) {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 2500);
+        const res = await fetch(`${base}/models`, {
+          headers: { Authorization: `Bearer ${this.getGatewayApiKey()}` },
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
+        if (res.ok) return true;
+      } catch {}
+    }
+    return Boolean(
+      process.env.GROQ_API_KEY ||
+      process.env.CEREBRAS_API_KEY ||
+      process.env.OPENROUTER_API_KEY
+    );
   }
 
   async generateText(options: AIRequestOptions): Promise<AICompletionResult> {
     const startTime = Date.now();
-    const targets = this.getTargets(options.model);
+    const targets = await this.getTargets(options.model);
     let lastError: any = null;
 
     for (const target of targets) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 6000); // Fail-fast: 6 seconds per target
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
 
         const response = await fetch(target.url, {
           method: 'POST',
@@ -97,8 +194,8 @@ export class FreeLLMAPIProvider implements AIProvider {
           body: JSON.stringify({
             model: target.model,
             messages: options.messages.map((m) => ({ role: m.role, content: m.content })),
-            temperature: options.temperature ?? 0.7,
-            max_tokens: options.maxTokens ?? 2048,
+            temperature: options.temperature ?? 0.3,
+            max_tokens: options.maxTokens ?? 1500,
             stream: false,
           }),
           signal: options.signal || controller.signal,
@@ -141,12 +238,12 @@ export class FreeLLMAPIProvider implements AIProvider {
     onChunk: (chunk: AIStreamChunk) => void
   ): Promise<AICompletionResult> {
     const startTime = Date.now();
-    const targets = this.getTargets(options.model);
+    const targets = await this.getTargets(options.model);
 
     for (const target of targets) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 25000);
+        const timeoutId = setTimeout(() => controller.abort(), 20000);
 
         const response = await fetch(target.url, {
           method: 'POST',
@@ -159,8 +256,8 @@ export class FreeLLMAPIProvider implements AIProvider {
           body: JSON.stringify({
             model: target.model,
             messages: options.messages.map((m) => ({ role: m.role, content: m.content })),
-            temperature: options.temperature ?? 0.7,
-            max_tokens: options.maxTokens ?? 2048,
+            temperature: options.temperature ?? 0.3,
+            max_tokens: options.maxTokens ?? 1500,
             stream: true,
           }),
           signal: options.signal || controller.signal,
@@ -206,9 +303,7 @@ export class FreeLLMAPIProvider implements AIProvider {
                   model: target.model,
                 });
               }
-            } catch {
-              // skip unparseable SSE line
-            }
+            } catch {}
           }
         }
 

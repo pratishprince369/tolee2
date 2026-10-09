@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { AIMessagePayload, AIPersonaConfig } from './types';
+import { requiresLiveWebSearch, searchAndGroundQuery, isPersonQuery } from '@/lib/web-search';
 
 export interface ContextBuilderOptions {
   userId?: string;
@@ -11,6 +12,7 @@ export interface ContextBuilderOptions {
     groupName?: string;
     senderName?: string;
   };
+  searchEvidence?: string;
 }
 
 // ponytail: RTK output token compression (ceiling: regex truncation; upgrade path: AST-aware token parser)
@@ -56,12 +58,24 @@ export async function buildAIContext(options: ContextBuilderOptions): Promise<AI
     }
   } else {
     systemParts.push(
-      'You are Tolee AI, an advanced AI companion integrated into the Tolee communication platform. ' +
-      'You are knowledgeable, fast, helpful, polite, and format text beautifully with Markdown, code blocks with syntax, and LaTeX math when appropriate.'
+      'You are Tolee AI, an advanced, factually grounded AI companion integrated into the Tolee platform. ' +
+      'You are knowledgeable, fast, honest, polite, and format text beautifully with Markdown and code blocks.'
     );
   }
 
-  // 2. User Memories from database
+  // 2. Critical Factual Grounding & Anti-Hallucination Policy
+  systemParts.push(
+    `[CRITICAL FACTUAL GROUNDING POLICY]:\n` +
+    `1. NEVER invent, hallucinate, or guess a person's profession, identity, achievements, political office, or biography.\n` +
+    `2. If verified evidence is provided in [LIVE VERIFIED EVIDENCE], rely strictly on those verified facts.\n` +
+    `3. If reliable sources/evidence are unavailable, ambiguous, or the person cannot be verified with confidence, state honestly:\n` +
+    `   "Mujhe reliable sources se is vyakti ki identity ya profession verify nahi ho saki. Kripya thoda aur context ya profile link share karein." (or in English if user asked in English).\n` +
+    `4. NEVER claim someone is a cricketer, actor, doctor, or other profession without verified evidence.\n` +
+    `5. For Tolee platform data (groups, posts, notifications, wallet), use actual authenticated database records. Never invent platform stats.\n` +
+    `6. If an action fails or cannot be executed, say so honestly. Never claim an action succeeded without real execution.`
+  );
+
+  // 3. User Memories from database
   if (userId && includeMemories) {
     try {
       const memories = await prisma.aIMemory.findMany({
@@ -79,7 +93,24 @@ export async function buildAIContext(options: ContextBuilderOptions): Promise<AI
     }
   }
 
-  // 3. Reply / Group context
+  // 4. Live Internet Grounding for Person / Temporal Queries
+  const lastUserMsg = [...rawMessages].reverse().find(m => m.role === 'user')?.content || '';
+  if (options.searchEvidence) {
+    systemParts.push(`\n[LIVE VERIFIED EVIDENCE]:\n${options.searchEvidence}`);
+  } else if (lastUserMsg && requiresLiveWebSearch(lastUserMsg)) {
+    try {
+      const searchRes = await searchAndGroundQuery(lastUserMsg, 3);
+      if (searchRes.hasEvidence) {
+        systemParts.push(`\n[LIVE VERIFIED EVIDENCE]:\n${searchRes.contextText}`);
+      } else if (isPersonQuery(lastUserMsg)) {
+        systemParts.push(`\n[LIVE VERIFIED EVIDENCE]:\n(NO verified public sources found for this entity. Do NOT guess or invent facts.)`);
+      }
+    } catch {
+      // Search non-blocking
+    }
+  }
+
+  // 5. Reply / Group context
   if (replyContext) {
     systemParts.push(`\n[CURRENT REPLY TARGET]\nThe user is replying directly to this message:\n"${replyContext}"`);
   }

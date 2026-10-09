@@ -8,6 +8,7 @@ import { SYSTEM_PROMPTS } from '@/modules/tolee-ai-manager/Core/prompt-manager';
 import { AgentOrchestrator } from '@/modules/tolee-ai-agent/core/agent-orchestrator';
 import { ToleeRealityValidator } from './reality-validator';
 import { ToleeFastPath } from './fast-path';
+import { isPersonQuery } from '@/lib/web-search';
 
 // -------------------------------------------------------------
 // TYPES & INTERFACES
@@ -539,7 +540,10 @@ In the Tolee ecosystem, AI functions as your active co-pilot: creating posts, sc
 
   // --- GENERAL HELPER ---
   private static answerGeneralQuery(query: string): string {
-    return `Here is what you need to know about **"${query}"**:\n\n1. **Core Summary**: It represents a key concept that helps streamline workflows, improve efficiency, and make data-driven decisions.\n2. **Best Practice**: Start with clear goals, validate intermediate milestones, and continuously iterate based on feedback.\n3. **Next Step**: Let me know if you would like me to deep-dive into specific examples, write code, or draft actionable steps!`;
+    if (isPersonQuery(query)) {
+      return `Mujhe reliable sources se is vyakti ki identity ya profession verify nahi ho saki. Kripya thoda aur context ya profile link share karein.`;
+    }
+    return `Main abhi is vishay par vishvasniya jankari taiyar karne me asamadha hoon. Kripya apna sawal thoda aur vistar se likhein ya thodi der baad dobara koshish karein.`;
   }
 }
 

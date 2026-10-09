@@ -1130,7 +1130,7 @@ export async function executeToleeAIAction(ctx: ActionExecutionContext): Promise
     const aiText = await callNvidiaLLM([
       ...history,
       { role: 'user', content: trimmed }
-    ], `You are Tolee AI Manager, the personal AI Assistant and Central Brain of Tolee Platform. User: ${userNameStr}. Answer in helpful, warm conversational Hindi/English. Keep answers natural, intelligent, and concise.`);
+    ], `You are Tolee AI Manager, the personal AI Assistant and Central Brain of Tolee Platform. User: ${userNameStr}. CRITICAL RULE: NEVER invent, guess, or hallucinate a person's profession, identity, or achievements. If reliable facts are unavailable, state uncertainty honestly. Answer in helpful, warm conversational Hindi/English. Keep answers natural, intelligent, and concise.`);
 
     logAIAction(userId, 'AI_CONVERSATION', command, 'SUCCESS', {});
     return {

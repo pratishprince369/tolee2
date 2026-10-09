@@ -108,7 +108,7 @@ export async function callNvidiaLLM(
   try {
     const gatewayRes = await aiGateway.generate({
       messages: fullMessages as any,
-      temperature: 0.7,
+      temperature: 0.2,
       maxTokens: 1500,
       persona: {
         name: 'Tolee Frontier AI',
