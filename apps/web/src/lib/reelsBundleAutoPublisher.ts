@@ -441,6 +441,36 @@ export async function compressAndOptimizeReelVideo(fileId: string, downloadUrl: 
   };
 }
 
+let isPublishingBatch = false;
+let lastBatchRunTime = 0;
+
+/**
+ * ⚡ Lazy Self-Healing Auto-Publisher
+ * Auto-triggers Google Drive bundle ingest in background when users visit Reels.
+ * Throttled to at most once per 20 minutes to keep fresh content continuously streaming.
+ */
+export function triggerBackgroundReelsPublisherIfNeeded(): void {
+  const now = Date.now();
+  if (isPublishingBatch || (now - lastBatchRunTime < 20 * 60 * 1000)) {
+    return;
+  }
+
+  isPublishingBatch = true;
+  lastBatchRunTime = now;
+
+  // Background non-blocking execution
+  setTimeout(async () => {
+    try {
+      console.log('[AutoPublisher] Auto-triggering background Reels batch from Google Drive bundles...');
+      await publishDailyBundleReelsBatch(5);
+    } catch (err: any) {
+      console.warn('[AutoPublisher] Background batch execution notice:', err?.message || err);
+    } finally {
+      isPublishingBatch = false;
+    }
+  }, 100);
+}
+
 /**
  * STEP 7, 8, 9, 10, 11: ROTATE 5 ACCOUNTS & PUBLISH ~10 POSTS PER USER PER DAY
  */

@@ -7,7 +7,17 @@ import { prisma } from '@/lib/prisma';
 import { extractYouTubeVideoId } from '@/lib/youtube';
 import { getTrendingYouTubeShorts } from '@/lib/youtubeShortsService';
 import { getStreamableVideoUrl, getPosterUrl, isGoogleDriveUrl } from '@/lib/media';
+import { triggerBackgroundReelsPublisherIfNeeded } from '@/lib/reelsBundleAutoPublisher';
 import type { Metadata } from 'next';
+
+function shuffleArray<T>(array: T[]): T[] {
+  const arr = [...array];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -45,17 +55,25 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function ReelsPage({ searchParams }: { searchParams: { videoId?: string } }) {
+export default async function ReelsPage({ searchParams }: { searchParams: { videoId?: string; excludeIds?: string } }) {
   const session = await getServerSession(authOptions);
   const currentUserId = (session?.user as any)?.id;
 
-
+  // ⚡ Lazy Self-Healing Google Drive Auto-Publisher: runs in background on page visits
+  triggerBackgroundReelsPublisherIfNeeded();
 
   // Fetch candidate posts with Unseen Prioritization and Dynamic Rotation (Steps 14 & 15)
   let dbReels: any[] = [];
   try {
-    // 1. Fetch user watch history for anti-repetition (Step 14 & 15)
+    // 1. Fetch user watch history & client session excludeIds for anti-repetition (Step 14 & 15)
     const viewedReelIds = new Set<string>();
+    if (searchParams?.excludeIds) {
+      searchParams.excludeIds.split(',').forEach(id => {
+        const clean = id.trim();
+        if (clean) viewedReelIds.add(clean);
+      });
+    }
+
     if (currentUserId) {
       try {
         const recentViews = await prisma.view.findMany({
@@ -74,7 +92,7 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
     }
 
     // 2. Fetch candidates: real creator & automated reels (Google Drive bundles, Apify Instagram, Cloudinary).
-    // Exclude static images and suppress generic Pexels stock video footage.
+    // Exclude static images, suppress generic Pexels stock video footage, and filter out viewed reels at DB level.
     let candidatePosts = await prisma.post.findMany({
       where: {
         postType: 'reel',
@@ -85,10 +103,11 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
         NOT: [
           { mediaUrls: { contains: '/image/upload/' } },
           { mediaUrls: { contains: 'pexels.com' } }
-        ]
+        ],
+        ...(viewedReelIds.size > 0 ? { id: { notIn: Array.from(viewedReelIds).slice(0, 300) } } : {})
       },
       orderBy: { createdAt: 'desc' },
-      take: 150,
+      take: 200,
       include: {
         author: {
           select: {
@@ -121,8 +140,8 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
       }
     });
 
-    // Fallback if real reels pool is unexpectedly low
-    if (candidatePosts.length < 10) {
+    // Fallback if unseen pool is low, backfill from general pool
+    if (candidatePosts.length < 15) {
       const fallbackPosts = await prisma.post.findMany({
         where: {
           postType: 'reel',
@@ -133,7 +152,7 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
           NOT: { mediaUrls: { contains: '/image/upload/' } }
         },
         orderBy: { createdAt: 'desc' },
-        take: 30,
+        take: 50,
         include: {
           author: { select: { id: true, name: true, username: true, avatar: true, isPrivate: true, isVerified: true } },
           tolees: { include: { tolee: { select: { id: true, name: true, slug: true, ownerId: true } } } },
@@ -164,28 +183,16 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
       }
     }
 
-    // 4. Controlled ranking / shuffle (Step 14 & 15):
-    // Prioritize unseen reels, demote stock pexels footage behind real bundle/IG reels, randomized dynamically
-    const shuffledUnseen = unseenPosts.sort((a, b) => {
-      const aIsStock = a.mediaUrls?.includes('pexels.com');
-      const bIsStock = b.mediaUrls?.includes('pexels.com');
-      if (aIsStock && !bIsStock) return 1;
-      if (!aIsStock && bIsStock) return -1;
-      return 0.5 - Math.random();
-    });
-    const selectedPosts: any[] = shuffledUnseen.slice(0, 10);
+    // 4. True Fisher-Yates Dynamic Randomization:
+    // Ensures fresh non-repeating mix every time the user visits Reels
+    const shuffledUnseen = shuffleArray(unseenPosts);
+    const selectedPosts: any[] = shuffledUnseen.slice(0, 15);
 
     // If unseen pool is exhausted, backfill with shuffled seen posts (never static order)
-    if (selectedPosts.length < 10 && seenPosts.length > 0) {
-      const shuffledSeen = seenPosts.sort((a, b) => {
-        const aIsStock = a.mediaUrls?.includes('pexels.com');
-        const bIsStock = b.mediaUrls?.includes('pexels.com');
-        if (aIsStock && !bIsStock) return 1;
-        if (!aIsStock && bIsStock) return -1;
-        return 0.5 - Math.random();
-      });
+    if (selectedPosts.length < 15 && seenPosts.length > 0) {
+      const shuffledSeen = shuffleArray(seenPosts);
       for (const sp of shuffledSeen) {
-        if (selectedPosts.length >= 10) break;
+        if (selectedPosts.length >= 15) break;
         selectedPosts.push(sp);
       }
     }

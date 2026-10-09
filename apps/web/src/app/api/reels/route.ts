@@ -3,8 +3,18 @@ import { prisma } from '@/lib/prisma';
 import { getStreamableVideoUrl, getPosterUrl } from '@/lib/media';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
+import { triggerBackgroundReelsPublisherIfNeeded } from '@/lib/reelsBundleAutoPublisher';
 
 export const dynamic = 'force-dynamic';
+
+function shuffleArray<T>(array: T[]): T[] {
+  const arr = [...array];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
 
 function extractVideoFingerprint(url: string | null | undefined): string {
   if (!url) return '';
@@ -25,6 +35,9 @@ function extractVideoFingerprint(url: string | null | undefined): string {
 }
 
 export async function GET(req: NextRequest) {
+  // Fire background publisher if needed (throttled) to ensure fresh Google Drive reels are continuously injected
+  triggerBackgroundReelsPublisherIfNeeded();
+
   const { searchParams } = new URL(req.url);
   const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '10', 10), 1), 30);
   const fingerprint = searchParams.get('fingerprint');
@@ -189,14 +202,10 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // 6. Controlled prioritization: Demote Pexels stock footage behind real reels + micro-randomization
-    const sortedUnseen = unseenCandidates.sort((a, b) => {
-      const aIsPexels = a.mediaUrls && a.mediaUrls.includes('pexels.com');
-      const bIsPexels = b.mediaUrls && b.mediaUrls.includes('pexels.com');
-      if (aIsPexels && !bIsPexels) return 1;
-      if (!aIsPexels && bIsPexels) return -1;
-      return 0.5 - Math.random();
-    });
+    // 6. Controlled prioritization: Demote Pexels stock footage behind real reels + Fisher-Yates uniform shuffle
+    const realUnseen = shuffleArray(unseenCandidates.filter(p => !p.mediaUrls?.includes('pexels.com')));
+    const pexelsUnseen = shuffleArray(unseenCandidates.filter(p => p.mediaUrls?.includes('pexels.com')));
+    const sortedUnseen = [...realUnseen, ...pexelsUnseen];
 
     const selected: any[] = [];
     for (const post of sortedUnseen) {

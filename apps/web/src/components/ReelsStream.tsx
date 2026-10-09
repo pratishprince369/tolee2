@@ -323,6 +323,20 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
   const sessionLoadedReelIds = useRef(new Set<string>());
   const displayedVideoUrls = useRef(new Set<string>());
 
+  // Hydrate session viewed history across page reloads & navigations
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = JSON.parse(sessionStorage.getItem('tolee_viewed_reels') || '[]');
+        if (Array.isArray(stored)) {
+          stored.forEach((id: string) => {
+            if (typeof id === 'string') sessionLoadedReelIds.current.add(id);
+          });
+        }
+      } catch {}
+    }
+  }, []);
+
   // Sync displayed IDs and video URLs with reels state
   useEffect(() => {
     reels.forEach((r: any) => {
@@ -505,6 +519,14 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
         viewTimerRef.current = setTimeout(() => {
           if (!viewedReelsRef.current.has(reelIdToView)) {
             viewedReelsRef.current.add(reelIdToView);
+            sessionLoadedReelIds.current.add(reelIdToView);
+            try {
+              const stored = JSON.parse(sessionStorage.getItem('tolee_viewed_reels') || '[]');
+              if (Array.isArray(stored) && !stored.includes(reelIdToView)) {
+                stored.push(reelIdToView);
+                sessionStorage.setItem('tolee_viewed_reels', JSON.stringify(stored.slice(-250)));
+              }
+            } catch {}
             let fp = localStorage.getItem('device_fingerprint');
             if (!fp) {
               fp = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
