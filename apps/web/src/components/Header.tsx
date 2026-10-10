@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Search, Bell, MessageCircle, LogOut, User, Settings, Compass, Store, Globe, Heart, Bot, Zap, MessageSquare, Briefcase, Award, FileText, Radio, Wallet, Plus, Trophy, Music, Gamepad2 } from 'lucide-react';
+import { Search, Bell, MessageCircle, LogOut, User, Settings, Compass, Store, Globe, Heart, Bot, Zap, MessageSquare, Briefcase, Award, FileText, Radio, Wallet, Plus, Trophy, Music, Gamepad2, Share2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -533,6 +533,15 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
                     </div>
                     <span className="text-[9px] font-extrabold bg-teal-500/10 text-teal-600 dark:text-teal-400 px-1.5 py-0.5 rounded-full">
                       EARNINGS
+                    </span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => router.push('/referrals')} className="cursor-pointer flex w-full items-center justify-between">
+                    <div className="flex items-center">
+                      <Share2 className="mr-2 h-4 w-4 text-indigo-500" />
+                      <span className="font-semibold text-slate-900 dark:text-white">10% Refer Partner</span>
+                    </div>
+                    <span className="text-[9px] font-extrabold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 px-1.5 py-0.5 rounded-full">
+                      10% SHARE
                     </span>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => router.push('/sports')} className="cursor-pointer flex w-full items-center">
