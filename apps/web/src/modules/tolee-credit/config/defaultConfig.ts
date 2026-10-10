@@ -1,6 +1,6 @@
 export const DEFAULT_CREDIT_CONFIG = {
   id: 'global_credit_config',
-  defaultRevenueSharePercent: 20.0, // 20% to group founder/admin
+  defaultRevenueSharePercent: 10.0, // 10% to group founder/admin
   minimumWithdrawalAmount: 500.0,   // ₹500 minimum payout threshold
   settlementPeriodDays: 7,          // 7 days for pending revenue verification
   fraudCheckEnabled: true,

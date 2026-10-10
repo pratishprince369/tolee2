@@ -83,10 +83,10 @@ export function CreditTermsModal({
             <Percent className="w-5 h-5 shrink-0 text-teal-500 mt-0.5" />
             <div>
               <h4 className="font-extrabold text-sm text-zinc-900 dark:text-white">
-                20% Community Revenue Share Scheme
+                10% Community Revenue Share Scheme
               </h4>
               <p className="text-[11.5px] mt-0.5 text-zinc-600 dark:text-zinc-300">
-                As a Tolee Group founder, you earn a verified 20% revenue share on all eligible advertising activity attributed to your community.
+                As a Tolee Group founder, you earn a verified 10% revenue share on all eligible advertising activity attributed to your community.
               </p>
             </div>
           </div>
@@ -103,7 +103,7 @@ export function CreditTermsModal({
                   A. Group Placement Ads
                 </span>
                 <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                  When ads or sponsored campaigns are displayed inside your group feed or targeted to your members, 20% of the ad spend is credited to your Tolee Credit Wallet.
+                  When ads or sponsored campaigns are displayed inside your group feed or targeted to your members, 10% of the ad spend is credited to your Tolee Credit Wallet.
                 </p>
               </div>
 
@@ -112,7 +112,7 @@ export function CreditTermsModal({
                   B. Global First-Origin Member Ads
                 </span>
                 <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                  If a user who first joined Tolee through your group runs an open platform ad in the future, you receive 20% attribution as their origin community founder.
+                  If a user who first joined Tolee through your group runs an open platform ad in the future, you receive 10% attribution as their origin community founder.
                 </p>
               </div>
             </div>

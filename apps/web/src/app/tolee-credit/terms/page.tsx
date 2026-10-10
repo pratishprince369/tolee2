@@ -47,24 +47,24 @@ export default function ToleeCreditTermsPage() {
           </p>
         </div>
 
-        {/* 1. The 20% Revenue Sharing Scheme */}
+        {/* 1. The 10% Revenue Sharing Scheme */}
         <section className="p-6 rounded-3xl bg-white dark:bg-[#0b1220] border border-zinc-200/80 dark:border-[#16233a] space-y-4 shadow-xs">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-teal-500/10 text-teal-500 flex items-center justify-center font-bold">
               <Percent className="w-4 h-4" />
             </div>
             <h3 className="text-base font-bold text-zinc-900 dark:text-white">
-              1. 20% Revenue Share Model
+              1. 10% Revenue Share Model
             </h3>
           </div>
           <p className="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed">
-            When verified advertising campaigns, sponsored promotions, or boost activities run on Tolee, a defined <strong>20% revenue share</strong> is automatically calculated and attributed to eligible group founders’ Tolee Credit Wallets.
+            When verified advertising campaigns, sponsored promotions, or boost activities run on Tolee, a defined <strong>10% revenue share</strong> is automatically calculated and attributed to eligible group founders’ Tolee Credit Wallets.
           </p>
           <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-[#070b13] border border-zinc-100 dark:border-[#141f33] text-xs space-y-2">
             <p className="font-bold text-zinc-800 dark:text-zinc-200">Example Calculation:</p>
             <p className="text-zinc-500 dark:text-zinc-400">
               An advertiser spends <strong>₹1,000</strong> on an eligible campaign attributed to your group.
-              Your wallet receives <strong>₹200 (20%)</strong> as Pending Balance.
+              Your wallet receives <strong>₹100 (10%)</strong> as Pending Balance.
             </p>
           </div>
         </section>
@@ -87,7 +87,7 @@ export default function ToleeCreditTermsPage() {
                 <span>Primary Rule: Group Placement & Context</span>
               </h4>
               <p className="text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                When an ad is specifically displayed inside your group feed or targeted to your group members, 100% of that placement's 20% share is credited directly to your group founder wallet.
+                When an ad is specifically displayed inside your group feed or targeted to your group members, 100% of that placement's 10% share is credited directly to your group founder wallet.
               </p>
             </div>
 

@@ -160,7 +160,7 @@ export function AdminCreditDashboard({ overview, initialConfig, initialWithdrawa
               onChange={(e) => setConfig({ ...config, defaultRevenueSharePercent: parseFloat(e.target.value) || 0 })}
               className="w-full bg-zinc-50 dark:bg-[#0e1626] border border-zinc-200 dark:border-[#18263e] rounded-xl px-3.5 py-2 text-zinc-900 dark:text-white font-bold"
             />
-            <span className="text-[10px] text-zinc-400">Share given to group founder from ad spend (e.g. 20%)</span>
+            <span className="text-[10px] text-zinc-400">Share given to group founder from ad spend (e.g. 10%)</span>
           </div>
 
           <div className="space-y-1">

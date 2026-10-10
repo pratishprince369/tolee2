@@ -747,12 +747,12 @@ export default function CreateToleePage() {
           </div>
         </div>
 
-        {/* Tolee Credit Monetization & 20% Revenue Sharing Agreement */}
+        {/* Tolee Credit Monetization & 10% Revenue Sharing Agreement */}
         <div className="p-4 border-t border-gray-200 dark:border-gray-800 bg-teal-500/5 dark:bg-[#0c1424] space-y-2.5 text-left">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 text-teal-600 dark:text-teal-400 font-extrabold text-xs">
               <Percent className="w-3.5 h-3.5" />
-              <span>Tolee Credit Monetization (20% Share)</span>
+              <span>Tolee Credit Monetization (10% Share)</span>
             </div>
             <button
               type="button"
@@ -771,7 +771,7 @@ export default function CreateToleePage() {
               className="mt-0.5 w-3.5 h-3.5 rounded accent-teal-500 cursor-pointer"
             />
             <span>
-              I accept the <strong>Tolee Credit Community Revenue Sharing Scheme</strong> (20% ad share on group & origin member traffic).
+              I accept the <strong>Tolee Credit Community Revenue Sharing Scheme</strong> (10% ad share on group & origin member traffic).
             </span>
           </label>
         </div>

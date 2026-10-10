@@ -2591,7 +2591,7 @@ model CreditBankAccount {
 
 model CreditSystemConfig {
   id                         String   @id @default("global_credit_config")
-  defaultRevenueSharePercent Float    @default(20.0) // 20%
+  defaultRevenueSharePercent Float    @default(10.0) // 10%
   minimumWithdrawalAmount    Float    @default(500.0) // ₹500
   settlementPeriodDays       Int      @default(7) // 7 days
   fraudCheckEnabled          Boolean  @default(true)

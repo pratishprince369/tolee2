@@ -87,7 +87,7 @@ export function ToleeCreditHub({
           <h4 className="font-bold text-zinc-900 dark:text-white">How Tolee Credit Earnings Work</h4>
           <p className="leading-relaxed text-[11.5px] text-zinc-500 dark:text-zinc-400">
             When you create a Tolee community, your group becomes eligible for community revenue share.
-            When verified advertising campaigns run across Tolee, the configured revenue share (e.g. 20%) is credited to your wallet as Pending, and becomes Available for withdrawal upon standard settlement.
+            When verified advertising campaigns run across Tolee, the configured revenue share (10%) is credited to your wallet as Pending, and becomes Available for withdrawal upon standard settlement.
           </p>
         </div>
       </div>
