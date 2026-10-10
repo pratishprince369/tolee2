@@ -170,7 +170,7 @@ export function ReferralsDashboardClient() {
               Earn 10% Sharing On Every Eligible Ad Spend
             </h2>
             <p className="text-xs sm:text-sm text-indigo-100 leading-relaxed">
-              When users who joined through your referral link run eligible advertisements on Tolee, 10% of their qualifying ad spend is automatically credited to you.
+              When users who joined through your referral link run eligible advertisements on Tolee, 10% of their qualifying real ad spend (deposited from bank accounts/UPI) is automatically credited to you. Free promotional credits & digital offers provided by Tolee are excluded from sharing.
             </p>
 
             {/* Referral Link Box */}

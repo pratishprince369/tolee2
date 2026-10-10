@@ -1075,7 +1075,9 @@ model Wallet {
   id           String   @id @default(cuid())
   userId       String   @unique
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  balance      Float    @default(2500.0) // Non-withdrawable promotional credit
+  balance      Float    @default(2500.0) // Total usable balance
+  realBalance  Float    @default(0.0)    // Real deposited funds from bank/UPI/gateway (qualifies for 10% revenue sharing)
+  promoBalance Float    @default(2500.0) // Promotional/digital offer credits from Tolee (does NOT qualify for sharing)
   totalEarned  Float    @default(2500.0)
   totalSpent   Float    @default(0.0)
   createdAt    DateTime @default(now())

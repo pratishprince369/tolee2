@@ -47,6 +47,8 @@ export async function checkAndInitializeWallet(referredBy?: string) {
         data: {
           userId,
           balance: 2500.0,
+          realBalance: 0.0,
+          promoBalance: 2500.0,
           totalEarned: 2500.0,
           totalSpent: 0.0,
           transactions: {
@@ -128,6 +130,7 @@ export async function checkAndInitializeWallet(referredBy?: string) {
                   where: { userId: referrer.id },
                   data: {
                     balance: { increment: 500.0 },
+                    promoBalance: { increment: 500.0 },
                     totalEarned: { increment: 500.0 },
                     transactions: {
                       create: {
@@ -144,6 +147,8 @@ export async function checkAndInitializeWallet(referredBy?: string) {
                   data: {
                     userId: referrer.id,
                     balance: 3000.0,
+                    realBalance: 0.0,
+                    promoBalance: 3000.0,
                     totalEarned: 3000.0,
                     totalSpent: 0.0,
                     transactions: {
@@ -544,6 +549,9 @@ export async function createQuickBoostAction(
 
     // Idempotent atomic execution with wallet deduction
     const campaign = await prisma.$transaction(async (tx) => {
+      let realBudgetUsed = 0;
+      let promoBudgetUsed = 0;
+
       // 1. Check and deduct wallet if not free boost
       if (!isFreeBoostEligible && totalRequiredBudget > 0) {
         const wallet = await tx.wallet.findUnique({
@@ -554,10 +562,16 @@ export async function createQuickBoostAction(
           throw new Error(`Insufficient wallet balance (₹${wallet?.balance || 0}). Required: ₹${totalRequiredBudget.toFixed(2)}. Please recharge your Ads Wallet.`);
         }
 
+        const currentPromo = Math.max(0, (wallet as any).promoBalance ?? 0);
+        promoBudgetUsed = Math.min(currentPromo, totalRequiredBudget);
+        realBudgetUsed = Math.max(0, totalRequiredBudget - promoBudgetUsed);
+
         await tx.wallet.update({
           where: { userId },
           data: {
             balance: { decrement: totalRequiredBudget },
+            promoBalance: { decrement: promoBudgetUsed },
+            realBalance: { decrement: realBudgetUsed },
             totalSpent: { increment: totalRequiredBudget }
           }
         });
@@ -636,15 +650,29 @@ export async function createQuickBoostAction(
       if (!isFreeBoostEligible && totalRequiredBudget > 0) {
         const userWallet = await tx.wallet.findUnique({ where: { userId } });
         if (userWallet) {
-          await tx.walletTransaction.create({
+          const spendTx = await tx.walletTransaction.create({
             data: {
               walletId: userWallet.id,
               amount: -totalRequiredBudget,
               type: 'spend',
-              description: `Paid Boost Post (${duration} days): ${primaryText.slice(0, 25)}`,
+              description: `Paid Boost Post (${duration} days): ${primaryText.slice(0, 25)} (Real: ₹${realBudgetUsed.toFixed(2)}, Promo: ₹${promoBudgetUsed.toFixed(2)})`,
               campaignId: newCampaign.id
             }
           });
+
+          // 10% referral revenue sharing ONLY on real deposited ad spend!
+          if (realBudgetUsed > 0) {
+            try {
+              await processReferralAdSpendCommission({
+                advertiserUserId: userId,
+                eligibleSpendAmount: realBudgetUsed,
+                campaignId: newCampaign.id,
+                billingTransactionId: spendTx.id
+              });
+            } catch (commErr) {
+              console.error('[Ads createBoost] Referral 10% revenue share error:', commErr);
+            }
+          }
         }
       }
 
@@ -902,11 +930,20 @@ export async function trackAdInteraction(
       });
 
       if (cost > 0) {
+        // Calculate split between promo balance (free offer credits) and real balance (bank deposits)
+        const currentPromo = Math.max(0, (wallet as any).promoBalance ?? 0);
+        const currentReal = Math.max(0, (wallet as any).realBalance ?? 0);
+
+        const promoUsed = Math.min(currentPromo, cost);
+        const realUsed = Math.max(0, cost - promoUsed);
+
         // Deduct from advertiser wallet balance
         const updatedWallet = await tx.wallet.update({
           where: { id: wallet.id },
           data: {
             balance: { decrement: cost },
+            promoBalance: { decrement: promoUsed },
+            realBalance: { decrement: realUsed },
             totalSpent: { increment: cost }
           }
         });
@@ -917,21 +954,24 @@ export async function trackAdInteraction(
             walletId: wallet.id,
             amount: -cost,
             type: 'spend',
-            description: `${type.toUpperCase()} deduction for ad "${ad.name}" (${context?.placementType || 'normal_feed'})`,
+            description: `${type.toUpperCase()} deduction for ad "${ad.name}" (Real: ₹${realUsed.toFixed(2)}, Promo: ₹${promoUsed.toFixed(2)})`,
             campaignId: campaign.id
           }
         });
 
         // --- 10% REFERRAL AD REVENUE SHARING ---
-        try {
-          await processReferralAdSpendCommission({
-            advertiserUserId: campaign.userId,
-            eligibleSpendAmount: cost,
-            campaignId: campaign.id,
-            billingTransactionId: spendTx.id
-          });
-        } catch (commErr) {
-          console.error('[Ads trackAdInteraction] Referral 10% revenue share error:', commErr);
+        // ONLY triggers for real deposited money from bank/UPI, NEVER for promotional/digital offer amounts!
+        if (realUsed > 0) {
+          try {
+            await processReferralAdSpendCommission({
+              advertiserUserId: campaign.userId,
+              eligibleSpendAmount: realUsed,
+              campaignId: campaign.id,
+              billingTransactionId: spendTx.id
+            });
+          } catch (commErr) {
+            console.error('[Ads trackAdInteraction] Referral 10% revenue share error:', commErr);
+          }
         }
 
         // --- FRANCHISE COMMISSION REVENUE SHARING ---
@@ -1707,6 +1747,93 @@ export async function transferWalletCreditsAction(data: {
 }
 
 /**
+ * Deposits real funds into user's Ads Wallet from Bank Account / UPI / Payment Gateway.
+ * Increases realBalance and total balance. Qualifies for 10% referral revenue sharing upon ad spend.
+ */
+export async function depositRealFundsToWalletAction(data: {
+  amount: number;
+  paymentMethod?: 'upi' | 'bank_transfer' | 'card' | 'netbanking';
+  referenceId?: string;
+}) {
+  try {
+    const userId = await getUserId();
+    if (!userId) return { success: false, error: 'Unauthorized' };
+
+    const depositAmount = Number(data.amount);
+    if (!depositAmount || isNaN(depositAmount) || depositAmount <= 0) {
+      return { success: false, error: 'Invalid deposit amount. Must be greater than 0.' };
+    }
+
+    const method = data.paymentMethod || 'bank_transfer';
+    const refId = data.referenceId || `DEP_${Date.now()}_${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+
+    const result = await prisma.$transaction(async (tx: any) => {
+      let wallet = await tx.wallet.findUnique({ where: { userId } });
+      if (!wallet) {
+        wallet = await tx.wallet.create({
+          data: {
+            userId,
+            balance: 2500.0,
+            realBalance: 0.0,
+            promoBalance: 2500.0,
+            totalEarned: 2500.0,
+            totalSpent: 0.0,
+            transactions: {
+              create: {
+                amount: 2500.0,
+                type: 'welcome',
+                description: 'Congratulations! Welcome promotional wallet credits'
+              }
+            }
+          }
+        });
+      }
+
+      const updatedWallet = await tx.wallet.update({
+        where: { id: wallet.id },
+        data: {
+          balance: { increment: depositAmount },
+          realBalance: { increment: depositAmount },
+          totalEarned: { increment: depositAmount }
+        }
+      });
+
+      const txRecord = await tx.walletTransaction.create({
+        data: {
+          walletId: wallet.id,
+          amount: depositAmount,
+          type: 'deposit',
+          description: `Bank Deposit: Added ₹${depositAmount.toLocaleString('en-IN')} via ${method.toUpperCase()} (Ref: ${refId})`
+        }
+      });
+
+      await tx.notification.create({
+        data: {
+          userId,
+          type: 'wallet_credit',
+          message: `✅ ₹${depositAmount.toLocaleString('en-IN')} successfully added to your Ads Wallet from your Bank Account via ${method.toUpperCase()}!`,
+          link: '/ads-manager'
+        }
+      });
+
+      return { updatedWallet, txRecord };
+    });
+
+    revalidatePath('/ads-manager');
+    return {
+      success: true,
+      realBalance: result.updatedWallet.realBalance,
+      balance: result.updatedWallet.balance,
+      transactionId: result.txRecord.id,
+      message: `Successfully deposited ₹${depositAmount.toLocaleString('en-IN')} into your Ads Wallet!`
+    };
+  } catch (err: any) {
+    console.error('depositRealFundsToWalletAction failed:', err);
+    return { success: false, error: err.message || 'Deposit transaction failed.' };
+  }
+}
+
+/**
  * Super Admin: Retrieves all wallet transfers and transaction statements with fraud flagging.
  */
 export async function superAdminGetWalletTransactions() {
@@ -2256,6 +2383,7 @@ export async function approveReferralAction(referralId: string) {
           where: { userId: referral.referrerId },
           data: {
             balance: { increment: 500.0 },
+            promoBalance: { increment: 500.0 },
             totalEarned: { increment: 500.0 },
             transactions: {
               create: {
@@ -2271,6 +2399,8 @@ export async function approveReferralAction(referralId: string) {
           data: {
             userId: referral.referrerId,
             balance: 3000.0,
+            realBalance: 0.0,
+            promoBalance: 3000.0,
             totalEarned: 3000.0,
             totalSpent: 0.0,
             transactions: {

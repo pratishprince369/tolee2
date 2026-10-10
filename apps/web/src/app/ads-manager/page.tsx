@@ -16,6 +16,7 @@ import {
   toggleCampaignStatus,
   searchUsersForTransfer,
   transferWalletCreditsAction,
+  depositRealFundsToWalletAction,
   setTransferPinAction,
   updateCampaignAction,
   deleteCampaignAction
@@ -67,6 +68,46 @@ export default function AdsManagerPage() {
   const [pinSetupLoading, setPinSetupLoading] = useState(false);
   const [authMethod, setAuthMethod] = useState<'pin' | 'password'>('pin');
   const [confirmPin, setConfirmPin] = useState('');
+
+  // Real Money Bank Deposit States
+  const [showDepositModal, setShowDepositModal] = useState(false);
+  const [depositAmount, setDepositAmount] = useState('1000');
+  const [depositMethod, setDepositMethod] = useState<'upi' | 'bank_transfer' | 'card' | 'netbanking'>('upi');
+  const [depositLoading, setDepositLoading] = useState(false);
+  const [depositError, setDepositError] = useState('');
+  const [depositSuccess, setDepositSuccess] = useState('');
+
+  const handleDepositFunds = async () => {
+    try {
+      setDepositLoading(true);
+      setDepositError('');
+      setDepositSuccess('');
+      const amountNum = parseFloat(depositAmount);
+      if (isNaN(amountNum) || amountNum <= 0) {
+        setDepositError('Please enter a valid amount greater than ₹0.');
+        setDepositLoading(false);
+        return;
+      }
+      const res = await depositRealFundsToWalletAction({
+        amount: amountNum,
+        paymentMethod: depositMethod
+      });
+      if (res.success) {
+        setDepositSuccess(res.message || 'Funds successfully deposited!');
+        await loadData();
+        setTimeout(() => {
+          setShowDepositModal(false);
+          setDepositSuccess('');
+        }, 1500);
+      } else {
+        setDepositError(res.error || 'Failed to deposit funds');
+      }
+    } catch (err: any) {
+      setDepositError(err.message || 'Deposit error occurred');
+    } finally {
+      setDepositLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (hasTransferPin) {
@@ -1024,22 +1065,60 @@ export default function AdsManagerPage() {
               </div>
 
               <div className="z-10">
-                <p className="text-[9px] tracking-wider text-zinc-300 uppercase font-semibold">Promotional Ad Credits</p>
-                <div className="flex items-center gap-3 mt-1">
+                <div className="flex items-center justify-between">
+                  <p className="text-[9px] tracking-wider text-zinc-300 uppercase font-semibold">Total Ads Wallet Balance</p>
+                </div>
+                <div className="flex items-center gap-2.5 mt-1 flex-wrap">
                   <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
                     ₹{wallet?.balance?.toLocaleString('en-IN') || '0.00'}
                   </h2>
-                  <button
-                    onClick={() => {
-                      setTransferError('');
-                      setTransferSuccess('');
-                      setShowTransferModal(true);
-                    }}
-                    className="p-1.5 bg-white/10 hover:bg-white/20 text-white rounded-xl backdrop-blur-md transition-all shadow-sm border border-white/10 hover:scale-105 active:scale-95 shrink-0 flex items-center justify-center"
-                    title="Transfer Credits"
-                  >
-                    <ArrowLeftRight className="h-4 w-4" />
-                  </button>
+                  <div className="flex items-center gap-1.5 ml-auto">
+                    <button
+                      onClick={() => {
+                        setDepositError('');
+                        setDepositSuccess('');
+                        setShowDepositModal(true);
+                      }}
+                      className="px-2.5 py-1.5 bg-[#00ba88] hover:bg-[#00ba88]/90 text-white text-xs font-bold rounded-xl shadow-md transition-all hover:scale-105 active:scale-95 shrink-0 flex items-center gap-1"
+                      title="Add Money from Bank"
+                    >
+                      <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
+                      Add Money
+                    </button>
+                    <button
+                      onClick={() => {
+                        setTransferError('');
+                        setTransferSuccess('');
+                        setShowTransferModal(true);
+                      }}
+                      className="p-1.5 bg-white/10 hover:bg-white/20 text-white rounded-xl backdrop-blur-md transition-all shadow-sm border border-white/10 hover:scale-105 active:scale-95 shrink-0 flex items-center justify-center"
+                      title="Transfer Credits"
+                    >
+                      <ArrowLeftRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Real Bank vs Promotional Credits breakdown */}
+                <div className="grid grid-cols-2 gap-2 mt-3 pt-2.5 border-t border-white/10 text-left">
+                  <div className="bg-white/10 rounded-xl p-2 backdrop-blur-sm">
+                    <p className="text-[8px] uppercase tracking-wider text-emerald-300 font-bold flex items-center gap-1">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400"></span> Real Bank Funds
+                    </p>
+                    <p className="text-xs sm:text-sm font-extrabold text-white mt-0.5">
+                      ₹{(wallet?.realBalance ?? 0).toLocaleString('en-IN')}
+                    </p>
+                    <p className="text-[7.5px] text-zinc-300">10% Referral Share applies</p>
+                  </div>
+                  <div className="bg-white/10 rounded-xl p-2 backdrop-blur-sm">
+                    <p className="text-[8px] uppercase tracking-wider text-amber-300 font-bold flex items-center gap-1">
+                      <span className="h-1.5 w-1.5 rounded-full bg-amber-400"></span> Promo Offer Credits
+                    </p>
+                    <p className="text-xs sm:text-sm font-extrabold text-white mt-0.5">
+                      ₹{(wallet?.promoBalance ?? (wallet?.balance ?? 2500)).toLocaleString('en-IN')}
+                    </p>
+                    <p className="text-[7.5px] text-zinc-300">Free Tolee offer (0% share)</p>
+                  </div>
                 </div>
               </div>
 
@@ -2042,6 +2121,149 @@ export default function AdsManagerPage() {
                 )}
               </form>
             )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Real Money Bank Deposit Modal Popup */}
+      {showDepositModal && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/65 backdrop-blur-sm animate-in fade-in duration-250">
+          <div className="rounded-t-3xl sm:rounded-3xl border border-gray-150 bg-white w-full sm:max-w-md text-[#0a1530] shadow-2xl relative flex flex-col animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200 max-h-[92vh] sm:max-h-[88vh]">
+            
+            {/* Fintech Gradient Header */}
+            <div className="bg-gradient-to-r from-[#0a1530] via-[#152a57] to-[#00ba88] p-5 text-white flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-2xl bg-white/20 flex items-center justify-center backdrop-blur-md">
+                  <Wallet className="h-5 w-5 text-white stroke-[2.5]" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold">Add Money to Ads Wallet</h3>
+                  <p className="text-[10px] text-emerald-300 uppercase tracking-widest font-bold mt-0.5">Real Bank / UPI Deposit</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => {
+                  setShowDepositModal(false);
+                  setDepositError('');
+                  setDepositSuccess('');
+                }}
+                className="h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-all"
+              >
+                <X className="h-4.5 w-4.5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-5 overflow-y-auto">
+              {depositError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold rounded-xl flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  <span>{depositError}</span>
+                </div>
+              )}
+
+              {depositSuccess && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold rounded-xl flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                  <span>{depositSuccess}</span>
+                </div>
+              )}
+
+              {/* Informational Callout */}
+              <div className="p-3 bg-emerald-50/60 border border-emerald-100 rounded-2xl text-[11px] text-emerald-900 leading-relaxed">
+                <p className="font-bold flex items-center gap-1.5 text-emerald-800">
+                  <ShieldCheck className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                  Real Money Ad Spend Revenue Sharing Rule
+                </p>
+                <p className="mt-1 text-emerald-700">
+                  Ads run using real money added from your bank account qualify your referrer for <strong>10% referral revenue sharing</strong>. Free promotional offer credits from Tolee are not eligible for sharing.
+                </p>
+              </div>
+
+              {/* Amount Selection */}
+              <div>
+                <label className="text-xs font-bold text-[#0a1530] mb-2 block">Select or Enter Amount (₹)</label>
+                <div className="grid grid-cols-4 gap-2 mb-3">
+                  {['500', '1000', '2500', '5000'].map((amt) => (
+                    <button
+                      key={amt}
+                      type="button"
+                      onClick={() => setDepositAmount(amt)}
+                      className={`py-2 text-xs font-extrabold rounded-xl border transition-all ${
+                        depositAmount === amt
+                          ? 'bg-[#0a1530] text-white border-[#0a1530] shadow-sm'
+                          : 'bg-slate-50 text-zinc-700 border-zinc-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      ₹{parseInt(amt).toLocaleString('en-IN')}
+                    </button>
+                  ))}
+                </div>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 font-extrabold text-zinc-400">₹</span>
+                  <input
+                    type="number"
+                    min="10"
+                    placeholder="Enter custom deposit amount..."
+                    value={depositAmount}
+                    onChange={(e) => setDepositAmount(e.target.value)}
+                    className="w-full pl-8 pr-4 py-3 rounded-xl bg-slate-50 border border-zinc-200 text-sm font-bold text-[#0a1530] focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+              </div>
+
+              {/* Payment Method */}
+              <div>
+                <label className="text-xs font-bold text-[#0a1530] mb-2 block">Payment Method</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { id: 'upi', label: 'UPI / QR / GPay', desc: 'Instant bank transfer' },
+                    { id: 'bank_transfer', label: 'Net Banking / IMPS', desc: 'Direct bank account' },
+                    { id: 'card', label: 'Debit / Credit Card', desc: 'Visa, Mastercard, RuPay' },
+                    { id: 'netbanking', label: 'Corporate Banking', desc: 'Commercial account' },
+                  ].map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setDepositMethod(m.id as any)}
+                      className={`p-2.5 text-left rounded-xl border transition-all ${
+                        depositMethod === m.id
+                          ? 'border-[#00ba88] bg-emerald-50/50 shadow-sm'
+                          : 'border-zinc-200 bg-white hover:bg-slate-50'
+                      }`}
+                    >
+                      <p className={`text-xs font-bold ${depositMethod === m.id ? 'text-[#00ba88]' : 'text-[#0a1530]'}`}>
+                        {m.label}
+                      </p>
+                      <p className="text-[10px] text-zinc-400 mt-0.5">{m.desc}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowDepositModal(false)}
+                  className="flex-1 border border-zinc-200 bg-white hover:bg-slate-50 text-zinc-600 font-bold h-11 rounded-xl text-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={depositLoading || !depositAmount || parseFloat(depositAmount) <= 0}
+                  onClick={handleDepositFunds}
+                  className="flex-1 bg-gradient-to-r from-[#00ba88] to-[#10b981] hover:opacity-95 text-white font-bold h-11 rounded-xl text-xs flex items-center justify-center gap-2 select-none shadow-md"
+                >
+                  {depositLoading ? (
+                    <><RefreshCw className="h-4 w-4 animate-spin" /> Processing Deposit...</>
+                  ) : (
+                    <><Check className="h-4 w-4 stroke-[3]" /> Add ₹{parseFloat(depositAmount || '0').toLocaleString('en-IN')}</>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>

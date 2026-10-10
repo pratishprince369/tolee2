@@ -274,6 +274,8 @@ export async function processReferralAdSpendCommission(params: {
         data: {
           userId: referrerId,
           balance: 2500.0,
+          realBalance: 0.0,
+          promoBalance: 2500.0,
           totalEarned: 2500.0,
           totalSpent: 0.0
         }
@@ -284,6 +286,7 @@ export async function processReferralAdSpendCommission(params: {
       where: { id: wallet.id },
       data: {
         balance: { increment: commissionAmount },
+        realBalance: { increment: commissionAmount },
         totalEarned: { increment: commissionAmount }
       }
     });
@@ -376,10 +379,12 @@ export async function reverseReferralAdSpendCommission(params: {
     // Adjust referrer wallet if balance allows
     const wallet = await tx.wallet.findUnique({ where: { userId: commission.referrerId } });
     if (wallet && wallet.balance >= commission.commissionAmount) {
+      const realDec = Math.min((wallet as any).realBalance ?? 0, commission.commissionAmount);
       await tx.wallet.update({
         where: { id: wallet.id },
         data: {
-          balance: { decrement: commission.commissionAmount }
+          balance: { decrement: commission.commissionAmount },
+          realBalance: { decrement: realDec }
         }
       });
 

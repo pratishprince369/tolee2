@@ -220,15 +220,47 @@ async function runTests() {
     assert(reversedLedger?.status === 'REVERSED' && Boolean(reversedLedger.reversalReference), 'Ledger status updated to REVERSED with reversal reference');
 
     // -----------------------------------------------------------------
-    // TEST 11: Dashboard Data Accuracy
+    // TEST 11: Real Bank Deposit vs Promotional Offer Credits
     // -----------------------------------------------------------------
-    console.log('\n--- TEST GROUP 5: DASHBOARD AGGREGATION ---');
+    console.log('\n--- TEST GROUP 5: REAL BANK DEPOSIT VS PROMOTIONAL CREDITS ---');
+    // Scenario A: User only spends from free promotional offer credit
+    const promoOnlySpend = await processReferralAdSpendCommission({
+      advertiserUserId: shyamUser.id,
+      eligibleSpendAmount: 0, // Real spend is 0 because paid using promotional bonus
+      billingTransactionId: `BILLING_TX_PROMO_ONLY_${testRunId}`
+    });
+    assert(promoOnlySpend.commissionAmount === 0, 'Ad spend funded by free promotional offer credits yields ₹0 referral sharing');
+
+    // Scenario B: User adds real money from bank account and spends it
+    const realBankSpendAmount = 10000.0; // ₹10,000 real bank deposit spent on ads
+    const realBankSpendCommission = await processReferralAdSpendCommission({
+      advertiserUserId: shyamUser.id,
+      eligibleSpendAmount: realBankSpendAmount,
+      billingTransactionId: `BILLING_TX_REAL_BANK_${testRunId}`
+    });
+    assert(realBankSpendCommission.success === true, 'Commission processed for real bank deposit spend');
+    assert(realBankSpendCommission.commissionAmount === 1000.0, '₹10,000 real bank deposit ad spend yields exactly ₹1,000 (10%) sharing', realBankSpendCommission);
+
+    // Scenario C: Mixed Spend (e.g. ₹500 promo credits + ₹2,000 real bank funds)
+    // Only the ₹2,000 real portion qualifies for 10% (= ₹200)
+    const mixedRealPortion = 2000.0;
+    const mixedSpendCommission = await processReferralAdSpendCommission({
+      advertiserUserId: shyamUser.id,
+      eligibleSpendAmount: mixedRealPortion,
+      billingTransactionId: `BILLING_TX_MIXED_REAL_${testRunId}`
+    });
+    assert(mixedSpendCommission.commissionAmount === 200.0, 'Mixed spend yields 10% ONLY on the real bank portion (₹2,000 -> ₹200)');
+
+    // -----------------------------------------------------------------
+    // TEST 12: Dashboard Data Accuracy
+    // -----------------------------------------------------------------
+    console.log('\n--- TEST GROUP 6: DASHBOARD AGGREGATION ---');
     const dashboardData = await getUserReferralDashboardData(ramUser.id);
     assert(dashboardData.metrics.totalReferredUsers === 1, 'Dashboard shows 1 total referred user');
     assert(dashboardData.metrics.activeReferredAdvertisers === 1, 'Dashboard shows 1 active advertiser');
     assert(dashboardData.metrics.reversedEarnings === 10000.0, 'Dashboard accurately accounts for ₹10,000 in reversed earnings');
-    assert(dashboardData.metrics.confirmedEarnings === 7500.0, 'Dashboard accurately reflects remaining ₹7,500 (5,000 + 2,500) confirmed earnings');
-    assert(dashboardData.commissions.length === 3, 'Dashboard shows complete transaction history of 3 commissions');
+    assert(dashboardData.metrics.confirmedEarnings === 8700.0, 'Dashboard accurately reflects confirmed real earnings (5000 + 2500 + 1000 + 200 = 8700)');
+    assert(dashboardData.commissions.length === 5, 'Dashboard shows complete transaction history of 5 commissions');
 
     console.log('\n================================================================');
     console.log(`🎉 ALL TESTS PASSED! (${passedTests}/${totalTests})`);
