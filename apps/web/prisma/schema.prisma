@@ -39,6 +39,7 @@ model User {
   isMobileVerified Boolean @default(false)
   verificationStatus String? @default("pending")
   subLocation   String?
+  referralCode  String?  @unique
 
   accounts      Account[]
   sessions      Session[]
@@ -173,6 +174,8 @@ model User {
   franchise     Franchise?
   referralsMade Referral[] @relation("Referrer")
   referralRecv  Referral?  @relation("Referee")
+  referrerCommissions ReferralCommission[] @relation("ReferrerCommissions")
+  referredCommissions ReferralCommission[] @relation("ReferredUserCommissions")
   campaigns     Campaign[]
   pushTokens    PushToken[]
   lastActiveAt  DateTime           @default(now())
@@ -1111,6 +1114,37 @@ model Referral {
   city          String?
   area          String?
   source        String?
+  referralCode  String?
+  attributedAt  DateTime @default(now())
+  attributionStatus String @default("attributed")
+}
+
+// 2B. Referral 10% Ad Revenue Sharing Commission Ledger
+model ReferralCommission {
+  id                   String    @id @default(cuid())
+  referrerId           String
+  referrer             User      @relation("ReferrerCommissions", fields: [referrerId], references: [id], onDelete: Cascade)
+  referredUserId       String
+  referredUser         User      @relation("ReferredUserCommissions", fields: [referredUserId], references: [id], onDelete: Cascade)
+  campaignId           String?
+  campaign             Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  billingTransactionId String?   @unique
+  eligibleSpendAmount  Float
+  commissionRate       Float     @default(0.10)
+  commissionAmount     Float
+  currency             String    @default("INR")
+  status               String    @default("CONFIRMED") // "PENDING" | "CONFIRMED" | "PAID" | "REVERSED" | "ON_HOLD"
+  holdReason           String?
+  reversalReference    String?
+  createdAt            DateTime  @default(now())
+  confirmedAt          DateTime?
+  paidAt               DateTime?
+  updatedAt            DateTime  @updatedAt
+
+  @@index([referrerId])
+  @@index([referredUserId])
+  @@index([status])
+  @@index([campaignId])
 }
 
 // 3. Campaign & Ads Structure (Campaign -> AdSet -> Ad)
@@ -1136,6 +1170,7 @@ model Campaign {
   userId            String
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   adSets            AdSet[]
+  referralCommissions ReferralCommission[]
 }
 
 model AdSet {

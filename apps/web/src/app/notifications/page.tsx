@@ -72,7 +72,7 @@ export default async function NotificationsPage() {
               bgColor = 'bg-green-50 dark:bg-green-900/20';
             }
 
-            if (notification.type === 'referral_invite') {
+            if (notification.type === 'referral_invite' || notification.type === 'referral_share_10') {
               return (
                 <Card key={notification.id} className="border-indigo-500/20 dark:border-indigo-500/10 bg-gradient-to-br from-indigo-50/40 via-white to-white dark:from-indigo-950/20 dark:via-zinc-950 dark:to-zinc-950 hover:from-indigo-50/60 dark:hover:from-indigo-950/30 transition-all rounded-2xl mb-6 shadow-sm relative overflow-hidden group">
                   <CardContent className="p-5 sm:p-6 flex flex-col sm:flex-row items-start gap-4">
@@ -82,7 +82,46 @@ export default async function NotificationsPage() {
                     <div className="flex-1 space-y-2.5">
                       <div>
                         <h3 className="font-extrabold text-gray-900 dark:text-white text-base sm:text-lg">
-                          🎉 Earn ₹500 in Your Ads Wallet!
+                          🎉 Get 10% Sharing
+                        </h3>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {new Date(notification.createdAt).toLocaleDateString()} at {new Date(notification.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                      <p className="text-sm text-gray-600 dark:text-zinc-300 leading-relaxed max-w-xl">
+                        Earn 10% sharing when users who joined through your referral link run eligible ads on Tolee. Share your link and grow your referral network.
+                      </p>
+                      
+                      {/* Primary CTA and Share client actions */}
+                      <div className="pt-2 flex flex-wrap items-center gap-3">
+                        <Link
+                          href="/referrals"
+                          className="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black rounded-xl px-4 py-2.5 shadow-sm transition-all"
+                        >
+                          <span>Get 10% Sharing</span>
+                        </Link>
+                        <ReferralNotificationActions referralCode={referralCode} />
+                      </div>
+                    </div>
+                    {!notification.isRead && (
+                      <div className="absolute top-4 right-4 w-2.5 h-2.5 bg-blue-500 rounded-full"></div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            }
+
+            if (notification.type === 'referral_earned') {
+              return (
+                <Card key={notification.id} className="border-amber-500/20 dark:border-amber-500/10 bg-gradient-to-br from-amber-50/40 via-white to-white dark:from-amber-950/20 dark:via-zinc-950 dark:to-zinc-950 hover:from-amber-50/60 dark:hover:from-amber-950/30 transition-all rounded-2xl mb-6 shadow-sm relative overflow-hidden group">
+                  <CardContent className="p-5 sm:p-6 flex flex-col sm:flex-row items-start gap-4">
+                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 bg-amber-100/80 dark:bg-amber-950 text-amber-600 dark:text-amber-400 font-extrabold text-2xl">
+                      💰
+                    </div>
+                    <div className="flex-1 space-y-2.5">
+                      <div>
+                        <h3 className="font-extrabold text-gray-900 dark:text-white text-base sm:text-lg">
+                          💰 10% Ad Revenue Share Earned!
                         </h3>
                         <p className="text-xs text-gray-500 mt-0.5">
                           {new Date(notification.createdAt).toLocaleDateString()} at {new Date(notification.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -91,12 +130,17 @@ export default async function NotificationsPage() {
                       <p className="text-sm text-gray-600 dark:text-zinc-300 leading-relaxed max-w-xl">
                         {notification.message}
                       </p>
-                      
-                      {/* Copy & Share Buttons client actions */}
-                      <ReferralNotificationActions referralCode={referralCode} />
+                      <div className="pt-2 flex flex-wrap items-center gap-3">
+                        <Link
+                          href="/referrals"
+                          className="inline-flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-black rounded-xl px-4 py-2.5 shadow-sm transition-all"
+                        >
+                          <span>View Referral Dashboard</span>
+                        </Link>
+                      </div>
                     </div>
                     {!notification.isRead && (
-                      <div className="absolute top-4 right-4 w-2.5 h-2.5 bg-blue-500 rounded-full"></div>
+                      <div className="absolute top-4 right-4 w-2.5 h-2.5 bg-amber-500 rounded-full"></div>
                     )}
                   </CardContent>
                 </Card>

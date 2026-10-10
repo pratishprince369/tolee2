@@ -6,6 +6,7 @@ import {
   Wallet, Share2, Copy, Check, Send, ExternalLink
 } from 'lucide-react';
 import { getUserWallet } from '@/actions/ads';
+import Link from 'next/link';
 
 interface Props {
   userId: string;
@@ -89,12 +90,21 @@ export function ProfileReferralsPanel({ userId, username }: Props) {
       {/* ─── HEADER BANNER ─── */}
       <div className="rounded-3xl bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-950/20 dark:to-purple-950/20 border border-indigo-500/10 p-6 relative overflow-hidden">
         <div className="relative z-10 space-y-2">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-widest bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
-            👥 Program active
-          </span>
-          <h3 className="text-xl font-black text-slate-800 dark:text-white">Invite Friends & Earn ₹500</h3>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-widest bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+              👥 10% Ad Revenue Sharing Active
+            </span>
+            <Link
+              href="/referrals"
+              className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
+            >
+              <span>View Full Earnings Ledger</span>
+              <ExternalLink className="w-3 h-3" />
+            </Link>
+          </div>
+          <h3 className="text-xl font-black text-slate-800 dark:text-white">Get 10% Sharing on Referral Ad Spend</h3>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed max-w-md">
-            Share your unique link or invite code. When they register on Tolee, they receive a ₹2,500 welcome credit and you instantly get ₹500 in your Ads Wallet.
+            Earn 10% sharing when users who joined through your referral link run eligible ads on Tolee. Share your link and grow your referral network.
           </p>
         </div>
         <div className="absolute right-0 bottom-0 top-0 w-1/3 opacity-10 pointer-events-none flex items-center justify-center">

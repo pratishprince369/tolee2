@@ -6,6 +6,7 @@ import { authOptions } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
 import { isVideoUrl } from '@/lib/media';
 import bcrypt from 'bcryptjs';
+import { processReferralAdSpendCommission, reverseReferralAdSpendCommission } from '@/lib/referralService';
 
 // Helper to get active session user ID
 async function getUserId() {
@@ -911,7 +912,7 @@ export async function trackAdInteraction(
         });
 
         // Add spending transaction
-        await tx.walletTransaction.create({
+        const spendTx = await tx.walletTransaction.create({
           data: {
             walletId: wallet.id,
             amount: -cost,
@@ -920,6 +921,18 @@ export async function trackAdInteraction(
             campaignId: campaign.id
           }
         });
+
+        // --- 10% REFERRAL AD REVENUE SHARING ---
+        try {
+          await processReferralAdSpendCommission({
+            advertiserUserId: campaign.userId,
+            eligibleSpendAmount: cost,
+            campaignId: campaign.id,
+            billingTransactionId: spendTx.id
+          });
+        } catch (commErr) {
+          console.error('[Ads trackAdInteraction] Referral 10% revenue share error:', commErr);
+        }
 
         // --- FRANCHISE COMMISSION REVENUE SHARING ---
         try {
@@ -1332,6 +1345,15 @@ export async function superAdminModerateCampaign(campaignId: string, status: 'ap
               campaignId: campaign.id
             }
           });
+          // Reverse any attributed referral commissions for this refunded spend
+          try {
+            await reverseReferralAdSpendCommission({
+              billingTransactionId: spendTx.id,
+              reason: `Campaign rejected: ${reason || 'Guidelines violation'}`
+            });
+          } catch (revErr) {
+            console.error('[updateCampaignStatusAction] Referral commission reversal notice:', revErr);
+          }
         }
       }
     }
@@ -2092,12 +2114,12 @@ export async function getSuperAdminReferralsDashboard() {
       }
     });
 
-    const referrersList = await Promise.all(referrers.map(async (u) => {
+    const referrersList = await Promise.all(referrers.map(async (u: any) => {
       const clicks = await prisma.auditLog.count({
         where: { action: 'referral_click', target: u.id }
       });
 
-      const completedReferrals = u.referralsMade.filter(r => r.status === 'completed');
+      const completedReferrals = u.referralsMade.filter((r: any) => r.status === 'completed');
       const lastReferralDate = u.referralsMade.length > 0 
         ? u.referralsMade[0].createdAt 
         : null;
@@ -2133,6 +2155,20 @@ export async function getSuperAdminReferralsDashboard() {
       orderBy: { createdAt: 'desc' }
     });
 
+    // 3. Fetch 10% Referral Commission Ledger
+    const commissionLedger = await prisma.referralCommission.findMany({
+      include: {
+        referrer: { select: { id: true, name: true, username: true, email: true } },
+        referredUser: { select: { id: true, name: true, username: true, email: true } },
+        campaign: { select: { id: true, name: true } }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100
+    });
+
+    const totalEligibleAdSpend = commissionLedger.reduce((sum: number, c: any) => sum + (c.status !== 'REVERSED' ? c.eligibleSpendAmount : 0), 0);
+    const totalCommission10Percent = commissionLedger.reduce((sum: number, c: any) => sum + (c.status !== 'REVERSED' ? c.commissionAmount : 0), 0);
+
     return {
       success: true,
       stats: {
@@ -2144,14 +2180,48 @@ export async function getSuperAdminReferralsDashboard() {
         totalPending,
         dailyReferrals,
         weeklyReferrals,
-        monthlyReferrals
+        monthlyReferrals,
+        totalEligibleAdSpend: Math.round(totalEligibleAdSpend * 100) / 100,
+        totalCommission10Percent: Math.round(totalCommission10Percent * 100) / 100
       },
       topReferrers,
       referrersList,
-      pendingReferralsList
+      pendingReferralsList,
+      commissionLedger
     };
   } catch (error: any) {
     console.error("Super Admin Referral dashboard error:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function adminUpdateCommissionStatusAction(commissionId: string, status: string, reason?: string) {
+  try {
+    const session = await getServerSession(authOptions);
+    const adminId = (session?.user as any)?.id;
+    if (!adminId) return { success: false, error: 'Unauthorized' };
+
+    const updated = await prisma.referralCommission.update({
+      where: { id: commissionId },
+      data: {
+        status,
+        holdReason: reason || null,
+        updatedAt: new Date()
+      }
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: 'referral_commission_status_update',
+        target: commissionId,
+        targetType: 'referral_commission',
+        adminId,
+        details: JSON.stringify({ status, reason })
+      }
+    });
+
+    return { success: true, updated };
+  } catch (error: any) {
     return { success: false, error: error.message };
   }
 }

@@ -6,6 +6,7 @@ import { prisma } from "./prisma";
 import bcrypt from "bcryptjs";
 import { cookies, headers } from "next/headers";
 import { autoJoinDefaultTolees } from "./autoJoinTolees";
+import { attributeReferralOnSignup } from "./referralService";
 
 
 // Ensure prisma is defined before passing to adapter
@@ -89,21 +90,8 @@ export const authOptions: NextAuthOptions = {
                 }
               });
 
-              // Send 6-Month Free Boosting notification 2 seconds after registration
-              setTimeout(async () => {
-                try {
-                  await prisma.notification.create({
-                    data: {
-                      userId: user.id,
-                      type: 'promotion',
-                      message: '🎉 Congratulations! You have unlocked 6 Months of FREE Post Boosting on Tolee! Boost any of your posts with zero charges.',
-                      link: '/ads-manager'
-                    }
-                  });
-                } catch (err) {
-                  console.error('[Auth] Failed to send 6-month free boost notification:', err);
-                }
-              }, 2000);
+              // Unwanted promotional notification disabled per Phase 2 cleanup
+              // Only "Get 10% Sharing" referral promotional notification is retained
             }
 
             if (user.isSuspended) {
@@ -254,50 +242,26 @@ export const authOptions: NextAuthOptions = {
         return "/auth/signin?error=banned";
       }
 
-      // --- FRANCHISE REFERRAL TRACKING (SIGNUP/LOGIN) ---
+      // --- REFERRAL ATTRIBUTION TRACKING (SIGNUP/LOGIN) ---
       try {
         const cookieStore = cookies();
         const referralCode = cookieStore.get("tolee_referral_code")?.value;
-        if (referralCode && referralCode.startsWith("FRN")) {
-          const existingReferral = await prisma.referral.findUnique({
-            where: { refereeId: user.id }
+        if (referralCode) {
+          const headersList = headers();
+          const userAgent = headersList.get("user-agent") || "";
+          const ipAddress = headersList.get("x-forwarded-for")?.split(",")[0] || "";
+          await attributeReferralOnSignup({
+            refereeId: user.id,
+            referralCode,
+            userAgent,
+            ipAddress
           });
-          if (!existingReferral) {
-            const franchise = await prisma.franchise.findUnique({
-              where: { code: referralCode }
-            });
-            if (franchise && franchise.status === "active") {
-              const headersList = headers();
-              const userAgent = headersList.get("user-agent") || "";
-
-              let device = "Desktop";
-              if (/Mobi|Android|iPhone|iPad/i.test(userAgent)) device = "Mobile";
-              else if (/Tablet|iPad/i.test(userAgent)) device = "Tablet";
-
-              // Log referral conversion
-              await prisma.referral.create({
-                data: {
-                  referrerId: franchise.userId,
-                  refereeId: user.id,
-                  franchiseId: franchise.id,
-                  device,
-                  source: "referral_link",
-                  rewardAmount: 0,
-                  status: "completed"
-                }
-              });
-
-              // Clean up tracking cookie
-              try {
-                cookieStore.delete("tolee_referral_code");
-              } catch (cookieErr) {
-                // Ignore cookie delete errors in some environments
-              }
-            }
-          }
+          try {
+            cookieStore.delete("tolee_referral_code");
+          } catch (_) {}
         }
       } catch (refErr) {
-        console.error("[NextAuth Franchise Referral Tracking Error]:", refErr);
+        console.error("[NextAuth Referral Tracking Notice]:", refErr);
       }
 
       // Record login activity for non-credential standard provider logins (e.g. Google OAuth)

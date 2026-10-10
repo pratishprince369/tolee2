@@ -8,7 +8,8 @@ import {
 import { 
   getSuperAdminReferralsDashboard, 
   approveReferralAction, 
-  rejectReferralAction 
+  rejectReferralAction,
+  adminUpdateCommissionStatusAction
 } from '@/actions/ads';
 
 export default function SuperAdminReferralsPanel() {
@@ -16,6 +17,7 @@ export default function SuperAdminReferralsPanel() {
   const [error, setError] = useState('');
   const [dashboard, setDashboard] = useState<any>(null);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
   
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -76,6 +78,25 @@ export default function SuperAdminReferralsPanel() {
       alert(err.message);
     } finally {
       setActionLoadingId(null);
+    }
+  };
+
+  const handleUpdateCommissionStatus = async (commissionId: string, status: string) => {
+    const reason = prompt(`Enter reason for updating commission status to ${status}:`);
+    if (reason === null) return;
+    setStatusUpdatingId(commissionId);
+    try {
+      const res = await adminUpdateCommissionStatusAction(commissionId, status, reason);
+      if (res.success) {
+        alert(`Commission marked as ${status}`);
+        await loadDashboard();
+      } else {
+        alert(res.error || 'Failed to update commission');
+      }
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setStatusUpdatingId(null);
     }
   };
 
@@ -296,6 +317,115 @@ export default function SuperAdminReferralsPanel() {
                         <span>History</span>
                         <ArrowRight className="w-3.5 h-3.5" />
                       </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* ─── 10% REFERRAL AD REVENUE SHARING COMMISSIONS LEDGER ─── */}
+      <div className="bg-[#0c0c0e] border border-zinc-900 rounded-3xl p-6 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-900 pb-4">
+          <div>
+            <h3 className="text-sm uppercase font-black tracking-wider text-white flex items-center gap-2">
+              <Wallet className="w-4 h-4 text-emerald-500" /> 10% Ad Revenue Sharing Commission Ledger
+            </h3>
+            <p className="text-[11px] text-zinc-500 mt-0.5">
+              Auditable records of all 10% revenue shares calculated on eligible ad spend.
+            </p>
+          </div>
+          <div className="flex items-center gap-4 text-xs font-bold">
+            <span className="text-zinc-400">Total Eligible Spend: <strong className="text-white">₹{(stats.totalEligibleAdSpend || 0).toLocaleString('en-IN')}</strong></span>
+            <span className="text-zinc-400">10% Commissions: <strong className="text-emerald-400">₹{(stats.totalCommission10Percent || 0).toLocaleString('en-IN')}</strong></span>
+          </div>
+        </div>
+
+        {(dashboard.commissionLedger || []).length === 0 ? (
+          <div className="text-center py-10 text-zinc-500 text-xs font-semibold">
+            No referral ad revenue commissions recorded in the ledger yet.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-zinc-900 text-zinc-500 font-black uppercase text-[9px] tracking-wider">
+                  <th className="py-3">Date</th>
+                  <th className="py-3">Referrer</th>
+                  <th className="py-3">Referred Advertiser</th>
+                  <th className="py-3">Campaign</th>
+                  <th className="py-3">Eligible Spend</th>
+                  <th className="py-3">10% Earning</th>
+                  <th className="py-3">Status</th>
+                  <th className="py-3 text-right">Moderation Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-900 font-medium">
+                {(dashboard.commissionLedger || []).map((c: any) => (
+                  <tr key={c.id} className="text-zinc-300 hover:bg-zinc-950/40">
+                    <td className="py-3.5 text-zinc-400 whitespace-nowrap">
+                      {new Date(c.createdAt).toLocaleDateString()}
+                    </td>
+                    <td className="py-3.5">
+                      <span className="font-bold text-white block">{c.referrer.name}</span>
+                      <span className="text-[10px] text-zinc-500">@{c.referrer.username}</span>
+                    </td>
+                    <td className="py-3.5">
+                      <span className="font-bold text-white block">{c.referredUser.name}</span>
+                      <span className="text-[10px] text-zinc-500">@{c.referredUser.username}</span>
+                    </td>
+                    <td className="py-3.5 text-zinc-400">
+                      {c.campaign?.name || 'Boost Campaign'}
+                    </td>
+                    <td className="py-3.5 font-bold text-white">
+                      ₹{c.eligibleSpendAmount.toLocaleString('en-IN')}
+                    </td>
+                    <td className="py-3.5 font-black text-emerald-400">
+                      +₹{c.commissionAmount.toLocaleString('en-IN')}
+                    </td>
+                    <td className="py-3.5">
+                      <span className={`inline-block px-2.5 py-0.5 rounded text-[8px] font-black uppercase ${
+                        c.status === 'CONFIRMED' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                        c.status === 'ON_HOLD' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                        c.status === 'REVERSED' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
+                        'bg-zinc-800 text-zinc-300'
+                      }`}>
+                        {c.status}
+                      </span>
+                      {c.holdReason && (
+                        <p className="text-[9px] text-zinc-500 mt-0.5">{c.holdReason}</p>
+                      )}
+                    </td>
+                    <td className="py-3.5 text-right space-x-1.5 whitespace-nowrap">
+                      {c.status === 'CONFIRMED' && (
+                        <button
+                          disabled={statusUpdatingId === c.id}
+                          onClick={() => handleUpdateCommissionStatus(c.id, 'ON_HOLD')}
+                          className="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 rounded-lg text-[10px] font-bold border border-amber-500/20 transition"
+                        >
+                          Hold
+                        </button>
+                      )}
+                      {c.status === 'ON_HOLD' && (
+                        <button
+                          disabled={statusUpdatingId === c.id}
+                          onClick={() => handleUpdateCommissionStatus(c.id, 'CONFIRMED')}
+                          className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg text-[10px] font-bold border border-emerald-500/20 transition"
+                        >
+                          Release Hold
+                        </button>
+                      )}
+                      {c.status !== 'REVERSED' && (
+                        <button
+                          disabled={statusUpdatingId === c.id}
+                          onClick={() => handleUpdateCommissionStatus(c.id, 'REVERSED')}
+                          className="px-2.5 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg text-[10px] font-bold border border-red-500/20 transition"
+                        >
+                          Reverse
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}

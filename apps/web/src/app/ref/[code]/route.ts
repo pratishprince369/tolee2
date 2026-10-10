@@ -16,8 +16,9 @@ export async function GET(
     const referrer = await prisma.user.findFirst({
       where: {
         OR: [
+          { referralCode: code },
           { id: code },
-          { username: code }
+          { username: { equals: code, mode: 'insensitive' } }
         ]
       }
     });
@@ -33,7 +34,7 @@ export async function GET(
           target: referrer.id,
           targetType: "user",
           ipAddress,
-          details: JSON.stringify({ userAgent, source })
+          details: JSON.stringify({ userAgent, source, code })
         }
       });
     }
@@ -61,14 +62,20 @@ export async function GET(
       });
     }
 
-    // 2. Redirect visitor directly to Google Play Store
-    const response = NextResponse.redirect(PLAY_STORE_URL);
+    // 3. Smart Redirect:
+    // If mobile download explicitly requested, open Play Store; otherwise redirect to web signup with ref
+    const isMobile = /Mobi|Android|iPhone|iPad/i.test(userAgent);
+    const targetUrl = (isMobile && searchParams.get("target") === "app")
+      ? PLAY_STORE_URL
+      : new URL(`/signup?ref=${encodeURIComponent(code)}`, req.url).toString();
 
-    // 3. Store referral code in secure cookie for 30 days
+    const response = NextResponse.redirect(targetUrl);
+
+    // 4. Store referral code in secure cookie for 30 days
     response.cookies.set("tolee_referral_code", code, {
       maxAge: 30 * 24 * 60 * 60, // 30 days
       path: "/",
-      httpOnly: true,
+      httpOnly: false, // allow client hydration
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax"
     });

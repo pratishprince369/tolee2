@@ -1569,17 +1569,21 @@ export async function triggerReferralInviteNotification() {
     }
     const userId = (session.user as any).id;
 
-    // Check if referral invite already exists to avoid duplication
+    // Check if referral promotional notification already exists to strictly avoid duplication
     const existingNotif = await prisma.notification.findFirst({
-      where: { userId, type: 'referral_invite' }
+      where: {
+        userId,
+        type: { in: ['referral_invite', 'referral_share_10'] }
+      }
     });
 
     if (!existingNotif) {
       await createSystemNotification({
         userId,
-        type: 'referral_invite',
-        message: "Invite your friends to Tolee. Whenever someone joins using your referral link, you'll receive ₹500 in your Ads Wallet after a successful referral.",
-        link: '/settings?tab=account' // Fallback page redirect
+        type: 'referral_share_10',
+        title: '🎉 Get 10% Sharing',
+        message: 'Earn 10% sharing when users who joined through your referral link run eligible ads on Tolee. Share your link and grow your referral network.',
+        link: '/referrals'
       });
     }
 

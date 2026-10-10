@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { sendOtp } from "@/lib/email";
 import { checkBotStatus } from "@/lib/botDetection";
 import { autoJoinDefaultTolees } from "@/lib/autoJoinTolees";
+import { attributeReferralOnSignup } from "@/lib/referralService";
 
 export async function POST(req: Request) {
   try {
@@ -101,58 +102,25 @@ export async function POST(req: Request) {
       }
     });
 
-    // Send 6-Month Free Boosting notification 2 seconds after registration
-    setTimeout(async () => {
-      try {
-        await prisma.notification.create({
-          data: {
-            userId: user.id,
-            type: 'promotion',
-            message: '🎉 Congratulations! You have unlocked 6 Months of FREE Post Boosting on Tolee! Boost any of your posts with zero charges.',
-            link: '/ads-manager'
-          }
-        });
-      } catch (err) {
-        console.error('[Register] Failed to send 6-month free boost notification:', err);
-      }
-    }, 2000);
+    // Unwanted promotional notification disabled per Phase 2 cleanup
+    // Only "Get 10% Sharing" referral promotional notification is retained
 
-    // --- FRANCHISE REFERRAL TRACKING ---
+    // --- REFERRAL ATTRIBUTION TRACKING ---
     const cookieStore = cookies();
     const referralCode = ref || cookieStore.get("tolee_referral_code")?.value;
     if (referralCode) {
       try {
-        if (referralCode.startsWith("FRN")) {
-          const franchise = await prisma.franchise.findUnique({
-            where: { code: referralCode }
-          });
-          if (franchise && franchise.status === "active") {
-            const userAgent = req.headers.get("user-agent") || "";
-            let device = "Desktop";
-            if (/Mobi|Android|iPhone|iPad/i.test(userAgent)) device = "Mobile";
-            else if (/Tablet|iPad/i.test(userAgent)) device = "Tablet";
-
-            // Create Referral record linking referee to franchise owner
-            await prisma.referral.create({
-              data: {
-                referrerId: franchise.userId,
-                refereeId: user.id,
-                franchiseId: franchise.id,
-                device,
-                source: "referral_link",
-                rewardAmount: 0,
-                status: "completed"
-              }
-            });
-
-            // Clean up tracking cookie
-            try {
-              cookieStore.delete("tolee_referral_code");
-            } catch (cookieErr) {
-              // Ignore cookie delete errors in some environments
-            }
-          }
-        }
+        const userAgent = req.headers.get("user-agent") || "";
+        const ipAddress = req.headers.get("x-forwarded-for")?.split(",")[0] || "";
+        await attributeReferralOnSignup({
+          refereeId: user.id,
+          referralCode,
+          userAgent,
+          ipAddress
+        });
+        try {
+          cookieStore.delete("tolee_referral_code");
+        } catch (_) {}
       } catch (refErr) {
         console.error("[Referral Logging Error]:", refErr);
       }
