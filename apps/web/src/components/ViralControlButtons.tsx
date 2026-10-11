@@ -184,82 +184,90 @@ export function ViralControlButtons({
   const isDownFilled = stats.downPercent >= 35 || stats.userVote === 'GET_IT_DOWN';
 
   // ═══════════════════════════════════════════════════════════════════════
-  // REELS VARIANT — Compact side-by-side with in-button progress fill
+  // REELS VARIANT — Compact side-by-side with full text & watermark percentage
   // ═══════════════════════════════════════════════════════════════════════
   if (variant === 'reel') {
     return (
       <div
         className={cn(
-          "w-full max-w-[280px] flex items-center gap-2 pointer-events-auto select-none my-1",
+          "w-full max-w-[320px] flex items-center gap-1.5 sm:gap-2 pointer-events-auto select-none my-1",
           className
         )}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* 🟢 Make Viral */}
+        {/* 🟢 Make this Viral */}
         <button
           type="button"
           onClick={() => handleVote('VIRAL')}
           disabled={isLoading}
           className={cn(
-            "relative overflow-hidden flex-1 flex items-center justify-between h-8 px-2.5 rounded-full text-[11px] font-bold transition-all duration-200 active:scale-95 shadow-sm border",
+            "relative overflow-hidden flex-1 flex items-center justify-center h-8 px-2 rounded-full text-[11px] font-bold transition-all duration-200 active:scale-95 shadow-sm border select-none cursor-pointer",
             isViralFilled
-              ? "border-emerald-500 bg-emerald-600/20 text-white"
-              : "border-emerald-500/30 bg-black/40 text-emerald-300 hover:text-white"
+              ? "border-emerald-500 bg-emerald-600/30 text-white"
+              : "border-emerald-500/30 bg-black/50 text-emerald-300 hover:text-white"
           )}
-          title="Make this Viral: calculated against all Tolee users"
+          title={`Make this Viral: ${stats.viralPercent}% of all Tolee users`}
         >
           {/* In-button progress fill */}
           <div
-            className="absolute inset-y-0 left-0 bg-emerald-600/90 transition-all duration-300 ease-out z-0 pointer-events-none"
+            className="absolute inset-y-0 left-0 bg-emerald-600/70 transition-all duration-300 ease-out z-0 pointer-events-none"
             style={{ width: `${Math.min(100, Math.max(0, stats.viralPercent))}%` }}
           />
 
-          <div className="relative z-10 flex items-center gap-1 min-w-0">
+          {/* Low opacity percentage watermark behind text */}
+          <span
+            aria-hidden="true"
+            className="absolute inset-0 flex items-center justify-center font-mono font-black text-sm tracking-tight opacity-20 pointer-events-none select-none z-0"
+          >
+            {stats.viralPercent}%
+          </span>
+
+          {/* Foreground Icon & Full Text */}
+          <div className="relative z-10 flex items-center justify-center gap-1 min-w-0 whitespace-nowrap">
             {isLoading && activeVoteTarget === 'VIRAL' ? (
               <Loader2 className="w-3 h-3 animate-spin shrink-0" />
             ) : (
               <Check className="w-3 h-3 stroke-[3] shrink-0" />
             )}
-            <span className="truncate">Make Viral</span>
-          </div>
-
-          <div className="relative z-10 flex items-center gap-1 shrink-0 ml-1">
-            <div className="h-3 w-px bg-current opacity-30" />
-            <span className="font-mono text-[10px] font-extrabold">{stats.viralPercent}%</span>
+            <span className="whitespace-nowrap tracking-tight">Make this Viral</span>
           </div>
         </button>
 
-        {/* 🔴 Get Down */}
+        {/* 🔴 Get it Down */}
         <button
           type="button"
           onClick={() => handleVote('GET_IT_DOWN')}
           disabled={isLoading}
           className={cn(
-            "relative overflow-hidden flex-1 flex items-center justify-between h-8 px-2.5 rounded-full text-[11px] font-bold transition-all duration-200 active:scale-95 shadow-sm border",
+            "relative overflow-hidden flex-1 flex items-center justify-center h-8 px-2 rounded-full text-[11px] font-bold transition-all duration-200 active:scale-95 shadow-sm border select-none cursor-pointer",
             isDownFilled
-              ? "border-rose-500 bg-rose-600/20 text-white"
-              : "border-rose-500/30 bg-black/40 text-rose-300 hover:text-white"
+              ? "border-rose-500 bg-rose-600/30 text-white"
+              : "border-rose-500/30 bg-black/50 text-rose-300 hover:text-white"
           )}
-          title="Get it Down: calculated against all Tolee users"
+          title={`Get it Down: ${stats.downPercent}% of all Tolee users`}
         >
           {/* In-button progress fill */}
           <div
-            className="absolute inset-y-0 left-0 bg-rose-600/90 transition-all duration-300 ease-out z-0 pointer-events-none"
+            className="absolute inset-y-0 left-0 bg-rose-600/70 transition-all duration-300 ease-out z-0 pointer-events-none"
             style={{ width: `${Math.min(100, Math.max(0, stats.downPercent))}%` }}
           />
 
-          <div className="relative z-10 flex items-center gap-1 min-w-0">
+          {/* Low opacity percentage watermark behind text */}
+          <span
+            aria-hidden="true"
+            className="absolute inset-0 flex items-center justify-center font-mono font-black text-sm tracking-tight opacity-20 pointer-events-none select-none z-0"
+          >
+            {stats.downPercent}%
+          </span>
+
+          {/* Foreground Icon & Full Text */}
+          <div className="relative z-10 flex items-center justify-center gap-1 min-w-0 whitespace-nowrap">
             {isLoading && activeVoteTarget === 'GET_IT_DOWN' ? (
               <Loader2 className="w-3 h-3 animate-spin shrink-0" />
             ) : (
               <ArrowDownCircle className="w-3 h-3 stroke-[2.5] shrink-0" />
             )}
-            <span className="truncate">Get Down</span>
-          </div>
-
-          <div className="relative z-10 flex items-center gap-1 shrink-0 ml-1">
-            <div className="h-3 w-px bg-current opacity-30" />
-            <span className="font-mono text-[10px] font-extrabold">{stats.downPercent}%</span>
+            <span className="whitespace-nowrap tracking-tight">Get it Down</span>
           </div>
         </button>
       </div>
@@ -267,13 +275,13 @@ export function ViralControlButtons({
   }
 
   // ═══════════════════════════════════════════════════════════════════════
-  // FEED POST VARIANT — Exact match to attached design reference
-  // Pill rounded buttons side-by-side with in-button horizontal progress fill
+  // FEED POST VARIANT
+  // Full text display without truncation with low opacity percentage behind text
   // ═══════════════════════════════════════════════════════════════════════
   return (
     <div
       className={cn(
-        "w-full pt-3 pb-1 flex items-center gap-2.5 sm:gap-3 select-none",
+        "w-full pt-3 pb-1 flex items-center gap-2 sm:gap-3 select-none",
         className
       )}
       onClick={(e) => e.stopPropagation()}
@@ -284,12 +292,12 @@ export function ViralControlButtons({
         onClick={() => handleVote('VIRAL')}
         disabled={isLoading}
         className={cn(
-          "relative overflow-hidden flex-1 flex items-center justify-between h-10 sm:h-11 px-3.5 sm:px-4 rounded-full text-xs sm:text-[13px] font-bold transition-all duration-200 active:scale-98 select-none border cursor-pointer",
+          "relative overflow-hidden flex-1 flex items-center justify-center h-10 sm:h-11 px-2.5 sm:px-3 rounded-full text-[11.5px] xs:text-xs sm:text-[13px] font-bold transition-all duration-200 active:scale-98 select-none border cursor-pointer",
           isViralFilled
             ? "border-emerald-600 bg-emerald-600 text-white shadow-xs"
             : "border-[#A7F3D0] dark:border-emerald-800/80 bg-[#E8F8F0] dark:bg-emerald-950/20 text-[#065F46] dark:text-emerald-300 hover:bg-[#DCFCE7]"
         )}
-        title="Make this Viral — calculated across all eligible Tolee users"
+        title={`Make this Viral — ${stats.viralPercent}% of all eligible Tolee users`}
       >
         {/* Dynamic In-Button Progress Layer */}
         <div
@@ -297,22 +305,22 @@ export function ViralControlButtons({
           style={{ width: `${Math.min(100, Math.max(0, stats.viralPercent))}%` }}
         />
 
-        {/* Button Content (Left: Check icon + Text) */}
-        <div className="relative z-10 flex items-center gap-1.5 sm:gap-2 min-w-0">
-          {isLoading && activeVoteTarget === 'VIRAL' ? (
-            <Loader2 className="w-4 h-4 animate-spin shrink-0" />
-          ) : (
-            <Check className="w-4 h-4 stroke-[3] shrink-0" />
-          )}
-          <span className="truncate">Make this Viral</span>
-        </div>
+        {/* Low opacity percentage watermark behind text */}
+        <span
+          aria-hidden="true"
+          className="absolute inset-0 flex items-center justify-center font-mono font-black text-base sm:text-lg tracking-tight opacity-20 pointer-events-none select-none z-0"
+        >
+          {stats.viralPercent}%
+        </span>
 
-        {/* Button Content (Right: Divider + Percentage) */}
-        <div className="relative z-10 flex items-center gap-2 shrink-0 ml-1.5">
-          <div className="h-3.5 w-px bg-current opacity-30" />
-          <span className="font-mono font-extrabold text-xs sm:text-[13px] min-w-[28px] text-right">
-            {stats.viralPercent}%
-          </span>
+        {/* Foreground Content: Check icon + Full Text (No truncation) */}
+        <div className="relative z-10 flex items-center justify-center gap-1.5 min-w-0 whitespace-nowrap">
+          {isLoading && activeVoteTarget === 'VIRAL' ? (
+            <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin shrink-0" />
+          ) : (
+            <Check className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[3] shrink-0" />
+          )}
+          <span className="whitespace-nowrap tracking-tight">Make this Viral</span>
         </div>
       </button>
 
@@ -322,12 +330,12 @@ export function ViralControlButtons({
         onClick={() => handleVote('GET_IT_DOWN')}
         disabled={isLoading}
         className={cn(
-          "relative overflow-hidden flex-1 flex items-center justify-between h-10 sm:h-11 px-3.5 sm:px-4 rounded-full text-xs sm:text-[13px] font-bold transition-all duration-200 active:scale-98 select-none border cursor-pointer",
+          "relative overflow-hidden flex-1 flex items-center justify-center h-10 sm:h-11 px-2.5 sm:px-3 rounded-full text-[11.5px] xs:text-xs sm:text-[13px] font-bold transition-all duration-200 active:scale-98 select-none border cursor-pointer",
           isDownFilled
             ? "border-rose-600 bg-rose-600 text-white shadow-xs"
             : "border-[#FECACA] dark:border-rose-900/60 bg-[#FEECEC] dark:bg-rose-950/20 text-[#DC2626] dark:text-rose-300 hover:bg-[#FEE2E2]"
         )}
-        title="Get it Down — calculated across all eligible Tolee users"
+        title={`Get it Down — ${stats.downPercent}% of all eligible Tolee users`}
       >
         {/* Dynamic In-Button Progress Layer */}
         <div
@@ -335,22 +343,22 @@ export function ViralControlButtons({
           style={{ width: `${Math.min(100, Math.max(0, stats.downPercent))}%` }}
         />
 
-        {/* Button Content (Left: Down Circle icon + Text) */}
-        <div className="relative z-10 flex items-center gap-1.5 sm:gap-2 min-w-0">
-          {isLoading && activeVoteTarget === 'GET_IT_DOWN' ? (
-            <Loader2 className="w-4 h-4 animate-spin shrink-0" />
-          ) : (
-            <ArrowDownCircle className="w-4 h-4 stroke-[2.5] shrink-0" />
-          )}
-          <span className="truncate">Get it Down</span>
-        </div>
+        {/* Low opacity percentage watermark behind text */}
+        <span
+          aria-hidden="true"
+          className="absolute inset-0 flex items-center justify-center font-mono font-black text-base sm:text-lg tracking-tight opacity-20 pointer-events-none select-none z-0"
+        >
+          {stats.downPercent}%
+        </span>
 
-        {/* Button Content (Right: Divider + Percentage) */}
-        <div className="relative z-10 flex items-center gap-2 shrink-0 ml-1.5">
-          <div className="h-3.5 w-px bg-current opacity-30" />
-          <span className="font-mono font-extrabold text-xs sm:text-[13px] min-w-[28px] text-right">
-            {stats.downPercent}%
-          </span>
+        {/* Foreground Content: Down Circle icon + Full Text (No truncation) */}
+        <div className="relative z-10 flex items-center justify-center gap-1.5 min-w-0 whitespace-nowrap">
+          {isLoading && activeVoteTarget === 'GET_IT_DOWN' ? (
+            <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin shrink-0" />
+          ) : (
+            <ArrowDownCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5] shrink-0" />
+          )}
+          <span className="whitespace-nowrap tracking-tight">Get it Down</span>
         </div>
       </button>
     </div>
