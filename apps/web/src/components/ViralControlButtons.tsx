@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { votePostDistributionAction } from '@/actions/viralControl';
-import { Flame, ArrowDownCircle, Check, Loader2 } from 'lucide-react';
+import { ArrowDownCircle, Check, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSession } from 'next-auth/react';
 
@@ -12,8 +12,11 @@ export interface ViralControlButtonsProps {
     viral_count?: number;
     get_it_down_count?: number;
     total_vote_count?: number;
+    total_eligible_users?: number;
     viral_percentage?: number;
     get_it_down_percentage?: number;
+    total_participation_percentage?: number;
+    all_users_participated?: boolean;
     current_user_vote?: 'VIRAL' | 'GET_IT_DOWN' | null;
   };
   variant?: 'feed' | 'reel';
@@ -30,16 +33,64 @@ export function ViralControlButtons({
   const isAuthenticated = Boolean(session?.user);
 
   const [stats, setStats] = useState({
-    viralCount: initialStats?.viral_count || 0,
-    downCount: initialStats?.get_it_down_count || 0,
-    totalVotes: initialStats?.total_vote_count || 0,
-    viralPercent: initialStats?.viral_percentage || 0,
-    downPercent: initialStats?.get_it_down_percentage || 0,
-    userVote: initialStats?.current_user_vote || null,
+    viralCount: initialStats?.viral_count ?? 0,
+    downCount: initialStats?.get_it_down_count ?? 0,
+    totalVotes: initialStats?.total_vote_count ?? 0,
+    totalEligibleUsers: initialStats?.total_eligible_users ?? 1,
+    viralPercent: initialStats?.viral_percentage ?? 0,
+    downPercent: initialStats?.get_it_down_percentage ?? 0,
+    allUsersParticipated: initialStats?.all_users_participated ?? false,
+    userVote: initialStats?.current_user_vote ?? null,
   });
 
   const [isLoading, setIsLoading] = useState(false);
   const [activeVoteTarget, setActiveVoteTarget] = useState<'VIRAL' | 'GET_IT_DOWN' | null>(null);
+
+  // Sync state whenever props update
+  useEffect(() => {
+    if (initialStats) {
+      setStats({
+        viralCount: initialStats.viral_count ?? 0,
+        downCount: initialStats.get_it_down_count ?? 0,
+        totalVotes: initialStats.total_vote_count ?? 0,
+        totalEligibleUsers: initialStats.total_eligible_users ?? 1,
+        viralPercent: initialStats.viral_percentage ?? 0,
+        downPercent: initialStats.get_it_down_percentage ?? 0,
+        allUsersParticipated: initialStats.all_users_participated ?? false,
+        userVote: initialStats.current_user_vote ?? null,
+      });
+    }
+  }, [
+    initialStats?.viral_count,
+    initialStats?.get_it_down_count,
+    initialStats?.viral_percentage,
+    initialStats?.get_it_down_percentage,
+    initialStats?.current_user_vote,
+    initialStats?.total_eligible_users,
+  ]);
+
+  // Client-side fallback fetch if initial percentages were missing
+  useEffect(() => {
+    if (initialStats?.viral_percentage === undefined && postId) {
+      fetch(`/api/posts/${postId}/distribution-stats`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (data?.stats) {
+            setStats({
+              viralCount: data.stats.viral_count ?? 0,
+              downCount: data.stats.get_it_down_count ?? 0,
+              totalVotes: data.stats.total_vote_count ?? 0,
+              totalEligibleUsers: data.stats.total_eligible_users ?? 1,
+              viralPercent: data.stats.viral_percentage ?? 0,
+              downPercent: data.stats.get_it_down_percentage ?? 0,
+              allUsersParticipated: data.stats.all_users_participated ?? false,
+              userVote: data.stats.current_user_vote ?? null,
+            });
+          }
+        })
+        .catch(() => {});
+    }
+  }, [postId, initialStats?.viral_percentage]);
 
   const handleVote = async (voteType: 'VIRAL' | 'GET_IT_DOWN') => {
     if (!isAuthenticated) {
@@ -47,8 +98,9 @@ export function ViralControlButtons({
       return;
     }
 
-    // Optimistic calculation
+    // Optimistic calculation against global eligible users (N)
     const prevStats = { ...stats };
+    const N = Math.max(1, stats.totalEligibleUsers);
     let newViralCount = stats.viralCount;
     let newDownCount = stats.downCount;
     let newUserVote: 'VIRAL' | 'GET_IT_DOWN' | null = voteType;
@@ -70,15 +122,33 @@ export function ViralControlButtons({
     }
 
     const newTotal = newViralCount + newDownCount;
-    const newViralPercent = newTotal > 0 ? Math.round((newViralCount / newTotal) * 100) : 0;
-    const newDownPercent = newTotal > 0 ? 100 - newViralPercent : 0;
+
+    // Make this Viral % = (ViralVotes / N) * 100
+    let newViralPercent = 0;
+    if (newViralCount > 0) {
+      newViralPercent = Math.round((newViralCount / N) * 100);
+      if (newViralPercent === 100 && newViralCount < N) newViralPercent = 99;
+      if (newViralCount >= N) newViralPercent = 100;
+    }
+
+    // Get it Down % = (DownVotes / N) * 100
+    let newDownPercent = 0;
+    if (newDownCount > 0) {
+      newDownPercent = Math.round((newDownCount / N) * 100);
+      if (newDownPercent === 100 && newDownCount < N) newDownPercent = 99;
+      if (newDownCount >= N) newDownPercent = 100;
+    }
+
+    const allUsersParticipated = newTotal >= N;
 
     setStats({
       viralCount: newViralCount,
       downCount: newDownCount,
       totalVotes: newTotal,
+      totalEligibleUsers: N,
       viralPercent: newViralPercent,
       downPercent: newDownPercent,
+      allUsersParticipated,
       userVote: newUserVote,
     });
 
@@ -92,8 +162,10 @@ export function ViralControlButtons({
           viralCount: res.stats.viral_count,
           downCount: res.stats.get_it_down_count,
           totalVotes: res.stats.total_vote_count,
+          totalEligibleUsers: res.stats.total_eligible_users ?? N,
           viralPercent: res.stats.viral_percentage,
           downPercent: res.stats.get_it_down_percentage,
+          allUsersParticipated: res.stats.all_users_participated,
           userVote: res.stats.current_user_vote,
         });
       } else {
@@ -108,179 +180,179 @@ export function ViralControlButtons({
     }
   };
 
+  const isViralFilled = stats.viralPercent >= 35 || stats.userVote === 'VIRAL';
+  const isDownFilled = stats.downPercent >= 35 || stats.userVote === 'GET_IT_DOWN';
+
   // ═══════════════════════════════════════════════════════════════════════
-  // REELS VARIANT — Compact, non-intrusive, low-brightness video overlay
+  // REELS VARIANT — Compact side-by-side with in-button progress fill
   // ═══════════════════════════════════════════════════════════════════════
   if (variant === 'reel') {
     return (
       <div
         className={cn(
-          "w-full max-w-[280px] flex flex-col gap-1.5 pointer-events-auto select-none my-1",
+          "w-full max-w-[280px] flex items-center gap-2 pointer-events-auto select-none my-1",
           className
         )}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center gap-2">
-          {/* 🟢 Make this Viral */}
-          <button
-            onClick={() => handleVote('VIRAL')}
-            disabled={isLoading}
-            className={cn(
-              "flex-1 flex items-center justify-center gap-1.5 py-1 px-2.5 rounded-full text-[11px] font-semibold transition-all duration-200 backdrop-blur-md active:scale-95 shadow-sm",
-              stats.userVote === 'VIRAL'
-                ? "bg-emerald-600 text-white shadow-emerald-500/30 ring-1 ring-emerald-400"
-                : "bg-black/40 hover:bg-emerald-950/40 text-emerald-300 hover:text-emerald-200 border border-emerald-500/30"
-            )}
-            title="Make this Viral: recommend to additional audience"
-          >
+        {/* 🟢 Make Viral */}
+        <button
+          type="button"
+          onClick={() => handleVote('VIRAL')}
+          disabled={isLoading}
+          className={cn(
+            "relative overflow-hidden flex-1 flex items-center justify-between h-8 px-2.5 rounded-full text-[11px] font-bold transition-all duration-200 active:scale-95 shadow-sm border",
+            isViralFilled
+              ? "border-emerald-500 bg-emerald-600/20 text-white"
+              : "border-emerald-500/30 bg-black/40 text-emerald-300 hover:text-white"
+          )}
+          title="Make this Viral: calculated against all Tolee users"
+        >
+          {/* In-button progress fill */}
+          <div
+            className="absolute inset-y-0 left-0 bg-emerald-600/90 transition-all duration-300 ease-out z-0 pointer-events-none"
+            style={{ width: `${Math.min(100, Math.max(0, stats.viralPercent))}%` }}
+          />
+
+          <div className="relative z-10 flex items-center gap-1 min-w-0">
             {isLoading && activeVoteTarget === 'VIRAL' ? (
-              <Loader2 className="w-3 h-3 animate-spin" />
+              <Loader2 className="w-3 h-3 animate-spin shrink-0" />
             ) : (
-              <Flame className={cn("w-3 h-3", stats.userVote === 'VIRAL' ? "fill-white" : "fill-emerald-400")} />
+              <Check className="w-3 h-3 stroke-[3] shrink-0" />
             )}
             <span className="truncate">Make Viral</span>
-            <span className="text-[10px] opacity-80 font-mono font-normal">
-              {stats.totalVotes > 0 ? `${stats.viralPercent}%` : ''}
-            </span>
-          </button>
+          </div>
 
-          {/* 🔴 Get it Down */}
-          <button
-            onClick={() => handleVote('GET_IT_DOWN')}
-            disabled={isLoading}
-            className={cn(
-              "flex-1 flex items-center justify-center gap-1.5 py-1 px-2.5 rounded-full text-[11px] font-semibold transition-all duration-200 backdrop-blur-md active:scale-95 shadow-sm",
-              stats.userVote === 'GET_IT_DOWN'
-                ? "bg-rose-600 text-white shadow-rose-500/30 ring-1 ring-rose-400"
-                : "bg-black/40 hover:bg-rose-950/40 text-rose-300 hover:text-rose-200 border border-rose-500/30"
-            )}
-            title="Get it Down: exclude from additional distribution"
-          >
+          <div className="relative z-10 flex items-center gap-1 shrink-0 ml-1">
+            <div className="h-3 w-px bg-current opacity-30" />
+            <span className="font-mono text-[10px] font-extrabold">{stats.viralPercent}%</span>
+          </div>
+        </button>
+
+        {/* 🔴 Get Down */}
+        <button
+          type="button"
+          onClick={() => handleVote('GET_IT_DOWN')}
+          disabled={isLoading}
+          className={cn(
+            "relative overflow-hidden flex-1 flex items-center justify-between h-8 px-2.5 rounded-full text-[11px] font-bold transition-all duration-200 active:scale-95 shadow-sm border",
+            isDownFilled
+              ? "border-rose-500 bg-rose-600/20 text-white"
+              : "border-rose-500/30 bg-black/40 text-rose-300 hover:text-white"
+          )}
+          title="Get it Down: calculated against all Tolee users"
+        >
+          {/* In-button progress fill */}
+          <div
+            className="absolute inset-y-0 left-0 bg-rose-600/90 transition-all duration-300 ease-out z-0 pointer-events-none"
+            style={{ width: `${Math.min(100, Math.max(0, stats.downPercent))}%` }}
+          />
+
+          <div className="relative z-10 flex items-center gap-1 min-w-0">
             {isLoading && activeVoteTarget === 'GET_IT_DOWN' ? (
-              <Loader2 className="w-3 h-3 animate-spin" />
+              <Loader2 className="w-3 h-3 animate-spin shrink-0" />
             ) : (
-              <ArrowDownCircle className={cn("w-3 h-3", stats.userVote === 'GET_IT_DOWN' ? "text-white" : "text-rose-400")} />
+              <ArrowDownCircle className="w-3 h-3 stroke-[2.5] shrink-0" />
             )}
             <span className="truncate">Get Down</span>
-            <span className="text-[10px] opacity-80 font-mono font-normal">
-              {stats.totalVotes > 0 ? `${stats.downPercent}%` : ''}
-            </span>
-          </button>
-        </div>
-
-        {/* Low-brightness progress bar */}
-        {stats.totalVotes > 0 && (
-          <div className="w-full flex h-1 rounded-full overflow-hidden bg-black/40 border border-white/10 backdrop-blur-xs">
-            <div
-              className="bg-emerald-500/70 transition-all duration-300"
-              style={{ width: `${stats.viralPercent}%` }}
-            />
-            <div
-              className="bg-rose-500/70 transition-all duration-300"
-              style={{ width: `${stats.downPercent}%` }}
-            />
           </div>
-        )}
+
+          <div className="relative z-10 flex items-center gap-1 shrink-0 ml-1">
+            <div className="h-3 w-px bg-current opacity-30" />
+            <span className="font-mono text-[10px] font-extrabold">{stats.downPercent}%</span>
+          </div>
+        </button>
       </div>
     );
   }
 
   // ═══════════════════════════════════════════════════════════════════════
-  // FEED POST VARIANT — Responsive card layout with subtle progress bars
+  // FEED POST VARIANT — Exact match to attached design reference
+  // Pill rounded buttons side-by-side with in-button horizontal progress fill
   // ═══════════════════════════════════════════════════════════════════════
   return (
     <div
       className={cn(
-        "w-full pt-2.5 pb-1 flex flex-col gap-2.5 border-t border-zinc-100 dark:border-zinc-800/60 select-none",
+        "w-full pt-3 pb-1 flex items-center gap-2.5 sm:gap-3 select-none",
         className
       )}
       onClick={(e) => e.stopPropagation()}
     >
-      {/* Action Buttons Row */}
-      <div className="flex items-center gap-2.5 w-full">
-        {/* 🟢 Make this Viral */}
-        <button
-          onClick={() => handleVote('VIRAL')}
-          disabled={isLoading}
-          className={cn(
-            "flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-xl font-medium text-xs sm:text-[13px] transition-all duration-200 active:scale-98 shadow-sm focus:outline-none",
-            stats.userVote === 'VIRAL'
-              ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20 ring-1 ring-emerald-500"
-              : "bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/40"
-          )}
-        >
+      {/* 🟢 Make this Viral Button */}
+      <button
+        type="button"
+        onClick={() => handleVote('VIRAL')}
+        disabled={isLoading}
+        className={cn(
+          "relative overflow-hidden flex-1 flex items-center justify-between h-10 sm:h-11 px-3.5 sm:px-4 rounded-full text-xs sm:text-[13px] font-bold transition-all duration-200 active:scale-98 select-none border cursor-pointer",
+          isViralFilled
+            ? "border-emerald-600 bg-emerald-600 text-white shadow-xs"
+            : "border-[#A7F3D0] dark:border-emerald-800/80 bg-[#E8F8F0] dark:bg-emerald-950/20 text-[#065F46] dark:text-emerald-300 hover:bg-[#DCFCE7]"
+        )}
+        title="Make this Viral — calculated across all eligible Tolee users"
+      >
+        {/* Dynamic In-Button Progress Layer */}
+        <div
+          className="absolute inset-y-0 left-0 bg-[#059669] dark:bg-emerald-600 transition-all duration-300 ease-out z-0 pointer-events-none"
+          style={{ width: `${Math.min(100, Math.max(0, stats.viralPercent))}%` }}
+        />
+
+        {/* Button Content (Left: Check icon + Text) */}
+        <div className="relative z-10 flex items-center gap-1.5 sm:gap-2 min-w-0">
           {isLoading && activeVoteTarget === 'VIRAL' ? (
-            <Loader2 className="w-4 h-4 animate-spin text-emerald-600 dark:text-emerald-300" />
-          ) : stats.userVote === 'VIRAL' ? (
-            <Check className="w-4 h-4 stroke-[2.5]" />
+            <Loader2 className="w-4 h-4 animate-spin shrink-0" />
           ) : (
-            <Flame className="w-4 h-4 text-emerald-600 dark:text-emerald-400 fill-emerald-500/30" />
+            <Check className="w-4 h-4 stroke-[3] shrink-0" />
           )}
-          <span>Make this Viral</span>
-        </button>
+          <span className="truncate">Make this Viral</span>
+        </div>
 
-        {/* 🔴 Get it Down */}
-        <button
-          onClick={() => handleVote('GET_IT_DOWN')}
-          disabled={isLoading}
-          className={cn(
-            "flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-xl font-medium text-xs sm:text-[13px] transition-all duration-200 active:scale-98 shadow-sm focus:outline-none",
-            stats.userVote === 'GET_IT_DOWN'
-              ? "bg-rose-600 hover:bg-rose-700 text-white shadow-rose-600/20 ring-1 ring-rose-500"
-              : "bg-rose-50 dark:bg-rose-950/20 text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-950/40 border border-rose-200 dark:border-rose-800/40"
-          )}
-        >
+        {/* Button Content (Right: Divider + Percentage) */}
+        <div className="relative z-10 flex items-center gap-2 shrink-0 ml-1.5">
+          <div className="h-3.5 w-px bg-current opacity-30" />
+          <span className="font-mono font-extrabold text-xs sm:text-[13px] min-w-[28px] text-right">
+            {stats.viralPercent}%
+          </span>
+        </div>
+      </button>
+
+      {/* 🔴 Get it Down Button */}
+      <button
+        type="button"
+        onClick={() => handleVote('GET_IT_DOWN')}
+        disabled={isLoading}
+        className={cn(
+          "relative overflow-hidden flex-1 flex items-center justify-between h-10 sm:h-11 px-3.5 sm:px-4 rounded-full text-xs sm:text-[13px] font-bold transition-all duration-200 active:scale-98 select-none border cursor-pointer",
+          isDownFilled
+            ? "border-rose-600 bg-rose-600 text-white shadow-xs"
+            : "border-[#FECACA] dark:border-rose-900/60 bg-[#FEECEC] dark:bg-rose-950/20 text-[#DC2626] dark:text-rose-300 hover:bg-[#FEE2E2]"
+        )}
+        title="Get it Down — calculated across all eligible Tolee users"
+      >
+        {/* Dynamic In-Button Progress Layer */}
+        <div
+          className="absolute inset-y-0 left-0 bg-[#E11D48] dark:bg-rose-600 transition-all duration-300 ease-out z-0 pointer-events-none"
+          style={{ width: `${Math.min(100, Math.max(0, stats.downPercent))}%` }}
+        />
+
+        {/* Button Content (Left: Down Circle icon + Text) */}
+        <div className="relative z-10 flex items-center gap-1.5 sm:gap-2 min-w-0">
           {isLoading && activeVoteTarget === 'GET_IT_DOWN' ? (
-            <Loader2 className="w-4 h-4 animate-spin text-rose-600 dark:text-rose-300" />
-          ) : stats.userVote === 'GET_IT_DOWN' ? (
-            <Check className="w-4 h-4 stroke-[2.5]" />
+            <Loader2 className="w-4 h-4 animate-spin shrink-0" />
           ) : (
-            <ArrowDownCircle className="w-4 h-4 text-rose-600 dark:text-rose-400" />
+            <ArrowDownCircle className="w-4 h-4 stroke-[2.5] shrink-0" />
           )}
-          <span>Get it Down</span>
-        </button>
-      </div>
-
-      {/* Progress Bars & Percentages */}
-      <div className="flex flex-col gap-1.5 px-0.5">
-        {/* Row 1: Viral Bar */}
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center justify-between text-[11px] font-medium text-zinc-600 dark:text-zinc-400">
-            <span className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              <span>Make this Viral</span>
-            </span>
-            <span className="font-mono text-zinc-700 dark:text-zinc-300 font-semibold">
-              {stats.totalVotes > 0 ? `${stats.viralPercent}%` : '0%'}
-            </span>
-          </div>
-          <div className="w-full h-1.5 bg-zinc-100 dark:bg-zinc-800/70 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full transition-all duration-300"
-              style={{ width: `${stats.totalVotes > 0 ? stats.viralPercent : 0}%` }}
-            />
-          </div>
+          <span className="truncate">Get it Down</span>
         </div>
 
-        {/* Row 2: Down Bar */}
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center justify-between text-[11px] font-medium text-zinc-600 dark:text-zinc-400">
-            <span className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-              <span>Get it Down</span>
-            </span>
-            <span className="font-mono text-zinc-700 dark:text-zinc-300 font-semibold">
-              {stats.totalVotes > 0 ? `${stats.downPercent}%` : '0%'}
-            </span>
-          </div>
-          <div className="w-full h-1.5 bg-zinc-100 dark:bg-zinc-800/70 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-rose-500 to-orange-500 rounded-full transition-all duration-300"
-              style={{ width: `${stats.totalVotes > 0 ? stats.downPercent : 0}%` }}
-            />
-          </div>
+        {/* Button Content (Right: Divider + Percentage) */}
+        <div className="relative z-10 flex items-center gap-2 shrink-0 ml-1.5">
+          <div className="h-3.5 w-px bg-current opacity-30" />
+          <span className="font-mono font-extrabold text-xs sm:text-[13px] min-w-[28px] text-right">
+            {stats.downPercent}%
+          </span>
         </div>
-      </div>
+      </button>
     </div>
   );
 }

@@ -28,49 +28,74 @@ async function runAllTests() {
   // ─────────────────────────────────────────────────────────────────────────
   // SUITE 1: PERCENTAGE CALCULATION TESTS
   // ─────────────────────────────────────────────────────────────────────────
-  console.log('--- SUITE 1: Deterministic Percentage Calculations ---');
+  // SUITE 1: PERCENTAGE CALCULATION TESTS (GLOBAL ELIGIBLE USERS DENOMINATOR)
+  // ─────────────────────────────────────────────────────────────────────────
+  console.log('--- SUITE 1: Global User Participation Calculations (N = All Registered Users) ---');
 
   // Test 1: 0 viral, 0 down -> empty state
-  const emptyState = calculateDistributionPercentages(0, 0);
+  const emptyState = calculateDistributionPercentages(0, 0, 1000);
   assert(
     emptyState.viral_percentage === 0 &&
       emptyState.get_it_down_percentage === 0 &&
-      emptyState.total_vote_count === 0,
-    '1. 0 viral, 0 down -> defined empty state (0% / 0%, total = 0)'
+      emptyState.total_vote_count === 0 &&
+      emptyState.total_eligible_users === 1000 &&
+      emptyState.total_participation_percentage === 0 &&
+      emptyState.all_users_participated === false,
+    '1. 0 viral, 0 down -> defined empty state (0% / 0%, total = 0, all_users_participated = false)'
   );
 
-  // Test 2: 1 viral, 0 down -> 100% viral
-  const allViral = calculateDistributionPercentages(1, 0);
+  // Test 2: 100 viral, 0 down, N=1000 -> 10% viral
+  const tenPercent = calculateDistributionPercentages(100, 0, 1000);
   assert(
-    allViral.viral_percentage === 100 &&
-      allViral.get_it_down_percentage === 0 &&
-      allViral.total_vote_count === 1,
-    '2. 1 viral, 0 down -> 100% viral, 0% down'
+    tenPercent.viral_percentage === 10 &&
+      tenPercent.get_it_down_percentage === 0 &&
+      tenPercent.total_participation_percentage === 10 &&
+      tenPercent.all_users_participated === false,
+    '2. 100 viral, 0 down (N=1000) -> 10% viral, 0% down, 10% participation'
   );
 
-  // Test 3: 0 viral, 1 down -> 100% down
-  const allDown = calculateDistributionPercentages(0, 1);
+  // Test 3: 0 viral, 250 down, N=1000 -> 25% down
+  const twentyFiveDown = calculateDistributionPercentages(0, 250, 1000);
   assert(
-    allDown.viral_percentage === 0 &&
-      allDown.get_it_down_percentage === 100 &&
-      allDown.total_vote_count === 1,
-    '3. 0 viral, 1 down -> 0% viral, 100% down'
+    twentyFiveDown.viral_percentage === 0 &&
+      twentyFiveDown.get_it_down_percentage === 25 &&
+      twentyFiveDown.total_participation_percentage === 25 &&
+      twentyFiveDown.all_users_participated === false,
+    '3. 0 viral, 250 down (N=1000) -> 0% viral, 25% down, 25% participation'
   );
 
-  // Test 4: 80 viral, 20 down -> 80% and 20%
-  const eightyTwenty = calculateDistributionPercentages(80, 20);
+  // Test 4: 500 viral, 250 down, N=1000 -> 50% viral, 25% down, 75% participation (do not sum to 100%)
+  const mixedVotes = calculateDistributionPercentages(500, 250, 1000);
   assert(
-    eightyTwenty.viral_percentage === 80 &&
-      eightyTwenty.get_it_down_percentage === 20 &&
-      eightyTwenty.total_vote_count === 100,
-    '4. 80 viral, 20 down -> 80% and 20%'
+    mixedVotes.viral_percentage === 50 &&
+      mixedVotes.get_it_down_percentage === 25 &&
+      mixedVotes.total_participation_percentage === 75 &&
+      mixedVotes.all_users_participated === false,
+    '4. 500 viral, 250 down (N=1000) -> 50% viral, 25% down (independent global denominators, NOT forced to 100%)'
   );
 
-  // Test 5: Sums to 100% for non-zero votes
-  const oddNumbers = calculateDistributionPercentages(7, 3);
+  // Test 5: 999 viral, 0 down, N=1000 -> clamped to 99%, all_users_participated = false
+  const nearComplete = calculateDistributionPercentages(999, 0, 1000);
   assert(
-    oddNumbers.viral_percentage + oddNumbers.get_it_down_percentage === 100,
-    '5. Percentages strictly sum to 100% for nonzero valid votes'
+    nearComplete.viral_percentage === 99 &&
+      nearComplete.all_users_participated === false,
+    '5. 999 viral / 1000 users -> 99% (completion protected, not displaying premature 100%)'
+  );
+
+  // Test 6: 1000 viral, 0 down, N=1000 -> exactly 100%, all_users_participated = true
+  const fullyComplete = calculateDistributionPercentages(1000, 0, 1000);
+  assert(
+    fullyComplete.viral_percentage === 100 &&
+      fullyComplete.all_users_participated === true,
+    '6. 1000 viral / 1000 users -> 100% viral and all_users_participated = true'
+  );
+
+  // Test 7: 500 viral, 500 down, N=1000 -> 100% participation complete
+  const allParticipatedMixed = calculateDistributionPercentages(500, 500, 1000);
+  assert(
+    allParticipatedMixed.total_participation_percentage === 100 &&
+      allParticipatedMixed.all_users_participated === true,
+    '7. 500 viral + 500 down (N=1000) -> 100% participation complete'
   );
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -147,47 +172,51 @@ async function runAllTests() {
   console.log('\n--- SUITE 2: Vote Persistence, Switching & Validation ---');
 
   try {
-    // 6. User 1 votes VIRAL
+    // 8. User 1 votes VIRAL
     const vote1Res = await submitDistributionVote(testPost.id, voter1.id, 'VIRAL');
+    const expectedViral1 = Math.round((1 / vote1Res.stats.total_eligible_users) * 100);
     assert(
       vote1Res.success &&
         vote1Res.stats.viral_count === 1 &&
         vote1Res.stats.get_it_down_count === 0 &&
-        vote1Res.stats.viral_percentage === 100 &&
+        vote1Res.stats.viral_percentage === (expectedViral1 === 100 && vote1Res.stats.total_eligible_users > 1 ? 99 : expectedViral1) &&
         vote1Res.stats.current_user_vote === 'VIRAL',
-      '6. User 1 selects Make this Viral -> persists in DB and updates count to 1 (100%)'
+      `8. User 1 selects Make this Viral -> persists in DB and updates count to 1 (viral=${vote1Res.stats.viral_percentage}%, N=${vote1Res.stats.total_eligible_users})`
     );
 
-    // 7. Verify DB persistence directly
+    // 9. Verify DB persistence directly
     const storedVote = await prisma.postDistributionVote.findUnique({
       where: { postId_userId: { postId: testPost.id, userId: voter1.id } },
     });
     assert(
       storedVote !== null && storedVote.voteType === 'VIRAL',
-      '7. Vote record exists in post_distribution_votes table with type VIRAL'
+      '9. Vote record exists in post_distribution_votes table with type VIRAL'
     );
 
-    // 8. User 2 votes GET_IT_DOWN
+    // 10. User 2 votes GET_IT_DOWN
     const vote2Res = await submitDistributionVote(testPost.id, voter2.id, 'GET_IT_DOWN');
+    const expectedViral2 = Math.round((1 / vote2Res.stats.total_eligible_users) * 100);
+    const expectedDown2 = Math.round((1 / vote2Res.stats.total_eligible_users) * 100);
     assert(
       vote2Res.success &&
         vote2Res.stats.viral_count === 1 &&
         vote2Res.stats.get_it_down_count === 1 &&
-        vote2Res.stats.viral_percentage === 50 &&
-        vote2Res.stats.get_it_down_percentage === 50,
-      '8. User 2 selects Get it Down -> counts = 1 viral, 1 down (50% / 50%)'
+        vote2Res.stats.viral_percentage === (expectedViral2 === 100 && vote2Res.stats.total_eligible_users > 1 ? 99 : expectedViral2) &&
+        vote2Res.stats.get_it_down_percentage === (expectedDown2 === 100 && vote2Res.stats.total_eligible_users > 1 ? 99 : expectedDown2),
+      `10. User 2 selects Get it Down -> counts = 1 viral, 1 down (viral=${vote2Res.stats.viral_percentage}%, down=${vote2Res.stats.get_it_down_percentage}%)`
     );
 
-    // 9. User 1 switches vote to GET_IT_DOWN
+    // 11. User 1 switches vote to GET_IT_DOWN
     const switchRes = await submitDistributionVote(testPost.id, voter1.id, 'GET_IT_DOWN');
+    const expectedDownSwitch = Math.round((2 / switchRes.stats.total_eligible_users) * 100);
     assert(
       switchRes.success &&
         switchRes.stats.viral_count === 0 &&
         switchRes.stats.get_it_down_count === 2 &&
         switchRes.stats.viral_percentage === 0 &&
-        switchRes.stats.get_it_down_percentage === 100 &&
+        switchRes.stats.get_it_down_percentage === (expectedDownSwitch === 100 && switchRes.stats.total_eligible_users > 2 ? 99 : expectedDownSwitch) &&
         switchRes.stats.current_user_vote === 'GET_IT_DOWN',
-      '9. User 1 switches from VIRAL to GET_IT_DOWN -> single active vote updated, totals recalculate cleanly'
+      '11. User 1 switches from VIRAL to GET_IT_DOWN -> single active vote updated, totals recalculate cleanly'
     );
 
     // Check no duplicate vote was created for User 1

@@ -6,40 +6,106 @@ export interface DistributionStats {
   viral_count: number;
   get_it_down_count: number;
   total_vote_count: number;
+  total_eligible_users: number;
   viral_percentage: number;
   get_it_down_percentage: number;
+  total_participation_percentage: number;
+  all_users_participated: boolean;
   current_user_vote: 'VIRAL' | 'GET_IT_DOWN' | null;
 }
 
+let cachedEligibleUsers: { count: number; expiresAt: number } | null = null;
+const ELIGIBLE_USERS_CACHE_TTL_MS = 20 * 1000; // 20s cache
+
+export async function getEligibleUserCount(forceFresh = false): Promise<number> {
+  const now = Date.now();
+  if (!forceFresh && cachedEligibleUsers && cachedEligibleUsers.expiresAt > now) {
+    return cachedEligibleUsers.count;
+  }
+  try {
+    const count = await prisma.user.count({
+      where: {
+        isBanned: false,
+        isSuspended: false,
+      },
+    });
+    const safeCount = Math.max(1, count);
+    cachedEligibleUsers = { count: safeCount, expiresAt: now + ELIGIBLE_USERS_CACHE_TTL_MS };
+    return safeCount;
+  } catch (err) {
+    console.error('[ViralControl] Error counting eligible users:', err);
+    return cachedEligibleUsers?.count || 1;
+  }
+}
+
 /**
- * Calculates deterministic percentages from real vote tallies.
- * Returns 0% / 0% for zero total votes. Percentages sum to 100% when total > 0.
+ * Calculates global percentages across all eligible Tolee users (N):
+ * Make this Viral % = (ViralVotes / N) * 100
+ * Get it Down % = (DownVotes / N) * 100
+ * Total Participation % = (TotalVotes / N) * 100
+ * All Users Participated = TotalVotes >= N
  */
-export function calculateDistributionPercentages(viralCount: number, getItDownCount: number) {
+export function calculateDistributionPercentages(
+  viralCount: number,
+  getItDownCount: number,
+  totalEligibleUsers: number = 1
+) {
+  const N = Math.max(1, totalEligibleUsers);
   const total = viralCount + getItDownCount;
-  if (total <= 0) {
-    return {
-      total_vote_count: 0,
-      viral_percentage: 0,
-      get_it_down_percentage: 0,
-    };
+  const allUsersParticipated = total >= N;
+
+  // Make this Viral %
+  let viralPercent = 0;
+  if (viralCount > 0) {
+    viralPercent = Math.round((viralCount / N) * 100);
+    // Preserve incomplete status even if ordinary rounding would display 100%
+    if (viralPercent === 100 && viralCount < N) {
+      viralPercent = 99;
+    }
+    if (viralCount >= N) {
+      viralPercent = 100;
+    }
   }
 
-  const viralPercent = Math.round((viralCount / total) * 100);
-  const downPercent = 100 - viralPercent;
+  // Get it Down %
+  let downPercent = 0;
+  if (getItDownCount > 0) {
+    downPercent = Math.round((getItDownCount / N) * 100);
+    if (downPercent === 100 && getItDownCount < N) {
+      downPercent = 99;
+    }
+    if (getItDownCount >= N) {
+      downPercent = 100;
+    }
+  }
+
+  // Total Participation %
+  let participationPercent = 0;
+  if (total > 0) {
+    participationPercent = Math.round((total / N) * 100);
+    if (participationPercent === 100 && total < N) {
+      participationPercent = 99;
+    }
+    if (total >= N) {
+      participationPercent = 100;
+    }
+  }
 
   return {
     total_vote_count: total,
+    total_eligible_users: N,
     viral_percentage: viralPercent,
     get_it_down_percentage: downPercent,
+    total_participation_percentage: participationPercent,
+    all_users_participated: allUsersParticipated,
   };
 }
 
 /**
- * Fetches distribution stats for a given post and authenticated user.
+ * Fetches distribution stats for a given post and authenticated user against all eligible Tolee users.
  */
 export async function getPostDistributionStats(postId: string, userId?: string | null): Promise<DistributionStats> {
-  const [post, userVote] = await Promise.all([
+  const [post, userVote, totalEligibleUsers] = await Promise.all([
     prisma.post.findUnique({
       where: { id: postId },
       select: { viralCount: true, getItDownCount: true },
@@ -50,21 +116,22 @@ export async function getPostDistributionStats(postId: string, userId?: string |
           select: { voteType: true },
         })
       : null,
+    getEligibleUserCount(),
   ]);
 
   const viralCount = post?.viralCount || 0;
   const downCount = post?.getItDownCount || 0;
-  const { total_vote_count, viral_percentage, get_it_down_percentage } = calculateDistributionPercentages(
-    viralCount,
-    downCount
-  );
+  const stats = calculateDistributionPercentages(viralCount, downCount, totalEligibleUsers);
 
   return {
     viral_count: viralCount,
     get_it_down_count: downCount,
-    total_vote_count,
-    viral_percentage,
-    get_it_down_percentage,
+    total_vote_count: stats.total_vote_count,
+    total_eligible_users: stats.total_eligible_users,
+    viral_percentage: stats.viral_percentage,
+    get_it_down_percentage: stats.get_it_down_percentage,
+    total_participation_percentage: stats.total_participation_percentage,
+    all_users_participated: stats.all_users_participated,
     current_user_vote: (userVote?.voteType as 'VIRAL' | 'GET_IT_DOWN') || null,
   };
 }
@@ -78,7 +145,7 @@ export async function batchGetPostDistributionStats(
 ): Promise<Map<string, DistributionStats>> {
   if (postIds.length === 0) return new Map();
 
-  const [posts, userVotes] = await Promise.all([
+  const [posts, userVotes, totalEligibleUsers] = await Promise.all([
     prisma.post.findMany({
       where: { id: { in: postIds } },
       select: { id: true, viralCount: true, getItDownCount: true },
@@ -89,6 +156,7 @@ export async function batchGetPostDistributionStats(
           select: { postId: true, voteType: true },
         })
       : [],
+    getEligibleUserCount(),
   ]);
 
   const userVoteMap = new Map<string, 'VIRAL' | 'GET_IT_DOWN'>();
@@ -98,16 +166,16 @@ export async function batchGetPostDistributionStats(
 
   const resultMap = new Map<string, DistributionStats>();
   posts.forEach((p: any) => {
-    const { total_vote_count, viral_percentage, get_it_down_percentage } = calculateDistributionPercentages(
-      p.viralCount,
-      p.getItDownCount
-    );
+    const stats = calculateDistributionPercentages(p.viralCount, p.getItDownCount, totalEligibleUsers);
     resultMap.set(p.id, {
       viral_count: p.viralCount,
       get_it_down_count: p.getItDownCount,
-      total_vote_count,
-      viral_percentage,
-      get_it_down_percentage,
+      total_vote_count: stats.total_vote_count,
+      total_eligible_users: stats.total_eligible_users,
+      viral_percentage: stats.viral_percentage,
+      get_it_down_percentage: stats.get_it_down_percentage,
+      total_participation_percentage: stats.total_participation_percentage,
+      all_users_participated: stats.all_users_participated,
       current_user_vote: userVoteMap.get(p.id) || null,
     });
   });
@@ -190,9 +258,11 @@ export async function submitDistributionVote(postId: string, userId: string, vot
     });
   }
 
-  const { total_vote_count, viral_percentage, get_it_down_percentage } = calculateDistributionPercentages(
+  const totalEligibleUsers = await getEligibleUserCount(true);
+  const stats = calculateDistributionPercentages(
     result.viralCount,
-    result.downCount
+    result.downCount,
+    totalEligibleUsers
   );
 
   return {
@@ -200,9 +270,12 @@ export async function submitDistributionVote(postId: string, userId: string, vot
     stats: {
       viral_count: result.viralCount,
       get_it_down_count: result.downCount,
-      total_vote_count,
-      viral_percentage,
-      get_it_down_percentage,
+      total_vote_count: stats.total_vote_count,
+      total_eligible_users: stats.total_eligible_users,
+      viral_percentage: stats.viral_percentage,
+      get_it_down_percentage: stats.get_it_down_percentage,
+      total_participation_percentage: stats.total_participation_percentage,
+      all_users_participated: stats.all_users_participated,
       current_user_vote: result.currentUserVote,
     },
   };
