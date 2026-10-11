@@ -1669,6 +1669,20 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                             </div>
                           )}
                         </div>
+
+                        {/* Tolee Viral Control — User-Controlled Content Distribution */}
+                        <ViralControlButtons
+                          postId={post.id}
+                          initialStats={{
+                            viral_count: post.viralCount,
+                            get_it_down_count: post.getItDownCount,
+                            total_vote_count: (post.viralCount || 0) + (post.getItDownCount || 0),
+                            viral_percentage: post.viralPercentage,
+                            get_it_down_percentage: post.getItDownPercentage,
+                            current_user_vote: post.currentUserVote,
+                          }}
+                          variant="feed"
+                        />
                       </CardFooter>
                     </Card>
                   );
@@ -2097,6 +2111,20 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                             </Link>
                           </div>
                         </div>
+
+                        {/* Tolee Viral Control — User-Controlled Content Distribution */}
+                        <ViralControlButtons
+                          postId={post.id}
+                          initialStats={{
+                            viral_count: post.viralCount,
+                            get_it_down_count: post.getItDownCount,
+                            total_vote_count: (post.viralCount || 0) + (post.getItDownCount || 0),
+                            viral_percentage: post.viralPercentage,
+                            get_it_down_percentage: post.getItDownPercentage,
+                            current_user_vote: post.currentUserVote,
+                          }}
+                          variant="feed"
+                        />
                       </CardFooter>
                     </Card>
                   );

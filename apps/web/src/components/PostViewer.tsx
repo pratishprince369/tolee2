@@ -30,6 +30,7 @@ import { QuickBoostModal } from '@/components/QuickBoostModal';
 import { PostInsightsModal } from '@/components/PostInsightsModal';
 import { HLSVideo } from '@/components/HLSVideo';
 import { extractYouTubeVideoId, getYouTubeEmbedUrl, getYouTubeWatchUrl } from '@/lib/youtube';
+import { ViralControlButtons } from '@/components/ViralControlButtons';
 import Link from 'next/link';
 
 function formatDistanceToNowSafe(dateString: string | null | undefined): string {
@@ -669,6 +670,22 @@ export default function PostViewer({ post }: PostViewerProps) {
                 {likesCount} {likesCount === 1 ? 'like' : 'likes'}
               </div>
             )}
+
+            {/* Tolee Viral Control — User-Controlled Content Distribution */}
+            <div className="pt-1">
+              <ViralControlButtons
+                postId={post.id}
+                initialStats={{
+                  viral_count: (post as any).viralCount,
+                  get_it_down_count: (post as any).getItDownCount,
+                  total_vote_count: ((post as any).viralCount || 0) + ((post as any).getItDownCount || 0),
+                  viral_percentage: (post as any).viralPercentage,
+                  get_it_down_percentage: (post as any).getItDownPercentage,
+                  current_user_vote: (post as any).currentUserVote,
+                }}
+                variant="feed"
+              />
+            </div>
 
             {/* Comments Stream */}
             <div className="mt-2 pt-3 border-t border-zinc-100 dark:border-zinc-900/60 space-y-3">

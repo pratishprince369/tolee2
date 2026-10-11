@@ -16,6 +16,7 @@ import { ViewTracker } from '@/components/ViewTracker';
 import { OptimisticPostCard } from '@/components/OptimisticPostCard';
 import { CreateNewsButton } from '@/components/CreateNewsButton';
 import { YouTubeAutoplayVideo } from '@/components/YouTubeAutoplayVideo';
+import { ViralControlButtons } from '@/components/ViralControlButtons';
 
 interface NewsFeedStreamProps {
   initialNews: any[];
@@ -402,7 +403,7 @@ export function NewsFeedStream({
 
               {/* Social Engagement bar */}
               {post?.id && (
-                <div className="p-5 pt-0 mt-2">
+                <div className="p-5 pt-0 mt-2 space-y-3">
                   <NewsEngagement
                     postId={post.id}
                     initialLikes={post.likes?.length || 0}
@@ -415,6 +416,20 @@ export function NewsFeedStream({
                     shareCount={post.shareCount || 0}
                     slug={item.slug}
                     headline={item.headline}
+                  />
+
+                  {/* Tolee Viral Control — User-Controlled Content Distribution */}
+                  <ViralControlButtons
+                    postId={post.id}
+                    initialStats={{
+                      viral_count: (post as any).viralCount,
+                      get_it_down_count: (post as any).getItDownCount,
+                      total_vote_count: ((post as any).viralCount || 0) + ((post as any).getItDownCount || 0),
+                      viral_percentage: (post as any).viralPercentage,
+                      get_it_down_percentage: (post as any).getItDownPercentage,
+                      current_user_vote: (post as any).currentUserVote,
+                    }}
+                    variant="feed"
                   />
                 </div>
               )}

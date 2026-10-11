@@ -17,6 +17,7 @@ import {
   Maximize2 
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { ViralControlButtons } from '@/components/ViralControlButtons';
 
 interface LiveStreamPostCardProps {
   post: any;
@@ -151,6 +152,24 @@ export function LiveStreamPostCard({ post, currentUserId }: LiveStreamPostCardPr
           <ArrowRight className="w-3.5 h-3.5" />
         </Link>
       </div>
+
+      {/* Tolee Viral Control — User-Controlled Content Distribution */}
+      {post?.id && (
+        <div className="p-3 bg-[#080e1a] border-t border-[#142036]">
+          <ViralControlButtons
+            postId={post.id}
+            initialStats={{
+              viral_count: post.viralCount,
+              get_it_down_count: post.getItDownCount,
+              total_vote_count: (post.viralCount || 0) + (post.getItDownCount || 0),
+              viral_percentage: post.viralPercentage,
+              get_it_down_percentage: post.getItDownPercentage,
+              current_user_vote: post.currentUserVote,
+            }}
+            variant="feed"
+          />
+        </div>
+      )}
 
     </div>
   );
