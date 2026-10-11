@@ -26,6 +26,7 @@ import { getOrCreatePersonalChat } from '@/actions/chat';
 import { editPostCaption, deletePostPermanently, updatePostVisibility, archivePost, incrementStoryEngagement, getPostStoryAnalytics } from '@/actions/post';
 import { formatViewCount } from '@/lib/utils';
 import { UserHovercard } from '@/components/UserHovercard';
+import { ViralControlButtons } from '@/components/ViralControlButtons';
 
 // Types matching profile and post items
 interface PostType {
@@ -625,6 +626,20 @@ export function ProfileFeedView({
                         </div>
                       )}
                     </div>
+
+                    {/* Tolee Viral Control — User-Controlled Content Distribution */}
+                    <ViralControlButtons
+                      postId={post.id}
+                      initialStats={{
+                        viral_count: (post as any).viralCount,
+                        get_it_down_count: (post as any).getItDownCount,
+                        total_vote_count: ((post as any).viralCount || 0) + ((post as any).getItDownCount || 0),
+                        viral_percentage: (post as any).viralPercentage,
+                        get_it_down_percentage: (post as any).getItDownPercentage,
+                        current_user_vote: (post as any).currentUserVote,
+                      }}
+                      variant="feed"
+                    />
                   </CardFooter>
                 </Card>
               </div>

@@ -5,13 +5,13 @@ import { getPostDistributionStats } from '@/lib/viralDistributionService';
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { postId: string } }
+  { params }: { params: { id?: string; postId?: string } }
 ) {
   try {
     const session = await getServerSession(authOptions);
     const userId = (session?.user as any)?.id || null;
 
-    const { postId } = params;
+    const postId = params.id || params.postId;
     if (!postId) {
       return NextResponse.json({ error: 'Post ID is required.' }, { status: 400 });
     }

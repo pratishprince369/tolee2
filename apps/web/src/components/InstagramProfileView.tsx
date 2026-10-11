@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
 import { getContentPermanentUrl, copyContentUrl } from '@/lib/shareService';
+import { ViralControlButtons } from '@/components/ViralControlButtons';
 import { 
   Grid, 
   Film, 
@@ -2176,6 +2177,24 @@ export function InstagramProfileView({
                 <span>{postLikesCount} {postLikesCount === 1 ? 'like' : 'likes'}</span>
                 <span className="text-gray-500 font-medium">{selectedPost?.shareCount || 0} {selectedPost?.shareCount === 1 ? 'share' : 'shares'}</span>
               </div>
+
+              {/* Tolee Viral Control — User-Controlled Content Distribution */}
+              {selectedPost?.id && (
+                <div className="pt-1">
+                  <ViralControlButtons
+                    postId={selectedPost.id}
+                    initialStats={{
+                      viral_count: (selectedPost as any).viralCount,
+                      get_it_down_count: (selectedPost as any).getItDownCount,
+                      total_vote_count: ((selectedPost as any).viralCount || 0) + ((selectedPost as any).getItDownCount || 0),
+                      viral_percentage: (selectedPost as any).viralPercentage,
+                      get_it_down_percentage: (selectedPost as any).getItDownPercentage,
+                      current_user_vote: (selectedPost as any).currentUserVote,
+                    }}
+                    variant="feed"
+                  />
+                </div>
+              )}
             </div>
             <form onSubmit={handleCommentSubmit} className="border-t border-gray-100 dark:border-[#262626] px-4 py-3 shrink-0 flex items-center gap-3 bg-white dark:bg-[#000000]">
               <Input placeholder="Add a comment..." value={newCommentText} onChange={(e) => setNewCommentText(e.target.value)} className="flex-1 border-none bg-transparent shadow-none focus-visible:ring-0 px-0 text-[13.5px] h-9" />

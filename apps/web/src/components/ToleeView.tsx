@@ -23,6 +23,7 @@ import { ToleeGroupSettings } from '@/components/ToleeGroupSettings';
 import { PostCarousel } from '@/components/PostCarousel';
 import { OptimisticPostCard } from '@/components/OptimisticPostCard';
 import { ManageToleeModal } from '@/components/ManageToleeModal';
+import { ViralControlButtons } from '@/components/ViralControlButtons';
 import { createPost, toggleLike, addComment, getLikes, getComments, toggleSavePost, toggleRepost, getReposts, updatePostVisibility, deletePostPermanently, editPostCaption } from '@/actions/post';
 import { joinTolee, leaveToleeGroup, startLiveSession, endLiveSession, requestToJoinLive, handleLiveJoinRequest, getLiveJoinRequests, getMemberLiveStatus, getPendingGroupRequests } from '@/actions/tolee';
 import { io } from 'socket.io-client';
@@ -1820,6 +1821,22 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                               </div>
                             </div>
                           </div>
+
+                          {/* Tolee Viral Control — User-Controlled Content Distribution */}
+                          <div className="px-5 pb-3">
+                            <ViralControlButtons
+                              postId={post.id}
+                              initialStats={{
+                                viral_count: (post as any).viralCount,
+                                get_it_down_count: (post as any).getItDownCount,
+                                total_vote_count: ((post as any).viralCount || 0) + ((post as any).getItDownCount || 0),
+                                viral_percentage: (post as any).viralPercentage,
+                                get_it_down_percentage: (post as any).getItDownPercentage,
+                                current_user_vote: (post as any).currentUserVote,
+                              }}
+                              variant="feed"
+                            />
+                          </div>
                         </Card>
                       );
                     }
@@ -2099,6 +2116,20 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                               </div>
                             )}
                           </div>
+
+                          {/* Tolee Viral Control — User-Controlled Content Distribution */}
+                          <ViralControlButtons
+                            postId={post.id}
+                            initialStats={{
+                              viral_count: (post as any).viralCount,
+                              get_it_down_count: (post as any).getItDownCount,
+                              total_vote_count: ((post as any).viralCount || 0) + ((post as any).getItDownCount || 0),
+                              viral_percentage: (post as any).viralPercentage,
+                              get_it_down_percentage: (post as any).getItDownPercentage,
+                              current_user_vote: (post as any).currentUserVote,
+                            }}
+                            variant="feed"
+                          />
                         </CardFooter>
                       </Card>
                     );

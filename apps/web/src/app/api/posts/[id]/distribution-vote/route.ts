@@ -5,7 +5,7 @@ import { submitDistributionVote } from '@/lib/viralDistributionService';
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { postId: string } }
+  { params }: { params: { id?: string; postId?: string } }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -15,7 +15,7 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized: Authentication required.' }, { status: 401 });
     }
 
-    const { postId } = params;
+    const postId = params.id || params.postId;
     if (!postId) {
       return NextResponse.json({ error: 'Post ID is required.' }, { status: 400 });
     }
