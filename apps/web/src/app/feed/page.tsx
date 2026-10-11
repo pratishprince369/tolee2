@@ -2,6 +2,7 @@ import { FeedStream } from '@/components/FeedStream';
 import { getPosts } from '@/actions/post';
 import { prisma } from '@/lib/prisma';
 import { prismaAI } from '@/lib/prisma-ai'; // 🛡️ AI content from tolee-1 DB
+import { batchGetPostDistributionStats } from '@/lib/viralDistributionService';
 
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
@@ -71,6 +72,7 @@ export default async function GlobalFeedPage() {
 
     const [res, aiPosts] = await Promise.all([getPosts({ limit: 50 }), aiPostsPromise]);
 
+    let distributionStatsMap = new Map<string, any>();
     if (res?.success && res.posts) {
       const authorIds = res.posts.map((p: any) => p.author?.id).filter(Boolean);
 
@@ -89,7 +91,20 @@ export default async function GlobalFeedPage() {
         pendingFollowAuthorIds = follows.filter((f: any) => f.status === 'pending').map((f: any) => f.followingId);
       }
 
+      const allPostIds = [
+        ...res.posts.map((p: any) => p.id),
+        ...((aiPosts as any[]) || []).map((p: any) => p.id),
+      ];
+      distributionStatsMap = await batchGetPostDistributionStats(allPostIds, currentUserId);
+
       dbPosts = res.posts.map((post: any) => {
+        const dStats = distributionStatsMap.get(post.id);
+        const viralCount = post.viralCount ?? dStats?.viral_count ?? 0;
+        const getItDownCount = post.getItDownCount ?? dStats?.get_it_down_count ?? 0;
+        const viralPercentage = dStats?.viral_percentage ?? 0;
+        const getItDownPercentage = dStats?.get_it_down_percentage ?? 0;
+        const currentUserVote = dStats?.current_user_vote ?? null;
+
         // Find the first tolee name
         const firstTolee = post.tolees?.[0]?.tolee;
         const likedByMe = currentUserId ? post.likes?.some((like: any) => like.userId === currentUserId) : false;
@@ -141,6 +156,11 @@ export default async function GlobalFeedPage() {
           repostedByMe,
           commentsList: post.comments || [],
           resharedByUser,
+          viralCount,
+          getItDownCount,
+          viralPercentage,
+          getItDownPercentage,
+          currentUserVote,
           // Listing fields
           title: post.title || null,
           price: post.price || null,
@@ -159,6 +179,12 @@ export default async function GlobalFeedPage() {
     }
 
     const aiPostsMapped = (aiPosts || []).map((post: any) => {
+      const dStats = (typeof distributionStatsMap !== 'undefined' && distributionStatsMap) ? distributionStatsMap.get(post.id) : null;
+      const viralCount = post.viralCount ?? dStats?.viral_count ?? 0;
+      const getItDownCount = post.getItDownCount ?? dStats?.get_it_down_count ?? 0;
+      const viralPercentage = dStats?.viral_percentage ?? 0;
+      const getItDownPercentage = dStats?.get_it_down_percentage ?? 0;
+      const currentUserVote = dStats?.current_user_vote ?? null;
       const firstTolee = post.tolees?.[0]?.tolee;
       return {
         id: post.id,
@@ -191,6 +217,11 @@ export default async function GlobalFeedPage() {
         repostedByMe: false,
         commentsList: [],
         resharedByUser: null,
+        viralCount,
+        getItDownCount,
+        viralPercentage,
+        getItDownPercentage,
+        currentUserVote,
         title: post.title || null,
         price: post.price || null,
         currency: post.currency || null,

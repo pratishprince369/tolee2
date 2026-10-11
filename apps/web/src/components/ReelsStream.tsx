@@ -37,6 +37,7 @@ import { YouTubeReelPlayer } from '@/components/YouTubeReelPlayer';
 import { extractYouTubeVideoId, decodeHtmlEntities } from '@/lib/youtube';
 import { ToleeMediaPicker } from '@/lib/toleeMediaPicker';
 import { Capacitor } from '@capacitor/core';
+import { ViralControlButtons } from '@/components/ViralControlButtons';
 
 const UnifiedCreatePostModal = dynamic(
   () => import('@/components/UnifiedCreatePostModal').then((m) => m.UnifiedCreatePostModal),
@@ -1686,13 +1687,13 @@ const ReelSlide = memo(function ReelSlide({
 
       {/* Mobile right action bar */}
       {!desktop && (
-        <div className="absolute right-3 bottom-[calc(5rem+env(safe-area-inset-bottom))] flex flex-col items-center gap-3.5 z-10 pointer-events-auto">
+        <div className="absolute right-3 bottom-[calc(2rem+env(safe-area-inset-bottom))] flex flex-col items-center gap-3.5 z-10 pointer-events-auto">
           <MobileActionBar reel={reel} session={session} onLike={onLike} onComment={onComment} onReshare={onReshare} onRepostsModal={onRepostsModal} onShare={onShare} onSave={onSave} onOptions={onOptions} onBoost={onBoost} />
         </div>
       )}
 
       {/* Bottom info */}
-      <div className={`absolute z-10 pointer-events-auto flex flex-col gap-2 ${desktop ? 'bottom-4 left-3 right-3' : 'bottom-[calc(5rem+env(safe-area-inset-bottom))] left-4 right-16'}`}>
+      <div className={`absolute z-10 pointer-events-auto flex flex-col gap-2 ${desktop ? 'bottom-4 left-3 right-3' : 'bottom-[calc(2rem+env(safe-area-inset-bottom))] left-4 right-16'}`}>
         <div className="flex items-center gap-2">
           <Link href={`/u/${reel.author}`}>
             <div className={`relative rounded-full ${reel.hasActiveStory ? 'p-[2px] bg-gradient-to-tr from-yellow-400 via-red-500 to-fuchsia-600' : ''}`}>
@@ -1730,6 +1731,20 @@ const ReelSlide = memo(function ReelSlide({
             )}
           </div>
         </div>
+
+        {/* Tolee Viral Control — User-Controlled Content Distribution */}
+        <ViralControlButtons
+          postId={reel.id}
+          initialStats={{
+            viral_count: reel.viralCount,
+            get_it_down_count: reel.getItDownCount,
+            total_vote_count: (reel.viralCount || 0) + (reel.getItDownCount || 0),
+            viral_percentage: reel.viralPercentage,
+            get_it_down_percentage: reel.getItDownPercentage,
+            current_user_vote: reel.currentUserVote,
+          }}
+          variant="reel"
+        />
         {(() => {
           if (!reel.caption) return null;
           const cleanCap = decodeHtmlEntities(reel.caption);

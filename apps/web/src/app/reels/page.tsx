@@ -8,6 +8,7 @@ import { extractYouTubeVideoId } from '@/lib/youtube';
 import { getTrendingYouTubeShorts } from '@/lib/youtubeShortsService';
 import { getStreamableVideoUrl, getPosterUrl, isGoogleDriveUrl } from '@/lib/media';
 import { triggerBackgroundReelsPublisherIfNeeded } from '@/lib/reelsBundleAutoPublisher';
+import { batchGetPostDistributionStats } from '@/lib/viralDistributionService';
 import type { Metadata } from 'next';
 
 function shuffleArray<T>(array: T[]): T[] {
@@ -227,7 +228,17 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
       authorsWithActiveStories = activeStories.map((s: any) => s.authorId);
     }
 
+    const reelPostIds = selectedPosts.map(p => p.id);
+    const distributionStatsMap = await batchGetPostDistributionStats(reelPostIds, currentUserId);
+
     dbReels = selectedPosts.map(post => {
+      const dStats = distributionStatsMap.get(post.id);
+      const viralCount = post.viralCount ?? dStats?.viral_count ?? 0;
+      const getItDownCount = post.getItDownCount ?? dStats?.get_it_down_count ?? 0;
+      const viralPercentage = dStats?.viral_percentage ?? 0;
+      const getItDownPercentage = dStats?.get_it_down_percentage ?? 0;
+      const currentUserVote = dStats?.current_user_vote ?? null;
+
       const firstTolee = post.tolees?.[0]?.tolee;
       const likedByMe = currentUserId ? (post.likes?.length > 0) : false;
       const savedByMe = currentUserId ? (post.savedBy?.length > 0) : false;
@@ -275,6 +286,11 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
         isFollowing,
         followStatus,
         hasActiveStory,
+        viralCount,
+        getItDownCount,
+        viralPercentage,
+        getItDownPercentage,
+        currentUserVote,
         location: post.location || null,
         poster: getPosterUrl(post.mediaUrls.split(/,(?=https?:\/\/)/)[0]),
         createdAt: post.createdAt,

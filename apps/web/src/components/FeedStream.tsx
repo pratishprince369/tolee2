@@ -18,6 +18,7 @@ import { CreateRequirementModal } from '@/components/CreateRequirementModal';
 import { UnifiedCreatePostModal } from '@/components/UnifiedCreatePostModal';
 import { OptimisticPostCard } from '@/components/OptimisticPostCard';
 import { uploadFile } from '@/lib/upload';
+import { ViralControlButtons } from '@/components/ViralControlButtons';
 import { createPost, toggleLike, addComment, getLikes, getComments, toggleSavePost, toggleRepost, getReposts, updatePostVisibility, deletePostPermanently, editPostCaption, archivePost, incrementStoryEngagement, getPostStoryAnalytics } from '@/actions/post';
 import { toggleFollow } from '@/actions/user';
 import dynamic from 'next/dynamic';
@@ -1857,6 +1858,20 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                             <Bookmark strokeWidth={1.5} className={`w-[20px] h-[20px] ${post.savedByMe ? 'fill-amber-500 text-amber-500' : 'fill-transparent'}`} />
                           </button>
                         </div>
+
+                        {/* Tolee Viral Control — User-Controlled Content Distribution */}
+                        <ViralControlButtons
+                          postId={post.id}
+                          initialStats={{
+                            viral_count: post.viralCount,
+                            get_it_down_count: post.getItDownCount,
+                            total_vote_count: (post.viralCount || 0) + (post.getItDownCount || 0),
+                            viral_percentage: post.viralPercentage,
+                            get_it_down_percentage: post.getItDownPercentage,
+                            current_user_vote: post.currentUserVote,
+                          }}
+                          variant="feed"
+                        />
                       </CardFooter>
                     </Card>
                   );
@@ -2415,6 +2430,20 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                           </button>
                         </div>
                       </div>
+
+                      {/* Tolee Viral Control — User-Controlled Content Distribution */}
+                      <ViralControlButtons
+                        postId={post.id}
+                        initialStats={{
+                          viral_count: post.viralCount,
+                          get_it_down_count: post.getItDownCount,
+                          total_vote_count: (post.viralCount || 0) + (post.getItDownCount || 0),
+                          viral_percentage: post.viralPercentage,
+                          get_it_down_percentage: post.getItDownPercentage,
+                          current_user_vote: post.currentUserVote,
+                        }}
+                        variant="feed"
+                      />
 
                       {/* View all comments link */}
                       <div

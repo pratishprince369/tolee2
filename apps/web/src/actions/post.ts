@@ -414,6 +414,15 @@ export async function getPosts(options?: { mediaType?: string; postType?: string
                   }
                 },
                 visibility: 'public'
+              },
+              // 6. Posts delivered to user via Tolee Viral Control test audience
+              {
+                distributionDeliveries: {
+                  some: {
+                    recipientUserId: currentUserId,
+                    status: 'delivered'
+                  }
+                }
               }
             ]
           } : {
@@ -436,6 +445,8 @@ export async function getPosts(options?: { mediaType?: string; postType?: string
         shareCount: true,
         location: true,
         subLocation: true,
+        viralCount: true,
+        getItDownCount: true,
         createdAt: true,
         worldProjectId: true,
         isSimulation: true,
@@ -2792,6 +2803,8 @@ export async function getReels(skip = 0, take = 20) {
         shareCount: true,
         location: true,
         subLocation: true,
+        viralCount: true,
+        getItDownCount: true,
         createdAt: true,
         worldProjectId: true,
         worldProject: {

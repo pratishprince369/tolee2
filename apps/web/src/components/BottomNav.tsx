@@ -104,6 +104,11 @@ export function BottomNav() {
     { name: 'Profile', href: '/u/me', isAvatar: true },
   ];
 
+  // Hide bottom nav strictly on Reels routes per Tolee Viral Control specification
+  if (pathname?.startsWith('/reels') || pathname?.startsWith('/reel')) {
+    return null;
+  }
+
   // Hide bottom nav for guests on landing page and auth pages
   if (!isAuthenticated && (pathname === '/' || pathname?.startsWith('/auth') || pathname === '/login' || pathname === '/signup')) {
     return null;
