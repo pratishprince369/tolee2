@@ -29,7 +29,7 @@ function decodeHtmlEntities(str: string): string {
  */
 export function extractCleanSearchTerm(query: string): string {
   let cleaned = query
-    .replace(/kon hai|kaun hai|who is|who was|kya hai|what is|unake bare me batao|unke bare me batao|inake bare me batao|inke bare me batao|batao|bataiye|tell me about|info about|details of|ke bare me/gi, '')
+    .replace(/kon hai|kaun hai|kon hain|kaun hain|who is|who was|kya hai|what is|unake bare me batao|unke bare me batao|inake bare me batao|inke bare me batao|batao|bataiye|tell me about|info about|details of|ke bare me|kon aahe|kon aahet|baddal mahiti|mahiti sanga|baddal sanga/gi, '')
     .replace(/[?।!.,]/g, '')
     .trim();
 
@@ -68,17 +68,17 @@ export function isPersonQuery(message: string): boolean {
   }
 
   const personTriggers = [
-    'kon hai', 'kaun hai', 'who is', 'who was',
+    'kon hai', 'kaun hai', 'kon hain', 'kaun hain', 'who is', 'who was',
     'unake bare me', 'unke bare me', 'inake bare me', 'inke bare me',
     'kiska name', 'kiska naam', 'biography', 'profile',
-    'politician', 'cricketer', 'actor', 'minister'
+    'politician', 'cricketer', 'actor', 'minister', 'kon aahe', 'kon aahet'
   ];
 
   return personTriggers.some((t) => lower.includes(t));
 }
 
 /**
- * Quick Wikipedia OpenSearch / Summary API for people, places, concepts
+ * Robust Wikipedia OpenSearch & Extract API for verified encyclopedic facts
  */
 async function searchWikipediaSummary(query: string): Promise<{ text: string; source: string }> {
   return new Promise((resolve) => {
@@ -86,14 +86,14 @@ async function searchWikipediaSummary(query: string): Promise<{ text: string; so
       const cleanTerm = extractCleanSearchTerm(query);
       if (!cleanTerm) return resolve({ text: '', source: '' });
 
-      const url = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(cleanTerm)}&utf8=&format=json&srlimit=3`;
+      const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(cleanTerm)}&utf8=&format=json&srlimit=3`;
       const req = https.get(
-        url,
+        searchUrl,
         {
           headers: {
             'User-Agent': 'ToleeApp/1.0 (https://tolee.in; contact@tolee.in)',
           },
-          timeout: 4500,
+          timeout: 4000,
         },
         (res) => {
           let data = '';
@@ -102,14 +102,52 @@ async function searchWikipediaSummary(query: string): Promise<{ text: string; so
             try {
               const json = JSON.parse(data);
               const searchResults = json?.query?.search || [];
-              const snippets = searchResults.map((r: any) => {
-                const text = (r.snippet || '').replace(/<[^>]+>/g, '').trim();
-                return decodeHtmlEntities(text);
-              }).filter(Boolean);
-              resolve({
-                text: snippets.join('\n'),
-                source: searchResults.length > 0 ? `Wikipedia (${searchResults[0].title})` : ''
-              });
+              if (searchResults.length === 0) {
+                return resolve({ text: '', source: '' });
+              }
+
+              const topTitle = searchResults[0].title;
+
+              // Fetch exact introductory extract for top matching title
+              const extractUrl = `https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=1&explaintext=1&titles=${encodeURIComponent(topTitle)}&format=json`;
+              const req2 = https.get(
+                extractUrl,
+                {
+                  headers: {
+                    'User-Agent': 'ToleeApp/1.0 (https://tolee.in; contact@tolee.in)',
+                  },
+                  timeout: 3500,
+                },
+                (res2) => {
+                  let data2 = '';
+                  res2.on('data', (c2) => { data2 += c2; });
+                  res2.on('end', () => {
+                    try {
+                      const pages = JSON.parse(data2)?.query?.pages || {};
+                      const page: any = Object.values(pages)[0];
+                      const extract = (page?.extract || '').trim();
+                      if (extract && extract.length > 30) {
+                        return resolve({
+                          text: extract,
+                          source: `Wikipedia (${topTitle})`,
+                        });
+                      }
+                    } catch {}
+
+                    // Fallback to snippets
+                    const snippets = searchResults.map((r: any) => {
+                      const text = (r.snippet || '').replace(/<[^>]+>/g, '').trim();
+                      return decodeHtmlEntities(text);
+                    }).filter(Boolean);
+                    resolve({
+                      text: snippets.join('\n'),
+                      source: `Wikipedia (${topTitle})`,
+                    });
+                  });
+                }
+              );
+              req2.on('error', () => resolve({ text: '', source: '' }));
+              req2.on('timeout', () => { req2.destroy(); resolve({ text: '', source: '' }); });
             } catch {
               resolve({ text: '', source: '' });
             }
@@ -144,9 +182,15 @@ export async function searchAndGroundQuery(query: string, maxResults: number = 4
   }
 
   const cleanTerm = extractCleanSearchTerm(q);
-  const searchQueries = [q];
-  if (cleanTerm && cleanTerm !== q && cleanTerm.length > 2) {
+  const searchQueries: string[] = [];
+  if (cleanTerm && cleanTerm.length > 2) {
     searchQueries.push(cleanTerm);
+  }
+  if (cleanTerm !== q) {
+    searchQueries.push(q);
+  }
+  if (isPersonQuery(q) && cleanTerm) {
+    searchQueries.push(`${cleanTerm} news`);
   }
 
   const allSnippets: string[] = [];
@@ -216,13 +260,14 @@ export async function searchAndGroundQuery(query: string, maxResults: number = 4
     }
   }
 
-  // Fallback to Wikipedia Summary API if web search had limited results
-  if (allSnippets.length < 2) {
+  // Integrate Wikipedia extract for person queries or if web search had limited results
+  if (isPersonQuery(q) || allSnippets.length < 2) {
     try {
       const wiki = await searchWikipediaSummary(q);
       if (wiki.text && wiki.text.length > 20) {
-        allSnippets.push(wiki.text);
-        if (wiki.source) sources.push(wiki.source);
+        // Put authoritative encyclopedic extract at the beginning
+        allSnippets.unshift(wiki.text);
+        if (wiki.source) sources.unshift(wiki.source);
       }
     } catch {}
   }

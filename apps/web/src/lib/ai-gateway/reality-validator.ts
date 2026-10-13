@@ -78,9 +78,30 @@ export class ToleeRealityValidator {
       }
     }
 
+    // Clean common phonetic/tokenization anomalies in Hindi/Hinglish
+    let cleanedReply = rawReply.replace(/\braja neta\b/gi, 'rajneta');
+
     // 2. Real-Person Grounding Verification
     if (isPersonQuery(ctx.userMessage)) {
       const evidenceLower = (ctx.searchEvidence || '').toLowerCase();
+
+      // Fix fabricated political transitions (e.g. "X se Y mein shamil" where X is not in search evidence)
+      const majorParties = [
+        { regex: /bharatiya janata party\s+se\s+/gi, key: 'bharatiya janata party' },
+        { regex: /bjp\s+se\s+/gi, key: 'bjp' },
+        { regex: /aam aadmi party\s+se\s+/gi, key: 'aam aadmi party' },
+        { regex: /aap\s+se\s+/gi, key: 'aap' },
+        { regex: /shiv sena\s+se\s+/gi, key: 'shiv sena' },
+        { regex: /ncp\s+se\s+/gi, key: 'ncp' },
+        { regex: /bsp\s+se\s+/gi, key: 'bsp' },
+      ];
+
+      for (const party of majorParties) {
+        if (party.regex.test(cleanedReply) && !evidenceLower.includes(party.key)) {
+          console.warn(`[ToleeRealityValidator] Stripping ungrounded party transition '${party.key} se'`);
+          cleanedReply = cleanedReply.replace(party.regex, '');
+        }
+      }
 
       // Check if the reply asserts a specific profession
       for (const prof of this.SUSPICIOUS_PROFESSIONS) {
@@ -111,7 +132,7 @@ export class ToleeRealityValidator {
 
     return {
       isValid: true,
-      sanitizedContent: rawReply
+      sanitizedContent: cleanedReply
     };
   }
 }
