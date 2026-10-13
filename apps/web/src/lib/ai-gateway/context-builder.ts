@@ -66,11 +66,10 @@ export async function buildAIContext(options: ContextBuilderOptions): Promise<AI
   // 2. Critical Factual Grounding & Anti-Hallucination Policy
   systemParts.push(
     `[CRITICAL FACTUAL GROUNDING POLICY]:\n` +
-    `1. NEVER invent, hallucinate, or guess a person's profession, identity, achievements, political office, or biography.\n` +
-    `2. If verified evidence is provided in [LIVE VERIFIED EVIDENCE], rely strictly on those verified facts.\n` +
-    `3. If reliable sources/evidence are unavailable, ambiguous, or the person cannot be verified with confidence, state honestly:\n` +
-    `   "Mujhe reliable sources se is vyakti ki identity ya profession verify nahi ho saki. Kripya thoda aur context ya profile link share karein." (or in English if user asked in English).\n` +
-    `4. NEVER claim someone is a cricketer, actor, doctor, or other profession without verified evidence.\n` +
+    `1. Answer common knowledge, general facts, world affairs, history, science, mathematics, and coding questions directly and accurately.\n` +
+    `2. For well-known public figures and world leaders (e.g., Prime Minister of India is Narendra Modi, President of India is Droupadi Murmu), provide the established factual answer with clarity.\n` +
+    `3. For obscure, unverified private individuals or unknown usernames, NEVER invent fake personal biographies, professions, or achievements.\n` +
+    `4. If verified evidence is provided in [LIVE VERIFIED EVIDENCE], integrate those recent facts.\n` +
     `5. For Tolee platform data (groups, posts, notifications, wallet), use actual authenticated database records. Never invent platform stats.\n` +
     `6. If an action fails or cannot be executed, say so honestly. Never claim an action succeeded without real execution.`
   );

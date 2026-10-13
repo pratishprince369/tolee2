@@ -540,6 +540,12 @@ In the Tolee ecosystem, AI functions as your active co-pilot: creating posts, sc
 
   // --- GENERAL HELPER ---
   private static answerGeneralQuery(query: string): string {
+    const q = (query || '').toLowerCase();
+    if (q.includes('pm') || q.includes('prime minister') || q.includes('pradhan mantri')) {
+      if (q.includes('india') || q.includes('bharat') || !q.includes(' of ')) {
+        return `भारत के वर्तमान प्रधानमंत्री **श्री नरेंद्र मोदी** (Narendra Modi) हैं। वे 26 मई 2014 से भारत के प्रधानमंत्री के रूप में सेवारत हैं।`;
+      }
+    }
     if (isPersonQuery(query)) {
       return `Mujhe reliable sources se is vyakti ki identity ya profession verify nahi ho saki. Kripya thoda aur context ya profile link share karein.`;
     }

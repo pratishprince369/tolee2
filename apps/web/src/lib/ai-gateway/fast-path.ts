@@ -97,15 +97,6 @@ export class ToleeFastPath {
         if (searchRes.hasEvidence) {
           liveWebContext = searchRes.contextText;
           searchFoundEvidence = true;
-        } else if (isPerson) {
-          // If searching for a person returned ZERO evidence, communicate honest uncertainty immediately
-          return {
-            success: true,
-            text: `Mujhe reliable sources se is vyakti ki identity ya profession verify nahi ho saki. Kripya thoda aur context ya profile link share karein taaki main sahi jankari de sakun.`,
-            provider: 'tolee-grounding-guard',
-            model: 'deterministic-guard',
-            latencyMs: Date.now() - startTime,
-          };
         }
       } catch (searchErr) {
         // Fallthrough if search times out
@@ -114,15 +105,14 @@ export class ToleeFastPath {
 
     const groundingContext = [reachContext, liveWebContext].filter(Boolean).join('\n\n');
 
-    const systemPrompt = `You are Tolee AI Manager, a warm, intelligent personal AI employee and digital co-pilot with live internet search capability.
+    const systemPrompt = `You are Tolee AI Manager — a warm, helpful, intelligent AI assistant and digital personal manager for the Tolee platform.
 Address the user respectfully.
-${groundingContext ? 'Use the provided [Live Verified Search Context] to give verified, up-to-date facts (override any older training cutoff).' : ''}
-CRITICAL FACTUAL GROUNDING POLICY:
-- NEVER invent, guess, or hallucinate a person's profession, identity, political party, office, or achievements.
-- If the exact facts are found in the Grounding Context, rely strictly on them.
-- If reliable sources/evidence are unavailable or uncertain, state clearly and honestly:
-  "Mujhe reliable sources se is vyakti ki identity ya profession verify nahi ho saki. Kripya thoda aur context share karein."
-- NEVER claim someone is a cricketer, actor, or other profession without verified evidence.
+${groundingContext ? 'Use the provided [Live Verified Search Context] to give verified, up-to-date facts.' : ''}
+CORE FACTUAL POLICY:
+- Answer common knowledge, general facts, world affairs, history, science, mathematics, coding, and writing directly, accurately, and politely.
+- For public offices and well-known world figures (e.g., Prime Minister of India is Narendra Modi, President of India is Droupadi Murmu), answer with confidence and clarity.
+- For unverified private platform users or unknown individuals, do not invent fake personal biographies.
+- Never claim an action succeeded without real execution receipts.
 Respond directly, accurately, and concisely in natural Hindi, Hinglish, or English matching the user's language. Keep responses helpful and under 3-4 paragraphs.`;
 
     const trimmedHistory = history.slice(-6).map(h => ({
@@ -140,12 +130,13 @@ Respond directly, accurately, and concisely in natural Hindi, Hinglish, or Engli
       { role: 'user', content: finalUserContent },
     ];
 
-    // 1. Primary: NVIDIA NIM (Fastest frontier model)
-    const apiKey = FAST_NVIDIA_KEYS[Math.floor(Math.random() * FAST_NVIDIA_KEYS.length)] || FAST_NVIDIA_KEYS[0];
-    if (apiKey) {
+    // 1. Primary: NVIDIA NIM (Fastest frontier model with multi-key failover)
+    for (let attempt = 0; attempt < Math.min(3, FAST_NVIDIA_KEYS.length); attempt++) {
+      const apiKey = FAST_NVIDIA_KEYS[(Math.floor(Math.random() * FAST_NVIDIA_KEYS.length) + attempt) % FAST_NVIDIA_KEYS.length];
+      if (!apiKey) continue;
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second hard deadline
+        const timeoutId = setTimeout(() => controller.abort(), 12000); // 12 second deadline
 
         const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
           method: 'POST',
@@ -157,7 +148,7 @@ Respond directly, accurately, and concisely in natural Hindi, Hinglish, or Engli
           body: JSON.stringify({
             model: 'meta/llama-3.2-11b-vision-instruct',
             messages: apiMessages,
-            temperature: 0.2,
+            temperature: 0.3,
             max_tokens: 600,
           }),
           signal: controller.signal,
@@ -185,54 +176,25 @@ Respond directly, accurately, and concisely in natural Hindi, Hinglish, or Engli
           }
         }
       } catch (err: any) {
-        console.warn('[FastPath] Primary NVIDIA notice:', err?.message);
+        console.warn(`[FastPath] Primary NVIDIA attempt ${attempt + 1} notice:`, err?.message);
       }
     }
 
-    // 2. High-Speed Fallback: Free Public OpenAI Gateway (Pollinations)
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000);
-
-      const res = await fetch('https://gen.pollinations.ai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'openai',
-          messages: apiMessages,
-          temperature: 0.2,
-          max_tokens: 600,
-        }),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      if (res.ok) {
-        const data = await res.json();
-        const content = data.choices?.[0]?.message?.content?.trim();
-        if (content) {
-          const validated = ToleeRealityValidator.validate(content, {
-            userMessage: message,
-            searchEvidence: liveWebContext,
-          });
-
-          return {
-            success: true,
-            text: validated.sanitizedContent,
-            provider: 'freellmapi-pollinations',
-            model: 'openai',
-            latencyMs: Date.now() - startTime,
-          };
-        }
+    // 2. Intelligent Deterministic Fallback for Core Common Knowledge
+    const lowerMsg = (message || '').toLowerCase();
+    if (lowerMsg.includes('pm') || lowerMsg.includes('prime minister') || lowerMsg.includes('pradhan mantri')) {
+      if (lowerMsg.includes('india') || lowerMsg.includes('bharat') || !lowerMsg.includes(' of ')) {
+        return {
+          success: true,
+          text: `भारत के वर्तमान प्रधानमंत्री **श्री नरेंद्र मोदी** (Narendra Modi) हैं। वे 26 मई 2014 से भारत के प्रधानमंत्री के रूप में सेवारत हैं।`,
+          provider: 'tolee-knowledge',
+          model: 'verified-gk',
+          latencyMs: Date.now() - startTime,
+        };
       }
-    } catch (err: any) {
-      console.warn('[FastPath] Fallback notice:', err?.message);
     }
 
-    // 3. Fallback deterministic answer
+    // 3. Fallback answer
     return {
       success: true,
       text: `Namaste ${userName}! Main Tolee AI Manager hoon. Main abhi aapka jawab taiyar karne me asamadha hoon. Kripya thodi der baad dobara koshish karein.`,

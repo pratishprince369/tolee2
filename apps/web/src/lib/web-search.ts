@@ -28,24 +28,50 @@ function decodeHtmlEntities(str: string): string {
  * Clean search query by removing conversational filler
  */
 export function extractCleanSearchTerm(query: string): string {
-  return query
+  let cleaned = query
     .replace(/kon hai|kaun hai|who is|who was|kya hai|what is|unake bare me batao|unke bare me batao|inake bare me batao|inke bare me batao|batao|bataiye|tell me about|info about|details of|ke bare me/gi, '')
     .replace(/[?।!.,]/g, '')
     .trim();
+
+  // Normalize Hinglish common roles/offices to clear search queries
+  if (/\bpm\b/i.test(cleaned) || /prime minister/i.test(cleaned)) {
+    if (/india|bharat/i.test(cleaned)) return 'prime minister of india';
+  }
+  if (/\bcm\b/i.test(cleaned) || /chief minister/i.test(cleaned)) {
+    if (/maharashtra/i.test(cleaned)) return 'chief minister of maharashtra';
+    if (/up|uttar pradesh/i.test(cleaned)) return 'chief minister of uttar pradesh';
+    if (/delhi/i.test(cleaned)) return 'chief minister of delhi';
+  }
+
+  cleaned = cleaned
+    .replace(/\bpm\b/gi, 'prime minister')
+    .replace(/\bcm\b/gi, 'chief minister')
+    .replace(/\bka\b|\bki\b|\bke\b/gi, 'of');
+
+  return cleaned.trim();
 }
 
 /**
- * Check if the input message is inquiring about a real person
+ * Check if the input message is inquiring about an obscure or private person
  */
 export function isPersonQuery(message: string): boolean {
   const lower = (message || '').toLowerCase().trim();
   if (!lower) return false;
 
+  // Public offices and broad institutional roles are NOT obscure private person queries
+  const publicOfficeKeywords = [
+    'pm', 'prime minister', 'president', 'cm', 'chief minister', 'governor', 'minister',
+    'ceo', 'founder', 'captain', 'leader', 'pradhan mantri', 'rashtrapati', 'mukhya mantri'
+  ];
+  if (publicOfficeKeywords.some((kw) => lower.includes(kw))) {
+    return false;
+  }
+
   const personTriggers = [
     'kon hai', 'kaun hai', 'who is', 'who was',
     'unake bare me', 'unke bare me', 'inake bare me', 'inke bare me',
     'kiska name', 'kiska naam', 'biography', 'profile',
-    'politician', 'cricketer', 'actor', 'minister', 'ceo', 'founder'
+    'politician', 'cricketer', 'actor', 'minister'
   ];
 
   return personTriggers.some((t) => lower.includes(t));
