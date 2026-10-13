@@ -67,7 +67,7 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
       setIsUnifiedModalOpen(true);
     };
     window.addEventListener('tolee_open_quick_actions', handleOpenQuickActions);
-    if (searchParams.get('action') === 'create') {
+    if (searchParams?.get('action') === 'create') {
       setUnifiedModalInitialMode('default');
       setIsUnifiedModalOpen(true);
     }
@@ -232,7 +232,7 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
 
   // Handle deep-link scrolling to target post from notification
   useEffect(() => {
-    const targetPostId = searchParams.get('post') || searchParams.get('postId');
+    const targetPostId = searchParams?.get('post') || searchParams?.get('postId');
     if (!targetPostId) return;
 
     const timer = setTimeout(() => {
@@ -834,7 +834,7 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
     // Server action
     const res = await toggleLike(id);
     if (res && res.success) {
-      if (searchParams.get('fromStory') === 'true') {
+      if (searchParams?.get('fromStory') === 'true') {
         incrementStoryEngagement(id);
       }
     }
@@ -881,7 +881,7 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
     
     const res = await addComment(postId, text, parentId);
     if (res && res.success) {
-      if (searchParams.get('fromStory') === 'true') {
+      if (searchParams?.get('fromStory') === 'true') {
         incrementStoryEngagement(postId);
       }
       // Update modal list with the real comment from database
@@ -1671,18 +1671,20 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                         </div>
 
                         {/* Tolee Viral Control — User-Controlled Content Distribution */}
-                        <ViralControlButtons
-                          postId={post.id}
-                          initialStats={{
-                            viral_count: post.viralCount,
-                            get_it_down_count: post.getItDownCount,
-                            total_vote_count: (post.viralCount || 0) + (post.getItDownCount || 0),
-                            viral_percentage: post.viralPercentage,
-                            get_it_down_percentage: post.getItDownPercentage,
-                            current_user_vote: post.currentUserVote,
-                          }}
-                          variant="feed"
-                        />
+                        {post?.id && (
+                          <ViralControlButtons
+                            postId={post.id}
+                            initialStats={{
+                              viral_count: post.viralCount,
+                              get_it_down_count: post.getItDownCount,
+                              total_vote_count: (post.viralCount || 0) + (post.getItDownCount || 0),
+                              viral_percentage: post.viralPercentage,
+                              get_it_down_percentage: post.getItDownPercentage,
+                              current_user_vote: post.currentUserVote,
+                            }}
+                            variant="feed"
+                          />
+                        )}
                       </CardFooter>
                     </Card>
                   );
@@ -1874,18 +1876,20 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                         </div>
 
                         {/* Tolee Viral Control — User-Controlled Content Distribution */}
-                        <ViralControlButtons
-                          postId={post.id}
-                          initialStats={{
-                            viral_count: post.viralCount,
-                            get_it_down_count: post.getItDownCount,
-                            total_vote_count: (post.viralCount || 0) + (post.getItDownCount || 0),
-                            viral_percentage: post.viralPercentage,
-                            get_it_down_percentage: post.getItDownPercentage,
-                            current_user_vote: post.currentUserVote,
-                          }}
-                          variant="feed"
-                        />
+                        {post?.id && (
+                          <ViralControlButtons
+                            postId={post.id}
+                            initialStats={{
+                              viral_count: post.viralCount,
+                              get_it_down_count: post.getItDownCount,
+                              total_vote_count: (post.viralCount || 0) + (post.getItDownCount || 0),
+                              viral_percentage: post.viralPercentage,
+                              get_it_down_percentage: post.getItDownPercentage,
+                              current_user_vote: post.currentUserVote,
+                            }}
+                            variant="feed"
+                          />
+                        )}
                       </CardFooter>
                     </Card>
                   );
@@ -2113,18 +2117,20 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                         </div>
 
                         {/* Tolee Viral Control — User-Controlled Content Distribution */}
-                        <ViralControlButtons
-                          postId={post.id}
-                          initialStats={{
-                            viral_count: post.viralCount,
-                            get_it_down_count: post.getItDownCount,
-                            total_vote_count: (post.viralCount || 0) + (post.getItDownCount || 0),
-                            viral_percentage: post.viralPercentage,
-                            get_it_down_percentage: post.getItDownPercentage,
-                            current_user_vote: post.currentUserVote,
-                          }}
-                          variant="feed"
-                        />
+                        {post?.id && (
+                          <ViralControlButtons
+                            postId={post.id}
+                            initialStats={{
+                              viral_count: post.viralCount,
+                              get_it_down_count: post.getItDownCount,
+                              total_vote_count: (post.viralCount || 0) + (post.getItDownCount || 0),
+                              viral_percentage: post.viralPercentage,
+                              get_it_down_percentage: post.getItDownPercentage,
+                              current_user_vote: post.currentUserVote,
+                            }}
+                            variant="feed"
+                          />
+                        )}
                       </CardFooter>
                     </Card>
                   );
@@ -2460,18 +2466,20 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                       </div>
 
                       {/* Tolee Viral Control — User-Controlled Content Distribution */}
-                      <ViralControlButtons
-                        postId={post.id}
-                        initialStats={{
-                          viral_count: post.viralCount,
-                          get_it_down_count: post.getItDownCount,
-                          total_vote_count: (post.viralCount || 0) + (post.getItDownCount || 0),
-                          viral_percentage: post.viralPercentage,
-                          get_it_down_percentage: post.getItDownPercentage,
-                          current_user_vote: post.currentUserVote,
-                        }}
-                        variant="feed"
-                      />
+                      {post?.id && (
+                        <ViralControlButtons
+                          postId={post.id}
+                          initialStats={{
+                            viral_count: post.viralCount,
+                            get_it_down_count: post.getItDownCount,
+                            total_vote_count: (post.viralCount || 0) + (post.getItDownCount || 0),
+                            viral_percentage: post.viralPercentage,
+                            get_it_down_percentage: post.getItDownPercentage,
+                            current_user_vote: post.currentUserVote,
+                          }}
+                          variant="feed"
+                        />
+                      )}
 
                       {/* View all comments link */}
                       <div

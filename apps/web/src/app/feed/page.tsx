@@ -1,4 +1,6 @@
+import React, { Suspense } from 'react';
 import { FeedStream } from '@/components/FeedStream';
+import FeedLoading from './loading';
 import { getPosts } from '@/actions/post';
 import { prisma } from '@/lib/prisma';
 import { prismaAI } from '@/lib/prisma-ai'; // 🛡️ AI content from tolee-1 DB
@@ -257,5 +259,9 @@ export default async function GlobalFeedPage() {
     console.error("Failed to load AI posts from tolee-1", err);
   }
 
-  return <FeedStream initialPosts={dbPosts} />;
+  return (
+    <Suspense fallback={<FeedLoading />}>
+      <FeedStream initialPosts={dbPosts} />
+    </Suspense>
+  );
 }

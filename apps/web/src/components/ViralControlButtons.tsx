@@ -180,8 +180,10 @@ export function ViralControlButtons({
     }
   };
 
-  const isViralFilled = stats.viralPercent >= 35 || stats.userVote === 'VIRAL';
-  const isDownFilled = stats.downPercent >= 35 || stats.userVote === 'GET_IT_DOWN';
+  const safeViralPercent = Number.isFinite(stats.viralPercent) ? stats.viralPercent : 0;
+  const safeDownPercent = Number.isFinite(stats.downPercent) ? stats.downPercent : 0;
+  const isViralFilled = safeViralPercent >= 35 || stats.userVote === 'VIRAL';
+  const isDownFilled = safeDownPercent >= 35 || stats.userVote === 'GET_IT_DOWN';
 
   // ═══════════════════════════════════════════════════════════════════════
   // REELS VARIANT — Compact side-by-side with full text & watermark percentage
@@ -206,12 +208,12 @@ export function ViralControlButtons({
               ? "border-emerald-500 bg-emerald-600/30 text-white"
               : "border-emerald-500/30 bg-black/50 text-emerald-300 hover:text-white"
           )}
-          title={`Make this Viral: ${stats.viralPercent}% of all Tolee users`}
+          title={`Make this Viral: ${safeViralPercent}% of all Tolee users`}
         >
           {/* In-button progress fill */}
           <div
             className="absolute inset-y-0 left-0 bg-emerald-600/70 transition-all duration-300 ease-out z-0 pointer-events-none"
-            style={{ width: `${Math.min(100, Math.max(0, stats.viralPercent))}%` }}
+            style={{ width: `${Math.min(100, Math.max(0, safeViralPercent))}%` }}
           />
 
           {/* Low opacity percentage watermark behind text */}
@@ -219,7 +221,7 @@ export function ViralControlButtons({
             aria-hidden="true"
             className="absolute inset-0 flex items-center justify-center font-mono font-black text-sm tracking-tight opacity-20 pointer-events-none select-none z-0"
           >
-            {stats.viralPercent}%
+            {safeViralPercent}%
           </span>
 
           {/* Foreground Icon & Full Text */}
@@ -244,12 +246,12 @@ export function ViralControlButtons({
               ? "border-rose-500 bg-rose-600/30 text-white"
               : "border-rose-500/30 bg-black/50 text-rose-300 hover:text-white"
           )}
-          title={`Get it Down: ${stats.downPercent}% of all Tolee users`}
+          title={`Get it Down: ${safeDownPercent}% of all Tolee users`}
         >
           {/* In-button progress fill */}
           <div
             className="absolute inset-y-0 left-0 bg-rose-600/70 transition-all duration-300 ease-out z-0 pointer-events-none"
-            style={{ width: `${Math.min(100, Math.max(0, stats.downPercent))}%` }}
+            style={{ width: `${Math.min(100, Math.max(0, safeDownPercent))}%` }}
           />
 
           {/* Low opacity percentage watermark behind text */}
@@ -257,7 +259,7 @@ export function ViralControlButtons({
             aria-hidden="true"
             className="absolute inset-0 flex items-center justify-center font-mono font-black text-sm tracking-tight opacity-20 pointer-events-none select-none z-0"
           >
-            {stats.downPercent}%
+            {safeDownPercent}%
           </span>
 
           {/* Foreground Icon & Full Text */}
@@ -297,12 +299,12 @@ export function ViralControlButtons({
             ? "border-emerald-600 bg-emerald-600 text-white shadow-xs"
             : "border-[#A7F3D0] dark:border-emerald-800/80 bg-[#E8F8F0] dark:bg-emerald-950/20 text-[#065F46] dark:text-emerald-300 hover:bg-[#DCFCE7]"
         )}
-        title={`Make this Viral — ${stats.viralPercent}% of all eligible Tolee users`}
+        title={`Make this Viral — ${safeViralPercent}% of all eligible Tolee users`}
       >
         {/* Dynamic In-Button Progress Layer */}
         <div
           className="absolute inset-y-0 left-0 bg-[#059669] dark:bg-emerald-600 transition-all duration-300 ease-out z-0 pointer-events-none"
-          style={{ width: `${Math.min(100, Math.max(0, stats.viralPercent))}%` }}
+          style={{ width: `${Math.min(100, Math.max(0, safeViralPercent))}%` }}
         />
 
         {/* Low opacity percentage watermark behind text */}
@@ -310,7 +312,7 @@ export function ViralControlButtons({
           aria-hidden="true"
           className="absolute inset-0 flex items-center justify-center font-mono font-black text-base sm:text-lg tracking-tight opacity-20 pointer-events-none select-none z-0"
         >
-          {stats.viralPercent}%
+          {safeViralPercent}%
         </span>
 
         {/* Foreground Content: Check icon + Full Text (No truncation) */}
@@ -335,12 +337,12 @@ export function ViralControlButtons({
             ? "border-rose-600 bg-rose-600 text-white shadow-xs"
             : "border-[#FECACA] dark:border-rose-900/60 bg-[#FEECEC] dark:bg-rose-950/20 text-[#DC2626] dark:text-rose-300 hover:bg-[#FEE2E2]"
         )}
-        title={`Get it Down — ${stats.downPercent}% of all eligible Tolee users`}
+        title={`Get it Down — ${safeDownPercent}% of all eligible Tolee users`}
       >
         {/* Dynamic In-Button Progress Layer */}
         <div
           className="absolute inset-y-0 left-0 bg-[#E11D48] dark:bg-rose-600 transition-all duration-300 ease-out z-0 pointer-events-none"
-          style={{ width: `${Math.min(100, Math.max(0, stats.downPercent))}%` }}
+          style={{ width: `${Math.min(100, Math.max(0, safeDownPercent))}%` }}
         />
 
         {/* Low opacity percentage watermark behind text */}
@@ -348,7 +350,7 @@ export function ViralControlButtons({
           aria-hidden="true"
           className="absolute inset-0 flex items-center justify-center font-mono font-black text-base sm:text-lg tracking-tight opacity-20 pointer-events-none select-none z-0"
         >
-          {stats.downPercent}%
+          {safeDownPercent}%
         </span>
 
         {/* Foreground Content: Down Circle icon + Full Text (No truncation) */}

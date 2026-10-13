@@ -991,8 +991,14 @@ export function InstagramProfileView({
           {/* Back button (Mobile/Desktop) */}
           <button
             type="button"
-            onClick={() => router.back()}
-            className="absolute top-3 left-3 w-8 h-8 bg-black/35 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-black/55 transition-colors z-20"
+            onClick={() => {
+              if (typeof window !== 'undefined' && window.history.length > 1) {
+                router.back();
+              } else {
+                router.push('/feed');
+              }
+            }}
+            className="absolute top-3 left-3 w-8 h-8 bg-black/35 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-black/55 transition-colors z-20 cursor-pointer"
             aria-label="Back"
           >
             <ChevronLeft className="w-4.5 h-4.5" />
