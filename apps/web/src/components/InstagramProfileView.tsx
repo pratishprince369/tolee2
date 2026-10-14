@@ -1014,7 +1014,7 @@ export function InstagramProfileView({
           </button>
           {/* Username pill */}
           <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-black/35 backdrop-blur-sm rounded-full px-3.5 py-1 z-20">
-            <span className="text-white text-[13px] font-semibold truncate max-w-[160px]">{user.username || 'user'}</span>
+            <span className="text-white text-[13px] font-semibold truncate max-w-[160px]">{user.username || user.name || 'user'}</span>
             <ChevronDown className="w-3.5 h-3.5 text-white/80 flex-shrink-0" />
           </div>
           {/* Edit Cover */}
@@ -1871,7 +1871,7 @@ export function InstagramProfileView({
                       <AvatarFallback>{user.name[0]}</AvatarFallback>
                     </Avatar>
                     <div className="flex flex-col">
-                      <span className="text-[13px] font-bold text-white leading-tight">{user.username}</span>
+                      <span className="text-[13px] font-bold text-white leading-tight">{user.username || user.name}</span>
                       <span className="text-[10px] text-white/70 font-semibold uppercase tracking-widest mt-0.5">{activeHighlight.title}</span>
                     </div>
                   </div>
@@ -2281,7 +2281,7 @@ export function InstagramProfileView({
               if (filteredFriends.length === 0) return (<div className="text-center py-8 text-xs text-gray-400">No matching friends found.</div>);
               return filteredFriends.map((friend: any) => (
                 <div key={friend.id} className="flex items-center justify-between gap-3 group">
-                  <div onClick={() => { setIsFriendsModalOpen(false); router.push(`/u/${friend.username || 'me'}`); }} className="flex items-center gap-3 cursor-pointer flex-1 min-w-0">
+                  <div onClick={() => { setIsFriendsModalOpen(false); router.push(`/u/${friend.username || friend.id}`); }} className="flex items-center gap-3 cursor-pointer flex-1 min-w-0">
                     <Avatar className="w-11 h-11 border border-gray-100 dark:border-zinc-800 transition-transform group-hover:scale-[1.02]">
                       <AvatarImage src={getValidAvatarUrl(friend.avatar)} alt={friend.name} />
                       <AvatarFallback className="bg-gradient-to-tr from-zinc-200 to-zinc-300 dark:from-zinc-800 dark:to-zinc-900 text-xs font-semibold uppercase">{friend.name.slice(0, 2)}</AvatarFallback>
@@ -2361,7 +2361,7 @@ export function InstagramProfileView({
                   <div 
                     onClick={() => { 
                       setIsFollowersModalOpen(false); 
-                      router.push(`/u/${follower.username || 'me'}`); 
+                      router.push(`/u/${follower.username || follower.id}`); 
                     }} 
                     className="flex items-center gap-3 cursor-pointer flex-1 min-w-0"
                   >
@@ -2450,7 +2450,7 @@ export function InstagramProfileView({
                   <div 
                     onClick={() => { 
                       setIsFollowingModalOpen(false); 
-                      router.push(`/u/${fol.username || 'me'}`); 
+                      router.push(`/u/${fol.username || fol.id}`); 
                     }} 
                     className="flex items-center gap-3 cursor-pointer flex-1 min-w-0"
                   >

@@ -1175,7 +1175,7 @@ export function StoryViewer({
                     storyViewersList.map((viewer) => (
                       <Link
                         key={viewer.id}
-                        href={`/u/${viewer.username}`}
+                        href={`/u/${viewer.username || viewer.id}`}
                         onClick={(e) => {
                           e.stopPropagation();
                           onClose();

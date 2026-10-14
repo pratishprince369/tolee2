@@ -680,7 +680,7 @@ export function ProfileFeedView({
             ) : modalComments.length > 0 ? (
               modalComments.map((comment: any) => (
                 <div key={comment.id} className="flex items-start gap-3">
-                  <Link href={`/u/${comment.author?.username || ''}`} onClick={() => setActiveCommentPost(null)}>
+                  <Link href={`/u/${comment.author?.username || comment.author?.id || ''}`} onClick={() => setActiveCommentPost(null)}>
                     <Avatar className="w-9 h-9 border border-gray-100 dark:border-zinc-800 shadow-xs">
                       <AvatarImage src={getValidAvatarUrl(comment.author?.avatar)} alt={comment.author?.name} />
                       <AvatarFallback>{comment.author?.name?.[0] || 'U'}</AvatarFallback>
@@ -753,11 +753,9 @@ export function ProfileFeedView({
                       {like.user.username && <span className="text-[11px] text-gray-400 leading-none mt-1">@{like.user.username}</span>}
                     </div>
                   </div>
-                  {like.user.username && (
-                    <Link href={`/u/${like.user.username}`} onClick={() => setActiveLikePost(null)}>
-                      <Button variant="outline" size="sm" className="h-8 rounded-full border-gray-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 font-bold text-xs px-4 bg-transparent text-gray-600 dark:text-gray-300">View Profile</Button>
-                    </Link>
-                  )}
+                  <Link href={`/u/${like.user.username || like.user.id}`} onClick={() => setActiveLikePost(null)}>
+                    <Button variant="outline" size="sm" className="h-8 rounded-full border-gray-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 font-bold text-xs px-4 bg-transparent text-gray-600 dark:text-gray-300">View Profile</Button>
+                  </Link>
                 </div>
               ))
             ) : (

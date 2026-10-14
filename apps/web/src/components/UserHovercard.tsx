@@ -91,7 +91,7 @@ export function UserHovercard({ username, children }: UserHovercardProps) {
                   <AvatarFallback>{(userData.name || 'U')[0]}</AvatarFallback>
                 </Avatar>
                 
-                <Link href={`/u/${userData.username}`} onClick={() => setOpen(false)}>
+                <Link href={`/u/${userData.username || userData.id}`} onClick={() => setOpen(false)}>
                   <Button size="sm" className="h-8 text-xs font-bold rounded-lg px-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md">
                     Profile
                   </Button>
@@ -104,7 +104,7 @@ export function UserHovercard({ username, children }: UserHovercardProps) {
                   {userData.name}
                   {userData.isVerified && <ShieldCheck className="w-3.5 h-3.5 text-primary fill-primary/10" />}
                 </h4>
-                <p className="text-xs text-gray-400">@{userData.username}</p>
+                <p className="text-xs text-gray-400">@{userData.username || userData.name?.toLowerCase().replace(/\s+/g, '') || 'user'}</p>
               </div>
 
               {/* Bio */}

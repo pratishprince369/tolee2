@@ -459,9 +459,9 @@ export function OnlineUsersModal({
 
                     {/* Quick Profile / Inspect Action */}
                     <div style={{ minWidth: '100px', display: 'flex', justifyContent: 'flex-end' }}>
-                      {!isGuest && user.username ? (
+                      {!isGuest && (user.username || user.userId) ? (
                         <Link
-                          href={`/u/${user.username}`}
+                          href={`/u/${user.username || user.userId}`}
                           target="_blank"
                           rel="noreferrer"
                           style={{
