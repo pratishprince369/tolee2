@@ -47,17 +47,17 @@ export function BeforeLoginFooter() {
   const [showAllLanguages, setShowAllLanguages] = useState(false);
 
   return (
-    <footer className="w-full bg-white dark:bg-[#0a0a0a] text-slate-500 dark:text-zinc-500 border-t border-slate-200 dark:border-zinc-900 py-6 px-4 sm:px-8 mt-auto select-none">
-      <div className="max-w-5xl mx-auto text-[11px] leading-relaxed">
+    <footer className="w-full bg-white dark:bg-[#0a0a0a] text-slate-500 dark:text-zinc-500 border-t border-slate-200 dark:border-zinc-900 py-4 xs:py-5 sm:py-6 px-3 xs:px-4 sm:px-8 mt-auto select-none">
+      <div className="max-w-5xl mx-auto text-[10px] xs:text-[11px] leading-relaxed">
         
         {/* Row 1: Languages Switcher Bar */}
-        <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1.5 text-slate-500 dark:text-zinc-400">
+        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-2.5 xs:gap-x-3.5 gap-y-1.5 text-slate-500 dark:text-zinc-400">
           {REGIONAL_LANGUAGES.map((lang) => (
             <button
               key={lang.code}
               type="button"
               onClick={() => setActiveLang(lang.code)}
-              className={`transition-colors cursor-pointer ${
+              className={`transition-colors cursor-pointer py-0.5 ${
                 activeLang === lang.code
                   ? 'font-bold text-slate-800 dark:text-zinc-200'
                   : 'hover:underline text-slate-500 dark:text-zinc-400'
@@ -69,7 +69,7 @@ export function BeforeLoginFooter() {
           <button
             type="button"
             onClick={() => setShowAllLanguages((prev) => !prev)}
-            className="flex items-center justify-center w-5 h-5 rounded border border-slate-300 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-700 transition-colors cursor-pointer ml-1"
+            className="inline-flex items-center justify-center w-5 h-5 rounded border border-slate-300 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-700 transition-colors cursor-pointer ml-1"
             title="More languages"
           >
             <Plus className="w-3 h-3" />
@@ -78,8 +78,8 @@ export function BeforeLoginFooter() {
 
         {/* Optional Expanded Languages Modal/Row */}
         {showAllLanguages && (
-          <div className="mt-2.5 p-3 rounded-lg bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-[11px] flex flex-wrap gap-x-3 gap-y-1 text-slate-600 dark:text-zinc-400">
-            <span>More languages:</span>
+          <div className="mt-2.5 p-2.5 xs:p-3 rounded-lg bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-[10px] xs:text-[11px] flex flex-wrap justify-center sm:justify-start gap-x-3 gap-y-1 text-slate-600 dark:text-zinc-400">
+            <span className="font-semibold">More languages:</span>
             {['অসমীয়া', 'ଓଡ଼ିଆ', 'मैथिली', 'संस्कृतम्', 'नेपाली', 'Español', 'Français', 'Deutsch', 'العربية', 'Português', 'Italiano'].map((extra) => (
               <button
                 key={extra}
@@ -96,15 +96,15 @@ export function BeforeLoginFooter() {
         )}
 
         {/* Thin Divider Line */}
-        <div className="w-full border-t border-slate-200 dark:border-zinc-800 my-2.5" />
+        <div className="w-full border-t border-slate-200 dark:border-zinc-800 my-2 xs:my-2.5" />
 
         {/* Row 2: Comprehensive Directory Links */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-slate-600 dark:text-zinc-400">
+        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-3 xs:gap-x-4 gap-y-1.5 text-slate-600 dark:text-zinc-400">
           {DIRECTORY_LINKS.map((link) => (
             <Link
               key={link.label}
               href={link.href}
-              className="hover:underline transition-colors"
+              className="hover:underline transition-colors py-0.5"
             >
               {link.label}
             </Link>
@@ -112,7 +112,7 @@ export function BeforeLoginFooter() {
         </div>
 
         {/* Row 3: Copyright */}
-        <div className="mt-4 text-slate-400 dark:text-zinc-500 font-normal">
+        <div className="mt-3 sm:mt-4 text-center sm:text-left text-slate-400 dark:text-zinc-500 font-normal">
           <span>Tolee © {new Date().getFullYear()}</span>
         </div>
 

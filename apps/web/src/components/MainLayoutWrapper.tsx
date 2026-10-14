@@ -16,7 +16,9 @@ export function isMobileHeaderHiddenRoute(pathname: string | null): boolean {
     pathname === '/profile' ||
     pathname.startsWith('/reels') ||
     pathname.startsWith('/live/broadcast') ||
-    pathname.startsWith('/live/meeting')
+    pathname.startsWith('/live/meeting') ||
+    pathname === '/' ||
+    pathname === '/login'
   );
 }
 
@@ -40,7 +42,7 @@ export function MainLayoutWrapper({
   return (
     <div className={cn(
       "flex flex-1 w-full relative",
-      isReels ? "p-0 m-0 h-[100dvh] overflow-hidden" : (isChat ? "pb-0" : "pb-16 lg:pb-0"),
+      isReels ? "p-0 m-0 h-[100dvh] overflow-hidden" : (isChat || !isAuthenticated ? "pb-0" : "pb-16 lg:pb-0"),
       isReels ? "pt-0" : (hideMobileHeader ? "pt-0 md:pt-16" : "pt-14 sm:pt-16")
     )}>
       {!isReels && sidebar}

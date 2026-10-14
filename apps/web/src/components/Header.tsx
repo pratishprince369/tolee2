@@ -569,7 +569,7 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
           </>
         ) : (
           <div className="flex items-center gap-1 xs:gap-1.5 sm:gap-3 min-w-0 flex-1 sm:flex-initial justify-end">
-            <div className="md:hidden flex items-center gap-0.5 xs:gap-1 overflow-x-auto no-scrollbar min-w-0 flex-1 justify-end py-0.5">
+            <div className="hidden xs:flex md:hidden items-center gap-0.5 xs:gap-1 overflow-x-auto no-scrollbar min-w-0 flex-1 justify-end py-0.5">
               {/* Mobile Search Button for guests */}
               <Button 
                 variant="ghost" 
@@ -632,14 +632,14 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
             <Link href="/auth/signin" className="flex-shrink-0">
               <Button 
                 variant="outline" 
-                className="rounded-full border-gray-300 dark:border-zinc-800 text-gray-700 dark:text-zinc-300 font-extrabold px-2.5 xs:px-3.5 sm:px-6 py-1 sm:py-2 text-xs sm:text-sm h-7.5 xs:h-8 sm:h-10 hover:bg-gray-50 dark:hover:bg-zinc-900 active:scale-95 transition-all duration-200"
+                className="rounded-full border-gray-300 dark:border-zinc-800 text-gray-700 dark:text-zinc-300 font-extrabold px-2 xs:px-3 sm:px-6 py-1 sm:py-2 text-[11px] xs:text-xs sm:text-sm h-7.5 xs:h-8 sm:h-10 hover:bg-gray-50 dark:hover:bg-zinc-900 active:scale-95 transition-all duration-200"
               >
                 Log In
               </Button>
             </Link>
-            <Link href="/auth/signup">
+            <Link href="/auth/signup" className="flex-shrink-0">
               <Button 
-                className="bg-primary hover:bg-primary/95 text-primary-foreground rounded-full font-black px-4 sm:px-7 py-1.5 sm:py-2 text-xs sm:text-sm h-8 sm:h-10 shadow-md hover:shadow-lg active:scale-95 transition-all duration-200 border-0"
+                className="bg-primary hover:bg-primary/95 text-primary-foreground rounded-full font-black px-3 xs:px-4 sm:px-7 py-1.5 sm:py-2 text-[11px] xs:text-xs sm:text-sm h-7.5 xs:h-8 sm:h-10 shadow-md hover:shadow-lg active:scale-95 transition-all duration-200 border-0"
               >
                 Sign Up
               </Button>
