@@ -85,6 +85,50 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   };
 }
 
+function renderContentWithBacklinks(text: string) {
+  if (!text) return null;
+  const parts = [];
+  const linkRegex = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s]+)/g;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = linkRegex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.substring(lastIndex, match.index));
+    }
+    if (match[1] && match[2]) {
+      parts.push(
+        <a
+          key={match.index}
+          href={match[2]}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-teal-600 dark:text-teal-400 font-semibold underline underline-offset-2 hover:text-teal-700 hover:underline"
+        >
+          {match[1]}
+        </a>
+      );
+    } else if (match[3]) {
+      parts.push(
+        <a
+          key={match.index}
+          href={match[3]}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-teal-600 dark:text-teal-400 font-semibold underline underline-offset-2 hover:text-teal-700 hover:underline break-all"
+        >
+          {match[3]}
+        </a>
+      );
+    }
+    lastIndex = linkRegex.lastIndex;
+  }
+  if (lastIndex < text.length) {
+    parts.push(text.substring(lastIndex));
+  }
+  return parts;
+}
+
 export default async function NewsReaderPage({ params }: { params: { slug: string } }) {
   const news = await getNewsBySlug(params.slug);
   const session = await getServerSession(authOptions);
@@ -321,9 +365,45 @@ export default async function NewsReaderPage({ params }: { params: { slug: strin
             }
             if (block.type === 'blockquote') {
               return (
-                <blockquote key={idx} className="border-l-4 border-indigo-500 pl-4 py-1 italic text-gray-700 dark:text-zinc-300 bg-gray-50/50 dark:bg-zinc-950/10 rounded-r-xl pr-3 text-[15px] leading-relaxed">
-                  {block.value}
+                <blockquote key={idx} className="border-l-4 border-teal-500 pl-4 py-2 italic text-gray-700 dark:text-zinc-300 bg-teal-50/20 dark:bg-zinc-900/40 rounded-r-2xl pr-4 text-[15.5px] leading-relaxed">
+                  {renderContentWithBacklinks(block.value)}
                 </blockquote>
+              );
+            }
+            if (block.type === 'bullet_list') {
+              return (
+                <ul key={idx} className="list-disc list-inside space-y-2 pl-2 text-[16px] text-gray-800 dark:text-zinc-300">
+                  {typeof block.value === 'string'
+                    ? block.value.split('\n').filter(Boolean).map((item: string, i: number) => (
+                        <li key={i}>{renderContentWithBacklinks(item.replace(/^[•*-]\s*/, ''))}</li>
+                      ))
+                    : null}
+                </ul>
+              );
+            }
+            if (block.type === 'numbered_list') {
+              return (
+                <ol key={idx} className="list-decimal list-inside space-y-2 pl-2 text-[16px] text-gray-800 dark:text-zinc-300">
+                  {typeof block.value === 'string'
+                    ? block.value.split('\n').filter(Boolean).map((item: string, i: number) => (
+                        <li key={i}>{renderContentWithBacklinks(item.replace(/^\d+[\.\)]\s*/, ''))}</li>
+                      ))
+                    : null}
+                </ol>
+              );
+            }
+            if (block.type === 'image') {
+              return (
+                <div key={idx} className="space-y-2 my-6">
+                  <div className="w-full rounded-2xl overflow-hidden border border-gray-150 dark:border-zinc-800 shadow-sm max-h-[500px]">
+                    <img src={block.value} alt={block.caption || 'Article media'} className="w-full h-full object-cover" />
+                  </div>
+                  {block.caption && (
+                    <p className="text-xs text-center text-gray-400 dark:text-zinc-500 italic">
+                      {block.caption}
+                    </p>
+                  )}
+                </div>
               );
             }
             if (block.type === 'callout') {
@@ -331,7 +411,7 @@ export default async function NewsReaderPage({ params }: { params: { slug: strin
                 <div key={idx} className="bg-indigo-50/50 dark:bg-indigo-950/10 border border-indigo-100 dark:border-indigo-900/50 rounded-2xl p-4 flex gap-3 items-start">
                   <Info className="w-5 h-5 text-indigo-500 mt-0.5 flex-shrink-0" />
                   <p className="text-sm leading-relaxed text-indigo-900/90 dark:text-indigo-300">
-                    {block.value}
+                    {renderContentWithBacklinks(block.value)}
                   </p>
                 </div>
               );
@@ -344,7 +424,7 @@ export default async function NewsReaderPage({ params }: { params: { slug: strin
                   </div>
                   <h4 className="font-extrabold text-sm text-gray-900 dark:text-white">Q: {block.value.question}</h4>
                   <p className="text-xs leading-relaxed text-gray-600 dark:text-zinc-400 pl-4 border-l border-purple-200">
-                    A: {block.value.answer}
+                    A: {renderContentWithBacklinks(block.value.answer)}
                   </p>
                 </div>
               );
@@ -365,10 +445,10 @@ export default async function NewsReaderPage({ params }: { params: { slug: strin
                 </div>
               ) : null;
             }
-            // default paragraph text render
+            // default paragraph text render with backlink support
             return (
               <p key={idx} className="text-[15.5px] sm:text-[16px] leading-relaxed text-gray-800 dark:text-zinc-300 whitespace-pre-line">
-                {block.value}
+                {renderContentWithBacklinks(block.value)}
               </p>
             );
           })}

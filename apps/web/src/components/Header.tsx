@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Search, Bell, MessageCircle, LogOut, User, Settings, Compass, Store, Globe, Heart, Bot, Zap, MessageSquare, Briefcase, Award, FileText, Radio, Wallet, Plus, Trophy, Music, Gamepad2, Share2 } from 'lucide-react';
+import { Search, Bell, MessageCircle, LogOut, User, Settings, Compass, Store, Globe, Heart, Bot, Zap, MessageSquare, Briefcase, Award, FileText, Radio, Wallet, Plus, Trophy, Music, Gamepad2, Share2, PenLine, Newspaper } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -506,6 +506,10 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
                   <DropdownMenuItem onClick={() => router.push('/u/me')} className="cursor-pointer flex w-full items-center">
                     <User className="mr-2 h-4 w-4" />
                     <span>Profile</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => router.push('/news/create')} className="cursor-pointer flex w-full items-center font-medium text-teal-700 dark:text-teal-300">
+                    <PenLine className="mr-2 h-4 w-4 text-teal-600 dark:text-teal-400" />
+                    <span>Post News Article</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setIsDraftsModalOpen(true)} className="cursor-pointer flex w-full items-center justify-between">
                     <div className="flex items-center">

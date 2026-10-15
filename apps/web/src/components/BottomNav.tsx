@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Home, Compass, Film, MessageCircle, Menu, User, Settings, Globe, Store, LogOut, MessageSquare, Map, Radio, Briefcase, Award, Newspaper, Tv, Bot, Bell, Megaphone, Zap, HelpCircle, FileText, Wallet, Sparkles, Trophy, Music, Gamepad2, Share2 } from 'lucide-react';
+import { Home, Compass, Film, MessageCircle, Menu, User, Settings, Globe, Store, LogOut, MessageSquare, Map, Radio, Briefcase, Award, Newspaper, Tv, Bot, Bell, Megaphone, Zap, HelpCircle, FileText, Wallet, Sparkles, Trophy, Music, Gamepad2, Share2, PenLine } from 'lucide-react';
 import { useSession, signOut } from 'next-auth/react';
 import { getSidebarDataCached } from '@/lib/sidebar-data';
 import { getDrafts } from '@/lib/draftManager';
@@ -154,6 +154,10 @@ export function BottomNav() {
                 <DropdownMenuItem onClick={() => { setClickedPath('/u/me'); router.push('/u/me'); }} className={getDropdownItemClass('/u/me')}>
                   <User className={getDropdownIconClass('/u/me')} />
                   <span>My Profile</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { setClickedPath('/news/create'); router.push('/news/create'); }} className={getDropdownItemClass('/news/create')}>
+                  <PenLine className={getDropdownIconClass('/news/create')} />
+                  <span className="font-semibold text-teal-600 dark:text-teal-400">Post News Article</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setIsDraftsModalOpen(true)} className="cursor-pointer flex w-full items-center justify-between py-2 px-3">
                   <div className="flex items-center">
