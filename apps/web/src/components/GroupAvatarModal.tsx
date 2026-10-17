@@ -71,10 +71,14 @@ export function GroupAvatarModal({
     }
 
     setSelectedFileName(file.name);
+    if (selectedImageSrc) {
+      try { URL.revokeObjectURL(selectedImageSrc); } catch (_) {}
+    }
     const objectUrl = URL.createObjectURL(file);
     setSelectedImageSrc(objectUrl);
     setCrop({ x: 0, y: 0 });
     setZoom(1);
+    e.target.value = '';
   };
 
   const handleResetCrop = () => {

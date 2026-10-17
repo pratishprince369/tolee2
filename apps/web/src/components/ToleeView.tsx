@@ -1476,7 +1476,7 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                       <Upload className="w-4 h-4 text-teal-600" />
                       <span>Upload Cover Photo</span>
                     </DropdownMenuItem>
-                    {tolee.coverImage && (
+                    {Boolean((tolee.coverImage || tolee.banner) && (tolee.coverImage || tolee.banner) !== '/default-tolee-cover.svg') && (
                       <DropdownMenuItem 
                         onClick={() => setIsRepositioningCover(true)}
                         className="cursor-pointer rounded-xl text-xs font-semibold py-2 flex items-center gap-2"
@@ -1485,7 +1485,7 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
                         <span>Reposition Cover Photo</span>
                       </DropdownMenuItem>
                     )}
-                    {tolee.coverImage && (
+                    {Boolean((tolee.coverImage || tolee.banner) && (tolee.coverImage || tolee.banner) !== '/default-tolee-cover.svg') && (
                       <>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem 

@@ -222,6 +222,9 @@ export function MyToleesClient({ initialTolees }: MyToleesClientProps) {
                     <img 
                       src={tolee.coverImage || '/default-tolee-cover.svg'} 
                       alt={tolee.name} 
+                      style={{
+                        objectPosition: `${(tolee as any).coverPositionX ?? 50}% ${(tolee as any).coverPositionY ?? 50}%`
+                      }}
                       className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-500"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
