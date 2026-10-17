@@ -1165,8 +1165,8 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
         
         <div className="container mx-auto px-4 max-w-6xl">
           <div className="flex flex-col md:flex-row items-start md:items-end gap-6 pb-6 -mt-16 relative z-10 w-full">
-            <div className="w-32 h-32 rounded-2xl border-4 border-white dark:border-black overflow-hidden bg-white shadow-lg">
-              <img src={tolee.avatar || '/default-tolee-avatar.svg'} alt={tolee.name} className="w-full h-full object-cover" />
+            <div className="w-28 h-28 sm:w-32 sm:h-32 md:w-36 md:h-36 rounded-full border-4 border-white dark:border-[#0a0a0a] overflow-hidden bg-white dark:bg-zinc-900 shadow-xl shrink-0 aspect-square ring-2 ring-black/5 dark:ring-white/10">
+              <img src={tolee.avatar || '/default-tolee-avatar.svg'} alt={tolee.name} className="w-full h-full object-cover object-center rounded-full" />
             </div>
             
             <div className="flex-grow mb-2 min-w-0 w-full">

@@ -235,10 +235,10 @@ export function MyToleesClient({ initialTolees }: MyToleesClientProps) {
                   {/* Card Content */}
                   <CardContent className="p-5 flex-grow flex flex-col relative pt-10">
                     {/* Avatar Overlay */}
-                    <div className="absolute -top-8 left-5 border-4 border-white dark:border-[#121212] rounded-xl overflow-hidden shadow-md bg-white dark:bg-gray-900">
-                      <Avatar className="w-14 h-14 rounded-lg">
-                        <AvatarImage src={tolee.avatar || '/default-tolee-avatar.svg'} alt={tolee.name} className="object-cover" />
-                        <AvatarFallback className="rounded-lg font-bold">{tolee.name[0]}</AvatarFallback>
+                    <div className="absolute -top-8 left-5 border-4 border-white dark:border-[#121212] rounded-full overflow-hidden shadow-md bg-white dark:bg-gray-900 aspect-square shrink-0">
+                      <Avatar className="w-14 h-14 rounded-full">
+                        <AvatarImage src={tolee.avatar || '/default-tolee-avatar.svg'} alt={tolee.name} className="object-cover rounded-full" />
+                        <AvatarFallback className="rounded-full font-bold">{tolee.name[0]}</AvatarFallback>
                       </Avatar>
                     </div>
 

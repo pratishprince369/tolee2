@@ -162,7 +162,7 @@ export function ManageToleeModal({ tolee, children }: { tolee: any, children: Re
               <img 
                 src={formData.avatar || '/default-tolee-avatar.svg'} 
                 alt="Avatar" 
-                className="w-12 h-12 rounded-xl object-cover border border-gray-200" 
+                className="w-12 h-12 rounded-full object-cover border border-gray-200 aspect-square shrink-0" 
               />
               <Input type="file" accept="image/*" onChange={handleAvatarChange} className="cursor-pointer" />
             </div>
