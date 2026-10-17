@@ -15,7 +15,7 @@ import {
   TrendingUp, PlayCircle, StopCircle, MapPin, Globe, AlertTriangle, Search, Repeat, Store,
   UtensilsCrossed, ShoppingBag, CheckCircle2, Lock,
   VideoOff, Mic, MicOff, Monitor, Radio, Sparkles, Settings,
-  Camera, Move, Upload, Smartphone, RotateCcw, Trash2
+  Camera, Move, Upload, Smartphone, RotateCcw, Trash2, Check
 } from 'lucide-react';
 
 import { GroupAvatarModal } from '@/components/GroupAvatarModal';
@@ -1459,14 +1459,9 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
             isAdmin && (
               <div className="absolute bottom-4 right-4 z-20">
                 <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button 
-                      size="sm" 
-                      className="bg-black/70 hover:bg-black/90 text-white font-bold text-xs rounded-xl backdrop-blur-md border border-white/20 shadow-lg flex items-center gap-2 h-9 px-3.5 cursor-pointer"
-                    >
-                      <Camera className="w-4 h-4 text-teal-400" />
-                      <span className="hidden sm:inline">Edit Cover Photo</span>
-                    </Button>
+                  <DropdownMenuTrigger className="bg-black/70 hover:bg-black/90 text-white font-bold text-xs rounded-xl backdrop-blur-md border border-white/20 shadow-lg flex items-center gap-2 h-9 px-3.5 cursor-pointer outline-none">
+                    <Camera className="w-4 h-4 text-teal-400" />
+                    <span className="hidden sm:inline">Edit Cover Photo</span>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-52 rounded-2xl p-1.5 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 shadow-xl">
                     <DropdownMenuItem 
