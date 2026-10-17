@@ -250,6 +250,8 @@ export default async function ToleePage({ params }: ToleePageProps) {
       avatar: dbTolee.avatar || '/default-tolee-avatar.svg',
       banner: dbTolee.coverImage || '/default-tolee-cover.svg',
       coverImage: dbTolee.coverImage || '',
+      coverPositionX: dbTolee.coverPositionX ?? 50,
+      coverPositionY: dbTolee.coverPositionY ?? 50,
       admin: { 
         name: dbTolee.owner?.username || dbTolee.owner?.name || 'Admin',
         username: dbTolee.owner?.username || null

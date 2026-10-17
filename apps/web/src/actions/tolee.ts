@@ -68,7 +68,11 @@ export async function getToleeBySlug(slug: string) {
         slug: true,
         description: true,
         avatar: true,
+        avatarUpdatedAt: true,
         coverImage: true,
+        coverPositionX: true,
+        coverPositionY: true,
+        coverUpdatedAt: true,
         isPrivate: true,
         isPublicVisible: true,
         ownerId: true,
@@ -589,7 +593,15 @@ export async function updateTolee(id: string, data: {
       }
     });
 
-    if (!tolee || tolee.ownerId !== userId) {
+    const isOwner = tolee.ownerId === userId;
+    const isSuperAdmin = (session?.user as any)?.role === 'SUPER_ADMIN' || session?.user?.email === process.env.SUPER_ADMIN_EMAIL;
+    const memberRecord = !isOwner ? await prisma.toleeMember.findUnique({
+      where: { userId_toleeId: { userId, toleeId: id } },
+      select: { role: true, status: true }
+    }) : null;
+    const isAdmin = memberRecord?.status === 'approved' && memberRecord.role === 'admin';
+
+    if (!isOwner && !isAdmin && !isSuperAdmin) {
       return { success: false, error: 'Not authorized to manage this Tolee' };
     }
 
@@ -630,16 +642,292 @@ export async function updateTolee(id: string, data: {
         rules: safeRules,
         avatar: data.avatar,
         avatarPublicId: newAvatarPublicId,
+        avatarUpdatedAt: data.avatar !== undefined ? new Date() : undefined,
         coverImage: data.coverImage,
-        coverImagePublicId: newCoverImagePublicId
+        coverImagePublicId: newCoverImagePublicId,
+        coverUpdatedAt: data.coverImage !== undefined ? new Date() : undefined,
       }
     });
 
     revalidatePath(`/t/${updated.slug}`);
+    revalidatePath('/my-tolees');
+    revalidatePath('/discover');
+    revalidatePath('/');
     return { success: true, tolee: updated };
   } catch (error) {
     console.error("Error updating tolee:", error);
     return { success: false, error: 'Failed to update tolee' };
+  }
+}
+
+export async function updateGroupAvatar(toleeId: string, avatarUrl: string, publicId?: string) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !(session.user as any).id) {
+      return { success: false, error: 'Unauthorized' };
+    }
+    const userId = (session.user as any).id;
+
+    const tolee = await prisma.tolee.findUnique({
+      where: { id: toleeId },
+      select: { id: true, ownerId: true, slug: true, avatar: true, avatarPublicId: true }
+    });
+
+    if (!tolee) {
+      return { success: false, error: 'Group not found' };
+    }
+
+    const isOwner = tolee.ownerId === userId;
+    const isSuperAdmin = (session?.user as any)?.role === 'SUPER_ADMIN' || session?.user?.email === process.env.SUPER_ADMIN_EMAIL;
+    const memberRecord = !isOwner ? await prisma.toleeMember.findUnique({
+      where: { userId_toleeId: { userId, toleeId } },
+      select: { role: true, status: true }
+    }) : null;
+    const isAdmin = memberRecord?.status === 'approved' && memberRecord.role === 'admin';
+
+    if (!isOwner && !isAdmin && !isSuperAdmin) {
+      return { success: false, error: 'Only group owners and admins can update the group avatar' };
+    }
+
+    const newPublicId = publicId || extractPublicIdFromUrl(avatarUrl);
+
+    if (tolee.avatar && tolee.avatar !== avatarUrl) {
+      const deleteId = tolee.avatarPublicId || extractPublicIdFromUrl(tolee.avatar);
+      if (deleteId) {
+        try {
+          await destroyAsset(deleteId, extractResourceTypeFromUrl(tolee.avatar));
+        } catch (cleanupErr) {
+          console.warn('Failed to delete old avatar asset:', cleanupErr);
+        }
+      }
+    }
+
+    const updated = await prisma.tolee.update({
+      where: { id: toleeId },
+      data: {
+        avatar: avatarUrl,
+        avatarPublicId: newPublicId,
+        avatarUpdatedAt: new Date(),
+      },
+      select: {
+        id: true,
+        slug: true,
+        avatar: true,
+        avatarUpdatedAt: true,
+      }
+    });
+
+    revalidatePath(`/t/${updated.slug}`);
+    revalidatePath('/my-tolees');
+    revalidatePath('/discover');
+    revalidatePath('/');
+
+    return { success: true, avatar: updated.avatar, slug: updated.slug };
+  } catch (error: any) {
+    console.error('Error updating group avatar:', error);
+    return { success: false, error: error.message || 'Failed to update group avatar' };
+  }
+}
+
+export async function updateGroupCover(
+  toleeId: string, 
+  coverImageUrl: string, 
+  positionX: number = 50, 
+  positionY: number = 50, 
+  publicId?: string
+) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !(session.user as any).id) {
+      return { success: false, error: 'Unauthorized' };
+    }
+    const userId = (session.user as any).id;
+
+    const tolee = await prisma.tolee.findUnique({
+      where: { id: toleeId },
+      select: { id: true, ownerId: true, slug: true, coverImage: true, coverImagePublicId: true }
+    });
+
+    if (!tolee) {
+      return { success: false, error: 'Group not found' };
+    }
+
+    const isOwner = tolee.ownerId === userId;
+    const isSuperAdmin = (session?.user as any)?.role === 'SUPER_ADMIN' || session?.user?.email === process.env.SUPER_ADMIN_EMAIL;
+    const memberRecord = !isOwner ? await prisma.toleeMember.findUnique({
+      where: { userId_toleeId: { userId, toleeId } },
+      select: { role: true, status: true }
+    }) : null;
+    const isAdmin = memberRecord?.status === 'approved' && memberRecord.role === 'admin';
+
+    if (!isOwner && !isAdmin && !isSuperAdmin) {
+      return { success: false, error: 'Only group owners and admins can update the group cover' };
+    }
+
+    const newPublicId = publicId || extractPublicIdFromUrl(coverImageUrl);
+
+    if (tolee.coverImage && tolee.coverImage !== coverImageUrl) {
+      const deleteId = tolee.coverImagePublicId || extractPublicIdFromUrl(tolee.coverImage);
+      if (deleteId) {
+        try {
+          await destroyAsset(deleteId, extractResourceTypeFromUrl(tolee.coverImage));
+        } catch (cleanupErr) {
+          console.warn('Failed to delete old cover asset:', cleanupErr);
+        }
+      }
+    }
+
+    const clampedX = Math.min(100, Math.max(0, positionX));
+    const clampedY = Math.min(100, Math.max(0, positionY));
+
+    const updated = await prisma.tolee.update({
+      where: { id: toleeId },
+      data: {
+        coverImage: coverImageUrl,
+        coverImagePublicId: newPublicId,
+        coverPositionX: clampedX,
+        coverPositionY: clampedY,
+        coverUpdatedAt: new Date(),
+      },
+      select: {
+        id: true,
+        slug: true,
+        coverImage: true,
+        coverPositionX: true,
+        coverPositionY: true,
+      }
+    });
+
+    revalidatePath(`/t/${updated.slug}`);
+    revalidatePath('/my-tolees');
+
+    return { 
+      success: true, 
+      coverImage: updated.coverImage, 
+      coverPositionX: updated.coverPositionX, 
+      coverPositionY: updated.coverPositionY, 
+      slug: updated.slug 
+    };
+  } catch (error: any) {
+    console.error('Error updating group cover:', error);
+    return { success: false, error: error.message || 'Failed to update group cover' };
+  }
+}
+
+export async function updateGroupCoverPosition(toleeId: string, positionX: number, positionY: number) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !(session.user as any).id) {
+      return { success: false, error: 'Unauthorized' };
+    }
+    const userId = (session.user as any).id;
+
+    const tolee = await prisma.tolee.findUnique({
+      where: { id: toleeId },
+      select: { id: true, ownerId: true, slug: true, coverImage: true }
+    });
+
+    if (!tolee) {
+      return { success: false, error: 'Group not found' };
+    }
+
+    const isOwner = tolee.ownerId === userId;
+    const isSuperAdmin = (session?.user as any)?.role === 'SUPER_ADMIN' || session?.user?.email === process.env.SUPER_ADMIN_EMAIL;
+    const memberRecord = !isOwner ? await prisma.toleeMember.findUnique({
+      where: { userId_toleeId: { userId, toleeId } },
+      select: { role: true, status: true }
+    }) : null;
+    const isAdmin = memberRecord?.status === 'approved' && memberRecord.role === 'admin';
+
+    if (!isOwner && !isAdmin && !isSuperAdmin) {
+      return { success: false, error: 'Only group owners and admins can reposition the group cover' };
+    }
+
+    const clampedX = Math.min(100, Math.max(0, positionX));
+    const clampedY = Math.min(100, Math.max(0, positionY));
+
+    const updated = await prisma.tolee.update({
+      where: { id: toleeId },
+      data: {
+        coverPositionX: clampedX,
+        coverPositionY: clampedY,
+      },
+      select: {
+        id: true,
+        slug: true,
+        coverPositionX: true,
+        coverPositionY: true,
+      }
+    });
+
+    revalidatePath(`/t/${updated.slug}`);
+    return { success: true, coverPositionX: updated.coverPositionX, coverPositionY: updated.coverPositionY };
+  } catch (error: any) {
+    console.error('Error updating cover position:', error);
+    return { success: false, error: error.message || 'Failed to reposition group cover' };
+  }
+}
+
+export async function removeGroupCover(toleeId: string) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !(session.user as any).id) {
+      return { success: false, error: 'Unauthorized' };
+    }
+    const userId = (session.user as any).id;
+
+    const tolee = await prisma.tolee.findUnique({
+      where: { id: toleeId },
+      select: { id: true, ownerId: true, slug: true, coverImage: true, coverImagePublicId: true }
+    });
+
+    if (!tolee) {
+      return { success: false, error: 'Group not found' };
+    }
+
+    const isOwner = tolee.ownerId === userId;
+    const isSuperAdmin = (session?.user as any)?.role === 'SUPER_ADMIN' || session?.user?.email === process.env.SUPER_ADMIN_EMAIL;
+    const memberRecord = !isOwner ? await prisma.toleeMember.findUnique({
+      where: { userId_toleeId: { userId, toleeId } },
+      select: { role: true, status: true }
+    }) : null;
+    const isAdmin = memberRecord?.status === 'approved' && memberRecord.role === 'admin';
+
+    if (!isOwner && !isAdmin && !isSuperAdmin) {
+      return { success: false, error: 'Only group owners and admins can remove the cover photo' };
+    }
+
+    if (tolee.coverImage) {
+      const deleteId = tolee.coverImagePublicId || extractPublicIdFromUrl(tolee.coverImage);
+      if (deleteId) {
+        try {
+          await destroyAsset(deleteId, extractResourceTypeFromUrl(tolee.coverImage));
+        } catch (cleanupErr) {
+          console.warn('Failed to delete cover asset:', cleanupErr);
+        }
+      }
+    }
+
+    const updated = await prisma.tolee.update({
+      where: { id: toleeId },
+      data: {
+        coverImage: null,
+        coverImagePublicId: null,
+        coverPositionX: 50,
+        coverPositionY: 50,
+        coverUpdatedAt: new Date(),
+      },
+      select: {
+        id: true,
+        slug: true,
+      }
+    });
+
+    revalidatePath(`/t/${updated.slug}`);
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error removing group cover:', error);
+    return { success: false, error: error.message || 'Failed to remove group cover' };
   }
 }
 

@@ -14,8 +14,13 @@ import {
   Trophy, Users, Calendar, BookOpen, Star, ShieldCheck,
   TrendingUp, PlayCircle, StopCircle, MapPin, Globe, AlertTriangle, Search, Repeat, Store,
   UtensilsCrossed, ShoppingBag, CheckCircle2, Lock,
-  VideoOff, Mic, MicOff, Monitor, Radio, Sparkles, Settings
+  VideoOff, Mic, MicOff, Monitor, Radio, Sparkles, Settings,
+  Camera, Move, Upload, Smartphone, RotateCcw, Trash2
 } from 'lucide-react';
+
+import { GroupAvatarModal } from '@/components/GroupAvatarModal';
+import { updateGroupCover, updateGroupCoverPosition, removeGroupCover } from '@/actions/tolee';
+import { uploadFile } from '@/lib/upload';
 
 import { CreatePostModal } from '@/components/CreatePostModal';
 import { ToleeCOSDashboard } from '@/components/ToleeCOSDashboard';
@@ -58,7 +63,213 @@ import { triggerAuthModal } from '@/components/AuthModal';
 export function ToleeView({ toleeData, currentUserId }: { toleeData: any, currentUserId: string | null }) {
   const { data: session } = useSession();
   const router = useRouter();
-  const { tolee, posts, leaderboard, membershipStatus, role } = toleeData || {};
+  const { posts, leaderboard, membershipStatus, role } = toleeData || {};
+  const [tolee, setTolee] = useState(toleeData?.tolee || {});
+
+  useEffect(() => {
+    if (toleeData?.tolee) {
+      setTolee(toleeData.tolee);
+      setCoverPosition({
+        x: toleeData.tolee.coverPositionX ?? 50,
+        y: toleeData.tolee.coverPositionY ?? 50,
+      });
+    }
+  }, [toleeData?.tolee]);
+
+  // Group DP Edit Modal State
+  const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
+
+  // Group Wall Cover Edit & Reposition State
+  const [coverPosition, setCoverPosition] = useState<{ x: number; y: number }>({
+    x: toleeData?.tolee?.coverPositionX ?? 50,
+    y: toleeData?.tolee?.coverPositionY ?? 50,
+  });
+  const [isRepositioningCover, setIsRepositioningCover] = useState(false);
+  const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [isSavingCover, setIsSavingCover] = useState(false);
+  const [coverFeedback, setCoverFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
+
+  const isDraggingCover = useRef(false);
+  const dragStartPos = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const dragStartPercent = useRef<{ x: number; y: number }>({ x: 50, y: 50 });
+  const coverBannerRef = useRef<HTMLDivElement>(null);
+  const coverFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleCoverMouseDown = (e: React.MouseEvent) => {
+    if (!isRepositioningCover) return;
+    e.preventDefault();
+    isDraggingCover.current = true;
+    dragStartPos.current = { x: e.clientX, y: e.clientY };
+    dragStartPercent.current = { ...coverPosition };
+  };
+
+  const handleCoverMouseMove = (e: React.MouseEvent) => {
+    if (!isRepositioningCover || !isDraggingCover.current || !coverBannerRef.current) return;
+    const rect = coverBannerRef.current.getBoundingClientRect();
+    const deltaX = e.clientX - dragStartPos.current.x;
+    const deltaY = e.clientY - dragStartPos.current.y;
+
+    const percentChangeY = (deltaY / rect.height) * 100;
+    const percentChangeX = (deltaX / rect.width) * 100;
+
+    const newY = Math.min(100, Math.max(0, dragStartPercent.current.y - percentChangeY));
+    const newX = Math.min(100, Math.max(0, dragStartPercent.current.x - percentChangeX));
+
+    setCoverPosition({ x: Math.round(newX), y: Math.round(newY) });
+  };
+
+  const handleCoverMouseUp = () => {
+    isDraggingCover.current = false;
+  };
+
+  const handleCoverTouchStart = (e: React.TouchEvent) => {
+    if (!isRepositioningCover || e.touches.length === 0) return;
+    isDraggingCover.current = true;
+    dragStartPos.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    dragStartPercent.current = { ...coverPosition };
+  };
+
+  const handleCoverTouchMove = (e: React.TouchEvent) => {
+    if (!isRepositioningCover || !isDraggingCover.current || e.touches.length === 0 || !coverBannerRef.current) return;
+    const rect = coverBannerRef.current.getBoundingClientRect();
+    const deltaX = e.touches[0].clientX - dragStartPos.current.x;
+    const deltaY = e.touches[0].clientY - dragStartPos.current.y;
+
+    const percentChangeY = (deltaY / rect.height) * 100;
+    const percentChangeX = (deltaX / rect.width) * 100;
+
+    const newY = Math.min(100, Math.max(0, dragStartPercent.current.y - percentChangeY));
+    const newX = Math.min(100, Math.max(0, dragStartPercent.current.x - percentChangeX));
+
+    setCoverPosition({ x: Math.round(newX), y: Math.round(newY) });
+  };
+
+  const handleCoverTouchEnd = () => {
+    isDraggingCover.current = false;
+  };
+
+  const handleCoverFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setCoverFeedback({ type: 'error', message: 'Unsupported format. Please select JPEG, PNG, or WebP.' });
+      setTimeout(() => setCoverFeedback(null), 4000);
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      setCoverFeedback({ type: 'error', message: 'Image size exceeds 10 MB limit.' });
+      setTimeout(() => setCoverFeedback(null), 4000);
+      return;
+    }
+
+    setCoverFile(file);
+    const preview = URL.createObjectURL(file);
+    setCoverPreviewUrl(preview);
+    setCoverPosition({ x: 50, y: 50 });
+    setIsRepositioningCover(true);
+    if (coverFileInputRef.current) coverFileInputRef.current.value = '';
+  };
+
+  const handleSaveCover = async () => {
+    try {
+      setIsSavingCover(true);
+      setCoverFeedback(null);
+
+      if (coverFile) {
+        const uploadRes = await uploadFile(coverFile);
+        if (!uploadRes?.secure_url) {
+          throw new Error('Failed to upload cover image.');
+        }
+
+        const res = await updateGroupCover(
+          tolee.id, 
+          uploadRes.secure_url, 
+          coverPosition.x, 
+          coverPosition.y, 
+          uploadRes.public_id
+        );
+
+        if (!res.success) {
+          throw new Error(res.error || 'Failed to save cover photo.');
+        }
+
+        setTolee((prev: any) => ({
+          ...prev,
+          banner: uploadRes.secure_url,
+          coverImage: uploadRes.secure_url,
+          coverPositionX: coverPosition.x,
+          coverPositionY: coverPosition.y,
+        }));
+        setCoverFeedback({ type: 'success', message: 'Cover photo updated successfully!' });
+      } else {
+        const res = await updateGroupCoverPosition(tolee.id, coverPosition.x, coverPosition.y);
+        if (!res.success) {
+          throw new Error(res.error || 'Failed to reposition cover photo.');
+        }
+
+        setTolee((prev: any) => ({
+          ...prev,
+          coverPositionX: coverPosition.x,
+          coverPositionY: coverPosition.y,
+        }));
+        setCoverFeedback({ type: 'success', message: 'Cover position saved successfully!' });
+      }
+
+      setIsRepositioningCover(false);
+      setCoverFile(null);
+      setCoverPreviewUrl(null);
+      setTimeout(() => setCoverFeedback(null), 3000);
+    } catch (err: any) {
+      console.error('Error saving cover:', err);
+      setCoverFeedback({ type: 'error', message: err.message || 'Failed to save cover.' });
+      setTimeout(() => setCoverFeedback(null), 5000);
+    } finally {
+      setIsSavingCover(false);
+    }
+  };
+
+  const handleCancelCover = () => {
+    if (coverPreviewUrl) {
+      URL.revokeObjectURL(coverPreviewUrl);
+    }
+    setCoverPreviewUrl(null);
+    setCoverFile(null);
+    setCoverPosition({
+      x: tolee?.coverPositionX ?? 50,
+      y: tolee?.coverPositionY ?? 50,
+    });
+    setIsRepositioningCover(false);
+  };
+
+  const handleRemoveCover = async () => {
+    if (!confirm('Are you sure you want to remove the cover photo?')) return;
+    try {
+      setIsSavingCover(true);
+      const res = await removeGroupCover(tolee.id);
+      if (res.success) {
+        setTolee((prev: any) => ({
+          ...prev,
+          banner: '/default-tolee-cover.svg',
+          coverImage: '',
+          coverPositionX: 50,
+          coverPositionY: 50,
+        }));
+        setCoverPosition({ x: 50, y: 50 });
+        setCoverFeedback({ type: 'success', message: 'Cover photo removed.' });
+        setTimeout(() => setCoverFeedback(null), 3000);
+      } else {
+        alert(res.error || 'Failed to remove cover photo.');
+      }
+    } catch (e) {
+      alert('An error occurred.');
+    } finally {
+      setIsSavingCover(false);
+    }
+  };
   const isOwner = !!(currentUserId && tolee?.ownerId === currentUserId);
   const isSuperAdmin = (session?.user as any)?.role === 'SUPER_ADMIN';
   const isAdmin = role === 'admin' || isOwner || isSuperAdmin;
@@ -1158,15 +1369,195 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
     <div className="min-h-screen bg-[#fafafa] dark:bg-[#0a0a0a] font-sans text-gray-900 dark:text-gray-100 w-full max-w-full overflow-x-hidden">
       {/* Tolee Banner & Header */}
       <div className="w-full bg-white dark:bg-black border-b border-gray-200 dark:border-gray-800">
-        <div className="w-full h-48 md:h-64 relative bg-gray-200 dark:bg-gray-900">
-          <img src={tolee.banner || '/default-tolee-cover.svg'} alt={tolee.name} className="w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
+        
+        {/* Cover Container with Facebook-style Reposition & Upload */}
+        <div 
+          ref={coverBannerRef}
+          onMouseDown={handleCoverMouseDown}
+          onMouseMove={handleCoverMouseMove}
+          onMouseUp={handleCoverMouseUp}
+          onMouseLeave={handleCoverMouseUp}
+          onTouchStart={handleCoverTouchStart}
+          onTouchMove={handleCoverTouchMove}
+          onTouchEnd={handleCoverTouchEnd}
+          className={`w-full relative bg-gray-200 dark:bg-gray-900 overflow-hidden transition-all ${
+            previewDevice === 'mobile' && isRepositioningCover ? 'max-w-md mx-auto h-48 rounded-2xl my-3 border-2 border-teal-500 shadow-2xl' : 'h-48 sm:h-64 md:h-72'
+          } ${isRepositioningCover ? 'cursor-grab active:cursor-grabbing select-none ring-4 ring-teal-500/40' : ''}`}
+        >
+          <img 
+            src={coverPreviewUrl || tolee.banner || tolee.coverImage || '/default-tolee-cover.svg'} 
+            alt={tolee.name} 
+            style={{
+              objectPosition: `${coverPosition.x}% ${coverPosition.y}%`,
+            }}
+            className="w-full h-full object-cover pointer-events-none select-none transition-none" 
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent pointer-events-none" />
+
+          {/* Repositioning Control Bar Overlay */}
+          {isRepositioningCover ? (
+            <div className="absolute top-3 inset-x-3 sm:inset-x-6 z-30 flex flex-wrap items-center justify-between gap-2 bg-black/85 backdrop-blur-md p-2.5 sm:p-3 rounded-2xl border border-white/20 shadow-2xl animate-in fade-in">
+              <div className="flex items-center gap-2 text-white text-xs sm:text-sm font-bold">
+                <Move className="w-4 h-4 text-teal-400 animate-pulse" />
+                <span>Drag image to reposition cover photo</span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {/* Desktop / Mobile Preview Mode Toggle */}
+                <div className="hidden sm:flex items-center bg-white/10 rounded-xl p-0.5 border border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewDevice('desktop')}
+                    className={`p-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 ${previewDevice === 'desktop' ? 'bg-white text-black' : 'text-white hover:text-teal-300'}`}
+                    title="Desktop Preview"
+                  >
+                    <Monitor className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewDevice('mobile')}
+                    className={`p-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 ${previewDevice === 'mobile' ? 'bg-white text-black' : 'text-white hover:text-teal-300'}`}
+                    title="Mobile Safe Area Preview"
+                  >
+                    <Smartphone className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={isSavingCover}
+                  onClick={handleCancelCover}
+                  className="text-white hover:bg-white/20 rounded-xl text-xs font-bold h-8 px-3"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={isSavingCover}
+                  onClick={handleSaveCover}
+                  className="bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl text-xs h-8 px-4 flex items-center gap-1 shadow-md"
+                >
+                  {isSavingCover ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Save Changes</span>
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            /* Edit Cover Button (Facebook-style) */
+            isAdmin && (
+              <div className="absolute bottom-4 right-4 z-20">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button 
+                      size="sm" 
+                      className="bg-black/70 hover:bg-black/90 text-white font-bold text-xs rounded-xl backdrop-blur-md border border-white/20 shadow-lg flex items-center gap-2 h-9 px-3.5 cursor-pointer"
+                    >
+                      <Camera className="w-4 h-4 text-teal-400" />
+                      <span className="hidden sm:inline">Edit Cover Photo</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-52 rounded-2xl p-1.5 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 shadow-xl">
+                    <DropdownMenuItem 
+                      onClick={() => coverFileInputRef.current?.click()}
+                      className="cursor-pointer rounded-xl text-xs font-semibold py-2 flex items-center gap-2"
+                    >
+                      <Upload className="w-4 h-4 text-teal-600" />
+                      <span>Upload Cover Photo</span>
+                    </DropdownMenuItem>
+                    {tolee.coverImage && (
+                      <DropdownMenuItem 
+                        onClick={() => setIsRepositioningCover(true)}
+                        className="cursor-pointer rounded-xl text-xs font-semibold py-2 flex items-center gap-2"
+                      >
+                        <Move className="w-4 h-4 text-indigo-500" />
+                        <span>Reposition Cover Photo</span>
+                      </DropdownMenuItem>
+                    )}
+                    {tolee.coverImage && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem 
+                          onClick={handleRemoveCover}
+                          className="cursor-pointer rounded-xl text-xs font-semibold py-2 flex items-center gap-2 text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/40"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          <span>Remove Cover Photo</span>
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            )
+          )}
+
+          {/* Feedback Toast */}
+          {coverFeedback && (
+            <div className={`absolute bottom-4 left-4 z-30 px-3.5 py-2 rounded-xl text-xs font-bold shadow-xl border animate-in fade-in flex items-center gap-2 ${
+              coverFeedback.type === 'success' 
+                ? 'bg-teal-600 text-white border-teal-500' 
+                : 'bg-red-600 text-white border-red-500'
+            }`}>
+              {coverFeedback.type === 'success' ? <Check className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
+              <span>{coverFeedback.message}</span>
+            </div>
+          )}
         </div>
+
+        {/* Hidden Cover File Input */}
+        <input 
+          ref={coverFileInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          onChange={handleCoverFileSelect}
+          className="hidden"
+        />
         
         <div className="container mx-auto px-4 max-w-6xl">
           <div className="flex flex-col md:flex-row items-start md:items-end gap-6 pb-6 -mt-16 relative z-10 w-full">
-            <div className="w-28 h-28 sm:w-32 sm:h-32 md:w-36 md:h-36 rounded-full border-4 border-white dark:border-[#0a0a0a] overflow-hidden bg-white dark:bg-zinc-900 shadow-xl shrink-0 aspect-square ring-2 ring-black/5 dark:ring-white/10">
-              <img src={tolee.avatar || '/default-tolee-avatar.svg'} alt={tolee.name} className="w-full h-full object-cover object-center rounded-full" />
+            
+            {/* Group DP with Edit Badge */}
+            <div className="relative group">
+              <div 
+                onClick={() => isAdmin && setIsAvatarModalOpen(true)}
+                className={`w-28 h-28 sm:w-32 sm:h-32 md:w-36 md:h-36 rounded-full border-4 border-white dark:border-[#0a0a0a] overflow-hidden bg-white dark:bg-zinc-900 shadow-xl shrink-0 aspect-square ring-2 ring-black/5 dark:ring-white/10 ${
+                  isAdmin ? 'cursor-pointer hover:opacity-95' : ''
+                } relative`}
+              >
+                <img 
+                  src={tolee.avatar || '/default-tolee-avatar.svg'} 
+                  alt={tolee.name} 
+                  className="w-full h-full object-cover object-center rounded-full" 
+                />
+                {isAdmin && (
+                  <div className="absolute inset-0 bg-black/40 rounded-full flex flex-col items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Camera className="w-6 h-6 mb-0.5" />
+                    <span className="text-[10px] font-bold">Edit Picture</span>
+                  </div>
+                )}
+              </div>
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => setIsAvatarModalOpen(true)}
+                  className="absolute bottom-1 right-1 p-2 bg-teal-600 hover:bg-teal-700 text-white rounded-full shadow-lg border-2 border-white dark:border-black transition-transform hover:scale-110 cursor-pointer"
+                  title="Edit Group Profile Picture"
+                >
+                  <Camera className="w-4 h-4" />
+                </button>
+              )}
             </div>
             
             <div className="flex-grow mb-2 min-w-0 w-full">
@@ -3143,6 +3534,21 @@ export function ToleeView({ toleeData, currentUserId }: { toleeData: any, curren
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Group Avatar Crop & Upload Modal */}
+      {tolee?.id && (
+        <GroupAvatarModal
+          isOpen={isAvatarModalOpen}
+          onClose={() => setIsAvatarModalOpen(false)}
+          toleeId={tolee.id}
+          toleeName={tolee.name || 'Group'}
+          currentAvatar={tolee.avatar || '/default-tolee-avatar.svg'}
+          onAvatarUpdated={(newAvatar) => {
+            setTolee((prev: any) => ({ ...prev, avatar: newAvatar }));
+            router.refresh();
+          }}
+        />
+      )}
 
     </div>
   );

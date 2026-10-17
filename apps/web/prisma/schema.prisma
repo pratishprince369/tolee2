@@ -224,8 +224,12 @@ model Tolee {
   description     String?
   avatar          String?
   avatarPublicId  String?
+  avatarUpdatedAt DateTime?
   coverImage      String?
   coverImagePublicId String?
+  coverPositionX  Float?   @default(50)
+  coverPositionY  Float?   @default(50)
+  coverUpdatedAt  DateTime?
   isPrivate       Boolean  @default(false)
   rules           String?
   category        String?
