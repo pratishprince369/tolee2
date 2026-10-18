@@ -75,6 +75,7 @@ public class MainActivity extends BridgeActivity {
     private ValueCallback<Uri[]> mFilePathCallback;
     private GeolocationPermissions.Callback mPendingGeoCallback;
     private String mPendingGeoOrigin;
+    private String mPendingDeepLinkUrl = null;
 
     // Handler and Runnable for scheduled cache clearing every 10 minutes
     private final android.os.Handler mCacheClearHandler = new android.os.Handler(android.os.Looper.getMainLooper());
@@ -158,27 +159,59 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void handleIntent(Intent intent) {
-        if (intent != null) {
-            if (intent.hasExtra("acceptCallId")) {
-                String callId = intent.getStringExtra("acceptCallId");
-                Intent callIntent = new Intent(this, CallActivity.class);
-                callIntent.putExtra("callId", callId);
-                callIntent.putExtra("receiverId", intent.getStringExtra("receiverId"));
-                startActivity(callIntent);
-                return;
-            }
+        if (intent == null) return;
 
-            if (intent.hasExtra("url")) {
-                String url = intent.getStringExtra("url");
-                if (url != null) {
-                    runOnUiThread(() -> {
-                        WebView webView = getBridge().getWebView();
-                        if (webView != null) {
-                            webView.evaluateJavascript("if(window.ToleeNavigate){ window.ToleeNavigate('" + url + "'); } else { window.location.href='" + url + "'; }", null);
-                        }
-                    });
+        if (intent.hasExtra("acceptCallId")) {
+            String callId = intent.getStringExtra("acceptCallId");
+            Intent callIntent = new Intent(this, CallActivity.class);
+            callIntent.putExtra("callId", callId);
+            callIntent.putExtra("receiverId", intent.getStringExtra("receiverId"));
+            startActivity(callIntent);
+            return;
+        }
+
+        String targetUrl = null;
+        if (intent.hasExtra("url")) {
+            targetUrl = intent.getStringExtra("url");
+        } else if (intent.getData() != null) {
+            Uri data = intent.getData();
+            String scheme = data.getScheme();
+            String host = data.getHost();
+            Log.d(TAG, "Deep link intent received: " + data.toString());
+
+            if ("tolee".equalsIgnoreCase(scheme)) {
+                // e.g. tolee://news/... or tolee:///news/...
+                String path = data.getPath();
+                if (path != null && !path.isEmpty()) {
+                    targetUrl = "https://tolee.in" + (path.startsWith("/") ? path : "/" + path);
+                } else if (host != null && !host.isEmpty()) {
+                    targetUrl = "https://tolee.in/" + host;
+                }
+            } else if ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme)) {
+                // e.g. https://www.tolee.in/news/... or https://tolee.in/news/...
+                String path = data.getPath();
+                String query = data.getQuery();
+                if (path != null) {
+                    targetUrl = "https://tolee.in" + path + (query != null && !query.isEmpty() ? "?" + query : "");
+                } else {
+                    targetUrl = "https://tolee.in/";
                 }
             }
+        }
+
+        if (targetUrl != null && !targetUrl.trim().isEmpty()) {
+            final String finalUrl = targetUrl;
+            Log.d(TAG, "Resolved deep link target: " + finalUrl);
+
+            runOnUiThread(() -> {
+                WebView webView = getBridge().getWebView();
+                if (webView != null && isReady) {
+                    webView.loadUrl(finalUrl);
+                } else {
+                    // Queue for navigation when WebView finishes initial load
+                    mPendingDeepLinkUrl = finalUrl;
+                }
+            });
         }
     }
 
@@ -274,6 +307,13 @@ public class MainActivity extends BridgeActivity {
                 CookieManager.getInstance().flush();
                 syncFCMToken();
                 updateSocketUrl(url);
+
+                if (mPendingDeepLinkUrl != null) {
+                    final String deepLink = mPendingDeepLinkUrl;
+                    mPendingDeepLinkUrl = null;
+                    Log.d(TAG, "Navigating to pending deep link after page load: " + deepLink);
+                    view.post(() -> view.loadUrl(deepLink));
+                }
             }
 
             @Override

@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { FollowButton } from '@/components/FollowButton';
 import { NewsShareButton } from '@/components/NewsShareButton';
+import { OpenInAppBanner } from '@/components/OpenInAppBanner';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { PostCarousel } from '@/components/PostCarousel';
@@ -260,6 +261,9 @@ export default async function NewsReaderPage({ params }: { params: { slug: strin
           </Badge>
         </div>
       </div>
+
+      {/* Mobile App Deep Link Smart Banner */}
+      <OpenInAppBanner slug={news.slug} title={news.headline} />
 
       <article className="max-w-[760px] mx-auto px-4 pt-6 space-y-6">
         

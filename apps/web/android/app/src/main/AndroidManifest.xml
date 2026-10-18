@@ -36,6 +36,14 @@
                 <data android:host="www.tolee.in" />
             </intent-filter>
 
+            <!-- Custom scheme support for tolee:// -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="tolee" />
+            </intent-filter>
+
         </activity>
 
         <activity
