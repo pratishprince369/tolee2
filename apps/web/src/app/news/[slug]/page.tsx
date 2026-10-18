@@ -2,15 +2,17 @@ import React from 'react';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { getNewsBySlug } from '@/actions/news';
+import { prisma } from '@/lib/prisma';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { 
-  Calendar, Clock, User, Share2, Bookmark, ArrowLeft, Globe, 
+  Calendar, Clock, User, Bookmark, ArrowLeft, Globe, 
   MessageCircle, Sparkles, HelpCircle, Film, Info, Quote, ChevronRight
 } from 'lucide-react';
 import { FollowButton } from '@/components/FollowButton';
+import { NewsShareButton } from '@/components/NewsShareButton';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { PostCarousel } from '@/components/PostCarousel';
@@ -141,6 +143,29 @@ export default async function NewsReaderPage({ params }: { params: { slug: strin
   const currentUserId = session?.user ? (session.user as any).id : null;
   const isSuperAdmin = session?.user?.email === process.env.SUPER_ADMIN_EMAIL;
   const canEdit = !!(currentUserId && post.authorId && currentUserId === post.authorId);
+  const isOwnArticle = Boolean(currentUserId && post.authorId && currentUserId === post.authorId);
+
+  // Check real follow status from database
+  let initialFollowStatus: 'approved' | 'pending' | null = null;
+  if (currentUserId && post.authorId && !isOwnArticle) {
+    try {
+      const followRecord = await prisma.follow.findUnique({
+        where: {
+          followerId_followingId: {
+            followerId: currentUserId,
+            followingId: post.authorId,
+          }
+        },
+        select: { status: true }
+      });
+      if (followRecord) {
+        initialFollowStatus = (followRecord.status as 'approved' | 'pending') || 'approved';
+      }
+    } catch (followErr) {
+      console.warn('Error checking initial follow status:', followErr);
+    }
+  }
+
   const authorName = post.author?.name || 'Anonymous Creator';
   const authorUsername = post.author?.username || 'anonymous';
   const authorAvatar = post.author?.image || '/default-user-avatar.svg';
@@ -281,10 +306,25 @@ export default async function NewsReaderPage({ params }: { params: { slug: strin
           </div>
 
           <div className="flex items-center gap-2">
-            <FollowButton targetUserId={post.authorId} initialIsFollowing={false} />
-            <Button size="sm" variant="outline" className="rounded-full flex items-center gap-1 text-xs">
-              <Share2 className="w-3.5 h-3.5" /> Share
-            </Button>
+            {!isOwnArticle && post.authorId && (
+              <FollowButton 
+                targetUserId={post.authorId} 
+                targetUsername={authorUsername}
+                initialStatus={initialFollowStatus}
+                initialIsFollowing={initialFollowStatus === 'approved'}
+                size="sm" 
+              />
+            )}
+            <NewsShareButton
+              postId={post.id}
+              slug={news.slug}
+              headline={news.headline}
+              summary={news.summary}
+              mediaUrl={mediaUrl}
+              mediaType={post.mediaTypes}
+              authorName={authorName}
+              authorAvatar={authorAvatar}
+            />
             {canEdit && (
               <Link href={`/news/edit/${post.id}`}>
                 <Button size="sm" variant="outline" className="rounded-full flex items-center gap-1 text-xs font-bold text-teal-600 hover:text-teal-700 hover:bg-teal-50/50 border-teal-200">

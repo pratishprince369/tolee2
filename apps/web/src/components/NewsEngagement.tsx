@@ -125,12 +125,27 @@ export function NewsEngagement({
         console.log('Share canceled or failed', err);
       }
     } else {
-      try {
-        await navigator.clipboard.writeText(shareUrl);
-        alert('Article link copied to clipboard!');
-      } catch (err) {
-        console.error('Failed to copy link', err);
+      let success = false;
+      if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+        try {
+          await navigator.clipboard.writeText(shareUrl);
+          success = true;
+        } catch (_) {}
       }
+      if (!success && typeof document !== 'undefined') {
+        try {
+          const textArea = document.createElement('textarea');
+          textArea.value = shareUrl;
+          textArea.style.position = 'fixed';
+          textArea.style.top = '-999999px';
+          document.body.appendChild(textArea);
+          textArea.select();
+          document.execCommand('copy');
+          document.body.removeChild(textArea);
+          success = true;
+        } catch (_) {}
+      }
+      alert(`Article link copied to clipboard!\n${shareUrl}`);
     }
   };
 
