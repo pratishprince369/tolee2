@@ -782,6 +782,64 @@ export function AIDashboard() {
                   />
                 </div>
               )}
+
+              {/* Interactive Action Card (Open-Higgsfield Video / Image actions) */}
+              {msg.interactiveAction && !msg.interactiveAction.executed && (
+                <div className="pt-1 flex items-center gap-2">
+                  {msg.interactiveAction.type === 'PREVIEW_VIDEO' && (
+                    <Button
+                      size="sm"
+                      onClick={async () => {
+                        const res = await executeConfirmedAIAction('SAVE_REEL_DRAFT', undefined, msg.interactiveAction?.payload);
+                        if (res.success) {
+                          setMessages((prev) =>
+                            prev.map((m) =>
+                              m.id === msg.id
+                                ? {
+                                    ...m,
+                                    text: `${m.text}\n\n✅ **Reel Draft Saved!** Aapke account me private reel draft save ho gaya hai (Draft ID: ${res.draftId}).`,
+                                    interactiveAction: { ...m.interactiveAction!, executed: true },
+                                  }
+                                : m
+                            )
+                          );
+                        }
+                      }}
+                      className="rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold gap-1.5 h-8 shadow-xs"
+                    >
+                      <Share2 className="w-3.5 h-3.5" />
+                      <span>💾 Save as Reel Draft</span>
+                    </Button>
+                  )}
+                  {msg.interactiveAction.type === 'PREVIEW_IMAGE' && (
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setMessages((prev) =>
+                          prev.map((m) =>
+                            m.id === msg.id
+                              ? {
+                                  ...m,
+                                  approvalPayload: {
+                                    actionType: 'PUBLISH_POST',
+                                    title: 'Publish Creative to Feed',
+                                    description: 'Confirm publishing this AI creative to your public Tolee feed.',
+                                    summary: msg.interactiveAction?.payload?.caption,
+                                    data: msg.interactiveAction?.payload,
+                                  },
+                                }
+                              : m
+                          )
+                        );
+                      }}
+                      className="rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold gap-1.5 h-8 shadow-xs"
+                    >
+                      <Share2 className="w-3.5 h-3.5" />
+                      <span>🚀 Review & Publish to Feed</span>
+                    </Button>
+                  )}
+                </div>
+              )}
             </div>
           ))}
 

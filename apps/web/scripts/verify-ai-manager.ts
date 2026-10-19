@@ -1,7 +1,7 @@
 /**
- * Tolee AI Manager Advanced Verification Test Suite V3
+ * Tolee AI Manager Advanced Verification Test Suite (V3 + Open-Higgsfield Media Integration)
  * Validates Agent Loop, Tools, Prompts, Approvals, Memory, Safety Rules,
- * Paid Ads Double Confirmation, and Batch Group Posting
+ * Paid Ads Double Confirmation, Batch Group Posting, and Open-Higgsfield AI Image/Video Generation.
  */
 
 import { ToolRegistry } from '../src/modules/tolee-ai-agent/tools/registry';
@@ -10,10 +10,15 @@ import { classifyIntelligenceIntent } from '../src/modules/tolee-ai-manager/Core
 import { ToleeRealityValidator } from '../src/lib/ai-gateway/reality-validator';
 import { ApprovalEngine } from '../src/modules/tolee-ai-agent/approvals/approval-engine';
 import { AgentOrchestrator } from '../src/modules/tolee-ai-agent/core/agent-orchestrator';
+import {
+  OpenHiggsfieldMediaService,
+  OPEN_HIGGSFIELD_MODELS,
+} from '../src/modules/tolee-ai-agent/media/generation-service';
 
 async function runTests() {
   console.log('====================================================');
-  console.log('🧪 TOLEE AI MANAGER — ADVANCED VERIFICATION TEST SUITE V3');
+  console.log('🧪 TOLEE AI MANAGER — ADVANCED VERIFICATION TEST SUITE');
+  console.log('🎬 OPEN-HIGGSFIELD AI IMAGE & VIDEO INTEGRATION');
   console.log('====================================================\n');
 
   let passed = 0;
@@ -34,7 +39,7 @@ async function runTests() {
   // ----------------------------------------------------
   console.log('--- TEST GROUP 1: Tool Registry & Canonical Schemas ---');
   const allTools = ToolRegistry.getAll();
-  assert(allTools.length >= 20, `ToolRegistry should register >= 20 tools (Found: ${allTools.length})`);
+  assert(allTools.length >= 25, `ToolRegistry should register >= 25 tools (Found: ${allTools.length})`);
 
   const requiredToolNames = [
     // Standard names
@@ -58,7 +63,14 @@ async function runTests() {
     'save_user_memory',
     'forget_user_memory',
     'cancel_active_task',
-    // Logical dot-notation aliases (Section 4)
+    // Open-Higgsfield Generative Media tools
+    'generate_ai_image',
+    'generate_ai_video',
+    'get_media_generation_status',
+    'list_my_generations',
+    'cancel_generation',
+    'save_media_as_reel_draft',
+    // Logical dot-notation aliases
     'content.create_post',
     'content.delete_post',
     'content.get_post_status',
@@ -75,6 +87,12 @@ async function runTests() {
     'memory.search',
     'memory.save',
     'memory.forget',
+    'media.generate_image',
+    'media.generate_video',
+    'media.get_generation_status',
+    'media.list_my_generations',
+    'media.cancel_generation',
+    'reels.create_draft',
   ];
 
   for (const name of requiredToolNames) {
@@ -108,7 +126,7 @@ async function runTests() {
   assert(prompt.includes('Prompt-injection defence'), 'Prompt includes anti-injection defense (Rule S-4)');
 
   // ----------------------------------------------------
-  // TEST 3: Supporting Prompts (Section 12)
+  // TEST 3: Supporting Prompts
   // ----------------------------------------------------
   console.log('\n--- TEST GROUP 3: Supporting Prompts ---');
   const intentPrompt = SUPPORTING_PROMPTS.INTENT_ROUTER('Roz subah ek post schedule karo');
@@ -121,11 +139,12 @@ async function runTests() {
   assert(safetyPrompt.includes('Check this draft post against Tolee community guidelines'), 'Safety classifier prompt is active');
 
   // ----------------------------------------------------
-  // TEST 4: Intent Classification & Routing
+  // TEST 4: Intent Classification & Routing (Including Video)
   // ----------------------------------------------------
   console.log('\n--- TEST GROUP 4: Intent Classification ---');
   assert(classifyIntelligenceIntent('write a python script to scrape data') === 'coding', 'Detects coding intent');
   assert(classifyIntelligenceIntent('generate an image of a cybernetic tiger') === 'image_generation', 'Detects image generation intent');
+  assert(classifyIntelligenceIntent('Mere real estate project ke liye cinematic property video banao') === 'video_generation', 'Detects video generation intent');
   assert(classifyIntelligenceIntent('what is the capital of India?') === 'general_chat', 'Detects general chat intent');
 
   // ----------------------------------------------------
@@ -164,16 +183,13 @@ async function runTests() {
   assert(Boolean(approval1.id && approval1.payloadHash), 'ApprovalEngine creates approval with unique ID and payload hash');
   assert(approval1.state === 'pending', 'New approval starts in pending state');
 
-  // Test 6.1: Cross-user authorization boundary
   const crossUserFetch = ApprovalEngine.getApproval(approval1.id, userB);
   assert(!crossUserFetch.success, 'Rejects approval lookup belonging to another user');
 
-  // Test 6.2: Tamper Protection
   const tamperedPayload = { caption: 'Malicious modified caption!', visibility: 'public' };
   const tamperResult = ApprovalEngine.approve(approval1.id, userA, tamperedPayload);
   assert(!tamperResult.success, 'Editing an approved payload invalidates the approval request');
 
-  // Test 6.3: Valid Approval and Double Execution Prevention
   const approval2 = ApprovalEngine.createApproval({
     userId: userA,
     actionType: 'PUBLISH_POST',
@@ -226,6 +242,54 @@ async function runTests() {
 
   const tiersResult = await adOptionsTool!.execute({}, { userId: 'user_ad_test' });
   assert(tiersResult.success && Array.isArray(tiersResult.data) && tiersResult.data.length >= 3, 'Returns official boost tiers with pricing and reach');
+
+  // ----------------------------------------------------
+  // TEST 9: Open-Higgsfield AI Image & Video Studio
+  // ----------------------------------------------------
+  console.log('\n--- TEST GROUP 9: Open-Higgsfield Generative Media Studio ---');
+
+  // 9.1: Model Catalog
+  assert(OPEN_HIGGSFIELD_MODELS.length >= 8, `Open-Higgsfield catalog registers >= 8 verified models (Found: ${OPEN_HIGGSFIELD_MODELS.length})`);
+  const imageModel = OpenHiggsfieldMediaService.getModel('flux-schnell', 'image');
+  assert(imageModel.displayName.includes('Flux'), 'Resolves premier Flux Schnell image model');
+  const videoModel = OpenHiggsfieldMediaService.getModel('seedance-2.5-text-to-video', 'video');
+  assert(videoModel.displayName.includes('Seedance'), 'Resolves premier Seedance 2.5 Cinema video model');
+
+  // 9.2: Real Image Generation (Draft Mode)
+  const imageGenTask = await OpenHiggsfieldMediaService.generateImage({
+    userId: userA,
+    prompt: 'Luxury modern villa with warm ambient lighting at sunset, 8k resolution',
+    modelId: 'flux-schnell',
+    aspectRatio: '16:9',
+  });
+
+  assert(imageGenTask.status === 'completed', 'Image generation completes successfully');
+  assert(imageGenTask.outputUrls.length > 0 && imageGenTask.outputUrls[0].startsWith('http'), 'Returns valid output URL for generated image');
+  assert(imageGenTask.type === 'image' && imageGenTask.userId === userA, 'Maintains user ownership of generated image');
+
+  // 9.3: Real Video Generation (Draft Mode)
+  const videoGenTask = await OpenHiggsfieldMediaService.generateVideo({
+    userId: userA,
+    prompt: 'Cinematic drone tracking shot over a modern luxury villa poolside',
+    modelId: 'seedance-2.5-text-to-video',
+    duration: 5,
+    aspectRatio: '16:9',
+  });
+
+  assert(videoGenTask.status === 'completed', 'Video generation completes successfully');
+  assert(videoGenTask.outputUrls.length > 0 && videoGenTask.outputUrls[0].includes('.mp4'), 'Returns playable MP4 video URL');
+  assert(videoGenTask.type === 'video' && videoGenTask.duration === 5, 'Enforces requested duration parameter');
+
+  // 9.4: Cross-user generation privacy protection
+  const foreignFetch = OpenHiggsfieldMediaService.getTask(videoGenTask.taskId, userB);
+  assert(foreignFetch === null, 'Rejects cross-user access to another user\'s media generation task');
+
+  const ownFetch = OpenHiggsfieldMediaService.getTask(videoGenTask.taskId, userA);
+  assert(ownFetch !== null && ownFetch.taskId === videoGenTask.taskId, 'Authorizes media lookup for authenticated owner');
+
+  // 9.5: Generation History Listing
+  const userHistory = OpenHiggsfieldMediaService.listUserTasks(userA);
+  assert(userHistory.length >= 2, `Generations history retrieves all user drafts (Found: ${userHistory.length})`);
 
   console.log('\n====================================================');
   console.log(`📊 TEST RESULTS: ${passed} PASSED, ${failed} FAILED`);

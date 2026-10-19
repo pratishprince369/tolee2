@@ -28,6 +28,14 @@ import {
   forgetUserMemoryTool,
   cancelActiveTaskTool,
 } from './v3-tools';
+import {
+  generateImageTool,
+  generateVideoTool,
+  getGenerationStatusTool,
+  listMyGenerationsTool,
+  cancelGenerationTool,
+  saveMediaAsReelDraftTool,
+} from './media-tools';
 
 export class ToolRegistry {
   private static tools: Map<string, ToolDefinition> = new Map();
@@ -66,13 +74,21 @@ export class ToolRegistry {
     this.register(forgetUserMemoryTool);
     this.register(cancelActiveTaskTool);
 
+    // Register Open-Higgsfield Generative Media Tools
+    this.register(generateImageTool);
+    this.register(generateVideoTool);
+    this.register(getGenerationStatusTool);
+    this.register(listMyGenerationsTool);
+    this.register(cancelGenerationTool);
+    this.register(saveMediaAsReelDraftTool);
+
     // Register canonical & standard aliases
     this.register({ ...sendMessageTool, name: 'send_message' });
     this.register({ ...createPostTool, name: 'create_post' });
     this.register({ ...createReminderTool, name: 'create_reminder' });
     this.register({ ...deletePostTool, name: 'delete_post' });
 
-    // Logical dot-notation aliases (Section 4)
+    // Logical dot-notation aliases (Section 4 & Open-Higgsfield)
     this.register({ ...createPostTool, name: 'content.create_post' });
     this.register({ ...getUserPostsTool, name: 'content.get_post_status' });
     this.register({ ...deletePostTool, name: 'content.delete_post' });
@@ -90,6 +106,12 @@ export class ToolRegistry {
     this.register({ ...searchUserMemoryTool, name: 'memory.search' });
     this.register({ ...saveUserMemoryTool, name: 'memory.save' });
     this.register({ ...forgetUserMemoryTool, name: 'memory.forget' });
+    this.register({ ...generateImageTool, name: 'media.generate_image' });
+    this.register({ ...generateVideoTool, name: 'media.generate_video' });
+    this.register({ ...getGenerationStatusTool, name: 'media.get_generation_status' });
+    this.register({ ...listMyGenerationsTool, name: 'media.list_my_generations' });
+    this.register({ ...cancelGenerationTool, name: 'media.cancel_generation' });
+    this.register({ ...saveMediaAsReelDraftTool, name: 'reels.create_draft' });
   }
 
   public static register(tool: ToolDefinition) {

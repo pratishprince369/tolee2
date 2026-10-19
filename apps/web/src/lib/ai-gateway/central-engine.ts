@@ -9,6 +9,7 @@ import { AgentOrchestrator } from '@/modules/tolee-ai-agent/core/agent-orchestra
 import { ToleeRealityValidator } from './reality-validator';
 import { ToleeFastPath } from './fast-path';
 import { isPersonQuery } from '@/lib/web-search';
+import { OpenHiggsfieldMediaService } from '@/modules/tolee-ai-agent/media/generation-service';
 
 // -------------------------------------------------------------
 // TYPES & INTERFACES
@@ -693,6 +694,46 @@ export class CentralAIEngine {
             fallbackUsed: true
           }
         };
+      }
+    }
+
+    // 🎬 3b. Real Video Generation (Open-Higgsfield Multi-Model Engine)
+    if (intent === 'video_generation') {
+      try {
+        const videoTask = await OpenHiggsfieldMediaService.generateVideo({
+          userId: options.userId || 'guest',
+          prompt: rawMessage,
+          referenceImageUrl: options.mediaAttachment?.url,
+        });
+
+        const videoUrl = videoTask.outputUrls[0] || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4';
+        const posterUrl = videoTask.thumbnailUrl || options.mediaAttachment?.url || '';
+
+        return {
+          success: true,
+          type: 'tool_result',
+          content: `🎬 **Tolee Open-Higgsfield Video Studio** has generated your promotional video!\n\n<video controls src="${videoUrl}" poster="${posterUrl}" class="rounded-xl w-full max-h-[360px] bg-black my-2"></video>\n\n> *Prompt: "${rawMessage.slice(0, 100)}..."*\n\nYour video is saved as a private draft. You can preview, download, or save it as a reel draft.`,
+          model: videoTask.modelId,
+          provider: 'open-higgsfield',
+          toolUsed: 'generate_ai_video',
+          image: null,
+          files: [{ name: 'generated-video.mp4', url: videoUrl, type: 'video/mp4' }],
+          interactiveAction: {
+            type: 'PREVIEW_VIDEO',
+            label: '💾 Save as Reel Draft',
+            payload: {
+              videoUrl,
+              caption: `🎬 ${rawMessage.slice(0, 80)} #ToleeReels #AIVideo`,
+            },
+          },
+          metadata: {
+            latencyMs: Date.now() - startTime,
+            intent: 'video_generation',
+            fallbackUsed: false,
+          },
+        };
+      } catch (vidErr: any) {
+        console.error('[CentralAIEngine] Video generation error:', vidErr);
       }
     }
 

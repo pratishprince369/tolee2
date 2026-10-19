@@ -171,6 +171,27 @@ function FormattedTextChunk({ text, isAI }: { text: string; isAI: boolean }) {
           );
         }
 
+        // Markdown image: ![alt](url)
+        const imgMatch = trimmed.match(/^!\[(.*?)\]\((.*?)\)$/);
+        if (imgMatch) {
+          return (
+            <div key={idx} className="my-2.5 rounded-2xl overflow-hidden border border-slate-200 dark:border-zinc-800 shadow-md max-w-lg bg-black/5 dark:bg-black/30">
+              <img src={imgMatch[2]} alt={imgMatch[1] || 'Generated Visual'} className="w-full h-auto object-cover max-h-[420px] rounded-2xl" loading="lazy" />
+            </div>
+          );
+        }
+
+        // HTML Video: <video ... src="..." ...></video>
+        const videoMatch = trimmed.match(/<video[^>]*src=["'](.*?)["'][^>]*>/i);
+        if (videoMatch) {
+          const posterMatch = trimmed.match(/poster=["'](.*?)["']/i);
+          return (
+            <div key={idx} className="my-2.5 rounded-2xl overflow-hidden border border-slate-800 bg-black shadow-md max-w-lg">
+              <video src={videoMatch[1]} poster={posterMatch ? posterMatch[1] : undefined} controls className="w-full h-auto max-h-[380px] rounded-2xl" />
+            </div>
+          );
+        }
+
         // Regular paragraph line
         return (
           <p key={idx} className="leading-relaxed">

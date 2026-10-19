@@ -741,6 +741,23 @@ export async function executeConfirmedAIAction(
       };
     }
 
+    if (action === 'SAVE_REEL_DRAFT') {
+      const videoUrl = payload?.videoUrl;
+      const caption = payload?.caption || 'AI Generated Reel Draft';
+      const draft = await prisma.post.create({
+        data: {
+          authorId: userId,
+          caption,
+          mediaUrls: videoUrl,
+          mediaTypes: 'video',
+          postType: 'reel',
+          visibility: 'private',
+          status: 'draft',
+        },
+      });
+      return { success: true, message: 'Reel draft successfully saved!', draftId: draft.id };
+    }
+
     return { success: false, error: `Unsupported AI action type: ${action}` };
   } catch (error: any) {
     console.error('Error executing confirmed AI action:', error);

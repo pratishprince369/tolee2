@@ -22,6 +22,7 @@ export type AIModuleIntent =
   | 'news'
   | 'settings'
   | 'image_generation'
+  | 'video_generation'
   | 'coding'
   | 'reasoning'
   | 'general_chat';
@@ -29,6 +30,7 @@ export type AIModuleIntent =
 export type GeneralAIIntent = 
   | 'platform_action'
   | 'image_generation'
+  | 'video_generation'
   | 'coding'
   | 'reasoning'
   | 'document_analysis'
@@ -87,6 +89,23 @@ export function classifyIntelligenceIntent(input: string, hasMedia: boolean = fa
 
   if (isReasoning) {
     return 'reasoning';
+  }
+
+  // 4b. AI Video Generation (Open-Higgsfield Engine)
+  const explicitVideoKeywords = [
+    'generate video', 'create video', 'make video', 'video banao',
+    'video generate karo', 'cinematic video', 'convert to video',
+    'image to video', 'text to video', 'reel video', 'promotional video',
+    'property video', 'video generate', 'ai video', 'reel banao',
+    'रील बनाओ', 'वीडियो बनाओ', 'वीडियो जनरेट करो'
+  ];
+
+  const hasExplicitVideoIntent =
+    explicitVideoKeywords.some((k) => query.includes(k)) ||
+    (query.includes('video') && (query.includes('generate') || query.includes('create') || query.includes('banao') || query.includes('convert') || query.includes('render')));
+
+  if (hasExplicitVideoIntent) {
+    return 'video_generation';
   }
 
   // 5. Image & Visual Generation (Strict Disambiguation)

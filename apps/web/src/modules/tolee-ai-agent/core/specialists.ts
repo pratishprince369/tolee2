@@ -58,8 +58,18 @@ export const TOLEE_SPECIALISTS: Record<SpecialistId, SpecialistDefinition> = {
     name: 'Tolee Creative Studio & Content Writer',
     role: 'High-Impact Visual & Copywriting Specialist',
     description: 'Creates marketing banners, high-converting social copy, video concepts, and graphic blueprints.',
-    instructions: `You are Tolee Content Creator. Craft compelling, viral, and culturally resonant captions and creative prompts for Indian and global audiences.`,
-    allowedTools: ['create_tolee_post', 'tolee_songs_catalog'],
+    instructions: `You are Tolee Content Creator and Open-Higgsfield Visual Specialist. Create high-impact, viral visual creatives, photorealistic images, and cinematic video concepts. Keep all outputs as private drafts until user explicitly approves publishing.`,
+    allowedTools: [
+      'generate_ai_image',
+      'generate_ai_video',
+      'get_media_generation_status',
+      'list_my_generations',
+      'save_media_as_reel_draft',
+      'media.generate_image',
+      'media.generate_video',
+      'create_tolee_post',
+      'tolee_songs_catalog',
+    ],
     temperature: 0.6,
     maxTokens: 1536,
     category: 'creative',
@@ -176,8 +186,8 @@ export class ToleeSpecialistRegistry {
       return TOLEE_SPECIALISTS.developer_agent;
     }
 
-    // 2. Creative / Design / Video
-    if (text.includes('banner') || text.includes('poster') || text.includes('video') || text.includes('reel') || text.includes('design') || text.includes('thumbnail')) {
+    // 2. Creative / Image / Video / Reel
+    if (text.includes('banner') || text.includes('poster') || text.includes('video') || text.includes('reel') || text.includes('image') || text.includes('photo') || text.includes('creative') || text.includes('design') || text.includes('thumbnail')) {
       return TOLEE_SPECIALISTS.content_creator;
     }
 
