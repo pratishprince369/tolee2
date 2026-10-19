@@ -35,6 +35,8 @@ export function MainLayoutWrapper({
 }: MainLayoutWrapperProps) {
   const pathname = usePathname();
   const isReels = pathname?.startsWith('/reels') || pathname?.startsWith('/reel');
+  const isAIManager = pathname?.startsWith('/ai-manager');
+  const isWorkspace = isReels || isAIManager;
   const hideMobileHeader = isMobileHeaderHiddenRoute(pathname);
 
   const isChat = pathname?.startsWith('/chat');
@@ -42,11 +44,11 @@ export function MainLayoutWrapper({
   return (
     <div className={cn(
       "flex flex-1 w-full relative",
-      isReels ? "p-0 m-0 h-[100dvh] overflow-hidden" : (isChat || !isAuthenticated ? "pb-0" : "pb-16 lg:pb-0"),
-      isReels ? "pt-0" : (hideMobileHeader ? "pt-0 md:pt-16" : "pt-14 sm:pt-16")
+      isWorkspace ? "p-0 m-0 h-[100dvh] overflow-hidden" : (isChat || !isAuthenticated ? "pb-0" : "pb-16 lg:pb-0"),
+      isWorkspace ? "pt-0" : (hideMobileHeader ? "pt-0 md:pt-16" : "pt-14 sm:pt-16")
     )}>
-      {!isReels && sidebar}
-      <div className={cn("flex-grow w-full min-w-0 overflow-x-clip", !isReels && isAuthenticated && "lg:pl-64")}>
+      {!isWorkspace && sidebar}
+      <div className={cn("flex-grow w-full min-w-0 overflow-x-clip", !isWorkspace && isAuthenticated && "lg:pl-64")}>
         {children}
       </div>
     </div>
