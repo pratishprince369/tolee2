@@ -4,6 +4,7 @@ import { CentralAIEngine } from '@/lib/ai-gateway/central-engine';
 import { ToleeRealityValidator } from '@/lib/ai-gateway/reality-validator';
 import { ToleeSpecialistRegistry, SpecialistId } from './specialists';
 import { buildMasterSystemPrompt } from '@/modules/tolee-ai-manager/Core/prompt-manager';
+import { ApprovalEngine } from '../approvals/approval-engine';
 
 const NVIDIA_API_KEYS = [
   process.env.NVIDIA_API_KEY,
@@ -46,6 +47,21 @@ export class AgentOrchestrator {
     specialistId?: SpecialistId;
   }> {
     const { userMessage, conversationHistory = [], context, specialistId } = options;
+
+    // 🛑 Section 11: Instant Cancellation & Recovery Handler ("ruko", "cancel", "mat karo")
+    const lowerMsg = (userMessage || '').trim().toLowerCase();
+    const isCancellation = /^(ruko|ruk jao|cancel|mat karo|stop|abort|don't do it|wait stop|nahi karna|kuch mat karo)\b/i.test(lowerMsg);
+    if (isCancellation) {
+      const cancelledCount = ApprovalEngine.cancelPendingForUser(context.userId);
+      return {
+        replyText: cancelledCount > 0
+          ? `Maine aapki ${cancelledCount} pending actions ko cancel kar diya hai. Koi unapproved change feed ya database me nahi kiya gaya.`
+          : 'Samajh gaya! Maine sab stop kar diya hai. Koi action execute nahi hua.',
+        executedTool: 'cancel_active_task',
+        toolData: { cancelledCount },
+      };
+    }
+
     const specialist = specialistId
       ? ToleeSpecialistRegistry.get(specialistId)
       : ToleeSpecialistRegistry.routeSpecialist(userMessage);

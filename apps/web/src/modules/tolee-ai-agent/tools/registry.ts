@@ -17,6 +17,17 @@ import {
   calendarAssistantTool,
   emailAssistantTool,
 } from './extended-tools';
+import {
+  postToGroupsTool,
+  getAdOptionsTool,
+  createAdCampaignTool,
+  updateProfileBioTool,
+  deletePostTool,
+  searchUserMemoryTool,
+  saveUserMemoryTool,
+  forgetUserMemoryTool,
+  cancelActiveTaskTool,
+} from './v3-tools';
 
 export class ToolRegistry {
   private static tools: Map<string, ToolDefinition> = new Map();
@@ -44,10 +55,41 @@ export class ToolRegistry {
     this.register(calendarAssistantTool);
     this.register(emailAssistantTool);
 
-    // Register canonical aliases
+    // Register V3 Agentic Tools
+    this.register(postToGroupsTool);
+    this.register(getAdOptionsTool);
+    this.register(createAdCampaignTool);
+    this.register(updateProfileBioTool);
+    this.register(deletePostTool);
+    this.register(searchUserMemoryTool);
+    this.register(saveUserMemoryTool);
+    this.register(forgetUserMemoryTool);
+    this.register(cancelActiveTaskTool);
+
+    // Register canonical & standard aliases
     this.register({ ...sendMessageTool, name: 'send_message' });
     this.register({ ...createPostTool, name: 'create_post' });
     this.register({ ...createReminderTool, name: 'create_reminder' });
+    this.register({ ...deletePostTool, name: 'delete_post' });
+
+    // Logical dot-notation aliases (Section 4)
+    this.register({ ...createPostTool, name: 'content.create_post' });
+    this.register({ ...getUserPostsTool, name: 'content.get_post_status' });
+    this.register({ ...deletePostTool, name: 'content.delete_post' });
+    this.register({ ...getToleeGroupsTool, name: 'groups.list_my_groups' });
+    this.register({ ...postToGroupsTool, name: 'groups.post_to_groups' });
+    this.register({ ...getLatestMessagesTool, name: 'chats.list_conversations' });
+    this.register({ ...sendMessageTool, name: 'chats.send_message' });
+    this.register({ ...getAdOptionsTool, name: 'ads.get_options' });
+    this.register({ ...createAdCampaignTool, name: 'ads.create_campaign' });
+    this.register({ ...createAdCampaignTool, name: 'ads.boost_post' });
+    this.register({ ...getUserProfileTool, name: 'profile.get' });
+    this.register({ ...updateProfileBioTool, name: 'profile.update_bio' });
+    this.register({ ...getScheduleTool, name: 'tasks.get_status' });
+    this.register({ ...cancelActiveTaskTool, name: 'tasks.cancel' });
+    this.register({ ...searchUserMemoryTool, name: 'memory.search' });
+    this.register({ ...saveUserMemoryTool, name: 'memory.save' });
+    this.register({ ...forgetUserMemoryTool, name: 'memory.forget' });
   }
 
   public static register(tool: ToolDefinition) {

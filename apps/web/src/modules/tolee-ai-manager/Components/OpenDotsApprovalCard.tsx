@@ -8,7 +8,7 @@ import {
 import { Button } from '@/components/ui/button';
 
 export interface ActionApprovalPayload {
-  actionType: 'PUBLISH_POST' | 'SEND_EMAIL' | 'SEND_WHATSAPP' | 'CREATE_AD' | 'DELETE_POST' | 'NAVIGATE';
+  actionType: 'PUBLISH_POST' | 'POST_TO_GROUPS' | 'SEND_EMAIL' | 'SEND_WHATSAPP' | 'CREATE_AD' | 'DELETE_POST' | 'UPDATE_BIO' | 'NAVIGATE' | string;
   title: string;
   description: string;
   target?: string;
@@ -46,6 +46,10 @@ export function OpenDotsApprovalCard({
         return { icon: <MessageSquare className="w-3.5 h-3.5 text-emerald-500" />, label: 'WhatsApp Action', border: 'border-emerald-500/20 bg-emerald-500/5' };
       case 'PUBLISH_POST':
         return { icon: <Share2 className="w-3.5 h-3.5 text-violet-500" />, label: 'Feed Publish', border: 'border-violet-500/20 bg-violet-500/5' };
+      case 'POST_TO_GROUPS':
+        return { icon: <Share2 className="w-3.5 h-3.5 text-indigo-500" />, label: 'Batch Group Publish', border: 'border-indigo-500/20 bg-indigo-500/5' };
+      case 'UPDATE_BIO':
+        return { icon: <CheckCircle2 className="w-3.5 h-3.5 text-sky-500" />, label: 'Profile Bio Update', border: 'border-sky-500/20 bg-sky-500/5' };
       case 'CREATE_AD':
         return { icon: <DollarSign className="w-3.5 h-3.5 text-amber-500" />, label: 'Ad Campaign Spend', border: 'border-amber-500/20 bg-amber-500/5' };
       case 'DELETE_POST':

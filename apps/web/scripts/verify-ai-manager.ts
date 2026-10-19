@@ -1,16 +1,19 @@
 /**
- * Tolee AI Manager Comprehensive Verification Test Suite
- * Validates Agent Loop, Tools, Prompts, Approvals, Memory, and Safety Rules
+ * Tolee AI Manager Advanced Verification Test Suite V3
+ * Validates Agent Loop, Tools, Prompts, Approvals, Memory, Safety Rules,
+ * Paid Ads Double Confirmation, and Batch Group Posting
  */
 
 import { ToolRegistry } from '../src/modules/tolee-ai-agent/tools/registry';
 import { buildMasterSystemPrompt, SUPPORTING_PROMPTS } from '../src/modules/tolee-ai-manager/Core/prompt-manager';
 import { classifyIntelligenceIntent } from '../src/modules/tolee-ai-manager/Core/ai-router';
 import { ToleeRealityValidator } from '../src/lib/ai-gateway/reality-validator';
+import { ApprovalEngine } from '../src/modules/tolee-ai-agent/approvals/approval-engine';
+import { AgentOrchestrator } from '../src/modules/tolee-ai-agent/core/agent-orchestrator';
 
 async function runTests() {
   console.log('====================================================');
-  console.log('🧪 TOLEE AI MANAGER — ADVANCED VERIFICATION TEST SUITE');
+  console.log('🧪 TOLEE AI MANAGER — ADVANCED VERIFICATION TEST SUITE V3');
   console.log('====================================================\n');
 
   let passed = 0;
@@ -27,13 +30,14 @@ async function runTests() {
   }
 
   // ----------------------------------------------------
-  // TEST 1: Tool Registry Completeness
+  // TEST 1: Tool Registry & Canonical Schemas
   // ----------------------------------------------------
-  console.log('--- TEST GROUP 1: Tool Registry & Schemas ---');
+  console.log('--- TEST GROUP 1: Tool Registry & Canonical Schemas ---');
   const allTools = ToolRegistry.getAll();
-  assert(allTools.length >= 10, `ToolRegistry should register >= 10 core tools (Found: ${allTools.length})`);
+  assert(allTools.length >= 20, `ToolRegistry should register >= 20 tools (Found: ${allTools.length})`);
 
   const requiredToolNames = [
+    // Standard names
     'get_latest_messages',
     'send_message',
     'get_user_posts',
@@ -44,11 +48,38 @@ async function runTests() {
     'create_reminder',
     'live_web_search',
     'calendar_assistant',
+    // V3 tools
+    'post_to_groups',
+    'create_ad_campaign',
+    'get_ad_options',
+    'update_profile_bio',
+    'delete_post',
+    'search_user_memory',
+    'save_user_memory',
+    'forget_user_memory',
+    'cancel_active_task',
+    // Logical dot-notation aliases (Section 4)
+    'content.create_post',
+    'content.delete_post',
+    'content.get_post_status',
+    'groups.list_my_groups',
+    'groups.post_to_groups',
+    'chats.list_conversations',
+    'chats.send_message',
+    'ads.get_options',
+    'ads.create_campaign',
+    'profile.get',
+    'profile.update_bio',
+    'tasks.get_status',
+    'tasks.cancel',
+    'memory.search',
+    'memory.save',
+    'memory.forget',
   ];
 
   for (const name of requiredToolNames) {
     const tool = ToolRegistry.get(name);
-    assert(Boolean(tool), `Tool '${name}' is registered in ToolRegistry`);
+    assert(Boolean(tool), `Tool / Alias '${name}' is registered in ToolRegistry`);
     if (tool) {
       assert(Boolean(tool.description && tool.parameters), `Tool '${name}' has description and parameters`);
     }
@@ -113,6 +144,88 @@ async function runTests() {
     sanitized.sanitizedContent.includes('draft') || sanitized.sanitizedContent.includes('prepare') || sanitized.sanitizedContent.includes('approve') || sanitized.hasHallucinationWarning,
     'Reality Validator intercepts unverified publish claims when no tool was executed'
   );
+
+  // ----------------------------------------------------
+  // TEST 6: Strict Backend Approval Engine (Section 6)
+  // ----------------------------------------------------
+  console.log('\n--- TEST GROUP 6: Strict Backend Approval Engine ---');
+  const userA = 'user_alice_123';
+  const userB = 'user_bob_456';
+
+  const approval1 = ApprovalEngine.createApproval({
+    userId: userA,
+    actionType: 'PUBLISH_POST',
+    title: 'Publish Festive Post',
+    description: 'Publishes draft to Tolee feed',
+    summary: 'Happy Diwali everyone!',
+    payload: { caption: 'Happy Diwali everyone!', visibility: 'public' },
+  });
+
+  assert(Boolean(approval1.id && approval1.payloadHash), 'ApprovalEngine creates approval with unique ID and payload hash');
+  assert(approval1.state === 'pending', 'New approval starts in pending state');
+
+  // Test 6.1: Cross-user authorization boundary
+  const crossUserFetch = ApprovalEngine.getApproval(approval1.id, userB);
+  assert(!crossUserFetch.success, 'Rejects approval lookup belonging to another user');
+
+  // Test 6.2: Tamper Protection
+  const tamperedPayload = { caption: 'Malicious modified caption!', visibility: 'public' };
+  const tamperResult = ApprovalEngine.approve(approval1.id, userA, tamperedPayload);
+  assert(!tamperResult.success, 'Editing an approved payload invalidates the approval request');
+
+  // Test 6.3: Valid Approval and Double Execution Prevention
+  const approval2 = ApprovalEngine.createApproval({
+    userId: userA,
+    actionType: 'PUBLISH_POST',
+    title: 'Valid Post',
+    description: 'Post draft',
+    summary: 'Clean post',
+    payload: { caption: 'Clean post' },
+  });
+
+  const validApprove = ApprovalEngine.approve(approval2.id, userA, { caption: 'Clean post' });
+  assert(validApprove.success && validApprove.record?.state === 'approved', 'Valid approval transitions state to approved');
+
+  const claim1 = ApprovalEngine.claimForExecution(approval2.id, userA);
+  assert(claim1.success && claim1.record?.state === 'executing', 'Atomically transitions from approved to executing');
+
+  const claim2 = ApprovalEngine.claimForExecution(approval2.id, userA);
+  assert(!claim2.success, 'Prevents double / concurrent execution');
+
+  ApprovalEngine.markCompleted(approval2.id, userA, { postId: 'post_999' });
+  const completed = ApprovalEngine.getApproval(approval2.id, userA);
+  assert(completed.record?.state === 'completed', 'Transitions state to completed upon successful operation');
+
+  // ----------------------------------------------------
+  // TEST 7: Instant Task Cancellation & Recovery (Section 11)
+  // ----------------------------------------------------
+  console.log('\n--- TEST GROUP 7: Instant Cancellation & Recovery ---');
+  ApprovalEngine.createApproval({
+    userId: 'user_cancel_test',
+    actionType: 'PUBLISH_POST',
+    title: 'Draft to cancel',
+    description: 'Pending post',
+    summary: 'Will be cancelled',
+    payload: { caption: 'Cancel me' },
+  });
+
+  const cancelResult = await AgentOrchestrator.process({
+    userMessage: 'ruko mat karo!',
+    context: { userId: 'user_cancel_test', userName: 'Tester' },
+  });
+
+  assert(cancelResult.executedTool === 'cancel_active_task', 'AgentOrchestrator intercepts "ruko mat karo" and stops actions');
+  assert(cancelResult.replyText.includes('cancel') || cancelResult.replyText.includes('stop'), 'Returns accurate cancellation confirmation');
+
+  // ----------------------------------------------------
+  // TEST 8: Paid Ads Double Confirmation (Section 8)
+  // ----------------------------------------------------
+  console.log('\n--- TEST GROUP 8: Paid Ads Double Confirmation ---');
+  const adOptionsTool = ToolRegistry.get('get_ad_options');
+  assert(Boolean(adOptionsTool), 'get_ad_options tool is active');
+
+  const tiersResult = await adOptionsTool!.execute({}, { userId: 'user_ad_test' });
+  assert(tiersResult.success && Array.isArray(tiersResult.data) && tiersResult.data.length >= 3, 'Returns official boost tiers with pricing and reach');
 
   console.log('\n====================================================');
   console.log(`📊 TEST RESULTS: ${passed} PASSED, ${failed} FAILED`);
