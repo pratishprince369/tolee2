@@ -910,23 +910,34 @@ export function AIDashboard() {
                 </button>
               </div>
 
-              {/* Assistant Profile: Mascot Avatar & Name "Tolee" */}
+              {/* Assistant Profile: Animated Mascot Avatar & Name "Tolee" */}
               <div className="flex flex-col items-center text-center space-y-2">
-                <div className="relative">
-                  {/* Mascot Image Avatar Container */}
-                  <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-teal-400/20 via-emerald-400/10 to-teal-500/20 p-1 shadow-md border-2 border-white dark:border-zinc-800 overflow-hidden flex items-center justify-center bg-white dark:bg-zinc-800">
+                <div className="relative group cursor-pointer pt-2">
+                  {/* Soft Pulsing Radial Glow */}
+                  <div className="absolute inset-0 bg-gradient-to-tr from-teal-500/25 via-emerald-400/20 to-teal-400/25 rounded-full blur-xl opacity-75 group-hover:opacity-100 animate-pulse transition-opacity" />
+
+                  {/* Mascot Floating & Waving Stage */}
+                  <div className="relative w-24 h-24 sm:w-28 sm:h-28 flex items-center justify-center">
                     <img
                       src="/tolee-ai-avatar.png"
-                      alt="Tolee"
-                      className="w-full h-full object-contain hover:scale-105 transition-transform"
+                      alt="Tolee Mascot"
+                      className="w-full h-full object-contain filter drop-shadow-[0_8px_16px_rgba(20,184,166,0.25)] select-none animate-tolee-mascot-idle hover:scale-105 transition-transform"
                     />
+
+                    {/* Hi / Waving Badge */}
+                    <span className="absolute -top-1 -right-1 text-sm bg-white dark:bg-zinc-800 border border-teal-200 dark:border-teal-800 shadow-sm rounded-full px-1.5 py-0.5 animate-tolee-hi select-none">
+                      👋
+                    </span>
+
+                    {/* Ground Pedestal Shadow */}
+                    <div className="absolute -bottom-1 w-16 h-2 bg-black/10 dark:bg-white/10 rounded-full blur-[2px] animate-tolee-shadow" />
                   </div>
 
                   {/* Edit Pencil Icon Badge */}
                   <button
                     title="Customize Tolee AI Manager personality"
                     onClick={() => alert('Customizing Tolee AI Manager personality & prompts...')}
-                    className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-300 flex items-center justify-center shadow-xs hover:scale-105 transition-transform"
+                    className="absolute bottom-1 right-1 w-6 h-6 rounded-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-300 flex items-center justify-center shadow-xs hover:scale-110 transition-transform z-10"
                   >
                     <Pencil className="w-3 h-3" />
                   </button>
@@ -934,9 +945,12 @@ export function AIDashboard() {
 
                 {/* Name "Tolee" & Live Status */}
                 <div>
-                  <h3 className="font-extrabold text-base text-slate-900 dark:text-white">Tolee</h3>
+                  <h3 className="font-extrabold text-base text-slate-900 dark:text-white flex items-center justify-center gap-1">
+                    <span>Tolee</span>
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500 fill-amber-500 animate-bounce" />
+                  </h3>
                   <div className="flex items-center justify-center gap-1.5 text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
                     <span className="font-semibold text-[11px] text-teal-600 dark:text-teal-400">Personal AI Manager</span>
                   </div>
                 </div>
@@ -1133,6 +1147,77 @@ export function AIDashboard() {
         );
       })()}
 
+      {/* Scoped CSS Keyframe Animations for Tolee Mascot */}
+      <style jsx global>{`
+        @keyframes toleeMascotIdle {
+          0%, 100% {
+            transform: translateY(0px) rotate(0deg) scale(1);
+          }
+          20% {
+            transform: translateY(-6px) rotate(-4deg) scale(1.02);
+          }
+          40% {
+            transform: translateY(-1px) rotate(3deg) scale(1.01);
+          }
+          60% {
+            transform: translateY(-7px) rotate(-3deg) scale(1.03);
+          }
+          80% {
+            transform: translateY(-2px) rotate(2deg) scale(1.01);
+          }
+        }
+
+        @keyframes toleeShadow {
+          0%, 100% {
+            transform: scale(1);
+            opacity: 0.28;
+          }
+          20%, 60% {
+            transform: scale(0.82);
+            opacity: 0.12;
+          }
+          40%, 80% {
+            transform: scale(0.95);
+            opacity: 0.22;
+          }
+        }
+
+        @keyframes toleeHiWave {
+          0%, 100% {
+            transform: rotate(0deg) translateY(0);
+          }
+          15% {
+            transform: rotate(24deg) translateY(-3px) scale(1.1);
+          }
+          30% {
+            transform: rotate(-12deg) translateY(-2px);
+          }
+          45% {
+            transform: rotate(22deg) translateY(-3px) scale(1.1);
+          }
+          60% {
+            transform: rotate(-8deg) translateY(-1px);
+          }
+          75% {
+            transform: rotate(14deg) translateY(-2px);
+          }
+        }
+
+        .animate-tolee-mascot-idle {
+          animation: toleeMascotIdle 3.6s ease-in-out infinite;
+          transform-origin: center bottom;
+        }
+
+        .animate-tolee-shadow {
+          animation: toleeShadow 3.6s ease-in-out infinite;
+          transform-origin: center center;
+        }
+
+        .animate-tolee-hi {
+          animation: toleeHiWave 2.4s ease-in-out infinite;
+          transform-origin: 70% 70%;
+        }
+      `}</style>
     </div>
   );
 }
