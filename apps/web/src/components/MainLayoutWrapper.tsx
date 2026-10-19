@@ -48,7 +48,7 @@ export function MainLayoutWrapper({
       isWorkspace ? "pt-0" : (hideMobileHeader ? "pt-0 md:pt-16" : "pt-14 sm:pt-16")
     )}>
       {!isWorkspace && sidebar}
-      <div className={cn("flex-grow w-full min-w-0 overflow-x-clip", !isWorkspace && isAuthenticated && "lg:pl-64")}>
+      <div className={cn("flex-grow w-full min-w-0 overflow-x-clip", isWorkspace ? "h-full flex flex-col" : (isAuthenticated && "lg:pl-64"))}>
         {children}
       </div>
     </div>

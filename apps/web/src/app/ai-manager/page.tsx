@@ -14,7 +14,9 @@ export default function AIManagerPage() {
         </div>
       }
     >
-      <AIDashboard />
+      <div className="w-full h-full flex flex-col">
+        <AIDashboard />
+      </div>
     </Suspense>
   );
 }

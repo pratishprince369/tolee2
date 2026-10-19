@@ -104,8 +104,8 @@ export function BottomNav() {
     { name: 'Profile', href: '/u/me', isAvatar: true },
   ];
 
-  // Hide bottom nav strictly on Reels routes per Tolee Viral Control specification
-  if (pathname?.startsWith('/reels') || pathname?.startsWith('/reel')) {
+  // Hide bottom nav strictly on Reels & AI Manager workspace routes per mobile UX specification
+  if (pathname?.startsWith('/reels') || pathname?.startsWith('/reel') || pathname?.startsWith('/ai-manager')) {
     return null;
   }
 

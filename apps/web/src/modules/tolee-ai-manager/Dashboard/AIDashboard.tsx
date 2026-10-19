@@ -573,7 +573,7 @@ export function AIDashboard() {
       {/* ========================================================= */}
       {/* 3. CENTER MAIN CHAT CANVAS                                 */}
       {/* ========================================================= */}
-      <main className="flex-1 flex flex-col h-full bg-white dark:bg-[#0c0d10] relative min-w-0">
+      <main className="flex-1 flex flex-col h-full bg-white dark:bg-[#0c0d10] relative min-w-0 overflow-hidden">
         
         {/* Top Header Bar (Desktop & Mobile) */}
         <header className="h-14 shrink-0 border-b border-slate-200/80 dark:border-zinc-800/80 px-3 sm:px-6 flex items-center justify-between bg-white/80 dark:bg-[#0c0d10]/80 backdrop-blur-md z-10">
@@ -648,7 +648,7 @@ export function AIDashboard() {
         </header>
 
         {/* Chat Feed */}
-        <div className="flex-1 overflow-y-auto px-3 sm:px-8 py-4 sm:py-6 space-y-4 sm:space-y-6 max-w-3xl mx-auto w-full">
+        <div className="flex-1 overflow-y-auto min-h-0 px-3 sm:px-8 py-3 sm:py-6 space-y-3 sm:space-y-6 max-w-3xl mx-auto w-full">
           
           {messages.map((msg) => (
             <div key={msg.id} className="space-y-3">
@@ -857,7 +857,7 @@ export function AIDashboard() {
         {/* ========================================================= */}
         {/* BOTTOM FLOATING INPUT DOCK (Mobile & Desktop)             */}
         {/* ========================================================= */}
-        <div className="p-2.5 sm:p-6 bg-gradient-to-t from-white via-white/95 to-transparent dark:from-[#0c0d10] dark:via-[#0c0d10]/95 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+        <div className="shrink-0 w-full p-2.5 sm:p-6 bg-gradient-to-t from-white via-white/95 to-transparent dark:from-[#0c0d10] dark:via-[#0c0d10]/95 pb-[calc(0.75rem+env(safe-area-inset-bottom))] z-20">
           <div className="max-w-3xl mx-auto relative bg-[#f4f5f7] dark:bg-[#17181d] border border-slate-200/90 dark:border-zinc-800/90 rounded-2xl shadow-xs transition-all focus-within:border-teal-500 focus-within:ring-2 focus-within:ring-teal-500/20">
             <div className="flex items-center px-2.5 sm:px-3.5 py-1.5 sm:py-2 gap-1.5 sm:gap-2">
               
