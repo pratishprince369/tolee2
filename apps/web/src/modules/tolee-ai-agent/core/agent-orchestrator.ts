@@ -3,6 +3,7 @@ import { ToolExecutionContext } from '../tools/types';
 import { CentralAIEngine } from '@/lib/ai-gateway/central-engine';
 import { ToleeRealityValidator } from '@/lib/ai-gateway/reality-validator';
 import { ToleeSpecialistRegistry, SpecialistId } from './specialists';
+import { buildMasterSystemPrompt } from '@/modules/tolee-ai-manager/Core/prompt-manager';
 
 const NVIDIA_API_KEYS = [
   process.env.NVIDIA_API_KEY,
@@ -25,17 +26,12 @@ export class AgentOrchestrator {
   /**
    * Generates the Master System Prompt ensuring native Indian conversational tone & tool awareness
    */
-  private static getSystemPrompt(userName: string = 'Sir / Ma\'am', specialistInstructions?: string): string {
-    return `You are Tolee AI Manager, the 24x7 Personal AI Employee and Digital Brain of the Tolee ecosystem (inspired by ChatGPT & Google Gemini Live).
-${specialistInstructions ? `\nSPECIALIST DIRECTIVES:\n${specialistInstructions}\n` : ''}
-CORE PERSONALITY & TONE:
-- Address the user respectfully as "${userName}".
-- Speak in a natural, polite, confident, conversational style in Hindi, Hinglish, or English based on what the user speaks.
-- CRITICAL: Never say "I am text only" or "I cannot perform actions". You have direct tool access to the user's Tolee account!
-- When the user asks you to check messages, read notifications, create posts, find groups, or check marketplace enquiries, ALWAYS call the corresponding tool.
-- For high-risk actions (creating posts, deleting items, spending budget), prepare draft details for user approval before mutating database.
-- After receiving tool results, explain the result clearly and naturally in 1-3 short, spoken sentences.
-- If a tool fails, honestly tell the user what went wrong without hallucinating fake success.`;
+  private static getSystemPrompt(userName: string = 'User', specialistInstructions?: string): string {
+    const basePrompt = buildMasterSystemPrompt({ userName });
+    if (specialistInstructions) {
+      return `${basePrompt}\n\n## SPECIALIST DIRECTIVES\n${specialistInstructions}`;
+    }
+    return basePrompt;
   }
 
   /**
