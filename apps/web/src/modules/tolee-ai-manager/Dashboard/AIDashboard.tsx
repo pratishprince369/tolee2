@@ -8,26 +8,11 @@ import {
   Lightbulb, LayoutGrid, FileSpreadsheet, Menu, X, Plus, Mic, MicOff,
   Send, MoreHorizontal, ArrowUp, ThumbsUp, ThumbsDown, Copy,
   Check, ExternalLink, Globe, Shield, Clock, Fingerprint,
-  Pencil, ChevronRight, Share2, UserPlus, Sparkle
+  Pencil, ChevronRight, Share2, UserPlus, Sparkle, PanelLeft
 } from 'lucide-react';
-import { DailySummaryGrid } from '../Components/DailySummaryGrid';
-import { VoiceInputDock } from '../Components/VoiceInputDock';
-import { FloatingVoiceHUD } from '../VoiceCompanion/FloatingVoiceHUD';
-import { DailyPlanner } from '../Personal/DailyPlanner';
-import { AICalendar } from '../Calendar/AICalendar';
-import { AITasks } from '../Tasks/AITasks';
-import { AICRM } from '../CRM/AICRM';
-import { AICommunity } from '../Community/AICommunity';
-import { AINews } from '../News/AINews';
-import { AIMemorySettings } from '../Settings/AIMemorySettings';
-import { AIFinance } from '../Finance/AIFinance';
-import { AIBirthdays } from '../Personal/AIBirthdays';
-import { OpenWorkAgentWorkspace } from '../Components/OpenWorkAgentWorkspace';
 import { AIMessageRenderer } from '../Components/AIMessageRenderer';
 import { OpenDotsApprovalCard } from '../Components/OpenDotsApprovalCard';
-import { PooledBrowserEngine } from '@/lib/ai-gateway/pooled-engine';
 import { getAIDashboardSummary, processAIPersonalMessage, executeConfirmedAIAction } from '@/actions/ai-manager';
-import { createPost } from '@/actions/post';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 
@@ -38,16 +23,7 @@ export type AIModuleTab =
   | 'ideas'
   | 'tasks'
   | 'tools'
-  | 'reports'
-  | 'openwork'
-  | 'planner'
-  | 'calendar'
-  | 'crm'
-  | 'community'
-  | 'news'
-  | 'settings'
-  | 'finance'
-  | 'birthdays';
+  | 'reports';
 
 interface Message {
   id: string;
@@ -89,141 +65,81 @@ interface ChatThread {
 }
 
 function formatTime(d: Date = new Date()) {
-  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase();
+  return d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase();
 }
 
 export function AIDashboard() {
   const { data: session } = useSession();
   const [activeNavIcon, setActiveNavIcon] = useState<AIModuleTab>('chat');
   const [activeThreadId, setActiveThreadId] = useState<string>('main');
+  
+  // Desktop panel state
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(true);
   const [rightPanelTab, setRightPanelTab] = useState<'tasks' | 'safety' | 'history' | 'memory'>('tasks');
+  
+  // Mobile responsive drawer states
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const [isMobileActivityOpen, setIsMobileActivityOpen] = useState(false);
+
   const [inputMessage, setInputMessage] = useState('');
   const [searchThreadQuery, setSearchThreadQuery] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
 
-  // Chat threads (Matching Muse.ai left panel)
-  const [threads, setThreads] = useState<ChatThread[]>([
-    { id: 'side_1', title: 'Find UK job opportunities', lastMessageTime: '11:40 pm' },
-    { id: 'side_2', title: 'Diwali viral reel campaign', lastMessageTime: '10:14 pm' },
-    { id: 'side_3', title: 'Competitor social media scan', lastMessageTime: 'Yesterday' }
-  ]);
+  // 1. CHAT THREADS: Blank by default for 1st-time users!
+  const [threads, setThreads] = useState<ChatThread[]>([]);
 
-  // Initial messages matching the exact conversational vibe and browser card from the screenshot
+  // 2. MESSAGES: Friendly clean welcome on 1st visit
   const [messages, setMessages] = useState<Message[]>([
     {
-      id: 'init_browser_1',
+      id: 'welcome_1',
       sender: 'Tolee AI Manager',
-      text: '',
+      text: `Namaste! 👋 Main aapka 24×7 Tolee AI Personal Manager hoon.\n\nAap mujhse Tolee posts banana, reels script, creative design, web search, schedule karna, ya koi bhi sawaal pooch sakte hain.\n\nBataiye, aaj main aapki kya madad karoon?`,
       isAI: true,
-      time: '11:38 pm',
-      browserCard: {
-        title: 'Find a job — UK Government Service',
-        url: 'https://findajob.dwp.gov.uk/search?q=digital+marketing+remote',
-        snippet: 'Browsing active sponsored and remote marketing listings on official portal...'
-      }
-    },
-    {
-      id: 'init_msg_1',
-      sender: 'Tolee AI Manager',
-      text: `Shortlist taiyaar hai — **4 strong remote roles** mile hain, aur applications abhi shuru kar di hain! 🎉\n\nJin par apply ho raha hai:\n\n1. **Gurobi Optimization** — Director of Marketing (EMEA Remote) — tumhare 12+ saal ke leadership + SEO/SEM background se excellent match\n2. **Canonical** — Marketing Manager (Remote, EMEA & Americas) — remote-first company, demand-gen/GTM role\n3. **Canonical** — Senior Marketing Automation Manager (Remote, EMEA) — thoda automation-focused, but worth trying\n4. **Melotech** — Head of Performance Marketing/CMO (Remote, London) — Google/Meta/YouTube Ads exactly tumhari expertise\n\n> 💡 **Honest note:** 8 aur UK-remote roles mile the, lekin sab ne "UK right to work / UK-based" manga — tumhare sponsorship case me fit nahi hote, isliye unhe chhod diya. UK government ki site par koi suitable senior role nahi mila. Aur ek caveat: Gurobi/Canonical ne India se hiring explicitly confirm nahi ki hai, lekin koi UK-only restriction bhi nahi hai — isliye tumhari approval par apply kar raha hun.\n\nBrowser abhi ek-ek karke applications bhar raha hai (CV upload ke saath). Har application ka confirmation aate hi tumhe bataunga. Agar kahin sign-in ya koi specific sawaal aaya to main tumse pooch lunga!`,
-      isAI: true,
-      time: '11:40 pm'
+      time: formatTime()
     }
   ]);
 
   const [isLoading, setIsLoading] = useState(false);
   const [publishingActionId, setPublishingActionId] = useState<string | null>(null);
-  const [summaryData, setSummaryData] = useState({
-    pendingTasksCount: 0,
-    remindersCount: 0,
-    memoriesCount: 0,
-    myGroupsCount: 0,
-    tasks: [],
-    reminders: [],
-    myGroups: []
-  });
 
-  // Today's Activity timeline (Matching the Muse.ai right panel in the screenshot)
-  const [activities, setActivities] = useState<ActivityItem[]>([
-    {
-      id: 'act_1',
-      title: 'Shortlist UK sponsorship roles',
-      subtitle: 'Shortlisted sponsorship and remote roles',
-      time: '11:37 pm',
-      completed: true
-    },
-    {
-      id: 'act_2',
-      title: 'Update UK move plan',
-      subtitle: 'Saved UK move plan and visa notes',
-      time: '11:36 pm',
-      completed: true
-    },
-    {
-      id: 'act_3',
-      title: 'Update memory with visa note',
-      subtitle: 'Updated sponsorship note for UK and worldwide roles',
-      time: '11:35 pm',
-      completed: true
-    },
-    {
-      id: 'act_4',
-      title: 'Research sponsorship visa requirements',
-      subtitle: 'Added Skilled Worker sponsorship requirement for UK employment',
-      time: '11:34 pm',
-      completed: true
-    },
-    {
-      id: 'act_5',
-      title: 'Search remote digital marketing roles',
-      subtitle: 'Added immediate availability, kept visa pending',
-      time: '11:33 pm',
-      completed: true
-    },
-    {
-      id: 'act_6',
-      title: 'Search remote digital marketing jobs',
-      subtitle: 'Saved UK remote digital marketing job search',
-      time: '11:30 pm',
-      completed: true
-    },
-    {
-      id: 'act_7',
-      title: 'Schedule daily creative posts',
-      subtitle: 'Scheduled daily creative posts for 10:14 IST',
-      time: '10:10 pm',
-      completed: true
-    },
-    {
-      id: 'act_8',
-      title: 'Confirm daily creative posting schedule',
-      subtitle: 'Scheduled daily creative post for @lok_times369',
-      time: '10:05 pm',
-      completed: true
-    }
-  ]);
+  // 3. TODAY'S ACTIVITIES: Blank by default for 1st-time users!
+  const [activities, setActivities] = useState<ActivityItem[]>([]);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // Load saved threads & activities from localStorage for returning users
   useEffect(() => {
-    loadSummary();
+    try {
+      const savedThreads = localStorage.getItem('tolee_ai_threads');
+      if (savedThreads) {
+        const parsed = JSON.parse(savedThreads);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setThreads(parsed);
+        }
+      }
+
+      const savedActs = localStorage.getItem('tolee_ai_activities');
+      if (savedActs) {
+        const parsed = JSON.parse(savedActs);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setActivities(parsed);
+        }
+      }
+
+      const savedMsgs = localStorage.getItem('tolee_ai_messages');
+      if (savedMsgs) {
+        const parsed = JSON.parse(savedMsgs);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setMessages(parsed);
+        }
+      }
+    } catch (_) {}
   }, []);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
-
-  const loadSummary = async () => {
-    try {
-      const res = await getAIDashboardSummary();
-      if (res.success && res.summary) {
-        setSummaryData(res.summary as any);
-      }
-    } catch (_) {}
-  };
 
   const handleSendMessage = async (textToSend: string) => {
     const text = textToSend.trim();
@@ -237,25 +153,48 @@ export function AIDashboard() {
       time: formatTime()
     };
 
-    setMessages((prev) => [...prev, userMsg]);
+    const updatedMessages = [...messages, userMsg];
+    setMessages(updatedMessages);
     setInputMessage('');
     setIsLoading(true);
 
-    // Add activity log item
+    // If first message in this thread, add thread to Left side history!
+    const threadTitle = text.length > 28 ? text.substring(0, 28) + '...' : text;
+    setThreads((prev) => {
+      const exists = prev.some((t) => t.id === activeThreadId);
+      let updated: ChatThread[];
+      if (exists) {
+        updated = prev.map((t) => (t.id === activeThreadId ? { ...t, lastMessageTime: formatTime() } : t));
+      } else {
+        updated = [{ id: activeThreadId === 'main' ? `thread_${Date.now()}` : activeThreadId, title: threadTitle, lastMessageTime: formatTime() }, ...prev];
+      }
+      try {
+        localStorage.setItem('tolee_ai_threads', JSON.stringify(updated));
+      } catch (_) {}
+      return updated;
+    });
+
+    // Add activity to Right side timeline!
     const newAct: ActivityItem = {
       id: `act_${Date.now()}`,
-      title: text.length > 32 ? text.substring(0, 32) + '...' : text,
-      subtitle: 'Executing personal assistant request',
+      title: threadTitle,
+      subtitle: 'Executing personal assistant command',
       time: formatTime(),
       completed: false
     };
-    setActivities((prev) => [newAct, ...prev]);
+    setActivities((prev) => {
+      const updated = [newAct, ...prev];
+      try {
+        localStorage.setItem('tolee_ai_activities', JSON.stringify(updated));
+      } catch (_) {}
+      return updated;
+    });
 
     try {
       const clientISO = new Date().toISOString();
       const timeZone = typeof window !== 'undefined' && window.Intl ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'Asia/Kolkata';
 
-      const recentHistory = messages.slice(-10).map((m) => ({
+      const recentHistory = updatedMessages.slice(-10).map((m) => ({
         role: m.isAI ? 'assistant' : 'user',
         content: m.text
       }));
@@ -263,7 +202,7 @@ export function AIDashboard() {
       const result = await processAIPersonalMessage(text, recentHistory, clientISO, timeZone);
       const aiText = (result as any).response || (result as any).reply || 'Task processed successfully.';
 
-      // Check if browsing query to render browser preview card
+      // Check if browsing query to render browser card
       const isSearchOrBrowse = /search|browse|jobs|check|price|competitor/i.test(text);
 
       const aiMsg: Message = {
@@ -277,27 +216,33 @@ export function AIDashboard() {
         browserCard: isSearchOrBrowse ? {
           title: `Web Research: ${text}`,
           url: `https://tolee.in/search?q=${encodeURIComponent(text)}`,
-          snippet: 'Browsed relevant sources and extracted verified findings...'
+          snippet: 'Browsed live information and verified source data...'
         } : undefined
       };
 
-      setMessages((prev) => [...prev, aiMsg]);
+      const finalMessages = [...updatedMessages, aiMsg];
+      setMessages(finalMessages);
+      try {
+        localStorage.setItem('tolee_ai_messages', JSON.stringify(finalMessages.slice(-50)));
+      } catch (_) {}
 
-      // Mark activity as completed
-      setActivities((prev) =>
-        prev.map((a) => (a.id === newAct.id ? { ...a, completed: true, subtitle: 'Completed and verified' } : a))
-      );
+      // Mark activity as completed on right panel
+      setActivities((prev) => {
+        const updated = prev.map((a) => (a.id === newAct.id ? { ...a, completed: true, subtitle: 'Completed & verified' } : a));
+        try {
+          localStorage.setItem('tolee_ai_activities', JSON.stringify(updated));
+        } catch (_) {}
+        return updated;
+      });
     } catch (err: any) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `err_${Date.now()}`,
-          sender: 'Tolee AI Manager',
-          text: 'Maaf kijiye, main abhi request poori nahi kar paya. Kripya thodi der baad dobara koshish karein.',
-          isAI: true,
-          time: formatTime()
-        }
-      ]);
+      const errMsg: Message = {
+        id: `err_${Date.now()}`,
+        sender: 'Tolee AI Manager',
+        text: 'Maaf kijiye, main abhi request poori nahi kar paya. Kripya thodi der baad dobara koshish karein.',
+        isAI: true,
+        time: formatTime()
+      };
+      setMessages((prev) => [...prev, errMsg]);
     } finally {
       setIsLoading(false);
     }
@@ -311,22 +256,17 @@ export function AIDashboard() {
 
   const handleCreateNewThread = () => {
     const newId = `thread_${Date.now()}`;
-    const newThread: ChatThread = {
-      id: newId,
-      title: `New task ${threads.length + 1}`,
-      lastMessageTime: formatTime()
-    };
-    setThreads((prev) => [newThread, ...prev]);
     setActiveThreadId(newId);
     setMessages([
       {
         id: `init_${Date.now()}`,
         sender: 'Tolee AI Manager',
-        text: 'Naya task shuru hua hai! 👋 Bataiye aaj kya kaam karwana hai? Main research, content writing, post scheduling ya web browsing sab sambhal lunga.',
+        text: 'Naya conversation shuru hua! 👋 Bataiye aaj kya kaam karna hai?',
         isAI: true,
         time: formatTime()
       }
     ]);
+    setIsMobileNavOpen(false);
   };
 
   const filteredThreads = threads.filter((t) =>
@@ -334,25 +274,24 @@ export function AIDashboard() {
   );
 
   return (
-    <div className="flex w-full h-[100dvh] bg-white dark:bg-[#0c0d10] text-slate-800 dark:text-zinc-100 overflow-hidden select-text font-sans">
+    <div className="flex w-full h-[100dvh] bg-white dark:bg-[#0c0d10] text-slate-800 dark:text-zinc-100 overflow-hidden font-sans relative">
       
       {/* ========================================================= */}
-      {/* 1. FAR-LEFT NARROW ICON NAVIGATION DOCK (Matching Muse)    */}
+      {/* 1. FAR-LEFT NARROW ICON NAVIGATION DOCK (Desktop)          */}
       {/* ========================================================= */}
-      <aside className="w-14 sm:w-16 shrink-0 bg-white dark:bg-[#121317] border-r border-slate-200/80 dark:border-zinc-800/80 flex flex-col items-center justify-between py-3 z-30">
+      <aside className="hidden md:flex w-14 sm:w-16 shrink-0 bg-white dark:bg-[#121317] border-r border-slate-200/80 dark:border-zinc-800/80 flex-col items-center justify-between py-3 z-30">
         
         {/* Top Icons */}
         <div className="flex flex-col items-center gap-4 w-full">
           {/* Brand Logo / Return to Tolee */}
           <Link
             href="/feed"
-            title="Tolee Social Feed par wapas jayein"
+            title="Tolee Feed par wapas jayein"
             className="w-9 h-9 rounded-xl bg-gradient-to-tr from-teal-500 to-emerald-600 text-white flex items-center justify-center font-black text-base shadow-sm hover:opacity-90 transition-opacity mb-2"
           >
             t
           </Link>
 
-          {/* Navigation Icon List */}
           <button
             onClick={() => setActiveNavIcon('chat')}
             title="Main Chat"
@@ -366,75 +305,36 @@ export function AIDashboard() {
           </button>
 
           <button
-            onClick={() => setActiveNavIcon('search')}
+            onClick={() => {
+              setActiveNavIcon('search');
+              handleSendMessage('Trending topics and breaking news search karo');
+            }}
             title="Search Web & Tolee"
-            className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
-              activeNavIcon === 'search'
-                ? 'bg-slate-100 dark:bg-zinc-800 text-slate-900 dark:text-white'
-                : 'text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-900'
-            }`}
+            className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-900 transition-all"
           >
             <Search className="w-4 h-4" />
           </button>
 
           <button
-            onClick={() => setActiveNavIcon('documents')}
-            title="Documents & Files"
-            className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
-              activeNavIcon === 'documents'
-                ? 'bg-slate-100 dark:bg-zinc-800 text-slate-900 dark:text-white'
-                : 'text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-900'
-            }`}
-          >
-            <FileText className="w-4 h-4" />
-          </button>
-
-          <button
-            onClick={() => setActiveNavIcon('ideas')}
+            onClick={() => {
+              setActiveNavIcon('ideas');
+              handleSendMessage('Viral reel ideas aur post scripts banao');
+            }}
             title="Creator Ideas & Reels"
-            className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
-              activeNavIcon === 'ideas'
-                ? 'bg-slate-100 dark:bg-zinc-800 text-slate-900 dark:text-white'
-                : 'text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-900'
-            }`}
+            className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-900 transition-all"
           >
             <Lightbulb className="w-4 h-4" />
           </button>
 
           <button
-            onClick={() => setActiveNavIcon('tasks')}
+            onClick={() => {
+              setActiveNavIcon('tasks');
+              handleSendMessage('Mere scheduled posts aur reminders dikhao');
+            }}
             title="Tasks & Reminders"
-            className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
-              activeNavIcon === 'tasks'
-                ? 'bg-slate-100 dark:bg-zinc-800 text-slate-900 dark:text-white'
-                : 'text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-900'
-            }`}
+            className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-900 transition-all"
           >
             <CheckSquare className="w-4 h-4" />
-          </button>
-
-          <button
-            onClick={() => setActiveNavIcon('tools')}
-            title="Apps & Tools Registry"
-            className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
-              activeNavIcon === 'tools'
-                ? 'bg-slate-100 dark:bg-zinc-800 text-slate-900 dark:text-white'
-                : 'text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-900'
-            }`}
-          >
-            <LayoutGrid className="w-4 h-4" />
-          </button>
-
-          <button
-            onClick={() => setActiveNavIcon('reports')}
-            title="PDF Reports & Insights"
-            className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
-              activeNavIcon === 'reports'
-                ? 'bg-slate-100 dark:bg-zinc-800 text-slate-900 dark:text-white'
-                : 'text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-900'
-            }`}
-          >
-            <FileSpreadsheet className="w-4 h-4" />
           </button>
 
           <button
@@ -466,7 +366,7 @@ export function AIDashboard() {
 
           <div 
             title={session?.user?.name || 'Account'}
-            className="w-8 h-8 rounded-full bg-slate-200 dark:bg-zinc-800 border border-slate-300 dark:border-zinc-700 flex items-center justify-center text-xs font-bold text-slate-700 dark:text-zinc-200 overflow-hidden cursor-pointer"
+            className="w-8 h-8 rounded-full bg-slate-200 dark:bg-zinc-800 border border-slate-300 dark:border-zinc-700 flex items-center justify-center text-xs font-bold text-slate-700 dark:text-zinc-200 overflow-hidden"
           >
             {session?.user?.image ? (
               <img src={session.user.image} alt="User" className="w-full h-full object-cover" />
@@ -478,24 +378,21 @@ export function AIDashboard() {
       </aside>
 
       {/* ========================================================= */}
-      {/* 2. LEFT SUB-SIDEBAR (Chats, Threads & Channels)           */}
+      {/* 2. LEFT SUB-SIDEBAR (Desktop)                             */}
       {/* ========================================================= */}
       <aside className="hidden md:flex w-60 lg:w-64 shrink-0 bg-[#f9fafb] dark:bg-[#101114] border-r border-slate-200/80 dark:border-zinc-800/80 flex-col justify-between py-4 px-3">
         <div className="flex flex-col gap-4 overflow-y-auto no-scrollbar">
           
-          {/* Search Box with options */}
+          {/* Search Box */}
           <div className="flex items-center gap-1.5 bg-white dark:bg-[#18191e] border border-slate-200 dark:border-zinc-800 rounded-xl px-2.5 py-1.5 shadow-xs">
             <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
             <input
               type="text"
-              placeholder="Search"
+              placeholder="Search chats..."
               value={searchThreadQuery}
               onChange={(e) => setSearchThreadQuery(e.target.value)}
               className="w-full bg-transparent text-xs text-slate-800 dark:text-zinc-100 placeholder:text-slate-400 focus:outline-none"
             />
-            <button className="text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200">
-              <MoreHorizontal className="w-3.5 h-3.5" />
-            </button>
           </div>
 
           {/* Main Chat Item */}
@@ -526,25 +423,33 @@ export function AIDashboard() {
               </button>
             </div>
 
-            {/* Side Chat Threads */}
-            <div className="space-y-0.5 mt-1">
-              {filteredThreads.map((thread) => (
-                <button
-                  key={thread.id}
-                  onClick={() => setActiveThreadId(thread.id)}
-                  className={`w-full text-left px-3 py-2 rounded-xl text-xs transition-all flex items-center justify-between group ${
-                    activeThreadId === thread.id
-                      ? 'bg-slate-200/70 dark:bg-zinc-800 text-slate-900 dark:text-white font-medium shadow-xs'
-                      : 'text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800/50'
-                  }`}
-                >
-                  <span className="truncate pr-2">{thread.title}</span>
-                  <span className="text-[10px] text-slate-400 shrink-0 group-hover:hidden">
-                    {thread.lastMessageTime}
-                  </span>
-                </button>
-              ))}
-            </div>
+            {/* Side Chat Threads (Blank on 1st visit, populates as user chats!) */}
+            {filteredThreads.length === 0 ? (
+              <div className="px-3 py-6 text-center text-slate-400 dark:text-zinc-500 space-y-1">
+                <MessageSquare className="w-5 h-5 mx-auto stroke-[1.5] text-slate-300 dark:text-zinc-600 mb-1" />
+                <p className="text-[11px] font-medium text-slate-500 dark:text-zinc-400">No chat history yet</p>
+                <p className="text-[10px] text-slate-400 dark:text-zinc-500 leading-tight">Start chatting to record tasks</p>
+              </div>
+            ) : (
+              <div className="space-y-0.5 mt-1">
+                {filteredThreads.map((thread) => (
+                  <button
+                    key={thread.id}
+                    onClick={() => setActiveThreadId(thread.id)}
+                    className={`w-full text-left px-3 py-2 rounded-xl text-xs transition-all flex items-center justify-between group ${
+                      activeThreadId === thread.id
+                        ? 'bg-slate-200/70 dark:bg-zinc-800 text-slate-900 dark:text-white font-medium shadow-xs'
+                        : 'text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800/50'
+                    }`}
+                  >
+                    <span className="truncate pr-2">{thread.title}</span>
+                    <span className="text-[10px] text-slate-400 shrink-0">
+                      {thread.lastMessageTime}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -575,24 +480,143 @@ export function AIDashboard() {
       </aside>
 
       {/* ========================================================= */}
+      {/* 2B. MOBILE NAVIGATION & THREADS DRAWER (Slide-over)       */}
+      {/* ========================================================= */}
+      {isMobileNavOpen && (
+        <div className="fixed inset-0 z-50 md:hidden flex">
+          {/* Backdrop */}
+          <div 
+            onClick={() => setIsMobileNavOpen(false)}
+            className="fixed inset-0 bg-black/50 backdrop-blur-xs transition-opacity"
+          />
+
+          {/* Drawer Body */}
+          <div className="relative w-72 max-w-[80vw] bg-white dark:bg-[#121317] h-full shadow-2xl flex flex-col justify-between py-4 px-3 z-10 animate-in slide-in-from-left duration-200">
+            <div className="flex flex-col gap-4 overflow-y-auto no-scrollbar">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-zinc-800">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-teal-500 to-emerald-600 text-white flex items-center justify-center font-black text-sm">
+                    t
+                  </div>
+                  <span className="font-bold text-sm text-slate-900 dark:text-white">Tolee AI</span>
+                </div>
+                <button
+                  onClick={() => setIsMobileNavOpen(false)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Main chat button */}
+              <button
+                onClick={() => {
+                  setActiveThreadId('main');
+                  setIsMobileNavOpen(false);
+                }}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold ${
+                  activeThreadId === 'main'
+                    ? 'bg-slate-200/80 dark:bg-zinc-800 text-slate-900 dark:text-white'
+                    : 'text-slate-600 dark:text-zinc-400'
+                }`}
+              >
+                <span>Main chat</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              </button>
+
+              {/* Side Chats */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between px-2 text-[11px] font-bold text-slate-400 uppercase">
+                  <span>Side chats</span>
+                  <button
+                    onClick={handleCreateNewThread}
+                    className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-300"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {filteredThreads.length === 0 ? (
+                  <p className="text-[11px] text-slate-400 px-2 py-3 text-center">No chat history yet</p>
+                ) : (
+                  filteredThreads.map((t) => (
+                    <button
+                      key={t.id}
+                      onClick={() => {
+                        setActiveThreadId(t.id);
+                        setIsMobileNavOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 rounded-xl text-xs truncate ${
+                        activeThreadId === t.id ? 'bg-slate-200/80 dark:bg-zinc-800 font-bold' : 'text-slate-600 dark:text-zinc-400'
+                      }`}
+                    >
+                      {t.title}
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="border-t border-slate-200 dark:border-zinc-800 pt-3">
+              <Link
+                href="/feed"
+                className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-slate-100 dark:bg-zinc-800 text-xs font-bold text-slate-700 dark:text-zinc-200"
+              >
+                <span>Exit to Tolee Feed</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
       {/* 3. CENTER MAIN CHAT CANVAS                                 */}
       {/* ========================================================= */}
       <main className="flex-1 flex flex-col h-full bg-white dark:bg-[#0c0d10] relative min-w-0">
         
-        {/* Top Chat Bar with Invite button */}
-        <header className="h-14 shrink-0 border-b border-slate-200/80 dark:border-zinc-800/80 px-4 sm:px-6 flex items-center justify-between bg-white/80 dark:bg-[#0c0d10]/80 backdrop-blur-md z-10">
+        {/* Top Header Bar (Desktop & Mobile) */}
+        <header className="h-14 shrink-0 border-b border-slate-200/80 dark:border-zinc-800/80 px-3 sm:px-6 flex items-center justify-between bg-white/80 dark:bg-[#0c0d10]/80 backdrop-blur-md z-10">
+          
           <div className="flex items-center gap-2 min-w-0">
-            <h2 className="font-semibold text-sm sm:text-base text-slate-900 dark:text-white truncate">
-              {activeThreadId === 'main' ? 'Main chat' : threads.find(t => t.id === activeThreadId)?.title || 'Side chat'}
-            </h2>
+            {/* Mobile Menu Button */}
+            <button
+              onClick={() => setIsMobileNavOpen(true)}
+              className="md:hidden p-1.5 rounded-lg border border-slate-200 dark:border-zinc-800 text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 shrink-0"
+              title="Open Navigation"
+            >
+              <Menu className="w-4 h-4" />
+            </button>
+
+            {/* Mascot Icon in Mobile header */}
+            <div className="w-7 h-7 rounded-full overflow-hidden bg-teal-50 dark:bg-zinc-800 border border-teal-200 dark:border-zinc-700 flex items-center justify-center shrink-0">
+              <img src="/tolee-ai-avatar.png" alt="Tolee" className="w-full h-full object-contain" />
+            </div>
+
+            <div className="min-w-0">
+              <h2 className="font-semibold text-xs sm:text-sm text-slate-900 dark:text-white truncate">
+                {activeThreadId === 'main' ? 'Main chat' : threads.find(t => t.id === activeThreadId)?.title || 'Side chat'}
+              </h2>
+            </div>
+            
             <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 rounded-full px-2 py-0.5">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               Active
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
-            {/* Invite Button (Exactly matching screenshot!) */}
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            {/* New Chat Button */}
+            <button
+              onClick={handleCreateNewThread}
+              title="Start new chat"
+              className="h-8 w-8 sm:w-auto sm:px-2.5 rounded-xl border border-slate-200 dark:border-zinc-800 text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 flex items-center justify-center gap-1 text-xs font-semibold"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">New</span>
+            </button>
+
+            {/* Invite Button */}
             <Button
               size="sm"
               variant="outline"
@@ -600,67 +624,70 @@ export function AIDashboard() {
                 navigator.clipboard.writeText(window.location.href);
                 alert('Tolee AI Manager link copied to clipboard!');
               }}
-              className="h-8 rounded-xl px-3 text-xs font-semibold border-slate-200 dark:border-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-800 flex items-center gap-1.5"
+              className="h-8 rounded-xl px-2.5 text-xs font-semibold border-slate-200 dark:border-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-800 flex items-center gap-1"
             >
               <UserPlus className="w-3.5 h-3.5 text-slate-500" />
-              <span>Invite</span>
+              <span className="hidden sm:inline">Invite</span>
             </Button>
 
-            {/* Toggle Right Panel on/off */}
+            {/* Toggle Right Activity Panel (Desktop: toggle panel, Mobile: open drawer) */}
             <button
-              onClick={() => setIsRightPanelOpen(!isRightPanelOpen)}
-              title={isRightPanelOpen ? 'Collapse side panel' : 'Open activity panel'}
-              className="w-8 h-8 rounded-xl flex items-center justify-center border border-slate-200 dark:border-zinc-800 text-slate-500 hover:text-slate-800 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors"
+              onClick={() => {
+                if (window.innerWidth < 768) {
+                  setIsMobileActivityOpen(true);
+                } else {
+                  setIsRightPanelOpen(!isRightPanelOpen);
+                }
+              }}
+              title="Activity & Tolee Assistant"
+              className="w-8 h-8 rounded-xl flex items-center justify-center border border-slate-200 dark:border-zinc-800 text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors shrink-0"
             >
-              <Bot className="w-4 h-4" />
+              <Bot className="w-4 h-4 text-teal-600" />
             </button>
           </div>
         </header>
 
         {/* Chat Feed */}
-        <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-6 space-y-6 max-w-3xl mx-auto w-full">
+        <div className="flex-1 overflow-y-auto px-3 sm:px-8 py-4 sm:py-6 space-y-4 sm:space-y-6 max-w-3xl mx-auto w-full">
           
           {messages.map((msg) => (
             <div key={msg.id} className="space-y-3">
               
-              {/* Optional: Embedded Browser Action Card (Matching Muse screenshot!) */}
+              {/* Optional: Embedded Browser Action Card */}
               {msg.browserCard && (
                 <div className="rounded-2xl border border-slate-200/90 dark:border-zinc-800 bg-[#f9fafb] dark:bg-[#141519] overflow-hidden shadow-xs animate-in fade-in transition-all">
-                  {/* Browser Window Header */}
-                  <div className="flex items-center justify-between px-3.5 py-2.5 bg-slate-100 dark:bg-[#18191e] border-b border-slate-200/80 dark:border-zinc-800/80">
+                  <div className="flex items-center justify-between px-3 py-2 bg-slate-100 dark:bg-[#18191e] border-b border-slate-200/80 dark:border-zinc-800/80">
                     <div className="flex items-center gap-2 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-zinc-700" />
-                        <span className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-zinc-700" />
-                        <span className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-zinc-700" />
+                      <div className="flex items-center gap-1 shrink-0">
+                        <span className="w-2 h-2 rounded-full bg-slate-300 dark:bg-zinc-700" />
+                        <span className="w-2 h-2 rounded-full bg-slate-300 dark:bg-zinc-700" />
+                        <span className="w-2 h-2 rounded-full bg-slate-300 dark:bg-zinc-700" />
                       </div>
-                      <div className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-zinc-400 bg-white dark:bg-[#101114] border border-slate-200 dark:border-zinc-800 rounded-lg px-2.5 py-0.5 truncate max-w-xs sm:max-w-md">
+                      <div className="flex items-center gap-1 text-[10px] sm:text-[11px] text-slate-500 dark:text-zinc-400 bg-white dark:bg-[#101114] border border-slate-200 dark:border-zinc-800 rounded-lg px-2 py-0.5 truncate max-w-[200px] sm:max-w-md">
                         <Globe className="w-3 h-3 text-slate-400 shrink-0" />
                         <span className="truncate">{msg.browserCard.url}</span>
                       </div>
                     </div>
                   </div>
 
-                  {/* Browser Content Preview */}
-                  <div className="p-4 sm:p-5 flex flex-col items-center justify-center text-center space-y-3 bg-white dark:bg-[#121316]">
-                    <div className="w-12 h-12 rounded-2xl bg-teal-50 dark:bg-teal-950/40 text-teal-600 dark:text-teal-400 flex items-center justify-center">
-                      <Globe className="w-6 h-6 animate-pulse" />
+                  <div className="p-3 sm:p-5 flex flex-col items-center justify-center text-center space-y-2.5 bg-white dark:bg-[#121316]">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-teal-50 dark:bg-teal-950/40 text-teal-600 dark:text-teal-400 flex items-center justify-center">
+                      <Globe className="w-5 h-5 sm:w-6 sm:h-6 animate-pulse" />
                     </div>
                     <div className="max-w-md space-y-1">
                       <h4 className="font-semibold text-xs sm:text-sm text-slate-900 dark:text-white">
                         {msg.browserCard.title}
                       </h4>
-                      <p className="text-xs text-slate-500 dark:text-zinc-400">
+                      <p className="text-[11px] sm:text-xs text-slate-500 dark:text-zinc-400">
                         {msg.browserCard.snippet}
                       </p>
                     </div>
 
-                    {/* Open Browser Button */}
                     <Button
                       size="sm"
                       variant="outline"
                       onClick={() => window.open(msg.browserCard?.url, '_blank')}
-                      className="rounded-xl text-xs font-semibold h-8 px-4 border-slate-200 dark:border-zinc-700 hover:bg-slate-100 dark:hover:bg-zinc-800 flex items-center gap-1.5"
+                      className="rounded-xl text-xs font-semibold h-7 sm:h-8 px-3 sm:px-4 border-slate-200 dark:border-zinc-700 hover:bg-slate-100 dark:hover:bg-zinc-800 flex items-center gap-1.5"
                     >
                       <span>Open browser</span>
                       <ExternalLink className="w-3 h-3" />
@@ -673,17 +700,17 @@ export function AIDashboard() {
               {msg.text && (
                 <div className={`flex w-full ${msg.isAI ? 'justify-start' : 'justify-end'}`}>
                   <div
-                    className={`relative max-w-2xl text-xs sm:text-[13.5px] leading-relaxed transition-all ${
+                    className={`relative max-w-[90%] sm:max-w-2xl text-xs sm:text-[13.5px] leading-relaxed transition-all ${
                       msg.isAI
-                        ? 'bg-[#f8f9fa] dark:bg-[#15161b] text-slate-800 dark:text-zinc-100 border border-slate-200/70 dark:border-zinc-800 rounded-2xl p-4 sm:p-5 shadow-xs'
-                        : 'bg-teal-600 text-white rounded-2xl px-4 py-3 shadow-xs'
+                        ? 'bg-[#f8f9fa] dark:bg-[#15161b] text-slate-800 dark:text-zinc-100 border border-slate-200/70 dark:border-zinc-800 rounded-2xl p-3.5 sm:p-5 shadow-xs'
+                        : 'bg-teal-600 text-white rounded-2xl px-3.5 sm:px-4 py-2.5 sm:py-3 shadow-xs'
                     }`}
                   >
                     <AIMessageRenderer content={msg.text} isAI={msg.isAI} />
 
-                    {/* Footer bar for AI messages (Copy, Thumbs, Retry) */}
+                    {/* Footer bar for AI messages (Copy, Thumbs) */}
                     {msg.isAI && (
-                      <div className="flex items-center justify-between pt-3 mt-3 border-t border-slate-200/50 dark:border-zinc-800/60 text-[11px] text-slate-400">
+                      <div className="flex items-center justify-between pt-2.5 mt-2.5 border-t border-slate-200/50 dark:border-zinc-800/60 text-[11px] text-slate-400">
                         <span className="text-[10px]">{msg.time}</span>
                         <div className="flex items-center gap-1">
                           <button
@@ -712,7 +739,7 @@ export function AIDashboard() {
 
               {/* Approval Card */}
               {msg.approvalPayload && (
-                <div className="max-w-2xl">
+                <div className="max-w-[92%] sm:max-w-2xl">
                   <OpenDotsApprovalCard
                     approval={msg.approvalPayload}
                     isExecuting={publishingActionId === msg.id}
@@ -762,7 +789,7 @@ export function AIDashboard() {
           {isLoading && (
             <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-zinc-400 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl px-3 py-2 w-fit animate-pulse">
               <Bot className="w-3.5 h-3.5 animate-spin text-teal-600" />
-              <span>Tolee AI Manager soch raha hai aur tools execute kar raha hai...</span>
+              <span>Tolee AI soch raha hai aur tools chala raha hai...</span>
             </div>
           )}
 
@@ -770,13 +797,13 @@ export function AIDashboard() {
         </div>
 
         {/* ========================================================= */}
-        {/* BOTTOM FLOATING INPUT DOCK (Matching Muse)                */}
+        {/* BOTTOM FLOATING INPUT DOCK (Mobile & Desktop)             */}
         {/* ========================================================= */}
-        <div className="p-4 sm:p-6 bg-gradient-to-t from-white via-white/95 to-transparent dark:from-[#0c0d10] dark:via-[#0c0d10]/95">
+        <div className="p-2.5 sm:p-6 bg-gradient-to-t from-white via-white/95 to-transparent dark:from-[#0c0d10] dark:via-[#0c0d10]/95 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
           <div className="max-w-3xl mx-auto relative bg-[#f4f5f7] dark:bg-[#17181d] border border-slate-200/90 dark:border-zinc-800/90 rounded-2xl shadow-xs transition-all focus-within:border-teal-500 focus-within:ring-2 focus-within:ring-teal-500/20">
-            <div className="flex items-center px-3.5 py-2 gap-2">
+            <div className="flex items-center px-2.5 sm:px-3.5 py-1.5 sm:py-2 gap-1.5 sm:gap-2">
               
-              {/* Plus Button for Attachments / Tools */}
+              {/* Plus Button for Attachments */}
               <button
                 type="button"
                 onClick={() => {
@@ -791,7 +818,7 @@ export function AIDashboard() {
                   };
                   input.click();
                 }}
-                title="Add attachment or action"
+                title="Add attachment"
                 className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 hover:bg-slate-200/60 dark:hover:bg-zinc-800 transition-colors shrink-0"
               >
                 <Plus className="w-4 h-4" />
@@ -859,195 +886,252 @@ export function AIDashboard() {
       </main>
 
       {/* ========================================================= */}
-      {/* 4. RIGHT SIDEBAR (Assistant Profile & Activity Timeline)  */}
+      {/* 4. RIGHT SIDEBAR (Desktop: Panel, Mobile: Drawer)         */}
       {/* ========================================================= */}
-      {isRightPanelOpen && (
-        <aside className="w-72 lg:w-80 shrink-0 bg-[#f9fafb] dark:bg-[#101114] border-l border-slate-200/80 dark:border-zinc-800/80 flex flex-col justify-between py-4 px-4 z-20 overflow-y-auto no-scrollbar">
-          
-          <div className="space-y-5">
-            {/* Header with Close X Button */}
-            <div className="flex items-center justify-end">
-              <button
-                onClick={() => setIsRightPanelOpen(false)}
-                title="Close panel"
-                className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 rounded-lg transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Assistant Profile (Matching Muse avatar & edit badge in screenshot!) */}
-            <div className="flex flex-col items-center text-center space-y-2">
-              <div className="relative">
-                {/* 3D Cute Avatar Container */}
-                <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-amber-100 via-orange-100 to-amber-200 dark:from-zinc-800 dark:to-zinc-700 p-1 shadow-md border-2 border-white dark:border-zinc-800 overflow-hidden flex items-center justify-center">
-                  <div className="w-full h-full rounded-full bg-[#f4ebe1] dark:bg-[#202126] flex items-center justify-center text-3xl select-none">
-                    🧸
-                  </div>
-                </div>
-
-                {/* Edit Pencil Icon Badge */}
+      
+      {/* Helper function to render Right Sidebar Content */}
+      {(() => {
+        const renderSidebarContent = (isMobileView: boolean = false) => (
+          <div className="flex flex-col justify-between h-full py-4 px-4 z-20 overflow-y-auto no-scrollbar">
+            <div className="space-y-5">
+              
+              {/* Header with Close X Button */}
+              <div className="flex items-center justify-between pb-1">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Assistant</span>
                 <button
-                  title="Customize assistant personality"
-                  onClick={() => alert('Customizing Tolee AI Manager personality & prompts...')}
-                  className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-300 flex items-center justify-center shadow-xs hover:scale-105 transition-transform"
+                  onClick={() => {
+                    if (isMobileView) setIsMobileActivityOpen(false);
+                    else setIsRightPanelOpen(false);
+                  }}
+                  title="Close panel"
+                  className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 rounded-lg transition-colors"
                 >
-                  <Pencil className="w-3 h-3" />
+                  <X className="w-4 h-4" />
                 </button>
               </div>
 
-              {/* Assistant Name & Live Status */}
-              <div>
-                <h3 className="font-bold text-sm text-slate-900 dark:text-white">Muse</h3>
-                <div className="flex items-center justify-center gap-1.5 text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="font-medium text-[11px]">Applying to roles</span>
-                </div>
-              </div>
-            </div>
+              {/* Assistant Profile: Mascot Avatar & Name "Tolee" */}
+              <div className="flex flex-col items-center text-center space-y-2">
+                <div className="relative">
+                  {/* Mascot Image Avatar Container */}
+                  <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-teal-400/20 via-emerald-400/10 to-teal-500/20 p-1 shadow-md border-2 border-white dark:border-zinc-800 overflow-hidden flex items-center justify-center bg-white dark:bg-zinc-800">
+                    <img
+                      src="/tolee-ai-avatar.png"
+                      alt="Tolee"
+                      className="w-full h-full object-contain hover:scale-105 transition-transform"
+                    />
+                  </div>
 
-            {/* 4 Icon Segmented Tabs (Matching the 4 icons in the screenshot!) */}
-            <div className="flex items-center justify-around bg-white dark:bg-[#18191e] border border-slate-200 dark:border-zinc-800 rounded-xl p-1 shadow-xs">
-              <button
-                onClick={() => setRightPanelTab('tasks')}
-                title="Activity & Tasks"
-                className={`p-1.5 rounded-lg transition-all ${
-                  rightPanelTab === 'tasks'
-                    ? 'bg-slate-100 dark:bg-zinc-800 text-slate-900 dark:text-white shadow-xs'
-                    : 'text-slate-400 hover:text-slate-700 dark:hover:text-zinc-300'
-                }`}
-              >
-                <CheckSquare className="w-4 h-4" />
-              </button>
-
-              <button
-                onClick={() => setRightPanelTab('safety')}
-                title="Approvals & Safety"
-                className={`p-1.5 rounded-lg transition-all ${
-                  rightPanelTab === 'safety'
-                    ? 'bg-slate-100 dark:bg-zinc-800 text-slate-900 dark:text-white shadow-xs'
-                    : 'text-slate-400 hover:text-slate-700 dark:hover:text-zinc-300'
-                }`}
-              >
-                <Shield className="w-4 h-4" />
-              </button>
-
-              <button
-                onClick={() => setRightPanelTab('history')}
-                title="History"
-                className={`p-1.5 rounded-lg transition-all ${
-                  rightPanelTab === 'history'
-                    ? 'bg-slate-100 dark:bg-zinc-800 text-slate-900 dark:text-white shadow-xs'
-                    : 'text-slate-400 hover:text-slate-700 dark:hover:text-zinc-300'
-                }`}
-              >
-                <Clock className="w-4 h-4" />
-              </button>
-
-              <button
-                onClick={() => setRightPanelTab('memory')}
-                title="Memory"
-                className={`p-1.5 rounded-lg transition-all ${
-                  rightPanelTab === 'memory'
-                    ? 'bg-slate-100 dark:bg-zinc-800 text-slate-900 dark:text-white shadow-xs'
-                    : 'text-slate-400 hover:text-slate-700 dark:hover:text-zinc-300'
-                }`}
-              >
-                <Fingerprint className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* TAB CONTENT: "Today" Activity Timeline (Matching screenshot!) */}
-            {rightPanelTab === 'tasks' && (
-              <div className="space-y-3 pt-1">
-                <p className="text-xs font-bold text-slate-800 dark:text-zinc-200">
-                  Today
-                </p>
-
-                <div className="space-y-3.5">
-                  {activities.map((act) => (
-                    <div key={act.id} className="flex items-start gap-2.5 text-xs group">
-                      {/* Checkmark in circle */}
-                      <div className="w-5 h-5 rounded-full border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 flex items-center justify-center shrink-0 mt-0.5">
-                        <Check className="w-3 h-3 text-slate-600 dark:text-zinc-300 stroke-[2.5]" />
-                      </div>
-
-                      {/* Title, Subtitle and Timestamp */}
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-slate-800 dark:text-zinc-100 leading-tight truncate">
-                          {act.title}
-                        </p>
-                        <p className="text-[11px] text-slate-400 dark:text-zinc-500 line-clamp-1 mt-0.5">
-                          {act.subtitle}
-                        </p>
-                        <span className="text-[10px] text-slate-400 dark:text-zinc-500">
-                          {act.time}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* TAB CONTENT: Approvals / Safety */}
-            {rightPanelTab === 'safety' && (
-              <div className="space-y-2 pt-1 text-xs">
-                <p className="font-bold text-slate-800 dark:text-zinc-200">Pending Approvals</p>
-                <div className="p-3 rounded-xl bg-white dark:bg-[#18191e] border border-slate-200 dark:border-zinc-800 space-y-1.5">
-                  <p className="text-slate-500 dark:text-zinc-400 text-[11px]">
-                    No pending high-risk actions. All drafts are secure.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* TAB CONTENT: History */}
-            {rightPanelTab === 'history' && (
-              <div className="space-y-2 pt-1 text-xs">
-                <p className="font-bold text-slate-800 dark:text-zinc-200">Recent Sessions</p>
-                <div className="space-y-1.5">
-                  {threads.map((t) => (
-                    <div key={t.id} className="p-2 rounded-lg bg-white dark:bg-[#18191e] border border-slate-200 dark:border-zinc-800 text-[11px]">
-                      <p className="font-medium text-slate-700 dark:text-zinc-300">{t.title}</p>
-                      <p className="text-slate-400 text-[10px]">{t.lastMessageTime}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* TAB CONTENT: Memory */}
-            {rightPanelTab === 'memory' && (
-              <div className="space-y-2 pt-1 text-xs">
-                <p className="font-bold text-slate-800 dark:text-zinc-200">AI Memory & Facts</p>
-                <div className="p-3 rounded-xl bg-white dark:bg-[#18191e] border border-slate-200 dark:border-zinc-800 space-y-2 text-[11px] text-slate-600 dark:text-zinc-300">
-                  <p>• Language: Hinglish preferred</p>
-                  <p>• Roles: Senior Marketing & Automation</p>
-                  <p>• Region: Worldwide / Remote</p>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => alert('Memory reset requested. Memory forgotten.')}
-                    className="w-full text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-[10px] h-6 mt-1"
+                  {/* Edit Pencil Icon Badge */}
+                  <button
+                    title="Customize Tolee AI Manager personality"
+                    onClick={() => alert('Customizing Tolee AI Manager personality & prompts...')}
+                    className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-300 flex items-center justify-center shadow-xs hover:scale-105 transition-transform"
                   >
-                    Forget my preferences
-                  </Button>
+                    <Pencil className="w-3 h-3" />
+                  </button>
+                </div>
+
+                {/* Name "Tolee" & Live Status */}
+                <div>
+                  <h3 className="font-extrabold text-base text-slate-900 dark:text-white">Tolee</h3>
+                  <div className="flex items-center justify-center gap-1.5 text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="font-semibold text-[11px] text-teal-600 dark:text-teal-400">Personal AI Manager</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 4 Icon Segmented Tabs */}
+              <div className="flex items-center justify-around bg-white dark:bg-[#18191e] border border-slate-200 dark:border-zinc-800 rounded-xl p-1 shadow-xs">
+                <button
+                  onClick={() => setRightPanelTab('tasks')}
+                  title="Activity & Tasks"
+                  className={`p-1.5 rounded-lg transition-all ${
+                    rightPanelTab === 'tasks'
+                      ? 'bg-slate-100 dark:bg-zinc-800 text-slate-900 dark:text-white shadow-xs'
+                      : 'text-slate-400 hover:text-slate-700 dark:hover:text-zinc-300'
+                  }`}
+                >
+                  <CheckSquare className="w-4 h-4" />
+                </button>
+
+                <button
+                  onClick={() => setRightPanelTab('safety')}
+                  title="Approvals & Safety"
+                  className={`p-1.5 rounded-lg transition-all ${
+                    rightPanelTab === 'safety'
+                      ? 'bg-slate-100 dark:bg-zinc-800 text-slate-900 dark:text-white shadow-xs'
+                      : 'text-slate-400 hover:text-slate-700 dark:hover:text-zinc-300'
+                  }`}
+                >
+                  <Shield className="w-4 h-4" />
+                </button>
+
+                <button
+                  onClick={() => setRightPanelTab('history')}
+                  title="History"
+                  className={`p-1.5 rounded-lg transition-all ${
+                    rightPanelTab === 'history'
+                      ? 'bg-slate-100 dark:bg-zinc-800 text-slate-900 dark:text-white shadow-xs'
+                      : 'text-slate-400 hover:text-slate-700 dark:hover:text-zinc-300'
+                  }`}
+                >
+                  <Clock className="w-4 h-4" />
+                </button>
+
+                <button
+                  onClick={() => setRightPanelTab('memory')}
+                  title="Memory"
+                  className={`p-1.5 rounded-lg transition-all ${
+                    rightPanelTab === 'memory'
+                      ? 'bg-slate-100 dark:bg-zinc-800 text-slate-900 dark:text-white shadow-xs'
+                      : 'text-slate-400 hover:text-slate-700 dark:hover:text-zinc-300'
+                  }`}
+                >
+                  <Fingerprint className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* TAB 1: "Today" Activity Timeline (Blank for 1st visit, populates live!) */}
+              {rightPanelTab === 'tasks' && (
+                <div className="space-y-3 pt-1">
+                  <p className="text-xs font-bold text-slate-800 dark:text-zinc-200">
+                    Today
+                  </p>
+
+                  {activities.length === 0 ? (
+                    <div className="px-3 py-6 text-center text-slate-400 dark:text-zinc-500 space-y-1.5 bg-white dark:bg-[#18191e] border border-slate-200/80 dark:border-zinc-800 rounded-2xl">
+                      <CheckSquare className="w-6 h-6 mx-auto stroke-[1.5] text-teal-500/70 dark:text-teal-400/70" />
+                      <p className="text-xs font-bold text-slate-700 dark:text-zinc-300">No activity yet</p>
+                      <p className="text-[11px] leading-relaxed">When you ask Tolee to search, write, or schedule, your live task history will appear here.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {activities.map((act) => (
+                        <div key={act.id} className="flex items-start gap-2.5 text-xs group">
+                          <div className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 mt-0.5 ${
+                            act.completed
+                              ? 'border-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400'
+                              : 'border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-400'
+                          }`}>
+                            <Check className="w-3 h-3 stroke-[2.5]" />
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-slate-800 dark:text-zinc-100 leading-tight truncate">
+                              {act.title}
+                            </p>
+                            <p className="text-[11px] text-slate-400 dark:text-zinc-500 line-clamp-1 mt-0.5">
+                              {act.subtitle}
+                            </p>
+                            <span className="text-[10px] text-slate-400 dark:text-zinc-500">
+                              {act.time}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* TAB 2: Approvals / Safety */}
+              {rightPanelTab === 'safety' && (
+                <div className="space-y-2 pt-1 text-xs">
+                  <p className="font-bold text-slate-800 dark:text-zinc-200">Pending Approvals</p>
+                  <div className="p-3 rounded-xl bg-white dark:bg-[#18191e] border border-slate-200 dark:border-zinc-800 space-y-1.5">
+                    <p className="text-slate-500 dark:text-zinc-400 text-[11px]">
+                      No pending high-risk actions. All drafts are secure.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 3: History */}
+              {rightPanelTab === 'history' && (
+                <div className="space-y-2 pt-1 text-xs">
+                  <p className="font-bold text-slate-800 dark:text-zinc-200">Recent Sessions</p>
+                  {threads.length === 0 ? (
+                    <p className="text-[11px] text-slate-400 p-2 text-center">No past sessions yet.</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {threads.map((t) => (
+                        <div key={t.id} className="p-2 rounded-lg bg-white dark:bg-[#18191e] border border-slate-200 dark:border-zinc-800 text-[11px]">
+                          <p className="font-medium text-slate-700 dark:text-zinc-300">{t.title}</p>
+                          <p className="text-slate-400 text-[10px]">{t.lastMessageTime}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* TAB 4: Memory */}
+              {rightPanelTab === 'memory' && (
+                <div className="space-y-2 pt-1 text-xs">
+                  <p className="font-bold text-slate-800 dark:text-zinc-200">AI Memory & Facts</p>
+                  <div className="p-3 rounded-xl bg-white dark:bg-[#18191e] border border-slate-200 dark:border-zinc-800 space-y-2 text-[11px] text-slate-600 dark:text-zinc-300">
+                    <p>• Language: Hinglish preferred</p>
+                    <p>• Platform: Tolee AI Social Media</p>
+                    <p>• Region: India / Worldwide</p>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        try {
+                          localStorage.removeItem('tolee_ai_threads');
+                          localStorage.removeItem('tolee_ai_activities');
+                          localStorage.removeItem('tolee_ai_messages');
+                        } catch (_) {}
+                        setThreads([]);
+                        setActivities([]);
+                        alert('History & Memory reset for this session.');
+                      }}
+                      className="w-full text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-[10px] h-6 mt-1"
+                    >
+                      Clear session data
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Bottom Brand Footer */}
+            <div className="border-t border-slate-200/80 dark:border-zinc-800/80 pt-3 flex items-center justify-between text-[11px] text-slate-400">
+              <span className="flex items-center gap-1">
+                <Shield className="w-3 h-3 text-emerald-500" />
+                <span>Safe Agent Loop</span>
+              </span>
+              <span className="text-[10px]">v1.7.6</span>
+            </div>
+          </div>
+        );
+
+        return (
+          <>
+            {/* Desktop Panel */}
+            {isRightPanelOpen && (
+              <aside className="hidden md:flex w-72 lg:w-80 shrink-0 bg-[#f9fafb] dark:bg-[#101114] border-l border-slate-200/80 dark:border-zinc-800/80 flex-col justify-between">
+                {renderSidebarContent(false)}
+              </aside>
+            )}
+
+            {/* Mobile Activity Drawer */}
+            {isMobileActivityOpen && (
+              <div className="fixed inset-0 z-50 md:hidden flex justify-end">
+                <div 
+                  onClick={() => setIsMobileActivityOpen(false)}
+                  className="fixed inset-0 bg-black/50 backdrop-blur-xs transition-opacity"
+                />
+                <div className="relative w-80 max-w-[85vw] bg-[#f9fafb] dark:bg-[#101114] h-full shadow-2xl z-10 animate-in slide-in-from-right duration-200">
+                  {renderSidebarContent(true)}
                 </div>
               </div>
             )}
-          </div>
-
-          {/* Bottom Brand / Security Footer */}
-          <div className="border-t border-slate-200/80 dark:border-zinc-800/80 pt-3 flex items-center justify-between text-[11px] text-slate-400">
-            <span className="flex items-center gap-1">
-              <Shield className="w-3 h-3 text-emerald-500" />
-              <span>Safe Agent Loop</span>
-            </span>
-            <span className="text-[10px]">v1.7.6</span>
-          </div>
-        </aside>
-      )}
+          </>
+        );
+      })()}
 
     </div>
   );
