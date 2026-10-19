@@ -36,6 +36,7 @@ import {
   cancelGenerationTool,
   saveMediaAsReelDraftTool,
 } from './media-tools';
+import { V4_BROWSING_TOOLS } from './v4-browsing-tools';
 
 export class ToolRegistry {
   private static tools: Map<string, ToolDefinition> = new Map();
@@ -112,6 +113,33 @@ export class ToolRegistry {
     this.register({ ...listMyGenerationsTool, name: 'media.list_my_generations' });
     this.register({ ...cancelGenerationTool, name: 'media.cancel_generation' });
     this.register({ ...saveMediaAsReelDraftTool, name: 'reels.create_draft' });
+
+    // Register V4 Browsing & Real-World Task Automation Tools
+    for (const tool of V4_BROWSING_TOOLS) {
+      this.register(tool);
+    }
+
+    // V4 Logical dot-notation aliases
+    const v4Aliases: Record<string, string> = {
+      'web_search': 'web.search',
+      'open_webpage': 'web.open_page',
+      'extract_page_content': 'web.extract_content',
+      'compare_sources': 'web.compare_sources',
+      'browser_inspect_form': 'browser.inspect_form',
+      'prepare_form_submission': 'browser.prepare_form',
+      'search_jobs': 'jobs.search',
+      'prepare_job_application': 'jobs.prepare_application',
+      'compare_products': 'commerce.compare_products',
+      'prepare_booking': 'booking.prepare',
+      'create_multi_step_task': 'tasks.create_plan',
+    };
+
+    for (const [canonical, alias] of Object.entries(v4Aliases)) {
+      const tool = this.get(canonical);
+      if (tool) {
+        this.register({ ...tool, name: alias });
+      }
+    }
   }
 
   public static register(tool: ToolDefinition) {

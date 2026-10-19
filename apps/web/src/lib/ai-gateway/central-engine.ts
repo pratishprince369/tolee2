@@ -816,6 +816,13 @@ export class CentralAIEngine {
             toolUsed: agentResult.executedTool || null,
             image: null,
             files: [],
+            interactiveAction: agentResult.approvalPayload
+              ? {
+                  type: 'APPROVAL_REQUEST',
+                  label: agentResult.approvalPayload.title || 'Review & Approve',
+                  payload: agentResult.approvalPayload,
+                }
+              : undefined,
             metadata: {
               latencyMs: Date.now() - startTime,
               intent: agentResult.executedTool ? 'tool_action' : intent,
