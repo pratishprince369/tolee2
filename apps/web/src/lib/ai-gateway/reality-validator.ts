@@ -23,6 +23,7 @@ export interface ValidationOutput {
   isValid: boolean;
   sanitizedContent: string;
   correctionNotice?: string;
+  hasHallucinationWarning?: boolean;
 }
 
 export class ToleeRealityValidator {
@@ -37,6 +38,14 @@ export class ToleeRealityValidator {
     'reminder created',
     'created the post',
     'sent the message'
+  ];
+
+  private static ACTION_PATTERNS = [
+    /\b(post|update|reel).*?\b(publish|published|kar diya|kar chuka|ho gaya)/i,
+    /\b(message|msg).*?\b(bhej diya|sent|bheja gaya)/i,
+    /\b(delete|deleted|hata diya|remove kar diya)\b/i,
+    /\b(reminder|alarm).*?\b(set kar diya|create kar diya|laga diya)/i,
+    /\b(successfully publish|published successfully|publish kar diya)\b/i,
   ];
 
   private static SUSPICIOUS_PROFESSIONS = [
@@ -63,7 +72,10 @@ export class ToleeRealityValidator {
     const userMsgLower = (ctx.userMessage || '').toLowerCase();
 
     // 1. Check if the LLM claimed an action occurred without tool verification
-    const claimsActionDone = this.ACTION_VERBS.some(v => replyLower.includes(v));
+    const claimsActionDone =
+      this.ACTION_VERBS.some(v => replyLower.includes(v)) ||
+      this.ACTION_PATTERNS.some(p => p.test(replyLower));
+
     if (claimsActionDone) {
       const wasToolActuallyRun = Boolean(ctx.toolUsed);
       const wasToolSuccessful = Boolean(ctx.toolResultSuccess);
@@ -72,7 +84,8 @@ export class ToleeRealityValidator {
         console.warn(`[ToleeRealityValidator] Action hallucination intercepted. Claim without valid receipt.`);
         return {
           isValid: false,
-          sanitizedContent: `⚠️ **Action Verification Notice**: System ne is action ko execute karne ke liye real confirmation require kiya hai. Kripya explicit command dein taaki backend par verified operation execute ho sake.`,
+          hasHallucinationWarning: true,
+          sanitizedContent: `⚠️ **Action Verification Notice**: Post abhi draft state me prepare kiya gaya hai aur user approval ke liye waiting hai. Bina explicit user confirmation/approval ke live post publish nahi kiya gaya hai.`,
           correctionNotice: 'Unverified action claim intercepted.'
         };
       }

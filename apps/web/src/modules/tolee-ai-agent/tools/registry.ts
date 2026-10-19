@@ -43,6 +43,11 @@ export class ToolRegistry {
     this.register(toleeSongsTool);
     this.register(calendarAssistantTool);
     this.register(emailAssistantTool);
+
+    // Register canonical aliases
+    this.register({ ...sendMessageTool, name: 'send_message' });
+    this.register({ ...createPostTool, name: 'create_post' });
+    this.register({ ...createReminderTool, name: 'create_reminder' });
   }
 
   public static register(tool: ToolDefinition) {

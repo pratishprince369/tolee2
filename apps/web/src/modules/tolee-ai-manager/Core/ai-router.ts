@@ -50,7 +50,6 @@ export function classifyIntelligenceIntent(input: string, hasMedia: boolean = fa
 
   // 3. Coding & Software Architecture
   const isCoding = 
-    query.includes('code') ||
     query.includes('coding') ||
     query.includes('function') ||
     query.includes('debug') ||
@@ -60,18 +59,14 @@ export function classifyIntelligenceIntent(input: string, hasMedia: boolean = fa
     query.includes('react') ||
     query.includes('next.js') ||
     query.includes('html') ||
-    query.includes('css') ||
-    query.includes('sql') ||
     query.includes('database') ||
-    query.includes('api') ||
     query.includes('regex') ||
     query.includes('algorithm') ||
     query.includes('frontend') ||
     query.includes('backend') ||
     query.includes('component') ||
-    query.includes('git') ||
     query.includes('docker') ||
-    query.includes('bug');
+    /\b(code|api|css|sql|git|bug)\b/.test(query);
 
   if (isCoding) {
     return 'coding';
