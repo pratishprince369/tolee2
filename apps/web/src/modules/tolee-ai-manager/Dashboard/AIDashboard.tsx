@@ -857,7 +857,7 @@ export function AIDashboard() {
         {/* ========================================================= */}
         {/* BOTTOM FLOATING INPUT DOCK (Mobile & Desktop)             */}
         {/* ========================================================= */}
-        <div className="shrink-0 w-full p-2.5 sm:p-6 bg-gradient-to-t from-white via-white/95 to-transparent dark:from-[#0c0d10] dark:via-[#0c0d10]/95 pb-[calc(0.75rem+env(safe-area-inset-bottom))] z-20">
+        <div className="shrink-0 w-full p-2.5 sm:p-4 lg:p-6 bg-gradient-to-t from-white via-white/95 to-transparent dark:from-[#0c0d10] dark:via-[#0c0d10]/95 pb-[calc(4.8rem+env(safe-area-inset-bottom))] lg:pb-6 z-20">
           <div className="max-w-3xl mx-auto relative bg-[#f4f5f7] dark:bg-[#17181d] border border-slate-200/90 dark:border-zinc-800/90 rounded-2xl shadow-xs transition-all focus-within:border-teal-500 focus-within:ring-2 focus-within:ring-teal-500/20">
             <div className="flex items-center px-2.5 sm:px-3.5 py-1.5 sm:py-2 gap-1.5 sm:gap-2">
               
