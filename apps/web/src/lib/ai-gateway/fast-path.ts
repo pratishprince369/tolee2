@@ -60,7 +60,14 @@ export class ToleeFastPath {
       // Autonomous Backlinks & Browser Automation (Muse parity)
       'backlink', 'backlinks', 'muse', 'crunchbase', 'alternativeto', 'saashub',
       'producthunt', 'directory submission', 'seo submission', 'browser automation',
-      'automate backlink', 'backlink banao', 'backlink bana'
+      'automate backlink', 'backlink banao', 'backlink bana',
+      // Jobs & Career Automation
+      'job', 'jobs', 'apply job', 'job apply', 'job application', 'apply for',
+      'naukri', 'internship', 'hiring', 'vacancy', 'career', 'job dhoond', 'resume submit', 'hire me',
+      // Travel & Bookings
+      'book flight', 'flight book', 'hotel book', 'ticket book', 'irctc', 'makemytrip',
+      // Browser Tasks & Automation
+      'open webpage', 'fill form', 'browser task', 'take control', 'scrape'
     ];
 
     const requiresToleeData = toleeKeywords.some(kw => q.includes(kw));

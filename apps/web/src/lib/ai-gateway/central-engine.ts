@@ -11,6 +11,7 @@ import { ToleeFastPath } from './fast-path';
 import { isPersonQuery } from '@/lib/web-search';
 import { OpenHiggsfieldMediaService } from '@/modules/tolee-ai-agent/media/generation-service';
 import { BacklinkOperatorEngine } from '@/modules/tolee-ai-agent/browser/backlink-engine';
+import { AutonomousOperatorEngine } from '@/modules/tolee-ai-agent/browser/autonomous-operator';
 
 // -------------------------------------------------------------
 // TYPES & INTERFACES
@@ -31,6 +32,7 @@ export interface NormalizedAIResponse {
     payload?: any;
     executed?: boolean;
   };
+  browserSession?: any;
   metadata: {
     latencyMs: number;
     intent: string;
@@ -606,10 +608,92 @@ export class CentralAIEngine {
     // 🧠 2. Intent Classification
     const intent = classifyIntelligenceIntent(rawMessage, hasMedia, mediaType);
 
-    // 🌐 2b. Autonomous Backlink & Directory Operator (Muse Parity)
-    const isBacklinkQuery =
-      /backlink|backlinks|directory submission|seo submission|website submission|promote tolee|crunchbase|alternativeto|saashub|producthunt|(?:linked\s*in|twitter|medium|reddit).*?(?:backlink|link|submit|post|share)|(?:backlink|link|submit).*?(?:linked\s*in|twitter|medium|reddit)/i.test(rawMessage);
+    // 🌐 2b. Autonomous Operator Layer (Jobs, Real-World Tasks, Bookings, Backlinks)
+    const isJobTask =
+      /apply\s*(?:for\s*)?(?:a\s*)?jobs?|job\s*apply|job\s*application|find\s*(?:me\s*)?jobs?|search\s*jobs?|naukri|internship|hiring|vacanc(?:y|ies)|career|job\s*dhoond|job\s*chahiye|job\s*lagwa|resume\s*(?:submit|send)|hire\s*me/i.test(
+        rawMessage
+      );
 
+    const isBookingTask =
+      /book\s*(?:a\s*)?(?:flight|hotel|ticket|train)|flight\s*book|hotel\s*book|ticket\s*book|travel\s*book|makemytrip|irctc/i.test(
+        rawMessage
+      );
+
+    const isBacklinkQuery =
+      /backlink|backlinks|directory submission|seo submission|website submission|promote tolee|crunchbase|alternativeto|saashub|producthunt|(?:linked\s*in|twitter|medium|reddit).*?(?:backlink|link|submit|post|share)|(?:backlink|link|submit).*?(?:linked\s*in|twitter|medium|reddit)/i.test(
+        rawMessage
+      );
+
+    // 💼 Job Search & Application Operator
+    if (isJobTask) {
+      try {
+        const jobResult = await AutonomousOperatorEngine.handleJobTask(rawMessage, history, {
+          userId: options.userId,
+          userName: options.userName,
+          userEmail: options.userEmail,
+        });
+
+        return {
+          success: true,
+          type: 'tool_result',
+          content: jobResult.message,
+          model: 'tolee-job-operator',
+          provider: 'tolee-core',
+          toolUsed: jobResult.toolUsed,
+          image: null,
+          files: [],
+          interactiveAction: {
+            type: 'APPROVAL_REQUEST',
+            label: jobResult.approvalPayload?.title || 'Review & Submit Job Application',
+            payload: jobResult.approvalPayload,
+          },
+          browserSession: jobResult.browserSession,
+          metadata: {
+            latencyMs: Date.now() - startTime,
+            intent: 'job_application_operator',
+            fallbackUsed: false,
+          },
+        };
+      } catch (jobErr: any) {
+        console.warn('[CentralAIEngine] Job operator notice:', jobErr?.message);
+      }
+    }
+
+    // ✈️ Travel & Booking Operator
+    if (isBookingTask) {
+      try {
+        const bookingResult = await AutonomousOperatorEngine.handleBookingTask(rawMessage, history, {
+          userId: options.userId,
+          userName: options.userName,
+        });
+
+        return {
+          success: true,
+          type: 'tool_result',
+          content: bookingResult.message,
+          model: 'tolee-booking-operator',
+          provider: 'tolee-core',
+          toolUsed: bookingResult.toolUsed,
+          image: null,
+          files: [],
+          interactiveAction: {
+            type: 'APPROVAL_REQUEST',
+            label: bookingResult.approvalPayload?.title || 'Review Booking Details',
+            payload: bookingResult.approvalPayload,
+          },
+          browserSession: bookingResult.browserSession,
+          metadata: {
+            latencyMs: Date.now() - startTime,
+            intent: 'booking_operator',
+            fallbackUsed: false,
+          },
+        };
+      } catch (bookErr: any) {
+        console.warn('[CentralAIEngine] Booking operator notice:', bookErr?.message);
+      }
+    }
+
+    // 🌐 Autonomous Backlink & Directory Operator
     if (isBacklinkQuery) {
       const plan = await BacklinkOperatorEngine.generateDynamicOperatorPlan(rawMessage, history, options.userName || 'User');
       return {
@@ -626,6 +710,7 @@ export class CentralAIEngine {
           label: `Action required: Waiting for you · ${plan.browserSession.targetDomain}`,
           payload: plan.browserSession,
         },
+        browserSession: plan.browserSession,
         metadata: {
           latencyMs: Date.now() - startTime,
           intent: 'backlink_operator',

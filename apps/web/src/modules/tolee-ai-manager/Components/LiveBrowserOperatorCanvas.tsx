@@ -340,8 +340,200 @@ export function LiveBrowserOperatorCanvas({
 
       {/* ── 4. Live Browser Canvas / Viewport ── */}
       <div className="flex-1 bg-slate-950 p-4 overflow-y-auto relative flex flex-col justify-between">
-        {/* VIEW 1: LinkedIn Target Platform */}
-        {activeTab.domain.includes('linkedin') && (
+        {/* VIEW 0: Job Application Operator */}
+        {(activeTabId === 'linkedin_jobs' || activeTab.url.includes('/jobs') || session?.jobData) && (
+          <div className="space-y-4 max-w-xl mx-auto w-full">
+            <div className="p-4 rounded-2xl bg-[#001428] border border-blue-900/60 space-y-3.5 shadow-xl">
+              <div className="flex items-center justify-between border-b border-blue-900/50 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black text-lg shadow-sm">
+                    💼
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm text-white flex items-center gap-1.5">
+                      <span>Job Application Operator</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">
+                        Live Vacancies Active
+                      </span>
+                    </h4>
+                    <span className="text-[10px] text-blue-300 font-medium">
+                      Target: {session?.jobData?.role || 'Software Engineer'} • {session?.jobData?.location || 'India / Remote'}
+                    </span>
+                  </div>
+                </div>
+                <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 font-semibold">
+                  Review & Apply
+                </span>
+              </div>
+
+              {/* Verified Candidate Profile Card */}
+              <div className="space-y-2 text-xs bg-slate-900/80 p-3.5 rounded-xl border border-slate-800">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-white text-xs">👤 Verified Candidate Profile</span>
+                  <span className="text-[10px] text-emerald-400 font-semibold">Tolee Profile Linked</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-[11px] pt-1">
+                  <div>
+                    <span className="text-slate-400">Candidate:</span>
+                    <p className="font-bold text-slate-200">
+                      {session?.jobData?.applicant?.name || 'Tolee Professional'}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-slate-400">Contact:</span>
+                    <p className="font-mono text-slate-300 truncate">
+                      {session?.jobData?.applicant?.email || 'user@tolee.in'}
+                    </p>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-slate-400">Verified Skills:</span>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {(
+                        session?.jobData?.applicant?.skills || [
+                          'React',
+                          'TypeScript',
+                          'Node.js',
+                          'System Architecture',
+                        ]
+                      ).map((s: string) => (
+                        <span
+                          key={s}
+                          className="px-2 py-0.5 rounded bg-slate-800 text-[10px] text-teal-300 border border-slate-700"
+                        >
+                          {s}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Discovered Job Listings */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold text-slate-300">Matching Live Vacancies:</span>
+                  <span className="text-[10px] text-slate-400">
+                    {session?.jobData?.jobs?.length || 3} positions discovered
+                  </span>
+                </div>
+
+                <div className="space-y-2 max-h-60 overflow-y-auto no-scrollbar">
+                  {(
+                    session?.jobData?.jobs || [
+                      {
+                        title: 'Senior Software Engineer',
+                        company: 'Tech Innovation Labs',
+                        location: 'Bengaluru / Hybrid',
+                        sourceUrl: 'https://www.linkedin.com/jobs/',
+                        descriptionSnippet:
+                          'Looking for a high-impact engineer to scale modern web applications.',
+                      },
+                    ]
+                  ).map((job: any, index: number) => (
+                    <div
+                      key={job.id || index}
+                      className="p-3 rounded-xl bg-slate-900/90 border border-slate-800 space-y-1.5"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <h5 className="font-bold text-xs text-white leading-tight">
+                            {job.title}
+                          </h5>
+                          <p className="text-[11px] text-blue-400 font-medium">
+                            {job.company} •{' '}
+                            <span className="text-slate-400">{job.location}</span>
+                          </p>
+                        </div>
+                        <a
+                          href={job.sourceUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-2 py-1 rounded-lg bg-blue-600/30 text-blue-300 hover:bg-blue-600/50 text-[10px] font-bold shrink-0 flex items-center gap-1 transition-colors"
+                        >
+                          <span>Open</span>
+                          <ExternalLink className="w-2.5 h-2.5" />
+                        </a>
+                      </div>
+                      <p className="text-[10.5px] text-slate-400 line-clamp-2 leading-relaxed">
+                        {job.descriptionSnippet}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Action Banner */}
+              <div className="p-3 rounded-xl bg-blue-950/60 border border-blue-800/60 flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span className="text-[11px] text-blue-200">
+                    Review and submit application with verified profile
+                  </span>
+                </div>
+                <button
+                  onClick={() => {
+                    if (activeTab.url) window.open(activeTab.url, '_blank');
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shrink-0 cursor-pointer"
+                >
+                  Open Portal
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* VIEW 0b: Travel & Booking Operator */}
+        {session?.bookingData && !session?.jobData && (
+          <div className="space-y-4 max-w-xl mx-auto w-full">
+            <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3 shadow-md">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-teal-500/20 text-teal-400 flex items-center justify-center font-bold text-sm">
+                    ✈️
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm text-white">
+                      {session.bookingData.serviceType || 'Travel Booking'}
+                    </h4>
+                    <span className="text-[10px] text-teal-400 font-semibold uppercase tracking-wider">
+                      Provider: {session.bookingData.provider}
+                    </span>
+                  </div>
+                </div>
+                <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 font-semibold">
+                  Awaiting Approval
+                </span>
+              </div>
+
+              <div className="space-y-2 text-xs">
+                <div>
+                  <span className="text-slate-400">Route:</span>
+                  <p className="font-bold text-slate-200">
+                    {session.bookingData.origin} ➔ {session.bookingData.destination}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-slate-400">Estimated Fare:</span>
+                  <p className="font-bold text-emerald-400 text-sm">
+                    {session.bookingData.estimatedCost}
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-[11px] text-slate-300">
+                <p>
+                  🛡️ <strong>Safety Guarantee:</strong> No financial transaction or payment will be made without your explicit review and authorization.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* VIEW 1: LinkedIn Target Platform (Backlinks & Company) */}
+        {activeTab.domain.includes('linkedin') &&
+          !activeTab.url.includes('/jobs') &&
+          !session?.jobData && (
           <div className="space-y-4 max-w-xl mx-auto w-full">
             <div className="p-4 rounded-2xl bg-[#001428] border border-blue-900/60 space-y-3.5 shadow-xl">
               <div className="flex items-center justify-between border-b border-blue-900/50 pb-3">

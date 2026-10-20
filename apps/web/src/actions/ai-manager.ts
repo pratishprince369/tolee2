@@ -550,8 +550,8 @@ export async function processAIPersonalMessage(
       response: result.content,
       action: result.toolUsed || result.metadata.intent.toUpperCase(),
       interactiveAction: result.interactiveAction,
-      approvalPayload: result.interactiveAction?.type === 'APPROVAL_REQUEST' ? result.interactiveAction.payload : undefined,
-      browserSession: result.interactiveAction?.type === 'BROWSER_SESSION' ? result.interactiveAction.payload : undefined,
+      approvalPayload: result.interactiveAction?.type === 'APPROVAL_REQUEST' ? result.interactiveAction.payload : (result as any).approvalPayload,
+      browserSession: (result as any).browserSession || (result.interactiveAction?.type === 'BROWSER_SESSION' ? result.interactiveAction.payload : undefined),
     };
   } catch (error: any) {
     console.error('Error in processAIPersonalMessage:', error);
