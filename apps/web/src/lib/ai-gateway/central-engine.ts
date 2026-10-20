@@ -608,10 +608,10 @@ export class CentralAIEngine {
 
     // 🌐 2b. Autonomous Backlink & Directory Operator (Muse Parity)
     const isBacklinkQuery =
-      /backlink|backlinks|muse|crunchbase|alternativeto|saashub|producthunt|directory submission|seo submission|website submission|promote tolee/i.test(rawMessage);
+      /backlink|backlinks|directory submission|seo submission|website submission|promote tolee|crunchbase|alternativeto|saashub|producthunt|(?:linked\s*in|twitter|medium|reddit).*?(?:backlink|link|submit|post|share)|(?:backlink|link|submit).*?(?:linked\s*in|twitter|medium|reddit)/i.test(rawMessage);
 
     if (isBacklinkQuery) {
-      const plan = BacklinkOperatorEngine.generateOperatorPlan(rawMessage);
+      const plan = await BacklinkOperatorEngine.generateDynamicOperatorPlan(rawMessage, history, options.userName || 'User');
       return {
         success: true,
         type: 'tool_result',
@@ -623,7 +623,7 @@ export class CentralAIEngine {
         files: [],
         interactiveAction: {
           type: 'BROWSER_SESSION',
-          label: 'Action required: Waiting for you · alternativeto.net',
+          label: `Action required: Waiting for you · ${plan.browserSession.targetDomain}`,
           payload: plan.browserSession,
         },
         metadata: {

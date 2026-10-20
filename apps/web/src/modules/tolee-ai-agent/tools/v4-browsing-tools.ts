@@ -727,7 +727,7 @@ export const V4_BROWSING_TOOLS: ToolDefinition[] = [
       },
     },
     execute: async (args: { target?: string }) => {
-      const plan = BacklinkOperatorEngine.generateOperatorPlan(args.target);
+      const plan = await BacklinkOperatorEngine.generateDynamicOperatorPlan(args.target);
       return {
         success: true,
         message: plan.message,

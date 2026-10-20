@@ -280,6 +280,74 @@ export function AIDashboard() {
     setIsMobileNavOpen(false);
   };
 
+  const handleStopTask = (targetMsgId?: string) => {
+    setBrowserSession((prev: any) =>
+      prev
+        ? { ...prev, isStopped: true, status: 'stopped', statusText: 'Task stopped by user' }
+        : { isStopped: true, status: 'stopped', statusText: 'Task stopped by user' }
+    );
+
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.browserSession
+          ? {
+              ...m,
+              browserSession: {
+                ...m.browserSession,
+                isStopped: true,
+                status: 'stopped',
+                statusText: 'Task stopped by user',
+              },
+            }
+          : m
+      )
+    );
+
+    const stopMsg: Message = {
+      id: `stop_${Date.now()}`,
+      sender: 'Tolee AI Manager',
+      text: '🛑 **Task Stopped.** The automated browser task has been paused. You can resume at any time or ask a new question.',
+      isAI: true,
+      time: formatTime(),
+    };
+    setMessages((prev) => [...prev, stopMsg]);
+
+    setActivities((prev) => [
+      {
+        id: `act_${Date.now()}`,
+        title: 'Browser Task Paused',
+        subtitle: 'Automated workflow halted by user',
+        time: formatTime(),
+        completed: false,
+      },
+      ...prev,
+    ]);
+  };
+
+  const handleResumeTask = (targetMsgId?: string) => {
+    setBrowserSession((prev: any) =>
+      prev
+        ? { ...prev, isStopped: false, status: 'waiting_user', statusText: 'Active · Waiting for verification' }
+        : null
+    );
+
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.browserSession
+          ? {
+              ...m,
+              browserSession: {
+                ...m.browserSession,
+                isStopped: false,
+                status: 'waiting_user',
+                statusText: 'Active · Waiting for verification',
+              },
+            }
+          : m
+      )
+    );
+  };
+
   const filteredThreads = threads.filter((t) =>
     t.title.toLowerCase().includes(searchThreadQuery.toLowerCase())
   );
@@ -712,14 +780,33 @@ export function AIDashboard() {
                 <div className="flex w-full justify-start">
                   <div className="flex items-center justify-between w-full max-w-[90%] sm:max-w-2xl bg-white dark:bg-[#18191e] border border-slate-200 dark:border-zinc-800 rounded-2xl p-3 shadow-xs mb-1">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-500 flex items-center justify-center shrink-0">
-                        <Globe className="w-4 h-4 animate-spin" />
+                      <div
+                        className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                          msg.browserSession.isStopped
+                            ? 'bg-rose-500/10 text-rose-500'
+                            : 'bg-amber-500/15 text-amber-500'
+                        }`}
+                      >
+                        <Globe className={`w-4 h-4 ${msg.browserSession.isStopped ? '' : 'animate-spin'}`} />
                       </div>
                       <div>
-                        <span className="text-xs font-bold text-slate-800 dark:text-zinc-200">
-                          Browser
-                        </span>
-                        <p className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-bold text-slate-800 dark:text-zinc-200">
+                            Browser Operator
+                          </span>
+                          {msg.browserSession.isStopped && (
+                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-rose-500/15 text-rose-400 font-bold">
+                              Paused
+                            </span>
+                          )}
+                        </div>
+                        <p
+                          className={`text-[11px] font-semibold ${
+                            msg.browserSession.isStopped
+                              ? 'text-slate-400 dark:text-zinc-500'
+                              : 'text-amber-600 dark:text-amber-400'
+                          }`}
+                        >
                           {msg.browserSession.statusText || 'Waiting for you...'}
                         </p>
                       </div>
@@ -735,16 +822,21 @@ export function AIDashboard() {
                       >
                         Open View
                       </button>
-                      <button
-                        onClick={() => {
-                          setBrowserSession((prev: any) =>
-                            prev ? { ...prev, isStopped: !prev.isStopped, statusText: 'Stopped by user' } : null
-                          );
-                        }}
-                        className="px-2.5 py-1 rounded-xl border border-slate-200 dark:border-zinc-700 text-xs font-semibold text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
-                      >
-                        Stop task
-                      </button>
+                      {msg.browserSession.isStopped ? (
+                        <button
+                          onClick={() => handleResumeTask(msg.id)}
+                          className="px-2.5 py-1 rounded-xl border border-emerald-300 dark:border-emerald-800 text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors cursor-pointer"
+                        >
+                          Resume task
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleStopTask(msg.id)}
+                          className="px-2.5 py-1 rounded-xl border border-slate-200 dark:border-zinc-700 text-xs font-semibold text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
+                        >
+                          Stop task
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -913,7 +1005,7 @@ export function AIDashboard() {
         {/* ========================================================= */}
         <div className="shrink-0 w-full p-2.5 sm:p-4 lg:p-6 bg-gradient-to-t from-white via-white/95 to-transparent dark:from-[#0c0d10] dark:via-[#0c0d10]/95 pb-[calc(4.8rem+env(safe-area-inset-bottom))] lg:pb-6 z-20">
           {/* Muse-Style "A task needs review" Floating Banner */}
-          {browserSession && browserSession.status === 'waiting_user' && (
+          {browserSession && browserSession.status === 'waiting_user' && !browserSession.isStopped && (
             <div className="max-w-3xl mx-auto mb-2.5 px-1 animate-in fade-in slide-in-from-bottom duration-200">
               <div className="flex items-center justify-between p-2.5 sm:p-3 rounded-2xl bg-amber-500/15 dark:bg-amber-950/40 border border-amber-500/30 shadow-xs">
                 <div className="flex items-center gap-2.5">
@@ -923,7 +1015,7 @@ export function AIDashboard() {
                       A task needs review
                     </p>
                     <p className="text-[11px] text-amber-700 dark:text-amber-300/80">
-                      {browserSession.statusText || 'AlternativeTo / Crunchbase verification is waiting for your click.'}
+                      {browserSession.statusText || 'Action required in live browser session.'}
                     </p>
                   </div>
                 </div>
@@ -1040,20 +1132,23 @@ export function AIDashboard() {
                   else setIsRightPanelOpen(false);
                   setRightPanelTab('tasks');
                 }}
-                onStopTask={() => {
-                  setBrowserSession((prev: any) =>
-                    prev ? { ...prev, isStopped: true, statusText: 'Stopped by user' } : null
-                  );
-                }}
+                onStopTask={handleStopTask}
+                onResumeTask={handleResumeTask}
                 onVerifyLink={async (siteId) => {
                   const res = await executeConfirmedAIAction('CONFIRM_BACKLINK_VERIFICATION', undefined, { siteId });
                   if (res.success) {
+                    const verifiedName =
+                      siteId === 'linkedin'
+                        ? 'LinkedIn'
+                        : siteId === 'alternativeto'
+                        ? 'AlternativeTo'
+                        : 'Crunchbase';
                     setMessages((prev) => [
                       ...prev,
                       {
                         id: `ai_${Date.now()}`,
                         sender: 'Tolee AI Manager',
-                        text: `✅ **Verified!** ${siteId === 'alternativeto' ? 'AlternativeTo' : 'Crunchbase'} backlink confirmation completed. Tolee AI has verified domain ownership. Next submission scheduled tomorrow at 11:15 AM.`,
+                        text: `✅ **Verified!** ${verifiedName} backlink confirmation completed. Tolee AI has verified domain ownership.`,
                         isAI: true,
                         time: formatTime(),
                       },
@@ -1061,7 +1156,7 @@ export function AIDashboard() {
                     setActivities((prev) => [
                       {
                         id: `act_${Date.now()}`,
-                        title: `${siteId === 'alternativeto' ? 'AlternativeTo' : 'Crunchbase'} Backlink Verified`,
+                        title: `${verifiedName} Backlink Verified`,
                         subtitle: 'Live backlink active for tolee.in',
                         time: formatTime(),
                         completed: true,
@@ -1070,8 +1165,10 @@ export function AIDashboard() {
                     ]);
                   }
                 }}
-                targetDomain={browserSession?.targetDomain || 'alternativeto.net'}
-                initialUrl={browserSession?.currentUrl || 'https://mail.google.com'}
+                session={browserSession}
+                targetDomain={browserSession?.targetDomain || 'linkedin.com'}
+                initialUrl={browserSession?.currentUrl || 'https://www.linkedin.com'}
+                isStopped={Boolean(browserSession?.isStopped)}
               />
             );
           }

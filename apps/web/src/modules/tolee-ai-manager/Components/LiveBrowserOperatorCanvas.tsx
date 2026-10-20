@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   ExternalLink,
@@ -13,66 +13,131 @@ import {
   AlertCircle,
   Mail,
   ShieldCheck,
-  ChevronDown,
+  Play,
+  Pause,
   ListOrdered,
   Sparkles,
+  Share2,
+  Copy,
+  Check,
 } from 'lucide-react';
-import { BacklinkSite, HIGH_AUTHORITY_BACKLINK_QUEUE } from '@/modules/tolee-ai-agent/browser/backlink-engine';
+import { HIGH_AUTHORITY_BACKLINK_QUEUE } from '@/modules/tolee-ai-agent/browser/backlink-engine';
 
-interface BrowserTab {
+export interface BrowserTab {
   id: string;
   title: string;
   domain: string;
   url: string;
-  status: 'action_required' | 'waiting_verification' | 'ready';
+  status: 'action_required' | 'waiting_verification' | 'ready' | 'stopped';
 }
 
-interface LiveBrowserOperatorCanvasProps {
+export interface LiveBrowserOperatorCanvasProps {
   onClose: () => void;
   onStopTask?: () => void;
+  onResumeTask?: () => void;
   onVerifyLink?: (siteId: string) => Promise<void>;
+  session?: any;
   targetDomain?: string;
   initialUrl?: string;
+  isStopped?: boolean;
 }
 
 export function LiveBrowserOperatorCanvas({
   onClose,
   onStopTask,
+  onResumeTask,
   onVerifyLink,
-  targetDomain = 'alternativeto.net',
-  initialUrl = 'https://mail.google.com',
+  session,
+  targetDomain = 'linkedin.com',
+  initialUrl,
+  isStopped = false,
 }: LiveBrowserOperatorCanvasProps) {
-  const [tabs, setTabs] = useState<BrowserTab[]>([
-    {
-      id: 'crunchbase',
-      title: 'crunchbase.com',
-      domain: 'crunchbase.com',
-      url: 'https://www.crunchbase.com/organization/tolee',
-      status: 'waiting_verification',
-    },
-    {
-      id: 'alternativeto',
-      title: 'alternativeto.net',
-      domain: 'alternativeto.net',
-      url: 'https://alternativeto.net/software/tolee/',
-      status: 'action_required',
-    },
-    {
-      id: 'gmail',
-      title: 'mail.google.com',
-      domain: 'mail.google.com',
-      url: 'https://mail.google.com/mail/u/0/#inbox',
-      status: 'ready',
-    },
-  ]);
+  // Build initial tabs from session or defaults
+  const getInitialTabs = (): BrowserTab[] => {
+    if (session?.tabs && Array.isArray(session.tabs) && session.tabs.length > 0) {
+      return session.tabs;
+    }
+    const domain = targetDomain || 'linkedin.com';
+    if (domain.includes('linkedin')) {
+      return [
+        {
+          id: 'linkedin',
+          title: 'linkedin.com',
+          domain: 'linkedin.com',
+          url: initialUrl || 'https://www.linkedin.com/company/setup/new/',
+          status: 'action_required',
+        },
+        {
+          id: 'tolee',
+          title: 'tolee.in',
+          domain: 'tolee.in',
+          url: 'https://tolee.in',
+          status: 'ready',
+        },
+      ];
+    }
+    return [
+      {
+        id: domain.replace(/[^a-z0-9]/g, '_'),
+        title: domain,
+        domain: domain,
+        url: initialUrl || `https://${domain}`,
+        status: 'action_required',
+      },
+      {
+        id: 'tolee',
+        title: 'tolee.in',
+        domain: 'tolee.in',
+        url: 'https://tolee.in',
+        status: 'ready',
+      },
+    ];
+  };
 
-  const [activeTabId, setActiveTabId] = useState<string>('alternativeto');
+  const [tabs, setTabs] = useState<BrowserTab[]>(getInitialTabs);
+  const [activeTabId, setActiveTabId] = useState<string>(() => {
+    return session?.activeTabId || (tabs[0]?.id || 'linkedin');
+  });
+
   const [isUserControl, setIsUserControl] = useState<boolean>(false);
   const [verifiedSites, setVerifiedSites] = useState<Set<string>>(new Set());
   const [isVerifying, setIsVerifying] = useState<boolean>(false);
   const [showQueueDrawer, setShowQueueDrawer] = useState<boolean>(false);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
-  const activeTab = tabs.find((t) => t.id === activeTabId) || tabs[1];
+  // Sync tabs when session changes
+  useEffect(() => {
+    if (session?.tabs && Array.isArray(session.tabs) && session.tabs.length > 0) {
+      setTabs(session.tabs);
+      if (session.activeTabId) {
+        setActiveTabId(session.activeTabId);
+      }
+    }
+  }, [session]);
+
+  const activeTab = tabs.find((t) => t.id === activeTabId) || tabs[0] || {
+    id: 'target',
+    title: targetDomain,
+    domain: targetDomain,
+    url: initialUrl || `https://${targetDomain}`,
+    status: 'action_required',
+  };
+
+  const [urlInput, setUrlInput] = useState<string>(activeTab.url);
+
+  useEffect(() => {
+    if (activeTab?.url) {
+      setUrlInput(activeTab.url);
+    }
+  }, [activeTab?.url]);
+
+  const handleCopy = (key: string, text: string) => {
+    try {
+      navigator.clipboard.writeText(text);
+      setCopiedKey(key);
+      setTimeout(() => setCopiedKey(null), 2000);
+    } catch (_) {}
+  };
 
   const handleVerifyClick = async (siteId: string) => {
     setIsVerifying(true);
@@ -81,46 +146,62 @@ export function LiveBrowserOperatorCanvas({
         await onVerifyLink(siteId);
       }
       setVerifiedSites((prev) => new Set([...prev, siteId]));
-      // Update tab status
       setTabs((prev) =>
-        prev.map((t) =>
-          t.id === siteId ? { ...t, status: 'ready' as const } : t
-        )
+        prev.map((t) => (t.id === siteId ? { ...t, status: 'ready' as const } : t))
       );
     } finally {
       setIsVerifying(false);
     }
   };
 
+  const isTaskHalted = Boolean(isStopped || session?.isStopped || session?.status === 'stopped');
+
   return (
     <div className="flex flex-col h-full bg-slate-900 text-slate-100 font-sans select-none overflow-hidden border-l border-slate-700/80 shadow-2xl">
-      {/* ── 1. Top Header: Action Required & Controls (Exact Muse Layout) ── */}
+      {/* ── 1. Top Header: Status & Controls ── */}
       <div className="bg-slate-950 px-3 py-2.5 flex items-center justify-between border-b border-slate-800 gap-2 shrink-0">
-        {/* Left: Action Required Badge */}
+        {/* Left: Status Badge */}
         <div className="flex items-center gap-2 min-w-0">
-          <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
+          {isTaskHalted ? (
+            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0" />
+          ) : (
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
+          )}
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
-              <span className="font-extrabold text-xs text-white tracking-tight">
-                Action required
+              <span className={`font-extrabold text-xs tracking-tight ${isTaskHalted ? 'text-rose-400' : 'text-white'}`}>
+                {isTaskHalted ? 'Task Paused' : 'Action required'}
               </span>
             </div>
             <p className="text-[11px] text-slate-400 truncate flex items-center gap-1">
-              <span>Waiting for you · {activeTab.domain}</span>
+              <span>{isTaskHalted ? 'Stopped by user' : `Waiting for you · ${activeTab.domain}`}</span>
               <ExternalLink className="w-2.5 h-2.5 text-slate-500" />
             </p>
           </div>
         </div>
 
-        {/* Right: Actions (Stop, Take control, Close) */}
+        {/* Right: Actions (Stop/Resume, Take control, Close) */}
         <div className="flex items-center gap-1.5 shrink-0">
-          {onStopTask && (
-            <button
-              onClick={onStopTask}
-              className="px-2.5 py-1 rounded-lg text-xs font-semibold text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 border border-rose-900/60 transition-colors cursor-pointer"
-            >
-              Stop
-            </button>
+          {isTaskHalted ? (
+            onResumeTask && (
+              <button
+                onClick={onResumeTask}
+                className="px-2.5 py-1 rounded-lg text-xs font-semibold text-emerald-400 hover:text-emerald-300 hover:bg-emerald-950/40 border border-emerald-800/60 transition-colors cursor-pointer flex items-center gap-1"
+              >
+                <Play className="w-3 h-3 fill-current" />
+                <span>Resume</span>
+              </button>
+            )
+          ) : (
+            onStopTask && (
+              <button
+                onClick={onStopTask}
+                className="px-2.5 py-1 rounded-lg text-xs font-semibold text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 border border-rose-900/60 transition-colors cursor-pointer flex items-center gap-1"
+              >
+                <Pause className="w-3 h-3" />
+                <span>Stop</span>
+              </button>
+            )
           )}
 
           <button
@@ -167,12 +248,12 @@ export function LiveBrowserOperatorCanvas({
               ) : (
                 <Globe className="w-3.5 h-3.5 text-slate-400 shrink-0" />
               )}
-              <span className="truncate">{tab.domain}</span>
+              <span className="truncate">{tab.domain || tab.title}</span>
             </button>
           );
         })}
 
-        {/* View ~25 Queue Sites Toggle */}
+        {/* Directory Queue Toggle */}
         <button
           onClick={() => setShowQueueDrawer(!showQueueDrawer)}
           className="ml-auto px-2 py-1 text-[11px] font-bold text-teal-400 hover:text-teal-300 hover:bg-slate-800 rounded-lg flex items-center gap-1 shrink-0 transition-colors"
@@ -186,43 +267,214 @@ export function LiveBrowserOperatorCanvas({
       {/* ── 3. Browser Navigation & URL Bar ── */}
       <div className="bg-slate-900 px-3 py-1.5 flex items-center gap-2 border-b border-slate-800 shrink-0">
         <div className="flex items-center gap-1 text-slate-400">
-          <button className="p-1 hover:text-white rounded transition-colors">
+          <button className="p-1 hover:text-white rounded transition-colors" title="Back">
             <ArrowLeft className="w-3.5 h-3.5" />
           </button>
-          <button className="p-1 hover:text-white rounded transition-colors">
+          <button className="p-1 hover:text-white rounded transition-colors" title="Forward">
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
-          <button className="p-1 hover:text-white rounded transition-colors">
+          <button
+            onClick={() => setUrlInput(activeTab.url)}
+            className="p-1 hover:text-white rounded transition-colors"
+            title="Reload"
+          >
             <RotateCw className="w-3.5 h-3.5" />
           </button>
         </div>
 
-        {/* URL Pill */}
+        {/* URL Pill / Input */}
         <div className="flex-1 flex items-center gap-1.5 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-300 font-mono">
           <Lock className="w-3 h-3 text-emerald-400 shrink-0" />
-          <span className="truncate">{activeTab.url}</span>
+          {isUserControl ? (
+            <input
+              type="text"
+              value={urlInput}
+              onChange={(e) => setUrlInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  setTabs((prev) =>
+                    prev.map((t) => (t.id === activeTabId ? { ...t, url: urlInput } : t))
+                  );
+                }
+              }}
+              className="bg-transparent w-full text-slate-100 outline-none text-xs font-mono"
+            />
+          ) : (
+            <span className="truncate">{activeTab.url}</span>
+          )}
         </div>
+
+        {/* Direct Open Button */}
+        <a
+          href={activeTab.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="p-1 text-slate-400 hover:text-white rounded transition-colors"
+          title="Open in new window"
+        >
+          <ExternalLink className="w-3.5 h-3.5" />
+        </a>
       </div>
 
       {/* ── User Control Active Notice Banner ── */}
       {isUserControl && (
         <div className="bg-blue-600/90 text-white px-3 py-1 text-xs font-semibold flex items-center justify-between shrink-0">
-          <span>🎮 Direct browser control active. Click the verification link to proceed.</span>
-          <button
-            onClick={() => setIsUserControl(false)}
-            className="text-[11px] underline font-bold"
-          >
+          <span>🎮 Direct browser control active. You can edit URL or operate directly.</span>
+          <button onClick={() => setIsUserControl(false)} className="text-[11px] underline font-bold">
             Done
           </button>
         </div>
       )}
 
+      {/* ── Task Paused Notice Banner ── */}
+      {isTaskHalted && (
+        <div className="bg-rose-950/60 border-b border-rose-900/50 text-rose-300 px-3 py-1.5 text-xs font-semibold flex items-center justify-between shrink-0">
+          <span>🛑 Task is paused by user. Automated operations are halted.</span>
+          {onResumeTask && (
+            <button onClick={onResumeTask} className="text-[11px] underline font-bold text-white">
+              Resume Task
+            </button>
+          )}
+        </div>
+      )}
+
       {/* ── 4. Live Browser Canvas / Viewport ── */}
       <div className="flex-1 bg-slate-950 p-4 overflow-y-auto relative flex flex-col justify-between">
-        {/* TAB: AlternativeTo */}
-        {activeTabId === 'alternativeto' && (
+        {/* VIEW 1: LinkedIn Target Platform */}
+        {activeTab.domain.includes('linkedin') && (
           <div className="space-y-4 max-w-xl mx-auto w-full">
-            {/* AlternativeTo Header Mock */}
+            <div className="p-4 rounded-2xl bg-[#001428] border border-blue-900/60 space-y-3.5 shadow-xl">
+              <div className="flex items-center justify-between border-b border-blue-900/50 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-[#0a66c2] text-white flex items-center justify-center font-black text-lg shadow-sm">
+                    in
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm text-white flex items-center gap-1.5">
+                      <span>LinkedIn Profile & Company Backlink</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-blue-500/20 text-blue-300 border border-blue-500/30 font-bold">
+                        DA 98
+                      </span>
+                    </h4>
+                    <span className="text-[10px] text-blue-300 font-medium">
+                      High-Authority Direct Indexable Links • Official Domain Authority
+                    </span>
+                  </div>
+                </div>
+                <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 font-semibold">
+                  {verifiedSites.has('linkedin') ? 'Verified' : 'Human Login Required'}
+                </span>
+              </div>
+
+              {/* 1. Company Page Setup */}
+              <div className="space-y-2.5 text-xs bg-slate-900/80 p-3.5 rounded-xl border border-slate-800">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-white text-xs flex items-center gap-1">
+                    <span>1. Company Page Website Link</span>
+                    <span className="text-[10px] text-emerald-400 font-semibold">(Public & Permanent)</span>
+                  </span>
+                  <a
+                    href="https://www.linkedin.com/company/setup/new/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] text-blue-400 hover:text-blue-300 flex items-center gap-1 font-bold underline"
+                  >
+                    <span>Open Setup</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-[11px] pt-1">
+                  <div>
+                    <span className="text-slate-400">Company Name:</span>
+                    <p className="font-bold text-slate-200">Tolee</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-400">Website URL:</span>
+                    <div className="flex items-center justify-between bg-slate-950 px-2 py-1 rounded border border-slate-800 mt-0.5">
+                      <span className="font-mono text-teal-400 font-bold truncate">https://tolee.in</span>
+                      <button
+                        onClick={() => handleCopy('tolee_url', 'https://tolee.in')}
+                        className="text-[10px] text-slate-400 hover:text-white ml-1 font-sans cursor-pointer"
+                      >
+                        {copiedKey === 'tolee_url' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-slate-400">Industry:</span>
+                    <p className="text-slate-300 font-medium">Technology, Information and Internet • Social Networking</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. Personal Profile Featured / Bio Link */}
+              <div className="space-y-2 text-xs bg-slate-900/80 p-3.5 rounded-xl border border-slate-800">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-white text-xs">2. Personal Profile Header / Custom Link</span>
+                  <span className="text-[10px] text-slate-400">Instant setup</span>
+                </div>
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  Apne LinkedIn profile header me <strong>Edit intro &rarr; Custom button</strong> select karein, link me <code className="text-teal-400">https://tolee.in</code> aur button text me <strong>"Visit Website"</strong> daalein.
+                </p>
+              </div>
+
+              {/* 3. Pulse Article Draft */}
+              <div className="space-y-2 text-xs bg-slate-900/80 p-3.5 rounded-xl border border-slate-800">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-white text-xs">3. LinkedIn Pulse Article Strategy</span>
+                  <button
+                    onClick={() => {
+                      const article = `Introducing Tolee: The Next-Gen AI Social Network\n\nTolee combines personal AI co-pilots, neighborhood discovery (Radar), reels, ad-free music streaming, and creator monetization in one platform.\n\nLearn more and join the ecosystem: https://tolee.in`;
+                      handleCopy('article', article);
+                    }}
+                    className="text-[10px] px-2.5 py-1 rounded-lg bg-blue-600/30 text-blue-300 hover:bg-blue-600/50 transition-colors font-bold cursor-pointer"
+                  >
+                    {copiedKey === 'article' ? 'Copied Article Draft!' : 'Copy Article Draft'}
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  Publish an article with anchor keyword pointing to tolee.in for high semantic SEO authority.
+                </p>
+              </div>
+
+              {/* Human Takeover Notice */}
+              <div className="p-3.5 rounded-xl bg-blue-950/60 border border-blue-800/60 space-y-2.5 mt-2">
+                <div className="flex items-start gap-2">
+                  <ShieldCheck className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold text-xs text-blue-200">
+                      Action required: Human Login / Takeover
+                    </p>
+                    <p className="text-[11px] text-blue-300/80 leading-normal mt-0.5">
+                      LinkedIn requires personal account login and 2FA. Click <strong>"Open LinkedIn Setup"</strong> or use <strong>"Take control of the browser"</strong> to sign in and confirm the link.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    onClick={() => window.open('https://www.linkedin.com/company/setup/new/', '_blank')}
+                    className="flex-1 py-2 rounded-xl bg-[#0a66c2] hover:bg-[#004182] text-white font-black text-xs shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>Open LinkedIn in New Window</span>
+                  </button>
+                  <button
+                    onClick={() => handleVerifyClick('linkedin')}
+                    className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1 transition-all cursor-pointer"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Mark as Added</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* VIEW 2: AlternativeTo */}
+        {activeTab.domain.includes('alternativeto') && (
+          <div className="space-y-4 max-w-xl mx-auto w-full">
             <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3 shadow-md">
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                 <div className="flex items-center gap-2.5">
@@ -241,7 +493,6 @@ export function LiveBrowserOperatorCanvas({
                 </span>
               </div>
 
-              {/* Tolee Listing Details Pre-filled */}
               <div className="space-y-2 text-xs">
                 <div>
                   <span className="text-slate-400">Software Name:</span>
@@ -252,18 +503,13 @@ export function LiveBrowserOperatorCanvas({
                   <p className="font-bold text-teal-400 underline">https://tolee.in</p>
                 </div>
                 <div>
-                  <span className="text-slate-400">Category & Alternatives:</span>
-                  <p className="text-slate-300">Social Networking • Alternative to Instagram, X (Twitter), TikTok</p>
-                </div>
-                <div>
                   <span className="text-slate-400">Description:</span>
                   <p className="text-slate-300 leading-relaxed">
-                    AI-powered next-gen social media platform featuring personal AI Manager, Reels, neighborhood discovery (Radar), ad-free songs streaming, and creator monetization.
+                    AI-powered next-gen social media platform featuring personal AI Manager, Reels, neighborhood discovery (Radar), and ad-free songs.
                   </p>
                 </div>
               </div>
 
-              {/* Human-in-the-Loop Action Card */}
               {!verifiedSites.has('alternativeto') ? (
                 <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-2 mt-3">
                   <div className="flex items-start gap-2">
@@ -273,7 +519,7 @@ export function LiveBrowserOperatorCanvas({
                         Email Verification Link Click Required
                       </p>
                       <p className="text-[11px] text-amber-300/80 leading-normal mt-0.5">
-                        AlternativeTo requires a human confirmation click on their email link to verify domain ownership of <strong>tolee.in</strong>.
+                        AlternativeTo requires confirming domain ownership of <strong>tolee.in</strong>.
                       </p>
                     </div>
                   </div>
@@ -303,8 +549,8 @@ export function LiveBrowserOperatorCanvas({
           </div>
         )}
 
-        {/* TAB: Crunchbase */}
-        {activeTabId === 'crunchbase' && (
+        {/* VIEW 3: Crunchbase */}
+        {activeTab.domain.includes('crunchbase') && (
           <div className="space-y-4 max-w-xl mx-auto w-full">
             <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3 shadow-md">
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -333,10 +579,6 @@ export function LiveBrowserOperatorCanvas({
                   <span className="text-slate-400">Website:</span>
                   <p className="font-bold text-blue-400 underline">https://tolee.in</p>
                 </div>
-                <div>
-                  <span className="text-slate-400">Headquarters & Sector:</span>
-                  <p className="text-slate-300">India • Social Media, Artificial Intelligence, Creator Economy</p>
-                </div>
               </div>
 
               {!verifiedSites.has('crunchbase') ? (
@@ -363,8 +605,8 @@ export function LiveBrowserOperatorCanvas({
           </div>
         )}
 
-        {/* TAB: Gmail Verification Simulation */}
-        {activeTabId === 'gmail' && (
+        {/* VIEW 4: Gmail Verification */}
+        {activeTab.domain.includes('mail.google') && (
           <div className="space-y-3 max-w-xl mx-auto w-full">
             <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3 shadow-md">
               <div className="flex items-center gap-2 text-xs font-bold text-slate-300 border-b border-slate-800 pb-2">
@@ -380,12 +622,9 @@ export function LiveBrowserOperatorCanvas({
                 <p className="text-[11px] text-slate-400 font-medium">
                   Confirm ownership of Tolee on AlternativeTo
                 </p>
-                <p className="text-[11px] text-slate-300 leading-relaxed pt-1">
-                  Hi Team Tolee, please confirm that you manage the domain <strong>tolee.in</strong> to complete the software listing.
-                </p>
                 <button
                   onClick={() => handleVerifyClick('alternativeto')}
-                  className="mt-2 px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs"
+                  className="mt-2 px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs cursor-pointer"
                 >
                   Confirm Ownership Link
                 </button>
@@ -393,6 +632,56 @@ export function LiveBrowserOperatorCanvas({
             </div>
           </div>
         )}
+
+        {/* VIEW 5: Universal Target Domain View (Fallback for any website) */}
+        {!activeTab.domain.includes('linkedin') &&
+          !activeTab.domain.includes('alternativeto') &&
+          !activeTab.domain.includes('crunchbase') &&
+          !activeTab.domain.includes('mail.google') && (
+            <div className="space-y-4 max-w-xl mx-auto w-full">
+              <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3 shadow-md">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-teal-500/20 text-teal-400 flex items-center justify-center font-bold text-sm">
+                      <Globe className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-sm text-white">{activeTab.domain}</h4>
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        {activeTab.url}
+                      </span>
+                    </div>
+                  </div>
+                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30 font-semibold">
+                    Live Target
+                  </span>
+                </div>
+
+                <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2 text-xs">
+                  <p className="text-slate-300 leading-relaxed">
+                    Target website <strong>{activeTab.domain}</strong> is active in your browser workspace. Click below to inspect, take control, or open in a new window.
+                  </p>
+                  <div className="flex items-center gap-2 pt-2">
+                    <a
+                      href={activeTab.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3.5 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs flex items-center gap-1.5 transition-colors"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>Open Website</span>
+                    </a>
+                    <button
+                      onClick={() => setIsUserControl(true)}
+                      className="px-3.5 py-1.5 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-200 font-bold text-xs transition-colors cursor-pointer"
+                    >
+                      Take Control
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
         {/* ── ~25 Sites Queue Drawer (Toggleable) ── */}
         {showQueueDrawer && (
