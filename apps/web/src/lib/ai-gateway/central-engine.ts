@@ -10,6 +10,7 @@ import { ToleeRealityValidator } from './reality-validator';
 import { ToleeFastPath } from './fast-path';
 import { isPersonQuery } from '@/lib/web-search';
 import { OpenHiggsfieldMediaService } from '@/modules/tolee-ai-agent/media/generation-service';
+import { BacklinkOperatorEngine } from '@/modules/tolee-ai-agent/browser/backlink-engine';
 
 // -------------------------------------------------------------
 // TYPES & INTERFACES
@@ -605,7 +606,35 @@ export class CentralAIEngine {
     // 🧠 2. Intent Classification
     const intent = classifyIntelligenceIntent(rawMessage, hasMedia, mediaType);
 
-    // ⚡ 2b. FAST PATH: Instant Direct LLM for General Knowledge & Conversational Queries
+    // 🌐 2b. Autonomous Backlink & Directory Operator (Muse Parity)
+    const isBacklinkQuery =
+      /backlink|backlinks|muse|crunchbase|alternativeto|saashub|producthunt|directory submission|seo submission|website submission|promote tolee/i.test(rawMessage);
+
+    if (isBacklinkQuery) {
+      const plan = BacklinkOperatorEngine.generateOperatorPlan(rawMessage);
+      return {
+        success: true,
+        type: 'tool_result',
+        content: plan.message,
+        model: 'tolee-backlink-operator',
+        provider: 'tolee-core',
+        toolUsed: 'automate_backlink_submission',
+        image: null,
+        files: [],
+        interactiveAction: {
+          type: 'BROWSER_SESSION',
+          label: 'Action required: Waiting for you · alternativeto.net',
+          payload: plan.browserSession,
+        },
+        metadata: {
+          latencyMs: Date.now() - startTime,
+          intent: 'backlink_operator',
+          fallbackUsed: false,
+        },
+      };
+    }
+
+    // ⚡ 2c. FAST PATH: Instant Direct LLM for General Knowledge & Conversational Queries
     // If not media, not platform action, and query does not require DB tools -> Execute fast path (1-3s)
     if (!hasMedia && intent !== 'image_generation' && intent !== 'document_analysis' && intent !== 'platform_action' && ToleeFastPath.isFastPathCandidate(rawMessage)) {
       try {

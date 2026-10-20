@@ -56,7 +56,11 @@ export class ToleeFastPath {
       // Music & Songs
       'song', 'gana', 'gaana', 'music', 'bajao', 'chalao', 'sunao', 'play',
       // News
-      'news', 'khabar', 'samachar', 'headline', 'breaking'
+      'news', 'khabar', 'samachar', 'headline', 'breaking',
+      // Autonomous Backlinks & Browser Automation (Muse parity)
+      'backlink', 'backlinks', 'muse', 'crunchbase', 'alternativeto', 'saashub',
+      'producthunt', 'directory submission', 'seo submission', 'browser automation',
+      'automate backlink', 'backlink banao', 'backlink bana'
     ];
 
     const requiresToleeData = toleeKeywords.some(kw => q.includes(kw));
@@ -136,19 +140,18 @@ Respond directly, accurately, and concisely in natural Hindi, Hinglish, or Engli
       { role: 'user', content: finalUserContent },
     ];
 
-    // 1. Primary: NVIDIA NIM (Fastest frontier model with multi-key failover)
-    for (let attempt = 0; attempt < Math.min(3, FAST_NVIDIA_KEYS.length); attempt++) {
-      const apiKey = FAST_NVIDIA_KEYS[(Math.floor(Math.random() * FAST_NVIDIA_KEYS.length) + attempt) % FAST_NVIDIA_KEYS.length];
-      if (!apiKey) continue;
+    // 1. Primary: NVIDIA NIM (Fast frontier model with 3.5s timeout)
+    const primaryKey = FAST_NVIDIA_KEYS[0];
+    if (primaryKey) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 12000); // 12 second deadline
+        const timeoutId = setTimeout(() => controller.abort(), 3500); // 3.5s fail-fast deadline
 
         const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${apiKey}`,
+            Authorization: `Bearer ${primaryKey}`,
             Accept: 'application/json',
           },
           body: JSON.stringify({
@@ -166,7 +169,6 @@ Respond directly, accurately, and concisely in natural Hindi, Hinglish, or Engli
           const data = await response.json();
           const content = data.choices?.[0]?.message?.content?.trim();
           if (content) {
-            // Validate response against reality & anti-hallucination guard
             const validated = ToleeRealityValidator.validate(content, {
               userMessage: message,
               searchEvidence: liveWebContext,
@@ -182,8 +184,61 @@ Respond directly, accurately, and concisely in natural Hindi, Hinglish, or Engli
           }
         }
       } catch (err: any) {
-        console.warn(`[FastPath] Primary NVIDIA attempt ${attempt + 1} notice:`, err?.message);
+        // Fast failover to Pollinations
       }
+    }
+
+    // 2. High-Speed Fallback: Pollinations Multi-Model Gateway (1-2s response)
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+      const pollRes = await fetch('https://gen.pollinations.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'openai',
+          messages: apiMessages,
+          temperature: groundingContext ? 0.1 : 0.3,
+          max_tokens: 600,
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (pollRes.ok) {
+        const pollData = await pollRes.json();
+        const content = pollData.choices?.[0]?.message?.content?.trim();
+        if (content) {
+          return {
+            success: true,
+            text: content,
+            provider: 'pollinations-ai',
+            model: 'openai',
+            latencyMs: Date.now() - startTime,
+          };
+        }
+      }
+    } catch (pollErr: any) {
+      // Fallback to direct raw text endpoint
+      try {
+        const rawRes = await fetch(`https://text.pollinations.ai/${encodeURIComponent(message)}?system=${encodeURIComponent(systemPrompt.slice(0, 300))}`);
+        if (rawRes.ok) {
+          const rawText = await rawRes.text();
+          if (rawText && rawText.trim()) {
+            return {
+              success: true,
+              text: rawText.trim(),
+              provider: 'pollinations-text',
+              model: 'default',
+              latencyMs: Date.now() - startTime,
+            };
+          }
+        }
+      } catch {}
     }
 
     // 2. Intelligent Deterministic Fallback for Core Common Knowledge

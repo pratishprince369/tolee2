@@ -4,6 +4,7 @@ import { ApprovalEngine } from '../approvals/approval-engine';
 import { AgentTaskManager } from '../tasks/agent-task-manager';
 import { prisma } from '@/lib/prisma';
 import { searchAndGroundQuery } from '@/lib/web-search';
+import { BacklinkOperatorEngine } from '../browser/backlink-engine';
 
 /**
  * 🌐 V4 Browsing, Browser Automation, Job Search & Task Automation Tools
@@ -706,6 +707,35 @@ export const V4_BROWSING_TOOLS: ToolDefinition[] = [
           error: `Failed to create task plan: ${err.message}`,
         };
       }
+    },
+  },
+
+  // --------------------------------------------------------------------------
+  // 12. automate_backlink_submission (Muse Parity)
+  // --------------------------------------------------------------------------
+  {
+    name: 'automate_backlink_submission',
+    description: 'Autonomous white-hat backlink and business directory submission operator (Crunchbase, AlternativeTo, Product Hunt, SaaSHub). Prepares profile, manages email verification, and syncs live browser canvas.',
+    riskLevel: 'LOW',
+    parameters: {
+      type: 'object',
+      properties: {
+        target: {
+          type: 'string',
+          description: 'Specific platform or all quality queue (e.g., "all", "crunchbase", "alternativeto").',
+        },
+      },
+    },
+    execute: async (args: { target?: string }) => {
+      const plan = BacklinkOperatorEngine.generateOperatorPlan(args.target);
+      return {
+        success: true,
+        message: plan.message,
+        data: {
+          state: plan.state,
+          browserSession: plan.browserSession,
+        },
+      };
     },
   },
 ];

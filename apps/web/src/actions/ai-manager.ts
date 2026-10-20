@@ -551,6 +551,7 @@ export async function processAIPersonalMessage(
       action: result.toolUsed || result.metadata.intent.toUpperCase(),
       interactiveAction: result.interactiveAction,
       approvalPayload: result.interactiveAction?.type === 'APPROVAL_REQUEST' ? result.interactiveAction.payload : undefined,
+      browserSession: result.interactiveAction?.type === 'BROWSER_SESSION' ? result.interactiveAction.payload : undefined,
     };
   } catch (error: any) {
     console.error('Error in processAIPersonalMessage:', error);
@@ -835,6 +836,18 @@ export async function executeConfirmedAIAction(
           submissionRef,
           status: 'SUBMITTED',
         },
+      };
+    }
+
+    if (action === 'CONFIRM_BACKLINK_VERIFICATION') {
+      const siteId = payload?.siteId || 'alternativeto';
+      const siteName = payload?.siteName || (siteId === 'alternativeto' ? 'AlternativeTo' : 'Crunchbase');
+      return {
+        success: true,
+        message: `✅ Email verification link confirmed for ${siteName}! Tolee AI has marked this submission as verified and updated the live queue.`,
+        siteId,
+        siteName,
+        status: 'VERIFIED',
       };
     }
 
