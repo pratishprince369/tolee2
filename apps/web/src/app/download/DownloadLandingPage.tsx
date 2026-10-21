@@ -74,9 +74,9 @@ export function DownloadLandingPage() {
           <div className="order-2 lg:order-1 lg:col-span-7 flex flex-col items-center lg:items-start text-center lg:text-left">
             
             {/* Tag badge */}
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800/60 text-xs font-black text-red-600 dark:text-red-400 mb-4 animate-bounce">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-50 dark:bg-teal-950/50 border border-teal-200 dark:border-teal-800/60 text-xs font-black text-teal-700 dark:text-teal-300 mb-4">
               <Rocket className="w-3.5 h-3.5" />
-              <span>LIMITED PROMO: FREE BOOSTING FOR 6 MONTHS</span>
+              <span>EXPLORE & GROW WITH TOLEE</span>
             </div>
 
             {/* Headline */}
@@ -137,7 +137,7 @@ export function DownloadLandingPage() {
               <div className="relative rounded-3xl overflow-hidden border border-slate-200/90 dark:border-zinc-800/90 shadow-2xl bg-white dark:bg-zinc-950 aspect-square flex items-center justify-center">
                 <Image
                   src="/tolee-boost-poster.jpg"
-                  alt="Get Free Boosting For 6 Month - Download Tolee Now"
+                  alt="Download Tolee App Now"
                   width={640}
                   height={640}
                   priority
@@ -173,11 +173,11 @@ export function DownloadLandingPage() {
                 <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-snug">
                   Download Tolee App Now
                 </h2>
-                <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-gradient-to-r from-red-500/10 via-amber-500/10 to-emerald-500/10 border border-red-500/20 text-red-600 dark:text-red-400 font-extrabold text-xs sm:text-sm">
-                  <span>🎉 Get 6 Month Boosting on Tolee Free!</span>
+                <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-teal-500/10 border border-teal-500/20 text-[#0E9F9A] dark:text-teal-400 font-extrabold text-xs sm:text-sm">
+                  <span>🚀 Hyperlocal Community & Growth</span>
                 </div>
                 <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 mt-2 font-medium">
-                  Connect. Create. Belong. Claim your 6-month free boost directly inside the app.
+                  Connect. Create. Belong. Supercharge your reach with verified local communities.
                 </p>
               </div>
 
@@ -185,7 +185,7 @@ export function DownloadLandingPage() {
               <div className="space-y-3 mb-6 bg-slate-50 dark:bg-zinc-900/60 p-4 rounded-2xl border border-slate-100 dark:border-zinc-800/80">
                 <div className="flex items-start gap-2.5 text-xs font-semibold text-slate-700 dark:text-zinc-300">
                   <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                  <span>Free 6 months product & business promotion</span>
+                  <span>Powerful product & business promotions</span>
                 </div>
                 <div className="flex items-start gap-2.5 text-xs font-semibold text-slate-700 dark:text-zinc-300">
                   <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />

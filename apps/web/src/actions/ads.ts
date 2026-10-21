@@ -7,6 +7,7 @@ import { revalidatePath } from 'next/cache';
 import { isVideoUrl } from '@/lib/media';
 import bcrypt from 'bcryptjs';
 import { processReferralAdSpendCommission, reverseReferralAdSpendCommission } from '@/lib/referralService';
+import { getActiveBoostMembership } from '@/lib/membership-service';
 
 // Helper to get active session user ID
 async function getUserId() {
@@ -258,19 +259,12 @@ export async function getUserWallet() {
     const referralCode = user?.username || userId;
     const referralLink = `https://www.tolee.in/ref/${referralCode}`;
 
-    // 6-Month Free Boosting eligibility calculation
-    const userRecord = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { createdAt: true }
-    });
-    const sixMonthsAgo = new Date();
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-    const userJoinDate = userRecord?.createdAt ? new Date(userRecord.createdAt) : new Date();
-    const isFreeBoostEligible = userJoinDate > sixMonthsAgo;
-
-    const sixMonthsAfterJoin = new Date(userJoinDate);
-    sixMonthsAfterJoin.setMonth(sixMonthsAfterJoin.getMonth() + 6);
-    const freeBoostDaysRemaining = Math.max(0, Math.ceil((sixMonthsAfterJoin.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+    // Boost Membership eligibility calculation (Unlimited Boost Membership)
+    const boostMembership = await getActiveBoostMembership(userId);
+    const isFreeBoostEligible = !!boostMembership;
+    const freeBoostDaysRemaining = boostMembership
+      ? Math.max(0, Math.ceil((boostMembership.expiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+      : 0;
 
     return {
       success: true,
@@ -468,16 +462,9 @@ export async function createQuickBoostAction(
       return { success: false, error: 'Invalid longitude coordinate' };
     }
 
-    // Check 6 months free boost eligibility from join date
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { createdAt: true }
-    });
-
-    const sixMonthsAgo = new Date();
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-    const userCreatedAt = user?.createdAt ? new Date(user.createdAt) : new Date();
-    const isFreeBoostEligible = userCreatedAt > sixMonthsAgo;
+    // Check paid Boost Membership eligibility (Unlimited Boost Membership)
+    const boostMembership = await getActiveBoostMembership(userId);
+    const isFreeBoostEligible = !!boostMembership;
 
     let mediaUrls: string[] = [];
     let primaryText = '';

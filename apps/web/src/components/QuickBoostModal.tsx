@@ -380,23 +380,44 @@ export function QuickBoostModal({
               </div>
             )}
 
-            {/* 6-Month Free Offer Banner */}
-            {freeBoostEligible && (
+            {/* Boost Membership Banner */}
+            {freeBoostEligible ? (
               <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-500/15 via-teal-500/15 to-blue-500/15 border border-emerald-500/30 flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2.5">
                   <Sparkles className="w-5 h-5 text-emerald-600 animate-bounce" />
                   <div>
                     <p className="font-extrabold text-emerald-900 dark:text-emerald-300">
-                      6 Months Free Boost Active!
+                      Unlimited Boost Membership Active!
                     </p>
                     <p className="text-emerald-700/90 dark:text-emerald-400/90 text-[11px]">
-                      Zero charges from your wallet for {freeBoostDays} more days.
+                      Zero platform charges for your post boosts ({freeBoostDays} days remaining).
                     </p>
                   </div>
                 </div>
                 <span className="font-black px-2.5 py-1 rounded-full bg-emerald-600 text-white text-[11px] shadow-xs">
-                  ₹0 COST
+                  MEMBERSHIP
                 </span>
+              </div>
+            ) : (
+              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-blue-500/10 via-indigo-500/10 to-purple-500/10 border border-blue-500/20 flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2.5">
+                  <Sparkles className="w-4 h-4 text-blue-600" />
+                  <div>
+                    <p className="font-bold text-zinc-900 dark:text-zinc-100">
+                      Tolee Unlimited Boost Membership
+                    </p>
+                    <p className="text-zinc-500 dark:text-zinc-400 text-[11px]">
+                      Get 6 months unlimited post boosting for just ₹500.
+                    </p>
+                  </div>
+                </div>
+                <Link
+                  href="/boost-membership"
+                  target="_blank"
+                  className="px-2.5 py-1 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] transition-colors"
+                >
+                  View Plan
+                </Link>
               </div>
             )}
 
@@ -929,7 +950,7 @@ export function QuickBoostModal({
 
                     {freeBoostEligible && (
                       <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-bold">
-                        <span>6-Month Free Boost Discount:</span>
+                        <span>Boost Membership Waiver:</span>
                         <span>-₹{(totalBudgetAmount + gstAmount).toFixed(2)}</span>
                       </div>
                     )}

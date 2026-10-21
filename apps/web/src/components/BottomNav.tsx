@@ -281,6 +281,15 @@ export function BottomNav() {
                   <Megaphone className={getDropdownIconClass('/ads-manager')} />
                   <span>Ads Manager</span>
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { setClickedPath('/boost-membership'); router.push('/boost-membership'); }} className={getDropdownItemClass('/boost-membership')}>
+                  <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center">
+                      <Sparkles className={getDropdownIconClass('/boost-membership')} />
+                      <span className="font-semibold">Boost Membership</span>
+                    </div>
+                    <span className="text-[8px] font-extrabold uppercase text-white bg-emerald-600 px-1.5 py-0.5 rounded shadow-xs">₹500</span>
+                  </div>
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => { setClickedPath('/creator-program'); router.push('/creator-program'); }} className={getDropdownItemClass('/creator-program')}>
                   <div className="flex items-center justify-between w-full">
                     <div className="flex items-center">

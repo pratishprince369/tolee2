@@ -188,6 +188,7 @@ export function Sidebar() {
     { name: 'Tolee World', href: '/world', icon: Globe },
     { name: 'Live Map', href: '/map', icon: Map },
     { name: 'Ads Manager', href: '/ads-manager', icon: Megaphone },
+    { name: 'Boost Membership', href: '/boost-membership', icon: Sparkles },
     { name: 'Creator Program', href: '/creator-program', icon: Zap, isCreator: true },
   ] : [
     { name: 'Tolee Radar', href: '/radar', icon: Radio },

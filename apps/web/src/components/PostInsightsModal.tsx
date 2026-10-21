@@ -84,20 +84,39 @@ export function PostInsightsModal({
             <div className="py-12 text-center text-red-500 text-sm">{error}</div>
           ) : data ? (
             <>
-              {/* 6-Month Free Boosting Offer Banner */}
-              {data.freeBoost?.isEligible && (
+              {/* Boost Membership Status Banner */}
+              {data.freeBoost?.isEligible ? (
                 <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-blue-500/10 border border-emerald-500/20 dark:border-teal-500/20 flex items-start gap-3">
                   <div className="p-1.5 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 shrink-0">
                     <Sparkles className="w-4 h-4" />
                   </div>
                   <div className="text-xs">
                     <p className="font-bold text-emerald-800 dark:text-emerald-300">
-                      6 Months Free Boost Active
+                      Unlimited Boost Membership Active
                     </p>
                     <p className="text-emerald-700/80 dark:text-emerald-400/80 mt-0.5">
-                      You have <span className="font-bold">{data.freeBoost.daysRemaining} days</span> remaining of zero-charge boosting for all your posts!
+                      You have <span className="font-bold">{data.freeBoost.daysRemaining} days</span> remaining of zero-charge boosting for all your eligible posts!
                     </p>
                   </div>
+                </div>
+              ) : (
+                <div className="p-3.5 rounded-2xl bg-gradient-to-r from-blue-500/10 via-indigo-500/10 to-purple-500/10 border border-blue-500/20 dark:border-indigo-500/20 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 text-xs">
+                    <div className="p-1.5 rounded-xl bg-blue-500/20 text-blue-600 dark:text-blue-400 shrink-0">
+                      <Sparkles className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-zinc-900 dark:text-zinc-100">Unlimited Boost Membership</p>
+                      <p className="text-zinc-500 dark:text-zinc-400">Boost all your posts for 6 months at just ₹500</p>
+                    </div>
+                  </div>
+                  <Link
+                    href="/boost-membership"
+                    onClick={onClose}
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-xs whitespace-nowrap transition-colors"
+                  >
+                    Get Plan
+                  </Link>
                 </div>
               )}
 

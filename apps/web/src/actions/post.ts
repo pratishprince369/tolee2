@@ -11,6 +11,7 @@ import { getSimulationSettings, getSimulatedEngagement, generateDynamicComments,
 import { runNewsAIPipeline } from '@/lib/aiNews';
 import { getMediaThumbnail, getStreamableVideoUrl } from '@/lib/media';
 import { CURATED_AUDIO_LIBRARY } from '@/lib/audioLibrary';
+import { getActiveBoostMembership } from '@/lib/membership-service';
 
 export async function createPost(data: {
   content?: string;
@@ -3106,22 +3107,12 @@ export async function getPostInsightsAction(postId: string) {
       return { success: false, error: 'Post not found' };
     }
 
-    // Check user's 6-month free boost eligibility
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { createdAt: true }
-    });
-
-    const sixMonthsAgo = new Date();
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-    const userJoinDate = user?.createdAt ? new Date(user.createdAt) : new Date();
-    const isFreeBoostEligible = userJoinDate > sixMonthsAgo;
-    
-    // Calculate days remaining in 6-month free period
-    const sixMonthsAfterJoin = new Date(userJoinDate);
-    sixMonthsAfterJoin.setMonth(sixMonthsAfterJoin.getMonth() + 6);
-    const msRemaining = Math.max(0, sixMonthsAfterJoin.getTime() - Date.now());
-    const daysRemaining = Math.ceil(msRemaining / (1000 * 60 * 60 * 24));
+    // Check user's active Boost Membership (Tolee Unlimited Boost Membership)
+    const boostMembership = await getActiveBoostMembership(userId);
+    const isFreeBoostEligible = !!boostMembership;
+    const daysRemaining = boostMembership
+      ? Math.max(0, Math.ceil((boostMembership.expiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+      : 0;
 
     // Find any Boost Campaign linked to this post
     const boostCampaign = await prisma.campaign.findFirst({

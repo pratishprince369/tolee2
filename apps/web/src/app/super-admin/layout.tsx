@@ -26,6 +26,7 @@ const navItems = [
   { href: '/super-admin/sports', label: 'Sports Management', icon: '🏆' },
   { href: '/super-admin/franchise', label: 'Franchise Program', icon: '🏪' },
   { href: '/super-admin/referrals', label: 'Referrals & Rewards', icon: '🤝' },
+  { href: '/super-admin/boost-membership', label: 'Boost Membership (₹500)', icon: '⚡' },
   { href: '/super-admin/shops', label: 'Shops & Listings', icon: '🏪' },
   { href: '/super-admin/simulation', label: 'Simulation Mode', icon: '🟢' },
 ];

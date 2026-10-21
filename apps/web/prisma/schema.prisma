@@ -178,6 +178,10 @@ model User {
   referralRecv  Referral?  @relation("Referee")
   referrerCommissions ReferralCommission[] @relation("ReferrerCommissions")
   referredCommissions ReferralCommission[] @relation("ReferredUserCommissions")
+  boostMembership           BoostMembership?
+  membershipPayments        MembershipPayment[]        @relation("UserMembershipPayments")
+  membershipReferralRewards MembershipReferralReward[] @relation("ReferrerMembershipRewards")
+  membershipReceivedRewards MembershipReferralReward[] @relation("RefereeMembershipRewards")
   campaigns     Campaign[]
   pushTokens    PushToken[]
   lastActiveAt  DateTime           @default(now())
@@ -1159,6 +1163,90 @@ model ReferralCommission {
   @@index([referredUserId])
   @@index([status])
   @@index([campaignId])
+}
+
+// 2C. Tolee Unlimited Boost Membership & Referral Rewards
+model BoostMembership {
+  id                String               @id @default(cuid())
+  userId            String               @unique
+  user              User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status            String               @default("ACTIVE") // "ACTIVE" | "EXPIRED" | "CANCELLED" | "REVOKED"
+  startDate         DateTime             @default(now())
+  expiresAt         DateTime
+  planName          String               @default("Tolee Unlimited Boost Membership")
+  pricePaid         Float                @default(500.0)
+  totalMonthsEarned Int                  @default(0) // Months added via qualifying paid referrals
+  autoRenew         Boolean              @default(false)
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  payments          MembershipPayment[]
+  auditLogs         MembershipAuditLog[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+model MembershipPayment {
+  id               String                    @id @default(cuid())
+  orderId          String                    @unique
+  paymentId        String?                   @unique
+  userId           String
+  user             User                      @relation("UserMembershipPayments", fields: [userId], references: [id], onDelete: Cascade)
+  membershipId     String?
+  membership       BoostMembership?          @relation(fields: [membershipId], references: [id], onDelete: SetNull)
+  amount           Float                     @default(500.0)
+  currency         String                    @default("INR")
+  status           String                    @default("PENDING") // "PENDING" | "SUCCESS" | "FAILED" | "REFUNDED"
+  paymentMethod    String?                   // "razorpay" | "cashfree" | "upi" | "manual" | "test"
+  gatewayOrderId   String?
+  gatewayPaymentId String?
+  gatewaySignature String?
+  durationDays     Int                       @default(180) // 6 months = 180 days
+  appliedAt        DateTime?
+  metadata         Json?
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+
+  referralReward   MembershipReferralReward?
+
+  @@index([userId])
+  @@index([status])
+  @@index([orderId])
+}
+
+model MembershipReferralReward {
+  id             String            @id @default(cuid())
+  paymentId      String            @unique
+  payment        MembershipPayment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  referrerId     String
+  referrer       User              @relation("ReferrerMembershipRewards", fields: [referrerId], references: [id], onDelete: Cascade)
+  refereeId      String
+  referee        User              @relation("RefereeMembershipRewards", fields: [refereeId], references: [id], onDelete: Cascade)
+  bonusDays      Int               @default(30) // +1 Month (30 days)
+  status         String            @default("APPLIED") // "APPLIED" | "REVOKED"
+  rewardedAt     DateTime          @default(now())
+  revokedAt      DateTime?
+  reversalReason String?
+
+  @@index([referrerId])
+  @@index([refereeId])
+}
+
+model MembershipAuditLog {
+  id             String           @id @default(cuid())
+  membershipId   String?
+  membership     BoostMembership? @relation(fields: [membershipId], references: [id], onDelete: SetNull)
+  userId         String
+  actorId        String?          // admin user id or "SYSTEM"
+  action         String           // "CREATED" | "EXTENDED_PURCHASE" | "EXTENDED_REFERRAL" | "ADMIN_ADJUST" | "REVOKED" | "REFUNDED"
+  previousExpiry DateTime?
+  newExpiry      DateTime?
+  details        String?
+  createdAt      DateTime         @default(now())
+
+  @@index([membershipId])
+  @@index([userId])
 }
 
 // 3. Campaign & Ads Structure (Campaign -> AdSet -> Ad)

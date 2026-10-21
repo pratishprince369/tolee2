@@ -4,13 +4,13 @@ import { DownloadLandingPage } from './DownloadLandingPage';
 
 export const metadata: Metadata = {
   title: "Download Tolee App | Connect, Create, Belong & Boost Your Business",
-  description: "Get Free Boosting for 6 Months on Tolee! Download Tolee App now on Google Play Store to boost your products, grow your business, and connect with local communities.",
-  keywords: ["Tolee App", "Download Tolee", "Google Play Store", "Free Boosting", "Local Community App", "Tolee India"],
+  description: "Download Tolee App now on Google Play Store to boost your products, grow your business, and connect with local communities.",
+  keywords: ["Tolee App", "Download Tolee", "Google Play Store", "Local Community App", "Tolee India", "Post Boosting"],
   alternates: {
     canonical: "https://tolee.in/download",
   },
   openGraph: {
-    title: "Download Tolee App – Get Free Boosting for 6 Months",
+    title: "Download Tolee App – Connect, Create & Grow",
     description: "Boost your product, grow your business, get more reach, and build your local community on Tolee. Available on Google Play Store.",
     url: "https://tolee.in/download",
     siteName: "Tolee",
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Download Tolee App – Get Free Boosting for 6 Months",
+    title: "Download Tolee App – Connect, Create & Grow",
     description: "Boost your product, grow your business, get more reach, and build your local community on Tolee.",
     images: ["https://tolee.in/tolee-boost-poster.jpg"],
   },
