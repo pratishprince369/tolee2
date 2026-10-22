@@ -51,6 +51,13 @@ export default function BoostMembershipPage() {
 
   useEffect(() => {
     loadDashboard();
+    // Preload Razorpay Checkout script
+    if (typeof window !== 'undefined' && !(window as any).Razorpay) {
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.async = true;
+      document.body.appendChild(script);
+    }
   }, []);
 
   async function loadDashboard() {
@@ -79,7 +86,71 @@ export default function BoostMembershipPage() {
         setIsProcessing(false);
         return;
       }
-      setCurrentOrder(res.order);
+
+      const order = res.order;
+      setCurrentOrder(order);
+
+      // Open Razorpay Standard Checkout directly when live keys and order are available
+      if (order.gatewayOrderId && order.keyId && (window as any).Razorpay) {
+        const options = {
+          key: order.keyId,
+          amount: order.amount * 100,
+          currency: order.currency || 'INR',
+          name: 'Tolee',
+          description: order.planName || 'Tolee Unlimited Boost Membership',
+          image: '/favicon.ico',
+          order_id: order.gatewayOrderId,
+          prefill: {
+            name: order.user?.name || '',
+            email: order.user?.email || '',
+            contact: order.user?.phone || '',
+          },
+          theme: {
+            color: '#0E9F9A',
+          },
+          handler: async function (response: any) {
+            setIsProcessing(true);
+            try {
+              const verifyRes = await verifyAndActivateMembershipAction({
+                orderId: order.orderId,
+                paymentId: response.razorpay_payment_id,
+                gatewayOrderId: response.razorpay_order_id,
+                gatewaySignature: response.razorpay_signature,
+                paymentMethod: 'razorpay',
+                gatewayResponse: response,
+              });
+
+              if (!verifyRes.success) {
+                showToast(verifyRes.error || 'Payment verification failed');
+                return;
+              }
+
+              showToast('🎉 Membership activated successfully via Razorpay!');
+              await loadDashboard();
+            } catch (err: any) {
+              showToast(err.message || 'Verification error');
+            } finally {
+              setIsProcessing(false);
+            }
+          },
+          modal: {
+            ondismiss: function () {
+              setIsProcessing(false);
+            },
+          },
+        };
+
+        const rzp = new (window as any).Razorpay(options);
+        rzp.on('payment.failed', function (resp: any) {
+          showToast(resp.error?.description || 'Payment failed');
+          setIsProcessing(false);
+        });
+        rzp.open();
+        setIsProcessing(false);
+        return;
+      }
+
+      // Fallback to manual checkout modal if Razorpay script is blocked or offline
       setShowCheckoutModal(true);
     } catch (err: any) {
       showToast(err.message || 'Payment initiation failed');

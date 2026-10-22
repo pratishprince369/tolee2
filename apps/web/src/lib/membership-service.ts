@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { getOrCreateUserReferralCode } from '@/lib/referralService';
 import { createSystemNotification } from '@/lib/notification-service';
+import crypto from 'crypto';
 
 export const BOOST_MEMBERSHIP_PLAN = {
   name: 'Tolee Unlimited Boost Membership',
@@ -44,6 +45,7 @@ export async function getActiveBoostMembership(userId: string) {
 
 /**
  * Creates an order to purchase or renew the ₹500 Boost Membership.
+ * If Razorpay keys are configured, initializes a live Razorpay order.
  */
 export async function createMembershipOrder(userId: string) {
   const user = await prisma.user.findUnique({
@@ -57,6 +59,41 @@ export async function createMembershipOrder(userId: string) {
 
   const orderId = `BM_${Date.now()}_${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
+  let gatewayOrderId: string | null = null;
+  const rzpKey = process.env.RAZORPAY_KEY_ID;
+  const rzpSecret = process.env.RAZORPAY_KEY_SECRET;
+
+  if (rzpKey && rzpSecret) {
+    try {
+      const auth = Buffer.from(`${rzpKey}:${rzpSecret}`).toString('base64');
+      const rzpRes = await fetch('https://api.razorpay.com/v1/orders', {
+        method: 'POST',
+        headers: {
+          Authorization: `Basic ${auth}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          amount: BOOST_MEMBERSHIP_PLAN.price * 100, // paise = 50000
+          currency: 'INR',
+          receipt: orderId,
+          notes: {
+            userId: user.id,
+            plan: BOOST_MEMBERSHIP_PLAN.name,
+          },
+        }),
+      });
+
+      if (rzpRes.ok) {
+        const rzpData = await rzpRes.json();
+        gatewayOrderId = rzpData.id;
+      } else {
+        console.error('Razorpay order creation returned non-ok:', await rzpRes.text());
+      }
+    } catch (rzpErr) {
+      console.error('Failed to create live Razorpay order:', rzpErr);
+    }
+  }
+
   const payment = await prisma.membershipPayment.create({
     data: {
       orderId,
@@ -65,11 +102,15 @@ export async function createMembershipOrder(userId: string) {
       currency: BOOST_MEMBERSHIP_PLAN.currency,
       durationDays: BOOST_MEMBERSHIP_PLAN.durationDays,
       status: 'PENDING',
+      gatewayOrderId,
+      paymentMethod: gatewayOrderId ? 'razorpay' : 'gateway',
     },
   });
 
   return {
     orderId: payment.orderId,
+    gatewayOrderId,
+    keyId: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || rzpKey || null,
     amount: payment.amount,
     currency: payment.currency,
     planName: BOOST_MEMBERSHIP_PLAN.name,
@@ -85,16 +126,40 @@ export async function createMembershipOrder(userId: string) {
 
 /**
  * Idempotently verifies and activates a membership after successful payment.
+ * Verifies Razorpay HMAC signature when provided.
  * Automatically attributes +30 days to the referrer if this user was referred by someone.
  */
 export async function verifyAndActivateMembership(params: {
   orderId: string;
   paymentId?: string;
   paymentMethod?: string;
+  gatewayOrderId?: string;
+  gatewaySignature?: string;
   gatewayResponse?: any;
   actorId?: string;
 }) {
-  const { orderId, paymentId, paymentMethod = 'gateway', gatewayResponse, actorId } = params;
+  const {
+    orderId,
+    paymentId,
+    paymentMethod = 'gateway',
+    gatewayOrderId,
+    gatewaySignature,
+    gatewayResponse,
+    actorId,
+  } = params;
+
+  // Verify Razorpay HMAC signature if provided
+  const rzpSecret = process.env.RAZORPAY_KEY_SECRET;
+  if (gatewayOrderId && gatewaySignature && paymentId && rzpSecret) {
+    const expectedSignature = crypto
+      .createHmac('sha256', rzpSecret)
+      .update(`${gatewayOrderId}|${paymentId}`)
+      .digest('hex');
+
+    if (expectedSignature !== gatewaySignature) {
+      throw new Error('Invalid Razorpay signature. Payment verification failed.');
+    }
+  }
 
   const payment = await prisma.membershipPayment.findUnique({
     where: { orderId },

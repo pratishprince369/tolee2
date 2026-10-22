@@ -52,6 +52,8 @@ export async function verifyAndActivateMembershipAction(params: {
   orderId: string;
   paymentId?: string;
   paymentMethod?: string;
+  gatewayOrderId?: string;
+  gatewaySignature?: string;
   gatewayResponse?: any;
 }) {
   try {
