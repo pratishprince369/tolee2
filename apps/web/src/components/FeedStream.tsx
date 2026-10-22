@@ -1267,8 +1267,7 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
               {/* Box 4: Post News */}
               <div 
                 onClick={() => {
-                  setUnifiedModalInitialMode('news');
-                  setIsUnifiedModalOpen(true);
+                  router.push('/news/create');
                 }}
                 className="group relative flex flex-col items-center text-center p-5 rounded-2xl border border-indigo-100 dark:border-indigo-950/20 bg-indigo-50/10 dark:bg-indigo-950/5 hover:bg-indigo-50/40 dark:hover:bg-indigo-950/15 hover:border-indigo-300 dark:hover:border-indigo-800/80 cursor-pointer shadow-sm hover:shadow-md hover:-translate-y-1 hover:scale-[1.02] transition-all duration-300 active:scale-[0.98]"
               >
@@ -3490,8 +3489,7 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
             <div 
               onClick={() => {
                 setIsQuickActionOpen(false);
-                setUnifiedModalInitialMode('news');
-                setIsUnifiedModalOpen(true);
+                router.push('/news/create');
               }}
               className="group flex items-start gap-3.5 p-3.5 sm:p-4 rounded-2xl border border-indigo-100 dark:border-indigo-950/30 bg-indigo-50/20 dark:bg-indigo-950/10 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/20 hover:border-indigo-200 cursor-pointer transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0"
             >
