@@ -142,8 +142,9 @@ export default function BoostMembershipPage() {
 
         const rzp = new (window as any).Razorpay(options);
         rzp.on('payment.failed', function (resp: any) {
-          showToast(resp.error?.description || 'Payment failed');
+          showToast(resp.error?.description || 'Gateway under review. Opening verification test checkout...');
           setIsProcessing(false);
+          setShowCheckoutModal(true);
         });
         rzp.open();
         setIsProcessing(false);
