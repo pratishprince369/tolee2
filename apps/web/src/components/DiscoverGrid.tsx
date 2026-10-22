@@ -406,6 +406,11 @@ export function DiscoverGrid({ initialTolees, tolees: propTolees, isAuthenticate
                   Terms of Service
                 </Link>
               </li>
+              <li>
+                <Link href="/refund-policy" className="hover:text-[#0a7c85] transition-colors">
+                  Refund Policy
+                </Link>
+              </li>
             </ul>
           </div>
         </div>

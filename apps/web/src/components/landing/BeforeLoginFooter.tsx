@@ -37,6 +37,7 @@ const DIRECTORY_LINKS = [
   { label: 'About', href: '/about' },
   { label: 'Privacy Policy', href: '/privacy' },
   { label: 'Terms', href: '/terms' },
+  { label: 'Refund Policy', href: '/refund-policy' },
   { label: 'Child Safety', href: '/child-safety' },
   { label: 'Help & Support', href: '/contact' },
   { label: 'Contact Us', href: '/contact' },

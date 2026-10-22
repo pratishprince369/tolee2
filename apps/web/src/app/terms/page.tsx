@@ -44,6 +44,13 @@ export default function TermsAndConditions() {
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">5. Changes to Terms</h2>
           <p>We reserve the right to modify these terms at any time. Your continued use of the platform constitutes acceptance of the new terms.</p>
         </section>
+
+        <section>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">6. Cancellation &amp; Refund Policy</h2>
+          <p>
+            All paid subscriptions, including Tolee Unlimited Boost Membership, are subject to our dedicated <a href="/refund-policy" className="text-[#0E9F9A] hover:underline font-semibold">Cancellation &amp; Refund Policy</a>.
+          </p>
+        </section>
       </div>
     </div>
   );

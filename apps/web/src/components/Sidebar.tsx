@@ -315,6 +315,7 @@ export function Sidebar() {
             <Link href="/about" className="hover:text-[#0E9F9A] dark:hover:text-[#0E9F9A] transition-colors">About Us</Link>
             <Link href="/privacy" className="hover:text-[#0E9F9A] dark:hover:text-[#0E9F9A] transition-colors">Privacy Policy</Link>
             <Link href="/terms" className="hover:text-[#0E9F9A] dark:hover:text-[#0E9F9A] transition-colors">Terms & Conditions</Link>
+            <Link href="/refund-policy" className="hover:text-[#0E9F9A] dark:hover:text-[#0E9F9A] transition-colors">Refund Policy</Link>
             <Link href="/contact" className="hover:text-[#0E9F9A] dark:hover:text-[#0E9F9A] transition-colors">Contact Us</Link>
             <span>© 2026 Tolee</span>
           </div>
