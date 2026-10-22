@@ -1743,7 +1743,7 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
 
                   let cleanCoverImg = post.mediaUrls ? post.mediaUrls.split(/,(?=https?:\/\/)/)[0] : undefined;
                   if (cleanCoverImg && (cleanCoverImg.includes('youtube.com/embed/') || cleanCoverImg.includes('youtu.be/'))) {
-                    cleanCoverImg = ytVideoId ? `https://i.ytimg.com/vi/${ytVideoId}/hqdefault.jpg` : undefined;
+                    cleanCoverImg = (ytVideoId && /^[a-zA-Z0-9_-]{11}$/.test(ytVideoId)) ? `https://i.ytimg.com/vi/${ytVideoId}/hqdefault.jpg` : '/tolee-news-default.png';
                   }
 
                   return (
@@ -3305,12 +3305,14 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
         </DialogContent>
       </Dialog>
 
-      <ReShareModal 
-        isOpen={reshareModalOpen}
-        onClose={() => setReshareModalOpen(false)}
-        postId={selectedPostIdForReshare || ''}
-        onSuccess={handleReshareSuccess}
-      />
+      {reshareModalOpen && (
+        <ReShareModal 
+          isOpen={reshareModalOpen}
+          onClose={() => setReshareModalOpen(false)}
+          postId={selectedPostIdForReshare || ''}
+          onSuccess={handleReshareSuccess}
+        />
+      )}
 
       {selectedPostForShare && (
         <ShareModal
@@ -3459,24 +3461,28 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
 
 
       {/* Quick Boost Modal */}
-      <QuickBoostModal 
-        isOpen={isQuickBoostOpen} 
-        onClose={() => setIsQuickBoostOpen(false)} 
-        type={quickBoostType} 
-        targetId={quickBoostTargetId} 
-      />
+      {isQuickBoostOpen && (
+        <QuickBoostModal 
+          isOpen={isQuickBoostOpen} 
+          onClose={() => setIsQuickBoostOpen(false)} 
+          type={quickBoostType} 
+          targetId={quickBoostTargetId} 
+        />
+      )}
 
       {/* Post Insights Modal */}
-      <PostInsightsModal
-        isOpen={isInsightsOpen}
-        onClose={() => setIsInsightsOpen(false)}
-        postId={insightsPostId}
-        onOpenBoost={() => {
-          setQuickBoostType('post');
-          setQuickBoostTargetId(insightsPostId);
-          setIsQuickBoostOpen(true);
-        }}
-      />
+      {isInsightsOpen && (
+        <PostInsightsModal
+          isOpen={isInsightsOpen}
+          onClose={() => setIsInsightsOpen(false)}
+          postId={insightsPostId}
+          onOpenBoost={() => {
+            setQuickBoostType('post');
+            setQuickBoostTargetId(insightsPostId);
+            setIsQuickBoostOpen(true);
+          }}
+        />
+      )}
 
       {/* Story Viewer Dialog */}
       {isStoryViewerOpen && (

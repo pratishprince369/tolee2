@@ -1,27 +1,36 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 
 export function RoutePrefetcher() {
   const pathname = usePathname();
   const router = useRouter();
+  const routerRef = useRef(router);
 
-  React.useEffect(() => {
+  useEffect(() => {
+    routerRef.current = router;
+  }, [router]);
+
+  useEffect(() => {
     // Perform prefetching during browser idle time to avoid interrupting active UI threads
     const runPrefetch = () => {
       if (typeof window === 'undefined') return;
 
       const prefetchRoutes = (routes: string[]) => {
         routes.forEach(route => {
-          if ('requestIdleCallback' in window) {
-            window.requestIdleCallback(() => {
-              router.prefetch(route);
-            });
-          } else {
-            setTimeout(() => {
-              router.prefetch(route);
-            }, 100);
+          try {
+            if ('requestIdleCallback' in window) {
+              window.requestIdleCallback(() => {
+                routerRef.current?.prefetch(route);
+              });
+            } else {
+              setTimeout(() => {
+                routerRef.current?.prefetch(route);
+              }, 100);
+            }
+          } catch (e) {
+            // Silently swallow prefetch aborts
           }
         });
       };
@@ -41,9 +50,9 @@ export function RoutePrefetcher() {
     };
 
     // Prefetch during idle browser time
-    const timer = setTimeout(runPrefetch, 250);
+    const timer = setTimeout(runPrefetch, 400);
     return () => clearTimeout(timer);
-  }, [pathname, router]);
+  }, [pathname]);
 
   return null;
 }

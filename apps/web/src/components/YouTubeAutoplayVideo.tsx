@@ -77,7 +77,8 @@ export function YouTubeAutoplayVideo({
     }
   }, [mounted, isIntersecting, hasError, cleanVideoId]);
 
-  const fallbackThumbnail = thumbnailUrl || (cleanVideoId ? `https://i.ytimg.com/vi/${cleanVideoId}/hqdefault.jpg` : '/tolee-news-default.png');
+  const isValidYtId = cleanVideoId && /^[a-zA-Z0-9_-]{11}$/.test(cleanVideoId);
+  const fallbackThumbnail = thumbnailUrl || (isValidYtId ? `https://i.ytimg.com/vi/${cleanVideoId}/hqdefault.jpg` : '/tolee-news-default.png');
 
   if (hasError || !cleanVideoId) {
     return (

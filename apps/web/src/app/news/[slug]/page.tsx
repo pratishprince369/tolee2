@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { getNewsBySlug } from '@/actions/news';
@@ -19,6 +19,7 @@ import { authOptions } from '@/lib/auth';
 import { PostCarousel } from '@/components/PostCarousel';
 import { NewsEngagement } from '@/components/NewsEngagement';
 import { YouTubeAutoplayVideo } from '@/components/YouTubeAutoplayVideo';
+import { NewsBackButton } from '@/components/NewsBackButton';
 import { Metadata } from 'next';
 
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
@@ -250,11 +251,7 @@ export default async function NewsReaderPage({ params }: { params: { slug: strin
       
       {/* Reader Header Nav */}
       <div className="sticky top-0 z-30 bg-white/95 dark:bg-[#0a0a0a]/95 backdrop-blur-md border-b border-gray-100 dark:border-zinc-900 px-4 py-3 flex items-center justify-between">
-        <Link href="/">
-          <Button variant="ghost" size="sm" className="flex items-center gap-1 text-gray-500 hover:text-black">
-            <ArrowLeft className="w-4 h-4" /> Home Feed
-          </Button>
-        </Link>
+        <NewsBackButton />
         <div className="flex items-center gap-2">
           <Badge className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs uppercase px-2.5 py-0.5 rounded-full">
             {news.category}
@@ -537,19 +534,21 @@ export default async function NewsReaderPage({ params }: { params: { slug: strin
 
         {/* Engagement Bar & Quick Comment Box */}
         <div className="mt-8 pt-4 border-t border-gray-100 dark:border-zinc-900">
-          <NewsEngagement
-            postId={post.id}
-            initialLikes={post.likes?.length || 0}
-            initialComments={post.comments?.length || 0}
-            initialReposts={post.reposts?.length || 0}
-            initialViews={news.viewsCount || 0}
-            initialLikedByMe={currentUserId ? post.likes?.some((l: any) => l.userId === currentUserId) : false}
-            initialSavedByMe={currentUserId ? post.savedBy?.some((s: any) => s.userId === currentUserId) : false}
-            initialRepostedByMe={currentUserId ? post.reposts?.some((r: any) => r.userId === currentUserId) : false}
-            shareCount={post.shareCount || 0}
-            slug={news.slug}
-            headline={news.headline}
-          />
+          <Suspense fallback={null}>
+            <NewsEngagement
+              postId={post.id}
+              initialLikes={post.likes?.length || 0}
+              initialComments={post.comments?.length || 0}
+              initialReposts={post.reposts?.length || 0}
+              initialViews={news.viewsCount || 0}
+              initialLikedByMe={currentUserId ? post.likes?.some((l: any) => l.userId === currentUserId) : false}
+              initialSavedByMe={currentUserId ? post.savedBy?.some((s: any) => s.userId === currentUserId) : false}
+              initialRepostedByMe={currentUserId ? post.reposts?.some((r: any) => r.userId === currentUserId) : false}
+              shareCount={post.shareCount || 0}
+              slug={news.slug}
+              headline={news.headline}
+            />
+          </Suspense>
         </div>
 
       </article>

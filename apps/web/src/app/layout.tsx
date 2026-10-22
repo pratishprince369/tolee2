@@ -302,7 +302,9 @@ export default async function RootLayout({
             isAuthenticated={isAuthenticated}
             sidebar={isAuthenticated ? <Sidebar /> : null}
           >
-            {children}
+            <Suspense fallback={null}>
+              {children}
+            </Suspense>
           </MainLayoutWrapper>
           
           <BottomNav />
