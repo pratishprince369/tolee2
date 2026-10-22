@@ -61,6 +61,61 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
     setMounted(true);
   }, []);
 
+  // Save scroll position throttled for seamless back navigation restoration
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    let timeout: any = null;
+    const handleScroll = () => {
+      if (timeout) clearTimeout(timeout);
+      timeout = setTimeout(() => {
+        try {
+          if (window.scrollY > 0) {
+            sessionStorage.setItem('tolee_feed_scroll_y', window.scrollY.toString());
+          }
+        } catch (e) {}
+      }, 150);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      if (timeout) clearTimeout(timeout);
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
+
+  // Restore previous scroll position or last viewed article when returning to feed
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const savedY = sessionStorage.getItem('tolee_feed_scroll_y');
+    const lastPostId = sessionStorage.getItem('tolee_feed_last_post_id');
+
+    if (savedY && !searchParams?.get('postId') && !searchParams?.get('post')) {
+      const parsedY = parseInt(savedY, 10);
+      if (!isNaN(parsedY) && parsedY > 0) {
+        requestAnimationFrame(() => {
+          window.scrollTo({ top: parsedY, behavior: 'instant' as ScrollBehavior });
+          if (lastPostId) {
+            const el = document.getElementById(`post-${lastPostId}`);
+            if (el) {
+              el.scrollIntoView({ behavior: 'instant' as ScrollBehavior, block: 'nearest' });
+            }
+          }
+        });
+      }
+    }
+  }, []);
+
+  const recordPostNavigation = (postId: string) => {
+    try {
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('tolee_feed_last_post_id', postId);
+        sessionStorage.setItem('tolee_feed_scroll_y', window.scrollY.toString());
+      }
+    } catch (e) {}
+  };
+
   useEffect(() => {
     const handleOpenQuickActions = () => {
       setUnifiedModalInitialMode('default');
@@ -1779,7 +1834,7 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
                           />
                         </div>
                       ) : cleanCoverImg ? (
-                        <Link href={`/news/${newsSlug}`}>
+                        <Link href={`/news/${newsSlug}`} onClick={() => recordPostNavigation(post.id)}>
                           <div className="w-full overflow-hidden bg-slate-50 dark:bg-zinc-950 aspect-video relative cursor-pointer">
                             <img src={cleanCoverImg} alt={newsHeadline} className="w-full h-full object-cover hover:scale-[1.01] transition-transform duration-300" loading="lazy" />
                           </div>
@@ -1788,7 +1843,7 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
 
                       {/* Content Body: Headline, Summary, Author Meta */}
                       <div className="p-5 space-y-3">
-                        <Link href={`/news/${newsSlug}`}>
+                        <Link href={`/news/${newsSlug}`} onClick={() => recordPostNavigation(post.id)}>
                           <h2 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white leading-tight hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer transition-colors line-clamp-2">
                             {newsHeadline}
                           </h2>

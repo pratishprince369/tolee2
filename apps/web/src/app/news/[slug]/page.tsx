@@ -137,7 +137,7 @@ export default async function NewsReaderPage({ params }: { params: { slug: strin
   const news = await getNewsBySlug(params.slug);
   const session = await getServerSession(authOptions);
 
-  if (!news) {
+  if (!news || !news.post) {
     notFound();
   }
 
