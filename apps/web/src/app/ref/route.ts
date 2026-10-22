@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = 'force-dynamic';
+
 const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=in.tolee.app&pcampaignid=web_share";
 
 export async function GET(req: NextRequest) {
