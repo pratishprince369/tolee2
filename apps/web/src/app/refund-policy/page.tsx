@@ -62,35 +62,39 @@ export default function RefundPolicy() {
 
         <section className="space-y-3">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white border-b border-gray-200 dark:border-zinc-800 pb-2">
-            3. Refund Eligibility &amp; Conditions
+            3. Refund Method — Credit to Tolee Ads Wallet
           </h2>
-          <p>A full or partial refund will be approved under the following conditions:</p>
+          <p>
+            All approved refunds, service adjustments, and compensation amounts are credited in digital form directly to your <strong>Tolee Ads Wallet</strong> balance.
+          </p>
           <ul className="list-disc list-inside space-y-2">
             <li>
-              <strong>Duplicate or Erroneous Transactions:</strong> In the event of a technical issue or gateway network delay resulting in double charges for the same order, the extra charged amount will be refunded 100% automatically or upon notification.
+              <strong>Digital Wallet Credits:</strong> Once credited to your Ads Wallet, the digital balance never expires and can be seamlessly utilized in the future for:
+              <ul className="list-circle list-inside ml-5 mt-1 space-y-1 text-gray-500 dark:text-zinc-400">
+                <li>Creating targeted ad campaigns in Tolee Ads Manager</li>
+                <li>Boosting posts, reels, and business listings</li>
+                <li>Participating in special promotional events and platform offers</li>
+              </ul>
             </li>
             <li>
-              <strong>Payment Deducted but Plan Not Activated:</strong> If an amount was deducted from your bank/card/UPI account but the membership or wallet was not activated due to a technical failure, we will either manually activate your plan immediately or issue a 100% refund.
-            </li>
-            <li>
-              <strong>Service Non-Delivery:</strong> If Tolee is unable to deliver the core paid features within 48 hours of payment verification, you are entitled to a full refund upon request.
+              <strong>Duplicate Technical Deductions:</strong> If your bank or UPI was charged multiple times for the exact same order due to a network glitch, the extra duplicate transaction is reversed back to the original bank/card/UPI payment source via our gateway (Razorpay) within 5–7 business days.
             </li>
           </ul>
         </section>
 
         <section className="space-y-3">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white border-b border-gray-200 dark:border-zinc-800 pb-2">
-            4. Refund Processing Timeline
+            4. Refund Eligibility &amp; Processing Timeline
           </h2>
           <ul className="list-disc list-inside space-y-2">
             <li>
-              All refund requests are reviewed and processed by our billing team within <strong>24 to 48 business hours</strong>.
+              <strong>Review Window:</strong> All refund requests submitted to our support team are reviewed within <strong>24 to 48 business hours</strong>.
             </li>
             <li>
-              Once approved, the refund is credited directly to the original payment source (Credit/Debit Card, UPI ID, or NetBanking bank account) through our payment gateway (Razorpay).
+              <strong>Instant Digital Wallet Credit:</strong> Upon approval, the refunded amount is credited to your Tolee Ads Wallet immediately, allowing you to use it right away for future promotions.
             </li>
             <li>
-              Depending on your issuing bank, the refunded amount typically reflects in your statement within <strong>5 to 7 business days</strong>.
+              <strong>Duplicate Banking Reversals:</strong> For verified duplicate debits, the refund reflects in your bank/card statement within <strong>5 to 7 business days</strong> depending on your bank&apos;s processing cycle.
             </li>
           </ul>
         </section>
