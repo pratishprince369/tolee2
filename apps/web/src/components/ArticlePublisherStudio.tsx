@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { uploadFile } from '@/lib/upload';
 import { saveNewsDraft, publishNews } from '@/actions/news';
+import { GenerativeAiStudioModal } from '@/components/GenerativeAiStudioModal';
 
 interface ContentBlock {
   id: string;
@@ -56,6 +57,7 @@ export function ArticlePublisherStudio({ user, initialData }: ArticlePublisherSt
   });
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
+  const [isAiStudioOpen, setIsAiStudioOpen] = useState(false);
   const coverInputRef = useRef<HTMLInputElement>(null);
 
   // Content Blocks
@@ -663,6 +665,14 @@ export function ArticlePublisherStudio({ user, initialData }: ArticlePublisherSt
                     <Button 
                       type="button" 
                       size="sm" 
+                      onClick={() => setIsAiStudioOpen(true)}
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs flex items-center gap-1 shadow-md"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" /> AI Cover Studio
+                    </Button>
+                    <Button 
+                      type="button" 
+                      size="sm" 
                       variant="destructive"
                       onClick={removeCover}
                       className="rounded-xl text-xs font-bold flex items-center gap-1 shadow-md"
@@ -672,12 +682,11 @@ export function ArticlePublisherStudio({ user, initialData }: ArticlePublisherSt
                   </div>
                 </div>
               ) : (
-                /* LinkedIn-like cover placeholder */
+                /* LinkedIn-like cover placeholder with dual options */
                 <div 
-                  onClick={() => coverInputRef.current?.click()}
-                  className="w-full bg-[#f3f2ef]/80 dark:bg-zinc-900/60 border-2 border-dashed border-slate-200 dark:border-zinc-800 hover:border-teal-500/60 dark:hover:border-teal-500/60 rounded-2xl p-8 sm:p-12 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-3 group"
+                  className="w-full bg-[#f3f2ef]/80 dark:bg-zinc-900/60 border-2 border-dashed border-slate-200 dark:border-zinc-800 rounded-2xl p-8 sm:p-10 text-center transition-all flex flex-col items-center justify-center gap-3"
                 >
-                  <div className="w-14 h-14 rounded-2xl bg-white dark:bg-zinc-800 shadow-sm border border-slate-200/60 dark:border-zinc-700/60 flex items-center justify-center text-slate-400 group-hover:text-teal-600 transition-colors">
+                  <div className="w-14 h-14 rounded-2xl bg-white dark:bg-zinc-800 shadow-sm border border-slate-200/60 dark:border-zinc-700/60 flex items-center justify-center text-slate-400">
                     <ImageIcon className="w-7 h-7" />
                   </div>
                   <div>
@@ -685,20 +694,43 @@ export function ArticlePublisherStudio({ user, initialData }: ArticlePublisherSt
                       Add a cover image or video to your article.
                     </p>
                     <p className="text-xs text-slate-400 mt-0.5">
-                      (Optional — you can also publish without an image)
+                      Upload from your device or generate a photorealistic thumbnail with AI.
                     </p>
                   </div>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    size="sm"
-                    className="mt-1 rounded-full text-xs font-bold border-slate-300 dark:border-zinc-700 pointer-events-none group-hover:border-teal-600 group-hover:text-teal-600"
-                  >
-                    <UploadCloud className="w-3.5 h-3.5 mr-1.5" /> Upload from computer
-                  </Button>
+                  <div className="flex flex-wrap items-center justify-center gap-2.5 mt-1">
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => coverInputRef.current?.click()}
+                      className="rounded-full text-xs font-bold border-slate-300 dark:border-zinc-700 hover:border-teal-600 hover:text-teal-600 cursor-pointer"
+                    >
+                      <UploadCloud className="w-3.5 h-3.5 mr-1.5" /> Upload from computer
+                    </Button>
+                    <Button 
+                      type="button" 
+                      size="sm"
+                      onClick={() => setIsAiStudioOpen(true)}
+                      className="rounded-full text-xs font-bold bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-sm flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" /> AI Generate Cover (Flux)
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
+
+            <GenerativeAiStudioModal
+              isOpen={isAiStudioOpen}
+              onClose={() => setIsAiStudioOpen(false)}
+              initialPrompt={title ? `${title}. Ultra-realistic, 8k documentary news photography` : 'Breaking modern news broadcast background, high resolution 8k'}
+              targetAspectRatio="16:9"
+              title="Article Cover AI Generator"
+              onSelectMedia={(url) => {
+                setCoverUrl(url);
+                setCoverFile(null);
+              }}
+            />
 
             {/* 2. TITLE INPUT (LARGE, FRAMELESS) */}
             <div>

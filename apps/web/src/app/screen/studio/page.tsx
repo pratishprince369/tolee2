@@ -16,6 +16,7 @@ import {
   Undo, Pause, RefreshCw, TrendingUp
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { GenerativeAiStudioModal } from '@/components/GenerativeAiStudioModal';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { 
   getCreatorAnalytics, getCreatorVideos, createMuxDirectUpload, 
@@ -130,6 +131,7 @@ export default function CreatorStudioPage() {
   const [muxUploadId, setMuxUploadId] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [isReel, setIsReel] = useState(false);
+  const [isAiStudioOpen, setIsAiStudioOpen] = useState(false);
 
   // Upload progress state
   const [uploadSpeed, setUploadSpeed] = useState('0 KB/s');
@@ -1729,6 +1731,28 @@ export default function CreatorStudioPage() {
                           <FileVideo className="w-12 h-12 text-zinc-400 mx-auto mb-3 animate-pulse" />
                           <p className="text-xs font-bold text-zinc-700 dark:text-zinc-300">Drag video file here or click to browse</p>
                           <p className="text-[10px] text-zinc-400 mt-1">Supports MP4, MOV, AVI, MKV, WebM formats</p>
+                        </div>
+
+                        {/* Generative AI Video & Reel Studio */}
+                        <div 
+                          onClick={() => setIsAiStudioOpen(true)}
+                          className="p-4 bg-gradient-to-r from-purple-500/10 via-indigo-500/10 to-teal-500/10 border border-purple-500/20 hover:border-purple-500/40 rounded-2xl cursor-pointer transition-all flex items-center justify-between group shadow-sm"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center shadow-md">
+                              <Sparkles className="w-5 h-5 animate-pulse" />
+                            </div>
+                            <div>
+                              <p className="text-xs font-extrabold text-zinc-900 dark:text-white flex items-center gap-1.5">
+                                AI Creative Studio
+                                <span className="bg-purple-500 text-white text-[9px] px-1.5 py-0.2 rounded-full font-bold">Kling / Veo / Flux</span>
+                              </p>
+                              <p className="text-[10px] text-zinc-500 dark:text-zinc-400">Generate 4K cinematic AI video, 9:16 vertical reels, or Lip-Sync talking avatar</p>
+                            </div>
+                          </div>
+                          <span className="text-xs font-bold text-purple-600 dark:text-purple-400 group-hover:translate-x-0.5 transition-transform">
+                            Open Studio →
+                          </span>
                         </div>
 
                         {/* Mobile Camera/Gallery uploads */}
@@ -3947,6 +3971,22 @@ export default function CreatorStudioPage() {
           </div>
         )}
 
+        <GenerativeAiStudioModal
+          isOpen={isAiStudioOpen}
+          onClose={() => setIsAiStudioOpen(false)}
+          initialTab="video"
+          targetAspectRatio="16:9"
+          title="Creator Screen AI Studio"
+          onSelectMedia={(url, type) => {
+            if (type === 'video') {
+              setVideoPreviewUrl(url);
+              setSelectedThumbnailUrl(url);
+              setCurrentStep(2);
+            } else {
+              setSelectedThumbnailUrl(url);
+            }
+          }}
+        />
       </main>
     </div>
 

@@ -62,8 +62,22 @@ export async function POST(request: Request) {
     const encoded = encodeURIComponent(finalPrompt);
 
     // 4. Generate High-Res Video/Poster Stream
-    const videoUrl = `https://image.pollinations.ai/prompt/${encoded}?model=flux-realism&enhance=true&width=${width}&height=${height}&seed=${seed}&nologo=true`;
-    const posterUrl = videoUrl;
+    let videoUrl = `https://image.pollinations.ai/prompt/${encoded}?model=flux-realism&enhance=true&width=${width}&height=${height}&seed=${seed}&nologo=true`;
+    let posterUrl = videoUrl;
+
+    if (process.env.MUAPI_API_KEY) {
+      try {
+        const { generateAiVideo } = await import('@/lib/generativeAiService');
+        const muRes = await generateAiVideo(finalPrompt, {
+          aspectRatio: aspectRatio === 'portrait' ? '9:16' : '16:9',
+        });
+        if (muRes.success && muRes.url) {
+          videoUrl = muRes.url;
+        }
+      } catch (e) {
+        console.warn('MuAPI video generation failed, using fallback stream:', e);
+      }
+    }
 
     return NextResponse.json({
       success: true,

@@ -14,6 +14,7 @@ import { AIMessageRenderer } from '../Components/AIMessageRenderer';
 import { OpenDotsApprovalCard } from '../Components/OpenDotsApprovalCard';
 import { LiveBrowserOperatorCanvas } from '../Components/LiveBrowserOperatorCanvas';
 import { getAIDashboardSummary, processAIPersonalMessage, executeConfirmedAIAction } from '@/actions/ai-manager';
+import { GenerativeAiStudioModal } from '@/components/GenerativeAiStudioModal';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 
@@ -79,6 +80,7 @@ export function AIDashboard() {
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(true);
   const [rightPanelTab, setRightPanelTab] = useState<'tasks' | 'safety' | 'history' | 'memory' | 'browser'>('tasks');
   const [browserSession, setBrowserSession] = useState<any>(null);
+  const [isGenerativeStudioOpen, setIsGenerativeStudioOpen] = useState(false);
   
   // Mobile responsive drawer states
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
@@ -417,6 +419,14 @@ export function AIDashboard() {
           </button>
 
           <button
+            onClick={() => setIsGenerativeStudioOpen(true)}
+            title="Open AI Studio (Image, Video, Lip-sync)"
+            className="w-9 h-9 rounded-xl flex items-center justify-center text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/40 transition-all cursor-pointer"
+          >
+            <Sparkles className="w-4 h-4" />
+          </button>
+
+          <button
             onClick={() => {
               const textBlob = messages.map(m => `[${m.time}] ${m.sender}: ${m.text}`).join('\n\n');
               const blob = new Blob([textBlob], { type: 'text/plain' });
@@ -694,6 +704,16 @@ export function AIDashboard() {
               <Plus className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">New</span>
             </button>
+
+            {/* Generative AI Studio Button */}
+            <Button
+              size="sm"
+              onClick={() => setIsGenerativeStudioOpen(true)}
+              className="h-8 rounded-xl px-2.5 sm:px-3 text-xs font-bold bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white flex items-center gap-1.5 shadow-sm"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">AI Studio</span>
+            </Button>
 
             {/* Invite Button */}
             <Button
@@ -1513,6 +1533,12 @@ export function AIDashboard() {
           transform-origin: 70% 70%;
         }
       `}</style>
+
+      <GenerativeAiStudioModal
+        isOpen={isGenerativeStudioOpen}
+        onClose={() => setIsGenerativeStudioOpen(false)}
+        title="Tolee AI Creative Studio"
+      />
     </div>
   );
 }

@@ -479,7 +479,7 @@ export function CreatePostModal({
                 </Button>
               )}
 
-              {!videoOnly && (
+              {!videoOnly ? (
                 <>
                   <Button 
                     type="button"
@@ -500,6 +500,16 @@ export function CreatePostModal({
                     <span>AI Video</span>
                   </Button>
                 </>
+              ) : (
+                <Button 
+                  type="button"
+                  onClick={() => setVideoModalOpen(true)} 
+                  variant="ghost" 
+                  className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 rounded-xl h-9 px-3 font-bold text-xs flex items-center gap-1.5 border border-indigo-200/60 dark:border-indigo-800/50 bg-indigo-50/30 dark:bg-indigo-950/20 mr-1 shadow-sm transition-transform duration-200 hover:scale-[1.02]"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>AI Reel Generator</span>
+                </Button>
               )}
               {!videoOnly && (
                 <Button onClick={() => triggerFileInput('image/*')} variant="ghost" size="icon" className="text-green-500 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-950 rounded-full h-10 w-10">
