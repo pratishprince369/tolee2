@@ -98,6 +98,7 @@ import { DraftsReminderBanner } from "@/components/DraftsReminderBanner";
 import { OfflineSmartPocketBanner } from "@/components/OfflineSmartPocketBanner";
 import AnalyticsTracker from "@/components/AnalyticsTracker";
 import { RoutePrefetcher } from "@/components/RoutePrefetcher";
+import { NavigationStabilizer } from "@/components/NavigationStabilizer";
 import { MainLayoutWrapper } from "@/components/MainLayoutWrapper";
 import { Suspense } from "react";
 import { prisma } from "@/lib/prisma";
@@ -279,6 +280,7 @@ export default async function RootLayout({
       </head>
       <body className="antialiased min-h-screen bg-background flex flex-col">
         <Providers>
+          <NavigationStabilizer />
           <RoutePrefetcher />
           <OfflineSmartPocketBanner />
           <GlobalAlarmListener />

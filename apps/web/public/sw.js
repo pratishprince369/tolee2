@@ -1,6 +1,5 @@
-const CACHE_NAME = 'tolee-pwa-cache-v3';
+const CACHE_NAME = 'tolee-pwa-cache-v4';
 const ASSETS_TO_CACHE = [
-  '/',
   '/manifest.json',
   '/logo.png',
   '/default-user-avatar.svg'
@@ -23,6 +22,7 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         cacheNames.map((cache) => {
           if (cache !== CACHE_NAME) {
+            console.log('[PWA SW] Clearing outdated cache:', cache);
             return caches.delete(cache);
           }
         })
@@ -201,7 +201,7 @@ self.addEventListener('notificationclick', (event) => {
 });
 
 // ----------------------------------------------------
-// FETCH STRATEGY FOR PWA
+// FETCH STRATEGY FOR PWA (Static media only - never HTML/JS)
 // ----------------------------------------------------
 
 self.addEventListener('fetch', (event) => {
@@ -217,10 +217,10 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  const isStaticAsset = url.pathname.match(/\.(png|jpg|jpeg|svg|ico|json|js|css)$/);
-  const isRootPage = url.pathname === '/';
+  // Only cache static media/image assets. NEVER intercept or cache HTML, RSC, or JS chunks!
+  const isStaticAsset = url.pathname.match(/\.(png|jpg|jpeg|svg|ico|webp|woff2?|ttf)$/);
   
-  if (!isStaticAsset && !isRootPage) {
+  if (!isStaticAsset) {
     return;
   }
 
@@ -240,7 +240,7 @@ self.addEventListener('fetch', (event) => {
           if (cachedResponse) {
             return cachedResponse;
           }
-          return new Response('Network error occurred', { status: 503, statusText: 'Service Unavailable' });
+          return new Response('Asset unavailable', { status: 404 });
         });
       })
   );

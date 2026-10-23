@@ -262,7 +262,7 @@ export function NewsFeedStream({
           // Robust Cover Image & YouTube Thumbnail Extraction
           let cleanCoverImg: string | null = null;
 
-          if (isYouTube && ytVideoId) {
+          if (isYouTube && ytVideoId && /^[a-zA-Z0-9_-]{11}$/.test(ytVideoId)) {
             cleanCoverImg = `https://i.ytimg.com/vi/${ytVideoId}/hqdefault.jpg`;
           }
 

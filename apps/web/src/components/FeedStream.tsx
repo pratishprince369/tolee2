@@ -88,24 +88,30 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const savedY = sessionStorage.getItem('tolee_feed_scroll_y');
-    const lastPostId = sessionStorage.getItem('tolee_feed_last_post_id');
+    const restorePosition = () => {
+      const savedY = sessionStorage.getItem('tolee_feed_scroll_y');
+      const lastPostId = sessionStorage.getItem('tolee_feed_last_post_id');
 
-    if (savedY && !searchParams?.get('postId') && !searchParams?.get('post')) {
-      const parsedY = parseInt(savedY, 10);
-      if (!isNaN(parsedY) && parsedY > 0) {
-        requestAnimationFrame(() => {
-          window.scrollTo({ top: parsedY, behavior: 'instant' as ScrollBehavior });
-          if (lastPostId) {
-            const el = document.getElementById(`post-${lastPostId}`);
-            if (el) {
-              el.scrollIntoView({ behavior: 'instant' as ScrollBehavior, block: 'nearest' });
+      if (savedY && !searchParams?.get('postId') && !searchParams?.get('post')) {
+        const parsedY = parseInt(savedY, 10);
+        if (!isNaN(parsedY) && parsedY > 0) {
+          requestAnimationFrame(() => {
+            window.scrollTo({ top: parsedY, behavior: 'instant' as ScrollBehavior });
+            if (lastPostId) {
+              const el = document.getElementById(`post-${lastPostId}`);
+              if (el) {
+                el.scrollIntoView({ behavior: 'instant' as ScrollBehavior, block: 'nearest' });
+              }
             }
-          }
-        });
+          });
+        }
       }
-    }
-  }, []);
+    };
+
+    restorePosition();
+    window.addEventListener('pageshow', restorePosition);
+    return () => window.removeEventListener('pageshow', restorePosition);
+  }, [searchParams]);
 
   const recordPostNavigation = (postId: string) => {
     try {
