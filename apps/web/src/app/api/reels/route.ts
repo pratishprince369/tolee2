@@ -120,7 +120,10 @@ export async function GET(req: NextRequest) {
         visibility: 'public',
         NOT: [
           { mediaUrls: { contains: '/image/upload/' } },
-          { mediaUrls: { contains: 'pexels.com' } }
+          { mediaUrls: { contains: 'pexels.com' } },
+          { caption: { contains: '#ai_' } },
+          { caption: { contains: '#ai ' } },
+          { caption: { contains: '#ai\n' } }
         ],
         ...(excludeIdSet.size > 0 ? { id: { notIn: Array.from(excludeIdSet) } } : {})
       },
@@ -165,7 +168,13 @@ export async function GET(req: NextRequest) {
           mediaTypes: 'video',
           mediaUrls: { not: null },
           visibility: 'public',
-          NOT: { mediaUrls: { contains: '/image/upload/' } },
+          NOT: [
+            { mediaUrls: { contains: '/image/upload/' } },
+            { mediaUrls: { contains: 'pexels.com' } },
+            { caption: { contains: '#ai_' } },
+            { caption: { contains: '#ai ' } },
+            { caption: { contains: '#ai\n' } }
+          ],
           ...(excludeIdSet.size > 0 ? { id: { notIn: Array.from(excludeIdSet) } } : {})
         },
         orderBy: { createdAt: 'desc' },
@@ -202,10 +211,31 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // 6. Controlled prioritization: Demote Pexels stock footage behind real reels + Fisher-Yates uniform shuffle
-    const realUnseen = shuffleArray(unseenCandidates.filter(p => !p.mediaUrls?.includes('pexels.com')));
-    const pexelsUnseen = shuffleArray(unseenCandidates.filter(p => p.mediaUrls?.includes('pexels.com')));
-    const sortedUnseen = [...realUnseen, ...pexelsUnseen];
+    // Helper to interleave posts round-robin by author so consecutive reels switch creators & categories
+    function interleaveByAuthor(items: any[]): any[] {
+      const byAuthor = new Map<string, any[]>();
+      for (const item of items) {
+        const key = item.author?.username || 'general';
+        if (!byAuthor.has(key)) byAuthor.set(key, []);
+        byAuthor.get(key)!.push(item);
+      }
+      const buckets = Array.from(byAuthor.values());
+      const result: any[] = [];
+      let maxLen = 0;
+      for (const b of buckets) {
+        if (b.length > maxLen) maxLen = b.length;
+      }
+      for (let i = 0; i < maxLen; i++) {
+        for (const b of buckets) {
+          if (i < b.length) result.push(b[i]);
+        }
+      }
+      return result;
+    }
+
+    // 6. Dynamic Randomization & Multi-Account/Category Interleaving:
+    const realUnseen = interleaveByAuthor(shuffleArray(unseenCandidates.filter(p => !p.mediaUrls?.includes('pexels.com'))));
+    const sortedUnseen = realUnseen;
 
     const selected: any[] = [];
     for (const post of sortedUnseen) {
@@ -214,9 +244,9 @@ export async function GET(req: NextRequest) {
     }
 
     // 7. Step 31: Content exhaustion fallback:
-    // If unseen content is fewer than limit, recycle oldest seen content (NOT recently seen)
+    // If unseen content is fewer than limit, recycle oldest seen content with interleaving
     if (selected.length < limit && seenCandidates.length > 0) {
-      const recycled = seenCandidates.reverse(); // oldest first
+      const recycled = interleaveByAuthor(seenCandidates.reverse()); // oldest first
       for (const post of recycled) {
         if (selected.length >= limit) break;
         selected.push(post);

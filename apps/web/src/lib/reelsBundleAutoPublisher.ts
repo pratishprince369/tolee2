@@ -37,138 +37,169 @@ export interface BundleReelItem extends CentralReelItem {}
  */
 export const SOURCE_INDEXES: SourceIndexPage[] = [
   {
-    id: 'bio_link_mdsiraju',
-    name: 'REELS KI DUNIYA (4000+ Reels)',
-    url: 'https://bio.link/mdsiraju',
-    provider: 'bio_link',
-    description: '4000+ Reels PRO bundle including AI, God, Sanatani, and Cartoon Shorts'
+    id: 'linktree_dollarkit',
+    name: 'DollarKit Movie & Viral Reels Hub',
+    url: 'https://linktr.ee/dollarkit',
+    provider: 'linktree',
+    description: 'Realistic movie clips, cinema shorts, gym fitness, cricket, satisfying, and emotional video bundles'
   },
   {
     id: 'linktree_reelsbundle',
-    name: 'Reels Bundle & Shorts Collection',
+    name: 'Reels Bundle & Movie Collection',
     url: 'https://linktr.ee/reelsbundle',
     provider: 'linktree',
-    description: 'Dynamic index of viral shorts, animations, movies, and motivational bundles'
+    description: 'Movie explanations, cinema clips, and viral realistic shorts'
   }
 ];
 
 /**
- * Pre-indexed fallback bundles for bio.link/mdsiraju and verified collections
- * Used when Cloudflare WAF challenge (403) protects direct scraping of bio.link.
+ * Pre-indexed verified realistic movie clips & shorts bundles
+ * Prioritizing real movies, cinema scenes, sports, gym motivation, and emotional clips.
  */
 export const KNOWN_SOURCE_BUNDLES: DiscoveredBundle[] = [
-  // bio.link/mdsiraju bundles (AI, Cartoons, Motivation, Entertainment)
+  // 1. Realistic Movie Explained & Cinema Shorts (loktimes369 -> suman_kumar)
   {
-    sourceIndexUrl: 'https://bio.link/mdsiraju',
-    bundleUrl: 'https://drive.google.com/drive/folders/1OztyF42rnSi_P1F1XdT78JoyBLFr5W7M',
-    folderId: '1OztyF42rnSi_P1F1XdT78JoyBLFr5W7M',
-    name: '500+ 2D Funny Animation Videos',
-    category: 'animation',
-    provider: 'google_drive'
-  },
-  {
-    sourceIndexUrl: 'https://bio.link/mdsiraju',
-    bundleUrl: 'https://drive.google.com/drive/folders/1ebHNOPHZcMWe1KBetMVFc0YqzXjtHAbh',
-    folderId: '1ebHNOPHZcMWe1KBetMVFc0YqzXjtHAbh',
-    name: '500+ AI Reels Collection',
-    category: 'ai_tech',
-    provider: 'google_drive'
-  },
-  {
-    sourceIndexUrl: 'https://bio.link/mdsiraju',
-    bundleUrl: 'https://drive.google.com/drive/folders/13DYmOOCGU5yrk3loYHwcwjXsyCTUVwLI',
-    folderId: '13DYmOOCGU5yrk3loYHwcwjXsyCTUVwLI',
-    name: '150+ Motivational Reels Videos',
-    category: 'motivation',
-    provider: 'google_drive'
-  },
-  {
-    sourceIndexUrl: 'https://bio.link/mdsiraju',
-    bundleUrl: 'https://drive.google.com/drive/folders/1Hyk3ZH2l3_3JQYFvzWiuEuND4_gYg7Pv',
-    folderId: '1Hyk3ZH2l3_3JQYFvzWiuEuND4_gYg7Pv',
-    name: '200+ Shin Chan & Anime Videos',
-    category: 'animation',
-    provider: 'google_drive'
-  },
-  // linktr.ee/reelsbundle collections
-  {
-    sourceIndexUrl: 'https://linktr.ee/reelsbundle',
-    bundleUrl: 'https://drive.google.com/drive/folders/1dHDKZe6HIDnDpX4jXMfow3VEXYxRJgY5',
-    folderId: '1dHDKZe6HIDnDpX4jXMfow3VEXYxRJgY5',
-    name: 'Cartoon Explained Shorts',
-    category: 'animation',
-    provider: 'google_drive'
-  },
-  {
-    sourceIndexUrl: 'https://linktr.ee/reelsbundle',
-    bundleUrl: 'https://drive.google.com/drive/folders/1mOTYdoy7KXvd-rqh7tJwtEL08v5ibt8j',
-    folderId: '1mOTYdoy7KXvd-rqh7tJwtEL08v5ibt8j',
-    name: 'Movie Explained Shorts 1',
-    category: 'movies',
-    provider: 'google_drive'
-  },
-  {
-    sourceIndexUrl: 'https://linktr.ee/reelsbundle',
+    sourceIndexUrl: 'https://linktr.ee/dollarkit',
     bundleUrl: 'https://drive.google.com/drive/folders/1dVjqB7m_IKHIZ2-PN8PmNiXhC4jRVFbU',
     folderId: '1dVjqB7m_IKHIZ2-PN8PmNiXhC4jRVFbU',
-    name: '500+ Movie Explained Shorts',
+    name: '500+ Movie Explained Shorts (Hindi/English)',
     category: 'movies',
     provider: 'google_drive'
   },
   {
-    sourceIndexUrl: 'https://linktr.ee/reelsbundle',
-    bundleUrl: 'https://drive.google.com/drive/folders/1-20KuM_Q8N41AZ3urB9OIsE4RwEqg33o',
-    folderId: '1-20KuM_Q8N41AZ3urB9OIsE4RwEqg33o',
-    name: 'Viral Shorts Vault A',
-    category: 'viral',
+    sourceIndexUrl: 'https://linktr.ee/dollarkit',
+    bundleUrl: 'https://drive.google.com/drive/folders/1mOTYdoy7KXvd-rqh7tJwtEL08v5ibt8j',
+    folderId: '1mOTYdoy7KXvd-rqh7tJwtEL08v5ibt8j',
+    name: '250+ Movie Explained Shorts 1',
+    category: 'movies',
     provider: 'google_drive'
   },
   {
-    sourceIndexUrl: 'https://linktr.ee/reelsbundle',
-    bundleUrl: 'https://drive.google.com/drive/folders/1abXzzLDuRm_WGrwGz-Zh5O798-JKvJAd',
-    folderId: '1abXzzLDuRm_WGrwGz-Zh5O798-JKvJAd',
-    name: 'Facts & Wonders Shorts',
-    category: 'motivation',
-    provider: 'google_drive'
-  },
-  {
-    sourceIndexUrl: 'https://linktr.ee/reelsbundle',
+    sourceIndexUrl: 'https://linktr.ee/dollarkit',
     bundleUrl: 'https://drive.google.com/drive/folders/15qei5cdB_Z0UAMNPj9_2uPmSzg8kh8cW',
     folderId: '15qei5cdB_Z0UAMNPj9_2uPmSzg8kh8cW',
-    name: 'Viral Cinema Clips',
+    name: 'Viral Cinema & Thriller Clips',
     category: 'movies',
     provider: 'google_drive'
   },
+
+  // 2. Real Indian Cricket Match Moments & Highlights (adsvidia369 -> adsvia)
   {
-    sourceIndexUrl: 'https://linktr.ee/reelsbundle',
-    bundleUrl: 'https://drive.google.com/drive/folders/1FNBnfB99cmeAujzgTyIcAChKoUaZO-y6',
-    folderId: '1FNBnfB99cmeAujzgTyIcAChKoUaZO-y6',
-    name: 'Funny & Comedy Shorts',
-    category: 'comedy',
+    sourceIndexUrl: 'https://linktr.ee/dollarkit',
+    bundleUrl: 'https://drive.google.com/drive/folders/19ZOdWVrqXqH3G_RGIVDKIQ_THtAv3zao',
+    folderId: '19ZOdWVrqXqH3G_RGIVDKIQ_THtAv3zao',
+    name: '500+ Indian Cricket Match Moments',
+    category: 'cricket',
     provider: 'google_drive'
   },
   {
-    sourceIndexUrl: 'https://linktr.ee/reelsbundle',
-    bundleUrl: 'https://drive.google.com/drive/folders/1C2es7ujnrFvas4_b8eYJP6DmAkpwAxMj',
-    folderId: '1C2es7ujnrFvas4_b8eYJP6DmAkpwAxMj',
-    name: '200+ Viral Reel Videos',
-    category: 'viral',
+    sourceIndexUrl: 'https://linktr.ee/dollarkit',
+    bundleUrl: 'https://drive.google.com/drive/folders/1E5T979omkCYH36T-KapZeKxQoNPX8M1N',
+    folderId: '1E5T979omkCYH36T-KapZeKxQoNPX8M1N',
+    name: 'Cricket Viral Moments & Highlights',
+    category: 'cricket',
+    provider: 'google_drive'
+  },
+
+  // 3. Satisfying & Art Real World Reels (vadapavwaledada -> vsdapav)
+  {
+    sourceIndexUrl: 'https://linktr.ee/dollarkit',
+    bundleUrl: 'https://drive.google.com/drive/folders/1jzhyjsiKPRWJSZZSsasz4qq8Kq9qapV5',
+    folderId: '1jzhyjsiKPRWJSZZSsasz4qq8Kq9qapV5',
+    name: '1200+ Satisfying Real World Reels',
+    category: 'satisfying',
     provider: 'google_drive'
   },
   {
-    sourceIndexUrl: 'https://linktr.ee/reelsbundle',
-    bundleUrl: 'https://drive.google.com/drive/folders/1h5q_Bd1OoD4dAeZVtNUoqRzkq-V9DTke',
-    folderId: '1h5q_Bd1OoD4dAeZVtNUoqRzkq-V9DTke',
-    name: '300+ Viral Reel Videos',
-    category: 'viral',
+    sourceIndexUrl: 'https://linktr.ee/dollarkit',
+    bundleUrl: 'https://drive.google.com/drive/folders/1HI2Q3zmom9MkblsgdgT-9sjjtFp5jDY3',
+    folderId: '1HI2Q3zmom9MkblsgdgT-9sjjtFp5jDY3',
+    name: '700+ Art & Craft Creations',
+    category: 'art',
+    provider: 'google_drive'
+  },
+
+  // 4. Business, Trading & Space Reels (updatesontimes -> updatesontimes)
+  {
+    sourceIndexUrl: 'https://linktr.ee/dollarkit',
+    bundleUrl: 'https://drive.google.com/drive/folders/1U-hv1MG7Uh_ZXMcqsC48EXLSMkkcU2qU',
+    folderId: '1U-hv1MG7Uh_ZXMcqsC48EXLSMkkcU2qU',
+    name: 'Trading Tips & Market Analysis',
+    category: 'business',
     provider: 'google_drive'
   },
   {
-    sourceIndexUrl: 'https://linktr.ee/reelsbundle',
-    bundleUrl: 'https://drive.google.com/drive/folders/1maID_DgrGhrXMvCs7d7JtGPorOmMfbKH',
-    folderId: '1maID_DgrGhrXMvCs7d7JtGPorOmMfbKH',
-    name: 'Lifestyle & Travel Shorts',
+    sourceIndexUrl: 'https://linktr.ee/dollarkit',
+    bundleUrl: 'https://drive.google.com/drive/folders/19OihxyPDGIludrkNUL-G35tqdY_607tM',
+    folderId: '19OihxyPDGIludrkNUL-G35tqdY_607tM',
+    name: 'Business Tips Hindi & Success Rules',
+    category: 'business',
+    provider: 'google_drive'
+  },
+  {
+    sourceIndexUrl: 'https://linktr.ee/dollarkit',
+    bundleUrl: 'https://drive.google.com/drive/folders/1ebHNOPHZcMWe1KBetMVFc0YqzXjtHAbh',
+    folderId: '1ebHNOPHZcMWe1KBetMVFc0YqzXjtHAbh',
+    name: '1000+ Universe & Astronomy Reels',
+    category: 'space',
+    provider: 'google_drive'
+  },
+  {
+    sourceIndexUrl: 'https://linktr.ee/dollarkit',
+    bundleUrl: 'https://drive.google.com/drive/folders/193sV7W9KGkZPVkVbs4rjFmHEu5Is8qZV',
+    folderId: '193sV7W9KGkZPVkVbs4rjFmHEu5Is8qZV',
+    name: 'Stock Market & Financial Wisdom',
+    category: 'business',
+    provider: 'google_drive'
+  },
+
+  // 5. Gym, Fitness, Aesthetic Lifestyle & Devotion (rinkugupta90282 -> rinku_sharma)
+  {
+    sourceIndexUrl: 'https://linktr.ee/dollarkit',
+    bundleUrl: 'https://drive.google.com/drive/folders/1ABWJ5HhhYWD5b-Ijd46MJzX6jkl8Up74',
+    folderId: '1ABWJ5HhhYWD5b-Ijd46MJzX6jkl8Up74',
+    name: '2800+ GYM & Fitness Motivation',
+    category: 'fitness',
+    provider: 'google_drive'
+  },
+  {
+    sourceIndexUrl: 'https://linktr.ee/dollarkit',
+    bundleUrl: 'https://drive.google.com/drive/folders/1jesQ7V_duScTQ9W02bCPsvc8ffXSabxP',
+    folderId: '1jesQ7V_duScTQ9W02bCPsvc8ffXSabxP',
+    name: '2200+ Gym & Fitness Clips',
+    category: 'fitness',
+    provider: 'google_drive'
+  },
+  {
+    sourceIndexUrl: 'https://linktr.ee/dollarkit',
+    bundleUrl: 'https://drive.google.com/drive/folders/1abXzzLDuRm_WGrwGz-Zh5O798-JKvJAd',
+    folderId: '1abXzzLDuRm_WGrwGz-Zh5O798-JKvJAd',
+    name: 'Aesthetic Music Shorts & Lifestyle',
     category: 'lifestyle',
+    provider: 'google_drive'
+  },
+  {
+    sourceIndexUrl: 'https://linktr.ee/dollarkit',
+    bundleUrl: 'https://drive.google.com/drive/folders/191Oh9QVYDCXKX0yIoy7_mGV7-D6BT9Jy',
+    folderId: '191Oh9QVYDCXKX0yIoy7_mGV7-D6BT9Jy',
+    name: '1000+ Emotional Real Life Shorts',
+    category: 'emotional',
+    provider: 'google_drive'
+  },
+  {
+    sourceIndexUrl: 'https://linktr.ee/dollarkit',
+    bundleUrl: 'https://drive.google.com/drive/folders/1S7pNvAiVhy6eBkQQQYHOxE5uBa94EwHn',
+    folderId: '1S7pNvAiVhy6eBkQQQYHOxE5uBa94EwHn',
+    name: 'Sanatan & Krishna Devotional Shorts',
+    category: 'devotion',
+    provider: 'google_drive'
+  },
+  {
+    sourceIndexUrl: 'https://linktr.ee/dollarkit',
+    bundleUrl: 'https://drive.google.com/drive/folders/1XZ00wKCxPruEpTyDmRxtLzP3GxPG3N1W',
+    folderId: '1XZ00wKCxPruEpTyDmRxtLzP3GxPG3N1W',
+    name: '1400+ Hindi Motivational (Real Speeches)',
+    category: 'motivation',
     provider: 'google_drive'
   }
 ];
@@ -179,39 +210,39 @@ export const KNOWN_SOURCE_BUNDLES: DiscoveredBundle[] = [
  */
 export const POSTING_ACCOUNTS = [
   {
-    email: 'vadapavwaledada@gmail.com',
-    username: 'vsdapav',
-    name: 'vadapav wale dada',
-    preferredCategory: 'animation', // Cartoons, Shin Chan, 2D animations
-    fallbackCategory: 'comedy'
-  },
-  {
     email: 'loktimes369@gmail.com',
     username: 'suman_kumar',
     name: 'Suman Kumar',
-    preferredCategory: 'movies', // Movie explained, cinema stories, drama
-    fallbackCategory: 'viral'
+    preferredCategory: 'movies', // Movie explained, cinema scenes
+    fallbackCategory: 'emotional'
   },
   {
     email: 'adsvidia369@gmail.com',
     username: 'adsvia',
     name: 'ads vidia',
-    preferredCategory: 'ai_tech', // AI reels, tech trends, futuristic clips
-    fallbackCategory: 'viral'
+    preferredCategory: 'cricket', // Cricket matches, sports & viral cinema
+    fallbackCategory: 'movies'
+  },
+  {
+    email: 'vadapavwaledada@gmail.com',
+    username: 'vsdapav',
+    name: 'vadapav wale dada',
+    preferredCategory: 'satisfying', // Satisfying clips, art & crafts
+    fallbackCategory: 'art'
   },
   {
     email: 'updatesontimes@gmail.com',
     username: 'updatesontimes',
     name: 'updateson times',
-    preferredCategory: 'motivation', // Motivational, life lessons, facts & news
-    fallbackCategory: 'viral'
+    preferredCategory: 'business', // Business tips, trading, space & universe
+    fallbackCategory: 'space'
   },
   {
     email: 'rinkugupta90282@gmail.com',
     username: 'rinku_sharma',
     name: 'Rinku Sharma',
-    preferredCategory: 'lifestyle', // Lifestyle, travel, comedy, entertainment
-    fallbackCategory: 'comedy'
+    preferredCategory: 'fitness', // Gym workout, aesthetic lifestyle, devotion
+    fallbackCategory: 'lifestyle'
   }
 ];
 
@@ -231,9 +262,9 @@ export async function discoverBundleSources(): Promise<DiscoveredBundle[]> {
     discoveredMap.set(bundle.folderId, bundle);
   }
 
-  // 2. Scan linktr.ee/reelsbundle for newly added folders
+  // 2. Scan linktr.ee/dollarkit for newly added folders
   try {
-    const res = await fetch('https://linktr.ee/reelsbundle', {
+    const res = await fetch('https://linktr.ee/dollarkit', {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
       },
@@ -249,11 +280,11 @@ export async function discoverBundleSources(): Promise<DiscoveredBundle[]> {
           const folderId = idMatch[1];
           if (!discoveredMap.has(folderId)) {
             discoveredMap.set(folderId, {
-              sourceIndexUrl: 'https://linktr.ee/reelsbundle',
+              sourceIndexUrl: 'https://linktr.ee/dollarkit',
               bundleUrl: `https://drive.google.com/drive/folders/${folderId}`,
               folderId,
-              name: `Discovered Bundle ${folderId.slice(0, 6)}`,
-              category: 'viral',
+              name: `DollarKit Bundle ${folderId.slice(0, 6)}`,
+              category: 'movies',
               provider: 'google_drive'
             });
           }
@@ -261,12 +292,12 @@ export async function discoverBundleSources(): Promise<DiscoveredBundle[]> {
       }
     }
   } catch (err: any) {
-    console.warn('[BundleDiscovery] Failed to refresh Linktree source index:', err?.message || err);
+    console.warn('[BundleDiscovery] Failed to refresh DollarKit source index:', err?.message || err);
   }
 
-  // 3. Scan bio.link/mdsiraju (with graceful fallback on Cloudflare WAF)
+  // 3. Scan linktr.ee/reelsbundle as secondary source
   try {
-    const res = await fetch('https://bio.link/mdsiraju', {
+    const res = await fetch('https://linktr.ee/reelsbundle', {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
       },
@@ -282,11 +313,11 @@ export async function discoverBundleSources(): Promise<DiscoveredBundle[]> {
           const folderId = idMatch[1];
           if (!discoveredMap.has(folderId)) {
             discoveredMap.set(folderId, {
-              sourceIndexUrl: 'https://bio.link/mdsiraju',
+              sourceIndexUrl: 'https://linktr.ee/reelsbundle',
               bundleUrl: `https://drive.google.com/drive/folders/${folderId}`,
               folderId,
-              name: `BioLink Discovered ${folderId.slice(0, 6)}`,
-              category: 'ai_tech',
+              name: `ReelsBundle Discovered ${folderId.slice(0, 6)}`,
+              category: 'movies',
               provider: 'google_drive'
             });
           }
@@ -294,14 +325,16 @@ export async function discoverBundleSources(): Promise<DiscoveredBundle[]> {
       }
     }
   } catch (err: any) {
-    console.warn('[BundleDiscovery] Bio.link source index protected or unavailable; utilizing cached catalog.');
+    console.warn('[BundleDiscovery] ReelsBundle secondary index unavailable; utilizing cached catalog.');
   }
 
   return Array.from(discoveredMap.values());
 }
 
 /**
- * STEP 3, 4, 6: BUILD CENTRAL REEL SOURCE CATALOG WITH DEDUPLICATION
+ * STEP 3, 4, 6: BUILD CENTRAL REEL SOURCE CATALOG WITH ROUND-ROBIN FOLDER INTERLEAVING
+ * Picks 1 video from each Drive bundle in round-robin sequence so that adjacent videos
+ * always belong to different Drive folders and different realistic categories.
  */
 export async function buildCentralReelCatalog(forceRefresh = false): Promise<CentralReelItem[]> {
   const now = Date.now();
@@ -310,29 +343,40 @@ export async function buildCentralReelCatalog(forceRefresh = false): Promise<Cen
   }
 
   const bundles = await discoverBundleSources();
-  const centralMap = new Map<string, CentralReelItem>();
+  const bundleBuckets = new Map<string, CentralReelItem[]>();
 
   // Helper to extract videos from a Google Drive folder
   async function scanFolder(bundle: DiscoveredBundle) {
     try {
-      const res = await fetch(`https://drive.google.com/drive/folders/${bundle.folderId}`, {
+      const bundleVideos: CentralReelItem[] = [];
+      const localSeen = new Set<string>();
+
+      // embeddedfolderview server-renders HTML containing all file IDs and names directly in flip-entry tags
+      const res = await fetch(`https://drive.google.com/embeddedfolderview?id=${bundle.folderId}#grid`, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         },
-        signal: AbortSignal.timeout(7000)
+        signal: AbortSignal.timeout(14000)
       });
       const html = await res.text();
-      const regex = /aria-label="([^"]+?\.(?:mp4|MP4|mkv|mov|webm))[^"]*"[^>]*?ssk='[^':]+:[^':]+:([^']+)'/gi;
-      let m: RegExpExecArray | null;
 
-      while ((m = regex.exec(html)) !== null) {
-        const rawTitle = m[1];
-        const cleanId = m[2].replace(/-\d+-\d+$/, '');
+      // Split by flip-entry for lightning-fast parsing without catastrophic regex backtracking
+      const entries = html.split('class="flip-entry"');
+      for (let i = 1; i < entries.length; i++) {
+        const chunk = entries[i];
+        const idMatch = chunk.match(/id="entry-([a-zA-Z0-9_-]+)"/);
+        const titleMatch = chunk.match(/class="flip-entry-title">([^<]+)<\/div>/);
+        if (!idMatch || !titleMatch) continue;
+
+        const cleanId = idMatch[1];
+        const rawTitle = titleMatch[1].trim();
 
         if (!cleanId || cleanId.length < 20) continue;
 
-        // STEP 4: Unique canonical identification (deduplicate across all folders)
-        if (centralMap.has(cleanId)) continue;
+        // Skip cartoon & AI generated video indicators explicitly
+        if (/ai_|#ai|flux|midjourney|ai generated|ai avatar|avatar|cartoon|2d animation/i.test(rawTitle)) continue;
+        if (localSeen.has(cleanId)) continue;
+        localSeen.add(cleanId);
 
         let caption = rawTitle
           .replace(/\.(mp4|mkv|mov|webm).*$/i, '')
@@ -345,17 +389,20 @@ export async function buildCentralReelCatalog(forceRefresh = false): Promise<Cen
           caption += ` #${bundle.category} #reels #viral #tolee`;
         }
 
-        centralMap.set(cleanId, {
+        bundleVideos.push({
           fileId: cleanId,
           title: caption,
           folder: bundle.name,
           category: bundle.category,
           sourceIndex: bundle.sourceIndexUrl,
           bundleUrl: bundle.bundleUrl,
-          // STEP 20: Direct streaming delivery URL bypassing serverless proxy
           videoUrl: `https://drive.usercontent.google.com/download?id=${cleanId}&export=download`,
           posterUrl: `https://lh3.googleusercontent.com/d/${cleanId}`
         });
+      }
+
+      if (bundleVideos.length > 0) {
+        bundleBuckets.set(bundle.folderId, bundleVideos);
       }
     } catch (err: any) {
       // Quiet fail per folder to prevent whole scan failure
@@ -369,9 +416,32 @@ export async function buildCentralReelCatalog(forceRefresh = false): Promise<Cen
     await Promise.all(chunk.map(b => scanFolder(b)));
   }
 
-  cachedCatalog = Array.from(centralMap.values());
+  // Interleave round-robin across all different Google Drive folders
+  // Take 1 video from Folder 1, 1 from Folder 2, 1 from Folder 3...
+  const buckets = Array.from(bundleBuckets.values()).filter(list => list.length > 0);
+  const interleavedCatalog: CentralReelItem[] = [];
+  const globalSeen = new Set<string>();
+
+  let maxLen = 0;
+  for (const b of buckets) {
+    if (b.length > maxLen) maxLen = b.length;
+  }
+
+  for (let idx = 0; idx < maxLen; idx++) {
+    for (const b of buckets) {
+      if (idx < b.length) {
+        const item = b[idx];
+        if (!globalSeen.has(item.fileId)) {
+          globalSeen.add(item.fileId);
+          interleavedCatalog.push(item);
+        }
+      }
+    }
+  }
+
+  cachedCatalog = interleavedCatalog;
   lastCatalogFetchTime = Date.now();
-  console.log(`[CentralCatalog] Catalog built successfully with ${cachedCatalog.length} unique videos from ${bundles.length} bundles.`);
+  console.log(`[CentralCatalog] Interleaved catalog built with ${cachedCatalog.length} unique videos from ${buckets.length} active bundles.`);
 
   return cachedCatalog;
 }
@@ -571,61 +641,76 @@ export async function publishDailyBundleReelsBatch(maxLimitPerRun = 5): Promise<
     let publishedCount = 0;
     const sessionClaimedIds = new Set<string>();
 
-    // 5. Publish videos in rotation across eligible accounts
-    for (const acc of eligibleAccounts) {
-      if (publishedCount >= maxLimitPerRun) break;
-
+    // 5. Interleaved Multi-Account Posting:
+    // Distribute 1 video per account per round so that subsequent posts alternate across accounts and categories.
+    while (publishedCount < maxLimitPerRun && eligibleAccounts.some(acc => {
       const u = userMap.get(acc.email);
-      if (!u) continue;
+      return u && (user24hCounts[u.username] || 0) < DAILY_USER_CAP;
+    })) {
+      let publishedInThisRound = 0;
 
-      const currentQuota = user24hCounts[u.username] || 0;
-      if (currentQuota >= DAILY_USER_CAP) continue;
+      for (const acc of eligibleAccounts) {
+        if (publishedCount >= maxLimitPerRun) break;
 
-      // Select matching videos by preferred category first, then fallback
-      const candidates = catalog.filter(item => 
-        !usedFileIds.has(item.fileId) && 
-        !sessionClaimedIds.has(item.fileId)
-      );
+        const u = userMap.get(acc.email);
+        if (!u) continue;
 
-      const categoryCandidates = candidates.filter(item => 
-        item.category === acc.preferredCategory || item.category === acc.fallbackCategory
-      );
+        const currentQuota = user24hCounts[u.username] || 0;
+        if (currentQuota >= DAILY_USER_CAP) continue;
 
-      const chosenVideo = categoryCandidates[0] || candidates[0];
+        // Select matching videos by preferred category first, then fallback, then any unused interleaved item
+        const candidates = catalog.filter(item => 
+          !usedFileIds.has(item.fileId) && 
+          !sessionClaimedIds.has(item.fileId)
+        );
 
-      if (!chosenVideo) {
-        logs.push(`No unused video candidates remaining for @${u.username}.`);
-        continue;
+        const categoryCandidates = candidates.filter(item => 
+          item.category === acc.preferredCategory || item.category === acc.fallbackCategory
+        );
+
+        const chosenVideo = categoryCandidates[0] || candidates[0];
+
+        if (!chosenVideo) {
+          logs.push(`No unused video candidates remaining for @${u.username}.`);
+          continue;
+        }
+
+        // STEP 10: Cross-user duplicate claim
+        sessionClaimedIds.add(chosenVideo.fileId);
+        usedFileIds.add(chosenVideo.fileId);
+
+        // STEP 20: Compress and optimize raw video before publishing to guarantee instant streaming
+        const optimizedMedia = await compressAndOptimizeReelVideo(chosenVideo.fileId, chosenVideo.videoUrl);
+        const mediaUrlsCombined = `${optimizedMedia.videoUrl},${optimizedMedia.posterUrl}`;
+
+        // Stagger createdAt slightly so reels appear in the interleaved chronological order
+        const postTimestamp = new Date(Date.now() - (maxLimitPerRun - publishedCount) * 60 * 1000);
+
+        const created = await prisma.post.create({
+          data: {
+            caption: chosenVideo.title,
+            postType: 'reel',
+            mediaUrls: mediaUrlsCombined,
+            mediaTypes: 'video',
+            mediaPublicIds: chosenVideo.fileId,
+            mediaResourceTypes: optimizedMedia.resourceType,
+            status: 'published',
+            visibility: 'public',
+            authorId: u.id,
+            isSimulation: true,
+            createdAt: postTimestamp,
+            tolees: defaultTolee ? { create: [{ toleeId: defaultTolee.id }] } : undefined
+          },
+          select: { id: true }
+        });
+
+        publishedCount++;
+        publishedInThisRound++;
+        user24hCounts[u.username] = (user24hCounts[u.username] || 0) + 1;
+        logs.push(`Published [${chosenVideo.category}] "${chosenVideo.title.slice(0, 32)}..." for @${u.username} (Post #${user24hCounts[u.username]}/10 today) -> ${created.id}`);
       }
 
-      // STEP 10: Cross-user duplicate claim
-      sessionClaimedIds.add(chosenVideo.fileId);
-      usedFileIds.add(chosenVideo.fileId);
-
-      // STEP 20: Compress and optimize raw video before publishing to guarantee instant streaming
-      const optimizedMedia = await compressAndOptimizeReelVideo(chosenVideo.fileId, chosenVideo.videoUrl);
-      const mediaUrlsCombined = `${optimizedMedia.videoUrl},${optimizedMedia.posterUrl}`;
-
-      const created = await prisma.post.create({
-        data: {
-          caption: chosenVideo.title,
-          postType: 'reel',
-          mediaUrls: mediaUrlsCombined,
-          mediaTypes: 'video',
-          mediaPublicIds: chosenVideo.fileId,
-          mediaResourceTypes: optimizedMedia.resourceType,
-          status: 'published',
-          visibility: 'public',
-          authorId: u.id,
-          isSimulation: true,
-          tolees: defaultTolee ? { create: [{ toleeId: defaultTolee.id }] } : undefined
-        },
-        select: { id: true }
-      });
-
-      publishedCount++;
-      user24hCounts[u.username] = (user24hCounts[u.username] || 0) + 1;
-      logs.push(`Published [${chosenVideo.category}] "${chosenVideo.title.slice(0, 32)}..." for @${u.username} (Post #${user24hCounts[u.username]}/10 today) -> ${created.id}`);
+      if (publishedInThisRound === 0) break;
     }
 
     logs.push(`Batch complete. Successfully published ${publishedCount} new Reels.`);

@@ -103,7 +103,10 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
         mediaUrls: { not: null },
         NOT: [
           { mediaUrls: { contains: '/image/upload/' } },
-          { mediaUrls: { contains: 'pexels.com' } }
+          { mediaUrls: { contains: 'pexels.com' } },
+          { caption: { contains: '#ai_' } },
+          { caption: { contains: '#ai ' } },
+          { caption: { contains: '#ai\n' } }
         ],
         ...(viewedReelIds.size > 0 ? { id: { notIn: Array.from(viewedReelIds).slice(0, 300) } } : {})
       },
@@ -150,7 +153,13 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
           isArchived: false,
           visibility: 'public',
           mediaUrls: { not: null },
-          NOT: { mediaUrls: { contains: '/image/upload/' } }
+          NOT: [
+          { mediaUrls: { contains: '/image/upload/' } },
+          { mediaUrls: { contains: 'pexels.com' } },
+          { caption: { contains: '#ai_' } },
+          { caption: { contains: '#ai ' } },
+          { caption: { contains: '#ai\n' } }
+        ]
         },
         orderBy: { createdAt: 'desc' },
         take: 50,
@@ -184,14 +193,37 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
       }
     }
 
-    // 4. True Fisher-Yates Dynamic Randomization:
-    // Ensures fresh non-repeating mix every time the user visits Reels
+    // Helper to interleave posts round-robin by author so consecutive reels switch creators & categories
+    function interleaveByAuthor(items: any[]): any[] {
+      const byAuthor = new Map<string, any[]>();
+      for (const item of items) {
+        const key = item.author?.username || 'general';
+        if (!byAuthor.has(key)) byAuthor.set(key, []);
+        byAuthor.get(key)!.push(item);
+      }
+      const buckets = Array.from(byAuthor.values());
+      const result: any[] = [];
+      let maxLen = 0;
+      for (const b of buckets) {
+        if (b.length > maxLen) maxLen = b.length;
+      }
+      for (let i = 0; i < maxLen; i++) {
+        for (const b of buckets) {
+          if (i < b.length) result.push(b[i]);
+        }
+      }
+      return result;
+    }
+
+    // 4. Dynamic Randomization & Multi-Account/Category Interleaving:
+    // Ensures fresh non-repeating mix across all categories every time the user visits Reels
     const shuffledUnseen = shuffleArray(unseenPosts);
-    const selectedPosts: any[] = shuffledUnseen.slice(0, 15);
+    const interleavedUnseen = interleaveByAuthor(shuffledUnseen);
+    const selectedPosts: any[] = interleavedUnseen.slice(0, 15);
 
     // If unseen pool is exhausted, backfill with shuffled seen posts (never static order)
     if (selectedPosts.length < 15 && seenPosts.length > 0) {
-      const shuffledSeen = shuffleArray(seenPosts);
+      const shuffledSeen = interleaveByAuthor(shuffleArray(seenPosts));
       for (const sp of shuffledSeen) {
         if (selectedPosts.length >= 15) break;
         selectedPosts.push(sp);
