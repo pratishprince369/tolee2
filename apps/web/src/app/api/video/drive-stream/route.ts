@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
   }
 
   const range = req.headers.get('range') || 'bytes=0-';
-  const targetUrl = `https://drive.usercontent.google.com/download?id=${fileId}&export=download`;
+  const targetUrl = `https://drive.usercontent.google.com/download?id=${fileId}&export=download&confirm=t`;
 
   const fetchHeaders: HeadersInit = {
     'User-Agent': USER_AGENT,
@@ -48,20 +48,28 @@ export async function GET(req: NextRequest) {
       method: 'GET',
       headers: fetchHeaders,
       cache: 'no-store',
+      signal: AbortSignal.timeout(15000),
     });
 
     if (!driveRes.ok && driveRes.status !== 206) {
-      // Fallback: try standard drive export url if usercontent fails
-      const fallbackUrl = `https://drive.google.com/uc?id=${fileId}&export=download`;
+      // Fallback: try standard drive export url with confirmation if usercontent fails
+      const fallbackUrl = `https://drive.google.com/uc?id=${fileId}&export=download&confirm=t`;
       driveRes = await fetch(fallbackUrl, {
         method: 'GET',
         headers: fetchHeaders,
         cache: 'no-store',
         redirect: 'follow',
+        signal: AbortSignal.timeout(15000),
       });
 
       if (!driveRes.ok && driveRes.status !== 206) {
-        return new NextResponse('Video stream unavailable from upstream source', { status: driveRes.status });
+        return new NextResponse('Video stream unavailable from upstream source', { 
+          status: driveRes.status || 502,
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Cross-Origin-Resource-Policy': 'cross-origin'
+          }
+        });
       }
     }
 
@@ -72,8 +80,12 @@ export async function GET(req: NextRequest) {
     });
   } catch (err: any) {
     console.error(`[DriveStreamProxy Error] fileId ${fileId}:`, err?.message || err);
-    return NextResponse.redirect(`https://drive.usercontent.google.com/download?id=${fileId}&export=download`, {
-      status: 307,
+    return new NextResponse('Video stream gateway timeout or unavailable', { 
+      status: 504,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Cross-Origin-Resource-Policy': 'cross-origin'
+      }
     });
   }
 }

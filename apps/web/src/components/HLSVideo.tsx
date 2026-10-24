@@ -38,8 +38,21 @@ export function setGlobalActiveVideo(video: HTMLVideoElement | null) {
       try {
         v.pause();
         v.muted = true;
+        v.volume = 0;
       } catch (e) {}
     }
+  }
+
+  if (typeof document !== 'undefined') {
+    document.querySelectorAll('video').forEach((v) => {
+      if (v !== video) {
+        try {
+          v.pause();
+          v.muted = true;
+          v.volume = 0;
+        } catch (e) {}
+      }
+    });
   }
 
   globalActiveVideo = video;
@@ -216,6 +229,12 @@ export const HLSVideo = forwardRef<HTMLVideoElement, HLSVideoProps>(
     const playSafe = useCallback(async () => {
       const video = videoRef.current;
       if (!video) return;
+      if (!isActiveRef.current) {
+        video.pause();
+        video.muted = true;
+        video.volume = 0;
+        return;
+      }
 
       const token = ++playbackGeneration;
       video.muted = !!mutedRef.current;
@@ -253,12 +272,16 @@ export const HLSVideo = forwardRef<HTMLVideoElement, HLSVideoProps>(
       const video = videoRef.current;
       if (!video) return;
 
-      // Resolve Google Drive URLs to direct byte-range download URL without serverless proxying
-      const resolvedSrc = (src.includes('drive.usercontent.google.com') || src.includes('drive.google.com'))
-        ? (src.match(/[?&]id=([a-zA-Z0-9_-]+)/)?.[1] || src.match(/\/file\/d\/([a-zA-Z0-9_-]+)/)?.[1] || src.match(/\/d\/([a-zA-Z0-9_-]+)/)?.[1]
-            ? `https://drive.usercontent.google.com/download?id=${(src.match(/[?&]id=([a-zA-Z0-9_-]+)/)?.[1] || src.match(/\/file\/d\/([a-zA-Z0-9_-]+)/)?.[1] || src.match(/\/d\/([a-zA-Z0-9_-]+)/)?.[1])}&export=download`
-            : src)
-        : src;
+      // Resolve Google Drive URLs to internal proxy stream to guarantee CORS, range requests & bypass virus scan warning
+      let resolvedSrc = src;
+      if (src.includes('drive.usercontent.google.com') || src.includes('drive.google.com')) {
+        const fileId = src.match(/[?&]id=([a-zA-Z0-9_-]+)/)?.[1] ||
+                       src.match(/\/file\/d\/([a-zA-Z0-9_-]+)/)?.[1] ||
+                       src.match(/\/d\/([a-zA-Z0-9_-]+)/)?.[1];
+        if (fileId) {
+          resolvedSrc = `/api/video/drive-stream?id=${fileId}`;
+        }
+      }
 
       // Tear down anything that was already loaded
       const teardown = () => {
@@ -379,6 +402,7 @@ export const HLSVideo = forwardRef<HTMLVideoElement, HLSVideoProps>(
       } else {
         video.pause();
         video.muted = true;
+        video.volume = 0;
         if (!ignoreGlobalActive && getGlobalActiveVideo() === video) {
           setGlobalActiveVideo(null);
         }

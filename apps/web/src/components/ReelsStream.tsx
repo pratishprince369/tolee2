@@ -65,14 +65,16 @@ const getValidAvatarUrl = (url: string | null | undefined): string => {
 function useActiveReelIndex(
   containerRef: React.RefObject<HTMLDivElement | null>,
   reelCount: number,
+  enabled: boolean = true,
 ): number {
   const [activeIndex, setActiveIndex] = useState(0);
   const activeIndexRef = useRef(0);
   activeIndexRef.current = activeIndex;
 
   useEffect(() => {
+    if (!enabled || reelCount === 0) return;
     const container = containerRef.current;
-    if (!container || reelCount === 0) return;
+    if (!container) return;
 
     // 1. Smooth RAF-throttled scroll handler (zero DOM layout thrashing)
     let rafId: number | null = null;
@@ -122,7 +124,7 @@ function useActiveReelIndex(
       container.removeEventListener('scroll', handleScroll);
       observer.disconnect();
     };
-  }, [reelCount, containerRef]);
+  }, [reelCount, containerRef, enabled]);
 
   return activeIndex;
 }
@@ -493,8 +495,8 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
   });
 
   // Independent active-index tracking for each layout
-  const mobileActiveIndex = useActiveReelIndex(mobileScrollRef, itemsToRender.length);
-  const desktopActiveIndex = useActiveReelIndex(desktopScrollRef, itemsToRender.length);
+  const mobileActiveIndex = useActiveReelIndex(mobileScrollRef, itemsToRender.length, mounted && !isDesktop);
+  const desktopActiveIndex = useActiveReelIndex(desktopScrollRef, itemsToRender.length, mounted && isDesktop);
 
   const viewedReelsRef = useRef<Set<string>>(new Set());
   const viewTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -702,11 +704,38 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
   const scrollToReel = useCallback((containerRef: React.RefObject<HTMLDivElement | null>, idx: number) => {
     const container = containerRef.current;
     if (!container) return;
-    const slides = container.querySelectorAll('.reel-container');
-    if (slides[idx]) {
-      (slides[idx] as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  }, []);
+    const safeIdx = Math.max(0, Math.min(idx, itemsToRender.length - 1));
+    const targetTop = safeIdx * container.clientHeight;
+    container.scrollTo({ top: targetTop, behavior: 'smooth' });
+  }, [itemsToRender.length]);
+
+  // Desktop keyboard navigation (ArrowUp, ArrowDown, PageUp, PageDown)
+  useEffect(() => {
+    if (!mounted || !isDesktop) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return;
+      }
+      if (isAnyModalOpen) return;
+
+      if (e.key === 'ArrowDown' || e.key === 'PageDown') {
+        e.preventDefault();
+        if (desktopActiveIndex < itemsToRender.length - 1) {
+          scrollToReel(desktopScrollRef, desktopActiveIndex + 1);
+        }
+      } else if (e.key === 'ArrowUp' || e.key === 'PageUp') {
+        e.preventDefault();
+        if (desktopActiveIndex > 0) {
+          scrollToReel(desktopScrollRef, desktopActiveIndex - 1);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [mounted, isDesktop, desktopActiveIndex, itemsToRender.length, isAnyModalOpen, scrollToReel]);
 
   useEffect(() => {
     if (!mounted || itemsToRender.length === 0) return;
@@ -1139,7 +1168,16 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
             <EmptyState onUpload={handleReelsUploadClick} />
           </div>
         ) : (
-          <div className="flex items-center justify-center h-full gap-6 px-4">
+          <div
+            className="flex items-center justify-center h-full gap-6 px-4"
+            onWheel={(e) => {
+              const container = desktopScrollRef.current;
+              if (!container || isAnyModalOpen) return;
+              if (!container.contains(e.target as Node)) {
+                container.scrollTop += e.deltaY;
+              }
+            }}
+          >
 
             {/* Prev / Next arrows */}
             <div className="flex flex-col gap-3 shrink-0">
@@ -1522,6 +1560,7 @@ const ReelSlide = memo(function ReelSlide({
 }) {
   const [isReady, setIsReady] = useState(false);
   const [isError, setIsError] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
 
   if (reel.isUnavailable) {
     return (
@@ -1545,6 +1584,7 @@ const ReelSlide = memo(function ReelSlide({
     if (isActive) {
       setIsReady(false);
       setIsError(false);
+      setRetryKey(0);
     }
   }, [isActive]);
 
@@ -1594,6 +1634,7 @@ const ReelSlide = memo(function ReelSlide({
       ) : (
         <>
           <HLSVideo
+            key={`hls-${reel.id || reel.video}-${retryKey}`}
             src={reel.video}
             className={`w-full h-full object-cover transition-opacity duration-300 ${isReady ? 'opacity-100' : 'opacity-0'}`}
             poster={reel.poster || getPosterUrl(reel.video)}
@@ -1658,14 +1699,16 @@ const ReelSlide = memo(function ReelSlide({
                   <p className="text-xs text-zinc-400 max-w-[200px]">Tap retry to reload video stream</p>
                 </div>
                 <button
+                  disabled={retryKey >= 3}
                   onClick={(e) => {
                     e.stopPropagation();
                     setIsError(false);
                     setIsReady(false);
+                    setRetryKey((prev) => prev + 1);
                   }}
-                  className="px-4 py-1.5 rounded-full bg-white/20 hover:bg-white/30 text-white font-medium text-xs transition-all active:scale-95 border border-white/20"
+                  className="px-4 py-1.5 rounded-full bg-white/20 hover:bg-white/30 text-white font-medium text-xs transition-all active:scale-95 border border-white/20 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Retry
+                  {retryKey >= 3 ? 'Unable to load' : 'Retry'}
                 </button>
               </div>
             </div>
