@@ -807,32 +807,40 @@ export function AIDashboard() {
                     <div className="flex items-center gap-2.5">
                       <div
                         className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
-                          msg.browserSession.isStopped
+                          msg.browserSession.isBlocked
+                            ? 'bg-rose-500/15 text-rose-500'
+                            : msg.browserSession.isStopped
                             ? 'bg-rose-500/10 text-rose-500'
                             : 'bg-amber-500/15 text-amber-500'
                         }`}
                       >
-                        <Globe className={`w-4 h-4 ${msg.browserSession.isStopped ? '' : 'animate-spin'}`} />
+                        <Globe className={`w-4 h-4 ${msg.browserSession.isStopped || msg.browserSession.isBlocked ? '' : 'animate-spin'}`} />
                       </div>
                       <div>
                         <div className="flex items-center gap-1.5">
                           <span className="text-xs font-bold text-slate-800 dark:text-zinc-200">
                             Browser Operator
                           </span>
-                          {msg.browserSession.isStopped && (
+                          {msg.browserSession.isBlocked ? (
+                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-rose-500/15 text-rose-500 font-bold">
+                              Access Blocked
+                            </span>
+                          ) : msg.browserSession.isStopped ? (
                             <span className="text-[10px] px-1.5 py-0.2 rounded bg-rose-500/15 text-rose-400 font-bold">
                               Paused
                             </span>
-                          )}
+                          ) : null}
                         </div>
                         <p
                           className={`text-[11px] font-semibold ${
-                            msg.browserSession.isStopped
+                            msg.browserSession.isBlocked
+                              ? 'text-rose-600 dark:text-rose-400'
+                              : msg.browserSession.isStopped
                               ? 'text-slate-400 dark:text-zinc-500'
                               : 'text-amber-600 dark:text-amber-400'
                           }`}
                         >
-                          {msg.browserSession.statusText || 'Waiting for you...'}
+                          {msg.browserSession.statusText || (msg.browserSession.isBlocked ? 'Access Blocked by Website Security Service' : 'Waiting for you...')}
                         </p>
                       </div>
                     </div>
@@ -847,7 +855,15 @@ export function AIDashboard() {
                       >
                         Open View
                       </button>
-                      {msg.browserSession.isStopped ? (
+                      {msg.browserSession.isBlocked ? (
+                        <button
+                          onClick={() => window.open(msg.browserSession.currentUrl || `https://${msg.browserSession.targetDomain}`, '_blank', 'noopener,noreferrer')}
+                          className="px-2.5 py-1 rounded-xl border border-rose-200 dark:border-rose-800 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer flex items-center gap-1"
+                        >
+                          <span>Popout</span>
+                          <ExternalLink className="w-2.5 h-2.5" />
+                        </button>
+                      ) : msg.browserSession.isStopped ? (
                         <button
                           onClick={() => handleResumeTask(msg.id)}
                           className="px-2.5 py-1 rounded-xl border border-emerald-300 dark:border-emerald-800 text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors cursor-pointer"
@@ -1030,7 +1046,7 @@ export function AIDashboard() {
         {/* ========================================================= */}
         <div className="shrink-0 w-full p-2.5 sm:p-4 lg:p-6 bg-gradient-to-t from-white via-white/95 to-transparent dark:from-[#0c0d10] dark:via-[#0c0d10]/95 pb-[calc(4.8rem+env(safe-area-inset-bottom))] lg:pb-6 z-20">
           {/* Muse-Style "A task needs review" Floating Banner */}
-          {browserSession && browserSession.status === 'waiting_user' && !browserSession.isStopped && (
+          {browserSession && browserSession.status === 'waiting_user' && !browserSession.isStopped && !browserSession.isBlocked && browserSession.status !== 'blocked' && (
             <div className="max-w-3xl mx-auto mb-2.5 px-1 animate-in fade-in slide-in-from-bottom duration-200">
               <div className="flex items-center justify-between p-2.5 sm:p-3 rounded-2xl bg-amber-500/15 dark:bg-amber-950/40 border border-amber-500/30 shadow-xs">
                 <div className="flex items-center gap-2.5">

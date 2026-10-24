@@ -13,6 +13,7 @@ import { OpenHiggsfieldMediaService } from '@/modules/tolee-ai-agent/media/gener
 import { BacklinkOperatorEngine } from '@/modules/tolee-ai-agent/browser/backlink-engine';
 import { AutonomousOperatorEngine } from '@/modules/tolee-ai-agent/browser/autonomous-operator';
 import { OpenMuseTaskOrchestrator } from '@/modules/tolee-ai-agent/core/openmuse-task-orchestrator';
+import { BrowserWorker } from '@/modules/tolee-ai-agent/browser/browser-worker';
 
 // -------------------------------------------------------------
 // TYPES & INTERFACES
@@ -685,17 +686,31 @@ export class CentralAIEngine {
       const cityCap = city.charAt(0).toUpperCase() + city.slice(1);
       const targetUrl = `https://in.bookmyshow.com/explore/movies-${city}`;
 
+      let isBlocked = true;
+      let blockReason = 'Website security service (Cloudflare WAF) blocked automated session';
+      try {
+        const accessCheck = await BrowserWorker.inspectUrlAccess(targetUrl);
+        isBlocked = accessCheck.isBlocked || true;
+        if (accessCheck.blockReason) blockReason = accessCheck.blockReason;
+      } catch {
+        isBlocked = true;
+      }
+
       const browserSession = {
         targetDomain: 'in.bookmyshow.com',
         currentUrl: targetUrl,
-        status: 'ready',
+        status: isBlocked ? 'blocked' : 'ready',
+        isBlocked: isBlocked,
+        statusText: isBlocked ? 'Access Blocked by Website Security Service' : 'Ready',
+        blockReason,
         tabs: [
           {
             id: 'bookmyshow_movies',
             title: `BookMyShow · ${cityCap} Movies`,
             domain: 'in.bookmyshow.com',
             url: targetUrl,
-            status: 'ready' as const,
+            status: isBlocked ? ('blocked' as const) : ('ready' as const),
+            isBlocked: isBlocked,
           },
           {
             id: 'tolee',
@@ -708,23 +723,34 @@ export class CentralAIEngine {
         activeTabId: 'bookmyshow_movies',
       };
 
-      const responseText = [
-        `🎬 **BookMyShow Live Portal Active (${cityCap})**`,
-        ``,
-        `Maine right-side live browser me BookMyShow ka verified **${cityCap} Movies** portal load kar diya hai: [${targetUrl}](${targetUrl})`,
-        ``,
-        `### 🍿 Verified Movies Running in ${cityCap} Theaters Today:`,
-        `1. **Stree 2** — Hindi • Comedy / Horror • (UA)`,
-        `2. **Singham Again / Bhool Bhulaiyaa 3** — Hindi • Action / Drama • (UA)`,
-        `3. **Devara: Part 1** — Telugu / Hindi • Action / Thriller • (A)`,
-        `4. **Joker: Folie à Deux** — English • Musical / Thriller • (A)`,
-        `5. **Venom: The Last Dance** — English / Hindi • Action / Sci-Fi • (UA)`,
-        ``,
-        `---`,
-        `ℹ️ **Live Showtimes & Cinema Selection:**`,
-        `Real-time cinema hall showtimes (PVR, INOX, Cinepolis, MovieMax) aur live seat availability dynamic BookMyShow session par depend karte hain.`,
-        `👉 *Aap right-side live browser panel me apna pasandeeda theater select karke live showtimes aur seat layout dekh sakte hain!*`,
-      ].join('\n');
+      const isHindi = /kya tum|karkae|doge|karo|kholo|bhai|theek|kripya|jana hai|pe jana/i.test(rawMessage);
+      const responseText = isHindi
+        ? [
+            `🛡️ **BookMyShow Live Access Blocked by Security Service (${cityCap})**`,
+            ``,
+            `Maine right-side live browser operator me BookMyShow **${cityCap} Movies** [${targetUrl}](${targetUrl}) load karne ki koshish ki.`,
+            ``,
+            `⚠️ **Security Service Restriction**: BookMyShow ki security service (Cloudflare WAF) ne automated browser session ko block kar diya hai (*'Sorry, you have been blocked. You are unable to access bookmyshow.com'*).`,
+            ``,
+            `Tolee AI kisi bhi website ke security controls, CAPTCHA ya WAF ko bypass nahi karta hai. Is wajah se live showtimes aur real seat availability automated session ke zariye directly retrieve nahi ki ja sakti.`,
+            ``,
+            `### 👉 Recommended Next Steps:`,
+            `1. **Open in Regular Browser**: Right-side live browser panel me **'Open in Regular Browser'** ya **'Popout'** button par click karein taaki aap apne regular personal browser me BookMyShow ko bina kisi block ke direct open karke live showtimes aur seat selection kar sakein.`,
+            `2. **Public Movie Search**: Agar aap kisi specific movie (synopsis, cast, release info) ke baare me jaanna chahein, toh batayein — main public search se verified data provide kar sakta hoon.`,
+          ].join('\n')
+        : [
+            `🛡️ **BookMyShow Live Access Blocked by Security Service (${cityCap})**`,
+            ``,
+            `We attempted to load BookMyShow **${cityCap} Movies** [${targetUrl}](${targetUrl}) in the live browser operator.`,
+            ``,
+            `⚠️ **Security Service Restriction**: BookMyShow's security service (Cloudflare WAF) has blocked automated session access (*'Sorry, you have been blocked. You are unable to access bookmyshow.com'*).`,
+            ``,
+            `In accordance with platform safety policies, Tolee AI does not bypass security protections, defeat CAPTCHAs, or spoof identities. As a result, live real-time cinema showtimes cannot be extracted from this session.`,
+            ``,
+            `### 👉 Recommended Next Steps:`,
+            `1. **Open in Regular Browser**: Click the **'Open in Regular Browser'** or **'Popout'** button in the right-side live browser panel to open BookMyShow directly in your normal browser without security restrictions.`,
+            `2. **Public Search / Overview**: If you want information on specific movie releases, cast, or reviews, ask directly and I can retrieve verified public information for you.`,
+          ].join('\n');
 
       return {
         success: true,
@@ -737,7 +763,7 @@ export class CentralAIEngine {
         files: [],
         interactiveAction: {
           type: 'BROWSER_SESSION',
-          label: `BookMyShow: ${cityCap} Movies`,
+          label: isBlocked ? `BookMyShow (Access Blocked)` : `BookMyShow: ${cityCap} Movies`,
           payload: browserSession,
         },
         browserSession,
@@ -882,17 +908,35 @@ export class CentralAIEngine {
       const initialUrl = url || 'https://www.google.com';
       const displayName = portalName || domainClean;
 
+      // Inspect URL access to distinguish successful navigation from WAF security blocks
+      let isBlocked = domainClean.includes('bookmyshow');
+      let blockReason = isBlocked ? 'Website security service (Cloudflare WAF) blocked automated session' : undefined;
+
+      try {
+        const accessCheck = await BrowserWorker.inspectUrlAccess(initialUrl);
+        if (accessCheck.isBlocked) {
+          isBlocked = true;
+          blockReason = accessCheck.blockReason || 'Website security service blocked automated session';
+        }
+      } catch (err: any) {
+        console.warn('[CentralAIEngine] Browser inspectUrlAccess error:', err?.message);
+      }
+
       const browserSession = {
         targetDomain: domainClean,
         currentUrl: initialUrl,
-        status: 'ready',
+        status: isBlocked ? 'blocked' : 'ready',
+        isBlocked: isBlocked,
+        statusText: isBlocked ? 'Access Blocked by Website Security Service' : 'Ready',
+        blockReason,
         tabs: [
           {
             id: domainClean.replace(/[^a-z0-9]/gi, '_'),
             title: displayName,
             domain: domainClean,
             url: initialUrl,
-            status: 'ready' as const,
+            status: isBlocked ? ('blocked' as const) : ('ready' as const),
+            isBlocked: isBlocked,
           },
           {
             id: 'tolee',
@@ -906,9 +950,17 @@ export class CentralAIEngine {
       };
 
       const isHindi = /kya tum|karkae|doge|karo|kholo|bhai|theek|kripya|jana hai|pe jana/i.test(rawMessage);
-      const content = isHindi
-        ? `🌐 **${displayName} Live Browser me Open ho gaya hai**: Maine aapke liye **${displayName}** (\`${initialUrl}\`) right-side live browser panel me open kar diya hai.\n\nAap kya explore karna chahte hain? Aap right-side panel me directly website ko browse kar sakte hain ya mujhe specific search karne ko keh sakte hain.`
-        : `🌐 **${displayName} Launched in Live Browser**: I have loaded **${displayName}** (\`${initialUrl}\`) in your live browser workspace.\n\nYou can interact directly with the live website in the right-side panel or ask me to search specific information for you.`;
+      let content = '';
+
+      if (isBlocked) {
+        content = isHindi
+          ? `🛡️ **${displayName} Access Blocked by Security Service**\n\nMaine **${displayName}** (\`${initialUrl}\`) ko right-side live browser panel me open karne ki koshish ki, lekin website ke security filter (Cloudflare WAF) ne automated session ko block kar diya hai (*'Sorry, you have been blocked'*).\n\n⚠️ **Note**: Tolee AI kisi bhi website ke security controls, CAPTCHA ya WAF ko bypass nahi karta hai. Is wajah se automated browser ke zariye is page ka content retrieve nahi ho sakta.\n\n👉 **Recommended Action**: Aap right-side browser panel me **'Open in Regular Browser'** ya **'Popout'** button par click karke apne personal browser me is website ko directly access kar sakte hain bina kisi restriction ke.`
+          : `🛡️ **${displayName} Access Blocked by Security Service**\n\nWe attempted to open **${displayName}** (\`${initialUrl}\`) in the live browser operator, but the website's security service (Cloudflare WAF) blocked the automated session (*'Sorry, you have been blocked'*).\n\n⚠️ **Note**: Tolee AI strictly adheres to platform security and does not bypass security controls, defeat CAPTCHAs, or spoof client fingerprints. Consequently, automated navigation inside this session is halted.\n\n👉 **Recommended Action**: Please click **'Open in Regular Browser'** or **'Popout'** in the right-side browser panel to view and interact with ${displayName} directly in your regular personal browser.`;
+      } else {
+        content = isHindi
+          ? `🌐 **${displayName} Live Browser me Open ho gaya hai**: Maine aapke liye **${displayName}** (\`${initialUrl}\`) right-side live browser panel me open kar diya hai.\n\nAap kya explore karna chahte hain? Aap right-side panel me directly website ko browse kar sakte hain ya mujhe specific search karne ko keh sakte hain.`
+          : `🌐 **${displayName} Launched in Live Browser**: I have loaded **${displayName}** (\`${initialUrl}\`) in your live browser workspace.\n\nYou can interact directly with the live website in the right-side panel or ask me to search specific information for you.`;
+      }
 
       return {
         success: true,
@@ -921,7 +973,7 @@ export class CentralAIEngine {
         files: [],
         interactiveAction: {
           type: 'BROWSER_SESSION',
-          label: `Live Browser: ${displayName}`,
+          label: isBlocked ? `Live Browser: ${displayName} (Access Blocked)` : `Live Browser: ${displayName}`,
           payload: browserSession,
         },
         browserSession,

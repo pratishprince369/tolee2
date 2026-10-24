@@ -85,9 +85,22 @@ export async function GET(request: NextRequest) {
               modifiedHtml = modifiedHtml.replace(/if\s*\(top\s*!==\s*self\)\s*top\.location\s*=\s*self\.location;?/gi, '');
             }
 
+            const hasBlockKeywords =
+              proxyRes.statusCode === 403 ||
+              proxyRes.statusCode === 429 ||
+              data.includes('Sorry, you have been blocked') ||
+              data.includes('Attention Required! | Cloudflare') ||
+              data.includes('Why have I been blocked') ||
+              data.includes('security service to protect itself') ||
+              data.includes('Access Denied');
+
             const responseHeaders = new Headers();
             responseHeaders.set('Content-Type', proxyRes.headers['content-type'] || 'text/html; charset=utf-8');
             responseHeaders.set('Cache-Control', 'no-store, max-age=0');
+            responseHeaders.set('x-tolee-browser-blocked', hasBlockKeywords ? 'true' : 'false');
+            if (hasBlockKeywords) {
+              responseHeaders.set('x-tolee-block-reason', 'WAF_SECURITY_SERVICE_BLOCKED');
+            }
             // Remove frame blocking headers
             responseHeaders.delete('x-frame-options');
             responseHeaders.delete('content-security-policy');

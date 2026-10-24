@@ -253,6 +253,79 @@ export class BrowserWorker {
   }
 
   /**
+   * 🔍 Inspects whether a destination URL is accessible or blocked by anti-bot/WAF security services.
+   */
+  public static async inspectUrlAccess(targetUrl: string): Promise<{
+    accessible: boolean;
+    isBlocked: boolean;
+    statusCode: number;
+    blockReason?: string;
+    finalUrl: string;
+  }> {
+    const safety = this.isSafeUrl(targetUrl);
+    if (!safety.safe) {
+      return { accessible: false, isBlocked: false, statusCode: 403, blockReason: safety.reason, finalUrl: targetUrl };
+    }
+
+    return new Promise((resolve) => {
+      try {
+        const parsed = new URL(targetUrl);
+        const client = parsed.protocol === 'https:' ? https : http;
+
+        const req = client.get(
+          targetUrl,
+          {
+            headers: {
+              'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+              Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+              'Accept-Language': 'en-US,en;q=0.9',
+            },
+            timeout: 3500,
+          },
+          (res) => {
+            let body = '';
+            res.on('data', (c) => {
+              if (body.length < 25000) body += c;
+            });
+
+            res.on('end', () => {
+              const code = res.statusCode || 200;
+              const hasBlockKeywords =
+                body.includes('Sorry, you have been blocked') ||
+                body.includes('Attention Required! | Cloudflare') ||
+                body.includes('Why have I been blocked') ||
+                body.includes('Access Denied') ||
+                body.includes('security service to protect itself');
+
+              const isBlocked = code === 403 || code === 429 || hasBlockKeywords;
+
+              resolve({
+                accessible: !isBlocked && code < 400,
+                isBlocked,
+                statusCode: code,
+                blockReason: isBlocked ? 'Website security service (WAF / Cloudflare) blocked automated session' : undefined,
+                finalUrl: res.headers.location || targetUrl,
+              });
+            });
+          }
+        );
+
+        req.on('timeout', () => {
+          req.destroy();
+          resolve({ accessible: false, isBlocked: false, statusCode: 504, blockReason: 'Gateway timeout', finalUrl: targetUrl });
+        });
+
+        req.on('error', (err) => {
+          resolve({ accessible: false, isBlocked: false, statusCode: 500, blockReason: err.message, finalUrl: targetUrl });
+        });
+      } catch (err: any) {
+        resolve({ accessible: false, isBlocked: false, statusCode: 500, blockReason: err.message, finalUrl: targetUrl });
+      }
+    });
+  }
+
+  /**
    * 🌐 Opens and extracts structured content from any safe public webpage.
    */
   public static async openWebpage(url: string): Promise<WebpageMetadata> {
