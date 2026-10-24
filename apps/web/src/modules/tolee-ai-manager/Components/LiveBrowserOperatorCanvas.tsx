@@ -124,10 +124,13 @@ export function LiveBrowserOperatorCanvas({
   };
 
   const [urlInput, setUrlInput] = useState<string>(activeTab.url);
+  const [iframeKey, setIframeKey] = useState<number>(0);
+  const [iframeError, setIframeError] = useState<boolean>(false);
 
   useEffect(() => {
     if (activeTab?.url) {
       setUrlInput(activeTab.url);
+      setIframeError(false);
     }
   }, [activeTab?.url]);
 
@@ -483,52 +486,7 @@ export function LiveBrowserOperatorCanvas({
           </div>
         )}
 
-        {/* VIEW 0b: Travel & Booking Operator */}
-        {session?.bookingData && !session?.jobData && (
-          <div className="space-y-4 max-w-xl mx-auto w-full">
-            <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3 shadow-md">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-teal-500/20 text-teal-400 flex items-center justify-center font-bold text-sm">
-                    ✈️
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-sm text-white">
-                      {session.bookingData.serviceType || 'Travel Booking'}
-                    </h4>
-                    <span className="text-[10px] text-teal-400 font-semibold uppercase tracking-wider">
-                      Provider: {session.bookingData.provider}
-                    </span>
-                  </div>
-                </div>
-                <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 font-semibold">
-                  Awaiting Approval
-                </span>
-              </div>
 
-              <div className="space-y-2 text-xs">
-                <div>
-                  <span className="text-slate-400">Route:</span>
-                  <p className="font-bold text-slate-200">
-                    {session.bookingData.origin} ➔ {session.bookingData.destination}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-slate-400">Estimated Fare:</span>
-                  <p className="font-bold text-emerald-400 text-sm">
-                    {session.bookingData.estimatedCost}
-                  </p>
-                </div>
-              </div>
-
-              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-[11px] text-slate-300">
-                <p>
-                  🛡️ <strong>Safety Guarantee:</strong> No financial transaction or payment will be made without your explicit review and authorization.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* VIEW 1: LinkedIn Target Platform (Backlinks & Company) */}
         {activeTab.domain.includes('linkedin') &&
@@ -825,52 +783,54 @@ export function LiveBrowserOperatorCanvas({
           </div>
         )}
 
-        {/* VIEW 5: Universal Target Domain View (Fallback for any website) */}
+        {/* VIEW 5: Real Live Browser Viewport (Active for all websites) */}
         {!activeTab.domain.includes('linkedin') &&
           !activeTab.domain.includes('alternativeto') &&
           !activeTab.domain.includes('crunchbase') &&
           !activeTab.domain.includes('mail.google') && (
-            <div className="space-y-4 max-w-xl mx-auto w-full">
-              <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3 shadow-md">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-lg bg-teal-500/20 text-teal-400 flex items-center justify-center font-bold text-sm">
-                      <Globe className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-sm text-white">{activeTab.domain}</h4>
-                      <span className="text-[10px] text-slate-400 font-mono">
-                        {activeTab.url}
-                      </span>
-                    </div>
-                  </div>
-                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30 font-semibold">
-                    Live Target
+            <div className="flex-1 w-full h-full flex flex-col min-h-[460px] bg-slate-950 rounded-xl overflow-hidden border border-slate-800 shadow-inner relative">
+              {/* Live Webpage Action Header */}
+              <div className="px-3 py-2 bg-slate-900 border-b border-slate-800 flex items-center justify-between text-xs shrink-0">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                  <span className="font-bold text-slate-200 text-xs truncate max-w-[200px] sm:max-w-md">
+                    {activeTab.title || activeTab.domain}
+                  </span>
+                  <span className="text-[10px] text-teal-400 font-mono bg-teal-950/60 px-1.5 py-0.5 rounded border border-teal-800/40 shrink-0">
+                    Live Verified
                   </span>
                 </div>
-
-                <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2 text-xs">
-                  <p className="text-slate-300 leading-relaxed">
-                    Target website <strong>{activeTab.domain}</strong> is active in your browser workspace. Click below to inspect, take control, or open in a new window.
-                  </p>
-                  <div className="flex items-center gap-2 pt-2">
-                    <a
-                      href={activeTab.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-3.5 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs flex items-center gap-1.5 transition-colors"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                      <span>Open Website</span>
-                    </a>
-                    <button
-                      onClick={() => setIsUserControl(true)}
-                      className="px-3.5 py-1.5 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-200 font-bold text-xs transition-colors cursor-pointer"
-                    >
-                      Take Control
-                    </button>
-                  </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    onClick={() => setIframeKey((k) => k + 1)}
+                    title="Reload Webpage"
+                    className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                  >
+                    <RotateCw className="w-3.5 h-3.5" />
+                  </button>
+                  <a
+                    href={activeTab.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Open in Native Browser Window"
+                    className="px-2.5 py-1 rounded-md bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 text-[11px] font-bold flex items-center gap-1 transition-colors"
+                  >
+                    <span>Popout</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
                 </div>
+              </div>
+
+              {/* Real Webpage Iframe / Live Proxy View */}
+              <div className="flex-1 w-full h-full relative bg-white">
+                <iframe
+                  key={`${activeTab.url}-${iframeKey}`}
+                  src={`/api/browser/proxy?url=${encodeURIComponent(activeTab.url)}`}
+                  className="w-full h-full border-0 bg-white"
+                  title={activeTab.title || activeTab.domain}
+                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-downloads allow-modals"
+                  onError={() => setIframeError(true)}
+                />
               </div>
             </div>
           )}

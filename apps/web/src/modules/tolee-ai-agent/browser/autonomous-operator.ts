@@ -261,103 +261,55 @@ export class AutonomousOperatorEngine {
     const fromMatch = userPrompt.match(/from\s+([a-zA-Z\s]+?)(?:\s+to|\s+on|\s+for|$)/i);
     const toMatch = userPrompt.match(/to\s+([a-zA-Z\s]+?)(?:\s+from|\s+on|\s+for|\s+in|$)/i);
 
-    const origin = fromMatch ? fromMatch[1].trim() : 'Delhi (DEL)';
-    const destination = toMatch ? toMatch[1].trim() : 'Mumbai (BOM)';
-    const travelDate = 'Next Available / Flexible Date';
-    const estimatedCost = isFlight ? '₹4,850' : '₹3,200 / night';
-
-    const bookingDraft = BrowserWorker.prepareBooking({
-      serviceType,
-      provider,
-      dateTime: travelDate,
-      details: {
-        origin,
-        destination,
-        travelDate,
-        passengers: 1,
-      },
-      estimatedCost,
-    });
-
-    const approval = ApprovalEngine.createApproval({
-      userId: context.userId || 'guest_user',
-      actionType: 'EXECUTE_BOOKING',
-      title: `${serviceType}: ${origin} ➔ ${destination}`,
-      description: `Verify and confirm reservation on ${provider}. Explicit user approval required before any financial checkout.`,
-      summary: `Service: ${serviceType}\nRoute: ${origin} ➔ ${destination}\nProvider: ${provider}\nEstimated Cost: ${estimatedCost}`,
-      payload: {
-        bookingId: bookingDraft.bookingId,
-        provider,
-        cost: estimatedCost,
-        origin,
-        destination,
-      },
-      sourceTool: 'prepare_booking',
-      requiredTier: 'TIER_1',
-    });
+    const origin = fromMatch ? fromMatch[1].trim() : 'Delhi';
+    const destination = toMatch ? toMatch[1].trim() : 'Mumbai';
 
     const searchUrl = isFlight
       ? `https://www.google.com/travel/flights?q=flights+from+${encodeURIComponent(origin)}+to+${encodeURIComponent(destination)}`
-      : `https://www.makemytrip.com/hotels/`;
+      : `https://www.makemytrip.com/hotels/${encodeURIComponent(destination.toLowerCase().replace(/[^a-z0-9]/g, '-'))}-hotels.html`;
 
     const browserSession = {
       isActive: true,
-      status: 'waiting_user',
+      status: 'ready',
       isStopped: false,
-      statusText: `Action required: Review booking parameters · ${origin} to ${destination}`,
+      statusText: `Live Search Active · ${origin} to ${destination}`,
       currentUrl: searchUrl,
-      targetDomain: 'google.com',
+      targetDomain: isFlight ? 'google.com' : 'makemytrip.com',
       activeTabId: 'booking_portal',
       tabs: [
         {
           id: 'booking_portal',
-          title: `${provider} · ${origin} ➔ ${destination}`,
+          title: `${provider} · ${destination}`,
           domain: isFlight ? 'google.com' : 'makemytrip.com',
           url: searchUrl,
-          status: 'action_required',
+          status: 'ready' as const,
         },
         {
           id: 'tolee_travel',
-          title: 'Tolee Safe Checkout',
+          title: 'tolee.in',
           domain: 'tolee.in',
-          url: bookingDraft.checkoutUrl,
-          status: 'ready',
+          url: 'https://tolee.in',
+          status: 'ready' as const,
         },
       ],
-      bookingData: {
-        serviceType,
-        provider,
-        origin,
-        destination,
-        travelDate,
-        estimatedCost,
-      },
-      pendingAction: {
-        siteId: 'booking_portal',
-        siteName: provider,
-        title: `${serviceType}: ${origin} to ${destination}`,
-        description: `Estimated cost: ${estimatedCost}. Explicit user approval required prior to reservation checkout.`,
-        verificationUrl: searchUrl,
-      },
     };
 
     const message = [
-      `✈️ **Travel Operator Draft Prepared: ${serviceType}**`,
+      `✈️ **Travel & Portal Search Active: ${serviceType}**`,
       ``,
       `• **Route**: ${origin} ➔ ${destination}`,
-      `• **Provider**: ${provider}`,
-      `• **Estimated Cost**: ${estimatedCost}`,
-      `• **Cancellation Policy**: Standard 24-hour free cancellation prior to departure.`,
+      `• **Portal**: ${provider}`,
       ``,
-      `Maine right side me booking portal open kar diya hai. User safety rule ke tehat, bina aapke explicit review aur confirmation ke koi payment ya checkout execute nahi hoga.`,
-      `Neeche diye gaye **"Review & Approve"** card se details verify karein.`,
+      `Maine right-side live browser me real search portal open kar diya hai: [${searchUrl}](${searchUrl})`,
+      ``,
+      `⚠️ **Search & Comparison Only**:`,
+      `Yeh kewal live search view hai — koi reservation ya financial payment execute nahi hua hai. Aap right-side live browser panel me real rates aur availability check karke direct operate kar sakte hain.`,
     ].join('\n');
 
     return {
       message,
       browserSession,
-      approvalPayload: approval,
-      toolUsed: 'prepare_booking',
+      toolUsed: 'search_travel_portal',
     };
   }
 }

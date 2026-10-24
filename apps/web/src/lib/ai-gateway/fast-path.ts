@@ -70,7 +70,9 @@ export class ToleeFastPath {
       'open webpage', 'fill form', 'browser task', 'take control', 'scrape',
       'open website', 'open site', 'open url', 'open link', 'khol do', 'khol de',
       'browser open', 'open google', 'google.com', 'google kholo', 'open page',
-      'open karkae', 'open karke'
+      'open karkae', 'open karke',
+      // Real Portals & Navigation Intents
+      'bookmyshow', 'bms', 'makemytrip', 'mmt', 'pe jana hai', 'jana hai', 'le chalo', 'kholo', 'khol'
     ];
 
     const requiresToleeData = toleeKeywords.some(kw => q.includes(kw));
@@ -133,6 +135,7 @@ CORE FACTUAL POLICY & STRICT ANTI-HALLUCINATION RULES:
 - For public offices and well-known world figures (e.g., Prime Minister of India is Narendra Modi, President of India is Droupadi Murmu), answer with confidence and clarity.
 - For unverified private platform users or unknown individuals, do not invent fake personal biographies.
 - Never claim an action succeeded without real execution receipts.
+- NEVER return fake placeholder templates like [Movie Name], [Show Time], [Theater Name], [Seat Availability], [Hotel Name], or [Price]. If live seat availability or dynamic cinema hall showtimes require user selection in the portal, explicitly state that and refer the user to the live browser panel.
 Respond directly, accurately, and concisely in natural Hindi, Hinglish, or English matching the user's language. Keep responses helpful and under 3-4 paragraphs.`;
 
     const trimmedHistory = history.slice(-6).map(h => ({
