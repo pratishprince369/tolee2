@@ -67,7 +67,10 @@ export class ToleeFastPath {
       // Travel & Bookings
       'book flight', 'flight book', 'hotel book', 'ticket book', 'irctc', 'makemytrip',
       // Browser Tasks & Automation
-      'open webpage', 'fill form', 'browser task', 'take control', 'scrape'
+      'open webpage', 'fill form', 'browser task', 'take control', 'scrape',
+      'open website', 'open site', 'open url', 'open link', 'khol do', 'khol de',
+      'browser open', 'open google', 'google.com', 'google kholo', 'open page',
+      'open karkae', 'open karke'
     ];
 
     const requiresToleeData = toleeKeywords.some(kw => q.includes(kw));
@@ -155,16 +158,6 @@ Respond directly, accurately, and concisely in natural Hindi, Hinglish, or Engli
         text: `Namaste ${userName}! Main Tolee AI Personal Manager hoon. Main bilkul theek hoon! Aapke liye Tolee posts banana, strategy plan karna, coding, ya kisi bhi sawal ka jawab taiyar kar sakta hoon. Bataiye aaj main aapki kya madad karoon?`,
         provider: 'tolee-local',
         model: 'fast-greeting',
-        latencyMs: Date.now() - startTime,
-      };
-    }
-
-    if (cleanMsg.includes('google.com') || cleanMsg.includes('google open') || cleanMsg.includes('khol do') || cleanMsg.includes('kholega')) {
-      return {
-        success: true,
-        text: `Haan bilkul! Aap Google ko yahan se directly access kar sakte hain: [Google Search](https://www.google.com)\n\nAgar aapko koi specific jankari ya search karna hai, toh aap mujhe yahin direct bata sakte hain, main live web research karke aapko verified data yahin provide kar dunga.`,
-        provider: 'tolee-local',
-        model: 'fast-navigator',
         latencyMs: Date.now() - startTime,
       };
     }

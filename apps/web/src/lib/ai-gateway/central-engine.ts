@@ -638,6 +638,7 @@ export class CentralAIEngine {
                 payload: taskResult.task,
               },
           taskRecord: taskResult.task,
+          browserSession: taskResult.browserSession,
           metadata: {
             latencyMs: Date.now() - startTime,
             intent: 'multi_step_task',
@@ -647,6 +648,99 @@ export class CentralAIEngine {
       } catch (taskErr: any) {
         console.warn('[CentralAIEngine] OpenMuse task orchestrator notice:', taskErr?.message);
       }
+    }
+
+    // 🌐 2b. Direct Web Navigation & Live Browser Operator (Section 4)
+    const checkBrowserNavigation = (msg: string): { matches: boolean; url: string; domain: string } => {
+      const q = msg.trim().toLowerCase();
+      const openIntent =
+        /\b(open|khol|kholo|browse|visit|launch|load|surfe)\b/i.test(q) ||
+        /open\s*(?:karkae|karke|karo|kardoge|kar do|karein|kar|doge)/i.test(q) ||
+        /khol\s*(?:ke|karke|do|karo|dena|doge)/i.test(q);
+
+      if (!openIntent && !q.startsWith('http://') && !q.startsWith('https://')) {
+        return { matches: false, url: '', domain: '' };
+      }
+
+      // Explicit Google handling
+      if (q.includes('google')) {
+        return { matches: true, url: 'https://www.google.com', domain: 'google.com' };
+      }
+
+      const urlPattern = /(https?:\/\/[^\s]+)/i;
+      const domainPattern = /\b([a-zA-Z0-9-]+\.[a-zA-Z]{2,}(?:\/[^\s]*)?)\b/i;
+      const match = q.match(urlPattern) || q.match(domainPattern);
+
+      if (match) {
+        let raw = match[1];
+        let fullUrl = raw.startsWith('http://') || raw.startsWith('https://') ? raw : `https://${raw}`;
+        try {
+          const parsed = new URL(fullUrl);
+          const domain = parsed.hostname.replace(/^www\./, '');
+          return { matches: true, url: fullUrl, domain };
+        } catch {
+          return { matches: false, url: '', domain: '' };
+        }
+      }
+
+      return { matches: false, url: '', domain: '' };
+    };
+
+    const browserNav = checkBrowserNavigation(rawMessage);
+    if (browserNav.matches) {
+      const { url, domain } = browserNav;
+      const domainClean = domain || 'google.com';
+      const initialUrl = url || 'https://www.google.com';
+
+      const browserSession = {
+        targetDomain: domainClean,
+        currentUrl: initialUrl,
+        status: 'ready',
+        tabs: [
+          {
+            id: domainClean.replace(/[^a-z0-9]/gi, '_'),
+            title: domainClean,
+            domain: domainClean,
+            url: initialUrl,
+            status: 'ready' as const,
+          },
+          {
+            id: 'tolee',
+            title: 'tolee.in',
+            domain: 'tolee.in',
+            url: 'https://tolee.in',
+            status: 'ready' as const,
+          },
+        ],
+        activeTabId: domainClean.replace(/[^a-z0-9]/gi, '_'),
+      };
+
+      const isHindi = /kya tum|karkae|doge|karo|kholo|bhai|theek|kripya/i.test(rawMessage);
+      const content = isHindi
+        ? `🌐 **Live Browser Launched**: Haan bilkul! Maine aapke liye **${domainClean}** live browser panel me open kar diya hai.\n\nAap right-side panel me interact kar sakte hain ya directly browse kar sakte hain.`
+        : `🌐 **Live Browser Launched**: I have loaded **${domainClean}** in your live browser workspace.\n\nYou can interact directly with the page in the browser panel on the right.`;
+
+      return {
+        success: true,
+        type: 'tool_result',
+        content,
+        model: 'tolee-browser-operator',
+        provider: 'tolee-core',
+        toolUsed: 'open_browser_url',
+        image: null,
+        files: [],
+        interactiveAction: {
+          type: 'BROWSER_SESSION',
+          label: `Live Browser: ${domainClean}`,
+          payload: browserSession,
+        },
+        browserSession,
+        metadata: {
+          latencyMs: Date.now() - startTime,
+          intent: 'browser_navigation',
+          fallbackUsed: false,
+        },
+      };
     }
 
     // 🧠 2b. Intent Classification
