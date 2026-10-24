@@ -147,24 +147,46 @@ Respond directly, accurately, and concisely in natural Hindi, Hinglish, or Engli
       { role: 'user', content: finalUserContent },
     ];
 
-    // 1. Primary: NVIDIA NIM (Fast frontier model with 3.5s timeout)
-    const primaryKey = FAST_NVIDIA_KEYS[0];
-    if (primaryKey) {
+    // 0. Instant Deterministic Handlers for Greetings & Navigation
+    const cleanMsg = (message || '').toLowerCase().trim();
+    if (/^(hi|hello|hey|namaste|kaise ho|kya haal hai|good morning|good evening|pranam)\b/i.test(cleanMsg)) {
+      return {
+        success: true,
+        text: `Namaste ${userName}! Main Tolee AI Personal Manager hoon. Main bilkul theek hoon! Aapke liye Tolee posts banana, strategy plan karna, coding, ya kisi bhi sawal ka jawab taiyar kar sakta hoon. Bataiye aaj main aapki kya madad karoon?`,
+        provider: 'tolee-local',
+        model: 'fast-greeting',
+        latencyMs: Date.now() - startTime,
+      };
+    }
+
+    if (cleanMsg.includes('google.com') || cleanMsg.includes('google open') || cleanMsg.includes('khol do') || cleanMsg.includes('kholega')) {
+      return {
+        success: true,
+        text: `Haan bilkul! Aap Google ko yahan se directly access kar sakte hain: [Google Search](https://www.google.com)\n\nAgar aapko koi specific jankari ya search karna hai, toh aap mujhe yahin direct bata sakte hain, main live web research karke aapko verified data yahin provide kar dunga.`,
+        provider: 'tolee-local',
+        model: 'fast-navigator',
+        latencyMs: Date.now() - startTime,
+      };
+    }
+
+    // 1. Primary: NVIDIA NIM (Rotates across active keys with 12s timeout)
+    const candidateKeys = FAST_NVIDIA_KEYS.length > 0 ? FAST_NVIDIA_KEYS.slice(0, 3) : ['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'];
+    for (const apiKey of candidateKeys) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3500); // 3.5s fail-fast deadline
+        const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s generous window for cloud inference
 
         const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${primaryKey}`,
+            Authorization: `Bearer ${apiKey}`,
             Accept: 'application/json',
           },
           body: JSON.stringify({
             model: 'meta/llama-3.2-11b-vision-instruct',
             messages: apiMessages,
-            temperature: groundingContext ? 0.1 : 0.3,
+            temperature: groundingContext ? 0.1 : 0.4,
             max_tokens: 600,
           }),
           signal: controller.signal,
@@ -191,7 +213,7 @@ Respond directly, accurately, and concisely in natural Hindi, Hinglish, or Engli
           }
         }
       } catch (err: any) {
-        // Fast failover to Pollinations
+        // Try next key in pool
       }
     }
 
@@ -262,10 +284,10 @@ Respond directly, accurately, and concisely in natural Hindi, Hinglish, or Engli
       }
     }
 
-    // 3. Fallback answer
+    // 3. Fallback answer: signal false so CentralAIEngine fallback brain takes over
     return {
-      success: true,
-      text: `Namaste ${userName}! Main Tolee AI Manager hoon. Main abhi aapka jawab taiyar karne me asamadha hoon. Kripya thodi der baad dobara koshish karein.`,
+      success: false,
+      text: '',
       provider: 'tolee-local',
       model: 'fast-local',
       latencyMs: Date.now() - startTime,
