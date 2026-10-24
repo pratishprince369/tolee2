@@ -12,8 +12,9 @@ import {
 } from 'lucide-react';
 import { AIMessageRenderer } from '../Components/AIMessageRenderer';
 import { OpenDotsApprovalCard } from '../Components/OpenDotsApprovalCard';
+import { OpenMuseTaskCard } from '../Components/OpenMuseTaskCard';
 import { LiveBrowserOperatorCanvas } from '../Components/LiveBrowserOperatorCanvas';
-import { getAIDashboardSummary, processAIPersonalMessage, executeConfirmedAIAction } from '@/actions/ai-manager';
+import { getAIDashboardSummary, processAIPersonalMessage, executeConfirmedAIAction, getAgentTasks, cancelAgentTask, resumeAgentTask } from '@/actions/ai-manager';
 import { GenerativeAiStudioModal } from '@/components/GenerativeAiStudioModal';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -210,6 +211,10 @@ export function AIDashboard() {
       // Check if browsing or backlink query
       const isSearchOrBrowse = /search|browse|jobs|check|price|competitor/i.test(text);
       const sessionData = (result as any).browserSession || ((result as any).interactiveAction?.type === 'BROWSER_SESSION' ? (result as any).interactiveAction.payload : undefined);
+      const taskData = (result as any).taskRecord || ((result as any).interactiveAction?.type === 'OPENMUSE_TASK' ? (result as any).interactiveAction.payload : undefined);
+      if (taskData) {
+        loadAgentTasksList();
+      }
 
       if (sessionData) {
         setBrowserSession(sessionData);

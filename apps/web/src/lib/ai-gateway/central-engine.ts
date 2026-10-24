@@ -12,6 +12,7 @@ import { isPersonQuery } from '@/lib/web-search';
 import { OpenHiggsfieldMediaService } from '@/modules/tolee-ai-agent/media/generation-service';
 import { BacklinkOperatorEngine } from '@/modules/tolee-ai-agent/browser/backlink-engine';
 import { AutonomousOperatorEngine } from '@/modules/tolee-ai-agent/browser/autonomous-operator';
+import { OpenMuseTaskOrchestrator } from '@/modules/tolee-ai-agent/core/openmuse-task-orchestrator';
 
 // -------------------------------------------------------------
 // TYPES & INTERFACES
@@ -33,6 +34,7 @@ export interface NormalizedAIResponse {
     executed?: boolean;
   };
   browserSession?: any;
+  taskRecord?: any;
   metadata: {
     latencyMs: number;
     intent: string;
@@ -605,7 +607,49 @@ export class CentralAIEngine {
       };
     }
 
-    // 🧠 2. Intent Classification
+    // 🧠 2. OpenMuse Multi-Step Task Planning & Execution (Section 4)
+    if (options.userId && OpenMuseTaskOrchestrator.isMultiStepTask(rawMessage)) {
+      try {
+        const taskResult = await OpenMuseTaskOrchestrator.executeMultiStepTask({
+          message: rawMessage,
+          userId: options.userId,
+          userName: options.userName || 'User',
+          userEmail: options.userEmail,
+        });
+
+        return {
+          success: true,
+          type: 'tool_result',
+          content: taskResult.summary,
+          model: 'openmuse-task-orchestrator',
+          provider: 'tolee-core',
+          toolUsed: 'execute_multi_step_task',
+          image: null,
+          files: [],
+          interactiveAction: taskResult.approvalRequired
+            ? {
+                type: 'APPROVAL_REQUEST',
+                label: taskResult.approvalPayload?.title || 'Review & Publish Generated Content',
+                payload: taskResult.approvalPayload,
+              }
+            : {
+                type: 'OPENMUSE_TASK',
+                label: `Task: ${taskResult.task.title}`,
+                payload: taskResult.task,
+              },
+          taskRecord: taskResult.task,
+          metadata: {
+            latencyMs: Date.now() - startTime,
+            intent: 'multi_step_task',
+            fallbackUsed: false,
+          },
+        };
+      } catch (taskErr: any) {
+        console.warn('[CentralAIEngine] OpenMuse task orchestrator notice:', taskErr?.message);
+      }
+    }
+
+    // 🧠 2b. Intent Classification
     const intent = classifyIntelligenceIntent(rawMessage, hasMedia, mediaType);
 
     // 🌐 2b. Autonomous Operator Layer (Jobs, Real-World Tasks, Bookings, Backlinks)

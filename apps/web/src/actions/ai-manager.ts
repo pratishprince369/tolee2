@@ -13,6 +13,7 @@ import { executeToleeAIAction, cleanAndTranslateImagePrompt, fetchLiveNewsForTol
 import { classifyIntelligenceIntent } from '@/modules/tolee-ai-manager/Core/ai-router';
 import { CentralAIEngine } from '@/lib/ai-gateway/central-engine';
 import { ApprovalEngine } from '@/modules/tolee-ai-agent/approvals/approval-engine';
+import { AgentTaskManager } from '@/modules/tolee-ai-agent/tasks/agent-task-manager';
 
 async function getUserId(): Promise<string> {
   const session = await getServerSession(authOptions);
@@ -552,6 +553,7 @@ export async function processAIPersonalMessage(
       interactiveAction: result.interactiveAction,
       approvalPayload: result.interactiveAction?.type === 'APPROVAL_REQUEST' ? result.interactiveAction.payload : (result as any).approvalPayload,
       browserSession: (result as any).browserSession || (result.interactiveAction?.type === 'BROWSER_SESSION' ? result.interactiveAction.payload : undefined),
+      taskRecord: (result as any).taskRecord || (result.interactiveAction?.type === 'OPENMUSE_TASK' ? result.interactiveAction.payload : undefined),
     };
   } catch (error: any) {
     console.error('Error in processAIPersonalMessage:', error);
@@ -921,4 +923,38 @@ export async function getOpenWorkSkillsList() {
     success: true,
     skills
   };
+}
+
+// ------------------------------------
+// OPENMUSE AGENT TASK LIFECYCLE (Sections 4, 7, 8, 11)
+// ------------------------------------
+
+export async function getAgentTasks(limit: number = 10) {
+  try {
+    const userId = await getUserId();
+    const tasks = AgentTaskManager.listUserTasks(userId, limit);
+    return { success: true, tasks };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Failed to list agent tasks', tasks: [] };
+  }
+}
+
+export async function cancelAgentTask(taskId: string) {
+  try {
+    const userId = await getUserId();
+    const success = AgentTaskManager.cancelTask(taskId, userId);
+    return { success, message: success ? 'Task cancelled successfully.' : 'Task not found or access denied.' };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function resumeAgentTask(taskId: string) {
+  try {
+    const userId = await getUserId();
+    const res = AgentTaskManager.resumeTask(taskId, userId);
+    return res;
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
 }
