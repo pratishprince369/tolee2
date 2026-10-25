@@ -8,7 +8,7 @@ import {
   Lightbulb, LayoutGrid, FileSpreadsheet, Menu, X, Plus, Mic, MicOff,
   Send, MoreHorizontal, ArrowUp, ThumbsUp, ThumbsDown, Copy,
   Check, ExternalLink, Globe, Shield, Clock, Fingerprint,
-  Pencil, ChevronRight, Share2, UserPlus, Sparkle, PanelLeft
+  Pencil, ChevronRight, Share2, UserPlus, Sparkle, PanelLeft, Trash2
 } from 'lucide-react';
 import { AIMessageRenderer } from '../Components/AIMessageRenderer';
 import { OpenDotsApprovalCard } from '../Components/OpenDotsApprovalCard';
@@ -287,6 +287,20 @@ export function AIDashboard() {
     setIsMobileNavOpen(false);
   };
 
+  const handleDeleteThread = (e: React.MouseEvent, threadId: string) => {
+    e.stopPropagation();
+    setThreads((prev) => {
+      const updated = prev.filter((t) => t.id !== threadId);
+      try {
+        localStorage.setItem('tolee_ai_threads', JSON.stringify(updated));
+      } catch (_) {}
+      return updated;
+    });
+    if (activeThreadId === threadId) {
+      setActiveThreadId('main');
+    }
+  };
+
   const handleStopTask = (targetMsgId?: string) => {
     setBrowserSession((prev: any) =>
       prev
@@ -537,9 +551,19 @@ export function AIDashboard() {
                     }`}
                   >
                     <span className="truncate pr-2">{thread.title}</span>
-                    <span className="text-[10px] text-slate-400 shrink-0">
-                      {thread.lastMessageTime}
-                    </span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <span className="text-[10px] text-slate-400 group-hover:hidden">
+                        {thread.lastMessageTime}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => handleDeleteThread(e, thread.id)}
+                        title="Delete chat"
+                        className="hidden group-hover:flex p-1 rounded hover:bg-rose-100 dark:hover:bg-rose-950/50 text-slate-400 hover:text-rose-500 transition-colors"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
                   </button>
                 ))}
               </div>

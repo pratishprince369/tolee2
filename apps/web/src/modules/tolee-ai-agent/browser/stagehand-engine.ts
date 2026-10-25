@@ -99,16 +99,18 @@ export class ToleeStagehandEngine {
     const elements: StagehandObservedElement[] = [];
 
     // Extract inputs
-    const inputRegex = /<input[^>]+(?:type=["']([^"']+)["'])?[^>]*>/gi;
+    const inputRegex = /<input[^>]+>/gi;
     let match: RegExpExecArray | null;
     while ((match = inputRegex.exec(html)) !== null && elements.length < 15) {
       const tag = match[0];
-      const type = (match[1] || 'text').toLowerCase();
+      const typeMatch = tag.match(/type=["']([^"']+)["']/i);
+      const type = (typeMatch ? typeMatch[1] : 'text').toLowerCase();
       if (['hidden', 'submit', 'image'].includes(type)) continue;
 
       const placeholderMatch = tag.match(/placeholder=["']([^"']+)["']/i);
+      const ariaLabel = tag.match(/aria-label=["']([^"']+)["']/i);
       const nameMatch = tag.match(/name=["']([^"']+)["']/i);
-      const label = placeholderMatch?.[1] || nameMatch?.[1] || `${type} input`;
+      const label = placeholderMatch?.[1] || ariaLabel?.[1] || nameMatch?.[1] || `${type} input`;
 
       elements.push({
         type: 'input',
@@ -119,8 +121,8 @@ export class ToleeStagehandEngine {
     }
 
     // Extract buttons
-    const buttonRegex = /<(?:button|a[^>]+class=[^>]*btn)[^>]*>([\s\S]*?)<\/(?:button|a)>/gi;
-    while ((match = buttonRegex.exec(html)) !== null && elements.length < 30) {
+    const buttonRegex = /<button[^>]*>([\s\S]*?)<\/button>/gi;
+    while ((match = buttonRegex.exec(html)) !== null && elements.length < 25) {
       const innerText = match[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
       if (innerText && innerText.length < 40) {
         elements.push({
@@ -128,6 +130,22 @@ export class ToleeStagehandEngine {
           label: innerText,
           action: 'click',
           purpose: `Click "${innerText}"`,
+        });
+      }
+    }
+
+    // Extract interactive links
+    const linkRegex = /<a[^>]+href=["']([^"'#][^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi;
+    while ((match = linkRegex.exec(html)) !== null && elements.length < 35) {
+      const href = match[1];
+      const linkText = match[2].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+      if (linkText && linkText.length > 1 && linkText.length < 40 && !linkText.startsWith('http')) {
+        elements.push({
+          type: 'link',
+          label: linkText,
+          action: 'click',
+          selectorHint: href,
+          purpose: `Navigate to ${linkText}`,
         });
       }
     }
@@ -181,37 +199,8 @@ export class ToleeStagehandEngine {
       };
     }
 
-    // 2. Fetch HTML content
-    const html = await new Promise<string>((resolve) => {
-      try {
-        const client = url.startsWith('https') ? https : http;
-        const req = client.get(
-          url,
-          {
-            headers: {
-              'User-Agent':
-                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-              Accept: 'text/html,application/xhtml+xml',
-            },
-            timeout: 5000,
-          },
-          (res) => {
-            let body = '';
-            res.on('data', (c) => {
-              if (body.length < 200000) body += c;
-            });
-            res.on('end', () => resolve(body));
-          }
-        );
-        req.on('error', () => resolve(''));
-        req.on('timeout', () => {
-          req.destroy();
-          resolve('');
-        });
-      } catch {
-        resolve('');
-      }
-    });
+    // 2. Fetch HTML content with redirect and SSRF handling
+    const html = await BrowserWorker.fetchHtml(url).catch(() => '');
 
     if (!html) {
       return {

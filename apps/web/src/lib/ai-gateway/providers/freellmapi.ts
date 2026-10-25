@@ -144,7 +144,7 @@ export class FreeLLMAPIProvider implements AIProvider {
     // 5. Pollinations OpenAI-Compatible Free Tier
     targets.push({
       name: 'Pollinations AI Gateway',
-      url: 'https://gen.pollinations.ai/v1/chat/completions',
+      url: 'https://text.pollinations.ai/openai',
       apiKey: process.env.POLLINATIONS_API_KEY || 'public-free',
       model: optionsModel || 'openai',
     });
