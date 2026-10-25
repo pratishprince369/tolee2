@@ -17,7 +17,7 @@ import { z } from 'zod';
 import https from 'https';
 import http from 'http';
 import { URL } from 'url';
-import { BrowserWorker } from './browser-worker';
+import { BrowserWorker, BrowserDiagnosticState } from './browser-worker';
 import { searchAndGroundQuery } from '@/lib/web-search';
 import { ToleeFastPath } from '@/lib/ai-gateway/fast-path';
 import { ApprovalRecord } from '../approvals/approval-engine';
@@ -35,6 +35,7 @@ export interface StagehandObserveResult {
   domain: string;
   pageTitle: string;
   isBlocked: boolean;
+  diagnosticState: BrowserDiagnosticState;
   blockReason?: string;
   elements: StagehandObservedElement[];
   suggestedActions: string[];
@@ -48,6 +49,8 @@ export interface StagehandActResult {
   targetUrl: string;
   resultingUrl: string;
   status: 'completed_verified' | 'waiting_approval' | 'blocked' | 'failed';
+  diagnosticState?: BrowserDiagnosticState;
+  blockReason?: string;
   message: string;
   verifiedState?: string;
   approvalRequired?: boolean;
@@ -157,18 +160,23 @@ export class ToleeStagehandEngine {
       domain = targetUrl;
     }
 
-    // 1. Check WAF / Cloudflare access block
+    // 1. Check access & diagnostics via 15-state engine
     const accessCheck = await BrowserWorker.inspectUrlAccess(url);
-    if (accessCheck.isBlocked) {
+    if (!accessCheck.accessible || accessCheck.isBlocked || accessCheck.state !== 'SUCCESS') {
       return {
         url,
         domain,
-        pageTitle: accessCheck.statusCode === 403 ? 'Access Restricted' : 'Security Block',
-        isBlocked: true,
-        blockReason: accessCheck.blockReason || 'Website security service (Cloudflare WAF) blocked automated session',
+        pageTitle: accessCheck.statusCode === 403 ? 'Access Restricted' : accessCheck.state.replace(/_/g, ' '),
+        isBlocked: accessCheck.isBlocked,
+        diagnosticState: accessCheck.state,
+        blockReason: accessCheck.blockReason || accessCheck.reason || 'Website access restricted',
         elements: [],
-        suggestedActions: ['Open in Regular Browser (Popout)', 'Verify credentials in external tab'],
-        summary: `Page access to ${domain} was blocked by the website's security service. The agent stopped automated exploration.`,
+        suggestedActions: [
+          'Open in Regular Browser (Popout)',
+          'Take Control of Browser',
+          'Retry Page Load',
+        ],
+        summary: `Page access to ${domain} was restricted (${accessCheck.blockReason || accessCheck.state}). Automated exploration stopped.`,
         timestamp: new Date().toISOString(),
       };
     }
@@ -211,8 +219,9 @@ export class ToleeStagehandEngine {
         domain,
         pageTitle: domain,
         isBlocked: false,
+        diagnosticState: 'HTTP_ERROR',
         elements: [],
-        suggestedActions: ['Reload page', 'Check network connection'],
+        suggestedActions: ['Retry Page Load', 'Open in Regular Browser'],
         summary: `Could not retrieve live DOM snapshot from ${domain}.`,
         timestamp: new Date().toISOString(),
       };
@@ -231,6 +240,7 @@ export class ToleeStagehandEngine {
       domain,
       pageTitle: title || domain,
       isBlocked: false,
+      diagnosticState: 'SUCCESS',
       elements,
       suggestedActions,
       summary: cleanedText.slice(0, 400),
@@ -251,15 +261,16 @@ export class ToleeStagehandEngine {
 
     // Step 1: Pre-observe to check if site is blocked
     const observation = await this.observe(cleanUrl, instruction);
-    if (observation.isBlocked) {
+    if (observation.isBlocked || observation.diagnosticState !== 'SUCCESS') {
       return {
         success: false,
         action: instruction,
         targetUrl: cleanUrl,
         resultingUrl: cleanUrl,
         status: 'blocked',
-        message: `🛡️ Action halted: ${observation.domain}'s security service has blocked automated session access (${observation.blockReason}).`,
+        diagnosticState: observation.diagnosticState,
         blockReason: observation.blockReason,
+        message: `🛡️ Action halted: ${observation.domain} access restricted (${observation.blockReason || observation.diagnosticState}).`,
         durationMs: Date.now() - startTime,
       };
     }

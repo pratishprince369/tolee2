@@ -821,7 +821,15 @@ export function AIDashboard() {
                           <span className="text-xs font-bold text-slate-800 dark:text-zinc-200">
                             Browser Operator
                           </span>
-                          {msg.browserSession.isBlocked ? (
+                          {msg.browserSession.diagnosticState === 'CAPTCHA_REQUIRED' ? (
+                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-500 font-bold">
+                              CAPTCHA Required
+                            </span>
+                          ) : msg.browserSession.diagnosticState === 'NAVIGATION_TIMEOUT' ? (
+                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-500 font-bold">
+                              Timeout
+                            </span>
+                          ) : msg.browserSession.isBlocked ? (
                             <span className="text-[10px] px-1.5 py-0.2 rounded bg-rose-500/15 text-rose-500 font-bold">
                               Access Blocked
                             </span>

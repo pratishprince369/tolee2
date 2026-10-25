@@ -22,13 +22,17 @@ import {
   Check,
 } from 'lucide-react';
 import { HIGH_AUTHORITY_BACKLINK_QUEUE } from '@/modules/tolee-ai-agent/browser/backlink-engine';
+import { BrowserDiagnosticState } from '@/modules/tolee-ai-agent/browser/browser-worker';
 
 export interface BrowserTab {
   id: string;
   title: string;
   domain: string;
   url: string;
-  status: 'action_required' | 'waiting_verification' | 'ready' | 'stopped';
+  status: 'action_required' | 'waiting_verification' | 'ready' | 'stopped' | 'blocked';
+  isBlocked?: boolean;
+  diagnosticState?: BrowserDiagnosticState;
+  blockReason?: string;
 }
 
 export interface LiveBrowserOperatorCanvasProps {
@@ -126,11 +130,15 @@ export function LiveBrowserOperatorCanvas({
   const [urlInput, setUrlInput] = useState<string>(activeTab.url);
   const [iframeKey, setIframeKey] = useState<number>(0);
   const [iframeError, setIframeError] = useState<boolean>(false);
+  const [isWarningDismissed, setIsWarningDismissed] = useState<boolean>(false);
+  const [urlCopied, setUrlCopied] = useState<boolean>(false);
 
   useEffect(() => {
     if (activeTab?.url) {
       setUrlInput(activeTab.url);
       setIframeError(false);
+      setIsWarningDismissed(false);
+      setUrlCopied(false);
     }
   }, [activeTab?.url]);
 
@@ -139,6 +147,14 @@ export function LiveBrowserOperatorCanvas({
       navigator.clipboard.writeText(text);
       setCopiedKey(key);
       setTimeout(() => setCopiedKey(null), 2000);
+    } catch (_) {}
+  };
+
+  const handleCopyUrl = (url: string) => {
+    try {
+      navigator.clipboard.writeText(url);
+      setUrlCopied(true);
+      setTimeout(() => setUrlCopied(false), 2000);
     } catch (_) {}
   };
 
@@ -158,12 +174,34 @@ export function LiveBrowserOperatorCanvas({
   };
 
   const isTaskHalted = Boolean(isStopped || session?.isStopped || session?.status === 'stopped');
+
+  const diagnosticState: BrowserDiagnosticState =
+    activeTab.diagnosticState ||
+    session?.diagnosticState ||
+    (session?.isBlocked || session?.status === 'blocked' || activeTab.status === 'blocked' || activeTab.isBlocked
+      ? 'BOT_PROTECTION_BLOCK'
+      : 'SUCCESS');
+
   const isBlocked = Boolean(
     session?.isBlocked ||
     session?.status === 'blocked' ||
     activeTab.status === 'blocked' ||
-    activeTab.domain.includes('bookmyshow')
+    activeTab.isBlocked ||
+    diagnosticState === 'BOT_PROTECTION_BLOCK' ||
+    diagnosticState === 'ACCESS_DENIED' ||
+    diagnosticState === 'CAPTCHA_REQUIRED'
   );
+
+  const blockReason =
+    activeTab.blockReason ||
+    session?.blockReason ||
+    (diagnosticState === 'CAPTCHA_REQUIRED'
+      ? 'Interactive challenge or CAPTCHA required'
+      : diagnosticState === 'BOT_PROTECTION_BLOCK'
+      ? 'Security service (Cloudflare WAF) blocked automated session'
+      : diagnosticState === 'LOGIN_REQUIRED'
+      ? 'Login authentication required'
+      : 'Access restricted by website');
 
   return (
     <div className="flex flex-col h-full bg-slate-900 text-slate-100 font-sans select-none overflow-hidden border-l border-slate-700/80 shadow-2xl">
@@ -833,24 +871,57 @@ export function LiveBrowserOperatorCanvas({
                 </div>
               </div>
 
-              {/* Security Block Warning Bar */}
-              {isBlocked && (
-                <div className="bg-rose-950/90 border-b border-rose-800/70 text-rose-200 px-3 py-2 text-xs flex items-center justify-between shrink-0 gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
+              {/* Security Block / Diagnostics Warning Bar with 5 Handoff Controls */}
+              {isBlocked && !isWarningDismissed && (
+                <div className="bg-rose-950/95 border-b border-rose-800/80 text-rose-200 px-3 py-2 text-xs flex flex-wrap items-center justify-between gap-2 shrink-0">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
                     <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
                     <span className="text-[11px] font-medium leading-tight truncate">
-                      <strong>{activeTab.domain}</strong> security service has restricted automated session access.
+                      <strong>{activeTab.domain}</strong>: {blockReason}
                     </span>
                   </div>
-                  <a
-                    href={activeTab.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-2.5 py-1 rounded bg-rose-600 hover:bg-rose-500 text-white font-bold text-[11px] flex items-center gap-1 shrink-0 transition-colors shadow-sm cursor-pointer"
-                  >
-                    <span>Open in Regular Browser</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <a
+                      href={activeTab.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Open in Regular Browser"
+                      className="px-2.5 py-1 rounded bg-rose-600 hover:bg-rose-500 text-white font-bold text-[11px] flex items-center gap-1 transition-colors shadow-sm cursor-pointer"
+                    >
+                      <span>Open in Regular Browser</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                    <button
+                      onClick={() => setIsUserControl(true)}
+                      title="Take Control"
+                      className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-[11px] border border-slate-700 transition-colors cursor-pointer"
+                    >
+                      Take Control
+                    </button>
+                    <button
+                      onClick={() => setIframeKey((k) => k + 1)}
+                      title="Retry Page Load"
+                      className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-[11px] border border-slate-700 transition-colors cursor-pointer flex items-center gap-1"
+                    >
+                      <RotateCw className="w-2.5 h-2.5" />
+                      <span>Retry</span>
+                    </button>
+                    <button
+                      onClick={() => handleCopyUrl(activeTab.url)}
+                      title="Copy URL"
+                      className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-[11px] border border-slate-700 transition-colors cursor-pointer flex items-center gap-1"
+                    >
+                      {urlCopied ? <Check className="w-2.5 h-2.5 text-emerald-400" /> : <Copy className="w-2.5 h-2.5" />}
+                      <span>{urlCopied ? 'Copied' : 'Copy URL'}</span>
+                    </button>
+                    <button
+                      onClick={() => setIsWarningDismissed(true)}
+                      title="Dismiss Notice"
+                      className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               )}
 

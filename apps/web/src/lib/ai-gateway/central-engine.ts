@@ -687,14 +687,18 @@ export class CentralAIEngine {
       const cityCap = city.charAt(0).toUpperCase() + city.slice(1);
       const targetUrl = `https://in.bookmyshow.com/explore/movies-${city}`;
 
-      let isBlocked = true;
-      let blockReason = 'Website security service (Cloudflare WAF) blocked automated session';
+      let isBlocked = false;
+      let diagnosticState = 'SUCCESS';
+      let blockReason = '';
       try {
         const accessCheck = await BrowserWorker.inspectUrlAccess(targetUrl);
-        isBlocked = accessCheck.isBlocked || true;
-        if (accessCheck.blockReason) blockReason = accessCheck.blockReason;
-      } catch {
+        isBlocked = accessCheck.isBlocked || !accessCheck.accessible;
+        diagnosticState = accessCheck.state;
+        blockReason = accessCheck.blockReason || accessCheck.reason || '';
+      } catch (err: any) {
         isBlocked = true;
+        diagnosticState = 'UNKNOWN_ERROR';
+        blockReason = err?.message || 'Access inspection error';
       }
 
       const browserSession = {
@@ -702,7 +706,8 @@ export class CentralAIEngine {
         currentUrl: targetUrl,
         status: isBlocked ? 'blocked' : 'ready',
         isBlocked: isBlocked,
-        statusText: isBlocked ? 'Access Blocked by Website Security Service' : 'Ready',
+        diagnosticState,
+        statusText: isBlocked ? (blockReason || 'Access Blocked by Website Security Service') : 'Ready',
         blockReason,
         tabs: [
           {
@@ -712,6 +717,8 @@ export class CentralAIEngine {
             url: targetUrl,
             status: isBlocked ? ('blocked' as const) : ('ready' as const),
             isBlocked: isBlocked,
+            diagnosticState,
+            blockReason,
           },
           {
             id: 'tolee',
@@ -918,18 +925,21 @@ export class CentralAIEngine {
       const initialUrl = url || 'https://www.google.com';
       const displayName = portalName || domainClean;
 
-      // Inspect URL access to distinguish successful navigation from WAF security blocks
-      let isBlocked = domainClean.includes('bookmyshow');
-      let blockReason = isBlocked ? 'Website security service (Cloudflare WAF) blocked automated session' : undefined;
+      // Inspect URL access with 15-state diagnostic engine
+      let isBlocked = false;
+      let diagnosticState = 'SUCCESS';
+      let blockReason = '';
 
       try {
         const accessCheck = await BrowserWorker.inspectUrlAccess(initialUrl);
-        if (accessCheck.isBlocked) {
-          isBlocked = true;
-          blockReason = accessCheck.blockReason || 'Website security service blocked automated session';
-        }
+        isBlocked = accessCheck.isBlocked || !accessCheck.accessible;
+        diagnosticState = accessCheck.state;
+        blockReason = accessCheck.blockReason || accessCheck.reason || '';
       } catch (err: any) {
         console.warn('[CentralAIEngine] Browser inspectUrlAccess error:', err?.message);
+        isBlocked = true;
+        diagnosticState = 'UNKNOWN_ERROR';
+        blockReason = err?.message || 'Access inspection error';
       }
 
       const browserSession = {
@@ -937,7 +947,8 @@ export class CentralAIEngine {
         currentUrl: initialUrl,
         status: isBlocked ? 'blocked' : 'ready',
         isBlocked: isBlocked,
-        statusText: isBlocked ? 'Access Blocked by Website Security Service' : 'Ready',
+        diagnosticState,
+        statusText: isBlocked ? (blockReason || 'Access Blocked') : 'Ready',
         blockReason,
         tabs: [
           {
@@ -947,6 +958,8 @@ export class CentralAIEngine {
             url: initialUrl,
             status: isBlocked ? ('blocked' as const) : ('ready' as const),
             isBlocked: isBlocked,
+            diagnosticState,
+            blockReason,
           },
           {
             id: 'tolee',
@@ -963,9 +976,23 @@ export class CentralAIEngine {
       let content = '';
 
       if (isBlocked) {
-        content = isHindi
-          ? `🛡️ **${displayName} Access Blocked by Security Service**\n\nMaine **${displayName}** (\`${initialUrl}\`) ko right-side live browser panel me open karne ki koshish ki, lekin website ke security filter (Cloudflare WAF) ne automated session ko block kar diya hai (*'Sorry, you have been blocked'*).\n\n⚠️ **Note**: Tolee AI kisi bhi website ke security controls, CAPTCHA ya WAF ko bypass nahi karta hai. Is wajah se automated browser ke zariye is page ka content retrieve nahi ho sakta.\n\n👉 **Recommended Action**: Aap right-side browser panel me **'Open in Regular Browser'** ya **'Popout'** button par click karke apne personal browser me is website ko directly access kar sakte hain bina kisi restriction ke.`
-          : `🛡️ **${displayName} Access Blocked by Security Service**\n\nWe attempted to open **${displayName}** (\`${initialUrl}\`) in the live browser operator, but the website's security service (Cloudflare WAF) blocked the automated session (*'Sorry, you have been blocked'*).\n\n⚠️ **Note**: Tolee AI strictly adheres to platform security and does not bypass security controls, defeat CAPTCHAs, or spoof client fingerprints. Consequently, automated navigation inside this session is halted.\n\n👉 **Recommended Action**: Please click **'Open in Regular Browser'** or **'Popout'** in the right-side browser panel to view and interact with ${displayName} directly in your regular personal browser.`;
+        if (diagnosticState === 'BOT_PROTECTION_BLOCK') {
+          content = isHindi
+            ? `🛡️ **${displayName} Access Blocked by Security Service (WAF)**\n\nMaine **${displayName}** (\`${initialUrl}\`) ko right-side live browser panel me open karne ki koshish ki, lekin website ke security filter (Cloudflare WAF / Bot Defense) ne automated session ko block kar diya hai (*'Sorry, you have been blocked'*).\n\n⚠️ **Note**: Tolee AI kisi bhi website ke security controls, CAPTCHA ya WAF ko bypass nahi karta hai.\n\n👉 **Recommended Action**: Aap right-side browser panel me **'Open in Regular Browser'** ya **'Popout'** button par click karke apne regular browser me is website ko directly access kar sakte hain bina kisi restriction ke.`
+            : `🛡️ **${displayName} Access Blocked by Security Service (WAF)**\n\nWe attempted to open **${displayName}** (\`${initialUrl}\`) in the live browser operator, but the website's security service (Cloudflare WAF / Bot Defense) blocked the automated session (*'Sorry, you have been blocked'*).\n\n⚠️ **Note**: Tolee AI strictly adheres to platform security and does not bypass security controls, defeat CAPTCHAs, or spoof client fingerprints.\n\n👉 **Recommended Action**: Please click **'Open in Regular Browser'** or **'Popout'** in the right-side browser panel to view and interact with ${displayName} directly in your regular personal browser.`;
+        } else if (diagnosticState === 'CAPTCHA_REQUIRED') {
+          content = isHindi
+            ? `🤖 **${displayName} par CAPTCHA Challenge mila hai**\n\nWebsite **${displayName}** (\`${initialUrl}\`) ko open karne ke liye human verification (Cloudflare Turnstile ya reCAPTCHA) ki zaroorat hai.\n\n👉 **Recommended Action**: Right-side panel me **'Take Control'** par click karke aap khud challenge complete kar sakte hain ya **'Open in Regular Browser'** use karein.`
+            : `🤖 **CAPTCHA Challenge Required on ${displayName}**\n\nThe website **${displayName}** (\`${initialUrl}\`) presented an interactive human verification challenge (Turnstile or reCAPTCHA).\n\n👉 **Recommended Action**: Click **'Take Control'** in the right-side browser panel to complete the challenge yourself, or click **'Open in Regular Browser'**.`;
+        } else if (diagnosticState === 'NAVIGATION_TIMEOUT') {
+          content = isHindi
+            ? `⏱️ **${displayName} Connection Timeout**\n\n**${displayName}** (\`${initialUrl}\`) respond karne me bohot waqt le raha hai (Timeout ho gaya).\n\n👉 **Action**: Aap right-side panel me **'Retry'** par click karein ya **'Open in Regular Browser'** se check karein.`
+            : `⏱️ **Connection Timeout to ${displayName}**\n\nThe request to **${displayName}** (\`${initialUrl}\`) timed out before the server responded.\n\n👉 **Action**: Click **'Retry'** in the right-side panel to try again, or **'Open in Regular Browser'**.`;
+        } else {
+          content = isHindi
+            ? `⚠️ **${displayName} Access Issue (${diagnosticState.replace(/_/g, ' ')})**\n\n**${displayName}** (\`${initialUrl}\`) ko open karte waqt restriction mila: *${blockReason || diagnosticState}*.\n\n👉 **Action**: Aap right-side panel me **'Open in Regular Browser'** use karke directly open kar sakte hain.`
+            : `⚠️ **Access Issue with ${displayName} (${diagnosticState.replace(/_/g, ' ')})**\n\nEncountered an access issue loading **${displayName}** (\`${initialUrl}\`): *${blockReason || diagnosticState}*.\n\n👉 **Action**: Please click **'Open in Regular Browser'** or **'Retry'** in the live browser operator.`;
+        }
       } else {
         content = isHindi
           ? `🌐 **${displayName} Live Browser me Open ho gaya hai**: Maine aapke liye **${displayName}** (\`${initialUrl}\`) right-side live browser panel me open kar diya hai.\n\nAap kya explore karna chahte hain? Aap right-side panel me directly website ko browse kar sakte hain ya mujhe specific search karne ko keh sakte hain.`

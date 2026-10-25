@@ -4,6 +4,35 @@ import { URL } from 'url';
 import crypto from 'crypto';
 import { searchAndGroundQuery } from '@/lib/web-search';
 
+export type BrowserDiagnosticState =
+  | 'SUCCESS'
+  | 'LOADING'
+  | 'NAVIGATION_TIMEOUT'
+  | 'DNS_OR_NETWORK_ERROR'
+  | 'CONNECTION_REFUSED'
+  | 'TLS_OR_CERTIFICATE_ERROR'
+  | 'HTTP_ERROR'
+  | 'ACCESS_DENIED'
+  | 'BOT_PROTECTION_BLOCK'
+  | 'CAPTCHA_REQUIRED'
+  | 'LOGIN_REQUIRED'
+  | 'JAVASCRIPT_RENDERING_ERROR'
+  | 'UNSUPPORTED_INTERACTION'
+  | 'BROWSER_DISCONNECTED'
+  | 'UNKNOWN_ERROR';
+
+export interface BrowserDiagnosticResult {
+  state: BrowserDiagnosticState;
+  statusCode: number;
+  accessible: boolean;
+  isBlocked: boolean;
+  blockReason?: string;
+  reason?: string;
+  finalUrl: string;
+  technicalDetails?: string;
+  suggestedAction: 'none' | 'open_regular_browser' | 'take_control' | 'retry' | 'login' | 'solve_captcha';
+}
+
 export interface WebpageMetadata {
   url: string;
   title: string;
@@ -253,18 +282,295 @@ export class BrowserWorker {
   }
 
   /**
+   * 🔬 Universal Browser Diagnostic Classifier (15 Discrete States)
+   * Multi-signal detection across HTTP status, headers, HTML body markers, and network errors.
+   */
+  public static classifyBrowserDiagnostic(params: {
+    statusCode?: number;
+    headers?: Record<string, any>;
+    body?: string;
+    error?: any;
+    targetUrl: string;
+    finalUrl?: string;
+  }): BrowserDiagnosticResult {
+    const { statusCode = 200, headers = {}, body = '', error, targetUrl, finalUrl = targetUrl } = params;
+
+    // 1. Network / Transport Layer Errors
+    if (error) {
+      const code = (error.code || '').toUpperCase();
+      const msg = (error.message || '').toLowerCase();
+
+      if (code === 'ETIMEDOUT' || code === 'ESOCKETTIMEDOUT' || msg.includes('timeout')) {
+        return {
+          state: 'NAVIGATION_TIMEOUT',
+          statusCode: 504,
+          accessible: false,
+          isBlocked: false,
+          blockReason: 'Navigation timed out waiting for server response.',
+          reason: 'Navigation timed out waiting for server response.',
+          finalUrl,
+          technicalDetails: error.message || 'ETIMEDOUT',
+          suggestedAction: 'retry',
+        };
+      }
+
+      if (code === 'ENOTFOUND' || code === 'EAI_AGAIN' || msg.includes('getaddrinfo enotfound') || msg.includes('not found')) {
+        return {
+          state: 'DNS_OR_NETWORK_ERROR',
+          statusCode: 502,
+          accessible: false,
+          isBlocked: false,
+          blockReason: 'Domain name resolution failed (DNS lookup error).',
+          reason: 'Domain name resolution failed (DNS lookup error).',
+          finalUrl,
+          technicalDetails: error.message || 'ENOTFOUND',
+          suggestedAction: 'retry',
+        };
+      }
+
+      if (code === 'ECONNREFUSED' || msg.includes('connection refused')) {
+        return {
+          state: 'CONNECTION_REFUSED',
+          statusCode: 502,
+          accessible: false,
+          isBlocked: false,
+          blockReason: 'Remote host actively refused the connection.',
+          reason: 'Remote host actively refused the connection.',
+          finalUrl,
+          technicalDetails: error.message || 'ECONNREFUSED',
+          suggestedAction: 'retry',
+        };
+      }
+
+      if (
+        code.includes('CERT_') ||
+        code === 'DEPTH_ZERO_SELF_SIGNED_CERT' ||
+        code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' ||
+        msg.includes('certificate') ||
+        msg.includes('tls') ||
+        msg.includes('ssl')
+      ) {
+        return {
+          state: 'TLS_OR_CERTIFICATE_ERROR',
+          statusCode: 495,
+          accessible: false,
+          isBlocked: false,
+          blockReason: 'TLS/SSL certificate validation failed.',
+          reason: 'TLS/SSL certificate validation failed.',
+          finalUrl,
+          technicalDetails: error.message || 'TLS_CERT_ERROR',
+          suggestedAction: 'open_regular_browser',
+        };
+      }
+
+      if (code === 'ECONNRESET' || msg.includes('socket hang up') || msg.includes('econnreset')) {
+        return {
+          state: 'BROWSER_DISCONNECTED',
+          statusCode: 502,
+          accessible: false,
+          isBlocked: false,
+          blockReason: 'Connection dropped unexpectedly by the remote host.',
+          reason: 'Connection dropped unexpectedly by the remote host.',
+          finalUrl,
+          technicalDetails: error.message || 'ECONNRESET',
+          suggestedAction: 'retry',
+        };
+      }
+
+      return {
+        state: 'UNKNOWN_ERROR',
+        statusCode: 500,
+        accessible: false,
+        isBlocked: false,
+        blockReason: error.message || 'Unknown network error',
+        reason: error.message || 'Unknown network error',
+        finalUrl,
+        technicalDetails: error.message,
+        suggestedAction: 'retry',
+      };
+    }
+
+    // Case-insensitive header lookup
+    const headerKeys = Object.keys(headers).reduce((acc, k) => {
+      acc[k.toLowerCase()] = headers[k];
+      return acc;
+    }, {} as Record<string, any>);
+
+    const serverHeader = String(headerKeys['server'] || '').toLowerCase();
+    const hasCfRay = Boolean(headerKeys['cf-ray'] || headerKeys['cf-mitigated']);
+    const hasAmzWaf = Boolean(headerKeys['x-amzn-waf-action'] || headerKeys['x-amz-waf-action']);
+    const hasDataDome = Boolean(headerKeys['x-datadome'] || headerKeys['x-datadome-response']);
+
+    const bodyLower = body.toLowerCase();
+
+    // 2. Interactive CAPTCHA Detection
+    const hasCaptchaMarkers =
+      bodyLower.includes('cf-turnstile') ||
+      bodyLower.includes('challenges.cloudflare.com') ||
+      bodyLower.includes('g-recaptcha') ||
+      bodyLower.includes('recaptcha/api.js') ||
+      bodyLower.includes('hcaptcha.com') ||
+      bodyLower.includes('geetest') ||
+      bodyLower.includes('verify you are human') ||
+      bodyLower.includes('complete the security check') ||
+      bodyLower.includes('please verify you are a human') ||
+      bodyLower.includes('confirm you are human');
+
+    if (hasCaptchaMarkers) {
+      return {
+        state: 'CAPTCHA_REQUIRED',
+        statusCode,
+        accessible: false,
+        isBlocked: true,
+        blockReason: 'Website requires interactive CAPTCHA verification.',
+        reason: 'Website requires interactive CAPTCHA verification.',
+        finalUrl,
+        technicalDetails: 'Interactive challenge detected (Turnstile/reCAPTCHA/hCaptcha)',
+        suggestedAction: 'take_control',
+      };
+    }
+
+    // 3. Bot Protection / WAF Blocks
+    const hasWafBlockStrings =
+      body.includes('Sorry, you have been blocked') ||
+      body.includes('Attention Required! | Cloudflare') ||
+      body.includes('Why have I been blocked') ||
+      body.includes('security service to protect itself') ||
+      body.includes('Cloudflare Ray ID') ||
+      body.includes('cf-browser-verification') ||
+      body.includes('The requested URL was rejected. Please consult with your administrator.') ||
+      body.includes('Request blocked by PerimeterX') ||
+      body.includes('Protected by DataDome') ||
+      body.includes('Access Denied - GoDaddy') ||
+      body.includes('AkamaiGHost');
+
+    const isCloudflareBlock =
+      (statusCode === 403 || statusCode === 429 || statusCode === 503) &&
+      (hasCfRay || serverHeader.includes('cloudflare') || hasWafBlockStrings);
+
+    const isGenericWafBlock =
+      (statusCode === 403 || statusCode === 429) && (hasAmzWaf || hasDataDome || hasWafBlockStrings);
+
+    if (isCloudflareBlock || isGenericWafBlock || hasWafBlockStrings) {
+      const wafName =
+        hasCfRay || serverHeader.includes('cloudflare') || body.includes('Cloudflare')
+          ? 'Cloudflare WAF'
+          : hasAmzWaf
+          ? 'AWS WAF'
+          : hasDataDome
+          ? 'DataDome'
+          : 'Website Security Service (WAF)';
+
+      return {
+        state: 'BOT_PROTECTION_BLOCK',
+        statusCode,
+        accessible: false,
+        isBlocked: true,
+        blockReason: `Website security service (${wafName}) blocked automated session.`,
+        reason: `Website security service (${wafName}) blocked automated session.`,
+        finalUrl,
+        technicalDetails: `Status ${statusCode} - WAF signatures identified (${wafName})`,
+        suggestedAction: 'open_regular_browser',
+      };
+    }
+
+    // 4. Login Wall / Authentication Required
+    const isLoginWall =
+      statusCode === 401 ||
+      ((statusCode === 200 || statusCode === 302) &&
+        (finalUrl.includes('/login') || finalUrl.includes('/signin') || finalUrl.includes('/auth')) &&
+        !targetUrl.includes('/login') &&
+        !targetUrl.includes('/signin')) ||
+      bodyLower.includes('sign in to your account') ||
+      bodyLower.includes('please log in to continue') ||
+      bodyLower.includes('you must be logged in');
+
+    if (isLoginWall) {
+      return {
+        state: 'LOGIN_REQUIRED',
+        statusCode: statusCode === 401 ? 401 : 200,
+        accessible: false,
+        isBlocked: false,
+        blockReason: 'Website requires user authentication or login.',
+        reason: 'Website requires user authentication or login.',
+        finalUrl,
+        technicalDetails: 'Authentication boundary or redirect detected',
+        suggestedAction: 'login',
+      };
+    }
+
+    // 5. Access Denied (Permissions error without WAF bot markers)
+    if (statusCode === 403) {
+      return {
+        state: 'ACCESS_DENIED',
+        statusCode: 403,
+        accessible: false,
+        isBlocked: true,
+        blockReason: 'HTTP 403 Forbidden: Access to this specific resource is restricted.',
+        reason: 'HTTP 403 Forbidden: Access to this specific resource is restricted.',
+        finalUrl,
+        technicalDetails: 'HTTP 403 Forbidden without WAF signature',
+        suggestedAction: 'open_regular_browser',
+      };
+    }
+
+    // 6. Generic HTTP Errors (4xx, 5xx)
+    if (statusCode >= 400) {
+      if (statusCode === 504) {
+        return {
+          state: 'NAVIGATION_TIMEOUT',
+          statusCode: 504,
+          accessible: false,
+          isBlocked: false,
+          blockReason: 'Gateway timeout (HTTP 504).',
+          reason: 'Gateway timeout (HTTP 504).',
+          finalUrl,
+          technicalDetails: 'HTTP 504 Gateway Timeout',
+          suggestedAction: 'retry',
+        };
+      }
+
+      return {
+        state: 'HTTP_ERROR',
+        statusCode,
+        accessible: false,
+        isBlocked: false,
+        blockReason: `HTTP Error ${statusCode} received from server.`,
+        reason: `HTTP Error ${statusCode} received from server.`,
+        finalUrl,
+        technicalDetails: `HTTP ${statusCode}`,
+        suggestedAction: 'retry',
+      };
+    }
+
+    // 7. Successful Navigation
+    return {
+      state: 'SUCCESS',
+      statusCode: statusCode || 200,
+      accessible: true,
+      isBlocked: false,
+      finalUrl,
+      suggestedAction: 'none',
+    };
+  }
+
+  /**
    * 🔍 Inspects whether a destination URL is accessible or blocked by anti-bot/WAF security services.
    */
-  public static async inspectUrlAccess(targetUrl: string): Promise<{
-    accessible: boolean;
-    isBlocked: boolean;
-    statusCode: number;
-    blockReason?: string;
-    finalUrl: string;
-  }> {
+  public static async inspectUrlAccess(targetUrl: string): Promise<BrowserDiagnosticResult> {
     const safety = this.isSafeUrl(targetUrl);
     if (!safety.safe) {
-      return { accessible: false, isBlocked: false, statusCode: 403, blockReason: safety.reason, finalUrl: targetUrl };
+      return {
+        state: 'ACCESS_DENIED',
+        accessible: false,
+        isBlocked: true,
+        statusCode: 403,
+        blockReason: safety.reason,
+        reason: safety.reason,
+        finalUrl: targetUrl,
+        technicalDetails: 'SSRF_GUARD_REJECTED',
+        suggestedAction: 'none',
+      };
     }
 
     return new Promise((resolve) => {
@@ -281,46 +587,52 @@ export class BrowserWorker {
               Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
               'Accept-Language': 'en-US,en;q=0.9',
             },
-            timeout: 3500,
+            timeout: 5000,
           },
           (res) => {
             let body = '';
             res.on('data', (c) => {
-              if (body.length < 25000) body += c;
+              if (body.length < 35000) body += c;
             });
 
             res.on('end', () => {
-              const code = res.statusCode || 200;
-              const hasBlockKeywords =
-                body.includes('Sorry, you have been blocked') ||
-                body.includes('Attention Required! | Cloudflare') ||
-                body.includes('Why have I been blocked') ||
-                body.includes('Access Denied') ||
-                body.includes('security service to protect itself');
-
-              const isBlocked = code === 403 || code === 429 || hasBlockKeywords;
-
-              resolve({
-                accessible: !isBlocked && code < 400,
-                isBlocked,
-                statusCode: code,
-                blockReason: isBlocked ? 'Website security service (WAF / Cloudflare) blocked automated session' : undefined,
+              const result = this.classifyBrowserDiagnostic({
+                statusCode: res.statusCode || 200,
+                headers: res.headers as Record<string, any>,
+                body,
+                targetUrl,
                 finalUrl: res.headers.location || targetUrl,
               });
+              resolve(result);
             });
           }
         );
 
         req.on('timeout', () => {
           req.destroy();
-          resolve({ accessible: false, isBlocked: false, statusCode: 504, blockReason: 'Gateway timeout', finalUrl: targetUrl });
+          resolve(
+            this.classifyBrowserDiagnostic({
+              error: { code: 'ETIMEDOUT', message: 'Connection timed out' },
+              targetUrl,
+            })
+          );
         });
 
         req.on('error', (err) => {
-          resolve({ accessible: false, isBlocked: false, statusCode: 500, blockReason: err.message, finalUrl: targetUrl });
+          resolve(
+            this.classifyBrowserDiagnostic({
+              error: err,
+              targetUrl,
+            })
+          );
         });
       } catch (err: any) {
-        resolve({ accessible: false, isBlocked: false, statusCode: 500, blockReason: err.message, finalUrl: targetUrl });
+        resolve(
+          this.classifyBrowserDiagnostic({
+            error: err,
+            targetUrl,
+          })
+        );
       }
     });
   }
