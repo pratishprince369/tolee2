@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Shield, Brain, Trash2, Plus, Lock, BellOff, CheckCircle2, Globe, Sparkles } from 'lucide-react';
+import { Shield, Brain, Trash2, Plus, Lock, BellOff, CheckCircle2, Globe, Sparkles, Search, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { getAIMemories, saveAIMemory, deleteAIMemory, dismissAllAIReminders } from '@/actions/ai-manager';
@@ -18,6 +18,7 @@ const SUPPORTED_LANGUAGES = [
 
 export function AIMemorySettings() {
   const [memories, setMemories] = useState<any[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
   const [key, setKey] = useState('');
   const [value, setValue] = useState('');
   const [loading, setLoading] = useState(false);
@@ -180,28 +181,76 @@ export function AIMemorySettings() {
           </Button>
         </form>
 
+        {/* Search & Filter Bar */}
+        {memories.length > 0 && (
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Input
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search memories, preferences, or categories..."
+              className="pl-9 bg-slate-50 dark:bg-zinc-800/40 text-xs rounded-xl"
+            />
+          </div>
+        )}
+
         <div className="space-y-2">
           {memories.length > 0 ? (
-            memories.map((m) => (
-              <div 
-                key={m.id} 
-                className="flex items-center justify-between p-3.5 bg-slate-50 dark:bg-zinc-800/50 border border-slate-100 dark:border-zinc-800 rounded-2xl"
-              >
-                <div className="flex items-center gap-2">
-                  <Lock className="w-3.5 h-3.5 text-slate-400" />
-                  <span className="font-bold text-xs text-slate-700 dark:text-zinc-300">{m.key}:</span>
-                  <span className="text-xs text-slate-900 dark:text-white">{m.value}</span>
-                </div>
-                <Button 
-                  size="sm" 
-                  variant="ghost" 
-                  onClick={() => handleDelete(m.id)}
-                  className="text-rose-500 hover:bg-rose-50 hover:text-rose-600 rounded-xl"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </Button>
-              </div>
-            ))
+            memories
+              .filter(
+                (m) =>
+                  !searchTerm ||
+                  m.key?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                  m.value?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                  m.category?.toLowerCase().includes(searchTerm.toLowerCase())
+              )
+              .map((m) => {
+                const isAutoLearned = [
+                  'home_city',
+                  'preferred_name',
+                  'profession_role',
+                  'favorite_movie_genre',
+                  'disliked_movie_genre',
+                  'dietary_preference',
+                  'hotel_travel_budget',
+                  'hotel_tier_preference',
+                ].includes(m.key) || m.category === 'preference';
+
+                return (
+                  <div
+                    key={m.id}
+                    className="flex items-center justify-between p-3.5 bg-slate-50 dark:bg-zinc-800/50 border border-slate-100 dark:border-zinc-800 rounded-2xl hover:border-violet-300 dark:hover:border-violet-800 transition-colors"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Lock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <div className="min-w-0 flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-xs text-slate-700 dark:text-zinc-300">
+                          {m.key}:
+                        </span>
+                        <span className="text-xs text-slate-900 dark:text-white font-medium">
+                          {m.value}
+                        </span>
+                        <span className="text-[10px] uppercase font-mono px-1.5 py-0.2 rounded bg-slate-200 dark:bg-zinc-700 text-slate-600 dark:text-zinc-300">
+                          {m.category || 'personal'}
+                        </span>
+                        {isAutoLearned && (
+                          <span className="text-[10px] bg-violet-500/15 text-violet-600 dark:text-violet-400 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                            <Zap className="w-2.5 h-2.5" /> Mem0 Auto
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleDelete(m.id)}
+                      className="text-rose-500 hover:bg-rose-50 hover:text-rose-600 rounded-xl shrink-0"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                );
+              })
           ) : (
             <p className="text-xs text-slate-400 italic text-center py-4">No AI memories saved yet</p>
           )}

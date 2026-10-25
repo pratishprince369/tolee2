@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { AIMessagePayload, AIPersonaConfig } from './types';
 import { requiresLiveWebSearch, searchAndGroundQuery, isPersonQuery } from '@/lib/web-search';
+import { ToleeMem0Engine } from './mem0-service';
 
 export interface ContextBuilderOptions {
   userId?: string;
@@ -74,18 +75,15 @@ export async function buildAIContext(options: ContextBuilderOptions): Promise<AI
     `6. If an action fails or cannot be executed, say so honestly. Never claim an action succeeded without real execution.`
   );
 
-  // 3. User Memories from database
+  // 3. User Memories & Preferences via Mem0 Engine (Semantically ranked)
   if (userId && includeMemories) {
     try {
-      const memories = await prisma.aIMemory.findMany({
-        where: { userId },
-        take: 10,
-        orderBy: { updatedAt: 'desc' },
-      });
+      const lastUserMsg = [...rawMessages].reverse().find(m => m.role === 'user')?.content || '';
+      const memories = await ToleeMem0Engine.getRelevantMemories(userId, lastUserMsg, 8);
 
       if (memories.length > 0) {
-        const memoryLines = memories.map((m: any) => `- ${m.key}: ${m.value}`);
-        systemParts.push(`\n[USER CONTEXT & MEMORIES]\n${memoryLines.join('\n')}`);
+        const memoryLines = memories.map((m: any) => `- ${m.key} (${m.category}): ${m.value}`);
+        systemParts.push(`\n[USER CONTEXT & MEMORIES (MEM0)]\n${memoryLines.join('\n')}`);
       }
     } catch {
       // Non-blocking memory retrieval

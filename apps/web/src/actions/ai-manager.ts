@@ -14,6 +14,7 @@ import { classifyIntelligenceIntent } from '@/modules/tolee-ai-manager/Core/ai-r
 import { CentralAIEngine } from '@/lib/ai-gateway/central-engine';
 import { ApprovalEngine } from '@/modules/tolee-ai-agent/approvals/approval-engine';
 import { AgentTaskManager } from '@/modules/tolee-ai-agent/tasks/agent-task-manager';
+import { ToleeMem0Engine } from '@/lib/ai-gateway/mem0-service';
 
 async function getUserId(): Promise<string> {
   const session = await getServerSession(authOptions);
@@ -545,6 +546,13 @@ export async function processAIPersonalMessage(
       timeZone,
       mediaAttachment,
     });
+
+    // 🧠 Mem0 Engine: Asynchronously extract and self-improve user preferences (non-blocking)
+    if (userId && trimmed) {
+      ToleeMem0Engine.extractAndStoreMemories(userId, trimmed, result.content).catch((mErr) => {
+        console.warn('[Mem0] Background memory extraction notice:', mErr?.message);
+      });
+    }
 
     return {
       success: result.success,
