@@ -4,6 +4,7 @@ import { executeToleeAIAction, cleanAndTranslateImagePrompt } from '@/lib/tolee-
 import cloudinary from '@/lib/cloudinary';
 import { NvidiaNIMProvider } from './providers/nvidia-nim';
 import { FreeLLMAPIProvider } from './providers/freellmapi';
+import { DeepInferProvider } from './providers/deepinfer-provider';
 import { SYSTEM_PROMPTS } from '@/modules/tolee-ai-manager/Core/prompt-manager';
 import { AgentOrchestrator } from '@/modules/tolee-ai-agent/core/agent-orchestrator';
 import { ToleeRealityValidator } from './reality-validator';
@@ -163,6 +164,24 @@ class ProviderHealthRegistry {
         'llama-3.3-70b-versatile',
         'gemini-2.0-flash',
         'openai'
+      ]
+    });
+
+    // 7. DeepSeek DeepInfer (Optional High-Throughput SM100 / Ascend 950 Cluster)
+    const deepinferEnabled =
+      process.env.DEEPINFER_ENABLED === 'true' ||
+      (Boolean(process.env.DEEPINFER_ENDPOINT) && process.env.DEEPINFER_ENDPOINT !== 'http://127.0.0.1:8000/v1');
+
+    this.providers.set('deepinfer', {
+      id: 'deepinfer',
+      name: 'DeepSeek DeepInfer Frontier Cluster',
+      enabled: deepinferEnabled,
+      healthy: deepinferEnabled,
+      lastChecked: Date.now(),
+      models: [
+        'deepseek-v4.1-flash',
+        'deepseek-v3',
+        'deepseek-r1'
       ]
     });
   }
@@ -1474,7 +1493,55 @@ export class CentralAIEngine {
       }
     }
 
-    // 🌐 6. Multi-Provider Cloud AI Router (FreeLLMAPI / NVIDIA NIM / Gemini / OpenAI / Groq)
+    // 🌐 6. Multi-Provider Cloud AI Router (DeepInfer / FreeLLMAPI / NVIDIA NIM / Gemini / OpenAI / Groq)
+    // 6a-0. DeepSeek DeepInfer High-Throughput Inference Engine (Optional, Phase 3 & 6)
+    if (
+      process.env.DEEPINFER_ENABLED === 'true' ||
+      options.model?.toLowerCase().includes('deepinfer') ||
+      options.model?.toLowerCase().includes('deepseek-v4')
+    ) {
+      try {
+        const deepinfer = new DeepInferProvider();
+        const deepinferResult = await deepinfer.generateText({
+          model: options.model,
+          messages: [
+            { role: 'system', content: SYSTEM_PROMPTS.PERSONAL_EMPLOYEE },
+            ...history.map(h => ({ role: (h.role === 'assistant' ? 'assistant' : 'user') as 'assistant' | 'user', content: h.content })),
+            { role: 'user', content: rawMessage }
+          ]
+        });
+
+        if (deepinferResult.text && deepinferResult.text.trim()) {
+          const validatedText = ToleeRealityValidator.validate(deepinferResult.text.trim(), {
+            userId: options.userId || 'guest',
+            userMessage: rawMessage,
+            toolUsed: null,
+            toolResultSuccess: false,
+          }).sanitizedContent;
+
+          return {
+            success: true,
+            type: 'text',
+            content: validatedText,
+            model: deepinferResult.model,
+            provider: 'deepseek-deepinfer',
+            toolUsed: null,
+            image: null,
+            files: [],
+            metadata: {
+              latencyMs: Date.now() - startTime,
+              intent,
+              fallbackUsed: false,
+              tokensUsed: deepinferResult.tokensUsed,
+            }
+          };
+        }
+      } catch (diErr: any) {
+        console.warn('[CentralAIEngine] DeepInfer notice, falling back to standard providers:', diErr?.message);
+        providerRegistry.markFailure('deepinfer');
+      }
+    }
+
     // 6a. FreeLLMAPI Unified Multi-Model Gateway (DeepSeek, Llama-3.3, Qwen, Cerebras, Pollinations)
     try {
       const freellm = new FreeLLMAPIProvider();

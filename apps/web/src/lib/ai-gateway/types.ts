@@ -4,7 +4,8 @@ export type AIProviderType =
   | 'openai'
   | 'claude'
   | 'nvidia'
-  | 'freellmapi';
+  | 'freellmapi'
+  | 'deepinfer';
 
 export interface AIMessagePayload {
   role: 'user' | 'assistant' | 'system';
