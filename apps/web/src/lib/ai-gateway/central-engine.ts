@@ -14,6 +14,7 @@ import { BacklinkOperatorEngine } from '@/modules/tolee-ai-agent/browser/backlin
 import { AutonomousOperatorEngine } from '@/modules/tolee-ai-agent/browser/autonomous-operator';
 import { OpenMuseTaskOrchestrator } from '@/modules/tolee-ai-agent/core/openmuse-task-orchestrator';
 import { BrowserWorker } from '@/modules/tolee-ai-agent/browser/browser-worker';
+import { ToleeStagehandEngine } from '@/modules/tolee-ai-agent/browser/stagehand-engine';
 
 // -------------------------------------------------------------
 // TYPES & INTERFACES
@@ -775,28 +776,35 @@ export class CentralAIEngine {
       };
     }
 
-    // 🏨 Case B: MakeMyTrip Live Hotel Search & Real Comparison
+    // 🏨 Case B: MakeMyTrip Live Hotel Search & Real Comparison (No Fake Cards)
     const isMakeMyTripHotelQuery =
       (rawLower.includes('makemytrip') || rawLower.includes('mmt')) &&
       (rawLower.includes('hotel') || rawLower.includes('stay') || rawLower.includes('room') || rawLower.includes('compare'));
 
     if (isMakeMyTripHotelQuery) {
-      const cityMatch = rawLower.match(/\b(mumbai|delhi|bengaluru|bangalore|goa|jaipur|udaipur|pune|hyderabad|chennai|kolkata)\b/i);
-      const city = cityMatch ? cityMatch[1].toLowerCase() : 'mumbai';
+      const cityMatch = rawLower.match(/\b(mumbai|delhi|bengaluru|bangalore|goa|jaipur|udaipur|pune|hyderabad|chennai|kolkata|ahmedabad|chandigarh)\b/i);
+      const city = cityMatch ? cityMatch[1].toLowerCase() : (rawLower.includes('goa') ? 'goa' : 'mumbai');
       const cityCap = city.charAt(0).toUpperCase() + city.slice(1);
       const targetUrl = `https://www.makemytrip.com/hotels/${city}-hotels.html`;
+
+      const observation = await ToleeStagehandEngine.observe(targetUrl);
+      const isBlocked = observation.isBlocked;
 
       const browserSession = {
         targetDomain: 'makemytrip.com',
         currentUrl: targetUrl,
-        status: 'ready',
+        status: isBlocked ? 'blocked' : 'ready',
+        isBlocked,
+        statusText: isBlocked ? 'Access Blocked by Website Security Service' : `MakeMyTrip · ${cityCap} Hotels Active`,
+        blockReason: observation.blockReason,
         tabs: [
           {
             id: 'makemytrip_hotels',
             title: `MakeMyTrip · ${cityCap} Hotels`,
             domain: 'makemytrip.com',
             url: targetUrl,
-            status: 'ready' as const,
+            status: isBlocked ? ('blocked' as const) : ('ready' as const),
+            isBlocked,
           },
           {
             id: 'tolee',
@@ -809,39 +817,41 @@ export class CentralAIEngine {
         activeTabId: 'makemytrip_hotels',
       };
 
-      const responseText = [
-        `🏨 **MakeMyTrip Live Hotel Search Active (${cityCap})**`,
-        ``,
-        `Maine right-side live browser me MakeMyTrip **${cityCap} Hotels** portal open kar diya hai: [${targetUrl}](${targetUrl})`,
-        ``,
-        `### 📊 Top Verified Hotels in ${cityCap} (Feature & Price Comparison):`,
-        ``,
-        `| Hotel Name | Location / Area | Category & Rating | Starting Range (Approx) | Official Portal |`,
-        `| :--- | :--- | :--- | :--- | :--- |`,
-        `| **The Taj Mahal Palace** | Colaba, South Mumbai | 5-Star Luxury (4.8/5) | ₹22,000+ / night | [MakeMyTrip](${targetUrl}) |`,
-        `| **Trident Hotel** | Nariman Point, Marine Drive | 5-Star Sea View (4.6/5) | ₹14,000+ / night | [MakeMyTrip](${targetUrl}) |`,
-        `| **ITC Maratha** | Sahar, Near Airport | 5-Star Business (4.5/5) | ₹9,500+ / night | [MakeMyTrip](${targetUrl}) |`,
-        `| **Novotel Mumbai** | Juhu Beach | 5-Star Beachfront (4.4/5) | ₹8,500+ / night | [MakeMyTrip](${targetUrl}) |`,
-        `| **Hotel Suba Palace** | Apollo Bunder, Colaba | 3-Star Premium (4.2/5) | ₹4,200+ / night | [MakeMyTrip](${targetUrl}) |`,
-        ``,
-        `---`,
-        `⚠️ **Search & Comparison Only**:`,
-        `Yeh kewal verified live options aur indicative market rates hain — **koi booking, payment, ya reservation confirm nahi hua hai**.`,
-        `👉 *Exact check-in / check-out dates, guest count aur room type select karne ke liye aap right-side live browser panel me MakeMyTrip par details finalize kar sakte hain.*`,
-      ].join('\n');
+      const responseText = isBlocked
+        ? [
+            `🛡️ **MakeMyTrip Access Blocked by Security Service (${cityCap})**`,
+            ``,
+            `We attempted to open MakeMyTrip **${cityCap} Hotels** [${targetUrl}](${targetUrl}) in the live browser operator, but the portal's security service blocked automated access.`,
+            ``,
+            `👉 **Popout Action**: Click **'Open in Regular Browser'** in the right-side panel to view real-time ${cityCap} hotels and current live tariffs without restrictions.`,
+          ].join('\n')
+        : [
+            `🏨 **MakeMyTrip Live Hotel Operator Active (${cityCap})**`,
+            ``,
+            `Maine right-side live browser me verified MakeMyTrip **${cityCap} Hotels** portal open kar diya hai: [${targetUrl}](${targetUrl})`,
+            ``,
+            `### 🔍 Live Hotel Discovery for ${cityCap}:`,
+            `- **Destination**: ${cityCap}`,
+            `- **Source URL**: \`${targetUrl}\``,
+            `- **Status**: Live browser session connected. Available room inventory and tariffs depend dynamically on your check-in/check-out dates.`,
+            ``,
+            `---`,
+            `👉 *Aap right-side live browser workspace me directly check-in dates, guest count, aur room filters adjust karke real-time verified prices dekh sakte hain.*`,
+            `⚠️ *Note: No fake booking or simulated reservation was made.*`,
+          ].join('\n');
 
       return {
         success: true,
         type: 'tool_result',
         content: responseText,
-        model: 'tolee-browser-operator',
+        model: 'tolee-stagehand-operator',
         provider: 'tolee-core',
-        toolUsed: 'compare_makemytrip_hotels',
+        toolUsed: 'search_makemytrip_hotels',
         image: null,
         files: [],
         interactiveAction: {
           type: 'BROWSER_SESSION',
-          label: `MakeMyTrip: ${cityCap} Hotels`,
+          label: isBlocked ? `MakeMyTrip (Access Blocked)` : `MakeMyTrip: ${cityCap} Hotels`,
           payload: browserSession,
         },
         browserSession,
@@ -987,6 +997,153 @@ export class CentralAIEngine {
 
     // 🧠 2b. Intent Classification
     const intent = classifyIntelligenceIntent(rawMessage, hasMedia, mediaType);
+
+    // 🎭 Stagehand Multi-Step Autonomous Web Research (Phase 7)
+    const isMultiStepResearch =
+      (rawLower.includes('real estate') || rawLower.includes('property') || rawLower.includes('website') || rawLower.includes('competitor')) &&
+      (rawLower.includes('marketing') || rawLower.includes('analyze') || rawLower.includes('strategy') || rawLower.includes('compare')) &&
+      (rawLower.includes('report') || rawLower.includes('prepare a report') || rawLower.includes('five') || rawLower.includes('5'));
+
+    if (isMultiStepResearch) {
+      const researchResult = await ToleeStagehandEngine.executeMultiStepResearch(rawMessage);
+      const targetUrl = 'https://magicbricks.com';
+      const browserSession = {
+        targetDomain: 'magicbricks.com',
+        currentUrl: targetUrl,
+        status: 'completed',
+        tabs: researchResult.visitedSites.map((s, idx) => ({
+          id: `site_${idx}`,
+          title: s.title,
+          domain: s.url.replace(/^https?:\/\//, ''),
+          url: s.url,
+          status: 'ready' as const,
+        })),
+        activeTabId: 'site_0',
+      };
+
+      return {
+        success: true,
+        type: 'tool_result',
+        content: researchResult.report,
+        model: 'tolee-stagehand-researcher',
+        provider: 'tolee-core',
+        toolUsed: 'stagehand_multistep_research',
+        image: null,
+        files: [],
+        interactiveAction: {
+          type: 'BROWSER_SESSION',
+          label: 'Stagehand Research Verified',
+          payload: browserSession,
+        },
+        browserSession,
+        metadata: {
+          latencyMs: Date.now() - startTime,
+          intent: 'stagehand_multistep_research',
+          fallbackUsed: false,
+        },
+      };
+    }
+
+    // 🎭 Stagehand Core AI Primitives: Observe, Act, Extract (Phase 3)
+    const isStagehandObserve =
+      /\b(observe|inspect\s+page|page\s+observe|page\s+kya\s+hai|scan\s+page)\b/i.test(rawLower);
+
+    const isStagehandAct =
+      /\b(stagehand\s+act|browser\s+act|click\s+on|type\s+in|fill\s+the\s+form)\b/i.test(rawLower);
+
+    const isStagehandExtract =
+      /\b(stagehand\s+extract|extract\s+data|scrape\s+data|data\s+nikalo|pull\s+pricing)\b/i.test(rawLower);
+
+    if (isStagehandObserve || isStagehandAct || isStagehandExtract) {
+      const urlMatch = rawMessage.match(/(https?:\/\/[^\s]+)/i) || rawMessage.match(/\b([a-zA-Z0-9-]+\.[a-zA-Z]{2,}(?:\/[^\s]*)?)\b/i);
+      const targetUrl = urlMatch ? (urlMatch[1].startsWith('http') ? urlMatch[1] : `https://${urlMatch[1]}`) : 'https://www.google.com';
+
+      if (isStagehandObserve) {
+        const obs = await ToleeStagehandEngine.observe(targetUrl, rawMessage);
+        const browserSession = {
+          targetDomain: obs.domain,
+          currentUrl: targetUrl,
+          status: obs.isBlocked ? 'blocked' : 'ready',
+          isBlocked: obs.isBlocked,
+          statusText: obs.isBlocked ? 'Access Blocked' : `Observed ${obs.elements.length} elements`,
+          tabs: [{ id: 'tab1', title: obs.pageTitle, domain: obs.domain, url: targetUrl, status: obs.isBlocked ? 'blocked' : 'ready', isBlocked: obs.isBlocked }],
+          activeTabId: 'tab1',
+        };
+
+        const content = obs.isBlocked
+          ? `🛡️ **Stagehand Observation**: Access to ${obs.domain} was blocked by website security (${obs.blockReason}).`
+          : [
+              `👁️ **Stagehand Page Observation: [${obs.pageTitle}](${targetUrl})**`,
+              ``,
+              `**Page Summary**: ${obs.summary}`,
+              ``,
+              `### 🎯 Interactive Elements Discovered (${obs.elements.length}):`,
+              ...obs.elements.slice(0, 8).map((e) => `- **${e.type.toUpperCase()}**: "${e.label}" (${e.purpose})`),
+              ``,
+              `### 👉 Suggested Next Actions:`,
+              ...obs.suggestedActions.map((a) => `1. ${a}`),
+            ].join('\n');
+
+        return {
+          success: true,
+          type: 'tool_result',
+          content,
+          model: 'tolee-stagehand-operator',
+          provider: 'tolee-core',
+          toolUsed: 'stagehand_observe',
+          image: null,
+          files: [],
+          interactiveAction: { type: 'BROWSER_SESSION', label: `Stagehand Observe: ${obs.domain}`, payload: browserSession },
+          browserSession,
+          metadata: { latencyMs: Date.now() - startTime, intent: 'stagehand_observe', fallbackUsed: false },
+        };
+      }
+
+      if (isStagehandAct) {
+        const actRes = await ToleeStagehandEngine.act(targetUrl, rawMessage, { userId: options.userId, userName: options.userName });
+        const browserSession = {
+          targetDomain: new URL(actRes.resultingUrl).hostname,
+          currentUrl: actRes.resultingUrl,
+          status: actRes.status,
+          statusText: actRes.verifiedState || actRes.message,
+          tabs: [{ id: 'tab1', title: actRes.action, domain: new URL(actRes.resultingUrl).hostname, url: actRes.resultingUrl, status: 'ready' }],
+          activeTabId: 'tab1',
+        };
+
+        return {
+          success: true,
+          type: 'tool_result',
+          content: actRes.message,
+          model: 'tolee-stagehand-operator',
+          provider: 'tolee-core',
+          toolUsed: 'stagehand_act',
+          image: null,
+          files: [],
+          interactiveAction: actRes.approvalRequired
+            ? { type: 'APPROVAL_REQUEST', label: actRes.approvalPayload?.title || 'Review Consequential Action', payload: actRes.approvalPayload }
+            : { type: 'BROWSER_SESSION', label: `Stagehand Act: ${actRes.action}`, payload: browserSession },
+          browserSession,
+          metadata: { latencyMs: Date.now() - startTime, intent: 'stagehand_act', fallbackUsed: false },
+        };
+      }
+
+      if (isStagehandExtract) {
+        const extRes = await ToleeStagehandEngine.extract(targetUrl, rawMessage);
+        return {
+          success: extRes.success,
+          type: 'tool_result',
+          content: extRes.data
+            ? `📊 **Stagehand Extracted Data from [${targetUrl}](${targetUrl})**:\n\`\`\`json\n${JSON.stringify(extRes.data, null, 2)}\n\`\`\``
+            : `⚠️ Could not extract data: ${extRes.error}`,
+          model: 'tolee-stagehand-operator',
+          provider: 'tolee-core',
+          toolUsed: 'stagehand_extract',
+          image: null,
+          files: [],
+          metadata: { latencyMs: Date.now() - startTime, intent: 'stagehand_extract', fallbackUsed: false },
+        };
+      }
+    }
 
     // 🌐 2b. Autonomous Operator Layer (Jobs, Real-World Tasks, Bookings, Backlinks)
     const isJobTask =
