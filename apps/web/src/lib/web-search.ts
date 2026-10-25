@@ -182,6 +182,71 @@ export async function searchAndGroundQuery(query: string, maxResults: number = 4
   }
 
   const cleanTerm = extractCleanSearchTerm(q);
+
+  // 🚀 1. High-Precision Dedicated AI Search (Tavily API - Recommended for Vercel)
+  if (process.env.TAVILY_API_KEY) {
+    try {
+      const tavilyRes = await fetch('https://api.tavily.com/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          api_key: process.env.TAVILY_API_KEY,
+          query: cleanTerm || q,
+          search_depth: 'basic',
+          max_results: maxResults,
+        }),
+      });
+      if (tavilyRes.ok) {
+        const data = await tavilyRes.json();
+        if (data.results && data.results.length > 0) {
+          const snippets = data.results.map((r: any) => `${r.title}: ${r.content}`);
+          const sources = data.results.map((r: any) => r.url);
+          return {
+            hasEvidence: true,
+            snippets,
+            contextText: snippets.join('\n\n'),
+            sources,
+          };
+        }
+      }
+    } catch (err: any) {
+      console.warn('[WebSearch] Tavily fallback to DuckDuckGo:', err?.message);
+    }
+  }
+
+  // 🚀 2. Google Search Provider (Serper API)
+  if (process.env.SERPER_API_KEY) {
+    try {
+      const serperRes = await fetch('https://google.serper.dev/search', {
+        method: 'POST',
+        headers: {
+          'X-API-KEY': process.env.SERPER_API_KEY,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ q: cleanTerm || q, num: maxResults }),
+      });
+      if (serperRes.ok) {
+        const data = await serperRes.json();
+        const snippets: string[] = [];
+        const sources: string[] = [];
+        if (data.organic && data.organic.length > 0) {
+          for (const item of data.organic.slice(0, maxResults)) {
+            snippets.push(`${item.title}: ${item.snippet}`);
+            sources.push(item.link);
+          }
+          return {
+            hasEvidence: true,
+            snippets,
+            contextText: snippets.join('\n\n'),
+            sources,
+          };
+        }
+      }
+    } catch (err: any) {
+      console.warn('[WebSearch] Serper fallback to DuckDuckGo:', err?.message);
+    }
+  }
+
   const searchQueries: string[] = [];
   if (cleanTerm && cleanTerm.length > 2) {
     searchQueries.push(cleanTerm);
