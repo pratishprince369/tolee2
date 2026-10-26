@@ -5,6 +5,7 @@ import { AgentTaskManager } from '../tasks/agent-task-manager';
 import { prisma } from '@/lib/prisma';
 import { searchAndGroundQuery } from '@/lib/web-search';
 import { BacklinkOperatorEngine } from '../browser/backlink-engine';
+import { ToleeStagehandEngine } from '../browser/stagehand-engine';
 
 /**
  * 🌐 V4 Browsing, Browser Automation, Job Search & Task Automation Tools
@@ -734,6 +735,432 @@ export const V4_BROWSING_TOOLS: ToolDefinition[] = [
         data: {
           state: plan.state,
           browserSession: plan.browserSession,
+        },
+      };
+    },
+  },
+
+  // --------------------------------------------------------------------------
+  // 13. web_open (V4 Specification)
+  // --------------------------------------------------------------------------
+  {
+    name: 'web_open',
+    description: 'Opens a public webpage, extracts clean text, links, and forms with anti-SSRF and prompt-injection defense.',
+    riskLevel: 'LOW',
+    parameters: {
+      type: 'object',
+      properties: {
+        url: {
+          type: 'string',
+          description: 'The target HTTP/HTTPS URL of the webpage to open and read.',
+        },
+      },
+      required: ['url'],
+    },
+    execute: async (args: { url: string }) => {
+      try {
+        const metadata = await BrowserWorker.openWebpage(args.url);
+        return {
+          success: true,
+          message: `Successfully opened and parsed content from "${metadata.title}".`,
+          data: metadata,
+        };
+      } catch (err: any) {
+        return {
+          success: false,
+          error: `Failed to open webpage: ${err.message}`,
+        };
+      }
+    },
+  },
+
+  // --------------------------------------------------------------------------
+  // 14. browser_start (Live Browser Session Initialization)
+  // --------------------------------------------------------------------------
+  {
+    name: 'browser_start',
+    description: 'Initializes an authoritative live browser session synchronized with the right-side browser operator canvas.',
+    riskLevel: 'LOW',
+    parameters: {
+      type: 'object',
+      properties: {
+        url: {
+          type: 'string',
+          description: 'Initial URL to load (defaults to https://tolee.in).',
+        },
+        title: {
+          type: 'string',
+          description: 'Session tab title.',
+        },
+      },
+    },
+    execute: async (args: { url?: string; title?: string }) => {
+      const targetUrl = args.url || 'https://tolee.in';
+      const session = {
+        sessionId: `sess_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+        activeTabId: 'main_tab',
+        tabs: [
+          {
+            id: 'main_tab',
+            title: args.title || 'Live Browser Operator',
+            domain: new URL(targetUrl.startsWith('http') ? targetUrl : `https://${targetUrl}`).hostname,
+            url: targetUrl,
+            status: 'ready' as const,
+          },
+        ],
+      };
+      return {
+        success: true,
+        message: `Live browser session started for ${targetUrl}.`,
+        data: session,
+      };
+    },
+  },
+
+  // --------------------------------------------------------------------------
+  // 15. browser_navigate (Exact URL Navigation with WAF/Security Inspection)
+  // --------------------------------------------------------------------------
+  {
+    name: 'browser_navigate',
+    description: 'Navigates the authoritative browser session to an exact destination URL, inspecting access and detecting Cloudflare/WAF bot protection.',
+    riskLevel: 'LOW',
+    parameters: {
+      type: 'object',
+      properties: {
+        url: {
+          type: 'string',
+          description: 'Target destination URL.',
+        },
+      },
+      required: ['url'],
+    },
+    execute: async (args: { url: string }) => {
+      try {
+        const diag = await BrowserWorker.inspectUrlAccess(args.url);
+        return {
+          success: true,
+          message: diag.isBlocked
+            ? `Security restriction detected on ${args.url}: ${diag.blockReason || diag.state}`
+            : `Navigated to ${args.url} (Status: ${diag.statusCode}).`,
+          data: {
+            url: args.url,
+            accessible: diag.accessible,
+            isBlocked: diag.isBlocked,
+            state: diag.state,
+            statusCode: diag.statusCode,
+            blockReason: diag.blockReason,
+            suggestedAction: diag.suggestedAction,
+          },
+        };
+      } catch (err: any) {
+        return {
+          success: false,
+          error: `Browser navigation error: ${err.message}`,
+        };
+      }
+    },
+  },
+
+  // --------------------------------------------------------------------------
+  // 16. browser_snapshot (Fresh DOM Accessibility Tree & Elements)
+  // --------------------------------------------------------------------------
+  {
+    name: 'browser_snapshot',
+    description: 'Extracts a fresh accessibility tree of interactive elements (buttons, inputs, links, dropdowns) on the current page.',
+    riskLevel: 'LOW',
+    parameters: {
+      type: 'object',
+      properties: {
+        url: {
+          type: 'string',
+          description: 'The URL to snapshot and observe.',
+        },
+      },
+      required: ['url'],
+    },
+    execute: async (args: { url: string }) => {
+      try {
+        const obs = await ToleeStagehandEngine.observe(args.url);
+        return {
+          success: true,
+          message: `Observed ${obs.elements.length} interactive elements on "${obs.pageTitle}".`,
+          data: {
+            url: obs.url,
+            domain: obs.domain,
+            pageTitle: obs.pageTitle,
+            isBlocked: obs.isBlocked,
+            diagnosticState: obs.diagnosticState,
+            elements: obs.elements,
+            suggestedActions: obs.suggestedActions,
+            summary: obs.summary,
+          },
+        };
+      } catch (err: any) {
+        return {
+          success: false,
+          error: `Browser snapshot failed: ${err.message}`,
+        };
+      }
+    },
+  },
+
+  // --------------------------------------------------------------------------
+  // 17. browser_click (Click Interactive Element)
+  // --------------------------------------------------------------------------
+  {
+    name: 'browser_click',
+    description: 'Clicks an interactive button or link on the webpage, enforcing consequential action checks.',
+    riskLevel: 'MEDIUM',
+    parameters: {
+      type: 'object',
+      properties: {
+        url: {
+          type: 'string',
+          description: 'Target webpage URL.',
+        },
+        label: {
+          type: 'string',
+          description: 'Visible label, accessible text, or selector of the element to click.',
+        },
+      },
+      required: ['url', 'label'],
+    },
+    execute: async (args: { url: string; label: string }, context: ToolExecutionContext) => {
+      const actResult = await ToleeStagehandEngine.act(args.url, `click ${args.label}`, {
+        userId: context.userId,
+        userName: context.userName,
+      });
+      return {
+        success: actResult.success,
+        message: actResult.message,
+        data: actResult,
+        requiresConfirmation: actResult.approvalRequired,
+        confirmationDetails: actResult.approvalPayload
+          ? {
+              actionType: actResult.approvalPayload.actionType,
+              title: actResult.approvalPayload.title,
+              description: actResult.approvalPayload.description,
+              payload: actResult.approvalPayload,
+            }
+          : undefined,
+      };
+    },
+  },
+
+  // --------------------------------------------------------------------------
+  // 18. browser_type (Type Into Input Field)
+  // --------------------------------------------------------------------------
+  {
+    name: 'browser_type',
+    description: 'Types text into an input or textarea element on the active page.',
+    riskLevel: 'LOW',
+    parameters: {
+      type: 'object',
+      properties: {
+        url: {
+          type: 'string',
+          description: 'Target webpage URL.',
+        },
+        field: {
+          type: 'string',
+          description: 'Field name, label, or selector.',
+        },
+        text: {
+          type: 'string',
+          description: 'Text string to type into the field.',
+        },
+      },
+      required: ['url', 'field', 'text'],
+    },
+    execute: async (args: { url: string; field: string; text: string }, context: ToolExecutionContext) => {
+      const actResult = await ToleeStagehandEngine.act(args.url, `type "${args.text}" into ${args.field}`, {
+        userId: context.userId,
+        userName: context.userName,
+      });
+      return {
+        success: actResult.success,
+        message: actResult.message,
+        data: actResult,
+      };
+    },
+  },
+
+  // --------------------------------------------------------------------------
+  // 19. browser_select (Select Dropdown Option)
+  // --------------------------------------------------------------------------
+  {
+    name: 'browser_select',
+    description: 'Selects a value in a select dropdown element.',
+    riskLevel: 'LOW',
+    parameters: {
+      type: 'object',
+      properties: {
+        url: {
+          type: 'string',
+          description: 'Target webpage URL.',
+        },
+        selector: {
+          type: 'string',
+          description: 'Dropdown selector or label.',
+        },
+        value: {
+          type: 'string',
+          description: 'Option value to select.',
+        },
+      },
+      required: ['url', 'value'],
+    },
+    execute: async (args: { url: string; selector?: string; value: string }, context: ToolExecutionContext) => {
+      const actResult = await ToleeStagehandEngine.act(args.url, `select "${args.value}" in ${args.selector || 'dropdown'}`, {
+        userId: context.userId,
+        userName: context.userName,
+      });
+      return {
+        success: actResult.success,
+        message: actResult.message,
+        data: actResult,
+      };
+    },
+  },
+
+  // --------------------------------------------------------------------------
+  // 20. browser_scroll (Scroll Webpage)
+  // --------------------------------------------------------------------------
+  {
+    name: 'browser_scroll',
+    description: 'Scrolls up or down on the page to reveal additional content or trigger lazy loading.',
+    riskLevel: 'LOW',
+    parameters: {
+      type: 'object',
+      properties: {
+        url: {
+          type: 'string',
+          description: 'Target webpage URL.',
+        },
+        direction: {
+          type: 'string',
+          enum: ['down', 'up'],
+          description: 'Scroll direction (default: down).',
+        },
+      },
+      required: ['url'],
+    },
+    execute: async (args: { url: string; direction?: 'down' | 'up' }, context: ToolExecutionContext) => {
+      const dir = args.direction || 'down';
+      const actResult = await ToleeStagehandEngine.act(args.url, `scroll ${dir}`, {
+        userId: context.userId,
+        userName: context.userName,
+      });
+      return {
+        success: actResult.success,
+        message: actResult.message,
+        data: actResult,
+      };
+    },
+  },
+
+  // --------------------------------------------------------------------------
+  // 21. browser_screenshot (Visual Capture / Canvas Rendering)
+  // --------------------------------------------------------------------------
+  {
+    name: 'browser_screenshot',
+    description: 'Captures a snapshot or rendered view of the current webpage for diagnostic inspection.',
+    riskLevel: 'LOW',
+    parameters: {
+      type: 'object',
+      properties: {
+        url: {
+          type: 'string',
+          description: 'Target URL to capture.',
+        },
+      },
+      required: ['url'],
+    },
+    execute: async (args: { url: string }) => {
+      const diag = await BrowserWorker.inspectUrlAccess(args.url);
+      return {
+        success: true,
+        message: `Captured visual state for ${args.url}. Status: ${diag.state}`,
+        data: {
+          url: args.url,
+          state: diag.state,
+          statusCode: diag.statusCode,
+          accessible: diag.accessible,
+          screenshotUrl: `/api/proxy?url=${encodeURIComponent(args.url)}`,
+        },
+      };
+    },
+  },
+
+  // --------------------------------------------------------------------------
+  // 22. browser_takeover_request (Security / CAPTCHA User Handoff)
+  // --------------------------------------------------------------------------
+  {
+    name: 'browser_takeover_request',
+    description: 'Requests interactive user takeover when website security (Cloudflare WAF, CAPTCHA, or login wall) restricts automated access.',
+    riskLevel: 'LOW',
+    parameters: {
+      type: 'object',
+      properties: {
+        url: {
+          type: 'string',
+          description: 'The blocked or restricted webpage URL.',
+        },
+        reason: {
+          type: 'string',
+          description: 'Reason for requesting human takeover (e.g. Cloudflare WAF block, CAPTCHA challenge).',
+        },
+      },
+      required: ['url'],
+    },
+    execute: async (args: { url: string; reason?: string }) => {
+      return {
+        success: true,
+        message: `Browser takeover requested for ${args.url}: ${args.reason || 'Protected portal requires direct human interaction.'}`,
+        data: {
+          url: args.url,
+          reason: args.reason || 'Bot protection restriction',
+          takeoverRequired: true,
+          suggestedAction: 'open_regular_browser',
+          handoffControls: [
+            { label: 'Open in Regular Browser', action: 'open_external' },
+            { label: 'Take Control', action: 'take_control' },
+          ],
+        },
+      };
+    },
+  },
+
+  // --------------------------------------------------------------------------
+  // 23. ask_user (Clarification & Missing Input Prompt)
+  // --------------------------------------------------------------------------
+  {
+    name: 'ask_user',
+    description: 'Prompts the user for clarifying missing details when continuing without them would risk a mistake.',
+    riskLevel: 'LOW',
+    parameters: {
+      type: 'object',
+      properties: {
+        question: {
+          type: 'string',
+          description: 'The specific clarifying question to ask the user.',
+        },
+        options: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Optional suggested quick responses or choices.',
+        },
+      },
+      required: ['question'],
+    },
+    execute: async (args: { question: string; options?: string[] }) => {
+      return {
+        success: true,
+        message: args.question,
+        data: {
+          question: args.question,
+          options: args.options || [],
+          requiresUserClarification: true,
         },
       };
     },

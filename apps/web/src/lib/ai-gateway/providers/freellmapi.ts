@@ -181,7 +181,7 @@ export class FreeLLMAPIProvider implements AIProvider {
     for (const target of targets) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        const timeoutId = setTimeout(() => controller.abort(), 2500);
 
         const response = await fetch(target.url, {
           method: 'POST',

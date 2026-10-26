@@ -336,7 +336,7 @@ class FrontierAutonomousBrain {
   }
 
   // --- MATH SOLVER ---
-  private static solveMath(query: string): string | null {
+  public static solveMath(query: string): string | null {
     const q = query.toLowerCase();
 
     // Match percentage queries like "25% of 50000" or "calculate 25% of 50000" or "18% of 75000"
@@ -729,6 +729,26 @@ export class CentralAIEngine {
           intent: 'time_date',
           fallbackUsed: false
         }
+      };
+    }
+
+    // 🧮 1b. Instant Mathematical Calculation Handler (0ms precision)
+    const instantMath = FrontierAutonomousBrain.solveMath(rawMessage);
+    if (instantMath) {
+      return {
+        success: true,
+        type: 'text',
+        content: instantMath,
+        model: 'tolee-math-engine',
+        provider: 'tolee-core',
+        toolUsed: 'calculate',
+        image: null,
+        files: [],
+        metadata: {
+          latencyMs: Date.now() - startTime,
+          intent: 'math_calculation',
+          fallbackUsed: false,
+        },
       };
     }
 

@@ -199,6 +199,7 @@ export class BrowserWorker {
 
     let cleaned = rawText
       // Neutralize common prompt-injection commands
+      .replace(/system\s+override\s*:\s*/gi, '[FILTERED_SYSTEM_OVERRIDE]: ')
       .replace(/ignore\s+(all\s+)?(previous|prior|above)\s+instructions/gi, '[FILTERED_INSTRUCTION_OVERRIDE]')
       .replace(/disregard\s+(all\s+)?(previous|prior|above)\s+instructions/gi, '[FILTERED_INSTRUCTION_OVERRIDE]')
       .replace(/you\s+are\s+now\s+in\s+developer\s+mode/gi, '[FILTERED_MODE_SWITCH]')

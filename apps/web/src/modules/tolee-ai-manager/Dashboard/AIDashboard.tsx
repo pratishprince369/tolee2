@@ -92,6 +92,11 @@ export function AIDashboard() {
   const [isListening, setIsListening] = useState(false);
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
 
+  // Chat History Management States (Delete Single & Delete All)
+  const [threadToDelete, setThreadToDelete] = useState<string | null>(null);
+  const [isDeleteAllOpen, setIsDeleteAllOpen] = useState(false);
+  const [activeMenuThreadId, setActiveMenuThreadId] = useState<string | null>(null);
+
   // 1. CHAT THREADS: Blank by default for 1st-time users!
   const [threads, setThreads] = useState<ChatThread[]>([]);
 
@@ -213,7 +218,7 @@ export function AIDashboard() {
       const sessionData = (result as any).browserSession || ((result as any).interactiveAction?.type === 'BROWSER_SESSION' ? (result as any).interactiveAction.payload : undefined);
       const taskData = (result as any).taskRecord || ((result as any).interactiveAction?.type === 'OPENMUSE_TASK' ? (result as any).interactiveAction.payload : undefined);
       if (taskData) {
-        loadAgentTasksList();
+        getAgentTasks().catch(() => {});
       }
 
       if (sessionData) {
@@ -240,9 +245,7 @@ export function AIDashboard() {
 
       const finalMessages = [...updatedMessages, aiMsg];
       setMessages(finalMessages);
-      try {
-        localStorage.setItem('tolee_ai_messages', JSON.stringify(finalMessages.slice(-50)));
-      } catch (_) {}
+      saveCurrentThreadMessages(activeThreadId, finalMessages);
 
       // Mark activity as completed on right panel
       setActivities((prev) => {
@@ -272,23 +275,70 @@ export function AIDashboard() {
     setTimeout(() => setCopiedMsgId(null), 2000);
   };
 
-  const handleCreateNewThread = () => {
-    const newId = `thread_${Date.now()}`;
-    setActiveThreadId(newId);
-    setMessages([
-      {
-        id: `init_${Date.now()}`,
-        sender: 'Tolee AI Manager',
-        text: 'Naya conversation shuru hua! 👋 Bataiye aaj kya kaam karna hai?',
-        isAI: true,
-        time: formatTime()
-      }
-    ]);
-    setIsMobileNavOpen(false);
+  const getInitialWelcomeMessage = (): Message => ({
+    id: 'welcome_1',
+    sender: 'Tolee AI Manager',
+    text: `Namaste! 👋 Main aapka 24×7 Tolee AI Personal Manager hoon.\n\nAap mujhse Tolee posts banana, reels script, creative design, web search, schedule karna, ya koi bhi sawaal pooch sakte hain.\n\nBataiye, aaj main aapki kya madad karoon?`,
+    isAI: true,
+    time: formatTime()
+  });
+
+  const getThreadStarterMessage = (): Message => ({
+    id: `init_${Date.now()}`,
+    sender: 'Tolee AI Manager',
+    text: 'Naya conversation shuru hua! 👋 Bataiye aaj kya kaam karna hai?',
+    isAI: true,
+    time: formatTime()
+  });
+
+  const saveCurrentThreadMessages = (threadId: string, currentMsgs: Message[]) => {
+    try {
+      const key = threadId === 'main' ? 'tolee_ai_messages' : `tolee_ai_thread_msgs_${threadId}`;
+      localStorage.setItem(key, JSON.stringify(currentMsgs.slice(-50)));
+    } catch (_) {}
   };
 
-  const handleDeleteThread = (e: React.MouseEvent, threadId: string) => {
-    e.stopPropagation();
+  const loadThreadMessages = (threadId: string): Message[] => {
+    try {
+      const key = threadId === 'main' ? 'tolee_ai_messages' : `tolee_ai_thread_msgs_${threadId}`;
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (_) {}
+    return [threadId === 'main' ? getInitialWelcomeMessage() : getThreadStarterMessage()];
+  };
+
+  const handleSelectThread = (targetThreadId: string) => {
+    if (targetThreadId === activeThreadId) {
+      setIsMobileNavOpen(false);
+      return;
+    }
+    saveCurrentThreadMessages(activeThreadId, messages);
+    setActiveThreadId(targetThreadId);
+    const loaded = loadThreadMessages(targetThreadId);
+    setMessages(loaded);
+    setIsMobileNavOpen(false);
+    setActiveMenuThreadId(null);
+  };
+
+  const handleCreateNewThread = () => {
+    saveCurrentThreadMessages(activeThreadId, messages);
+    const newId = `thread_${Date.now()}`;
+    setActiveThreadId(newId);
+    const initial = [getThreadStarterMessage()];
+    setMessages(initial);
+    saveCurrentThreadMessages(newId, initial);
+    setIsMobileNavOpen(false);
+    setActiveMenuThreadId(null);
+  };
+
+  const confirmDeleteThread = (threadId: string) => {
+    try {
+      localStorage.removeItem(`tolee_ai_thread_msgs_${threadId}`);
+    } catch (_) {}
+
     setThreads((prev) => {
       const updated = prev.filter((t) => t.id !== threadId);
       try {
@@ -296,9 +346,28 @@ export function AIDashboard() {
       } catch (_) {}
       return updated;
     });
+
     if (activeThreadId === threadId) {
       setActiveThreadId('main');
+      setMessages(loadThreadMessages('main'));
     }
+    setThreadToDelete(null);
+    setActiveMenuThreadId(null);
+  };
+
+  const confirmDeleteAllThreads = () => {
+    try {
+      threads.forEach((t) => {
+        localStorage.removeItem(`tolee_ai_thread_msgs_${t.id}`);
+      });
+      localStorage.removeItem('tolee_ai_threads');
+    } catch (_) {}
+
+    setThreads([]);
+    setActiveThreadId('main');
+    setMessages(loadThreadMessages('main'));
+    setIsDeleteAllOpen(false);
+    setActiveMenuThreadId(null);
   };
 
   const handleStopTask = (targetMsgId?: string) => {
@@ -506,7 +575,7 @@ export function AIDashboard() {
           {/* Main Chat Item */}
           <div className="space-y-1">
             <button
-              onClick={() => setActiveThreadId('main')}
+              onClick={() => handleSelectThread('main')}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
                 activeThreadId === 'main'
                   ? 'bg-slate-200/70 dark:bg-zinc-800 text-slate-900 dark:text-white shadow-xs'
@@ -518,17 +587,28 @@ export function AIDashboard() {
             </button>
           </div>
 
-          {/* Side chats section header with + button */}
+          {/* Side chats section header with + and delete-all buttons */}
           <div className="space-y-1 pt-1">
             <div className="flex items-center justify-between px-2 text-[11px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider">
               <span>Side chats</span>
-              <button
-                onClick={handleCreateNewThread}
-                title="New chat thread"
-                className="w-5 h-5 rounded-lg flex items-center justify-center hover:bg-slate-200 dark:hover:bg-zinc-800 text-slate-500 hover:text-slate-800 dark:hover:text-zinc-200 transition-colors"
-              >
-                <Plus className="w-3.5 h-3.5" />
-              </button>
+              <div className="flex items-center gap-1">
+                {threads.length > 0 && (
+                  <button
+                    onClick={() => setIsDeleteAllOpen(true)}
+                    title="Clear all chat history"
+                    className="w-5 h-5 rounded-lg flex items-center justify-center hover:bg-rose-100 dark:hover:bg-rose-950/50 text-slate-400 hover:text-rose-500 transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                <button
+                  onClick={handleCreateNewThread}
+                  title="New chat thread"
+                  className="w-5 h-5 rounded-lg flex items-center justify-center hover:bg-slate-200 dark:hover:bg-zinc-800 text-slate-500 hover:text-slate-800 dark:hover:text-zinc-200 transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
 
             {/* Side Chat Threads (Blank on 1st visit, populates as user chats!) */}
@@ -541,30 +621,57 @@ export function AIDashboard() {
             ) : (
               <div className="space-y-0.5 mt-1">
                 {filteredThreads.map((thread) => (
-                  <button
-                    key={thread.id}
-                    onClick={() => setActiveThreadId(thread.id)}
-                    className={`w-full text-left px-3 py-2 rounded-xl text-xs transition-all flex items-center justify-between group ${
-                      activeThreadId === thread.id
-                        ? 'bg-slate-200/70 dark:bg-zinc-800 text-slate-900 dark:text-white font-medium shadow-xs'
-                        : 'text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800/50'
-                    }`}
-                  >
-                    <span className="truncate pr-2">{thread.title}</span>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <span className="text-[10px] text-slate-400 group-hover:hidden">
-                        {thread.lastMessageTime}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={(e) => handleDeleteThread(e, thread.id)}
-                        title="Delete chat"
-                        className="hidden group-hover:flex p-1 rounded hover:bg-rose-100 dark:hover:bg-rose-950/50 text-slate-400 hover:text-rose-500 transition-colors"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
+                  <div key={thread.id} className="relative group">
+                    <div
+                      onClick={() => handleSelectThread(thread.id)}
+                      className={`w-full text-left px-3 py-2 rounded-xl text-xs transition-all flex items-center justify-between cursor-pointer select-none ${
+                        activeThreadId === thread.id
+                          ? 'bg-slate-200/70 dark:bg-zinc-800 text-slate-900 dark:text-white font-medium shadow-xs'
+                          : 'text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800/50'
+                      }`}
+                    >
+                      <span className="truncate pr-2">{thread.title}</span>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <span className="text-[10px] text-slate-400 group-hover:hidden">
+                          {thread.lastMessageTime}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveMenuThreadId(activeMenuThreadId === thread.id ? null : thread.id);
+                          }}
+                          title="Options"
+                          className="hidden group-hover:flex p-1 rounded hover:bg-slate-300/60 dark:hover:bg-zinc-700 text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 transition-colors"
+                        >
+                          <MoreHorizontal className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
-                  </button>
+
+                    {/* Popover Dropdown Menu */}
+                    {activeMenuThreadId === thread.id && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-40"
+                          onClick={() => setActiveMenuThreadId(null)}
+                        />
+                        <div className="absolute right-1 top-full mt-1 z-50 w-32 rounded-xl bg-white dark:bg-[#1a1b20] border border-slate-200 dark:border-zinc-800 shadow-xl py-1 text-xs animate-in fade-in-50 zoom-in-95">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveMenuThreadId(null);
+                              setThreadToDelete(thread.id);
+                            }}
+                            className="w-full flex items-center gap-2 px-3 py-1.5 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-left font-medium transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Delete</span>
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 ))}
               </div>
             )}
@@ -628,10 +735,7 @@ export function AIDashboard() {
 
               {/* Main chat button */}
               <button
-                onClick={() => {
-                  setActiveThreadId('main');
-                  setIsMobileNavOpen(false);
-                }}
+                onClick={() => handleSelectThread('main')}
                 className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold ${
                   activeThreadId === 'main'
                     ? 'bg-slate-200/80 dark:bg-zinc-800 text-slate-900 dark:text-white'
@@ -646,30 +750,52 @@ export function AIDashboard() {
               <div className="space-y-1">
                 <div className="flex items-center justify-between px-2 text-[11px] font-bold text-slate-400 uppercase">
                   <span>Side chats</span>
-                  <button
-                    onClick={handleCreateNewThread}
-                    className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-300"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    {threads.length > 0 && (
+                      <button
+                        onClick={() => setIsDeleteAllOpen(true)}
+                        title="Clear all chat history"
+                        className="p-1 rounded-md hover:bg-rose-100 dark:hover:bg-rose-950/50 text-slate-400 hover:text-rose-500"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    <button
+                      onClick={handleCreateNewThread}
+                      className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-300"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
 
                 {filteredThreads.length === 0 ? (
                   <p className="text-[11px] text-slate-400 px-2 py-3 text-center">No chat history yet</p>
                 ) : (
                   filteredThreads.map((t) => (
-                    <button
+                    <div
                       key={t.id}
-                      onClick={() => {
-                        setActiveThreadId(t.id);
-                        setIsMobileNavOpen(false);
-                      }}
-                      className={`w-full text-left px-3 py-2 rounded-xl text-xs truncate ${
-                        activeThreadId === t.id ? 'bg-slate-200/80 dark:bg-zinc-800 font-bold' : 'text-slate-600 dark:text-zinc-400'
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs ${
+                        activeThreadId === t.id ? 'bg-slate-200/80 dark:bg-zinc-800 font-bold text-slate-900 dark:text-white' : 'text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800/50'
                       }`}
                     >
-                      {t.title}
-                    </button>
+                      <button
+                        onClick={() => handleSelectThread(t.id)}
+                        className="truncate text-left flex-1 mr-2"
+                      >
+                        {t.title}
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setThreadToDelete(t.id);
+                        }}
+                        title="Delete chat"
+                        className="p-1 rounded text-slate-400 hover:text-rose-500 transition-colors shrink-0"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   ))
                 )}
               </div>
@@ -1329,7 +1455,7 @@ export function AIDashboard() {
                     onClick={() => setRightPanelTab('browser')}
                     title="Live Browser Operator"
                     className={`p-1.5 rounded-lg transition-all ${
-                      rightPanelTab === 'browser'
+                      (rightPanelTab as string) === 'browser'
                         ? 'bg-slate-100 dark:bg-zinc-800 text-teal-600 dark:text-teal-400 shadow-xs'
                         : 'text-slate-400 hover:text-slate-700 dark:hover:text-zinc-300'
                     }`}
@@ -1586,6 +1712,72 @@ export function AIDashboard() {
           transform-origin: 70% 70%;
         }
       `}</style>
+
+      {/* Delete Single Thread Confirmation Modal */}
+      {threadToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white dark:bg-[#18191e] border border-slate-200 dark:border-zinc-800 rounded-2xl p-5 max-w-sm w-full shadow-2xl space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-100 dark:bg-rose-950/50 text-rose-500 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-slate-900 dark:text-white text-sm">Delete chat?</h3>
+                <p className="text-xs text-slate-500 dark:text-zinc-400">
+                  Are you sure you want to delete this chat thread? This action cannot be undone.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-zinc-800">
+              <button
+                onClick={() => setThreadToDelete(null)}
+                className="px-3.5 py-1.5 rounded-xl text-xs font-medium text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => confirmDeleteThread(threadToDelete)}
+                className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-rose-500 hover:bg-rose-600 text-white shadow-xs transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete All Threads Confirmation Modal */}
+      {isDeleteAllOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white dark:bg-[#18191e] border border-slate-200 dark:border-zinc-800 rounded-2xl p-5 max-w-sm w-full shadow-2xl space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-100 dark:bg-rose-950/50 text-rose-500 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-slate-900 dark:text-white text-sm">Delete all chat history?</h3>
+                <p className="text-xs text-slate-500 dark:text-zinc-400">
+                  This will permanently clear all your saved chat threads and history.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-zinc-800">
+              <button
+                onClick={() => setIsDeleteAllOpen(false)}
+                className="px-3.5 py-1.5 rounded-xl text-xs font-medium text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteAllThreads}
+                className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-rose-500 hover:bg-rose-600 text-white shadow-xs transition-colors"
+              >
+                Clear All
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <GenerativeAiStudioModal
         isOpen={isGenerativeStudioOpen}

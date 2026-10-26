@@ -89,6 +89,12 @@ export class ToolRegistry {
     this.register({ ...createReminderTool, name: 'create_reminder' });
     this.register({ ...deletePostTool, name: 'delete_post' });
 
+    // V4 Specification Aliases (Section A & Tolee Tools)
+    this.register({ ...createPostTool, name: 'tolee_publish_post' });
+    this.register({ ...getUserPostsTool, name: 'tolee_get_insights' });
+    this.register({ ...getToleeGroupsTool, name: 'tolee_manage_group' });
+    this.register({ ...createReminderTool, name: 'tolee_create_reminder' });
+
     // Logical dot-notation aliases (Section 4 & Open-Higgsfield)
     this.register({ ...createPostTool, name: 'content.create_post' });
     this.register({ ...getUserPostsTool, name: 'content.get_post_status' });

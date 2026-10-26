@@ -94,6 +94,25 @@ export class ToleeRealityValidator {
     // Clean common phonetic/tokenization anomalies in Hindi/Hinglish
     let cleanedReply = rawReply.replace(/\braja neta\b/gi, 'rajneta');
 
+    // 1b. Anti-Simulation / Zero-Placeholder Guard (v4 Honesty Rule H-2)
+    const PLACEHOLDER_PATTERNS = [
+      /\[Movie Name\]/gi,
+      /\[Show Time\]/gi,
+      /\[Theater Name\]/gi,
+      /\[Seat Availability\]/gi,
+      /\[Hotel Name\]/gi,
+      /\[Room Type\]/gi,
+      /\[Price\]/gi,
+      /\[Ticket Price\]/gi,
+    ];
+
+    for (const pat of PLACEHOLDER_PATTERNS) {
+      if (pat.test(cleanedReply)) {
+        console.warn(`[ToleeRealityValidator] Simulated template placeholder intercepted: ${pat}`);
+        cleanedReply = cleanedReply.replace(pat, '*(Live portal selection required)*');
+      }
+    }
+
     // 2. Real-Person Grounding Verification
     if (isPersonQuery(ctx.userMessage)) {
       const evidenceLower = (ctx.searchEvidence || '').toLowerCase();
