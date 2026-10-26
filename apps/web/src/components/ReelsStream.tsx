@@ -500,8 +500,11 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
 
   const viewedReelsRef = useRef<Set<string>>(new Set());
   const viewTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const failedReelsSessionSet = useRef<Set<string>>(new Set());
+  const consecutiveFailuresRef = useRef<number>(0);
+  const [feedRecoveryMode, setFeedRecoveryMode] = useState(false);
 
-  // Sync active reel to browser URL & record view so it's not shown again on next visit
+  // Sync active reel to browser URL
   useEffect(() => {
     const activeIdx = isDesktop ? desktopActiveIndex : mobileActiveIndex;
     const activeItem = itemsToRender[activeIdx];
@@ -514,42 +517,43 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
           window.history.replaceState(null, '', targetUrl);
         }
       }
-
-      // Record view only after user has watched for >= 2 seconds (Section 22)
-      if (!viewedReelsRef.current.has(activeId)) {
-        if (viewTimerRef.current) clearTimeout(viewTimerRef.current);
-        const reelIdToView = activeId;
-        viewTimerRef.current = setTimeout(() => {
-          if (!viewedReelsRef.current.has(reelIdToView)) {
-            viewedReelsRef.current.add(reelIdToView);
-            sessionLoadedReelIds.current.add(reelIdToView);
-            try {
-              const stored = JSON.parse(sessionStorage.getItem('tolee_viewed_reels') || '[]');
-              if (Array.isArray(stored) && !stored.includes(reelIdToView)) {
-                stored.push(reelIdToView);
-                sessionStorage.setItem('tolee_viewed_reels', JSON.stringify(stored.slice(-250)));
-              }
-            } catch {}
-            let fp = localStorage.getItem('device_fingerprint');
-            if (!fp) {
-              fp = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
-              localStorage.setItem('device_fingerprint', fp);
-            }
-            fetch(`/api/reels/${reelIdToView}/view`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ fingerprint: fp }),
-            }).catch(() => {
-              recordView(reelIdToView, 'reel', fp!).catch(() => {});
-            });
-          }
-        }, 2000);
-      }
     }
-    return () => {
-      if (viewTimerRef.current) clearTimeout(viewTimerRef.current);
-    };
   }, [mobileActiveIndex, desktopActiveIndex, isDesktop, itemsToRender]);
+
+  // Record view ONLY when video is verified ready and playing (Phase 3 & Section 22)
+  const handlePlaybackSuccess = useCallback((reelId: string) => {
+    consecutiveFailuresRef.current = 0;
+    setFeedRecoveryMode(false);
+
+    if (!reelId || viewedReelsRef.current.has(reelId)) return;
+
+    if (viewTimerRef.current) clearTimeout(viewTimerRef.current);
+    viewTimerRef.current = setTimeout(() => {
+      if (!viewedReelsRef.current.has(reelId)) {
+        viewedReelsRef.current.add(reelId);
+        sessionLoadedReelIds.current.add(reelId);
+        try {
+          const stored = JSON.parse(sessionStorage.getItem('tolee_viewed_reels') || '[]');
+          if (Array.isArray(stored) && !stored.includes(reelId)) {
+            stored.push(reelId);
+            sessionStorage.setItem('tolee_viewed_reels', JSON.stringify(stored.slice(-250)));
+          }
+        } catch {}
+        let fp = localStorage.getItem('device_fingerprint');
+        if (!fp) {
+          fp = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
+          localStorage.setItem('device_fingerprint', fp);
+        }
+        fetch(`/api/reels/${reelId}/view`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fingerprint: fp }),
+        }).catch(() => {
+          recordView(reelId, 'reel', fp!).catch(() => {});
+        });
+      }
+    }, 2000);
+  }, []);
 
   const network = useNetworkConfig();
   const lastIndexRef = useRef(0);
@@ -635,21 +639,32 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
       return { shouldLoad: true, preload: 'none' as const };
     }
 
-    // Future slide (next video):
-    if (distance === 1) {
+    // Future slide window: rolling 5-reel preload window (Phase 4)
+    if (distance >= 1 && distance <= 5) {
+      // Conservative 2-reel limit under slow network or low RAM / battery
+      if ((network.isLowPower || network.effectiveType === '2g' || network.effectiveType === 'slow-2g' || isLowBattery || deviceStats.lowRAM) && distance > 2) {
+        return { shouldLoad: false, preload: 'none' as const };
+      }
+
       const nextItem = itemsToRender[idx];
       const nextVideoUrl = nextItem?.data?.video || nextItem?.data?.mediaUrls || '';
       const isNextDrive = isGoogleDriveUrl(nextVideoUrl);
 
-      // Step 17: If next is Google Drive, do not aggressively preload video buffer
-      if (isNextDrive) {
-        return { shouldLoad: true, preload: 'metadata' as const };
+      // Next immediate reel (distance 1):
+      if (distance === 1) {
+        if (isNextDrive) {
+          return { shouldLoad: true, preload: 'metadata' as const };
+        }
+        return {
+          shouldLoad: true,
+          preload: activeVideoPlaying ? ('auto' as const) : ('metadata' as const),
+        };
       }
 
-      // Step 18: Preload next video buffer ONLY after active video has started playing
+      // Next 2 to 5 upcoming reels: preload metadata to prime headers & video pipeline
       return {
         shouldLoad: true,
-        preload: activeVideoPlaying ? ('auto' as const) : ('metadata' as const),
+        preload: 'metadata' as const,
       };
     }
 
@@ -765,32 +780,55 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
     const currentActiveIndex = isDesktop ? desktopActiveIndex : mobileActiveIndex;
     if (index !== currentActiveIndex) return; // Only act if it is the currently visible reel
 
-    console.error(`[ReelsStream] Playback error on index ${index}: ${errDetail}`);
+    const reelId = item.type === 'reel' ? item.data?.id : (item.data?.id || item.id);
+    if (reelId) {
+      failedReelsSessionSet.current.add(reelId);
+    }
+
+    // Cancel active view timer immediately — failed videos never count as views
+    if (viewTimerRef.current) {
+      clearTimeout(viewTimerRef.current);
+      viewTimerRef.current = null;
+    }
+
+    consecutiveFailuresRef.current++;
+    console.warn(`[ReelsStream Auto-Recovery] Playback error at index ${index} (${reelId}): ${errDetail}. Consecutive failures: ${consecutiveFailuresRef.current}`);
 
     // If it's a simulated reel and we haven't reached max retries, try to fetch a fresh URL from Pexels API
-    if (item.type === 'reel' && item.data.isSimulation) {
-      const reelId = item.data.id;
+    if (item.type === 'reel' && item.data.isSimulation && reelId) {
       const retryCount = retriedUrls[reelId] || 0;
 
       if (retryCount < 2) {
         setRetriedUrls(prev => ({ ...prev, [reelId]: retryCount + 1 }));
         console.log(`[ReelsStream] Attempting to recover simulated reel ${reelId} (retry ${retryCount + 1}/2)...`);
         
-        // Extract category or use general
         const category = item.data.category || 'nature';
         const freshUrl = await getFreshPexelsVideoUrl(category);
 
         if (freshUrl) {
           console.log(`[ReelsStream] Successfully retrieved fresh Pexels URL: ${freshUrl}`);
           setReels(prev => prev.map(r => r.id === reelId ? { ...r, video: freshUrl } : r));
-          return; // Stop here, since state update will trigger reload
+          return;
         }
       }
     }
 
-    // Do NOT auto-scroll to the next reel anymore. Let the user scroll manually.
-    console.log(`[ReelsStream] Playback failed. Waiting for user interaction.`);
-  }, [isDesktop, desktopActiveIndex, mobileActiveIndex, itemsToRender, retriedUrls]);
+    // Safety guard: if 3 consecutive reels fail, pause auto-skip to prevent infinite skipping
+    if (consecutiveFailuresRef.current >= 3) {
+      console.warn(`[ReelsStream] 3 consecutive playback failures. Pausing auto-skip and showing recovery UI.`);
+      setFeedRecoveryMode(true);
+      return;
+    }
+
+    // Auto-advance smoothly to the next eligible reel (Phase 3)
+    const targetIdx = index + 1;
+    if (targetIdx < itemsToRender.length) {
+      const activeScrollRef = isDesktop ? desktopScrollRef : mobileScrollRef;
+      scrollToReel(activeScrollRef, targetIdx);
+    } else {
+      loadMoreReels();
+    }
+  }, [isDesktop, desktopActiveIndex, mobileActiveIndex, itemsToRender, retriedUrls, scrollToReel, loadMoreReels]);
 
   const handleNewPost = (post: any, postData?: any) => {
     if (post && post.mediaUrls) {
@@ -1046,9 +1084,9 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
           >
             {itemsToRender.map((item, index) => {
               // High performance sliding window virtualization:
-              // Only render full interactive slides within 1 index of active reel (active, previous, next).
+              // Render active, previous, and rolling 5 upcoming slides (Phase 4).
               // Faraway slides maintain exact snap height via lightweight placeholder.
-              const isWithinWindow = Math.abs(index - mobileActiveIndex) <= 1;
+              const isWithinWindow = index >= mobileActiveIndex - 1 && index <= mobileActiveIndex + 5;
               if (!isWithinWindow) {
                 return (
                   <div
@@ -1115,6 +1153,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
                   followStatus={followStates[reel.authorId]}
                   onFollow={() => handleFollowAuthor(reel.authorId, reel.author, reel.id)}
                   onPlaybackFailed={handlePlaybackFailed}
+                  onPlaybackSuccess={handlePlaybackSuccess}
                   shouldLoad={preloadParams.shouldLoad}
                   preload={preloadParams.preload}
                   {...makeActions(reel, originalIndex)}
@@ -1204,7 +1243,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
               style={{ width: 'min(420px, 42vw)', height: 'min(820px, calc(100dvh - 36px))', scrollBehavior: 'auto' }}
             >
               {itemsToRender.map((item, index) => {
-                const isWithinWindow = Math.abs(index - desktopActiveIndex) <= 1;
+                const isWithinWindow = index >= desktopActiveIndex - 1 && index <= desktopActiveIndex + 5;
                 if (!isWithinWindow) {
                   return (
                     <div
@@ -1271,6 +1310,7 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
                   followStatus={followStates[reel.authorId]}
                   onFollow={() => handleFollowAuthor(reel.authorId, reel.author, reel.id)}
                   onPlaybackFailed={handlePlaybackFailed}
+                  onPlaybackSuccess={handlePlaybackSuccess}
                   shouldLoad={preloadParams.shouldLoad}
                   preload={preloadParams.preload}
                   {...makeActions(reel, originalIndex)}
@@ -1544,6 +1584,7 @@ const ReelSlide = memo(function ReelSlide({
   onRepostsModal, onShare, onSave, onOptions, onBoost,
   followStatus, onFollow,
   onPlaybackFailed,
+  onPlaybackSuccess,
   shouldLoad,
   preload = 'auto',
 }: {
@@ -1555,12 +1596,39 @@ const ReelSlide = memo(function ReelSlide({
   followStatus?: 'approved' | 'pending' | null;
   onFollow?: () => void;
   onPlaybackFailed?: (index: number, errDetail: string) => void;
+  onPlaybackSuccess?: (reelId: string) => void;
   shouldLoad: boolean;
   preload?: 'auto' | 'metadata' | 'none';
 }) {
   const [isReady, setIsReady] = useState(false);
   const [isError, setIsError] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
+  const readinessTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const clearReadinessTimer = useCallback(() => {
+    if (readinessTimerRef.current) {
+      clearTimeout(readinessTimerRef.current);
+      readinessTimerRef.current = null;
+    }
+  }, []);
+
+  const handleReady = useCallback(() => {
+    clearReadinessTimer();
+    setIsReady(true);
+    setIsError(false);
+    if (onPlaybackSuccess) {
+      onPlaybackSuccess(reel.id);
+    }
+  }, [clearReadinessTimer, onPlaybackSuccess, reel.id]);
+
+  const handleVideoError = useCallback((e: any) => {
+    clearReadinessTimer();
+    setIsError(true);
+    console.error(`[Reel Play Error] Index: ${index}, ID: ${reel.id}, URL: ${reel.video}, Error:`, e);
+    if (onPlaybackFailed && isActive) {
+      onPlaybackFailed(index, `Video playback failed for URL: ${reel.video}`);
+    }
+  }, [clearReadinessTimer, index, reel.id, reel.video, onPlaybackFailed, isActive]);
 
   if (reel.isUnavailable) {
     return (
@@ -1585,16 +1653,20 @@ const ReelSlide = memo(function ReelSlide({
       setIsReady(false);
       setIsError(false);
       setRetryKey(0);
-    }
-  }, [isActive]);
 
-  const handleVideoError = (e: any) => {
-    setIsError(true);
-    console.error(`[Reel Play Error] Index: ${index}, ID: ${reel.id}, URL: ${reel.video}, Error:`, e);
-    if (onPlaybackFailed && isActive) {
-      onPlaybackFailed(index, `Video playback failed for URL: ${reel.video}`);
+      // Controlled playback-readiness timeout (Phase 2B & 3)
+      clearReadinessTimer();
+      readinessTimerRef.current = setTimeout(() => {
+        if (!isReady) {
+          console.warn(`[ReelsStream] Playback readiness timeout at index ${index} (${reel.id})`);
+          handleVideoError(new Error('Playback readiness timeout'));
+        }
+      }, 7500);
+    } else {
+      clearReadinessTimer();
     }
-  };
+    return () => clearReadinessTimer();
+  }, [isActive, clearReadinessTimer, handleVideoError, index, isReady, reel.id]);
 
   const isOwner = session?.user && (
     (session.user as any).id === reel.authorId || 
@@ -1648,9 +1720,9 @@ const ReelSlide = memo(function ReelSlide({
             loop
             muted={isMuted}
             playsInline
-            onCanPlay={() => setIsReady(true)}
-            onPlaying={() => setIsReady(true)}
-            onLoadedData={() => setIsReady(true)}
+            onCanPlay={handleReady}
+            onPlaying={handleReady}
+            onLoadedData={handleReady}
             onError={handleVideoError}
             onLoadStart={() => {
               setIsReady(false);
@@ -1702,6 +1774,7 @@ const ReelSlide = memo(function ReelSlide({
                   disabled={retryKey >= 3}
                   onClick={(e) => {
                     e.stopPropagation();
+                    clearReadinessTimer();
                     setIsError(false);
                     setIsReady(false);
                     setRetryKey((prev) => prev + 1);

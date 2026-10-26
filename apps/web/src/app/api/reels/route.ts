@@ -4,6 +4,7 @@ import { getStreamableVideoUrl, getPosterUrl } from '@/lib/media';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { triggerBackgroundReelsPublisherIfNeeded } from '@/lib/reelsBundleAutoPublisher';
+import { isKnownUnplayable } from '@/lib/videoHealth';
 
 export const dynamic = 'force-dynamic';
 
@@ -194,6 +195,7 @@ export async function GET(req: NextRequest) {
     const localVideoFingerprints = new Set<string>();
 
     for (const post of candidatePosts) {
+      if (isKnownUnplayable(post.mediaUrls)) continue;
       const fp = extractVideoFingerprint(post.mediaUrls);
       
       // Skip if this video was already displayed in this user's current feed session

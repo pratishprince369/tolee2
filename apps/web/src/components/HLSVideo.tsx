@@ -351,6 +351,9 @@ export const HLSVideo = forwardRef<HTMLVideoElement, HLSVideoProps>(
         const isStreamProxy = resolvedSrc.includes('/api/video/drive-stream');
         const isMp4 = resolvedSrc.toLowerCase().includes('.mp4') || resolvedSrc.toLowerCase().includes('video') || resolvedSrc.toLowerCase().includes('.mov') || resolvedSrc.toLowerCase().includes('.webm');
         const finalSrc = isMp4 && !isStreamProxy && !props.poster && !resolvedSrc.includes('#t=') ? `${resolvedSrc}#t=0.001` : resolvedSrc;
+        if (props.preload) {
+          video.preload = props.preload as "" | "auto" | "none" | "metadata";
+        }
         video.src = finalSrc;
 
         const handleReady = () => {

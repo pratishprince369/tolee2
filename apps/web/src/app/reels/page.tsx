@@ -8,6 +8,7 @@ import { extractYouTubeVideoId } from '@/lib/youtube';
 import { getTrendingYouTubeShorts } from '@/lib/youtubeShortsService';
 import { getStreamableVideoUrl, getPosterUrl, isGoogleDriveUrl } from '@/lib/media';
 import { triggerBackgroundReelsPublisherIfNeeded } from '@/lib/reelsBundleAutoPublisher';
+import { isKnownUnplayable } from '@/lib/videoHealth';
 import { batchGetPostDistributionStats } from '@/lib/viralDistributionService';
 import type { Metadata } from 'next';
 
@@ -181,7 +182,7 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
     const seenPosts: any[] = [];
 
     for (const post of candidatePosts) {
-      if (!post.mediaUrls) continue;
+      if (!post.mediaUrls || isKnownUnplayable(post.mediaUrls)) continue;
       const cleanV = (post.mediaUrls.split(/,(?=https?:\/\/)/)[0] || '').split('?')[0].toLowerCase();
       if (cleanV && seenVideoKeys.has(cleanV)) continue;
       if (cleanV) seenVideoKeys.add(cleanV);
