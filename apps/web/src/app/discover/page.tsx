@@ -119,11 +119,62 @@ export default async function DiscoverPage() {
     console.error("Error loading Discover Page Tolees:", error);
   }
 
+  const jsonLdDiscover = {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    "name": "Tolee Discover Groups",
+    "description": "Find, explore, and join local interest groups, tech clubs, and neighborhood Tolee communities.",
+    "url": "https://tolee.in/discover",
+    "isPartOf": {
+      "@type": "WebSite",
+      "name": "Tolee",
+      "url": "https://tolee.in"
+    },
+    "mainEntity": {
+      "@type": "ItemList",
+      "itemListElement": tolees.slice(0, 10).map((t: any, idx: number) => ({
+        "@type": "ListItem",
+        "position": idx + 1,
+        "name": t.name,
+        "url": `https://tolee.in/t/${t.slug}`
+      }))
+    }
+  };
+
+  const jsonLdBreadcrumbs = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Home",
+        "item": "https://tolee.in"
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": "Discover Groups",
+        "item": "https://tolee.in/discover"
+      }
+    ]
+  };
+
   return (
-    <DiscoverGrid 
-      initialTolees={tolees} 
-      isAuthenticated={isAuthenticated} 
-    />
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdDiscover) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdBreadcrumbs) }}
+      />
+      <DiscoverGrid 
+        initialTolees={tolees} 
+        isAuthenticated={isAuthenticated} 
+      />
+    </>
   );
 }
 

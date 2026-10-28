@@ -1,4 +1,5 @@
 import React from 'react';
+import type { Metadata } from 'next';
 import { prisma } from '@/lib/prisma';
 import { notFound, redirect } from 'next/navigation';
 import { getServerSession } from 'next-auth/next';
@@ -9,6 +10,55 @@ import { toggleFollow } from '@/actions/user';
 
 interface PageProps {
   params: Promise<{ username: string }> | { username: string };
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const resolvedParams = params instanceof Promise ? await params : params;
+  const rawUsername = resolvedParams?.username === 'me' ? null : resolvedParams?.username;
+  if (!rawUsername) return {};
+
+  try {
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [{ username: rawUsername }, { id: rawUsername }],
+      },
+      select: { name: true, username: true, isPrivate: true, searchEngineIndexable: true, avatar: true },
+    });
+
+    if (!user || user.isPrivate || user.searchEngineIndexable === false) {
+      return {
+        title: 'Private Account Posts | Tolee',
+        robots: { index: false, follow: false },
+      };
+    }
+
+    const name = user.name || user.username || 'Creator';
+    return {
+      title: `${name}'s Posts | Tolee Feed`,
+      description: `Explore public community posts and discussions shared by ${name} on Tolee.`,
+      alternates: {
+        canonical: `https://tolee.in/u/${user.username || rawUsername}/posts`,
+      },
+      openGraph: {
+        title: `${name}'s Posts | Tolee Feed`,
+        description: `Explore public community posts and discussions shared by ${name} on Tolee.`,
+        url: `https://tolee.in/u/${user.username || rawUsername}/posts`,
+        images: [{ url: user.avatar || 'https://tolee.in/logo.png' }],
+      },
+      robots: {
+        index: true,
+        follow: true,
+        googleBot: {
+          index: true,
+          follow: true,
+          'max-image-preview': 'large',
+          'max-snippet': -1,
+        },
+      },
+    };
+  } catch {
+    return { title: 'Posts | Tolee' };
+  }
 }
 
 export default async function UserProfileFeed({ params }: PageProps) {
@@ -202,23 +252,82 @@ export default async function UserProfileFeed({ params }: PageProps) {
     };
   });
 
+  const profileName = user.name || user.username || 'Creator';
+  const profileUsername = user.username || user.id;
+
+  const jsonLdProfileFeed = {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    "name": `${profileName}'s Posts Feed`,
+    "description": `Public posts, discussions, and updates shared by ${profileName} on Tolee.`,
+    "url": `https://tolee.in/u/${profileUsername}/posts`,
+    "mainEntity": {
+      "@type": "ItemList",
+      "itemListElement": posts.slice(0, 10).map((p: any, idx: number) => ({
+        "@type": "ListItem",
+        "position": idx + 1,
+        "name": p.caption?.slice(0, 80) || `Post #${p.id}`,
+        "url": `https://tolee.in/post/${p.id}`
+      }))
+    }
+  };
+
+  const jsonLdBreadcrumbs = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Home",
+        "item": "https://tolee.in"
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": profileName,
+        "item": `https://tolee.in/u/${profileUsername}`
+      },
+      {
+        "@type": "ListItem",
+        "position": 3,
+        "name": "Posts",
+        "item": `https://tolee.in/u/${profileUsername}/posts`
+      }
+    ]
+  };
+
   return (
-    <ProfileFeedView
-      user={{
-        ...user,
-        level: user.level || 1,
-        trustScore: user.trustScore || 100
-      }}
-      posts={posts}
-      isMe={isMe}
-      currentUserId={currentUserId}
-      initialIsFollowing={isFollowing}
-      initialFollowStatus={followStatus}
-      toggleFollowAction={toggleFollow}
-      toggleLikeAction={toggleLike}
-      addCommentAction={addComment}
-      getCommentsAction={getComments}
-      getLikesAction={getLikes}
-    />
+    <>
+      {!user.isPrivate && user.searchEngineIndexable !== false && (
+        <>
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdProfileFeed) }}
+          />
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdBreadcrumbs) }}
+          />
+        </>
+      )}
+      <ProfileFeedView
+        user={{
+          ...user,
+          level: user.level || 1,
+          trustScore: user.trustScore || 100
+        }}
+        posts={posts}
+        isMe={isMe}
+        currentUserId={currentUserId}
+        initialIsFollowing={isFollowing}
+        initialFollowStatus={followStatus}
+        toggleFollowAction={toggleFollow}
+        toggleLikeAction={toggleLike}
+        addCommentAction={addComment}
+        getCommentsAction={getComments}
+        getLikesAction={getLikes}
+      />
+    </>
   );
 }

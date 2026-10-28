@@ -86,7 +86,8 @@ export default async function ListingDetailPage({ params }: ListingDetailPagePro
       "availability": "https://schema.org/InStock",
       "seller": {
         "@type": "Person",
-        "name": listing.seller?.name || "Tolee Seller"
+        "name": listing.seller?.name || "Tolee Seller",
+        "url": listing.seller?.username ? `https://tolee.in/u/${listing.seller.username}` : `https://tolee.in`
       }
     }
   };

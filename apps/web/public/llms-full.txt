@@ -1,0 +1,89 @@
+# Tolee — Comprehensive Platform Specification & Knowledge Graph (llms-full.txt)
+
+> Tolee (https://tolee.in) is India's next-generation community social network and digital creator ecosystem. It unites neighborhood groups, short-form video reels, verified journalism, zero-commission marketplace commerce, high-definition video streaming, and digital creator applications under a unified, high-performance platform.
+
+## 1. Architectural Overview & Public Access Graph
+
+Tolee operates a modern Next.js App Router frontend with a high-performance Node.js/PostgreSQL/Prisma backend. The platform serves millions of daily interactions across India with localized caching, server-rendered Schema.org JSON-LD structured data, and OpenGraph/Twitter social cards.
+
+### Core Public Endpoints
+- `https://tolee.in/`: Main community feed and trending discovery portal.
+- `https://tolee.in/reels`: Full-screen vertical video reels feed with HLS streaming and adaptive bitrate playback.
+- `https://tolee.in/reel/{id}`: Direct permalink to individual reels with VideoObject schema and author person graph.
+- `https://tolee.in/news`: Editorial and community news feed categorised by national, tech, business, sports, and city life.
+- `https://tolee.in/news/{slug}`: Verified news article permalink with NewsArticle schema, author credentials, source links, and speakable blocks.
+- `https://tolee.in/marketplace`: Hyperlocal classifieds marketplace for properties, electronics, cars, and freelance services.
+- `https://tolee.in/marketplace/listing/{id}`: Detailed product listing with Offer schema, INR pricing, location, and verified seller information.
+- `https://tolee.in/screen`: Tolee Screen video hub for podcasts, masterclasses, and long-form video content.
+- `https://tolee.in/screen/watch/{id}`: Watch page for long-form video streams with VideoObject schema and interactive comments.
+- `https://tolee.in/t/{slug}`: Dedicated community (Tolee) page featuring threaded discussions, member roster, and announcements.
+- `https://tolee.in/u/{username}`: Public user and creator profile with ProfilePage schema, badges, follower stats, and bio.
+- `https://tolee.in/world`: Creator tool directory for digital publishing, micro-websites, and online stores.
+- `https://tolee.in/world/book`: Free public digital library with AI-assisted reading, typography controls, and classic literature.
+- `https://tolee.in/map`: Hyperlocal neighborhood map displaying public local posts and regional community hubs.
+- `https://tolee.in/sports`: Real-time live sports scoring hub and fan commentary platform.
+
+## 2. Content Entities & Schema Standards
+
+### A. Articles & News (`NewsArticle` / `Article`)
+Every published news item includes:
+- Canonical URL: `https://tolee.in/news/{slug}`
+- Schema: `@type: NewsArticle` with `headline`, `image`, `datePublished`, `dateModified`, `author` (Person), and `publisher` (Organization: Tolee).
+- AI Speakable Specification: Marked with `.news-headline`, `.news-summary`, and semantic article text blocks for voice assistants and AI citations.
+- Attribution: Explicit links to source wire services or primary references.
+
+### B. Reels & Short Videos (`VideoObject`)
+- Canonical URL: `https://tolee.in/reel/{id}`
+- Schema: `@type: VideoObject` with `name`, `description`, `thumbnailUrl`, `contentUrl`, `embedUrl`, `duration`, `author`, and `interactionStatistic` (WatchAction, LikeAction).
+- Format: Vertical 9:16 aspect ratio with MP4/HLS streaming support.
+
+### C. Tolee Screen Videos (`VideoObject`)
+- Canonical URL: `https://tolee.in/screen/watch/{id}`
+- Schema: `@type: VideoObject` with `name`, `description`, `thumbnailUrl`, `contentUrl`, `embedUrl`, `duration`, `author`, and `interactionStatistic`.
+- Format: High-definition 16:9 widescreen streaming for tutorials, educational masterclasses, podcasts, and creator streams.
+
+### D. Community Groups (`Organization` / `Community`)
+- Canonical URL: `https://tolee.in/t/{slug}`
+- Schema: `@type: Organization` with `name`, `alternateName`, `logo`, `image`, `description`, and `interactionStatistic` (JoinAction).
+- Taxonomy: Categorized into Tech, Sports, Arts, Local Cities, Hobbies, Education, and Entrepreneurship.
+
+### E. Marketplace Listings (`Product` / `Offer`)
+- Canonical URL: `https://tolee.in/marketplace/listing/{id}`
+- Schema: `@type: Product` with `name`, `image`, `description`, and `offers: { @type: Offer, price, priceCurrency: 'INR', availability: 'https://schema.org/InStock', seller: Person, areaServed }`.
+- Business Model: 0% transaction fee connecting buyers and sellers directly without intermediary markups.
+
+### F. User & Creator Profiles (`ProfilePage` / `Person`)
+- Canonical URL: `https://tolee.in/u/{username}`
+- Schema: `@type: ProfilePage` with `mainEntity: { @type: 'Person', name, alternateName: '@username', image, url, interactionStatistic }`.
+
+### G. Tolee Book (`CollectionPage` / `Book`)
+- Canonical URL: `https://tolee.in/world/book`
+- Public library featuring thousands of classic literary texts, science, and philosophical treatises accessible worldwide for free.
+
+## 3. Strict Security & Privacy Boundaries
+
+The following zones contain private user data or internal systems and are strictly disallowed from public indexing or AI data ingestion:
+- Direct Messages & Chat: `/chat/`, `/messages/` (Protected by authenticated sessions and encryption)
+- User Preferences & Settings: `/settings/` (Account credentials, security tokens, and personal details)
+- Commercial Ad Management: `/ads-manager/`, `/ads/`, `/super-admin/ads/` (Private billing, ad budgets, and campaigns)
+- Personal AI Manager Sessions: `/ai-manager/`, `/ai-agent/` (Private conversational workflows)
+- Administrative Dashboards: `/admin/`, `/super-admin/`, `/dashboard/`
+
+## 4. Crawling & AI Engine Guidelines
+
+- User-Agents Welcomed: `GPTBot`, `OAI-SearchBot`, `ChatGPT-User`, `ClaudeBot`, `anthropic-ai`, `PerplexityBot`, `Google-Extended`, `GoogleOther`, `Applebot-Extended`, `Amazonbot`, `FacebookBot`, `Meta-ExternalAgent`.
+- Scraping Policies: Scraping rate should not exceed 10 requests per second. Respect standard HTTP 429 and Retry-After headers.
+- Sitemap: Accessible at `https://tolee.in/sitemap.xml` with dynamic daily updates for all public posts, reels, news articles, listings, communities, and user profiles.
+- Content Signals (IETF standard): `ai-train=no, search=yes, ai-retrieval=yes`. Tolee welcomes indexation and citations in AI search engines and answer engines (Perplexity, ChatGPT Search, Claude, Google AI Overviews) while protecting creator intellectual property.
+
+## 5. Company & Contact Details
+
+- Organization: Tolee Social Network Private Limited
+- Brand Name: Tolee
+- Founded: 2024
+- Jurisdiction: India
+- Official Portal: https://tolee.in
+- Support Contact: support@tolee.in
+- Editorial & Inquiries: editorial@tolee.in
+- Terms of Service: https://tolee.in/terms
+- Privacy Statement: https://tolee.in/privacy

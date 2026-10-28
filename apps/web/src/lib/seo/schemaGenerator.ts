@@ -247,25 +247,35 @@ export function generateVideoSchema(video: {
   videoUrl?: string | null;
   thumbnailUrl?: string | null;
   uploadDate?: Date | string | null;
-  duration?: string | null;
+  duration?: string | number | null;
   creatorName?: string | null;
   creatorUsername?: string | null;
   viewsCount?: number;
   likesCount?: number;
+  isScreen?: boolean;
 }) {
-  const reelUrl = getCanonicalUrl(`/reel/${video.id}`);
+  const watchUrl = video.isScreen
+    ? getCanonicalUrl(`/screen/watch/${video.id}`)
+    : getCanonicalUrl(`/reel/${video.id}`);
   const creatorUrl = video.creatorUsername ? getCanonicalUrl(`/u/${video.creatorUsername}`) : SEO_CONFIG.siteUrl;
+
+  let formattedDuration: string | undefined;
+  if (typeof video.duration === 'number' && video.duration > 0) {
+    formattedDuration = `PT${Math.round(video.duration)}S`;
+  } else if (typeof video.duration === 'string' && video.duration) {
+    formattedDuration = video.duration.startsWith('PT') ? video.duration : `PT${video.duration}S`;
+  }
 
   return {
     '@context': 'https://schema.org',
     '@type': 'VideoObject',
-    name: video.title || 'Trending Video Reel on Tolee',
-    description: video.description || 'Watch short vertical video reels and trending creator moments on Tolee.',
+    name: video.title || (video.isScreen ? 'Tolee Screen Stream' : 'Trending Video Reel on Tolee'),
+    description: video.description || (video.isScreen ? 'Watch long-form video streams, tutorials, and masterclasses on Tolee Screen.' : 'Watch short vertical video reels and trending creator moments on Tolee.'),
     thumbnailUrl: [video.thumbnailUrl || SEO_CONFIG.defaultOgImage],
     uploadDate: video.uploadDate ? new Date(video.uploadDate).toISOString() : new Date().toISOString(),
     contentUrl: video.videoUrl || undefined,
-    embedUrl: reelUrl,
-    ...(video.duration ? { duration: video.duration } : {}),
+    embedUrl: watchUrl,
+    ...(formattedDuration ? { duration: formattedDuration } : {}),
     author: {
       '@type': 'Person',
       name: video.creatorName || video.creatorUsername || 'Tolee Creator',
@@ -346,6 +356,10 @@ export function generateNewsArticleSchema(article: {
         '@type': 'ImageObject',
         url: SEO_CONFIG.organization.logo,
       },
+    },
+    speakable: {
+      '@type': 'SpeakableSpecification',
+      cssSelector: ['.news-headline', '.news-summary', 'article p'],
     },
     ...(article.category ? { articleSection: article.category } : {}),
   };
@@ -461,5 +475,90 @@ export function generateFaqSchema(faqs: FaqItem[]) {
         text: faq.answer,
       },
     })),
+  };
+}
+
+/**
+ * 12. Book / Digital Library Collection Schema (for Tolee Book)
+ */
+export function generateBookCollectionSchema(params: {
+  title: string;
+  description: string;
+  url: string;
+}) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: params.title,
+    description: params.description,
+    url: getCanonicalUrl(params.url),
+    about: {
+      '@type': 'Thing',
+      name: 'E-Books & Literature',
+      description: 'Free digital classic books, literature, philosophy and science texts with AI reading assistance.'
+    },
+    publisher: {
+      '@type': 'Organization',
+      name: SEO_CONFIG.siteName,
+      logo: {
+        '@type': 'ImageObject',
+        url: SEO_CONFIG.organization.logo,
+      },
+    },
+  };
+}
+
+/**
+ * 13. BlogPosting Schema (for Tolee World Blogs & Articles)
+ */
+export function generateBlogPostingSchema(blog: {
+  slug: string;
+  title: string;
+  description?: string | null;
+  body?: string | null;
+  heroImage?: string | null;
+  datePublished?: Date | string | null;
+  dateModified?: Date | string | null;
+  authorName?: string | null;
+  authorUsername?: string | null;
+  category?: string | null;
+  keywords?: string[];
+}) {
+  const blogUrl = getCanonicalUrl(`/blog/${blog.slug}`);
+  const authorUrl = blog.authorUsername ? getCanonicalUrl(`/u/${blog.authorUsername}`) : SEO_CONFIG.siteUrl;
+
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BlogPosting',
+    headline: blog.title,
+    description: blog.description || blog.title,
+    articleBody: blog.body || blog.description || '',
+    image: [blog.heroImage || SEO_CONFIG.defaultOgImage],
+    datePublished: blog.datePublished ? new Date(blog.datePublished).toISOString() : new Date().toISOString(),
+    dateModified: blog.dateModified ? new Date(blog.dateModified).toISOString() : new Date().toISOString(),
+    url: blogUrl,
+    mainEntityOfPage: {
+      '@type': 'WebPage',
+      '@id': blogUrl,
+    },
+    author: {
+      '@type': 'Person',
+      name: blog.authorName || blog.authorUsername || 'Tolee Creator',
+      url: authorUrl,
+    },
+    publisher: {
+      '@type': 'Organization',
+      name: SEO_CONFIG.siteName,
+      logo: {
+        '@type': 'ImageObject',
+        url: SEO_CONFIG.organization.logo,
+      },
+    },
+    speakable: {
+      '@type': 'SpeakableSpecification',
+      cssSelector: ['h1', 'article p'],
+    },
+    ...(blog.category ? { articleSection: blog.category } : {}),
+    ...(blog.keywords && blog.keywords.length > 0 ? { keywords: blog.keywords } : {}),
   };
 }

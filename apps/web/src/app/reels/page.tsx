@@ -629,5 +629,58 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
     }
   }
 
-  return <ReelsStream initialReels={dbReels} />;
+  const jsonLdReels = {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    "name": "Tolee Reels",
+    "description": "Watch viral vertical video reels and discover trending creators on Tolee Reels.",
+    "url": "https://tolee.in/reels",
+    "isPartOf": {
+      "@type": "WebSite",
+      "name": "Tolee",
+      "url": "https://tolee.in"
+    },
+    "mainEntity": {
+      "@type": "ItemList",
+      "itemListElement": dbReels.slice(0, 10).map((r: any, idx: number) => ({
+        "@type": "ListItem",
+        "position": idx + 1,
+        "name": r.caption?.slice(0, 80) || `Reel by ${r.author || 'Creator'}`,
+        "url": `https://tolee.in/reel/${r.id}`
+      }))
+    }
+  };
+
+  const jsonLdBreadcrumbs = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Home",
+        "item": "https://tolee.in"
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": "Reels",
+        "item": "https://tolee.in/reels"
+      }
+    ]
+  };
+
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdReels) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdBreadcrumbs) }}
+      />
+      <ReelsStream initialReels={dbReels} />
+    </>
+  );
 }

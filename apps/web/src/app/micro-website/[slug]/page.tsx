@@ -1,20 +1,64 @@
 import React from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import type { Metadata } from 'next';
 import { getPublicWorldProject } from '@/actions/world';
+import { generateBreadcrumbSchema } from '@/lib/seo/schemaGenerator';
 import { Globe, MapPin, Sparkles, Send, Phone, MessageSquare, ExternalLink, ArrowLeft, Star, Heart } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 
 interface PageProps {
-  params: {
-    slug: string;
+  params: Promise<{ slug: string }> | { slug: string };
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const resolved = params instanceof Promise ? await params : params;
+  const project = await getPublicWorldProject(resolved.slug, 'WEBSITE');
+  if (!project) return { title: 'Page Not Found | Tolee' };
+
+  const title = project.seoTitle || `${project.name} | Tolee Micro-Website`;
+  const description = project.seoDesc || project.description || `Discover ${project.name} on Tolee World.`;
+  const image = project.bannerImage || 'https://tolee.in/logo.png';
+
+  return {
+    title,
+    description,
+    keywords: project.seoKeywords ? project.seoKeywords.split(',') : undefined,
+    alternates: {
+      canonical: `https://tolee.in/micro-website/${resolved.slug}`,
+    },
+    openGraph: {
+      title,
+      description,
+      url: `https://tolee.in/micro-website/${resolved.slug}`,
+      siteName: 'Tolee World',
+      type: 'website',
+      images: [{ url: image, width: 1200, height: 630, alt: project.name }],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: [image],
+    },
+    robots: {
+      index: project.status === 'published',
+      follow: project.status === 'published',
+      googleBot: {
+        index: project.status === 'published',
+        follow: project.status === 'published',
+        'max-image-preview': 'large',
+        'max-snippet': -1,
+      },
+    },
   };
 }
 
 export default async function PublicMicroWebsitePage({ params }: PageProps) {
-  const project = await getPublicWorldProject(params.slug, 'WEBSITE');
+  const resolved = params instanceof Promise ? await params : params;
+  const project = await getPublicWorldProject(resolved.slug, 'WEBSITE');
 
   if (!project) {
     notFound();
@@ -45,148 +89,129 @@ export default async function PublicMicroWebsitePage({ params }: PageProps) {
     badgeLabel = 'Local Services';
   }
 
+  const jsonLdWebPage = {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "name": project.name,
+    "description": project.description || `Micro-website ${project.name} on Tolee`,
+    "url": `https://tolee.in/micro-website/${project.slug}`,
+    "image": project.bannerImage || "https://tolee.in/logo.png",
+    "isPartOf": {
+      "@type": "WebSite",
+      "name": "Tolee",
+      "url": "https://tolee.in"
+    }
+  };
+
+  const jsonLdBreadcrumbs = generateBreadcrumbSchema([
+    { name: 'Home', url: '/' },
+    { name: 'Tolee World', url: '/world' },
+    { name: project.name, url: `/micro-website/${project.slug}` }
+  ]);
+
   return (
     <div className="min-h-screen bg-zinc-950 text-white pb-16 relative selection:bg-primary selection:text-white">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdWebPage) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdBreadcrumbs) }}
+      />
       {/* Decorative Blur Backdrops */}
-      <div className="absolute top-0 left-1/4 w-[400px] h-[400px] bg-primary/10 rounded-full blur-[100px] pointer-events-none z-0"></div>
-      <div className="absolute bottom-20 right-1/4 w-[300px] h-[300px] bg-purple-500/5 rounded-full blur-[80px] pointer-events-none z-0"></div>
+      <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary/10 rounded-full blur-[120px] pointer-events-none z-0"></div>
 
-      {/* Floating Home Link */}
       <div className="max-w-4xl mx-auto px-4 pt-6 relative z-10">
-        <Link href="/world" className="inline-flex items-center gap-2 text-xs text-zinc-400 hover:text-white transition-colors bg-zinc-900/60 backdrop-blur-md px-3.5 py-2 rounded-xl border border-zinc-800/80 mb-8">
-          <ArrowLeft className="w-3.5 h-3.5" /> Back to Tolee World
-        </Link>
-
-        {/* Hero Section Card */}
-        <div className="bg-zinc-900/40 border border-zinc-800/80 rounded-3xl overflow-hidden shadow-2xl backdrop-blur-md mb-8">
-          {project.bannerImage ? (
-            <div className="w-full h-56 md:h-72 relative">
-              <img src={project.bannerImage} alt={project.name} className="w-full h-full object-cover" />
-              <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/20 to-transparent"></div>
-            </div>
-          ) : (
-            <div className={`w-full h-44 bg-gradient-to-r ${themeGradient} opacity-90 flex items-center justify-center relative`}>
-              <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-transparent to-transparent"></div>
-              <Globe className="w-16 h-16 text-white/40 animate-pulse" />
-            </div>
-          )}
-
-          <div className="p-6 md:p-8 relative -mt-10 bg-zinc-900/60 backdrop-blur-md rounded-t-3xl border-t border-zinc-800/50">
-            <div className="flex flex-wrap justify-between items-start gap-4">
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <Badge variant="secondary" className="bg-zinc-800 text-zinc-300 border border-zinc-700/50 text-[10px] px-2 py-0.5 rounded-md uppercase font-bold tracking-wider">
-                    {badgeLabel}
-                  </Badge>
-                  {project.locationText && (
-                    <Badge variant="outline" className="text-zinc-400 border-zinc-800 text-[10px] flex items-center gap-1">
-                      <MapPin className="w-3 h-3 text-red-400" /> {project.locationText}
-                    </Badge>
-                  )}
-                </div>
-                <h1 className="text-2xl md:text-4xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-zinc-200 to-zinc-400">
-                  {project.name}
-                </h1>
-                {project.description && (
-                  <p className="text-zinc-400 mt-2 text-sm max-w-2xl leading-relaxed">
-                    {project.description}
-                  </p>
-                )}
-              </div>
-
-              {/* Action buttons */}
-              <div className="flex gap-2">
-                <Button size="sm" className="bg-primary hover:bg-primary/95 text-white rounded-xl flex items-center gap-2 font-bold px-4 h-10 shadow-lg shadow-primary/10">
-                  <Phone className="w-4 h-4" /> Call Creator
-                </Button>
-                <Button size="sm" variant="outline" className="border-zinc-800 bg-zinc-900/50 text-zinc-300 hover:text-white rounded-xl h-10 px-4">
-                  <MessageSquare className="w-4 h-4" /> Message
-                </Button>
-              </div>
-            </div>
-
-            {/* Micro Website URL details */}
-            <div className="mt-6 pt-6 border-t border-zinc-850 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-zinc-400 font-mono">
-              <span>Public Link: tolee.in/micro-website/{project.slug}</span>
-              <span className="text-[10px] text-zinc-500 uppercase font-sans font-bold flex items-center gap-1.5 bg-zinc-950 px-3 py-1.5 rounded-lg border border-zinc-850 w-fit">
-                <Sparkles className="w-3.5 h-3.5 text-primary" /> Verified Creator Website
-              </span>
-            </div>
-          </div>
+        
+        {/* Navigation Bar */}
+        <div className="flex items-center justify-between pb-8">
+          <Link href="/world" className="inline-flex items-center gap-2 text-xs text-zinc-400 hover:text-white transition-colors bg-zinc-900/60 backdrop-blur-md px-3.5 py-2 rounded-xl border border-zinc-800/80">
+            <ArrowLeft className="w-3.5 h-3.5" /> Back to World
+          </Link>
+          <Badge className="bg-zinc-900 border-zinc-800 text-zinc-300 text-xs px-3 py-1 font-medium">
+            {badgeLabel}
+          </Badge>
         </div>
 
-        {/* Website Elements / Canvas Blocks */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        {/* Hero Section */}
+        <div className="space-y-6">
           
-          {/* Main Content Blocks Column */}
-          <div className="md:col-span-2 space-y-6">
-            {elements.length === 0 ? (
-              <Card className="bg-zinc-900/30 border-zinc-800 backdrop-blur-md rounded-2xl p-8 text-center text-zinc-500">
-                <Globe className="w-10 h-10 mx-auto mb-3 opacity-50" />
-                <p className="text-sm">This website has no sections added yet.</p>
-              </Card>
-            ) : (
-              elements.map((el: any) => (
-                <Card key={el.id} className="bg-zinc-900/30 border-zinc-850 backdrop-blur-md rounded-2xl hover:border-zinc-800 transition-all overflow-hidden">
-                  <CardContent className="p-6 md:p-8">
-                    {el.title && (
-                      <h3 className="text-lg md:text-xl font-bold text-white mb-3 flex items-center gap-2">
-                        <Sparkles className="w-4 h-4 text-primary" /> {el.title}
-                      </h3>
-                    )}
-                    {el.body && (
-                      <p className="text-zinc-400 text-sm leading-relaxed whitespace-pre-line">
-                        {el.body}
-                      </p>
-                    )}
-                  </CardContent>
-                </Card>
-              ))
+          {/* Main Title Banner */}
+          <div className="space-y-3">
+            <h1 className="text-3xl md:text-5xl font-black tracking-tight leading-tight">
+              {project.name}
+            </h1>
+            
+            {project.description && (
+              <p className="text-zinc-400 text-sm md:text-base leading-relaxed max-w-2xl font-normal">
+                {project.description}
+              </p>
+            )}
+
+            {project.locationText && (
+              <div className="flex items-center gap-2 text-xs text-zinc-400 pt-1">
+                <MapPin className="w-3.5 h-3.5 text-rose-500" />
+                <span>{project.locationText}</span>
+              </div>
             )}
           </div>
 
-          {/* Sidebar / Interaction widgets column */}
+          {/* Banner Photo if provided */}
+          {project.bannerImage && (
+            <div className="w-full h-56 md:h-80 rounded-3xl overflow-hidden border border-zinc-800/80 shadow-2xl">
+              <img src={project.bannerImage} alt={project.name} className="w-full h-full object-cover" />
+            </div>
+          )}
+
+        </div>
+
+        {/* Content Dynamic Canvas Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-10">
+          
+          {/* Main Canvas Blocks */}
+          <div className="md:col-span-2 space-y-6">
+            
+            {elements.length === 0 ? (
+              <div className="p-8 border border-zinc-900 bg-zinc-900/20 rounded-2xl text-center space-y-3">
+                <Sparkles className="w-8 h-8 text-zinc-600 mx-auto" />
+                <p className="text-sm text-zinc-400">Welcome to {project.name}. Content blocks will appear here as the creator customizes this digital space.</p>
+              </div>
+            ) : (
+              elements.map((el: any) => (
+                <Card key={el.id} className="bg-zinc-900/40 border-zinc-850/80 backdrop-blur-md rounded-2xl p-6 transition-all hover:border-zinc-700">
+                  <h3 className="text-lg font-bold text-white mb-2">{el.title}</h3>
+                  <p className="text-xs text-zinc-400 leading-relaxed whitespace-pre-line">{el.content}</p>
+                </Card>
+              ))
+            )}
+
+          </div>
+
+          {/* Right Action / Contact Sidebar */}
           <div className="space-y-6">
             
-            {/* Lead Generation Widget */}
-            <Card className="bg-zinc-900/40 border-zinc-850 backdrop-blur-md rounded-2xl overflow-hidden">
-              <div className={`h-1.5 bg-gradient-to-r ${themeGradient}`}></div>
-              <CardContent className="p-5 space-y-4">
-                <h3 className="font-bold text-sm uppercase tracking-wider text-zinc-300 flex items-center gap-1.5">
-                  <Send className="w-4 h-4 text-primary" /> Get in Touch
-                </h3>
-                <p className="text-xs text-zinc-400 leading-relaxed">Leave your contact details and the creator will respond shortly.</p>
-                
-                <form action="#" className="space-y-3">
-                  <input 
-                    type="text" 
-                    placeholder="Your Name" 
-                    required 
-                    className="w-full bg-zinc-950 border border-zinc-850 rounded-xl px-3 py-2 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary"
-                  />
-                  <input 
-                    type="tel" 
-                    placeholder="Your Mobile Number" 
-                    required 
-                    className="w-full bg-zinc-950 border border-zinc-850 rounded-xl px-3 py-2 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary"
-                  />
-                  <textarea 
-                    placeholder="Your requirements..." 
-                    rows={3} 
-                    className="w-full bg-zinc-950 border border-zinc-850 rounded-xl p-3 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary"
-                  ></textarea>
-                  <Button type="button" className="w-full bg-primary hover:bg-primary/95 text-white text-xs font-bold rounded-xl h-10 flex items-center justify-center gap-2">
-                    Submit Request <Send className="w-3.5 h-3.5" />
-                  </Button>
-                </form>
-              </CardContent>
+            {/* Contact Action Card */}
+            <Card className="bg-zinc-900/50 border border-zinc-850 backdrop-blur-md rounded-2xl p-6 space-y-5">
+              <h3 className="font-bold text-sm tracking-wide text-white uppercase text-[11px]">Connect Directly</h3>
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                Reach out to the creator or business manager behind {project.name}.
+              </p>
+              
+              <div className="space-y-2">
+                <Button className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs rounded-xl h-10 shadow-lg shadow-emerald-950/40">
+                  <MessageSquare className="w-4 h-4 mr-2" /> Message on Tolee
+                </Button>
+                <Button variant="outline" className="w-full border-zinc-800 text-zinc-300 hover:text-white rounded-xl h-10 text-xs font-semibold">
+                  <Phone className="w-4 h-4 mr-2" /> Quick Inquiry
+                </Button>
+              </div>
             </Card>
 
-            {/* Social Share / Trust Card */}
-            <Card className="bg-zinc-900/40 border-zinc-850 backdrop-blur-md rounded-2xl p-5 space-y-4">
-              <h3 className="font-bold text-xs uppercase tracking-wider text-zinc-400">Creator Hub</h3>
+            {/* Share Card */}
+            <Card className="bg-zinc-900/30 border border-zinc-850 backdrop-blur-md rounded-2xl p-5 space-y-3">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-zinc-800 border border-zinc-750 flex items-center justify-center">
+                <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
                   <Globe className="w-5 h-5 text-primary" />
                 </div>
                 <div>

@@ -210,6 +210,10 @@ export default async function NewsReaderPage({ params }: { params: { slug: strin
     "mainEntityOfPage": {
       "@type": "WebPage",
       "@id": `https://tolee.in/news/${params.slug}`
+    },
+    "speakable": {
+      "@type": "SpeakableSpecification",
+      "cssSelector": [".news-headline", ".news-summary", "article p"]
     }
   };
 
@@ -272,12 +276,12 @@ export default async function NewsReaderPage({ params }: { params: { slug: strin
             <span className="text-indigo-600 dark:text-indigo-400">{news.category}</span>
           </div>
           
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 dark:text-white leading-tight tracking-tight">
+          <h1 className="news-headline text-3xl sm:text-4xl font-extrabold text-gray-900 dark:text-white leading-tight tracking-tight">
             {news.headline}
           </h1>
 
           {news.summary && (
-            <p className="text-[16px] sm:text-[17px] text-gray-500 dark:text-zinc-400 leading-relaxed font-medium italic">
+            <p className="news-summary text-[16px] sm:text-[17px] text-gray-500 dark:text-zinc-400 leading-relaxed font-medium italic">
               {news.summary}
             </p>
           )}

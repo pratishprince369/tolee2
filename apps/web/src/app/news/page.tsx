@@ -66,8 +66,57 @@ export default async function NewsHubPage({ searchParams }: { searchParams?: { c
     'Local News', 'Politics', 'Sports', 'Lifestyle', 'Real Estate', 'Crime & Safety'
   ];
 
+  const jsonLdNews = {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    "name": "Tolee News Hub",
+    "description": "Verified real-time breaking news, local updates, technology, science, and community journalism on Tolee News.",
+    "url": "https://tolee.in/news",
+    "isPartOf": {
+      "@type": "WebSite",
+      "name": "Tolee",
+      "url": "https://tolee.in"
+    },
+    "mainEntity": {
+      "@type": "ItemList",
+      "itemListElement": initialNews.slice(0, 10).map((item: any, idx: number) => ({
+        "@type": "ListItem",
+        "position": idx + 1,
+        "name": item.headline || item.post?.caption || "News Story",
+        "url": `https://tolee.in/news/${item.slug}`
+      }))
+    }
+  };
+
+  const jsonLdBreadcrumbs = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Home",
+        "item": "https://tolee.in"
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": "News Hub",
+        "item": "https://tolee.in/news"
+      }
+    ]
+  };
+
   return (
     <div className="min-h-screen bg-slate-50/50 dark:bg-[#0a0a0a] text-slate-900 dark:text-zinc-200 p-3 sm:p-6 lg:px-8 pt-16 sm:pt-20">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdNews) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdBreadcrumbs) }}
+      />
       <div className="max-w-3xl mx-auto space-y-6">
         
         {/* News Hub Premium Header */}

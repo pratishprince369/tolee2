@@ -1,4 +1,5 @@
 import React from 'react';
+import type { Metadata } from 'next';
 import { prisma } from '@/lib/prisma';
 import { notFound, redirect } from 'next/navigation';
 import { getServerSession } from 'next-auth/next';
@@ -8,6 +9,55 @@ import { toggleFollow } from '@/actions/user';
 
 interface PageProps {
   params: Promise<{ username: string }> | { username: string };
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const resolvedParams = params instanceof Promise ? await params : params;
+  const rawUsername = resolvedParams?.username === 'me' ? null : resolvedParams?.username;
+  if (!rawUsername) return {};
+
+  try {
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [{ username: rawUsername }, { id: rawUsername }],
+      },
+      select: { name: true, username: true, isPrivate: true, searchEngineIndexable: true, avatar: true },
+    });
+
+    if (!user || user.isPrivate || user.searchEngineIndexable === false) {
+      return {
+        title: 'Private Account Reels | Tolee',
+        robots: { index: false, follow: false },
+      };
+    }
+
+    const name = user.name || user.username || 'Creator';
+    return {
+      title: `${name}'s Video Reels | Tolee Reels`,
+      description: `Watch short-form vertical video reels and trending moments shared by ${name} on Tolee.`,
+      alternates: {
+        canonical: `https://tolee.in/u/${user.username || rawUsername}/reels`,
+      },
+      openGraph: {
+        title: `${name}'s Video Reels | Tolee Reels`,
+        description: `Watch short-form vertical video reels and trending moments shared by ${name} on Tolee.`,
+        url: `https://tolee.in/u/${user.username || rawUsername}/reels`,
+        images: [{ url: user.avatar || 'https://tolee.in/logo.png' }],
+      },
+      robots: {
+        index: true,
+        follow: true,
+        googleBot: {
+          index: true,
+          follow: true,
+          'max-image-preview': 'large',
+          'max-snippet': -1,
+        },
+      },
+    };
+  } catch {
+    return { title: 'Reels | Tolee' };
+  }
 }
 
 export default async function UserProfileReels({ params }: PageProps) {
@@ -192,19 +242,78 @@ export default async function UserProfileReels({ params }: PageProps) {
     };
   });
 
+  const profileName = user.name || user.username || 'Creator';
+  const profileUsername = user.username || user.id;
+
+  const jsonLdProfileReels = {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    "name": `${profileName}'s Video Reels`,
+    "description": `Short vertical video reels and highlights shared by ${profileName} on Tolee.`,
+    "url": `https://tolee.in/u/${profileUsername}/reels`,
+    "mainEntity": {
+      "@type": "ItemList",
+      "itemListElement": reels.slice(0, 10).map((r: any, idx: number) => ({
+        "@type": "ListItem",
+        "position": idx + 1,
+        "name": r.caption?.slice(0, 80) || `Reel by ${profileName}`,
+        "url": `https://tolee.in/reel/${r.id}`
+      }))
+    }
+  };
+
+  const jsonLdBreadcrumbs = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Home",
+        "item": "https://tolee.in"
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": profileName,
+        "item": `https://tolee.in/u/${profileUsername}`
+      },
+      {
+        "@type": "ListItem",
+        "position": 3,
+        "name": "Reels",
+        "item": `https://tolee.in/u/${profileUsername}/reels`
+      }
+    ]
+  };
+
   return (
-    <ProfileReelsView
-      user={{
-        ...user,
-        level: user.level || 1,
-        trustScore: user.trustScore || 100
-      }}
-      reels={reels}
-      isMe={isMe}
-      currentUserId={currentUserId}
-      initialIsFollowing={isFollowing}
-      initialFollowStatus={followStatus}
-      toggleFollowAction={toggleFollow}
-    />
+    <>
+      {!user.isPrivate && user.searchEngineIndexable !== false && (
+        <>
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdProfileReels) }}
+          />
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdBreadcrumbs) }}
+          />
+        </>
+      )}
+      <ProfileReelsView
+        user={{
+          ...user,
+          level: user.level || 1,
+          trustScore: user.trustScore || 100
+        }}
+        reels={reels}
+        isMe={isMe}
+        currentUserId={currentUserId}
+        initialIsFollowing={isFollowing}
+        initialFollowStatus={followStatus}
+        toggleFollowAction={toggleFollow}
+      />
+    </>
   );
 }

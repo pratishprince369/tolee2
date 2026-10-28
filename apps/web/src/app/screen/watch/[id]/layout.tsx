@@ -18,6 +18,23 @@ export async function generateMetadata({ params }: LayoutProps): Promise<Metadat
     });
 
     if (video) {
+      if (video.visibility === 'private') {
+        return {
+          title: 'Private Video | Tolee Screen',
+          description: 'This video is private.',
+          robots: {
+            index: false,
+            follow: false,
+            nocache: true,
+            googleBot: {
+              index: false,
+              follow: false,
+              noimageindex: true,
+            },
+          },
+        };
+      }
+
       const creatorName = video.user?.name || video.user?.username || 'Creator';
       const title = `${video.title} | ${creatorName} on Tolee Screen`;
       const description = video.description?.slice(0, 160) || `Watch "${video.title}" by ${creatorName} on Tolee Screen.`;
@@ -76,7 +93,7 @@ export default async function ScreenWatchLayout({ children, params }: LayoutProp
       }
     });
 
-    if (video) {
+    if (video && video.visibility !== 'private') {
       const creatorName = video.user?.name || video.user?.username || 'Creator';
       const thumbnail = video.thumbnailUrl || (video.muxPlaybackId ? `https://image.mux.com/${video.muxPlaybackId}/thumbnail.png` : 'https://tolee.in/logo.png');
 
@@ -88,11 +105,20 @@ export default async function ScreenWatchLayout({ children, params }: LayoutProp
         "thumbnailUrl": thumbnail,
         "uploadDate": video.createdAt ? new Date(video.createdAt).toISOString() : new Date().toISOString(),
         "duration": video.duration ? `PT${Math.floor(video.duration)}S` : undefined,
+        "contentUrl": video.mediaUrl || undefined,
         "embedUrl": `https://tolee.in/screen/watch/${id}`,
         "author": {
           "@type": "Person",
           "name": creatorName,
           "url": video.user?.username ? `https://tolee.in/u/${video.user.username}` : `https://tolee.in`
+        },
+        "publisher": {
+          "@type": "Organization",
+          "name": "Tolee Screen",
+          "logo": {
+            "@type": "ImageObject",
+            "url": "https://tolee.in/logo.png"
+          }
         },
         "interactionStatistic": {
           "@type": "InteractionCounter",

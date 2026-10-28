@@ -1,20 +1,65 @@
 import React from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import type { Metadata } from 'next';
 import { getPublicWorldProject } from '@/actions/world';
+import { generateBlogPostingSchema, generateBreadcrumbSchema } from '@/lib/seo/schemaGenerator';
 import { FileText, MapPin, Sparkles, User, Calendar, Tag, ArrowLeft, Bookmark, Heart, MessageSquare } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 
 interface PageProps {
-  params: {
-    slug: string;
+  params: Promise<{ slug: string }> | { slug: string };
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const resolved = params instanceof Promise ? await params : params;
+  const project = await getPublicWorldProject(resolved.slug, 'BLOG');
+  if (!project) return { title: 'Blog Not Found | Tolee' };
+
+  const title = project.seoTitle || `${project.name} | Tolee World Blog`;
+  const description = project.seoDesc || project.description || `Read ${project.name} on Tolee World.`;
+  const image = project.bannerImage || 'https://tolee.in/logo.png';
+
+  return {
+    title,
+    description,
+    keywords: project.seoKeywords ? project.seoKeywords.split(',') : undefined,
+    alternates: {
+      canonical: `https://tolee.in/blog/${resolved.slug}`,
+    },
+    openGraph: {
+      title,
+      description,
+      url: `https://tolee.in/blog/${resolved.slug}`,
+      siteName: 'Tolee World',
+      type: 'article',
+      images: [{ url: image, width: 1200, height: 630, alt: project.name }],
+      publishedTime: project.createdAt ? new Date(project.createdAt).toISOString() : undefined,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: [image],
+    },
+    robots: {
+      index: project.status === 'published',
+      follow: project.status === 'published',
+      googleBot: {
+        index: project.status === 'published',
+        follow: project.status === 'published',
+        'max-image-preview': 'large',
+        'max-snippet': -1,
+      },
+    },
   };
 }
 
 export default async function PublicBlogPage({ params }: PageProps) {
-  const project = await getPublicWorldProject(params.slug, 'BLOG');
+  const resolved = params instanceof Promise ? await params : params;
+  const project = await getPublicWorldProject(resolved.slug, 'BLOG');
 
   if (!project) {
     notFound();
@@ -29,8 +74,34 @@ export default async function PublicBlogPage({ params }: PageProps) {
   // Split content by paragraphs for premium reading typography
   const paragraphs = blogBody.split(/\n\s*\n/).filter((p: string) => p.trim().length > 0);
 
+  const jsonLdBlog = generateBlogPostingSchema({
+    slug: project.slug,
+    title: project.name,
+    description: project.description,
+    body: blogBody,
+    heroImage: project.bannerImage,
+    datePublished: project.createdAt,
+    dateModified: project.updatedAt,
+    category,
+    keywords: tags,
+  });
+
+  const jsonLdBreadcrumbs = generateBreadcrumbSchema([
+    { name: 'Home', url: '/' },
+    { name: 'Tolee World', url: '/world' },
+    { name: project.name, url: `/blog/${project.slug}` },
+  ]);
+
   return (
     <div className="min-h-screen bg-zinc-950 text-white pb-20 relative selection:bg-primary selection:text-white">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdBlog) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdBreadcrumbs) }}
+      />
       {/* Decorative backdrop */}
       <div className="absolute top-0 right-1/4 w-[400px] h-[400px] bg-emerald-500/5 rounded-full blur-[100px] pointer-events-none z-0"></div>
 

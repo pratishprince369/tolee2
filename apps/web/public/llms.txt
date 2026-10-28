@@ -1,0 +1,53 @@
+# Tolee
+
+> India's premier hyperlocal community social platform, combining interest-based groups (Tolees), short vertical reels, verified real-time news, zero-commission marketplace, long-form video streaming on Tolee Screen, and digital creator tools.
+
+## Core Hubs
+
+- [Home & Discover](https://tolee.in): The central gateway to discover trending community posts, popular groups, and verified creator highlights across India.
+- [Tolee Reels](https://tolee.in/reels): Short-form vertical video stream showcasing trending creator moments, dances, comedy, education, and viral clips with original audio.
+- [Tolee News Hub](https://tolee.in/news): Verified real-time breaking news, regional updates, technology, science, business, and community journalism curated 24/7.
+- [Tolee Marketplace](https://tolee.in/marketplace): Direct buyer-to-seller classifieds for real estate, vehicles, electronics, jobs, and services with 0% platform transaction fee.
+- [Tolee Screen](https://tolee.in/screen): Long-form video streaming platform featuring educational masterclasses, podcasts, live stages, and creator broadcasts.
+- [Tolee World](https://tolee.in/world): Digital ecosystem for creators featuring micro-websites, online digital storefronts, and blogging suites.
+- [Tolee Book](https://tolee.in/world/book): Smart digital library offering thousands of free classic books, philosophy, and science literature with AI reading assistants.
+- [Tolee Live Map](https://tolee.in/map): Interactive map enabling users to explore local neighborhood hubs, hyper-local community updates, and nearby happenings.
+- [Tolee Sports](https://tolee.in/sports): Live scores, ball-by-ball updates, schedules, and fan discussions for cricket, football, and global tournaments.
+- [Creator Program](https://tolee.in/creator-program): Creator monetization system providing subscription tools, ad-revenue share, badges, and audience analytics.
+
+## Communities & Groups
+
+- [Discover Groups](https://tolee.in/discover): Directory of public interest communities spanning technology, literature, regional arts, sports, and city clubs.
+- [Community Pages](https://tolee.in/t/tech-titans): Dedicated group spaces (Tolees) with threaded forum discussions, member announcements, group reels, and shared albums.
+
+## News & Journalism
+
+- [Breaking & City News](https://tolee.in/news): Real-time reporting with verified source citations, topic tags, publisher credentials, and community engagement.
+
+## Hyperlocal Marketplace
+
+- [Classified Listings](https://tolee.in/marketplace): User-generated listings with high-resolution photos, verified seller badges, pricing in Indian Rupees (INR), and direct contact options.
+
+## Key Facts
+
+- Platform: Tolee
+- Official Website: https://tolee.in
+- Founded: 2024
+- Headquarters: India
+- Primary Audience: Mobile and web users seeking authenticated local communities, verified news, zero-fee commerce, and short/long form video.
+- Content Moderation: Multi-tiered automated safety filters combined with community reporting and editorial review.
+- Marketplace Model: Completely free direct buyer-seller connection (0% commission).
+
+## Protected & Private Systems
+
+- User Private Chats: End-to-end encrypted direct messaging (`/chat`) is strictly private and non-indexable.
+- Account Settings: Private user configuration (`/settings`) is strictly non-indexable.
+- Advertising Operations: Commercial ad management (`/ads-manager`, `/ads`) requires business authentication and is private.
+- AI Manager Private Sessions: Personal AI assistant interactions are private and inaccessible to external crawlers.
+
+## Contact & Developer Links
+
+- Website: https://tolee.in
+- Support: support@tolee.in
+- Community Guidelines: https://tolee.in/terms
+- Privacy Policy: https://tolee.in/privacy
