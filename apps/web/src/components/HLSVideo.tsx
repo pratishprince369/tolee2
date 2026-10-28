@@ -13,14 +13,12 @@ import { usePlaybackTracker } from '@/hooks/usePlaybackTracker';
 let globalActiveVideo: HTMLVideoElement | null = null;
 let globalActiveAudio: HTMLAudioElement | null = null;
 const allMountedVideos = new Set<HTMLVideoElement>();
-let playbackGeneration = 0;
 
 export function getGlobalActiveVideo(): HTMLVideoElement | null {
   return globalActiveVideo;
 }
 
 export function stopAllVideos() {
-  playbackGeneration++;
   for (const v of allMountedVideos) {
     try {
       v.pause();
@@ -41,8 +39,6 @@ export function stopAllVideos() {
 }
 
 export function setGlobalActiveVideo(video: HTMLVideoElement | null) {
-  playbackGeneration++;
-
   if (video && typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('tolee_pause_music_player'));
   }
@@ -237,22 +233,18 @@ export const HLSVideo = forwardRef<HTMLVideoElement, HLSVideoProps>(
     const mutedRef = useRef(props.muted);
     mutedRef.current = props.muted;
 
-    // Desynchronization & freeze watchdog tracking refs
-    const lastPresentedFrameTimeRef = useRef<number>(0);
-    const desyncRecoveriesRef = useRef<number>(0);
-    const rfcHandleRef = useRef<number | null>(null);
-
     // Hard-mute whenever video is not active, regardless of caller props
     const effectiveMuted = !isActive ? true : (props.muted ?? false);
 
     /* ─────────────────────────────────────────────────────────────────────
        PLAY SAFE:
-       Starts muted to avoid audio leaks during async buffer/decode negotiations,
-       checks token & active status on resolution, and only unmutes once confirmed.
+       Starts with current mute preference, catches autoplay restrictions with
+       muted fallback, and verifies that video is still active on resolution.
     ───────────────────────────────────────────────────────────────────── */
     const playSafe = useCallback(async () => {
       const video = videoRef.current;
       if (!video) return;
+
       if (!isActiveRef.current) {
         video.pause();
         video.muted = true;
@@ -260,45 +252,35 @@ export const HLSVideo = forwardRef<HTMLVideoElement, HLSVideoProps>(
         return;
       }
 
-      const token = ++playbackGeneration;
-
-      // Start hard-muted to guarantee clean autoplay & zero audio leak during pipeline init
-      video.muted = true;
-      video.volume = 0;
+      // Apply current sound preference
+      const shouldMute = !isActiveRef.current ? true : !!mutedRef.current;
+      video.muted = shouldMute;
+      video.volume = shouldMute ? 0 : 1.0;
 
       try {
         await video.play();
-      } catch (e: any) {
-        if (!isActiveRef.current || token !== playbackGeneration) {
+        // If while awaiting play(), slide became inactive, pause immediately
+        if (!isActiveRef.current || (!ignoreGlobalActiveRef.current && globalActiveVideo !== video)) {
+          video.pause();
+          video.muted = true;
+          video.volume = 0;
+        }
+      } catch (err: any) {
+        if (!isActiveRef.current) {
           video.pause();
           video.muted = true;
           video.volume = 0;
           return;
         }
-        // Retry once muted if browser policy blocked unmuted attempt
-        try {
-          await video.play();
-        } catch (err: any) {
-          return;
+        // Fallback to muted playback if browser autoplay policy blocks unmuted audio
+        if (err?.name === 'NotAllowedError' && isActiveRef.current) {
+          video.muted = true;
+          video.volume = 0;
+          try {
+            await video.play();
+          } catch (e) {}
         }
       }
-
-      // Check if user scrolled or another video activated while awaiting play()
-      if (
-        token !== playbackGeneration ||
-        !isActiveRef.current ||
-        (!ignoreGlobalActiveRef.current && globalActiveVideo !== video)
-      ) {
-        video.pause();
-        video.muted = true;
-        video.volume = 0;
-        return;
-      }
-
-      // Playback active & confirmed — apply sound preference
-      const shouldMute = !!mutedRef.current;
-      video.muted = shouldMute;
-      video.volume = shouldMute ? 0 : 1.0;
     }, []);
 
     /* ─────────────────────────────────────────────────────────────────────
@@ -447,110 +429,7 @@ export const HLSVideo = forwardRef<HTMLVideoElement, HLSVideoProps>(
     }, [isActive, ignoreGlobalActive, playSafe]);
 
     /* ─────────────────────────────────────────────────────────────────────
-       EFFECT 3: Freeze & Desynchronization Watchdog
-       Monitors frame rendering vs audio clock. Halts runaway audio instantly
-       if video frames stall.
-    ───────────────────────────────────────────────────────────────────── */
-    useEffect(() => {
-      const video = videoRef.current;
-      if (!video || !isActive) return;
-
-      const hasRfc = typeof (video as any).requestVideoFrameCallback === 'function';
-      let cancelled = false;
-
-      const frameCallback = (now: DOMHighResTimeStamp) => {
-        lastPresentedFrameTimeRef.current = now;
-        if (!cancelled && !video.paused && isActiveRef.current && hasRfc) {
-          rfcHandleRef.current = (video as any).requestVideoFrameCallback(frameCallback);
-        }
-      };
-
-      if (hasRfc && !video.paused) {
-        lastPresentedFrameTimeRef.current = performance.now();
-        rfcHandleRef.current = (video as any).requestVideoFrameCallback(frameCallback);
-      }
-
-      return () => {
-        cancelled = true;
-        if (hasRfc && rfcHandleRef.current !== null) {
-          try {
-            (video as any).cancelVideoFrameCallback(rfcHandleRef.current);
-          } catch {}
-          rfcHandleRef.current = null;
-        }
-      };
-    }, [isActive]);
-
-    useEffect(() => {
-      if (!isActive) return;
-      const video = videoRef.current;
-      if (!video) return;
-
-      let lastCheckedMediaTime = video.currentTime;
-      let lastCheckedWallTime = performance.now();
-      desyncRecoveriesRef.current = 0;
-
-      const interval = setInterval(() => {
-        if (!isActiveRef.current || video.paused || video.ended) {
-          return;
-        }
-
-        const now = performance.now();
-        const currentMediaTime = video.currentTime;
-        const mediaAdvanced = currentMediaTime > lastCheckedMediaTime + 0.3;
-
-        const hasRfc = typeof (video as any).requestVideoFrameCallback === 'function';
-
-        let isFrozen = false;
-        if (hasRfc) {
-          const frameAge = now - lastPresentedFrameTimeRef.current;
-          if (mediaAdvanced && frameAge > 1200 && currentMediaTime > 0.5) {
-            isFrozen = true;
-          }
-        } else {
-          if (mediaAdvanced && video.readyState < 3 && currentMediaTime > 0.5) {
-            isFrozen = true;
-          }
-        }
-
-        if (isFrozen) {
-          console.warn(`[HLSVideo Watchdog] Detected frozen video while audio playing at t=${currentMediaTime.toFixed(2)}s. Resyncing...`);
-          // 1. Immediately pause to halt runaway audio
-          video.pause();
-          video.muted = true;
-          video.volume = 0;
-
-          desyncRecoveriesRef.current++;
-
-          if (desyncRecoveriesRef.current <= 2) {
-            try {
-              video.currentTime = currentMediaTime;
-            } catch {}
-            if (hlsRef.current) {
-              try { hlsRef.current.recoverMediaError(); } catch {}
-            }
-            setTimeout(() => {
-              if (isActiveRef.current && (ignoreGlobalActiveRef.current || globalActiveVideo === video)) {
-                lastPresentedFrameTimeRef.current = performance.now();
-                playSafe();
-              }
-            }, 200);
-          } else {
-            if (onBufferingChange) onBufferingChange(true);
-          }
-        }
-
-        lastCheckedMediaTime = currentMediaTime;
-        lastCheckedWallTime = now;
-      }, 800);
-
-      return () => {
-        clearInterval(interval);
-      };
-    }, [isActive, playSafe, onBufferingChange]);
-
-    /* ─────────────────────────────────────────────────────────────────────
-       EFFECT 4: Page visibility — pause all when tab is hidden
+       EFFECT 3: Page visibility — pause all when tab is hidden
     ───────────────────────────────────────────────────────────────────── */
     useEffect(() => {
       const video = videoRef.current;
@@ -571,7 +450,7 @@ export const HLSVideo = forwardRef<HTMLVideoElement, HLSVideoProps>(
     }, [playSafe]);
 
     /* ─────────────────────────────────────────────────────────────────────
-       EFFECT 5: Lifecycle registry & cleanup on unmount
+       EFFECT 4: Lifecycle registry & cleanup on unmount
     ───────────────────────────────────────────────────────────────────── */
     useEffect(() => {
       const video = videoRef.current;
@@ -598,7 +477,7 @@ export const HLSVideo = forwardRef<HTMLVideoElement, HLSVideoProps>(
     }, []);
 
     /* ─────────────────────────────────────────────────────────────────────
-       EFFECT 6: Sync muted prop directly to DOM element
+       EFFECT 5: Sync muted prop directly to DOM element
     ───────────────────────────────────────────────────────────────────── */
     useEffect(() => {
       const video = videoRef.current;

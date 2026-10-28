@@ -86,7 +86,6 @@ function useActiveReelIndex(
         if (!h) return;
         const dominantIndex = Math.round(container.scrollTop / h);
         if (dominantIndex !== activeIndexRef.current && dominantIndex >= 0 && dominantIndex < reelCount) {
-          setGlobalActiveVideo(null);
           activeIndexRef.current = dominantIndex;
           setActiveIndex(dominantIndex);
         }
@@ -109,7 +108,6 @@ function useActiveReelIndex(
         if (best) {
           const idx = Number((best.target as HTMLElement).getAttribute('data-index'));
           if (!isNaN(idx) && idx !== activeIndexRef.current && idx >= 0 && idx < reelCount) {
-            setGlobalActiveVideo(null);
             activeIndexRef.current = idx;
             setActiveIndex(idx);
           }
@@ -1655,7 +1653,6 @@ const ReelSlide = memo(function ReelSlide({
 
   useEffect(() => {
     if (isActive) {
-      setIsReady(false);
       setIsError(false);
       setRetryKey(0);
 
@@ -1713,7 +1710,7 @@ const ReelSlide = memo(function ReelSlide({
           <HLSVideo
             key={`hls-${reel.id || reel.video}-${retryKey}`}
             src={reel.video}
-            className={`w-full h-full object-cover transition-opacity duration-300 ${isReady ? 'opacity-100' : 'opacity-0'}`}
+            className="w-full h-full object-cover"
             poster={reel.poster || getPosterUrl(reel.video)}
             isActive={isActive}
             shouldLoad={shouldLoad}
@@ -1728,9 +1725,9 @@ const ReelSlide = memo(function ReelSlide({
             onCanPlay={handleReady}
             onPlaying={handleReady}
             onLoadedData={handleReady}
+            onTimeUpdate={() => { if (!isReady) setIsReady(true); }}
             onError={handleVideoError}
             onLoadStart={() => {
-              setIsReady(false);
               setIsError(false);
             }}
           />
@@ -1741,7 +1738,7 @@ const ReelSlide = memo(function ReelSlide({
               src={reel.poster || getPosterUrl(reel.video)}
               alt="Thumbnail"
               loading="eager"
-              className="absolute inset-0 w-full h-full object-cover z-0 filter blur-[1px] scale-102"
+              className="absolute inset-0 w-full h-full object-cover z-0 filter blur-[1px] scale-102 pointer-events-none"
             />
           )}
 
@@ -1938,7 +1935,6 @@ const AdReelSlide = memo(function AdReelSlide({
 
   useEffect(() => {
     if (isActive) {
-      setIsReady(false);
       setIsError(false);
     }
   }, [isActive]);
@@ -1974,7 +1970,7 @@ const AdReelSlide = memo(function AdReelSlide({
               <>
                 <HLSVideo
                   src={displayMedia}
-                  className={`w-full h-full object-cover transition-opacity duration-300 ${isReady ? 'opacity-100' : 'opacity-0'}`}
+                  className="w-full h-full object-cover"
                   poster={getPosterUrl(displayMedia)}
                   isActive={isActive}
                   shouldLoad={shouldLoad}
@@ -1985,9 +1981,9 @@ const AdReelSlide = memo(function AdReelSlide({
                   onCanPlay={() => setIsReady(true)}
                   onPlaying={() => setIsReady(true)}
                   onLoadedData={() => setIsReady(true)}
+                  onTimeUpdate={() => { if (!isReady) setIsReady(true); }}
                   onError={handleVideoError}
                   onLoadStart={() => {
-                    setIsReady(false);
                     setIsError(false);
                   }}
                 />
