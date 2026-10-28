@@ -85,6 +85,7 @@ export default async function ScreenWatchLayout({ children, params }: LayoutProp
   const { id } = params instanceof Promise ? await params : params;
 
   let jsonLdVideo = null;
+  let serverVideo: any = null;
   try {
     const video = await prisma.screenVideo.findUnique({
       where: { id },
@@ -94,6 +95,7 @@ export default async function ScreenWatchLayout({ children, params }: LayoutProp
     });
 
     if (video && video.visibility !== 'private') {
+      serverVideo = video;
       const creatorName = video.user?.name || video.user?.username || 'Creator';
       const thumbnail = video.thumbnailUrl || (video.muxPlaybackId ? `https://image.mux.com/${video.muxPlaybackId}/thumbnail.png` : 'https://tolee.in/logo.png');
 
@@ -166,6 +168,19 @@ export default async function ScreenWatchLayout({ children, params }: LayoutProp
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdBreadcrumbs) }}
       />
+      {/* Server-Side Rendered Semantic Video Metadata for AI Answer Engines */}
+      {serverVideo && (
+        <article className="sr-only">
+          <h1>{serverVideo.title}</h1>
+          <p>{serverVideo.description}</p>
+          <div>
+            <span>Creator: {serverVideo.user?.name || serverVideo.user?.username || 'Creator'}</span>
+            <time dateTime={serverVideo.createdAt ? new Date(serverVideo.createdAt).toISOString() : undefined}>
+              {serverVideo.createdAt ? new Date(serverVideo.createdAt).toLocaleDateString() : ''}
+            </time>
+          </div>
+        </article>
+      )}
       {children}
     </>
   );

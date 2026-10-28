@@ -86,6 +86,7 @@ function useActiveReelIndex(
         if (!h) return;
         const dominantIndex = Math.round(container.scrollTop / h);
         if (dominantIndex !== activeIndexRef.current && dominantIndex >= 0 && dominantIndex < reelCount) {
+          setGlobalActiveVideo(null);
           activeIndexRef.current = dominantIndex;
           setActiveIndex(dominantIndex);
         }
@@ -108,6 +109,7 @@ function useActiveReelIndex(
         if (best) {
           const idx = Number((best.target as HTMLElement).getAttribute('data-index'));
           if (!isNaN(idx) && idx !== activeIndexRef.current && idx >= 0 && idx < reelCount) {
+            setGlobalActiveVideo(null);
             activeIndexRef.current = idx;
             setActiveIndex(idx);
           }
@@ -160,6 +162,9 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
     setMounted(true);
     return () => {
       setGlobalActiveVideo(null);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('tolee_pause_all_videos'));
+      }
     };
   }, []);
 
@@ -1718,7 +1723,7 @@ const ReelSlide = memo(function ReelSlide({
             trafficSource="reels"
             isVisible={isActive}
             loop
-            muted={isMuted}
+            muted={!isActive || isMuted}
             playsInline
             onCanPlay={handleReady}
             onPlaying={handleReady}

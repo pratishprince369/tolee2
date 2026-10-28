@@ -76,6 +76,11 @@ export default async function ListingDetailPage({ params }: ListingDetailPagePro
     "name": listing.title,
     "image": [image],
     "description": listing.description || `Listing for ${listing.title} on Tolee Marketplace`,
+    "category": listing.category || "Classifieds",
+    "brand": {
+      "@type": "Brand",
+      "name": "Tolee Marketplace"
+    },
     "offers": {
       "@type": "Offer",
       "url": `https://tolee.in/marketplace/listing/${id}`,
@@ -84,6 +89,10 @@ export default async function ListingDetailPage({ params }: ListingDetailPagePro
       "priceValidUntil": "2030-12-31",
       "itemCondition": listing.condition === 'new' ? "https://schema.org/NewCondition" : "https://schema.org/UsedCondition",
       "availability": "https://schema.org/InStock",
+      "availableAtOrFrom": {
+        "@type": "Place",
+        "name": listing.locationText || "India"
+      },
       "seller": {
         "@type": "Person",
         "name": listing.seller?.name || "Tolee Seller",
@@ -127,6 +136,18 @@ export default async function ListingDetailPage({ params }: ListingDetailPagePro
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdBreadcrumbs) }}
       />
+      {/* Server-Side Rendered Semantic Metadata for AI Search & Answer Engines */}
+      <article className="sr-only">
+        <h1>{listing.title}</h1>
+        <p>{listing.description}</p>
+        <div>
+          <span>Price: ₹{listing.price?.toLocaleString() || '0'}</span>
+          <span>Category: {listing.category || 'Classifieds'}</span>
+          <span>Location: {listing.locationText || 'India'}</span>
+          <span>Seller: {listing.seller?.name || 'Tolee Member'}</span>
+        </div>
+      </article>
+
       <ListingDetailView 
         listing={listing} 
         currentUserId={currentUserId}

@@ -322,12 +322,22 @@ export default async function ReelDeepLinkPage({ params }: ReelPageProps) {
     "description": targetPost.caption || `Watch vertical video reel by ${creatorName} on Tolee.`,
     "thumbnailUrl": targetPost.author?.avatar || "https://tolee.in/logo.png",
     "uploadDate": targetPost.createdAt ? new Date(targetPost.createdAt).toISOString() : new Date().toISOString(),
+    "duration": "PT15S",
     "contentUrl": videoUrl,
     "embedUrl": `https://tolee.in/reel/${id}`,
     "author": {
       "@type": "Person",
       "name": creatorName,
       "url": targetPost.author?.username ? `https://tolee.in/u/${targetPost.author.username}` : `https://tolee.in`
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "Tolee Reels",
+      "url": "https://tolee.in",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://tolee.in/logo.png"
+      }
     },
     "interactionStatistic": {
       "@type": "InteractionCounter",
@@ -373,6 +383,18 @@ export default async function ReelDeepLinkPage({ params }: ReelPageProps) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdBreadcrumbs) }}
       />
+      {/* Server-Side Rendered Semantic Metadata for AI Search Crawlers & Indexing */}
+      {targetPost && (
+        <article className="sr-only">
+          <h1>{targetPost.caption?.slice(0, 100) || `Reel by ${creatorName}`}</h1>
+          <p>{targetPost.caption}</p>
+          <div>
+            <span>Creator: {creatorName}</span>
+            <time dateTime={targetPost.createdAt}>{new Date(targetPost.createdAt || Date.now()).toLocaleDateString()}</time>
+          </div>
+        </article>
+      )}
+
       <ReelsStream initialReels={dbReels} />
     </>
   );

@@ -438,6 +438,11 @@ export default async function ToleePage({ params }: ToleePageProps) {
     "url": `https://tolee.in/t/${dbTolee.slug}`,
     "logo": dbTolee.avatar || "https://tolee.in/logo.png",
     "image": dbTolee.coverImage || dbTolee.avatar || "https://tolee.in/logo.png",
+    "parentOrganization": {
+      "@type": "Organization",
+      "name": "Tolee",
+      "url": "https://tolee.in"
+    },
     "interactionStatistic": {
       "@type": "InteractionCounter",
       "interactionType": "https://schema.org/FollowAction",
@@ -487,6 +492,17 @@ export default async function ToleePage({ params }: ToleePageProps) {
           <div className="w-10 h-10 border-4 border-[#0a7c85]/20 border-t-[#0a7c85] rounded-full animate-spin" />
         </div>
       }>
+              {/* Server-Side Rendered Semantic Metadata for AI Search Crawlers */}
+      <article className="sr-only">
+        <h1>{dbTolee.name} Community on Tolee</h1>
+        <p>{dbTolee.description}</p>
+        <div>
+          <span>Category: {dbTolee.category || 'General'}</span>
+          <span>Members: {dbTolee._count?.members || 0}</span>
+          {dbTolee.rules && <p>Rules: {dbTolee.rules}</p>}
+        </div>
+      </article>
+
         <ToleeView 
           toleeData={toleeData} 
           currentUserId={currentUserId} 

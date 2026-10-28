@@ -164,11 +164,21 @@ export default async function PostPage({ params }: PostPageProps) {
     "headline": post.caption?.slice(0, 110) || `Post by ${authorName}`,
     "articleBody": post.caption || '',
     "url": `https://tolee.in/post/${id}`,
+    "mainEntityOfPage": `https://tolee.in/post/${id}`,
     "datePublished": post.createdAt ? new Date(post.createdAt).toISOString() : new Date().toISOString(),
     "author": {
       "@type": "Person",
       "name": authorName,
       "url": `https://tolee.in/u/${authorUsername}`
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "Tolee",
+      "url": "https://tolee.in",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://tolee.in/logo.png"
+      }
     },
     "image": mediaUrl,
     "interactionStatistic": [
@@ -220,6 +230,16 @@ export default async function PostPage({ params }: PostPageProps) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdBreadcrumbs) }}
       />
+      {/* Server-Side Rendered Semantic Metadata & Content for AI Search Engines & Bots */}
+      <article className="sr-only">
+        <h1>{post.caption?.slice(0, 100) || `Post by ${authorName}`}</h1>
+        <p>{post.caption}</p>
+        <div>
+          <span>Creator: {authorName} (@{authorUsername})</span>
+          <time dateTime={post.createdAt}>{new Date(post.createdAt || Date.now()).toLocaleDateString()}</time>
+        </div>
+      </article>
+
       <Suspense fallback={
         <div className="min-h-screen bg-[#070b13] flex items-center justify-center">
           <div className="w-8 h-8 rounded-full border-2 border-teal-500 border-t-transparent animate-spin" />
