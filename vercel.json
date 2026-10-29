@@ -18,6 +18,10 @@
     {
       "path": "/api/cron/ai-reward-nudge",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/generate-daily-sitemap",
+      "schedule": "0 2 * * *"
     }
   ]
 }

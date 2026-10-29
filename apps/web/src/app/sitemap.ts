@@ -1,5 +1,6 @@
 import { MetadataRoute } from 'next';
 import { prisma } from '@/lib/prisma';
+import { AISitemapService } from '@/lib/seo/ai-sitemap-service';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = 'https://tolee.in';
@@ -261,14 +262,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.85,
     }));
 
-    let topicUrls: MetadataRoute.Sitemap = [
+    const baseTopics = [
       'mumbai-real-estate',
       'tech-startups-india',
       'delhi-food-guide',
       'bollywood-updates',
       'cricket-ipl',
       'health-fitness-tips',
-    ].map((top) => ({
+    ];
+    const aiTrending = AISitemapService.getTrendingTopics();
+    const allTopics = Array.from(new Set([...baseTopics, ...aiTrending]));
+
+    let topicUrls: MetadataRoute.Sitemap = allTopics.map((top) => ({
       url: `${baseUrl}/topic/${top}`,
       lastModified: new Date(),
       changeFrequency: 'daily' as const,
