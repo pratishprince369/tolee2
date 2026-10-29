@@ -1236,7 +1236,8 @@ export class CentralAIEngine {
           status: obs.isBlocked ? 'blocked' : 'ready',
           isBlocked: obs.isBlocked,
           statusText: obs.isBlocked ? 'Access Blocked' : `Observed ${obs.elements.length} elements`,
-          tabs: [{ id: 'tab1', title: obs.pageTitle, domain: obs.domain, url: targetUrl, status: obs.isBlocked ? 'blocked' : 'ready', isBlocked: obs.isBlocked }],
+          elements: obs.elements,
+          tabs: [{ id: 'tab1', title: obs.pageTitle, domain: obs.domain, url: targetUrl, status: obs.isBlocked ? 'blocked' : 'ready', isBlocked: obs.isBlocked, elements: obs.elements }],
           activeTabId: 'tab1',
         };
 

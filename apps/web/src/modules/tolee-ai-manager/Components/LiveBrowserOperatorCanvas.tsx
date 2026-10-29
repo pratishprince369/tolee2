@@ -33,6 +33,7 @@ export interface BrowserTab {
   isBlocked?: boolean;
   diagnosticState?: BrowserDiagnosticState;
   blockReason?: string;
+  elements?: Array<{ ref?: string; label: string; type: string; purpose?: string }>;
 }
 
 export interface LiveBrowserOperatorCanvasProps {
@@ -926,15 +927,32 @@ export function LiveBrowserOperatorCanvas({
               )}
 
               {/* Real Webpage Iframe / Live Proxy View */}
-              <div className="flex-1 w-full h-full relative bg-white">
+              <div className="flex-1 w-full h-full relative bg-white flex flex-col">
                 <iframe
                   key={`${activeTab.url}-${iframeKey}`}
                   src={`/api/browser/proxy?url=${encodeURIComponent(activeTab.url)}`}
-                  className="w-full h-full border-0 bg-white"
+                  className="w-full flex-1 border-0 bg-white"
                   title={activeTab.title || activeTab.domain}
                   sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-downloads allow-modals"
                   onError={() => setIframeError(true)}
                 />
+                {activeTab.elements && activeTab.elements.length > 0 && (
+                  <div className="px-3 py-2 bg-slate-900 border-t border-slate-800 flex items-center gap-2 overflow-x-auto text-xs shrink-0 scrollbar-thin">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-teal-400 font-bold shrink-0 flex items-center gap-1">
+                      <span>🦊 Elements:</span>
+                    </span>
+                    {activeTab.elements.slice(0, 8).map((el, idx) => (
+                      <span
+                        key={idx}
+                        title={el.purpose || el.label}
+                        className="px-2 py-0.5 rounded-md bg-slate-800 border border-slate-700 text-slate-300 text-[10px] font-mono shrink-0 flex items-center gap-1"
+                      >
+                        <span className="text-teal-400 font-bold">{el.ref || `e${idx+1}`}:</span>
+                        <span className="truncate max-w-[120px]">{el.label}</span>
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}

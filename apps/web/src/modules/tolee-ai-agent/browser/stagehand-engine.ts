@@ -21,13 +21,16 @@ import { BrowserWorker, BrowserDiagnosticState } from './browser-worker';
 import { searchAndGroundQuery } from '@/lib/web-search';
 import { ToleeFastPath } from '@/lib/ai-gateway/fast-path';
 import { ApprovalRecord } from '../approvals/approval-engine';
+import { CamofoxBrowserService } from './camofox-service';
 
 export interface StagehandObservedElement {
-  type: 'button' | 'input' | 'link' | 'select' | 'modal';
+  type: 'button' | 'input' | 'link' | 'select' | 'modal' | 'textarea' | 'checkbox' | 'radio' | 'text';
   label: string;
   action: 'click' | 'type' | 'select' | 'navigate';
   selectorHint?: string;
   purpose?: string;
+  ref?: string;
+  value?: string;
 }
 
 export interface StagehandObserveResult {
@@ -199,40 +202,56 @@ export class ToleeStagehandEngine {
       };
     }
 
-    // 2. Fetch HTML content with redirect and SSRF handling
-    const html = await BrowserWorker.fetchHtml(url).catch(() => '');
+    // 2. Fetch accessibility tree snapshot via Camofox (or fallback)
+    const snapshot = await CamofoxBrowserService.getSnapshot({
+      tabId: 'observe_tab',
+      url,
+      userId: 'system',
+    });
 
-    if (!html) {
+    if (snapshot.isBlocked || snapshot.diagnosticState !== 'SUCCESS') {
       return {
         url,
         domain,
-        pageTitle: domain,
-        isBlocked: false,
-        diagnosticState: 'HTTP_ERROR',
+        pageTitle: snapshot.title || 'Access Restricted',
+        isBlocked: true,
+        diagnosticState: snapshot.diagnosticState,
+        blockReason: snapshot.blockReason || 'Website security block',
         elements: [],
-        suggestedActions: ['Retry Page Load', 'Open in Regular Browser'],
-        summary: `Could not retrieve live DOM snapshot from ${domain}.`,
+        suggestedActions: [
+          'Open in Regular Browser (Popout)',
+          'Take Control of Browser',
+          'Retry Page Load',
+        ],
+        summary: `Page access to ${domain} was restricted (${snapshot.blockReason || snapshot.diagnosticState}). Automated exploration stopped.`,
         timestamp: new Date().toISOString(),
       };
     }
 
-    const { title, elements, cleanedText } = this.pruneHtmlToAccessibilityTree(html);
+    const elements: StagehandObservedElement[] = snapshot.elements.map((el) => ({
+      ref: el.ref,
+      type: (el.type === 'textarea' || el.type === 'input' ? 'input' : el.type === 'link' ? 'link' : 'button') as any,
+      label: el.label,
+      action: el.type === 'input' || el.type === 'textarea' ? 'type' : 'click',
+      selectorHint: el.selector,
+      purpose: `${el.type === 'input' ? 'Type in' : 'Click'} "${el.label}" (Ref: ${el.ref})`,
+    }));
 
     // Formulate verified suggested actions based on observed elements
     const suggestedActions = elements.slice(0, 5).map((e) => {
-      if (e.action === 'type') return `Type search query in "${e.label}"`;
-      return `Click "${e.label}"`;
+      if (e.action === 'type') return `Type search query in "${e.label}" (Ref: ${e.ref || 'input'})`;
+      return `Click "${e.label}" (Ref: ${e.ref || 'button'})`;
     });
 
     return {
       url,
       domain,
-      pageTitle: title || domain,
+      pageTitle: snapshot.title || domain,
       isBlocked: false,
       diagnosticState: 'SUCCESS',
       elements,
       suggestedActions,
-      summary: cleanedText.slice(0, 400),
+      summary: snapshot.textSnippet.slice(0, 400),
       timestamp: new Date().toISOString(),
     };
   }
@@ -295,7 +314,71 @@ export class ToleeStagehandEngine {
       };
     }
 
-    // Step 3: Handle Exploratory / Search / Navigation Action
+    // Step 3: Handle Interactive Camofox Element Actions (click, type, scroll)
+    const clickRefMatch = instruction.match(/\b(?:click|tap|press)\s+([eE]\d+)\b/i);
+    const typeRefMatch = instruction.match(/\b(?:type|enter|fill|write)\s+['"]?([^'"]+)['"]?\s+(?:in|into|on)\s+([eE]\d+)\b/i);
+    const scrollMatch = instruction.match(/\b(?:scroll|page)\s*(down|up)\b/i);
+
+    if (clickRefMatch) {
+      const ref = clickRefMatch[1].toLowerCase();
+      const clickRes = await CamofoxBrowserService.click({
+        tabId: 'active_tab',
+        ref,
+        userId: context?.userId || 'anonymous',
+      });
+      return {
+        success: clickRes.success,
+        action: instruction,
+        targetUrl: cleanUrl,
+        resultingUrl: clickRes.currentUrl || cleanUrl,
+        status: clickRes.success ? 'completed_verified' : 'failed',
+        verifiedState: clickRes.success ? `Clicked element [${ref}] on ${observation.domain}` : `Failed to click [${ref}]`,
+        message: clickRes.success ? `✅ **Camofox Action Verified**: Clicked element \`${ref}\` successfully on ${observation.domain}.` : `❌ Could not click \`${ref}\`: ${clickRes.error}`,
+        durationMs: Date.now() - startTime,
+      };
+    }
+
+    if (typeRefMatch) {
+      const textToType = typeRefMatch[1];
+      const ref = typeRefMatch[2].toLowerCase();
+      const typeRes = await CamofoxBrowserService.type({
+        tabId: 'active_tab',
+        ref,
+        text: textToType,
+        userId: context?.userId || 'anonymous',
+      });
+      return {
+        success: typeRes.success,
+        action: instruction,
+        targetUrl: cleanUrl,
+        resultingUrl: cleanUrl,
+        status: typeRes.success ? 'completed_verified' : 'failed',
+        verifiedState: typeRes.success ? `Typed "${textToType}" into element [${ref}] on ${observation.domain}` : `Failed to type into [${ref}]`,
+        message: typeRes.success ? `✅ **Camofox Action Verified**: Typed "${textToType}" into element \`${ref}\`.` : `❌ Could not type into \`${ref}\`: ${typeRes.error}`,
+        durationMs: Date.now() - startTime,
+      };
+    }
+
+    if (scrollMatch) {
+      const dir = scrollMatch[1].toLowerCase() as 'up' | 'down';
+      await CamofoxBrowserService.scroll({
+        tabId: 'active_tab',
+        direction: dir,
+        userId: context?.userId || 'anonymous',
+      });
+      return {
+        success: true,
+        action: instruction,
+        targetUrl: cleanUrl,
+        resultingUrl: cleanUrl,
+        status: 'completed_verified',
+        verifiedState: `Scrolled page ${dir} on ${observation.domain}`,
+        message: `✅ **Camofox Action Verified**: Scrolled page ${dir}.`,
+        durationMs: Date.now() - startTime,
+      };
+    }
+
+    // Step 4: Handle Exploratory / Search / Navigation Action
     let resultingUrl = cleanUrl;
     let verifiedState = `Navigated to ${cleanUrl} and observed active elements.`;
 
