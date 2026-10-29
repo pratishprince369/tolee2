@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -56,6 +57,7 @@ export function UnifiedCreatePostModal({
   initialMedia,
   initialStep,
 }: UnifiedCreatePostModalProps) {
+  const router = useRouter();
   const { data: session } = useSession();
   const { startUpload } = useUpload();
   const [isPending, startTransition] = useTransition();
@@ -577,28 +579,28 @@ export function UnifiedCreatePostModal({
               />
 
               {mediaList.length === 0 ? (
-                <div className="space-y-4 my-auto py-2">
+                <div className="space-y-3 sm:space-y-4 my-auto py-2">
                   {/* BOX 1: SELECT PHOTOS */}
                   <div
                     onClick={() => triggerFileInput('image/*')}
-                    className="group relative flex items-start gap-4 p-5 rounded-[26px] bg-white dark:bg-[#181818] border border-[#DCF1EE] dark:border-zinc-800 hover:border-[#0a7c85]/50 hover:shadow-lg transition-all duration-200 cursor-pointer active:scale-[0.99] shadow-xs"
+                    className="group relative flex items-start gap-4 p-4 sm:p-5 rounded-[22px] sm:rounded-[26px] bg-white dark:bg-[#181818] border border-[#DCF1EE] dark:border-zinc-800 hover:border-[#0a7c85]/50 hover:shadow-lg transition-all duration-200 cursor-pointer active:scale-[0.99] shadow-xs"
                   >
-                    <div className="w-16 h-16 rounded-[22px] bg-[#EAF7F5] dark:bg-teal-950/40 text-[#0a7c85] flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform duration-200">
-                      <ImageIcon className="w-8 h-8 stroke-[2.2]" />
+                    <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-[18px] sm:rounded-[22px] bg-[#EAF7F5] dark:bg-teal-950/40 text-[#0a7c85] flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform duration-200">
+                      <ImageIcon className="w-7 h-7 sm:w-8 sm:h-8 stroke-[2.2]" />
                     </div>
                     <div className="flex-1 min-w-0 pr-1">
-                      <h3 className="text-[17px] font-black text-[#101828] dark:text-white group-hover:text-[#0a7c85] transition-colors">
+                      <h3 className="text-[16px] sm:text-[17px] font-black text-[#101828] dark:text-white group-hover:text-[#0a7c85] transition-colors">
                         Select Photos
                       </h3>
                       <p className="text-xs text-[#667085] dark:text-zinc-400 mt-1 leading-relaxed">
                         Choose photos from your device to share with the community.
                       </p>
-                      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#E2F7F5] dark:bg-teal-950/60 text-[#0a7c85] text-[11px] font-bold mt-3">
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#E2F7F5] dark:bg-teal-950/60 text-[#0a7c85] text-[11px] font-bold mt-2.5 sm:mt-3">
                         <ImageIcon className="w-3.5 h-3.5" />
                         <span>JPG, PNG, WEBP (Max 100MB)</span>
                       </div>
                     </div>
-                    <div className="w-10 h-10 rounded-full bg-[#EAF7F6] dark:bg-zinc-800 text-[#0a7c85] flex items-center justify-center flex-shrink-0 group-hover:bg-[#0a7c85] group-hover:text-white transition-all duration-200 self-center">
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#EAF7F6] dark:bg-zinc-800 text-[#0a7c85] flex items-center justify-center flex-shrink-0 group-hover:bg-[#0a7c85] group-hover:text-white transition-all duration-200 self-center">
                       <ChevronRight className="w-5 h-5 stroke-[2.5]" />
                     </div>
                   </div>
@@ -606,24 +608,24 @@ export function UnifiedCreatePostModal({
                   {/* BOX 2: SELECT VIDEOS */}
                   <div
                     onClick={() => triggerFileInput('video/mp4,video/quicktime,video/webm,video/3gpp,video/x-matroska,video/*,.mp4,.mov,.webm,.3gp,.mkv')}
-                    className="group relative flex items-start gap-4 p-5 rounded-[26px] bg-white dark:bg-[#181818] border border-[#DCF1EE] dark:border-zinc-800 hover:border-[#0a7c85]/50 hover:shadow-lg transition-all duration-200 cursor-pointer active:scale-[0.99] shadow-xs"
+                    className="group relative flex items-start gap-4 p-4 sm:p-5 rounded-[22px] sm:rounded-[26px] bg-white dark:bg-[#181818] border border-[#DCF1EE] dark:border-zinc-800 hover:border-[#0a7c85]/50 hover:shadow-lg transition-all duration-200 cursor-pointer active:scale-[0.99] shadow-xs"
                   >
-                    <div className="w-16 h-16 rounded-[22px] bg-[#EAF7F5] dark:bg-teal-950/40 text-[#0a7c85] flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform duration-200">
-                      <Video className="w-8 h-8 stroke-[2.2]" />
+                    <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-[18px] sm:rounded-[22px] bg-[#EAF7F5] dark:bg-teal-950/40 text-[#0a7c85] flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform duration-200">
+                      <Video className="w-7 h-7 sm:w-8 sm:h-8 stroke-[2.2]" />
                     </div>
                     <div className="flex-1 min-w-0 pr-1">
-                      <h3 className="text-[17px] font-black text-[#101828] dark:text-white group-hover:text-[#0a7c85] transition-colors">
+                      <h3 className="text-[16px] sm:text-[17px] font-black text-[#101828] dark:text-white group-hover:text-[#0a7c85] transition-colors">
                         Select Videos
                       </h3>
                       <p className="text-xs text-[#667085] dark:text-zinc-400 mt-1 leading-relaxed">
                         Choose videos from your device to share with the community.
                       </p>
-                      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#E2F7F5] dark:bg-teal-950/60 text-[#0a7c85] text-[11px] font-bold mt-3">
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#E2F7F5] dark:bg-teal-950/60 text-[#0a7c85] text-[11px] font-bold mt-2.5 sm:mt-3">
                         <Video className="w-3.5 h-3.5" />
                         <span>MP4, MOV, WEBM (Max 100MB)</span>
                       </div>
                     </div>
-                    <div className="w-10 h-10 rounded-full bg-[#EAF7F6] dark:bg-zinc-800 text-[#0a7c85] flex items-center justify-center flex-shrink-0 group-hover:bg-[#0a7c85] group-hover:text-white transition-all duration-200 self-center">
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#EAF7F6] dark:bg-zinc-800 text-[#0a7c85] flex items-center justify-center flex-shrink-0 group-hover:bg-[#0a7c85] group-hover:text-white transition-all duration-200 self-center">
                       <ChevronRight className="w-5 h-5 stroke-[2.5]" />
                     </div>
                   </div>
@@ -634,20 +636,44 @@ export function UnifiedCreatePostModal({
                       setIsTextOnly(true);
                       setStep(4);
                     }}
-                    className="group relative flex items-start gap-4 p-5 rounded-[26px] bg-white dark:bg-[#181818] border border-[#DCF1EE] dark:border-zinc-800 hover:border-[#0a7c85]/50 hover:shadow-lg transition-all duration-200 cursor-pointer active:scale-[0.99] shadow-xs"
+                    className="group relative flex items-start gap-4 p-4 sm:p-5 rounded-[22px] sm:rounded-[26px] bg-white dark:bg-[#181818] border border-[#DCF1EE] dark:border-zinc-800 hover:border-[#0a7c85]/50 hover:shadow-lg transition-all duration-200 cursor-pointer active:scale-[0.99] shadow-xs"
                   >
-                    <div className="w-16 h-16 rounded-[22px] bg-[#EAF7F5] dark:bg-teal-950/40 text-[#0a7c85] flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform duration-200">
-                      <FileText className="w-8 h-8 stroke-[2.2]" />
+                    <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-[18px] sm:rounded-[22px] bg-[#EAF7F5] dark:bg-teal-950/40 text-[#0a7c85] flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform duration-200">
+                      <FileText className="w-7 h-7 sm:w-8 sm:h-8 stroke-[2.2]" />
                     </div>
                     <div className="flex-1 min-w-0 pr-1">
-                      <h3 className="text-[17px] font-black text-[#101828] dark:text-white group-hover:text-[#0a7c85] transition-colors">
+                      <h3 className="text-[16px] sm:text-[17px] font-black text-[#101828] dark:text-white group-hover:text-[#0a7c85] transition-colors">
                         Post with Text Only
                       </h3>
                       <p className="text-xs text-[#667085] dark:text-zinc-400 mt-1 leading-relaxed">
                         Share your thoughts, updates or ask something from the community.
                       </p>
                     </div>
-                    <div className="w-10 h-10 rounded-full bg-[#EAF7F6] dark:bg-zinc-800 text-[#0a7c85] flex items-center justify-center flex-shrink-0 group-hover:bg-[#0a7c85] group-hover:text-white transition-all duration-200 self-center">
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#EAF7F6] dark:bg-zinc-800 text-[#0a7c85] flex items-center justify-center flex-shrink-0 group-hover:bg-[#0a7c85] group-hover:text-white transition-all duration-200 self-center">
+                      <ChevronRight className="w-5 h-5 stroke-[2.5]" />
+                    </div>
+                  </div>
+
+                  {/* BOX 4: POST NEWS (Image 1 Style) */}
+                  <div
+                    onClick={() => {
+                      onClose();
+                      router.push('/news/create');
+                    }}
+                    className="group relative flex items-start gap-4 p-4 sm:p-5 rounded-[22px] sm:rounded-[26px] bg-white dark:bg-[#181818] border border-[#E0E4FC] dark:border-zinc-800 hover:border-[#5051F9]/50 hover:shadow-lg transition-all duration-200 cursor-pointer active:scale-[0.99] shadow-xs"
+                  >
+                    <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-[18px] sm:rounded-[22px] bg-[#5B6BF0] text-white flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform duration-200 shadow-md shadow-[#5B6BF0]/25">
+                      <Newspaper className="w-7 h-7 sm:w-8 sm:h-8 stroke-[2.2]" />
+                    </div>
+                    <div className="flex-1 min-w-0 pr-1">
+                      <h3 className="text-[16px] sm:text-[17px] font-black text-[#5051F9] dark:text-indigo-400 group-hover:text-[#4243db] dark:group-hover:text-indigo-300 transition-colors">
+                        Post News
+                      </h3>
+                      <p className="text-xs text-[#667085] dark:text-zinc-400 mt-1 leading-relaxed">
+                        Publish simplified news updates, community articles or press releases.
+                      </p>
+                    </div>
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#EEF1FE] dark:bg-zinc-800 text-[#5051F9] dark:text-indigo-400 flex items-center justify-center flex-shrink-0 group-hover:bg-[#5051F9] group-hover:text-white transition-all duration-200 self-center">
                       <ChevronRight className="w-5 h-5 stroke-[2.5]" />
                     </div>
                   </div>
