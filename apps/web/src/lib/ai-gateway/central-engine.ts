@@ -5,7 +5,7 @@ import cloudinary from '@/lib/cloudinary';
 import { NvidiaNIMProvider } from './providers/nvidia-nim';
 import { FreeLLMAPIProvider } from './providers/freellmapi';
 import { DeepInferProvider } from './providers/deepinfer-provider';
-import { SYSTEM_PROMPTS } from '@/modules/tolee-ai-manager/Core/prompt-manager';
+import { SYSTEM_PROMPTS, buildMasterSystemPrompt } from '@/modules/tolee-ai-manager/Core/prompt-manager';
 import { AgentOrchestrator } from '@/modules/tolee-ai-agent/core/agent-orchestrator';
 import { ToleeRealityValidator } from './reality-validator';
 import { ToleeFastPath } from './fast-path';
@@ -673,6 +673,15 @@ export class CentralAIEngine {
     const history = options.history || (options.messages || []).map(m => ({ role: m.role, content: m.content }));
     const hasMedia = Boolean(options.mediaAttachment?.url || options.mediaAttachment?.content);
     const mediaType = options.mediaAttachment?.type || '';
+
+    const activeSystemPrompt = buildMasterSystemPrompt({
+      userName: options.userName,
+      timezone: options.timeZone,
+      currentDatetime: options.clientISO
+        ? new Date(options.clientISO).toLocaleString('en-IN', { timeZone: options.timeZone || 'Asia/Kolkata' })
+        : undefined,
+      memorySummary: options.persona?.memorySummary,
+    });
 
     // 0a. Request cancellation check (Phase 2, prompt 12)
     if (options.signal?.aborted) {
@@ -1605,7 +1614,47 @@ export class CentralAIEngine {
                   label: agentResult.approvalPayload.title || 'Review & Approve',
                   payload: agentResult.approvalPayload,
                 }
+              : (agentResult.toolData?.session || agentResult.toolData?.url)
+              ? {
+                  type: 'BROWSER_SESSION',
+                  label: `Live Browser: ${agentResult.toolData?.domain || 'Web'}`,
+                  payload: agentResult.toolData?.session || {
+                    targetDomain: agentResult.toolData?.domain || 'web',
+                    currentUrl: agentResult.toolData?.url,
+                    status: agentResult.toolData?.isBlocked ? 'blocked' : 'ready',
+                    isBlocked: Boolean(agentResult.toolData?.isBlocked),
+                    statusText: agentResult.toolData?.isBlocked ? 'Access Blocked' : 'Live Session',
+                    elements: agentResult.toolData?.elements || [],
+                    tabs: [{
+                      id: 'tab1',
+                      title: agentResult.toolData?.pageTitle || agentResult.toolData?.title || agentResult.toolData?.url,
+                      domain: agentResult.toolData?.domain || 'web',
+                      url: agentResult.toolData?.url,
+                      status: agentResult.toolData?.isBlocked ? 'blocked' : 'ready',
+                      isBlocked: Boolean(agentResult.toolData?.isBlocked),
+                      elements: agentResult.toolData?.elements || [],
+                    }],
+                    activeTabId: 'tab1',
+                  },
+                }
               : undefined,
+            browserSession: agentResult.toolData?.session || (agentResult.toolData?.url ? {
+              targetDomain: agentResult.toolData?.domain || 'web',
+              currentUrl: agentResult.toolData?.url,
+              status: agentResult.toolData?.isBlocked ? 'blocked' : 'ready',
+              isBlocked: Boolean(agentResult.toolData?.isBlocked),
+              elements: agentResult.toolData?.elements || [],
+              tabs: [{
+                id: 'tab1',
+                title: agentResult.toolData?.pageTitle || agentResult.toolData?.title || agentResult.toolData?.url,
+                domain: agentResult.toolData?.domain || 'web',
+                url: agentResult.toolData?.url,
+                status: agentResult.toolData?.isBlocked ? 'blocked' : 'ready',
+                isBlocked: Boolean(agentResult.toolData?.isBlocked),
+                elements: agentResult.toolData?.elements || [],
+              }],
+              activeTabId: 'tab1',
+            } : undefined),
             metadata: {
               latencyMs: Date.now() - startTime,
               intent: agentResult.executedTool ? 'tool_action' : intent,
@@ -1630,7 +1679,7 @@ export class CentralAIEngine {
         const deepinferResult = await deepinfer.generateText({
           model: options.model,
           messages: [
-            { role: 'system', content: SYSTEM_PROMPTS.PERSONAL_EMPLOYEE },
+            { role: 'system', content: activeSystemPrompt },
             ...history.map(h => ({ role: (h.role === 'assistant' ? 'assistant' : 'user') as 'assistant' | 'user', content: h.content })),
             { role: 'user', content: rawMessage }
           ]
@@ -1673,7 +1722,7 @@ export class CentralAIEngine {
       const freellmResult = await freellm.generateText({
         model: options.model,
         messages: [
-          { role: 'system', content: SYSTEM_PROMPTS.PERSONAL_EMPLOYEE },
+          { role: 'system', content: activeSystemPrompt },
           ...history.map(h => ({ role: (h.role === 'assistant' ? 'assistant' : 'user') as 'assistant' | 'user', content: h.content })),
           { role: 'user', content: rawMessage }
         ]
@@ -1712,7 +1761,7 @@ export class CentralAIEngine {
       const nim = new NvidiaNIMProvider();
       const nimResult = await nim.generateText({
         messages: [
-          { role: 'system', content: SYSTEM_PROMPTS.PERSONAL_EMPLOYEE },
+          { role: 'system', content: activeSystemPrompt },
           ...history.map(h => ({ role: (h.role === 'assistant' ? 'assistant' : 'user') as 'assistant' | 'user', content: h.content })),
           { role: 'user', content: rawMessage }
         ]

@@ -94,6 +94,11 @@ export class ToolRegistry {
     this.register({ ...getUserPostsTool, name: 'tolee_get_insights' });
     this.register({ ...getToleeGroupsTool, name: 'tolee_manage_group' });
     this.register({ ...createReminderTool, name: 'tolee_create_reminder' });
+    this.register({ ...getUserProfileTool, name: 'tolee_get_profile' });
+    this.register({ ...getWalletBalanceTool, name: 'tolee_get_wallet' });
+    this.register({ ...getStoriesTool, name: 'tolee_get_stories' });
+    this.register({ ...getRadarAlertsTool, name: 'tolee_get_radar' });
+    this.register({ ...liveWebSearchTool, name: 'tolee_search' });
 
     // Logical dot-notation aliases (Section 4 & Open-Higgsfield)
     this.register({ ...createPostTool, name: 'content.create_post' });
