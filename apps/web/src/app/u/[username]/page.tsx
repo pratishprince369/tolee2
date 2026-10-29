@@ -428,6 +428,10 @@ export default async function UserProfile({ params }: PageProps) {
                   "description": user.bio || `Profile of ${profileName} on Tolee`,
                   "image": user.avatar || "https://tolee.in/logo.png",
                   "url": `https://tolee.in/u/${profileUsername}`,
+                  "speakable": {
+                    "@type": "SpeakableSpecification",
+                    "cssSelector": [".profile-name", ".profile-bio", ".aeo-direct-answer"]
+                  },
                   "interactionStatistic": [
                     {
                       "@type": "InteractionCounter",
@@ -468,6 +472,17 @@ export default async function UserProfile({ params }: PageProps) {
               })
             }}
           />
+          {/* Server-Side Rendered Semantic Profile Summary for AI Answer Engines (AEO/GEO) */}
+          <article className="sr-only">
+            <h1 className="profile-name">{profileName} ({user.username ? `@${user.username}` : ''}) on Tolee</h1>
+            <p className="aeo-direct-answer profile-bio">
+              {user.bio || `${profileName} is a community member and content creator on Tolee social platform.`}
+            </p>
+            <div>
+              <span>Subscribers: {subscriberCount || 0}</span>
+              <span>Profile URL: https://tolee.in/u/{profileUsername}</span>
+            </div>
+          </article>
         </>
       )}
     </>
