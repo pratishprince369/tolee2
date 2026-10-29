@@ -381,6 +381,7 @@ model Post {
   storyAnalytics PostStoryAnalytics?
   newsRelation   NewsPost?
   reelAudio      ReelAudio?
+  sourceValidation ReelSourceValidation?
 
   // Tolee Viral Control: user-controlled distribution
   viralCount             Int                      @default(0)
@@ -392,6 +393,7 @@ model Post {
   @@index([createdAt])
   @@index([status])
   @@index([worldProjectId])
+  @@index([postType, status, isArchived])
 }
 
 model NewsPost {
@@ -3079,6 +3081,30 @@ model ReelAudio {
 
   @@index([songId])
   @@index([postId])
+}
+
+model ReelSourceValidation {
+  id                      String    @id @default(cuid())
+  postId                  String    @unique
+  post                    Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  sourceType              String    @default("google_drive") // "google_drive" | "cloudinary" | "direct"
+  sourceFileId            String?
+  sourceUrl               String
+  validationStatus        String    @default("PENDING") // "READY" | "PENDING" | "VALIDATING" | "TEMPORARILY_UNAVAILABLE" | "INVALID" | "DISABLED"
+  lastValidatedAt         DateTime?
+  lastPlaybackSuccessAt   DateTime?
+  consecutiveFailureCount Int       @default(0)
+  lastFailureReason       String?
+  contentHash             String?
+  videoDuration           Float?
+  publishedAt             DateTime?
+  nextValidationAt        DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  @@index([validationStatus])
+  @@index([sourceFileId])
+  @@index([nextValidationAt])
 }
 
 model SongReport {

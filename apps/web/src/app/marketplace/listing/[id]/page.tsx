@@ -81,6 +81,10 @@ export default async function ListingDetailPage({ params }: ListingDetailPagePro
       "@type": "Brand",
       "name": "Tolee Marketplace"
     },
+    "speakable": {
+      "@type": "SpeakableSpecification",
+      "cssSelector": [".listing-title", ".listing-price", ".listing-description", ".aeo-direct-answer"]
+    },
     "offers": {
       "@type": "Offer",
       "url": `https://tolee.in/marketplace/listing/${id}`,

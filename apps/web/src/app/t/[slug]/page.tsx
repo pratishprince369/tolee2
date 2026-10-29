@@ -438,6 +438,10 @@ export default async function ToleePage({ params }: ToleePageProps) {
     "url": `https://tolee.in/t/${dbTolee.slug}`,
     "logo": dbTolee.avatar || "https://tolee.in/logo.png",
     "image": dbTolee.coverImage || dbTolee.avatar || "https://tolee.in/logo.png",
+    "speakable": {
+      "@type": "SpeakableSpecification",
+      "cssSelector": [".tolee-name", ".tolee-description", ".aeo-direct-answer"]
+    },
     "parentOrganization": {
       "@type": "Organization",
       "name": "Tolee",

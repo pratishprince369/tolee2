@@ -114,7 +114,11 @@ export default async function ScreenWatchLayout({ children, params }: LayoutProp
           "name": creatorName,
           "url": video.user?.username ? `https://tolee.in/u/${video.user.username}` : `https://tolee.in`
         },
-        "publisher": {
+        "speakable": {
+      "@type": "SpeakableSpecification",
+      "cssSelector": [".video-title", ".video-description", ".aeo-direct-answer"]
+    },
+    "publisher": {
           "@type": "Organization",
           "name": "Tolee Screen",
           "logo": {

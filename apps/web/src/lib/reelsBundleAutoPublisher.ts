@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { v2 as cloudinary } from 'cloudinary';
 import { getAllCloudinaryAccounts } from '@/lib/cloudinary-fallback';
+import { probeGoogleDriveVideo } from '@/lib/videoValidationService';
 
 export interface SourceIndexPage {
   id: string;
@@ -373,6 +374,10 @@ export async function buildCentralReelCatalog(forceRefresh = false): Promise<Cen
 
         if (!cleanId || cleanId.length < 20) continue;
 
+        // Skip non-video files (text, zip, pdf, etc.) and non-media names like "Bonuses"
+        if (/\.(txt|pdf|docx?|zip|rar|tar|7z|jpe?g|png|webp|exe|json|html?)$/i.test(rawTitle)) continue;
+        if (/^bonuses|bonus|readme|instruction|links|guide/i.test(rawTitle)) continue;
+
         // Skip cartoon & AI generated video indicators explicitly
         if (/ai_|#ai|flux|midjourney|ai generated|ai avatar|avatar|cartoon|2d animation/i.test(rawTitle)) continue;
         if (localSeen.has(cleanId)) continue;
@@ -675,6 +680,15 @@ export async function publishDailyBundleReelsBatch(maxLimitPerRun = 5): Promise<
           continue;
         }
 
+        // Validate the candidate with Google Drive probe before publishing to guarantee playability!
+        const probeResult = await probeGoogleDriveVideo(chosenVideo.fileId);
+        if (!probeResult.isValid) {
+          logs.push(`Skipping unplayable Drive candidate ${chosenVideo.fileId} (${probeResult.reason || 'probe failed'}).`);
+          sessionClaimedIds.add(chosenVideo.fileId);
+          usedFileIds.add(chosenVideo.fileId);
+          continue;
+        }
+
         // STEP 10: Cross-user duplicate claim
         sessionClaimedIds.add(chosenVideo.fileId);
         usedFileIds.add(chosenVideo.fileId);
@@ -699,7 +713,19 @@ export async function publishDailyBundleReelsBatch(maxLimitPerRun = 5): Promise<
             authorId: u.id,
             isSimulation: true,
             createdAt: postTimestamp,
-            tolees: defaultTolee ? { create: [{ toleeId: defaultTolee.id }] } : undefined
+            tolees: defaultTolee ? { create: [{ toleeId: defaultTolee.id }] } : undefined,
+            sourceValidation: {
+              create: {
+                sourceType: optimizedMedia.resourceType,
+                sourceFileId: chosenVideo.fileId,
+                sourceUrl: optimizedMedia.videoUrl,
+                validationStatus: 'READY',
+                lastValidatedAt: new Date(),
+                lastPlaybackSuccessAt: new Date(),
+                consecutiveFailureCount: 0,
+                publishedAt: postTimestamp,
+              }
+            }
           },
           select: { id: true }
         });

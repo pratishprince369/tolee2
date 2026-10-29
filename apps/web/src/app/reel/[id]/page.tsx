@@ -330,6 +330,10 @@ export default async function ReelDeepLinkPage({ params }: ReelPageProps) {
       "name": creatorName,
       "url": targetPost.author?.username ? `https://tolee.in/u/${targetPost.author.username}` : `https://tolee.in`
     },
+    "speakable": {
+      "@type": "SpeakableSpecification",
+      "cssSelector": [".reel-caption", ".aeo-direct-answer", "article p"]
+    },
     "publisher": {
       "@type": "Organization",
       "name": "Tolee Reels",

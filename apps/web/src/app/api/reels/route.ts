@@ -111,6 +111,7 @@ export async function GET(req: NextRequest) {
 
     // 4. Query candidate reels from Neon DB (Step 17, 33)
     // Prioritize real reels (Google Drive bundles, Apify Instagram, Cloudinary), exclude generic Pexels stock footage
+    // Strictly exclude any reel marked INVALID, DISABLED, or TEMPORARILY_UNAVAILABLE by video validation service
     let candidatePosts = await prisma.post.findMany({
       where: {
         postType: 'reel',
@@ -119,6 +120,10 @@ export async function GET(req: NextRequest) {
         mediaTypes: 'video',
         mediaUrls: { not: null },
         visibility: 'public',
+        OR: [
+          { sourceValidation: null },
+          { sourceValidation: { validationStatus: 'READY' } }
+        ],
         NOT: [
           { mediaUrls: { contains: '/image/upload/' } },
           { mediaUrls: { contains: 'pexels.com' } },
@@ -131,6 +136,14 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: 'desc' },
       take: 250, // Large candidate pool ensuring diversity across real bundle & IG reels
       include: {
+        sourceValidation: {
+          select: {
+            validationStatus: true,
+            consecutiveFailureCount: true,
+            sourceType: true,
+            sourceFileId: true
+          }
+        },
         author: {
           select: {
             id: true,
@@ -169,6 +182,10 @@ export async function GET(req: NextRequest) {
           mediaTypes: 'video',
           mediaUrls: { not: null },
           visibility: 'public',
+          OR: [
+            { sourceValidation: null },
+            { sourceValidation: { validationStatus: 'READY' } }
+          ],
           NOT: [
             { mediaUrls: { contains: '/image/upload/' } },
             { mediaUrls: { contains: 'pexels.com' } },
@@ -181,6 +198,14 @@ export async function GET(req: NextRequest) {
         orderBy: { createdAt: 'desc' },
         take: limit * 2,
         include: {
+          sourceValidation: {
+            select: {
+              validationStatus: true,
+              consecutiveFailureCount: true,
+              sourceType: true,
+              sourceFileId: true
+            }
+          },
           author: { select: { id: true, name: true, username: true, avatar: true, isPrivate: true, isVerified: true } },
           tolees: { include: { tolee: { select: { id: true, name: true, slug: true, ownerId: true } } } },
           _count: { select: { likes: true, comments: true, reposts: true, views: true } }
@@ -195,6 +220,8 @@ export async function GET(req: NextRequest) {
     const localVideoFingerprints = new Set<string>();
 
     for (const post of candidatePosts) {
+      // Exclude invalid, disabled, or unplayable video sources
+      if (post.sourceValidation && post.sourceValidation.validationStatus !== 'READY') continue;
       if (isKnownUnplayable(post.mediaUrls)) continue;
       const fp = extractVideoFingerprint(post.mediaUrls);
       

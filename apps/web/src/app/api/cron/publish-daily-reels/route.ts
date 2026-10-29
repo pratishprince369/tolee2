@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { publishDailyBundleReelsBatch, discoverBundleSources, buildCentralReelCatalog } from '@/lib/reelsBundleAutoPublisher';
+import { validateExistingPendingReels } from '@/lib/videoValidationService';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,8 +26,18 @@ async function handleBatchPublish(req: NextRequest) {
     const limitParam = parseInt(searchParams.get('limit') || searchParams.get('count') || '10', 10);
     const limit = Math.min(Math.max(limitParam, 1), 50);
 
-    const result = await publishDailyBundleReelsBatch(limit);
-    return NextResponse.json(result);
+    // 1. Run 2-hour multi-account bundle publisher (validated fresh content)
+    const publishResult = await publishDailyBundleReelsBatch(limit);
+
+    // 2. Validate existing pending or temporary reels in background
+    const validationResult = await validateExistingPendingReels(20);
+
+    return NextResponse.json({
+      success: true,
+      timestamp: new Date().toISOString(),
+      publishResult,
+      validationResult
+    });
   } catch (error: any) {
     console.error('[publish-daily-reels Cron Error]:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

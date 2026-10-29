@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isKnownUnplayable, markVideoHealth } from '@/lib/videoHealth';
+import { recordPlaybackFailure } from '@/lib/videoValidationService';
+import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
@@ -119,6 +121,13 @@ export async function GET(req: NextRequest) {
     // If still non-ok or still returning HTML, file is unplayable
     if ((!driveRes.ok && driveRes.status !== 206) || contentType.includes('text/html')) {
       markVideoHealth(fileId, false, driveRes.status || 502, 'Stream returned HTML or error status');
+      prisma.post.findFirst({
+        where: { OR: [{ mediaPublicIds: fileId }, { mediaUrls: { contains: fileId } }] },
+        select: { id: true }
+      }).then(p => {
+        if (p) recordPlaybackFailure(p.id, `Drive returned HTTP ${driveRes.status || 502}`).catch(() => {});
+      }).catch(() => {});
+
       return new NextResponse(JSON.stringify({ error: 'unplayable_drive_video', status: driveRes.status }), {
         status: 502,
         headers: {
@@ -138,6 +147,13 @@ export async function GET(req: NextRequest) {
   } catch (err: any) {
     console.error(`[DriveStreamProxy Error] fileId ${fileId}:`, err?.message || err);
     markVideoHealth(fileId, false, 504, err?.message || 'Gateway timeout');
+    prisma.post.findFirst({
+      where: { OR: [{ mediaPublicIds: fileId }, { mediaUrls: { contains: fileId } }] },
+      select: { id: true }
+    }).then(p => {
+      if (p) recordPlaybackFailure(p.id, `Drive proxy timeout: ${err?.message || '504'}`).catch(() => {});
+    }).catch(() => {});
+
     return new NextResponse(JSON.stringify({ error: 'drive_gateway_timeout' }), {
       status: 504,
       headers: {

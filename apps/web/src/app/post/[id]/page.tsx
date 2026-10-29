@@ -177,6 +177,10 @@ export default async function PostPage({ params }: PostPageProps) {
       "name": authorName,
       "url": `https://tolee.in/u/${authorUsername}`
     },
+    "speakable": {
+      "@type": "SpeakableSpecification",
+      "cssSelector": [".post-caption", ".aeo-direct-answer", "article p"]
+    },
     "publisher": {
       "@type": "Organization",
       "name": "Tolee",

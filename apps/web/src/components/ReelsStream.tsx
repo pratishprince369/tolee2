@@ -535,6 +535,12 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
       if (!viewedReelsRef.current.has(reelId)) {
         viewedReelsRef.current.add(reelId);
         sessionLoadedReelIds.current.add(reelId);
+        // Report verified playback success to backend
+        fetch('/api/video/report-failure', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reelId, status: 'success' }),
+        }).catch(() => {});
         try {
           const stored = JSON.parse(sessionStorage.getItem('tolee_viewed_reels') || '[]');
           if (Array.isArray(stored) && !stored.includes(reelId)) {
@@ -786,6 +792,12 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
     const reelId = item.type === 'reel' ? item.data?.id : (item.data?.id || item.id);
     if (reelId) {
       failedReelsSessionSet.current.add(reelId);
+      // Immediately notify backend to validate & exclude from all feeds
+      fetch('/api/video/report-failure', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reelId, errorDetail: errDetail }),
+      }).catch(() => {});
     }
 
     // Cancel active view timer immediately — failed videos never count as views
@@ -1769,22 +1781,9 @@ const ReelSlide = memo(function ReelSlide({
                   <AlertCircle className="w-8 h-8 text-red-400" />
                 </div>
                 <div className="space-y-1">
-                  <h4 className="font-bold text-sm text-zinc-200">Buffering issue</h4>
-                  <p className="text-xs text-zinc-400 max-w-[200px]">Tap retry to reload video stream</p>
+                  <h4 className="font-bold text-sm text-zinc-200">Loading next Reel...</h4>
+                  <p className="text-xs text-zinc-400 max-w-[200px]">Skipping unavailable video</p>
                 </div>
-                <button
-                  disabled={retryKey >= 3}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    clearReadinessTimer();
-                    setIsError(false);
-                    setIsReady(false);
-                    setRetryKey((prev) => prev + 1);
-                  }}
-                  className="px-4 py-1.5 rounded-full bg-white/20 hover:bg-white/30 text-white font-medium text-xs transition-all active:scale-95 border border-white/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {retryKey >= 3 ? 'Unable to load' : 'Retry'}
-                </button>
               </div>
             </div>
           )}
