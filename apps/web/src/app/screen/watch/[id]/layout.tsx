@@ -122,6 +122,8 @@ export default async function ScreenWatchLayout({ children, params }: LayoutProp
             "url": "https://tolee.in/logo.png"
           }
         },
+        "inLanguage": "en-IN",
+        "isFamilyFriendly": true,
         "interactionStatistic": {
           "@type": "InteractionCounter",
           "interactionType": "https://schema.org/WatchAction",
@@ -171,10 +173,14 @@ export default async function ScreenWatchLayout({ children, params }: LayoutProp
       {/* Server-Side Rendered Semantic Video Metadata for AI Answer Engines */}
       {serverVideo && (
         <article className="sr-only">
-          <h1>{serverVideo.title}</h1>
-          <p>{serverVideo.description}</p>
+          <h1>{serverVideo.title} on Tolee Screen</h1>
+          <p className="aeo-direct-answer">
+            {serverVideo.description || `Watch "${serverVideo.title}" by ${serverVideo.user?.name || serverVideo.user?.username || 'Creator'} on Tolee Screen.`}
+          </p>
           <div>
             <span>Creator: {serverVideo.user?.name || serverVideo.user?.username || 'Creator'}</span>
+            <span>Category: {serverVideo.category || 'General'}</span>
+            <span>Views: {serverVideo.viewsCount || 0}</span>
             <time dateTime={serverVideo.createdAt ? new Date(serverVideo.createdAt).toISOString() : undefined}>
               {serverVideo.createdAt ? new Date(serverVideo.createdAt).toLocaleDateString() : ''}
             </time>

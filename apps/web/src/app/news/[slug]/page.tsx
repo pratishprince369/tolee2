@@ -211,11 +211,32 @@ export default async function NewsReaderPage({ params }: { params: { slug: strin
       "@type": "WebPage",
       "@id": `https://tolee.in/news/${params.slug}`
     },
+    "inLanguage": news.language ? (news.language.toLowerCase() === 'english' ? 'en-IN' : 'hi-IN') : 'en-IN',
+    "articleSection": news.category || 'General',
+    "keywords": news.keywords ? news.keywords.split(',').map((k: string) => k.trim()) : undefined,
     "speakable": {
       "@type": "SpeakableSpecification",
-      "cssSelector": [".news-headline", ".news-summary", "article p"]
+      "cssSelector": [".news-headline", ".news-summary", ".aeo-direct-answer", "article p"]
     }
   };
+
+  // Extract FAQ blocks for Google Rich FAQ Snippets & AI Citability (AEO/GEO)
+  const faqBlocks = contentBlocks.filter(
+    (b: any) => b && b.type === 'faq' && b.value && b.value.question && b.value.answer
+  );
+
+  const jsonLdFaq = faqBlocks.length > 0 ? {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": faqBlocks.map((b: any) => ({
+      "@type": "Question",
+      "name": b.value.question,
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": typeof b.value.answer === 'string' ? b.value.answer : JSON.stringify(b.value.answer)
+      }
+    }))
+  } : null;
 
   const jsonLdBreadcrumbs = {
     "@context": "https://schema.org",
@@ -252,6 +273,12 @@ export default async function NewsReaderPage({ params }: { params: { slug: strin
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdBreadcrumbs) }}
       />
+      {jsonLdFaq && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdFaq) }}
+        />
+      )}
       
       {/* Reader Header Nav */}
       <div className="sticky top-0 z-30 bg-white/95 dark:bg-[#0a0a0a]/95 backdrop-blur-md border-b border-gray-100 dark:border-zinc-900 px-4 py-3 flex items-center justify-between">
@@ -281,7 +308,7 @@ export default async function NewsReaderPage({ params }: { params: { slug: strin
           </h1>
 
           {news.summary && (
-            <p className="news-summary text-[16px] sm:text-[17px] text-gray-500 dark:text-zinc-400 leading-relaxed font-medium italic">
+            <p className="news-summary aeo-direct-answer text-[16px] sm:text-[17px] text-gray-500 dark:text-zinc-400 leading-relaxed font-medium italic">
               {news.summary}
             </p>
           )}

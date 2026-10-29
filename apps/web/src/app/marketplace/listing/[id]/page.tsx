@@ -138,11 +138,14 @@ export default async function ListingDetailPage({ params }: ListingDetailPagePro
       />
       {/* Server-Side Rendered Semantic Metadata for AI Search & Answer Engines */}
       <article className="sr-only">
-        <h1>{listing.title}</h1>
-        <p>{listing.description}</p>
+        <h1>{listing.title} on Tolee Marketplace</h1>
+        <p className="aeo-direct-answer">
+          {listing.title} is listed on Tolee Marketplace for ₹{listing.price?.toLocaleString() || '0'}{listing.locationText ? ` in ${listing.locationText}` : ''}. Condition: {listing.condition || 'Pre-owned'}. Contact seller {listing.seller?.name || 'Tolee Member'} directly on Tolee with 0% platform commission.
+        </p>
         <div>
           <span>Price: ₹{listing.price?.toLocaleString() || '0'}</span>
           <span>Category: {listing.category || 'Classifieds'}</span>
+          <span>Condition: {listing.condition || 'Pre-owned'}</span>
           <span>Location: {listing.locationText || 'India'}</span>
           <span>Seller: {listing.seller?.name || 'Tolee Member'}</span>
         </div>

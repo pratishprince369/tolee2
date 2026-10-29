@@ -495,7 +495,9 @@ export default async function ToleePage({ params }: ToleePageProps) {
               {/* Server-Side Rendered Semantic Metadata for AI Search Crawlers */}
       <article className="sr-only">
         <h1>{dbTolee.name} Community on Tolee</h1>
-        <p>{dbTolee.description}</p>
+        <p className="aeo-direct-answer">
+          {dbTolee.name} is a verified community group on Tolee with {dbTolee._count?.members || 0} active members{dbTolee.category ? ` focused on ${dbTolee.category}` : ''}. {dbTolee.description || 'Join to discuss, share reels, and connect with members.'}
+        </p>
         <div>
           <span>Category: {dbTolee.category || 'General'}</span>
           <span>Members: {dbTolee._count?.members || 0}</span>

@@ -161,11 +161,17 @@ export default async function PostPage({ params }: PostPageProps) {
   const jsonLdPost = {
     "@context": "https://schema.org",
     "@type": "SocialMediaPosting",
-    "headline": post.caption?.slice(0, 110) || `Post by ${authorName}`,
+    "headline": post.caption?.slice(0, 110) || `Post by ${authorName} on Tolee`,
     "articleBody": post.caption || '',
     "url": `https://tolee.in/post/${id}`,
     "mainEntityOfPage": `https://tolee.in/post/${id}`,
+    "inLanguage": "en-IN",
     "datePublished": post.createdAt ? new Date(post.createdAt).toISOString() : new Date().toISOString(),
+    "dateModified": post.updatedAt ? new Date(post.updatedAt).toISOString() : (post.createdAt ? new Date(post.createdAt).toISOString() : new Date().toISOString()),
+    "contentLocation": post.location ? {
+      "@type": "Place",
+      "name": post.location
+    } : undefined,
     "author": {
       "@type": "Person",
       "name": authorName,
@@ -232,11 +238,14 @@ export default async function PostPage({ params }: PostPageProps) {
       />
       {/* Server-Side Rendered Semantic Metadata & Content for AI Search Engines & Bots */}
       <article className="sr-only">
-        <h1>{post.caption?.slice(0, 100) || `Post by ${authorName}`}</h1>
-        <p>{post.caption}</p>
+        <h1>{post.caption?.slice(0, 100) || `Post by ${authorName} on Tolee`}</h1>
+        <p className="aeo-direct-answer">{post.caption || `Community post by ${authorName} on Tolee.`}</p>
         <div>
           <span>Creator: {authorName} (@{authorUsername})</span>
+          {post.location && <span>Location: {post.location}</span>}
           <time dateTime={post.createdAt}>{new Date(post.createdAt || Date.now()).toLocaleDateString()}</time>
+          <span>Likes: {post.likes || 0}</span>
+          <span>Comments: {post.comments || 0}</span>
         </div>
       </article>
 

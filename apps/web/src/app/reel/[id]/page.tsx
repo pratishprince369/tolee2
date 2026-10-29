@@ -339,6 +339,8 @@ export default async function ReelDeepLinkPage({ params }: ReelPageProps) {
         "url": "https://tolee.in/logo.png"
       }
     },
+    "inLanguage": "en-IN",
+    "isFamilyFriendly": true,
     "interactionStatistic": {
       "@type": "InteractionCounter",
       "interactionType": "https://schema.org/WatchAction",
@@ -386,10 +388,12 @@ export default async function ReelDeepLinkPage({ params }: ReelPageProps) {
       {/* Server-Side Rendered Semantic Metadata for AI Search Crawlers & Indexing */}
       {targetPost && (
         <article className="sr-only">
-          <h1>{targetPost.caption?.slice(0, 100) || `Reel by ${creatorName}`}</h1>
-          <p>{targetPost.caption}</p>
+          <h1>{targetPost.caption?.slice(0, 100) || `Reel by ${creatorName} on Tolee`}</h1>
+          <p className="aeo-direct-answer">{targetPost.caption || `Watch vertical video reel by ${creatorName} on Tolee Reels.`}</p>
           <div>
             <span>Creator: {creatorName}</span>
+            <span>Views: {targetPost._count?.views || 0}</span>
+            <span>Likes: {targetPost._count?.likes || 0}</span>
             <time dateTime={targetPost.createdAt}>{new Date(targetPost.createdAt || Date.now()).toLocaleDateString()}</time>
           </div>
         </article>
