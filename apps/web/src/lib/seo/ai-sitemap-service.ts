@@ -45,7 +45,7 @@ export class AISitemapService {
       console.log('[AISitemapService] Starting Daily Sitemap Generation with NVIDIA AI...');
 
       // 1. Fetch fresh candidate data from Neon PostgreSQL
-      const [recentNews, recentReels, activeTolees, recentListings, worldProjects] = await Promise.all([
+      const [recentNews, recentReels, activeTolees, recentListings, worldProjects, recentScreenVideos] = await Promise.all([
         prisma.newsPost.findMany({
           where: { post: { status: 'published', isArchived: false } },
           select: { slug: true, updatedAt: true, post: { select: { caption: true } } },
@@ -82,6 +82,11 @@ export class AISitemapService {
           select: { slug: true, type: true, updatedAt: true },
           take: 20,
         }).catch(() => []),
+        prisma.screenVideo.findMany({
+          select: { id: true, title: true, createdAt: true },
+          orderBy: { createdAt: 'desc' },
+          take: 25,
+        }).catch(() => []),
       ]);
 
       // 2. NVIDIA AI Consultation: Analyze headlines and detect viral search intent
@@ -98,8 +103,8 @@ export class AISitemapService {
 
       try {
         const nim = new NvidiaNIMProvider();
-        const newsSamples = recentNews.slice(0, 10).map((n) => n.post?.caption || n.slug).filter(Boolean);
-        const reelSamples = recentReels.slice(0, 10).map((r) => r.caption).filter(Boolean);
+        const newsSamples = recentNews.slice(0, 10).map((n: any) => n.post?.caption || n.slug).filter(Boolean);
+        const reelSamples = recentReels.slice(0, 10).map((r: any) => r.caption).filter(Boolean);
 
         const prompt = `You are Tolee AI SEO Strategist. Analyze these recent Indian news headlines and viral social reel topics:
 Headlines: ${JSON.stringify(newsSamples.slice(0, 8))}
@@ -239,6 +244,16 @@ Return JSON only in this exact schema:
           lastmod: p.updatedAt ? new Date(p.updatedAt).toISOString() : nowIso,
           changefreq: 'weekly',
           priority: 0.8,
+        });
+      }
+
+      // H. Tolee Screen Public Watch Videos
+      for (const v of (recentScreenVideos || [])) {
+        urlEntries.push({
+          loc: `${baseUrl}/screen/watch/${v.id}`,
+          lastmod: v.createdAt ? new Date(v.createdAt).toISOString() : nowIso,
+          changefreq: 'weekly',
+          priority: 0.85,
         });
       }
 
