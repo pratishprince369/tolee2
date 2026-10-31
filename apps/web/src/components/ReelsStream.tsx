@@ -324,6 +324,11 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
 
   const isLoadingMore = useRef(false);
   const hasMoreRef = useRef(true);
+  const nextCursorRef = useRef<string | null>(
+    initialReels && initialReels.length > 0 && initialReels[initialReels.length - 1]?.id
+      ? (new Date(initialReels[initialReels.length - 1].createdAt || Date.now()).toISOString() + '_' + initialReels[initialReels.length - 1].id)
+      : null
+  );
 
   // STEP 16: Active session deduplication tracking
   const sessionLoadedReelIds = useRef(new Set<string>());
@@ -358,50 +363,71 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
     isLoadingMore.current = true;
 
     try {
+      const cursorParam = nextCursorRef.current ? `&cursor=${encodeURIComponent(nextCursorRef.current)}` : '';
       const fp = typeof window !== 'undefined' ? localStorage.getItem('device_fingerprint') || '' : '';
       const fpParam = fp ? `&fingerprint=${encodeURIComponent(fp)}` : '';
       
-      // Step 16 & 17: Exclude all recently displayed reel IDs (server-side query filtering)
-      const excludeList = Array.from(sessionLoadedReelIds.current).slice(-100).join(',');
+      // Send recently displayed reel IDs to prevent immediate duplicate delivery
+      const excludeList = Array.from(sessionLoadedReelIds.current).slice(-80).join(',');
       const excludeParam = excludeList ? `&excludeIds=${encodeURIComponent(excludeList)}` : '';
 
-      const res = await fetch(`/api/reels?limit=10${excludeParam}${fpParam}`).then(r => r.json()).catch(() => null);
+      const res = await fetch(`/api/reels?limit=10${cursorParam}${excludeParam}${fpParam}`, {
+        cache: 'no-store'
+      }).then(r => r.json()).catch(() => null);
 
-      if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
+      if (res && res.success && Array.isArray(res.data)) {
         const newReels = res.data;
         hasMoreRef.current = Boolean(res.hasMore);
+        if (res.nextCursor) {
+          nextCursorRef.current = res.nextCursor;
+        }
 
-        setReels((prev) => {
-          const existingIds = new Set(prev.map((r: any) => r.id));
-          const existingVideos = new Set(
-            prev.map((r: any) => (r.video || '').split('?')[0].toLowerCase()).filter(Boolean)
-          );
+        if (newReels.length > 0) {
+          setReels((prev) => {
+            const existingIds = new Set(prev.map((r: any) => r.id));
+            const existingVideos = new Set(
+              prev.map((r: any) => (r.video || '').split('?')[0].toLowerCase()).filter(Boolean)
+            );
 
-          // Step 16: Zero duplicates guarantee by ID & clean video stream URL
-          const uniqueNewReels = newReels.filter((r: any) => {
-            if (!r || !r.id || existingIds.has(r.id)) return false;
-            const vKey = (r.video || '').split('?')[0].toLowerCase();
-            if (vKey && existingVideos.has(vKey)) return false;
+            // Step 16: Zero duplicates guarantee by ID & clean video stream URL
+            const uniqueNewReels = newReels.filter((r: any) => {
+              if (!r || !r.id || existingIds.has(r.id) || sessionLoadedReelIds.current.has(r.id)) return false;
+              const vKey = (r.video || '').split('?')[0].toLowerCase();
+              if (vKey && (existingVideos.has(vKey) || displayedVideoUrls.current.has(vKey))) return false;
 
-            existingIds.add(r.id);
-            sessionLoadedReelIds.current.add(r.id);
-            if (vKey) {
-              existingVideos.add(vKey);
-              displayedVideoUrls.current.add(vKey);
+              existingIds.add(r.id);
+              sessionLoadedReelIds.current.add(r.id);
+              if (vKey) {
+                existingVideos.add(vKey);
+                displayedVideoUrls.current.add(vKey);
+              }
+              videoMetadataCache.set(r.id, r);
+              return true;
+            });
+
+            if (uniqueNewReels.length === 0) {
+              // If incoming batch had duplicates, but more exist in database, advance cursor
+              if (res.hasMore && res.nextCursor) {
+                setTimeout(() => {
+                  isLoadingMore.current = false;
+                  loadMoreReels();
+                }, 50);
+              } else {
+                hasMoreRef.current = false;
+              }
+              return prev;
             }
-            videoMetadataCache.set(r.id, r);
-            return true;
+
+            return [...prev, ...uniqueNewReels];
           });
-
-          if (uniqueNewReels.length === 0) {
-            hasMoreRef.current = false;
-            return prev;
-          }
-
-          return [...prev, ...uniqueNewReels];
-        });
+        } else if (res.hasMore && res.nextCursor) {
+          setTimeout(() => {
+            isLoadingMore.current = false;
+            loadMoreReels();
+          }, 50);
+        }
       } else {
-        hasMoreRef.current = false;
+        // Network or server glitch; keep hasMoreRef so user can retry upon scrolling
       }
     } catch (err) {
       console.error('Failed to load more reels:', err);
@@ -718,11 +744,19 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
   }, [isAnyModalOpen]);
 
   useEffect(() => {
-    // When the user approaches the end of the loaded reels (e.g. index is reels.length - 6, i.e. 5 remaining reels)
-    if (reels.length > 0 && activeIndex >= reels.length - 6) {
+    // When the user approaches the end of the loaded reels (5 or fewer remaining), prefetch next batch
+    const remaining = reels.length - activeIndex;
+    if (reels.length > 0 && remaining <= 5) {
       loadMoreReels();
     }
   }, [activeIndex, reels.length, loadMoreReels]);
+
+  // Automatic backfill if initial batch has fewer than 5 reels
+  useEffect(() => {
+    if (reels.length < 5) {
+      loadMoreReels();
+    }
+  }, [reels.length, loadMoreReels]);
 
   /* ── Desktop arrow navigation ── */
   const scrollToReel = useCallback((containerRef: React.RefObject<HTMLDivElement | null>, idx: number) => {

@@ -111,7 +111,7 @@ export function generateProfileSchema(user: {
 }
 
 /**
- * 4. Group / Community Schema (for Tolee Communities)
+ * 4. Group / Community Schema (for Tolee Communities / Groups) - GEO/AEO Enhanced
  */
 export function generateGroupSchema(tolee: {
   slug: string;
@@ -130,13 +130,19 @@ export function generateGroupSchema(tolee: {
 
   return {
     '@context': 'https://schema.org',
-    '@type': 'Organization',
+    '@type': ['Organization', 'CommunityGroup'],
     name: `${tolee.name} Community`,
     alternateName: tolee.name,
     url: groupUrl,
     logo: tolee.avatar || bannerImage,
     image: bannerImage,
-    description: tolee.description || `Join ${tolee.name} on Tolee to connect with local members, discover discussions, and community updates.`,
+    description: tolee.description || `Join ${tolee.name} on Tolee to connect with local members, discover discussions, events, and community updates.`,
+    inLanguage: 'en-IN',
+    areaServed: 'India',
+    speakable: {
+      '@type': 'SpeakableSpecification',
+      cssSelector: ['.tolee-name', '.tolee-desc', '.aeo-direct-answer', 'h1', 'p'],
+    },
     ...(tolee.category ? { knowsAbout: tolee.category } : {}),
     ...(typeof tolee.memberCount === 'number'
       ? {
@@ -151,7 +157,7 @@ export function generateGroupSchema(tolee: {
 }
 
 /**
- * 5. DiscussionForumPosting / SocialMediaPosting Schema (for UGC Posts)
+ * 5. DiscussionForumPosting / SocialMediaPosting Schema (for UGC Posts) - GEO/AEO Enhanced
  */
 export function generatePostSchema(post: {
   id: string;
@@ -166,6 +172,7 @@ export function generatePostSchema(post: {
   likesCount?: number;
   commentsCount?: number;
   shareCount?: number;
+  location?: string | null;
 }) {
   const postUrl = getCanonicalUrl(`/post/${post.id}`);
   const authorProfileUrl = post.authorUsername ? getCanonicalUrl(`/u/${post.authorUsername}`) : SEO_CONFIG.siteUrl;
@@ -174,13 +181,18 @@ export function generatePostSchema(post: {
 
   return {
     '@context': 'https://schema.org',
-    '@type': 'DiscussionForumPosting',
+    '@type': ['SocialMediaPosting', 'DiscussionForumPosting'],
     '@id': postUrl,
     headline,
     articleBody: post.caption || '',
     url: postUrl,
     datePublished: post.createdAt ? new Date(post.createdAt).toISOString() : new Date().toISOString(),
     image: image ? [image] : [SEO_CONFIG.defaultOgImage],
+    inLanguage: 'en-IN',
+    speakable: {
+      '@type': 'SpeakableSpecification',
+      cssSelector: ['.post-caption', '.aeo-direct-answer', 'article p'],
+    },
     author: {
       '@type': 'Person',
       name: post.authorName || post.authorUsername || 'Tolee Creator',
@@ -196,6 +208,14 @@ export function generatePostSchema(post: {
         url: SEO_CONFIG.organization.logo,
       },
     },
+    ...(post.location
+      ? {
+          contentLocation: {
+            '@type': 'Place',
+            name: post.location,
+          },
+        }
+      : {}),
     ...(post.toleeName
       ? {
           isPartOf: {
@@ -238,7 +258,7 @@ export function generatePostSchema(post: {
 }
 
 /**
- * 6. VideoObject Schema (for Reels & Screen Videos)
+ * 6. VideoObject Schema (for Reels & Screen Videos) - GEO/AEO & SeekAction Enhanced
  */
 export function generateVideoSchema(video: {
   id: string;
@@ -275,6 +295,17 @@ export function generateVideoSchema(video: {
     uploadDate: video.uploadDate ? new Date(video.uploadDate).toISOString() : new Date().toISOString(),
     contentUrl: video.videoUrl || undefined,
     embedUrl: watchUrl,
+    inLanguage: 'en-IN',
+    isFamilyFriendly: true,
+    speakable: {
+      '@type': 'SpeakableSpecification',
+      cssSelector: ['.video-title', '.video-description', '.aeo-direct-answer', 'h1', 'p'],
+    },
+    potentialAction: {
+      '@type': 'SeekToAction',
+      target: `${watchUrl}?t={seek_to_second_number}`,
+      'startOffset-input': 'required name=seek_to_second_number',
+    },
     ...(formattedDuration ? { duration: formattedDuration } : {}),
     author: {
       '@type': 'Person',
@@ -283,7 +314,7 @@ export function generateVideoSchema(video: {
     },
     publisher: {
       '@type': 'Organization',
-      name: SEO_CONFIG.siteName,
+      name: video.isScreen ? 'Tolee Screen' : 'Tolee Reels',
       logo: {
         '@type': 'ImageObject',
         url: SEO_CONFIG.organization.logo,
@@ -313,7 +344,7 @@ export function generateVideoSchema(video: {
 }
 
 /**
- * 7. NewsArticle / Article Schema (for Editorial and News Posts)
+ * 7. NewsArticle / Article Schema (for Editorial and News Posts) - GEO/AEO & E-E-A-T Enhanced
  */
 export function generateNewsArticleSchema(article: {
   slug: string;
@@ -326,6 +357,8 @@ export function generateNewsArticleSchema(article: {
   authorName?: string | null;
   authorUsername?: string | null;
   category?: string | null;
+  keywords?: string[];
+  wordCount?: number;
 }) {
   const articleUrl = getCanonicalUrl(`/news/${article.slug}`);
   const authorUrl = article.authorUsername ? getCanonicalUrl(`/u/${article.authorUsername}`) : SEO_CONFIG.siteUrl;
@@ -344,14 +377,22 @@ export function generateNewsArticleSchema(article: {
       '@type': 'WebPage',
       '@id': articleUrl,
     },
+    inLanguage: 'en-IN',
+    isAccessibleForFree: true,
     author: {
       '@type': 'Person',
       name: article.authorName || article.authorUsername || 'Tolee Editorial',
       url: authorUrl,
+      ...(article.category ? { knowsAbout: [article.category, 'Journalism', 'India News'] } : {}),
+      worksFor: {
+        '@type': 'Organization',
+        name: 'Tolee News',
+        url: SEO_CONFIG.siteUrl,
+      },
     },
     publisher: {
       '@type': 'Organization',
-      name: SEO_CONFIG.siteName,
+      name: 'Tolee News',
       logo: {
         '@type': 'ImageObject',
         url: SEO_CONFIG.organization.logo,
@@ -359,14 +400,16 @@ export function generateNewsArticleSchema(article: {
     },
     speakable: {
       '@type': 'SpeakableSpecification',
-      cssSelector: ['.news-headline', '.news-summary', 'article p'],
+      cssSelector: ['.news-headline', '.news-summary', '.aeo-direct-answer', 'article p'],
     },
+    ...(article.wordCount ? { wordCount: article.wordCount } : {}),
     ...(article.category ? { articleSection: article.category } : {}),
+    ...(article.keywords && article.keywords.length > 0 ? { keywords: article.keywords.join(', ') } : {}),
   };
 }
 
 /**
- * 8. Product / Offer Schema (for Marketplace Listings)
+ * 8. Product / Offer Schema (for Marketplace Listings) - AEO/GEO Enhanced
  */
 export function generateListingSchema(listing: {
   id: string;
@@ -379,6 +422,7 @@ export function generateListingSchema(listing: {
   sellerName?: string | null;
   sellerUsername?: string | null;
   status?: string | null;
+  condition?: string | null;
   createdAt?: Date | string | null;
 }) {
   const listingUrl = getCanonicalUrl(`/marketplace/listing/${listing.id}`);
@@ -400,16 +444,30 @@ export function generateListingSchema(listing: {
     description: listing.description || listing.title,
     image: imageList,
     url: listingUrl,
+    brand: {
+      '@type': 'Brand',
+      name: 'Tolee Marketplace',
+    },
+    speakable: {
+      '@type': 'SpeakableSpecification',
+      cssSelector: ['.listing-title', '.listing-price', '.listing-description', '.aeo-direct-answer'],
+    },
     offers: {
       '@type': 'Offer',
       price: !isNaN(numericPrice) ? numericPrice : 0,
       priceCurrency: listing.currency || 'INR',
+      priceValidUntil: '2030-12-31',
+      itemCondition: listing.condition === 'new' ? 'https://schema.org/NewCondition' : 'https://schema.org/UsedCondition',
       availability: listing.status === 'active' ? 'https://schema.org/InStock' : 'https://schema.org/SoldOut',
       url: listingUrl,
       seller: {
         '@type': 'Person',
         name: listing.sellerName || listing.sellerUsername || 'Tolee Seller',
         url: sellerUrl,
+      },
+      availableAtOrFrom: {
+        '@type': 'Place',
+        name: listing.location || 'India',
       },
       ...(listing.location ? { areaServed: listing.location } : {}),
     },
@@ -556,7 +614,7 @@ export function generateBlogPostingSchema(blog: {
     },
     speakable: {
       '@type': 'SpeakableSpecification',
-      cssSelector: ['h1', 'article p'],
+      cssSelector: ['h1', 'article p', '.aeo-direct-answer'],
     },
     ...(blog.category ? { articleSection: blog.category } : {}),
     ...(blog.keywords && blog.keywords.length > 0 ? { keywords: blog.keywords } : {}),

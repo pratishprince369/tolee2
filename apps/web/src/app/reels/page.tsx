@@ -145,8 +145,8 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
       }
     });
 
-    // Fallback if unseen pool is low, backfill from general pool
-    if (candidatePosts.length < 15) {
+    // If initial query returned few candidates, fetch general candidates pool
+    if (candidatePosts.length < 30) {
       const fallbackPosts = await prisma.post.findMany({
         where: {
           postType: 'reel',
@@ -155,15 +155,15 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
           visibility: 'public',
           mediaUrls: { not: null },
           NOT: [
-          { mediaUrls: { contains: '/image/upload/' } },
-          { mediaUrls: { contains: 'pexels.com' } },
-          { caption: { contains: '#ai_' } },
-          { caption: { contains: '#ai ' } },
-          { caption: { contains: '#ai\n' } }
-        ]
+            { mediaUrls: { contains: '/image/upload/' } },
+            { mediaUrls: { contains: 'pexels.com' } },
+            { caption: { contains: '#ai_' } },
+            { caption: { contains: '#ai ' } },
+            { caption: { contains: '#ai\n' } }
+          ]
         },
-        orderBy: { createdAt: 'desc' },
-        take: 50,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: 60,
         include: {
           author: { select: { id: true, name: true, username: true, avatar: true, isPrivate: true, isVerified: true } },
           tolees: { include: { tolee: { select: { id: true, name: true, slug: true, ownerId: true } } } },
