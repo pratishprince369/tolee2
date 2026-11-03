@@ -2,13 +2,13 @@ apply plugin: 'com.android.application'
 
 android {
     namespace = "in.tolee.app"
-    compileSdk = rootProject.ext.compileSdkVersion
+    compileSdk 36
     defaultConfig {
         applicationId "in.tolee.app"
-        minSdkVersion rootProject.ext.minSdkVersion
-        targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 72
-        versionName "1.7.6"
+        minSdkVersion 24
+        targetSdkVersion 36
+        versionCode 73
+        versionName "1.7.7"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         
         // Optimize APK size by splitting into different architectures
