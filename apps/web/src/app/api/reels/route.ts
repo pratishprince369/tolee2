@@ -18,12 +18,12 @@ function shuffleArray<T>(array: T[]): T[] {
   return arr;
 }
 
-export function encodeCursor(post: { id: string; createdAt: Date }): string {
+function encodeCursor(post: { id: string; createdAt: Date }): string {
   const iso = new Date(post.createdAt).toISOString();
   return `${iso}_${post.id}`;
 }
 
-export function parseCursor(cursorStr: string | null | undefined): { cursorDate: Date; cursorId: string } | null {
+function parseCursor(cursorStr: string | null | undefined): { cursorDate: Date; cursorId: string } | null {
   if (!cursorStr) return null;
   try {
     const idx = cursorStr.lastIndexOf('_');

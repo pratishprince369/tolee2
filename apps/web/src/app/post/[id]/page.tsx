@@ -167,7 +167,7 @@ export default async function PostPage({ params }: PostPageProps) {
     "mainEntityOfPage": `https://tolee.in/post/${id}`,
     "inLanguage": "en-IN",
     "datePublished": post.createdAt ? new Date(post.createdAt).toISOString() : new Date().toISOString(),
-    "dateModified": post.updatedAt ? new Date(post.updatedAt).toISOString() : (post.createdAt ? new Date(post.createdAt).toISOString() : new Date().toISOString()),
+    "dateModified": (post as any).updatedAt ? new Date((post as any).updatedAt).toISOString() : (post.createdAt ? new Date(post.createdAt).toISOString() : new Date().toISOString()),
     "contentLocation": post.location ? {
       "@type": "Place",
       "name": post.location
