@@ -60,6 +60,8 @@ export async function POST(req: Request) {
         verification_otp: null,
         verification_attempts: 0,
         emailVerified: new Date(), // Standard NextAuth field compatibility
+        lastLoginAt: new Date(),
+        lastActiveAt: new Date()
       }
     });
 

@@ -113,6 +113,7 @@ export const authOptions: NextAuthOptions = {
                 data: {
                   lastLoginIp: ip,
                   lastLoginAt: new Date(),
+                  lastActiveAt: new Date(),
                   lastLoginDevice: "Android App - Native Google Sign-In",
                 }
               });
@@ -189,6 +190,7 @@ export const authOptions: NextAuthOptions = {
             data: {
               lastLoginIp: ip,
               lastLoginAt: new Date(),
+              lastActiveAt: new Date(),
               lastLoginDevice: userAgent,
             }
           });
@@ -208,6 +210,15 @@ export const authOptions: NextAuthOptions = {
   events: {
     async createUser({ user }) {
       try {
+        // Guarantee lastLoginAt and lastActiveAt on user creation
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            lastLoginAt: new Date(),
+            lastActiveAt: new Date()
+          }
+        }).catch(() => {});
+
         await autoJoinDefaultTolees(user.id, 5);
 
         const welcomeNotif = await prisma.notification.findFirst({
@@ -267,14 +278,18 @@ export const authOptions: NextAuthOptions = {
       // Record login activity for non-credential standard provider logins (e.g. Google OAuth)
       if (account?.provider !== 'credentials') {
         try {
-          await prisma.user.update({
-            where: { id: user.id },
-            data: {
-              lastLoginAt: new Date(),
-              lastLoginIp: "OAuth Direct",
-              lastLoginDevice: `${account?.provider ? account.provider.charAt(0).toUpperCase() + account.provider.slice(1) : 'Google'} OAuth Session`
-            }
-          });
+          const userIdentifier = user?.id ? { id: user.id } : (user?.email ? { email: user.email } : null);
+          if (userIdentifier) {
+            await prisma.user.updateMany({
+              where: userIdentifier,
+              data: {
+                lastLoginAt: new Date(),
+                lastActiveAt: new Date(),
+                lastLoginIp: "OAuth Direct",
+                lastLoginDevice: `${account?.provider ? account.provider.charAt(0).toUpperCase() + account.provider.slice(1) : 'Google'} OAuth Session`
+              }
+            });
+          }
         } catch (e) {
           console.error("Failed to update OAuth login activity:", e);
         }
@@ -333,6 +348,21 @@ export const authOptions: NextAuthOptions = {
           token.username = session.username;
         }
       }
+
+      // Keep active authenticated users' login and activity timestamp updated (throttled every 15 min)
+      const now = Date.now();
+      const lastPing = (token.lastActivePing as number) || 0;
+      if (token.id && now - lastPing > 15 * 60 * 1000) {
+        token.lastActivePing = now;
+        prisma.user.update({
+          where: { id: token.id as string },
+          data: {
+            lastActiveAt: new Date(),
+            lastLoginAt: new Date()
+          }
+        }).catch(() => {});
+      }
+
       return token;
     }
   }

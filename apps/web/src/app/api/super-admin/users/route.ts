@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
           groupCreationRestricted: true, commentRestricted: true,
           reelsRestricted: true, marketplaceRestricted: true,
           suspensionReason: true, restrictionExpiresAt: true,
-          createdAt: true, lastLoginAt: true, lastLoginIp: true,
+          createdAt: true, lastLoginAt: true, lastActiveAt: true, lastLoginIp: true,
           lastLoginDevice: true, trustScore: true,
           isSimulation: true,
           _count: { select: { posts: true, tolees: true, followers: true } }
@@ -69,8 +69,20 @@ export async function GET(req: NextRequest) {
       prisma.user.count({ where: { isSimulation: true } }),
     ]);
 
+    // Compute effective, accurate lastLoginAt (synced with latest user presence and login events)
+    const formattedUsers = users.map(u => {
+      const effectiveLastLogin = u.lastActiveAt && u.lastLoginAt
+        ? (new Date(u.lastActiveAt) > new Date(u.lastLoginAt) ? u.lastActiveAt : u.lastLoginAt)
+        : (u.lastLoginAt || u.lastActiveAt || u.createdAt);
+
+      return {
+        ...u,
+        lastLoginAt: effectiveLastLogin,
+      };
+    });
+
     return NextResponse.json({
-      users,
+      users: formattedUsers,
       total,
       totalReal,
       totalFake,

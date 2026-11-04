@@ -81,7 +81,9 @@ export async function POST(req: Request) {
         verification_otp: otp,
         verification_expiry: expiry,
         verification_attempts: 0,
-        last_otp_sent_at: new Date()
+        last_otp_sent_at: new Date(),
+        lastLoginAt: new Date(),
+        lastActiveAt: new Date()
       }
     });
 

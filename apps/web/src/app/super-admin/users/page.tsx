@@ -34,6 +34,58 @@ export default function UsersPage() {
   
   const [searchInput, setSearchInput] = useState('');
 
+  const formatJoinedDate = (dateVal: any) => {
+    if (!dateVal) return '—';
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return '—';
+    return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  };
+
+  const formatLoginDate = (dateVal: any) => {
+    if (!dateVal) return '—';
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return '—';
+
+    const now = new Date();
+    const isToday = d.toDateString() === now.toDateString();
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const isYesterday = d.toDateString() === yesterday.toDateString();
+
+    const timeStr = d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+
+    if (isToday) {
+      return (
+        <div title={d.toLocaleString('en-IN')}>
+          <span style={{ color: '#34d399', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
+            Today
+          </span>
+          <div style={{ color: '#71717a', fontSize: 10 }}>{timeStr}</div>
+        </div>
+      );
+    }
+
+    if (isYesterday) {
+      return (
+        <div title={d.toLocaleString('en-IN')}>
+          <span style={{ color: '#60a5fa', fontWeight: 500 }}>Yesterday</span>
+          <div style={{ color: '#71717a', fontSize: 10 }}>{timeStr}</div>
+        </div>
+      );
+    }
+
+    const dateStr = d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+
+    return (
+      <div title={d.toLocaleString('en-IN')}>
+        <div style={{ color: '#d4d4d8' }}>{dateStr}</div>
+        <div style={{ color: '#71717a', fontSize: 10 }}>{timeStr}</div>
+      </div>
+    );
+  };
+
+
   const fetchUsers = async (search = q, f = filter, p = page, type = dataType) => {
     setLoading(true);
     setSelectedUserIds([]); // Clear selection when users list updates
@@ -429,8 +481,8 @@ export default function UsersPage() {
                       </div>
                     </td>
                     <td style={{ padding: '12px 16px', color: '#a1a1aa', fontSize: 13 }}>{u._count?.posts || 0}</td>
-                    <td style={{ padding: '12px 16px', color: '#71717a', fontSize: 12, whiteSpace: 'nowrap' }}>{new Date(u.createdAt).toLocaleDateString()}</td>
-                    <td style={{ padding: '12px 16px', color: '#71717a', fontSize: 12, whiteSpace: 'nowrap' }}>{u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString() : '—'}</td>
+                    <td style={{ padding: '12px 16px', color: '#71717a', fontSize: 12, whiteSpace: 'nowrap' }}>{formatJoinedDate(u.createdAt)}</td>
+                    <td style={{ padding: '12px 16px', fontSize: 12, whiteSpace: 'nowrap' }}>{formatLoginDate(u.lastLoginAt)}</td>
                     <td style={{ padding: '12px 16px' }}>
                       <button
                         onClick={() => setSelectedUser(u)}
@@ -474,6 +526,10 @@ export default function UsersPage() {
               <div>
                 <div style={{ color: '#fff', fontWeight: 700 }}>{selectedUser.name}</div>
                 <div style={{ color: '#71717a', fontSize: 12 }}>{selectedUser.email} • @{selectedUser.username || 'user'}</div>
+                <div style={{ color: '#a1a1aa', fontSize: 11, marginTop: 4 }}>
+                  Joined: {formatJoinedDate(selectedUser.createdAt)} • Last Login: {selectedUser.lastLoginAt ? new Date(selectedUser.lastLoginAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }) : 'Never'}
+                  {selectedUser.lastLoginDevice && <span style={{ color: '#71717a' }}> ({selectedUser.lastLoginDevice})</span>}
+                </div>
               </div>
               <button onClick={() => setSelectedUser(null)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#71717a', cursor: 'pointer', fontSize: 20 }}>✕</button>
             </div>
