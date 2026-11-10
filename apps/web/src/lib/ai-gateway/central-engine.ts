@@ -1706,8 +1706,8 @@ export class CentralAIEngine {
               latencyMs: Date.now() - startTime,
               intent,
               fallbackUsed: false,
-              tokensUsed: deepinferResult.tokensUsed,
-            }
+              ...(deepinferResult.tokensUsed ? { tokensUsed: deepinferResult.tokensUsed } : {})
+            } as any
           };
         }
       } catch (diErr: any) {

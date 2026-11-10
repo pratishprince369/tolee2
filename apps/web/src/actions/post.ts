@@ -3193,7 +3193,7 @@ export async function getPostInsightsAction(postId: string) {
         freeBoost: {
           isEligible: isFreeBoostEligible,
           daysRemaining,
-          joinDate: userJoinDate
+          joinDate: post.createdAt
         }
       }
     };

@@ -12,20 +12,25 @@ export type ApprovalState =
 
 export interface ApprovalRecord {
   id: string;
-  userId: string;
+  userId?: string;
   actionType: string;
   title: string;
   description: string;
-  summary: string;
+  summary?: string;
   payload: Record<string, any>;
-  payloadHash: string;
-  state: ApprovalState;
+  payloadHash?: string;
+  state?: ApprovalState;
   cost?: string;
-  createdAt: number;
-  expiresAt: number;
+  createdAt?: number;
+  expiresAt?: number;
   executedAt?: number;
   result?: any;
   error?: string;
+  riskLevel?: string;
+  requiresConfirmation?: boolean;
+  status?: string;
+  timestamp?: string | number;
+  [key: string]: any;
 }
 
 export interface CreateApprovalParams {
@@ -33,10 +38,15 @@ export interface CreateApprovalParams {
   actionType: string;
   title: string;
   description: string;
-  summary: string;
-  payload: Record<string, any>;
+  summary?: string;
+  payload?: Record<string, any>;
   cost?: string;
   ttlMinutes?: number;
+  sourceTool?: string;
+  requiredTier?: string;
+  approvalLevel?: string | number;
+  metadata?: any;
+  [key: string]: any;
 }
 
 /**
@@ -87,6 +97,10 @@ export class ApprovalEngine {
 
     this.store.set(id, record);
     return record;
+  }
+
+  public static createRequest(params: CreateApprovalParams): ApprovalRecord {
+    return this.createApproval(params);
   }
 
   /**

@@ -940,6 +940,7 @@ export const V4_BROWSING_TOOLS: ToolDefinition[] = [
               actionType: actResult.approvalPayload.actionType,
               title: actResult.approvalPayload.title,
               description: actResult.approvalPayload.description,
+              summary: actResult.approvalPayload.summary || actResult.approvalPayload.description || '',
               payload: actResult.approvalPayload,
             }
           : undefined,

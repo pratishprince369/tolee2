@@ -42,6 +42,15 @@ export class DeepInferProvider implements AIProvider {
   private defaultModel: string;
   private timeoutMs: number;
 
+  async streamText(
+    options: AIRequestOptions,
+    onChunk: (chunk: AIStreamChunk) => void
+  ): Promise<AICompletionResult> {
+    const res = await this.generateText(options);
+    onChunk({ text: res.text, done: true, provider: 'deepseek-deepinfer', model: res.model });
+    return res;
+  }
+
   constructor(customConfig?: DeepInferConfig) {
     this.endpoint = customConfig?.endpoint || process.env.DEEPINFER_ENDPOINT || 'http://127.0.0.1:8000/v1';
     this.apiKey = customConfig?.apiKey || process.env.DEEPINFER_API_KEY || '';

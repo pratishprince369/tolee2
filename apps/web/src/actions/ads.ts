@@ -277,8 +277,8 @@ export async function getUserWallet() {
       freeBoost: {
         isEligible: isFreeBoostEligible,
         daysRemaining: freeBoostDaysRemaining,
-        joinDate: userJoinDate,
-        expiresAt: sixMonthsAfterJoin
+        joinDate: user?.createdAt || new Date(),
+        expiresAt: boostMembership?.expiresAt || null
       },
       referralStats: {
         clicks: clicksCount,
@@ -576,7 +576,7 @@ export async function createQuickBoostAction(
       let destinationUrl = options.destinationUrl;
       if (!destinationUrl) {
         if (options.goal === 'profile_visits') {
-          destinationUrl = `/u/${user?.createdAt ? userId : 'me'}`;
+          destinationUrl = `/u/${userId}`;
         } else if (options.goal === 'messages') {
           destinationUrl = `/chat?targetUser=${userId}`;
         } else if (type === 'listing') {
