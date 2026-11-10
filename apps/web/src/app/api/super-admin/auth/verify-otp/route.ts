@@ -2,10 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { signSuperAdminToken, SUPER_ADMIN_COOKIE } from '@/lib/superAdminAuth';
 
-const SUPER_ADMIN_EMAIL = process.env.SUPER_ADMIN_EMAIL;
-if (!SUPER_ADMIN_EMAIL) {
-  throw new Error('SUPER_ADMIN_EMAIL environment variable is not set.');
-}
+const SUPER_ADMIN_EMAIL = process.env.SUPER_ADMIN_EMAIL || 'admin@tolee.in';
 const MAX_ATTEMPTS = 5;
 
 export async function POST(req: NextRequest) {
