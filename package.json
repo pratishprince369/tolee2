@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "bin": {
-    "prisma": "prisma.js"
+    "prisma": "prisma.js",
+    "tsc": "tsc.js"
   },
   "scripts": {
     "dev": "npm --prefix apps/web run dev",

@@ -45,6 +45,14 @@ try {
         }
       }
     }
+
+    // Ensure tsc script is present in rootBin
+    const tscBin = path.join(rootBin, 'tsc');
+    if (!fs.existsSync(tscBin)) {
+      try {
+        fs.writeFileSync(tscBin, '#!/usr/bin/env node\nrequire("../typescript/bin/tsc");\n', { mode: 0o755 });
+      } catch (e) {}
+    }
   }
 } catch (err) {
   // Silent fallback
