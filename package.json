@@ -7,5 +7,11 @@
     "build": "npm --prefix apps/web run build",
     "start": "npm --prefix apps/web run start",
     "postinstall": "npm --prefix apps/web run postinstall"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.14.0"
+  },
+  "devDependencies": {
+    "prisma": "^5.14.0"
   }
 }
