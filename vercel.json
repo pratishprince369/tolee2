@@ -1,5 +1,5 @@
 {
   "buildCommand": "npm --prefix apps/web run build",
   "outputDirectory": "apps/web/.next",
-  "installCommand": "npm --prefix apps/web install && node apps/web/scripts/link-root-prisma.js"
+  "installCommand": "npm --prefix apps/web install"
 }

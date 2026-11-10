@@ -4,10 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "postinstall": "prisma generate && node scripts/link-root-prisma.js",
+    "postinstall": "prisma generate",
     "cap:sync": "npx cap sync",
     "cap:open": "npx cap open android",
     "test:e2e": "playwright test"
