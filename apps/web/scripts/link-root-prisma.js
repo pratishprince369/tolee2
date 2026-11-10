@@ -11,24 +11,36 @@ try {
     if (!fs.existsSync(rootNodeModules)) {
       try {
         fs.symlinkSync(webNodeModules, rootNodeModules, symType);
-      } catch (e) {
-        // Fallback to directory creation
-        fs.mkdirSync(rootNodeModules, { recursive: true });
+      } catch (e) {}
+    }
+
+    const rootBin = path.join(rootNodeModules, '.bin');
+    fs.mkdirSync(rootBin, { recursive: true });
+
+    // Link modules
+    for (const mod of ['prisma', '@prisma', 'typescript']) {
+      const src = path.join(webNodeModules, mod);
+      const dest = path.join(rootNodeModules, mod);
+      if (fs.existsSync(src) && !fs.existsSync(dest)) {
+        try {
+          fs.symlinkSync(src, dest, symType);
+        } catch (e) {
+          try { fs.cpSync(src, dest, { recursive: true }); } catch (err) {}
+        }
       }
     }
 
-    if (fs.existsSync(rootNodeModules)) {
-      const items = ['.bin', 'prisma', '@prisma', 'typescript'];
-      for (const item of items) {
-        const src = path.join(webNodeModules, item);
-        const dest = path.join(rootNodeModules, item);
-        if (fs.existsSync(src) && !fs.existsSync(dest)) {
+    // Link binaries
+    const webBin = path.join(webNodeModules, '.bin');
+    if (fs.existsSync(webBin)) {
+      for (const bin of fs.readdirSync(webBin)) {
+        const src = path.join(webBin, bin);
+        const dest = path.join(rootBin, bin);
+        if (!fs.existsSync(dest)) {
           try {
-            fs.symlinkSync(src, dest, symType);
+            fs.symlinkSync(src, dest, 'file');
           } catch (e) {
-            try {
-              fs.cpSync(src, dest, { recursive: true });
-            } catch (err) {}
+            try { fs.copyFileSync(src, dest); } catch (err) {}
           }
         }
       }
