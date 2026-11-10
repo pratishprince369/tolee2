@@ -4,34 +4,31 @@ const path = require('path');
 try {
   const rootDir = path.resolve(__dirname, '..', '..');
   const rootNodeModules = path.join(rootDir, 'node_modules');
-  const rootBin = path.join(rootNodeModules, '.bin');
   const webNodeModules = path.resolve(__dirname, '..', 'node_modules');
+  const symType = process.platform === 'win32' ? 'junction' : 'dir';
 
   if (fs.existsSync(webNodeModules)) {
-    fs.mkdirSync(rootBin, { recursive: true });
-
-    for (const mod of ['prisma', '@prisma', 'typescript']) {
-      const src = path.join(webNodeModules, mod);
-      const dest = path.join(rootNodeModules, mod);
-      if (fs.existsSync(src) && !fs.existsSync(dest)) {
-        try {
-          fs.symlinkSync(src, dest, 'junction');
-        } catch {
-          try { fs.cpSync(src, dest, { recursive: true }); } catch {}
-        }
+    if (!fs.existsSync(rootNodeModules)) {
+      try {
+        fs.symlinkSync(webNodeModules, rootNodeModules, symType);
+      } catch (e) {
+        // Fallback to directory creation
+        fs.mkdirSync(rootNodeModules, { recursive: true });
       }
     }
 
-    const webBin = path.join(webNodeModules, '.bin');
-    if (fs.existsSync(webBin)) {
-      for (const bin of fs.readdirSync(webBin)) {
-        const src = path.join(webBin, bin);
-        const dest = path.join(rootBin, bin);
-        if (!fs.existsSync(dest)) {
+    if (fs.existsSync(rootNodeModules)) {
+      const items = ['.bin', 'prisma', '@prisma', 'typescript'];
+      for (const item of items) {
+        const src = path.join(webNodeModules, item);
+        const dest = path.join(rootNodeModules, item);
+        if (fs.existsSync(src) && !fs.existsSync(dest)) {
           try {
-            fs.symlinkSync(src, dest);
-          } catch {
-            try { fs.copyFileSync(src, dest); } catch {}
+            fs.symlinkSync(src, dest, symType);
+          } catch (e) {
+            try {
+              fs.cpSync(src, dest, { recursive: true });
+            } catch (err) {}
           }
         }
       }
