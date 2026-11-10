@@ -2,10 +2,21 @@ const fs = require('fs');
 const path = require('path');
 
 try {
-  const rootDir = path.resolve(__dirname, '..', '..');
+  const rootDir = path.resolve(__dirname, '..', '..', '..');
   const rootNodeModules = path.join(rootDir, 'node_modules');
   const webNodeModules = path.resolve(__dirname, '..', 'node_modules');
   const symType = process.platform === 'win32' ? 'junction' : 'dir';
+
+  // Ensure root prisma directory links to apps/web/prisma
+  const rootPrisma = path.join(rootDir, 'prisma');
+  const webPrisma = path.resolve(__dirname, '..', 'prisma');
+  if (fs.existsSync(webPrisma) && !fs.existsSync(rootPrisma)) {
+    try {
+      fs.symlinkSync(webPrisma, rootPrisma, symType);
+    } catch (e) {
+      try { fs.cpSync(webPrisma, rootPrisma, { recursive: true }); } catch (err) {}
+    }
+  }
 
   if (fs.existsSync(webNodeModules)) {
     if (!fs.existsSync(rootNodeModules)) {
