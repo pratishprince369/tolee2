@@ -6,15 +6,7 @@
     },
     {
       "path": "/api/cron/publish-daily-reels",
-      "schedule": "0 */2 * * *"
-    },
-    {
-      "path": "/api/cron/publish-youtube-videos",
-      "schedule": "0 12 * * *"
-    },
-    {
-      "path": "/api/cron/ai-reward-nudge",
-      "schedule": "0 9 * * *"
+      "schedule": "0 6 * * *"
     }
   ]
 }
