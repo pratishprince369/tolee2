@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Tolee™ — Official Company & Platform Profile</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+    
+    * { 
+      box-sizing: border-box; 
+      margin: 0; 
+      padding: 0; 
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-adjust: exact !important;
+    }
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      color: #1e293b;
+      background: #f1f5f9;
+      padding: 30px 20px;
+      line-height: 1.6;
+    }
+    .page {
+      max-width: 900px;
+      margin: 0 auto;
+      background: #ffffff;
+      padding: 50px 60px;
+      border-radius: 12px;
+      box-shadow: 0 10px 35px rgba(0,0,0,0.06);
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 3px solid #0d9488;
+      padding-bottom: 22px;
+      margin-bottom: 24px;
+    }
+    .logo-area { display: flex; align-items: center; gap: 14px; }
+    .logo-badge {
+      width: 56px;
+      height: 56px;
+      background: linear-gradient(135deg, #0d9488, #0f766e);
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 34px;
+      font-weight: 800;
+      box-shadow: 0 4px 12px rgba(13, 148, 136, 0.3);
+    }
+    .brand-title h1 {
+      font-size: 30px;
+      font-weight: 800;
+      color: #0f172a;
+      letter-spacing: -0.5px;
+    }
+    .brand-title p {
+      font-size: 13px;
+      font-weight: 700;
+      color: #0d9488;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+    }
+    .header-contact {
+      text-align: right;
+      font-size: 12px;
+      color: #64748b;
+      line-height: 1.6;
+    }
+    .header-contact strong { color: #0f172a; font-size: 13px; }
+    
+    .doc-badge {
+      background: #f8fafc;
+      border-left: 4px solid #0d9488;
+      padding: 12px 18px;
+      border-radius: 6px;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: #334155;
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+
+    .hero {
+      background: linear-gradient(135deg, #0f172a 0%, #115e59 100%);
+      color: #ffffff;
+      padding: 28px 32px;
+      border-radius: 10px;
+      margin-bottom: 24px;
+    }
+    .hero h2 { font-size: 24px; font-weight: 800; margin-bottom: 8px; color: #ffffff; }
+    .hero p { font-size: 14px; color: #ccfbf1; max-width: 740px; line-height: 1.55; }
+
+    /* DEMOCRATIC ALGORITHM BANNER (PROFESSIONAL ENGLISH) */
+    .algorithm-banner {
+      background: #fffbeb;
+      border: 2px solid #fde047;
+      border-radius: 10px;
+      padding: 22px 26px;
+      margin-bottom: 26px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 20px;
+    }
+    .algo-text h3 {
+      font-size: 16.5px;
+      font-weight: 800;
+      color: #854d0e;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .algo-tagline {
+      font-size: 13px;
+      font-weight: 700;
+      color: #92400e;
+      margin-bottom: 6px;
+      display: block;
+    }
+    .algo-text p {
+      font-size: 12.5px;
+      color: #713f12;
+      line-height: 1.55;
+    }
+    .algo-buttons {
+      display: flex;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    .btn-viral {
+      background: #16a34a;
+      color: #ffffff;
+      font-weight: 800;
+      font-size: 12.5px;
+      padding: 10px 16px;
+      border-radius: 8px;
+      box-shadow: 0 4px 10px rgba(22, 163, 74, 0.25);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+    .btn-down {
+      background: #dc2626;
+      color: #ffffff;
+      font-weight: 800;
+      font-size: 12.5px;
+      padding: 10px 16px;
+      border-radius: 8px;
+      box-shadow: 0 4px 10px rgba(220, 38, 38, 0.25);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+    
+    .section-title {
+      font-size: 17px;
+      font-weight: 800;
+      color: #0f172a;
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 6px;
+      margin: 18px 0 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section-title span {
+      background: #0d9488;
+      color: #fff;
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 4px;
+    }
+
+    /* WHY USERS USE TOLEE GRID */
+    .benefits-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-top: 10px;
+    }
+    .benefit-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-top: 3px solid #0d9488;
+      border-radius: 8px;
+      padding: 12px 14px;
+    }
+    .benefit-card h4 {
+      font-size: 13.5px;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 5px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .benefit-card p {
+      font-size: 12px;
+      color: #64748b;
+      line-height: 1.45;
+    }
+
+    /* FEATURES GRID */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px;
+      margin-top: 12px;
+    }
+    .feature-card {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-left: 4px solid #0d9488;
+      border-radius: 8px;
+      padding: 12px 15px;
+    }
+    .feature-card h4 {
+      font-size: 14px;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .feature-card p {
+      font-size: 12px;
+      color: #475569;
+      line-height: 1.5;
+    }
+
+    /* AI MANAGER HIGHLIGHT STYLES */
+    .feature-card.highlight-ai {
+      grid-column: span 2;
+      background: linear-gradient(135deg, #f0fdf4 0%, #fafffe 100%);
+      border: 2px solid #0d9488;
+      box-shadow: 0 4px 15px rgba(13, 148, 136, 0.1);
+      padding: 15px 18px;
+      border-radius: 10px;
+    }
+    .feature-card.highlight-ai h4 {
+      font-size: 16px;
+      color: #0f766e;
+      margin-bottom: 6px;
+    }
+    .ai-badge {
+      background: #0d9488;
+      color: #fff;
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-weight: 700;
+      margin-left: 8px;
+    }
+    .ai-tasks-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .ai-task-item {
+      background: #ffffff;
+      border: 1px solid #ccfbf1;
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-size: 12px;
+      color: #334155;
+    }
+    .ai-task-item strong {
+      display: block;
+      color: #0f172a;
+      font-size: 12.5px;
+      margin-bottom: 2px;
+    }
+
+    /* SAFETY BOX */
+    .safety-box {
+      background: #f0fdf4;
+      border: 1.5px solid #86efac;
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin-top: 16px;
+    }
+    .safety-box h4 {
+      font-size: 14px;
+      color: #166534;
+      font-weight: 800;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .safety-box p {
+      font-size: 12.5px;
+      color: #15803d;
+      line-height: 1.55;
+    }
+
+    .footer {
+      border-top: 2px solid #e2e8f0;
+      margin-top: 18px;
+      padding-top: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: #64748b;
+    }
+    @page {
+      size: A4 portrait;
+      margin: 8mm 12mm 8mm 12mm;
+    }
+    @media print {
+      html, body {
+        background: #ffffff !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        width: 100% !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      .page {
+        box-shadow: none !important;
+        border: none !important;
+        padding: 0 !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        margin: 0 !important;
+        border-radius: 0 !important;
+      }
+      .header, .doc-badge, .hero, .algorithm-banner, .benefit-card, .feature-card, .safety-box, .footer {
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+      }
+      .section-title {
+        break-after: avoid !important;
+        page-break-after: avoid !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="page">
+    <!-- LETTERHEAD -->
+    <div class="header">
+      <div class="logo-area">
+        <div class="logo-badge">t</div>
+        <div class="brand-title">
+          <h1>Tolee™ <span>🇮🇳</span></h1>
+          <p>India’s Own AI Social Media Platform</p>
+        </div>
+      </div>
+      <div class="header-contact">
+        <strong>TOLEE MEDIA NETWORK PRIVATE LIMITED</strong><br>
+        Web: <a href="https://tolee.in" style="color:#0d9488; text-decoration:none;">tolee.in</a> | Direct Desk: <strong>+91 8976274649</strong><br>
+        Available on Web & Google Play Store
+      </div>
+    </div>
+
+    <!-- DOCUMENT METADATA -->
+    <div class="doc-badge">
+      <div><strong>DOCUMENT:</strong> OFFICIAL COMPANY & PLATFORM PROFILE</div>
+      <div><strong>PLATFORM CLASSIFICATION:</strong> AI SOCIAL MEDIA & CONTENT NETWORK</div>
+      <div><strong>CORE INNOVATION:</strong> DEMOCRATIZED USER-GOVERNED ALGORITHM</div>
+    </div>
+
+    <!-- HERO -->
+    <div class="hero">
+      <h2>Pioneering the Sovereign AI Social Network for India</h2>
+      <p>
+        Tolee is India’s indigenous AI-powered social media, short-video, community, and commerce ecosystem. Engineered to dismantle the monopoly of opaque foreign black-box algorithms, Tolee restores sovereign control to real users—creating a transparent, merit-based, and culturally empowering digital home.
+      </p>
+    </div>
+
+    <!-- REVOLUTIONARY HIGHLIGHT: USER-CONTROLLED ALGORITHM -->
+    <div class="algorithm-banner">
+      <div class="algo-text">
+        <h3>🔥 The World's First User-Governed Algorithm: Power in the Hands of the People</h3>
+        <span class="algo-tagline">"Authentic Merit Over Pay-to-Win Bias — The Community Decides What Deserves to Go Viral!"</span>
+        <p>
+          Legacy social networks rely on predatory, engagement-bait algorithms that amplify toxicity and reward paid artificial boosts. On Tolee, real users govern the feed directly using <strong>"Viral Karo" (Boost)</strong> and <strong>"Down Karo" (Suppress)</strong>. Genuine talent and valuable knowledge rise organically, while spam, misinformation, and low-quality content are swiftly downvoted by the community.
+        </p>
+      </div>
+      <div class="algo-buttons">
+        <div class="btn-viral">📈 Boost to Viral</div>
+        <div class="btn-down">📉 Downvote / Suppress</div>
+      </div>
+    </div>
+
+    <!-- SECTION 1: WHAT IS TOLEE & WHAT WE DO -->
+    <div class="section">
+      <div class="section-title"><span>01</span> Executive Overview: What is Tolee?</div>
+      <p style="font-size:13px; color:#334155; line-height:1.6;">
+        Tolee is an integrated digital super-ecosystem engineered to converge short-video entertainment, community networking, hyperlocal commerce, and autonomous artificial intelligence into a singular, highly optimized mobile experience.
+      </p>
+      <p style="font-size:13px; color:#334155; line-height:1.6; margin-top:8px;">
+        Instead of navigating fragmented single-purpose applications for reels, private chats, local buy-and-sell marketplaces, community forums, and daily productivity, <strong>Tolee empowers users with a unified, data-efficient digital platform.</strong>
+      </p>
+    </div>
+
+        <!-- SECTION 2: WHY USERS CHOOSE TOLEE (THE 4 CORE VALUE PILLARS) -->
+    <div class="section">
+      <div class="section-title"><span>02</span> Why Users Choose Tolee — The 4 Core Value Pillars</div>
+      <p style="font-size: 13px; color: #475569; margin-bottom: 12px; line-height: 1.5;">
+        Tolee is purpose-built to deliver direct, tangible value to everyday users, rising creators, community leaders, and local businesses through four transformative pillars:
+      </p>
+
+      <div class="benefits-grid" style="grid-template-columns: repeat(2, 1fr); gap: 14px;">
+        <div class="benefit-card" style="border-top: 3px solid #0d9488; padding: 16px;">
+          <h4 style="font-size: 14.5px; color: #0f172a; margin-bottom: 6px;">👨‍👩‍👧‍👦 1. Intimate Friends & Family Circle</h4>
+          <p style="font-size: 12.5px; color: #475569; line-height: 1.5;">
+            Stay deeply connected with your trusted inner circle—family, childhood friends, and colleagues. Tolee provides a wholesome, private, and family-safe environment with encrypted 1-on-1 chats, private group rooms, voice notes, and circle-only sharing free from toxic algorithmic clutter.
+          </p>
+        </div>
+
+        <div class="benefit-card" style="border-top: 3px solid #0d9488; padding: 16px;">
+          <h4 style="font-size: 14.5px; color: #0f172a; margin-bottom: 6px;">🚀 2. Guaranteed Organic Virality for Every User</h4>
+          <p style="font-size: 12.5px; color: #475569; line-height: 1.5;">
+            Break through artificial paywalls and shadow-bans. With Tolee’s transparent, user-governed voting architecture (<em>Viral Karo</em>), genuine talent, cultural storytelling, and compelling ideas go viral organically on Day 1 based on authentic community approval—not marketing budgets.
+          </p>
+        </div>
+
+        <div class="benefit-card" style="border-top: 3px solid #0d9488; padding: 16px;">
+          <h4 style="font-size: 14.5px; color: #0f172a; margin-bottom: 6px;">💰 3. Direct Creator & Group Admin Monetization</h4>
+          <p style="font-size: 12.5px; color: #475569; line-height: 1.5;">
+            Turn engagement into sustainable income. Creators earn directly through video monetization, tips, and brand deals. Crucially, <strong>Group Admins monetize their active communities</strong> through sponsored pinned posts, exclusive premium channels, and community commerce commissions.
+          </p>
+        </div>
+
+        <div class="benefit-card" style="border-top: 3px solid #0d9488; padding: 16px;">
+          <h4 style="font-size: 14.5px; color: #0f172a; margin-bottom: 6px;">📈 4. High-Intent Business Leads (Organic & Tolee Ads)</h4>
+          <p style="font-size: 12.5px; color: #475569; line-height: 1.5;">
+            Entrepreneurs, local retailers, freelancers, and brands acquire high-converting customer leads seamlessly. Generate organic leads through Hyperlocal Radar and community groups, or scale customer acquisition with high-ROI, self-serve <strong>Tolee Ads</strong> with pin-point local targeting.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION 3: CORE PLATFORM CAPABILITIES (PAGE 2) -->
+    <div class="section">
+      <div class="section-title"><span>03</span> Core Platform Architecture & Features</div>
+      
+      <div class="features-grid">
+        <div class="feature-card">
+          <h4>🎬 1. Tolee Reels & Social Feed</h4>
+          <p>High-velocity vertical short-video streaming, creative video filters, trending regional audio synchronization, and high-engagement social feeds.</p>
+        </div>
+
+        <div class="feature-card">
+          <h4>👥 2. Groups & Community Networks</h4>
+          <p>Dynamic interest-based community hubs—student clubs, technology forums, athletic fan communities, and localized city networks.</p>
+        </div>
+
+        <div class="feature-card">
+          <h4>📍 3. Tolee Radar (Hyperlocal Discovery)</h4>
+          <p>GPS-powered neighborhood radar mapping real-time cultural happenings, breaking community news, local businesses, and nearby social connections.</p>
+        </div>
+
+        <div class="feature-card">
+          <h4>🏪 4. Tolee Marketplace (Buy & Sell)</h4>
+          <p>A trusted, hyperlocal peer-to-peer and SME commerce platform allowing local businesses and users to list, discover, buy, and sell goods directly.</p>
+        </div>
+
+        <div class="feature-card">
+          <h4>🎵 5. Tolee Songs & Audio Streaming</h4>
+          <p>Integrated music ecosystem streaming Hindi, regional, indie, and spiritual audio catalogs with direct background score integration for creators.</p>
+        </div>
+
+        <div class="feature-card">
+          <h4>💬 6. Encrypted Chats & Tolee Shoots</h4>
+          <p>End-to-end encrypted peer-to-peer messaging, group discussions, voice notes, and <em>Tolee Shoots</em> for verified broadcast messaging.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION 4: AUTONOMOUS AI & ECOSYSTEM CONVERGENCE (PAGE 3) -->
+    <div style="page-break-before: always; break-before: page;"></div>
+    <div class="section">
+      <div class="section-title"><span>04</span> Flagship Innovation: Autonomous Tolee AI Manager</div>
+      
+      <!-- FULL WIDTH HIGHLIGHTED AI MANAGER CARD -->
+      <div class="feature-card highlight-ai" style="margin-bottom: 14px;">
+        <h4>🧠 Autonomous 24/7 Personal & Business Operations Engine <span class="ai-badge">FLAGSHIP INNOVATION</span></h4>
+        <p style="font-size: 12.5px; color: #334155; line-height: 1.5; margin-bottom: 8px;">
+          Tolee AI Manager transcends conventional conversational chatbots. It functions as an autonomous, multi-tasking agent executing real-world digital actions across the platform:
+        </p>
+        <div class="ai-tasks-grid">
+          <div class="ai-task-item">
+            <strong>🎵 1. Voice-Activated Audio & Media Playback</strong>
+            Instantly searches and streams user-requested regional music, devotional tracks, or trending hits via natural voice commands without leaving the current task.
+          </div>
+          <div class="ai-task-item">
+            <strong>💬 2. Intelligent Notification & Caller Briefing</strong>
+            Actively monitors incoming communications, identifies key senders, and provides concise summaries of priority messages and notifications without opening individual chats.
+          </div>
+          <div class="ai-task-item">
+            <strong>🎨 3. Automated Ad & Promotional Campaign Generation</strong>
+            Assists creators, local retailers, and brands by automatically designing high-converting Tolee ad copy, headlines, promotional banners, and seasonal discount campaigns.
+          </div>
+          <div class="ai-task-item">
+            <strong>📢 4. Cross-Community Multi-Group Auto-Posting</strong>
+            Seamlessly schedules, coordinates, and publishes announcements, products, and creative content across multiple relevant community groups automatically.
+          </div>
+        </div>
+      </div>
+
+      <div class="section-title" style="margin-top: 14px;"><span>05</span> Cultural & Lifestyle Convergence</div>
+      <div class="features-grid" style="grid-template-columns: repeat(3, 1fr); gap: 10px;">
+        <div class="feature-card">
+          <h4>🛕 Live Darshan</h4>
+          <p>Daily live temple broadcasts and morning rituals from India’s revered sacred destinations.</p>
+        </div>
+
+        <div class="feature-card">
+          <h4>🏏 Live Sports</h4>
+          <p>Ball-by-ball cricket scores, sports tracking, interactive fan banter, and community sports analytics.</p>
+        </div>
+
+        <div class="feature-card">
+          <h4>🎮 Instant Gaming</h4>
+          <p>Zero-install lightweight games integrated within the client, enabling social multiplayer competition.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION 4: VISION -->
+    <div class="safety-box">
+      <h4>🌱 Institutional Commitment & Vision</h4>
+      <p>
+        Tolee is committed to building India’s most trusted, democratic, and technologically sovereign digital public square. By transferring algorithmic governance to the citizens, Tolee champions digital equality, creative empowerment, and national technological pride.
+      </p>
+    </div>
+
+    <!-- FOOTER -->
+    <div class="footer">
+      <div>
+        <strong>Tolee Media Network Private Limited</strong><br>
+        Web: <a href="https://tolee.in" style="color:#0d9488; text-decoration:none;">tolee.in</a> | Google Play: <strong>Tolee App</strong> | Corporate Desk: <strong>+91 8976274649</strong>
+      </div>
+      <div style="font-weight:800; color:#0f172a;">
+        Promote • Engage • Grow • Connect 🇮🇳
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

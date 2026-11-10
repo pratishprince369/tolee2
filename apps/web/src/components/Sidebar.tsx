@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Compass, Film, MessageCircle, Bell, Settings, Store, Bot, Globe, Megaphone, Zap, MessageSquare, Map, Tv, Newspaper, Crown, Plus, Radio, Sparkles, Trophy, Music, Gamepad2 } from 'lucide-react';
+import { Home, Compass, Film, MessageCircle, Bell, Settings, Store, Bot, Globe, Megaphone, Zap, MessageSquare, Map, Tv, Newspaper, Crown, Plus, Radio, Sparkles, Trophy, Music, Gamepad2, Tent } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useSession } from 'next-auth/react';
 import { getSidebarDataCached } from '@/lib/sidebar-data';
@@ -172,6 +172,7 @@ export function Sidebar() {
 
   const mainNav = React.useMemo(() => isAuthenticated ? [
     { name: 'Tolee Radar', href: '/radar', icon: Radio },
+    { name: 'Tolee Expo', href: '/expo', icon: Tent, badge: 'HOT' },
     { name: 'Feed', href: '/feed', icon: Home },
     { name: 'Discover', href: '/discover', icon: Compass },
     { name: 'Reels', href: '/reels', icon: Film },
@@ -192,6 +193,7 @@ export function Sidebar() {
     { name: 'Creator Program', href: '/creator-program', icon: Zap, isCreator: true },
   ] : [
     { name: 'Tolee Radar', href: '/radar', icon: Radio },
+    { name: 'Tolee Expo', href: '/expo', icon: Tent, badge: 'HOT' },
     { name: 'Feed', href: '/feed', icon: Home },
     { name: 'Discover', href: '/discover', icon: Compass },
     { name: 'Reels', href: '/reels', icon: Film },

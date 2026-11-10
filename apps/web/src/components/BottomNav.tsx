@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Home, Compass, Film, MessageCircle, Menu, User, Settings, Globe, Store, LogOut, MessageSquare, Map, Radio, Briefcase, Award, Newspaper, Tv, Bot, Bell, Megaphone, Zap, HelpCircle, FileText, Wallet, Sparkles, Trophy, Music, Gamepad2, Share2, PenLine } from 'lucide-react';
+import { Home, Compass, Film, MessageCircle, Menu, User, Settings, Globe, Store, LogOut, MessageSquare, Map, Radio, Briefcase, Award, Newspaper, Tv, Bot, Bell, Megaphone, Zap, HelpCircle, FileText, Wallet, Sparkles, Trophy, Music, Gamepad2, Share2, PenLine, Tent } from 'lucide-react';
 import { useSession, signOut } from 'next-auth/react';
 import { getSidebarDataCached } from '@/lib/sidebar-data';
 import { getDrafts } from '@/lib/draftManager';
@@ -254,6 +254,13 @@ export function BottomNav() {
                 <DropdownMenuItem onClick={() => { setClickedPath('/radar'); router.push('/radar'); }} className={getDropdownItemClass('/radar')}>
                   <Radio className={getDropdownIconClass('/radar')} />
                   <span>Tolee Radar</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { setClickedPath('/expo'); router.push('/expo'); }} className={getDropdownItemClass('/expo')}>
+                  <Tent className={getDropdownIconClass('/expo')} />
+                  <div className="flex items-center justify-between w-full">
+                    <span>Tolee Expo</span>
+                    <span className="text-[9px] font-black uppercase text-white bg-gradient-to-r from-amber-500 to-rose-500 px-1.5 py-0.5 rounded shadow-xs">HOT</span>
+                  </div>
                 </DropdownMenuItem>
 
                 <DropdownMenuSeparator />
