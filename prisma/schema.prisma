@@ -210,6 +210,7 @@ model User {
   createdEvents        Event[]           @relation("UserEvents")
   eventAttendees       EventAttendee[]
   toleeJoinRequests    ToleeJoinRequest[]
+  expoListings         ExpoListing[]
 }
 
 model EmailLog {
@@ -3176,3 +3177,237 @@ model PostDistributionDelivery {
 
 
 
+
+
+// ==========================================
+// TOLEE EXPO & MICROSITE ENTERPRISE ARCHITECTURE
+// ==========================================
+
+enum ExpoListingStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  BLOCKED
+  EXPIRED
+}
+
+enum ExpoStallTier {
+  VIP
+  GOLD
+  SILVER
+  STANDARD
+}
+
+enum ExpoLeadStatus {
+  NEW
+  CONTACTED
+  FOLLOW_UP
+  CONVERTED
+  NOT_INTERESTED
+  CLOSED
+}
+
+model ExpoPackage {
+  id              String        @id @default(cuid())
+  name            String        // e.g. "VIP Front-Row Stall", "Gold Expo Stall", "Silver Expo Stall"
+  slug            String        @unique
+  tier            ExpoStallTier @default(STANDARD)
+  price           Float         // in INR
+  durationDays    Int           @default(90) // default 3 months
+  features        Json          // array of feature strings
+  defaultPriority Int           @default(100) // Lower = higher display priority
+  isActive        Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  listings        ExpoListing[]
+}
+
+model ExpoListing {
+  id                String            @id @default(cuid())
+  userId            String            // Owner User ID
+  packageId         String?
+  status            ExpoListingStatus @default(PENDING_APPROVAL)
+  rejectionReason   String?
+
+  // Business Information
+  brandName         String
+  slug              String            @unique
+  category          String            // "fashion", "wellness", "food", "jewellery", "tech", "general"
+  subcategory       String?
+  shortDescription  String
+  fullDescription   String            @db.Text
+  ownerName         String
+  contactNumber     String
+  whatsappNumber    String
+  email             String
+  websiteUrl        String?
+  address           String?
+  city              String
+  state             String
+  country           String            @default("India")
+  googleMapsUrl     String?
+
+  // Branding Visual Assets
+  logoUrl           String?
+  coverUrl          String?
+  bannerUrl         String?
+  profileUrl        String?
+  primaryColor      String?           @default("#0D9488")
+  secondaryColor    String?           @default("#0F172A")
+
+  // Expo Grid Card Offer Details
+  productName       String
+  offerLabel        String            // e.g. "FLAT 50% OFF EXPO DEAL"
+  offerDescription  String
+  originalPrice     Float
+  expoPrice         Float
+  discountPct       Int               @default(0)
+  couponCode        String?
+  offerValidity     DateTime?
+  tags              String[]          @default([])
+  features          String[]          @default([])
+  thumbnailUrl      String?
+
+  // Priority & Position Ordering (Super Admin Controlled)
+  displayOrder      Int               @default(999)
+  isFeatured        Boolean           @default(false)
+  isPinned          Boolean           @default(false)
+  isVerified        Boolean           @default(true)
+  priorityStartDate DateTime?
+  priorityEndDate   DateTime?
+
+  // Payment Tracking
+  amountPaid        Float             @default(0)
+  paymentStatus     String            @default("PENDING") // PENDING, COMPLETED, MANUAL_VERIFIED, FAILED
+  paymentTxnId      String?
+  paymentDate       DateTime?
+  packageExpiryDate DateTime?
+
+  // Administrative Tracking
+  createdById       String?           // Populated if created by Super Admin for client
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  // Relationships
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  package           ExpoPackage?      @relation(fields: [packageId], references: [id], onDelete: SetNull)
+  microsite         ExpoMicrosite?
+  enquiries         ExpoEnquiry[]
+  activityLogs      ExpoActivityLog[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([category])
+  @@index([displayOrder])
+  @@index([isFeatured])
+  @@index([isPinned])
+}
+
+model ExpoMicrosite {
+  id              String                  @id @default(cuid())
+  listingId       String                  @unique
+  template        String                  @default("vcard-modern-1")
+  businessHours   Json?                   // { monday: "9am - 8pm", ... }
+  socialLinks     Json?                   // { instagram, facebook, twitter, linkedin, youtube }
+  customCss       String?                 @db.Text
+  viewsCount      Int                     @default(0)
+  isActive        Boolean                 @default(true)
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  listing         ExpoListing             @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  products        ExpoMicrositeProduct[]
+  gallery         ExpoMicrositeGallery[]
+  sections        ExpoMicrositeSection[]
+}
+
+model ExpoMicrositeProduct {
+  id            String        @id @default(cuid())
+  micrositeId   String
+  name          String
+  description   String?       @db.Text
+  price         Float
+  originalPrice Float?
+  discountPct   Int?
+  imageUrl      String?
+  productUrl    String?
+  category      String?
+  isFeatured    Boolean       @default(false)
+  sortOrder     Int           @default(0)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  microsite     ExpoMicrosite @relation(fields: [micrositeId], references: [id], onDelete: Cascade)
+
+  @@index([micrositeId])
+}
+
+model ExpoMicrositeGallery {
+  id          String        @id @default(cuid())
+  micrositeId String
+  title       String?
+  mediaType   String        @default("image") // image, video, youtube
+  mediaUrl    String
+  sortOrder   Int           @default(0)
+  isFeatured  Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+
+  microsite   ExpoMicrosite @relation(fields: [micrositeId], references: [id], onDelete: Cascade)
+
+  @@index([micrositeId])
+}
+
+model ExpoMicrositeSection {
+  id          String        @id @default(cuid())
+  micrositeId String
+  title       String
+  content     String?       @db.Text
+  sectionType String        // "about", "services", "testimonials", "custom"
+  sortOrder   Int           @default(0)
+  isVisible   Boolean       @default(true)
+  metadata    Json?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  microsite   ExpoMicrosite @relation(fields: [micrositeId], references: [id], onDelete: Cascade)
+
+  @@index([micrositeId])
+}
+
+model ExpoEnquiry {
+  id              String         @id @default(cuid())
+  listingId       String
+  ownerUserId     String         // Denormalized for security and isolation
+  customerName    String
+  mobileNumber    String
+  emailAddress    String?
+  productInterest String?
+  message         String         @db.Text
+  preferredMethod String?        @default("whatsapp")
+  status          ExpoLeadStatus @default(NEW)
+  internalNotes   String?        @db.Text
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  listing         ExpoListing    @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([listingId])
+  @@index([ownerUserId])
+  @@index([status])
+}
+
+model ExpoActivityLog {
+  id          String      @id @default(cuid())
+  listingId   String
+  action      String      // "SUBMITTED", "APPROVED", "REJECTED", "BLOCKED", "PRIORITY_CHANGED", "EDITED"
+  performedBy String      // User ID or Super Admin email
+  role        String      // "OWNER", "SUPER_ADMIN"
+  details     Json?
+  createdAt   DateTime    @default(now())
+
+  listing     ExpoListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([listingId])
+}
