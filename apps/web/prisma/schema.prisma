@@ -211,6 +211,8 @@ model User {
   eventAttendees       EventAttendee[]
   toleeJoinRequests    ToleeJoinRequest[]
   expoListings         ExpoListing[]
+  creatorConversationsAsCreator CreatorConversation[] @relation("CreatorChatUser")
+  creatorConversationsAsAdmin   CreatorConversation[] @relation("AdminChatCreator")
 }
 
 model EmailLog {
@@ -1435,8 +1437,14 @@ model CreatorApplication {
   avgReelViews    String?
   contentType     String?  // e.g. "Short Videos,Reels,Long Form"
 
+  // Tolee Expo Commercial & Collaboration Rates
+  reelCharges             Float?
+  collaborationCharges    Float?
+  statusVideoCharges      Float?
+  additionalPricingDetails String?  @db.Text
+
   // Status & Admin
-  status          String   @default("pending") // "pending" | "approved" | "rejected"
+  status          String   @default("pending") // "pending" | "approved" | "rejected" | "on_hold"
   creatorTier     String?  // "creator" | "influencer" | "vip_creator" | "verified_creator" | "premium_partner"
   adminNotes      String?
   approvedAt      DateTime?
@@ -1445,6 +1453,38 @@ model CreatorApplication {
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+}
+
+model CreatorConversation {
+  id                 String           @id @default(cuid())
+  creatorUserId      String           @unique
+  creatorUser        User             @relation("CreatorChatUser", fields: [creatorUserId], references: [id], onDelete: Cascade)
+  createdByAdminId   String?
+  adminUser          User?            @relation("AdminChatCreator", fields: [createdByAdminId], references: [id], onDelete: SetNull)
+  lastMessageText    String?          @db.Text
+  lastMessageAt      DateTime         @default(now())
+  unreadAdminCount   Int              @default(0)
+  unreadCreatorCount Int              @default(0)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  messages           CreatorMessage[]
+
+  @@index([creatorUserId])
+  @@index([lastMessageAt])
+}
+
+model CreatorMessage {
+  id             String              @id @default(cuid())
+  conversationId String
+  conversation   CreatorConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  senderRole     String              // "admin" | "creator"
+  message        String              @db.Text
+  isRead         Boolean             @default(false)
+  createdAt      DateTime            @default(now())
+
+  @@index([conversationId])
+  @@index([createdAt])
 }
 
 model Highlight {

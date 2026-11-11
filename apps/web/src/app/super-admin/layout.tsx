@@ -11,6 +11,7 @@ const navItems = [
   { href: '/super-admin/content', label: 'Content', icon: '📝' },
   { href: '/super-admin/radar', label: 'Radar Moderation', icon: '📡' },
   { href: '/super-admin/expo', label: 'Tolee Expo & Microsites', icon: '🎪' },
+  { href: '/super-admin/creators', label: 'Creator Program & Chat', icon: '🌟' },
   { href: '/super-admin/shoots', label: 'Tolee Shoots', icon: '🚀' },
   { href: '/super-admin/ads', label: 'Ads & Campaigns', icon: '📣' },
   { href: '/super-admin/credit', label: 'Tolee Credit & Revenue', icon: '💰' },

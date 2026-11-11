@@ -55,6 +55,7 @@ interface FormData {
   fullName: string; username: string; email: string; mobile: string; city: string; country: string;
   instagramLink: string; youtubeLink: string; facebookLink: string; telegramLink: string; otherLink: string;
   followersRange: string; monthlyReach: string; niche: string[]; avgReelViews: string; contentType: string[];
+  reelCharges: string; collaborationCharges: string; statusVideoCharges: string; additionalPricingDetails: string;
   password?: string;
 }
 
@@ -62,6 +63,7 @@ const INITIAL: FormData = {
   fullName: '', username: '', email: '', mobile: '', city: '', country: 'India',
   instagramLink: '', youtubeLink: '', facebookLink: '', telegramLink: '', otherLink: '',
   followersRange: '', monthlyReach: '', niche: [], avgReelViews: '', contentType: [],
+  reelCharges: '', collaborationCharges: '', statusVideoCharges: '', additionalPricingDetails: '',
   password: '',
 };
 
@@ -76,6 +78,7 @@ export default function CreatorApplyPage() {
   const [existing, setExisting] = useState<any>(null);
   const [checkingExisting, setCheckingExisting] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
+  const [isEditingExisting, setIsEditingExisting] = useState(false);
 
   // Pre-fill from session + check existing application
   useEffect(() => {
@@ -91,7 +94,32 @@ export default function CreatorApplyPage() {
       fetch('/api/creator/apply')
         .then(r => r.json())
         .then(d => {
-          if (d.application) setExisting(d.application);
+          if (d.application) {
+            setExisting(d.application);
+            // Pre-fill form from existing in case user chooses to edit
+            setForm({
+              fullName: d.application.fullName || '',
+              username: d.application.username || '',
+              email: d.application.email || '',
+              mobile: d.application.mobile || '',
+              city: d.application.city || '',
+              country: d.application.country || 'India',
+              instagramLink: d.application.instagramLink || '',
+              youtubeLink: d.application.youtubeLink || '',
+              facebookLink: d.application.facebookLink || '',
+              telegramLink: d.application.telegramLink || '',
+              otherLink: d.application.otherLinks || '',
+              followersRange: d.application.followersRange || '',
+              monthlyReach: d.application.monthlyReach || '',
+              niche: d.application.niche ? d.application.niche.split(',').map((s: string) => s.trim()) : [],
+              avgReelViews: d.application.avgReelViews || '',
+              contentType: d.application.contentType ? d.application.contentType.split(',').map((s: string) => s.trim()) : [],
+              reelCharges: d.application.reelCharges != null ? String(d.application.reelCharges) : '',
+              collaborationCharges: d.application.collaborationCharges != null ? String(d.application.collaborationCharges) : '',
+              statusVideoCharges: d.application.statusVideoCharges != null ? String(d.application.statusVideoCharges) : '',
+              additionalPricingDetails: d.application.additionalPricingDetails || '',
+            });
+          }
         })
         .finally(() => setCheckingExisting(false));
     } else {
@@ -146,7 +174,12 @@ export default function CreatorApplyPage() {
       const res = await fetch('/api/creator/apply', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, niche: form.niche.join(','), contentType: form.contentType.join(',') })
+        body: JSON.stringify({
+          ...form,
+          niche: form.niche.join(','),
+          contentType: form.contentType.join(','),
+          isUpdate: isEditingExisting,
+        })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Submission failed');
@@ -192,8 +225,8 @@ export default function CreatorApplyPage() {
     );
   }
 
-  // Already applied — show status
-  if (existing) {
+  // Already applied — show status + option to edit / update commercial rates
+  if (existing && !isEditingExisting) {
     const statusColor = existing.status === 'approved' ? '#22c55e' : existing.status === 'rejected' ? '#ef4444' : '#f59e0b';
     const statusEmoji = existing.status === 'approved' ? '🎉' : existing.status === 'rejected' ? '❌' : '⏳';
     return (
@@ -201,24 +234,55 @@ export default function CreatorApplyPage() {
         <div className="max-w-lg w-full text-center">
           <div className="text-6xl mb-4">{statusEmoji}</div>
           <h1 className="text-3xl font-black text-white mb-3">
-            {existing.status === 'approved' ? 'Application Approved!' : existing.status === 'rejected' ? 'Not Approved' : 'Application Pending'}
+            {existing.status === 'approved' ? 'Application Approved!' : existing.status === 'rejected' ? 'Not Approved' : 'Application Pending Review'}
           </h1>
-          <p className="text-gray-400 mb-8">
+          <p className="text-gray-400 mb-6">
             {existing.status === 'approved'
               ? `Congratulations! You are now a ${existing.creatorTier || 'Creator'} on Tolee. Check your Creator Dashboard!`
               : existing.status === 'rejected'
               ? `Your application was reviewed. ${existing.adminNotes ? `Reason: ${existing.adminNotes}` : 'Please try again later.'}`
-              : 'Your application is under review. We will notify you soon!'}
+              : 'Your application is under review by Tolee Super Admin. We will review your details within 24-48 hours!'}
           </p>
+
           <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full text-sm font-bold mb-6" style={{ background: `${statusColor}20`, border: `1px solid ${statusColor}50`, color: statusColor }}>
-            Status: {existing.status.charAt(0).toUpperCase() + existing.status.slice(1)}
+            Status: {existing.status.charAt(0).toUpperCase() + existing.status.slice(1).replace('_', ' ')}
           </div>
-          <br />
-          {existing.status === 'approved' && (
-            <Link href="/creator-dashboard" className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-white" style={{ background: 'linear-gradient(135deg,#7c3aed,#4f46e5)' }}>
-              <Crown className="w-4 h-4" /> Open Creator Dashboard
-            </Link>
+
+          {/* Current commercial rates card */}
+          {(existing.reelCharges || existing.collaborationCharges || existing.statusVideoCharges) && (
+            <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-4 mb-6 text-left space-y-2">
+              <div className="text-xs font-bold text-amber-300 uppercase tracking-wider mb-2">🎪 Your Tolee Expo Commercial Rates</div>
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="bg-black/40 rounded-xl p-2.5 border border-zinc-800">
+                  <div className="text-[10px] text-gray-400">Per Reel</div>
+                  <div className="text-sm font-black text-emerald-400">{existing.reelCharges ? `₹${Number(existing.reelCharges).toLocaleString()}` : '—'}</div>
+                </div>
+                <div className="bg-black/40 rounded-xl p-2.5 border border-zinc-800">
+                  <div className="text-[10px] text-gray-400">Brand Collab</div>
+                  <div className="text-sm font-black text-emerald-400">{existing.collaborationCharges ? `₹${Number(existing.collaborationCharges).toLocaleString()}` : '—'}</div>
+                </div>
+                <div className="bg-black/40 rounded-xl p-2.5 border border-zinc-800">
+                  <div className="text-[10px] text-gray-400">Video Status</div>
+                  <div className="text-sm font-black text-emerald-400">{existing.statusVideoCharges ? `₹${Number(existing.statusVideoCharges).toLocaleString()}` : '—'}</div>
+                </div>
+              </div>
+            </div>
           )}
+
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <button
+              onClick={() => setIsEditingExisting(true)}
+              className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold text-white transition-all hover:brightness-110"
+              style={{ background: 'linear-gradient(135deg,#d97706,#b45309)' }}
+            >
+              ✏️ Update Commercial Pricing & Details
+            </button>
+            {existing.status === 'approved' && (
+              <Link href="/creator-dashboard" className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold text-white" style={{ background: 'linear-gradient(135deg,#7c3aed,#4f46e5)' }}>
+                <Crown className="w-4 h-4" /> Open Creator Dashboard
+              </Link>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -474,38 +538,183 @@ export default function CreatorApplyPage() {
                   })}
                 </div>
               </div>
+
+              {/* ── NEW SECTION: TOLEE EXPO COMMERCIAL & COLLABORATION RATES ── */}
+              <div className="pt-6 border-t border-white/10 space-y-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">🎪</span>
+                  <div>
+                    <h3 className="text-sm font-black text-amber-300 uppercase tracking-wide">
+                      TOLEE EXPO – COMMERCIAL & COLLABORATION RATES
+                    </h3>
+                    <p className="text-xs text-gray-400">
+                      Tell us your charges for different promotional activities and brand collaborations.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {/* A. Per Reel Charges */}
+                  <div>
+                    <label className={labelCls}>Per Reel Charges (₹)</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-3.5 text-gray-400 font-bold text-sm">₹</span>
+                      <input
+                        type="number"
+                        min="0"
+                        className={`${inputCls} pl-8`}
+                        placeholder="e.g. 5000"
+                        value={form.reelCharges}
+                        onChange={e => set('reelCharges', e.target.value)}
+                      />
+                    </div>
+                    <p className="text-[11px] text-gray-500 mt-1">Charge for 1 promotional Reel</p>
+                  </div>
+
+                  {/* B. Brand Collaboration Charges */}
+                  <div>
+                    <label className={labelCls}>Brand Collab Charges (₹)</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-3.5 text-gray-400 font-bold text-sm">₹</span>
+                      <input
+                        type="number"
+                        min="0"
+                        className={`${inputCls} pl-8`}
+                        placeholder="e.g. 10000"
+                        value={form.collaborationCharges}
+                        onChange={e => set('collaborationCharges', e.target.value)}
+                      />
+                    </div>
+                    <p className="text-[11px] text-gray-500 mt-1">Charge for 1 brand campaign</p>
+                  </div>
+
+                  {/* C. Video on Status Charges */}
+                  <div>
+                    <label className={labelCls}>Video on Status (₹)</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-3.5 text-gray-400 font-bold text-sm">₹</span>
+                      <input
+                        type="number"
+                        min="0"
+                        className={`${inputCls} pl-8`}
+                        placeholder="e.g. 1500"
+                        value={form.statusVideoCharges}
+                        onChange={e => set('statusVideoCharges', e.target.value)}
+                      />
+                    </div>
+                    <p className="text-[11px] text-gray-500 mt-1">Posting promotional video on status</p>
+                  </div>
+                </div>
+
+                {/* D. Additional Commercial Information */}
+                <div>
+                  <label className={labelCls}>Additional Pricing / Collaboration Details (Optional)</label>
+                  <textarea
+                    rows={3}
+                    className={inputCls}
+                    placeholder="Custom packages, multiple Reel packages, Story + Reel packages, long-term brand collaborations, event promotions, special promotional offers..."
+                    value={form.additionalPricingDetails}
+                    onChange={e => set('additionalPricingDetails', e.target.value)}
+                  />
+                </div>
+              </div>
             </div>
           )}
 
           {/* ── STEP 2: Review & Submit ── */}
           {step === 2 && (
             <div className="space-y-6">
-              <h2 className="text-xl font-black text-white mb-2">🎯 Review & Submit</h2>
-              <p className="text-gray-500 text-sm mb-6">Check your details before submitting</p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-black text-white">🎯 Review & Submit</h2>
+                  <p className="text-gray-500 text-sm">Check your details and commercial rates before submitting</p>
+                </div>
+              </div>
 
-              {/* Summary */}
-              <div className="space-y-3">
-                {[
-                  { label: 'Name', val: form.fullName },
-                  { label: 'Username', val: `@${form.username}` },
-                  { label: 'Email', val: form.email },
-                  { label: 'Mobile', val: form.mobile },
-                  { label: 'Location', val: `${form.city}, ${form.country}` },
-                  { label: 'Followers', val: form.followersRange },
-                  { label: 'Niche', val: (Array.isArray(form.niche) ? form.niche : []).join(', ') || '—' },
-                  { label: 'Instagram', val: form.instagramLink || '—' },
-                  { label: 'YouTube', val: form.youtubeLink || '—' },
-                ].map(({ label, val }) => (
-                  <div key={label} className="flex items-start justify-between py-2.5 border-b border-white/5 text-sm">
-                    <span className="text-gray-500 font-medium w-28 flex-shrink-0">{label}</span>
-                    <span className="text-gray-200 text-right flex-1 ml-4 truncate">{val}</span>
+              {/* Section 1: Basic Details */}
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
+                <div className="flex items-center justify-between mb-3 border-b border-white/10 pb-2">
+                  <h3 className="text-xs font-black text-purple-300 uppercase tracking-wider">👤 Basic Details</h3>
+                  <button onClick={() => setStep(0)} className="text-xs font-bold text-amber-400 hover:text-amber-300 hover:underline">
+                    Edit
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {[
+                    { label: 'Name', val: form.fullName },
+                    { label: 'Username', val: `@${form.username}` },
+                    { label: 'Email', val: form.email },
+                    { label: 'Mobile', val: form.mobile },
+                    { label: 'Location', val: `${form.city}, ${form.country}` },
+                  ].map(({ label, val }) => (
+                    <div key={label} className="flex items-start justify-between py-1 border-b border-white/5 text-xs sm:text-sm">
+                      <span className="text-gray-500 font-medium w-28 flex-shrink-0">{label}</span>
+                      <span className="text-gray-200 text-right flex-1 ml-4 truncate">{val}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Section 2: Social Media & Stats */}
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
+                <div className="flex items-center justify-between mb-3 border-b border-white/10 pb-2">
+                  <h3 className="text-xs font-black text-purple-300 uppercase tracking-wider">📱 Social Media & Creator Stats</h3>
+                  <button onClick={() => setStep(1)} className="text-xs font-bold text-amber-400 hover:text-amber-300 hover:underline">
+                    Edit
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {[
+                    { label: 'Followers', val: form.followersRange },
+                    { label: 'Monthly Reach', val: form.monthlyReach || '—' },
+                    { label: 'Avg Reel Views', val: form.avgReelViews || '—' },
+                    { label: 'Niches', val: (Array.isArray(form.niche) ? form.niche : []).join(', ') || '—' },
+                    { label: 'Content Types', val: (Array.isArray(form.contentType) ? form.contentType : []).join(', ') || '—' },
+                    { label: 'Instagram', val: form.instagramLink || '—' },
+                    { label: 'YouTube', val: form.youtubeLink || '—' },
+                    { label: 'Facebook', val: form.facebookLink || '—' },
+                    { label: 'Telegram', val: form.telegramLink || '—' },
+                  ].map(({ label, val }) => (
+                    <div key={label} className="flex items-start justify-between py-1 border-b border-white/5 text-xs sm:text-sm">
+                      <span className="text-gray-500 font-medium w-28 flex-shrink-0">{label}</span>
+                      <span className="text-gray-200 text-right flex-1 ml-4 truncate">{val}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Section 3: Tolee Expo Commercial Pricing */}
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4">
+                <div className="flex items-center justify-between mb-3 border-b border-amber-500/20 pb-2">
+                  <h3 className="text-xs font-black text-amber-300 uppercase tracking-wider">🎪 Tolee Expo Commercial Pricing</h3>
+                  <button onClick={() => setStep(1)} className="text-xs font-bold text-amber-400 hover:text-amber-300 hover:underline">
+                    Edit
+                  </button>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-center mb-3">
+                  <div className="bg-black/30 rounded-xl p-2 border border-amber-500/20">
+                    <div className="text-[10px] text-gray-400">Per Reel</div>
+                    <div className="text-sm font-black text-amber-300">{form.reelCharges ? `₹${Number(form.reelCharges).toLocaleString()}` : 'Not set'}</div>
                   </div>
-                ))}
+                  <div className="bg-black/30 rounded-xl p-2 border border-amber-500/20">
+                    <div className="text-[10px] text-gray-400">Brand Collab</div>
+                    <div className="text-sm font-black text-amber-300">{form.collaborationCharges ? `₹${Number(form.collaborationCharges).toLocaleString()}` : 'Not set'}</div>
+                  </div>
+                  <div className="bg-black/30 rounded-xl p-2 border border-amber-500/20">
+                    <div className="text-[10px] text-gray-400">Video on Status</div>
+                    <div className="text-sm font-black text-amber-300">{form.statusVideoCharges ? `₹${Number(form.statusVideoCharges).toLocaleString()}` : 'Not set'}</div>
+                  </div>
+                </div>
+                {form.additionalPricingDetails && (
+                  <div className="text-xs text-gray-300 bg-black/20 p-2.5 rounded-xl border border-white/5">
+                    <span className="text-gray-400 font-medium">Additional Pricing Details:</span> {form.additionalPricingDetails}
+                  </div>
+                )}
               </div>
 
               {/* Benefits reminder */}
-              <div className="rounded-2xl p-5 mt-4" style={{ background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.2)' }}>
-                <p className="text-purple-300 font-bold text-sm mb-3">🎁 After Approval You'll Get:</p>
+              <div className="rounded-2xl p-4" style={{ background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.2)' }}>
+                <p className="text-purple-300 font-bold text-xs mb-2">🎁 Included in Creator Program:</p>
                 <div className="grid grid-cols-2 gap-2">
                   {['🏆 Lifetime VIP Golden Card', '✅ Verified Blue Tick', '💰 ₹20,000 Ads Wallet', '🔥 Viral Push Access'].map(b => (
                     <div key={b} className="text-xs text-purple-200">{b}</div>

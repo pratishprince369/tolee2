@@ -1,13 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   Crown, Star, TrendingUp, Users, Wallet, Share2, Copy, CheckCircle2,
   Rocket, Award, Zap, ArrowRight, Loader2, Shield, Gift, RefreshCw,
-  Calendar, Clock, Trash2, Archive, Play, BarChart2, Eye, MapPin, Plus
+  Calendar, Clock, Trash2, Archive, Play, BarChart2, Eye, MapPin, Plus,
+  MessageSquare, Send
 } from 'lucide-react';
 import { getEventsForDashboardAction, deleteEventAction, duplicateEventAction, keepEventInHistoryAction } from '@/actions/event';
 import { getCreatorVideoAnalytics } from '@/actions/creator';
@@ -69,6 +70,66 @@ export default function CreatorDashboardPage() {
   const [activeEventTab, setActiveEventTab] = useState<'upcoming' | 'live' | 'ended' | 'draft'>('upcoming');
   const [analytics, setAnalytics] = useState<any>(null);
   const [loadingAnalytics, setLoadingAnalytics] = useState(true);
+
+  // Creator ↔ Tolee Super Admin Chat System
+  const [chatMessages, setChatMessages] = useState<any[]>([]);
+  const [chatLoading, setChatLoading] = useState(false);
+  const [chatInput, setChatInput] = useState('');
+  const [sendingChat, setSendingChat] = useState(false);
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const creatorChatScrollRef = useRef<HTMLDivElement>(null);
+
+  const fetchCreatorChat = async () => {
+    try {
+      const res = await fetch('/api/creator/chat');
+      const data = await res.json();
+      if (data.success && Array.isArray(data.messages)) {
+        setChatMessages(data.messages);
+        if (data.conversation?.unreadCreatorCount) {
+          setUnreadChatCount(data.conversation.unreadCreatorCount);
+        }
+      }
+    } catch (e) {
+      // silent
+    }
+  };
+
+  useEffect(() => {
+    if (session?.user) {
+      fetchCreatorChat();
+      const interval = setInterval(fetchCreatorChat, 3000);
+      return () => clearInterval(interval);
+    }
+  }, [session]);
+
+  useEffect(() => {
+    if (creatorChatScrollRef.current) {
+      creatorChatScrollRef.current.scrollTop = creatorChatScrollRef.current.scrollHeight;
+    }
+  }, [chatMessages]);
+
+  const handleSendCreatorChat = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!chatInput.trim()) return;
+
+    setSendingChat(true);
+    try {
+      const res = await fetch('/api/creator/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: chatInput.trim() })
+      });
+      const data = await res.json();
+      if (data.success && data.message) {
+        setChatMessages(prev => [...prev, data.message]);
+        setChatInput('');
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSendingChat(false);
+    }
+  };
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/auth/signin?callbackUrl=/creator-dashboard');
@@ -327,6 +388,143 @@ export default function CreatorDashboardPage() {
               </div>
             ))}
           </div>
+        </div>
+
+        {/* Tolee Expo Commercial Pricing Card */}
+        <div className="card p-6 mb-6" style={{ background: 'rgba(245,158,11,0.03)', border: '1px solid rgba(245,158,11,0.2)' }}>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 pb-3 border-b border-amber-500/20">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xl">🎪</span>
+                <h3 className="font-black text-amber-300 text-base">Tolee Expo – Commercial & Collaboration Rates</h3>
+              </div>
+              <p className="text-xs text-gray-400 mt-0.5">Your official rates for client brand deals and promotional campaigns on Tolee Expo</p>
+            </div>
+            <Link
+              href="/creator-program/apply"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white transition-all hover:brightness-110 self-start sm:self-auto"
+              style={{ background: 'linear-gradient(135deg,#d97706,#b45309)' }}
+            >
+              ✏️ Update Commercial Rates
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+            <div className="bg-black/30 border border-amber-500/20 rounded-xl p-3 text-center">
+              <div className="text-[11px] text-gray-400 mb-1">Per Reel Promotion</div>
+              <div className="text-lg font-black text-amber-300">
+                {application.reelCharges ? `₹${Number(application.reelCharges).toLocaleString()}` : 'Not set'}
+              </div>
+              <div className="text-[10px] text-gray-500">1 Sponsored Reel</div>
+            </div>
+
+            <div className="bg-black/30 border border-amber-500/20 rounded-xl p-3 text-center">
+              <div className="text-[11px] text-gray-400 mb-1">Brand Collaboration</div>
+              <div className="text-lg font-black text-emerald-400">
+                {application.collaborationCharges ? `₹${Number(application.collaborationCharges).toLocaleString()}` : 'Not set'}
+              </div>
+              <div className="text-[10px] text-gray-500">Full Brand Campaign</div>
+            </div>
+
+            <div className="bg-black/30 border border-amber-500/20 rounded-xl p-3 text-center">
+              <div className="text-[11px] text-gray-400 mb-1">Video on Status</div>
+              <div className="text-lg font-black text-sky-400">
+                {application.statusVideoCharges ? `₹${Number(application.statusVideoCharges).toLocaleString()}` : 'Not set'}
+              </div>
+              <div className="text-[10px] text-gray-500">24-Hour Story / Status</div>
+            </div>
+          </div>
+
+          {application.additionalPricingDetails && (
+            <div className="text-xs text-gray-300 bg-black/20 p-3 rounded-xl border border-white/5">
+              <span className="text-gray-400 font-semibold">Special Terms / Custom Packages:</span> {application.additionalPricingDetails}
+            </div>
+          )}
+        </div>
+
+        {/* ── Messages / Tolee Team Chat ── */}
+        <div id="messages" className="card p-6 mb-6" style={{ background: '#0e0e13', border: '1px solid rgba(168,85,247,0.25)' }}>
+          <div className="flex items-center justify-between gap-3 mb-4 pb-3 border-b border-white/10">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-full flex items-center justify-center bg-purple-500/20 border border-purple-500/40 text-purple-300">
+                <MessageSquare className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-black text-white text-base">Messages / Tolee Team Chat</h3>
+                  {unreadChatCount > 0 && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-red-500 text-white animate-pulse">
+                      {unreadChatCount} New
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-gray-400">Direct private chat with Tolee Super Admin for Expo brand briefs, terms & campaigns</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 text-xs text-emerald-400 font-bold bg-emerald-500/10 px-3 py-1.5 rounded-full border border-emerald-500/20">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+              Live Connected
+            </div>
+          </div>
+
+          {/* Chat Messages Stream */}
+          <div
+            ref={creatorChatScrollRef}
+            className="rounded-2xl p-4 mb-4 flex flex-col gap-3 overflow-y-auto"
+            style={{ minHeight: 260, maxHeight: 380, background: '#07070a', border: '1px solid rgba(255,255,255,0.06)' }}
+          >
+            {chatMessages.length === 0 ? (
+              <div className="text-center text-gray-500 py-10 my-auto">
+                <div className="text-3xl mb-2">💬</div>
+                <p className="text-sm font-semibold text-gray-300">Welcome to Tolee Team Chat!</p>
+                <p className="text-xs text-gray-500 mt-1 max-w-md mx-auto">
+                  Our Super Admin and marketing team will message you here regarding brand collaboration offers, Expo client campaigns, and promotional schedules.
+                </p>
+              </div>
+            ) : (
+              chatMessages.map((m: any) => {
+                const isAdmin = m.senderRole === 'admin';
+                return (
+                  <div
+                    key={m.id}
+                    className={`max-w-[85%] rounded-2xl p-3.5 text-sm shadow-md ${
+                      isAdmin
+                        ? 'self-start bg-[#18181f] text-gray-100 border border-purple-500/30'
+                        : 'self-end bg-gradient-to-r from-purple-600 to-indigo-600 text-white'
+                    }`}
+                  >
+                    <div className="text-[10px] font-bold mb-1 opacity-75">
+                      {isAdmin ? '🛡️ Tolee Super Admin / Team' : 'You'}
+                    </div>
+                    <div className="whitespace-pre-wrap leading-relaxed text-xs sm:text-sm">{m.message}</div>
+                    <div className="text-[9px] text-right mt-1 opacity-60">
+                      {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Chat Input */}
+          <form onSubmit={handleSendCreatorChat} className="flex gap-2">
+            <input
+              type="text"
+              placeholder="Reply to Tolee Team or ask about campaign details..."
+              value={chatInput}
+              onChange={e => setChatInput(e.target.value)}
+              className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-purple-500"
+            />
+            <button
+              type="submit"
+              disabled={sendingChat || !chatInput.trim()}
+              className="px-5 py-2.5 rounded-xl font-bold text-white text-sm transition-all hover:brightness-110 disabled:opacity-50 flex items-center gap-1.5"
+              style={{ background: 'linear-gradient(135deg,#7c3aed,#4f46e5)' }}
+            >
+              {sendingChat ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Send className="w-4 h-4" /> Send</>}
+            </button>
+          </form>
         </div>
 
         {/* Viral Boost Section */}

@@ -13,6 +13,7 @@ export async function POST(req: NextRequest) {
       fullName, username, email, mobile, city, country,
       instagramLink, youtubeLink, facebookLink, telegramLink, otherLinks,
       followersRange, monthlyReach, niche, avgReelViews, contentType,
+      reelCharges, collaborationCharges, statusVideoCharges, additionalPricingDetails,
       password
     } = body;
 
@@ -25,6 +26,11 @@ export async function POST(req: NextRequest) {
     let userId: string;
     let finalUsername = username;
 
+    const parsedReelCharges = reelCharges !== undefined && reelCharges !== '' && reelCharges !== null ? (parseFloat(String(reelCharges)) || null) : null;
+    const parsedCollabCharges = collaborationCharges !== undefined && collaborationCharges !== '' && collaborationCharges !== null ? (parseFloat(String(collaborationCharges)) || null) : null;
+    const parsedStatusCharges = statusVideoCharges !== undefined && statusVideoCharges !== '' && statusVideoCharges !== null ? (parseFloat(String(statusVideoCharges)) || null) : null;
+    const cleanAdditionalPricing = typeof additionalPricingDetails === 'string' ? additionalPricingDetails.trim() : null;
+
     if (session?.user) {
       userId = (session.user as any).id;
       finalUsername = (session.user as any).username || username;
@@ -32,6 +38,43 @@ export async function POST(req: NextRequest) {
       // Check if already applied
       const existing = await prisma.creatorApplication.findUnique({ where: { userId } });
       if (existing) {
+        if (body.isUpdate || body.allowUpdate) {
+          const updated = await prisma.creatorApplication.update({
+            where: { userId },
+            data: {
+              fullName,
+              username: finalUsername,
+              email: email.toLowerCase().trim(),
+              mobile,
+              city,
+              country: country || 'India',
+              instagramLink,
+              youtubeLink,
+              facebookLink,
+              telegramLink,
+              otherLinks: otherLinks ? (typeof otherLinks === 'string' ? otherLinks : JSON.stringify(otherLinks)) : null,
+              followersRange,
+              monthlyReach,
+              niche,
+              avgReelViews,
+              contentType,
+              reelCharges: parsedReelCharges,
+              collaborationCharges: parsedCollabCharges,
+              statusVideoCharges: parsedStatusCharges,
+              additionalPricingDetails: cleanAdditionalPricing,
+              status: existing.status === 'rejected' ? 'pending' : existing.status,
+            }
+          });
+
+          // Ensure CreatorConversation exists
+          await prisma.creatorConversation.upsert({
+            where: { creatorUserId: userId },
+            create: { creatorUserId: userId },
+            update: {}
+          }).catch(() => null);
+
+          return NextResponse.json({ success: true, application: updated, updated: true });
+        }
         return NextResponse.json({ error: 'You have already submitted an application', existing }, { status: 400 });
       }
     } else {
@@ -154,15 +197,26 @@ export async function POST(req: NextRequest) {
         youtubeLink,
         facebookLink,
         telegramLink,
-        otherLinks: otherLinks ? JSON.stringify(otherLinks) : null,
+        otherLinks: otherLinks ? (typeof otherLinks === 'string' ? otherLinks : JSON.stringify(otherLinks)) : null,
         followersRange,
         monthlyReach,
         niche,
         avgReelViews,
         contentType,
+        reelCharges: parsedReelCharges,
+        collaborationCharges: parsedCollabCharges,
+        statusVideoCharges: parsedStatusCharges,
+        additionalPricingDetails: cleanAdditionalPricing,
         status: 'pending',
       }
     });
+
+    // Ensure CreatorConversation exists for immediate chat capability
+    await prisma.creatorConversation.upsert({
+      where: { creatorUserId: userId },
+      create: { creatorUserId: userId },
+      update: {}
+    }).catch(() => null);
 
     // Update user creatorStatus to pending
     await prisma.user.update({
