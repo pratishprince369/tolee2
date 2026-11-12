@@ -1,7 +1,6 @@
 import React from 'react';
 import { prisma } from '@/lib/prisma';
 import { EXPO_LISTINGS } from './data/listings';
-import { ExpoHeroBanner } from './components/ExpoHeroBanner';
 import { ExpoClientGrid } from './components/ExpoClientGrid';
 import { ExpoFooterVendorCta } from './components/ExpoFooterVendorCta';
 import Link from 'next/link';
@@ -66,9 +65,6 @@ export default async function ToleeExpoPage() {
             </Link>
           </div>
         </div>
-
-        {/* HERO BANNER & PACKAGES */}
-        <ExpoHeroBanner />
 
         {/* DYNAMIC CLIENT GRID WITH SEARCH & FILTER */}
         <ExpoClientGrid initialListings={initialListings} />
