@@ -213,6 +213,35 @@ model User {
   expoListings         ExpoListing[]
   creatorConversationsAsCreator CreatorConversation[] @relation("CreatorChatUser")
   creatorConversationsAsAdmin   CreatorConversation[] @relation("AdminChatCreator")
+
+  // Age Verification & Legal Consent (13+ Requirement)
+  dateOfBirth                   DateTime?
+  ageVerified                   Boolean               @default(false)
+  consentRecord                 UserConsent?
+}
+
+model UserConsent {
+  id                         String   @id @default(cuid())
+  userId                     String   @unique
+  user                       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dateOfBirth                DateTime
+  ageAtConsent               Int
+  ageVerified                Boolean  @default(true)
+  ageVerificationMethod      String   @default("self_declaration_dob")
+  parentalConsentGranted     Boolean  @default(false)
+  parentGuardianName         String?
+  parentGuardianEmail        String?
+  termsAccepted              Boolean  @default(true)
+  privacyPolicyAccepted      Boolean  @default(true)
+  communityGuidelinesAccepted Boolean @default(true)
+  consentTimestamp           DateTime @default(now())
+  consentIpAddress           String?
+  consentPolicyVersion       String   @default("v1.0")
+  signupMethod               String   // "Google" | "Facebook" | "Email" | "Mobile"
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+
+  @@index([userId])
 }
 
 model EmailLog {

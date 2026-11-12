@@ -1,6 +1,7 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
+import FacebookProvider from "next-auth/providers/facebook";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "./prisma";
 import bcrypt from "bcryptjs";
@@ -29,6 +30,13 @@ export const authOptions: NextAuthOptions = {
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
       allowDangerousEmailAccountLinking: true,
     }),
+    ...(process.env.FACEBOOK_CLIENT_ID && process.env.FACEBOOK_CLIENT_SECRET ? [
+      FacebookProvider({
+        clientId: process.env.FACEBOOK_CLIENT_ID,
+        clientSecret: process.env.FACEBOOK_CLIENT_SECRET,
+        allowDangerousEmailAccountLinking: true,
+      })
+    ] : []),
     CredentialsProvider({
       name: "credentials",
       credentials: {
@@ -363,6 +371,7 @@ export const authOptions: NextAuthOptions = {
       if (token && session.user) {
         (session.user as any).id = token.id as string;
         (session.user as any).username = token.username as string | null;
+        (session.user as any).ageVerified = (token.ageVerified as boolean) ?? false;
         session.user.image = token.image as string;
       }
       return session;
@@ -373,9 +382,10 @@ export const authOptions: NextAuthOptions = {
         token.image = (user as any).image || (user as any).avatar;
         const dbUser = await prisma.user.findUnique({
           where: { id: user.id },
-          select: { username: true }
+          select: { username: true, ageVerified: true }
         });
         token.username = dbUser?.username || null;
+        token.ageVerified = dbUser?.ageVerified ?? false;
       }
       if (trigger === "update") {
         if (session?.image) {
@@ -383,6 +393,9 @@ export const authOptions: NextAuthOptions = {
         }
         if (session?.username !== undefined) {
           token.username = session.username;
+        }
+        if (session?.ageVerified !== undefined) {
+          token.ageVerified = session.ageVerified;
         }
       }
 

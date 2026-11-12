@@ -71,11 +71,24 @@ export default async function UserProfile({ params }: PageProps) {
       select: userSelect
     });
   } else if (rawUsername) {
-    // Attempt lookup by username first
+    // Attempt lookup by username first (exact)
     user = await prisma.user.findUnique({
       where: { username: rawUsername },
       select: userSelect
     });
+
+    // If not found, attempt case-insensitive lookup by username
+    if (!user) {
+      user = await prisma.user.findFirst({
+        where: {
+          username: {
+            equals: rawUsername,
+            mode: 'insensitive'
+          }
+        },
+        select: userSelect
+      });
+    }
     
     // If not found, attempt lookup by user ID
     if (!user) {

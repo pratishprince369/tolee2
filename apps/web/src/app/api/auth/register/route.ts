@@ -6,10 +6,21 @@ import { sendOtp } from "@/lib/email";
 import { checkBotStatus } from "@/lib/botDetection";
 import { autoJoinDefaultTolees } from "@/lib/autoJoinTolees";
 import { attributeReferralOnSignup } from "@/lib/referralService";
+import { validateAgeAndConsent } from "@/lib/ageValidation";
 
 export async function POST(req: Request) {
   try {
-    const { name, email, password, website, ref } = await req.json();
+    const body = await req.json();
+    const {
+      name, email, password, website, ref,
+      dateOfBirth,
+      termsAccepted,
+      privacyPolicyAccepted,
+      communityGuidelinesAccepted,
+      consentAccepted,
+      parentalConsentGranted,
+      signupMethod
+    } = body;
     
     // Honeypot check
     if (website) {
@@ -18,6 +29,19 @@ export async function POST(req: Request) {
 
     if (!name || !email || !password) {
       return NextResponse.json({ message: "Missing fields" }, { status: 400 });
+    }
+
+    // Age Verification & Mandatory Legal Consent (13+ Requirement)
+    const consentValidation = validateAgeAndConsent({
+      dateOfBirth,
+      termsAccepted: termsAccepted ?? consentAccepted,
+      privacyPolicyAccepted: privacyPolicyAccepted ?? consentAccepted,
+      communityGuidelinesAccepted: communityGuidelinesAccepted ?? consentAccepted,
+      parentalConsentGranted,
+    });
+
+    if (!consentValidation.valid) {
+      return NextResponse.json({ message: consentValidation.error }, { status: 400 });
     }
 
     const cleanEmail = email.toLowerCase().trim();
@@ -71,19 +95,39 @@ export async function POST(req: Request) {
       }
     }
 
+    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || req.headers.get('x-real-ip') || null;
+
     const user = await prisma.user.create({
       data: {
         name,
         email: cleanEmail,
         passwordHash: hashedPassword,
         username: uniqueUsername,
+        dateOfBirth: consentValidation.parsedDob,
+        ageVerified: true,
         email_verified: false,
         verification_otp: otp,
         verification_expiry: expiry,
         verification_attempts: 0,
         last_otp_sent_at: new Date(),
         lastLoginAt: new Date(),
-        lastActiveAt: new Date()
+        lastActiveAt: new Date(),
+        consentRecord: {
+          create: {
+            dateOfBirth: consentValidation.parsedDob!,
+            ageAtConsent: consentValidation.age,
+            ageVerified: true,
+            ageVerificationMethod: consentValidation.isMinor ? 'parental_guardian_consent' : 'self_declaration_dob',
+            parentalConsentGranted: consentValidation.isMinor ? Boolean(parentalConsentGranted) : false,
+            termsAccepted: true,
+            privacyPolicyAccepted: true,
+            communityGuidelinesAccepted: true,
+            consentTimestamp: new Date(),
+            consentIpAddress: clientIp,
+            consentPolicyVersion: 'v1.0',
+            signupMethod: signupMethod || 'Email',
+          }
+        }
       }
     });
 

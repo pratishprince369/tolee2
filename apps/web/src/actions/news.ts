@@ -426,11 +426,12 @@ export async function getNewsBySlug(slug: string) {
       }
     });
 
-    // Fallback: If not found by slug, try searching by NewsPost id or Post id
+    // Fallback: If not found in AI DB by slug, search main DB by slug, id, or postId
     if (!news) {
       news = await prisma.newsPost.findFirst({
         where: {
           OR: [
+            { slug: slug },
             { id: slug },
             { postId: slug }
           ]
