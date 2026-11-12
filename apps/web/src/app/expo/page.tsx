@@ -2,7 +2,6 @@ import React from 'react';
 import { prisma } from '@/lib/prisma';
 import { EXPO_LISTINGS } from './data/listings';
 import { ExpoClientGrid } from './components/ExpoClientGrid';
-import { ExpoFooterVendorCta } from './components/ExpoFooterVendorCta';
 import Link from 'next/link';
 import { PlusCircle, LayoutDashboard } from 'lucide-react';
 
@@ -68,9 +67,6 @@ export default async function ToleeExpoPage() {
 
         {/* DYNAMIC CLIENT GRID WITH SEARCH & FILTER */}
         <ExpoClientGrid initialListings={initialListings} />
-
-        {/* FOOTER VENDOR BANNER: BOOK YOUR EXPO STALL */}
-        <ExpoFooterVendorCta />
       </div>
     </div>
   );
