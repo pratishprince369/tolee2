@@ -219,6 +219,43 @@ export const authOptions: NextAuthOptions = {
           }
         }).catch(() => {});
 
+        // Ensure new OAuth users always get a clean, collision-free username
+        const existingUser = await prisma.user.findUnique({
+          where: { id: user.id },
+          select: { username: true, email: true, name: true }
+        });
+
+        if (existingUser && !existingUser.username) {
+          let base = '';
+          if (existingUser.email) {
+            base = existingUser.email.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '');
+          }
+          if (!base && existingUser.name) {
+            base = existingUser.name.toLowerCase().trim().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+          }
+          if (!base || base.length < 3) {
+            base = 'user_' + user.id.slice(-6).toLowerCase();
+          }
+
+          let candidate = base;
+          let counter = 1;
+          let taken = true;
+          while (taken) {
+            const check = await prisma.user.findUnique({ where: { username: candidate } });
+            if (!check) {
+              taken = false;
+            } else {
+              candidate = base + counter;
+              counter++;
+            }
+          }
+
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { username: candidate }
+          }).catch(() => {});
+        }
+
         await autoJoinDefaultTolees(user.id, 5);
 
         const welcomeNotif = await prisma.notification.findFirst({

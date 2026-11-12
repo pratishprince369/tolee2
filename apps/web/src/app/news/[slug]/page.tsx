@@ -169,7 +169,9 @@ export default async function NewsReaderPage({ params }: { params: { slug: strin
   }
 
   const authorName = post.author?.name || 'Anonymous Creator';
-  const authorUsername = post.author?.username || 'anonymous';
+  const authorProfileIdentifier = post.author?.username || post.author?.id || '';
+  const authorProfileUrl = authorProfileIdentifier ? `/u/${authorProfileIdentifier}` : '#';
+  const displayHandle = post.author?.username ? `@${post.author.username}` : '';
   const authorAvatar = post.author?.image || '/default-user-avatar.svg';
   const newsDateObj = new Date(news.createdAt);
   const dateFormatted = `${newsDateObj.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' })} | ${newsDateObj.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase()}`;
@@ -197,7 +199,7 @@ export default async function NewsReaderPage({ params }: { params: { slug: strin
     "author": {
       "@type": "Person",
       "name": authorName,
-      "url": authorUsername ? `https://tolee.in/u/${authorUsername}` : `https://tolee.in`
+      "url": authorProfileIdentifier ? `https://tolee.in/u/${authorProfileIdentifier}` : `https://tolee.in`
     },
     "publisher": {
       "@type": "Organization",
@@ -317,18 +319,18 @@ export default async function NewsReaderPage({ params }: { params: { slug: strin
         {/* Author details card */}
         <div className="flex flex-wrap items-center justify-between gap-4 py-4 border-y border-gray-100 dark:border-zinc-900">
           <div className="flex items-center gap-3">
-            <Link href={`/u/${authorUsername}`}>
-              <Avatar className="w-11 h-11 border border-zinc-100 dark:border-zinc-800 shadow-sm cursor-pointer">
+            <Link href={authorProfileUrl}>
+              <Avatar className="w-11 h-11 border border-zinc-100 dark:border-zinc-800 shadow-sm cursor-pointer hover:scale-105 transition-transform duration-200">
                 <AvatarImage src={authorAvatar} alt={authorName} />
                 <AvatarFallback>{authorName[0]}</AvatarFallback>
               </Avatar>
             </Link>
             <div>
               <div className="flex items-center gap-1.5">
-                <Link href={`/u/${authorUsername}`} className="font-bold text-[14.5px] text-gray-900 dark:text-white hover:underline cursor-pointer">
+                <Link href={authorProfileUrl} className="font-bold text-[14.5px] text-gray-900 dark:text-white hover:text-teal-600 dark:hover:text-teal-400 hover:underline cursor-pointer transition-colors">
                   {authorName}
                 </Link>
-                <span className="text-xs text-gray-400">@{authorUsername}</span>
+                {displayHandle && <span className="text-xs text-gray-400">{displayHandle}</span>}
               </div>
               <div className="flex items-center gap-3 text-xs text-gray-400 dark:text-zinc-500 mt-0.5">
                 <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /> {dateFormatted}</span>
@@ -341,7 +343,7 @@ export default async function NewsReaderPage({ params }: { params: { slug: strin
             {!isOwnArticle && post.authorId && (
               <FollowButton 
                 targetUserId={post.authorId} 
-                targetUsername={authorUsername}
+                targetUsername={authorProfileIdentifier}
                 initialStatus={initialFollowStatus}
                 initialIsFollowing={initialFollowStatus === 'approved'}
                 size="sm" 

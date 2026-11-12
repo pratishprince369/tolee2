@@ -381,20 +381,32 @@ export function NewsFeedStream({
 
               {/* Author & Publish Date & Estimated read time */}
               <div className="px-5 pb-4 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Avatar className="w-8 h-8 border border-zinc-100 dark:border-zinc-800 shadow-sm">
-                    <AvatarImage src={post?.author?.image || '/default-user-avatar.svg'} />
-                    <AvatarFallback>{post?.author?.name?.[0]}</AvatarFallback>
-                  </Avatar>
-                  <div className="flex flex-col">
-                    <span className="font-bold text-[12px] leading-tight text-gray-800 dark:text-zinc-200">
-                      {post?.author?.name || 'Anonymous Creator'}
-                    </span>
-                    <span suppressHydrationWarning className="text-[10px] text-gray-400 flex items-center gap-1 mt-0.5 select-none">
-                      <Calendar className="w-3 h-3" /> {dateStr}
-                    </span>
-                  </div>
-                </div>
+                {(() => {
+                  const authorProfileUrl = post?.author?.username
+                    ? `/u/${post.author.username}`
+                    : post?.author?.id
+                      ? `/u/${post.author.id}`
+                      : '#';
+                  return (
+                    <Link
+                      href={authorProfileUrl}
+                      className="flex items-center gap-2 group hover:opacity-90 transition-opacity"
+                    >
+                      <Avatar className="w-8 h-8 border border-zinc-100 dark:border-zinc-800 shadow-sm transition-transform duration-200 group-hover:scale-105">
+                        <AvatarImage src={post?.author?.image || '/default-user-avatar.svg'} />
+                        <AvatarFallback>{post?.author?.name?.[0]}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex flex-col">
+                        <span className="font-bold text-[12px] leading-tight text-gray-800 dark:text-zinc-200 group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors">
+                          {post?.author?.name || 'Anonymous Creator'}
+                        </span>
+                        <span suppressHydrationWarning className="text-[10px] text-gray-400 flex items-center gap-1 mt-0.5 select-none">
+                          <Calendar className="w-3 h-3" /> {dateStr}
+                        </span>
+                      </div>
+                    </Link>
+                  );
+                })()}
 
                 <div className="text-[10px] text-gray-400 font-extrabold flex items-center gap-1 uppercase select-none">
                   <Clock className="w-3.5 h-3.5" /> {item.readingTime || 1} Min Read
