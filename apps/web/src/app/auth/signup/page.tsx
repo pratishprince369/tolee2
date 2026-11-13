@@ -439,17 +439,3 @@ export default function SignupPage() {
     </Suspense>
   );
 }
-
-
-// Wrap in Suspense to fix "useSearchParams() should be wrapped in a suspense boundary" error
-export default function SignupPage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-[#fafafa] dark:bg-[#0a0a0a] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-      </div>
-    }>
-      <SignupForm />
-    </Suspense>
-  );
-}
