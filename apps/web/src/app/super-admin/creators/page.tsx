@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   Users, Search, Filter, MessageSquare, CheckCircle, XCircle, Clock,
   AlertCircle, ExternalLink, RefreshCw, Send, ChevronDown, Eye, DollarSign,
-  TrendingUp, Award, Instagram, Youtube, Phone, Mail, MapPin, Sparkles, X
+  TrendingUp, Award, Phone, Mail, MapPin, Sparkles, X
 } from 'lucide-react';
 
 interface Creator {
