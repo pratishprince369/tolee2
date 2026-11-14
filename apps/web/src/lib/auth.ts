@@ -47,7 +47,7 @@ export const authOptions: NextAuthOptions = {
             const payload = await res.json();
             
             // Verify that the audience prefix matches our Firebase/Google project
-            if (!payload.email || !payload.aud || !payload.aud.startsWith("968015582251")) {
+            if (!payload.email || !payload.aud || (!payload.aud.startsWith("968015582251") && !payload.aud.startsWith("146580226228"))) {
               throw new Error("Invalid Google ID token payload structure or audience mismatch");
             }
 
@@ -61,11 +61,21 @@ export const authOptions: NextAuthOptions = {
             });
 
             if (!user) {
+              // Generate collision-free username for new user
+              let baseUsername = (email ? email.split('@')[0] : (name || 'user')).toLowerCase().replace(/[^a-z0-9_]/g, '');
+              if (baseUsername.length < 3) baseUsername = 'user_' + Math.random().toString(36).slice(-6);
+              let candidate = baseUsername;
+              let counter = 1;
+              while (await prisma.user.findUnique({ where: { username: candidate } })) {
+                candidate = `${baseUsername}${counter++}`;
+              }
+
               // Create user if they don't exist
               user = await prisma.user.create({
                 data: {
                   email,
                   name,
+                  username: candidate,
                   image,
                   emailVerified: new Date(),
                   email_verified: true,
@@ -323,7 +333,9 @@ export const authOptions: NextAuthOptions = {
                 lastLoginAt: new Date(),
                 lastActiveAt: new Date(),
                 lastLoginIp: "OAuth Direct",
-                lastLoginDevice: `${account?.provider ? account.provider.charAt(0).toUpperCase() + account.provider.slice(1) : 'Google'} OAuth Session`
+                lastLoginDevice: `${account?.provider ? account.provider.charAt(0).toUpperCase() + account.provider.slice(1) : 'Google'} OAuth Session`,
+                email_verified: true,
+                emailVerified: new Date()
               }
             });
           }
@@ -372,12 +384,63 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id;
         token.image = (user as any).image || (user as any).avatar;
-        const dbUser = await prisma.user.findUnique({
+        
+        // Safely fetch dbUser with fallback so field schema changes never crash auth
+        let dbUser = await prisma.user.findUnique({
           where: { id: user.id },
           select: { username: true, ageVerified: true }
+        }).catch(async () => {
+          return await prisma.user.findUnique({
+            where: { id: user.id },
+            select: { username: true }
+          }).catch(() => null);
         });
-        token.username = dbUser?.username || null;
-        token.ageVerified = dbUser?.ageVerified ?? false;
+
+        let assignedUsername = dbUser?.username || null;
+
+        // If new OAuth user doesn't have a username yet, generate one immediately
+        if (!assignedUsername && user.id) {
+          try {
+            let base = '';
+            if (user.email) {
+              base = user.email.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '');
+            }
+            if (!base && (user as any).name) {
+              base = (user as any).name.toLowerCase().trim().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+            }
+            if (!base || base.length < 3) {
+              base = 'user_' + user.id.slice(-6).toLowerCase();
+            }
+
+            let candidate = base;
+            let counter = 1;
+            let taken = true;
+            while (taken) {
+              const check = await prisma.user.findUnique({ where: { username: candidate } });
+              if (!check) {
+                taken = false;
+              } else {
+                candidate = `${base}${counter++}`;
+              }
+            }
+
+            await prisma.user.update({
+              where: { id: user.id },
+              data: {
+                username: candidate,
+                email_verified: true,
+                emailVerified: new Date()
+              }
+            }).catch(() => {});
+
+            assignedUsername = candidate;
+          } catch (unameErr) {
+            console.error("Failed to auto-assign username on OAuth JWT:", unameErr);
+          }
+        }
+
+        token.username = assignedUsername;
+        token.ageVerified = (dbUser as any)?.ageVerified ?? false;
       }
       if (trigger === "update") {
         if (session?.image) {
