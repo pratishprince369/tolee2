@@ -88,6 +88,7 @@ import { OnboardingModal } from "@/components/OnboardingModal";
 import { OnboardingReminder } from "@/components/OnboardingReminder";
 import { AdsWalletWelcomeModal } from "@/components/AdsWalletWelcomeModal";
 import { UsernameSetupModal } from "@/components/UsernameSetupModal";
+import { AgeConsentModal } from "@/components/AgeConsentModal";
 import { AuthModal } from "@/components/AuthModal";
 import { PushNotificationManager } from "@/components/PushNotificationManager";
 import { ApkPromoManager } from "@/components/ApkPromoManager";
@@ -289,6 +290,7 @@ export default async function RootLayout({
           <OnboardingReminder />
           <AdsWalletWelcomeModal />
           <UsernameSetupModal />
+          <AgeConsentModal />
           <AuthModal />
           <PushNotificationManager />
           <ApkPromoManager />

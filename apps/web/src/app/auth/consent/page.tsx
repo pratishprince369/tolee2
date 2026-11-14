@@ -353,6 +353,15 @@ function ConsentForm() {
                 </>
               )}
             </button>
+
+            <div className="text-center pt-1">
+              <Link
+                href="/feed"
+                className="text-xs text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 underline"
+              >
+                Skip for now & continue to Feed →
+              </Link>
+            </div>
           </form>
 
           <p className="text-[11px] text-gray-400 dark:text-zinc-500 text-center leading-relaxed">

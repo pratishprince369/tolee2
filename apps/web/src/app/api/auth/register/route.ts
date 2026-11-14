@@ -31,17 +31,20 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "Missing fields" }, { status: 400 });
     }
 
-    // Age Verification & Mandatory Legal Consent (13+ Requirement)
-    const consentValidation = validateAgeAndConsent({
-      dateOfBirth,
-      termsAccepted: termsAccepted ?? consentAccepted,
-      privacyPolicyAccepted: privacyPolicyAccepted ?? consentAccepted,
-      communityGuidelinesAccepted: communityGuidelinesAccepted ?? consentAccepted,
-      parentalConsentGranted,
-    });
+    // Optional Age Verification & Consent during direct registration
+    let consentValidation: any = null;
+    if (dateOfBirth) {
+      consentValidation = validateAgeAndConsent({
+        dateOfBirth,
+        termsAccepted: termsAccepted ?? consentAccepted ?? true,
+        privacyPolicyAccepted: privacyPolicyAccepted ?? consentAccepted ?? true,
+        communityGuidelinesAccepted: communityGuidelinesAccepted ?? consentAccepted ?? true,
+        parentalConsentGranted,
+      });
 
-    if (!consentValidation.valid) {
-      return NextResponse.json({ message: consentValidation.error }, { status: 400 });
+      if (!consentValidation.valid) {
+        return NextResponse.json({ message: consentValidation.error }, { status: 400 });
+      }
     }
 
     const cleanEmail = email.toLowerCase().trim();
@@ -103,8 +106,8 @@ export async function POST(req: Request) {
         email: cleanEmail,
         passwordHash: hashedPassword,
         username: uniqueUsername,
-        dateOfBirth: consentValidation.parsedDob,
-        ageVerified: true,
+        dateOfBirth: consentValidation?.parsedDob || null,
+        ageVerified: Boolean(consentValidation?.valid),
         email_verified: false,
         verification_otp: otp,
         verification_expiry: expiry,
@@ -112,22 +115,24 @@ export async function POST(req: Request) {
         last_otp_sent_at: new Date(),
         lastLoginAt: new Date(),
         lastActiveAt: new Date(),
-        consentRecord: {
-          create: {
-            dateOfBirth: consentValidation.parsedDob!,
-            ageAtConsent: consentValidation.age,
-            ageVerified: true,
-            ageVerificationMethod: consentValidation.isMinor ? 'parental_guardian_consent' : 'self_declaration_dob',
-            parentalConsentGranted: consentValidation.isMinor ? Boolean(parentalConsentGranted) : false,
-            termsAccepted: true,
-            privacyPolicyAccepted: true,
-            communityGuidelinesAccepted: true,
-            consentTimestamp: new Date(),
-            consentIpAddress: clientIp,
-            consentPolicyVersion: 'v1.0',
-            signupMethod: signupMethod || 'Email',
+        ...(consentValidation?.valid && consentValidation.parsedDob ? {
+          consentRecord: {
+            create: {
+              dateOfBirth: consentValidation.parsedDob,
+              ageAtConsent: consentValidation.age,
+              ageVerified: true,
+              ageVerificationMethod: consentValidation.isMinor ? 'parental_guardian_consent' : 'self_declaration_dob',
+              parentalConsentGranted: consentValidation.isMinor ? Boolean(parentalConsentGranted) : false,
+              termsAccepted: true,
+              privacyPolicyAccepted: true,
+              communityGuidelinesAccepted: true,
+              consentTimestamp: new Date(),
+              consentIpAddress: clientIp,
+              consentPolicyVersion: 'v1.0',
+              signupMethod: signupMethod || 'Email',
+            }
           }
-        }
+        } : {})
       }
     });
 
