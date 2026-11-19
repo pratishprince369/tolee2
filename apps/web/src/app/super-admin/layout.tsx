@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
+import SitemapGeneratorCard from '@/components/super-admin/SitemapGeneratorCard';
 
 const navItems = [
   { href: '/super-admin', label: 'Overview', icon: '📊' },
@@ -17,6 +18,7 @@ const navItems = [
   { href: '/super-admin/credit', label: 'Tolee Credit & Revenue', icon: '💰' },
   { href: '/super-admin/security', label: 'Security & Logs', icon: '🛡️' },
   { href: '/super-admin/search', label: 'Search Analytics', icon: '🔍' },
+  { href: '/super-admin/seo-health', label: 'SEO & Sitemap.xml', icon: '🌐' },
   { href: '/super-admin/branding', label: 'Branding Settings', icon: '🎨' },
   { href: '/super-admin/contacts', label: 'Contact Queries', icon: '📬' },
   { href: '/super-admin/analytics', label: 'Visitor Analytics', icon: '📈' },
@@ -163,9 +165,12 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
               {new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#18181b', borderRadius: 20, padding: '6px 12px' }}>
-            <div style={{ width: 8, height: 8, background: '#22c55e', borderRadius: '50%', animation: 'pulse 2s infinite' }} />
-            <span style={{ color: '#22c55e', fontSize: 12, fontWeight: 600 }}>LIVE</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <SitemapGeneratorCard compact />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#18181b', borderRadius: 20, padding: '6px 12px' }}>
+              <div style={{ width: 8, height: 8, background: '#22c55e', borderRadius: '50%', animation: 'pulse 2s infinite' }} />
+              <span style={{ color: '#22c55e', fontSize: 12, fontWeight: 600 }}>LIVE</span>
+            </div>
           </div>
         </div>
 

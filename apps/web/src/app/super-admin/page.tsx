@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
+import Link from 'next/link';
 import { io, Socket } from 'socket.io-client';
 import WorldToolsManager from '@/components/super-admin/WorldToolsManager';
 import { OnlineUsersModal } from '@/components/super-admin/OnlineUsersModal';
@@ -767,6 +768,26 @@ export default function SuperAdminOverview() {
             />
             Auto-refresh (30s)
           </label>
+
+          <Link
+            href="/super-admin/seo-health"
+            style={{
+              textDecoration: 'none',
+              background: 'linear-gradient(135deg, rgba(16,185,129,0.15), rgba(20,184,166,0.15))',
+              border: '1px solid rgba(16,185,129,0.3)',
+              borderRadius: 10,
+              color: '#34d399',
+              padding: '8px 14px',
+              fontSize: 13,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              fontWeight: 700,
+              transition: 'all 0.2s',
+            }}
+          >
+            <span>🌐 SEO & Sitemap.xml</span>
+          </Link>
 
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
             <button onClick={() => fetchMetrics(dataType)} className="refresh-btn" style={{ background: '#18181b', border: '1px solid #27272a', borderRadius: 10, color: '#a1a1aa', padding: '8px 16px', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600 }}>

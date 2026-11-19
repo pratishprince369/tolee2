@@ -1,6 +1,7 @@
 import React from 'react';
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
+import SitemapGeneratorCard from '@/components/super-admin/SitemapGeneratorCard';
 import {
   Globe,
   Search,
@@ -85,6 +86,9 @@ export default async function SeoHealthAdminPage() {
             </Link>
           </div>
         </div>
+
+        {/* Interactive Sitemap Generator & Live File Replacer */}
+        <SitemapGeneratorCard initialUrlCount={estimatedSitemapUrls} />
 
         {/* Metric Cards Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
