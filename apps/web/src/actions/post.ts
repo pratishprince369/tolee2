@@ -2133,6 +2133,282 @@ export async function incrementShareCount(postId: string) {
   }
 }
 
+export interface RecentShareRecipient {
+  id: string; // userId or 'group:' + toleeId
+  name: string;
+  username: string;
+  avatar: string;
+  isGroup?: boolean;
+  hasStory?: boolean;
+  isVerified?: boolean;
+}
+
+export async function getRecentShareRecipients(searchQuery?: string): Promise<{
+  success: boolean;
+  recipients?: RecentShareRecipient[];
+  error?: string;
+}> {
+  try {
+    const session = await getServerSession(authOptions);
+    const userId = (session?.user as any)?.id;
+
+    const trimmedQuery = searchQuery?.trim();
+
+    if (trimmedQuery) {
+      // 1. Search users by name or username
+      const matchedUsers = await prisma.user.findMany({
+        where: {
+          AND: [
+            userId ? { id: { not: userId } } : {},
+            {
+              OR: [
+                { name: { contains: trimmedQuery, mode: 'insensitive' } },
+                { username: { contains: trimmedQuery, mode: 'insensitive' } }
+              ]
+            }
+          ]
+        },
+        select: {
+          id: true,
+          name: true,
+          username: true,
+          avatar: true,
+          image: true,
+          isVerified: true
+        },
+        take: 15
+      });
+
+      // 2. Search groups
+      const matchedTolees = await prisma.tolee.findMany({
+        where: {
+          name: { contains: trimmedQuery, mode: 'insensitive' }
+        },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          avatar: true
+        },
+        take: 6
+      });
+
+      // Story check for matched users
+      const userIds = matchedUsers.map(u => u.id);
+      const activeStories = await prisma.story.findMany({
+        where: {
+          authorId: { in: userIds },
+          expiresAt: { gt: new Date() }
+        },
+        select: { authorId: true }
+      });
+      const activeStorySet = new Set(activeStories.map(s => s.authorId));
+
+      const recipients: RecentShareRecipient[] = [
+        ...matchedUsers.map(u => ({
+          id: u.id,
+          name: u.name || u.username || 'User',
+          username: u.username || '',
+          avatar: u.avatar || u.image || '/default-user-avatar.svg',
+          isGroup: false,
+          hasStory: activeStorySet.has(u.id),
+          isVerified: u.isVerified || false
+        })),
+        ...matchedTolees.map(t => ({
+          id: `group:${t.id}`,
+          name: t.name,
+          username: t.slug,
+          avatar: t.avatar || '/default-tolee-avatar.svg',
+          isGroup: true,
+          hasStory: false,
+          isVerified: false
+        }))
+      ];
+
+      return { success: true, recipients };
+    }
+
+    // Default: Return actual recent chat contacts (Instagram-style)
+    const recipients: RecentShareRecipient[] = [];
+    const seenUserIds = new Set<string>();
+
+    if (userId) {
+      // A. Recent Personal Chat conversations
+      const userDms = await prisma.chat.findMany({
+        where: {
+          isGroupChat: false,
+          participants: {
+            some: { userId }
+          }
+        },
+        include: {
+          participants: true,
+          messages: {
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            select: { createdAt: true }
+          }
+        },
+        take: 30
+      });
+
+      // Sort by latest message date or chat date
+      const sortedDms = userDms.sort((a, b) => {
+        const timeA = a.messages[0]?.createdAt?.getTime() || a.createdAt.getTime();
+        const timeB = b.messages[0]?.createdAt?.getTime() || b.createdAt.getTime();
+        return timeB - timeA;
+      });
+
+      const otherUserIds: string[] = [];
+      for (const dm of sortedDms) {
+        const other = dm.participants.find(p => p.userId !== userId);
+        if (other && !seenUserIds.has(other.userId)) {
+          seenUserIds.add(other.userId);
+          otherUserIds.push(other.userId);
+        }
+      }
+
+      if (otherUserIds.length > 0) {
+        const users = await prisma.user.findMany({
+          where: { id: { in: otherUserIds } },
+          select: {
+            id: true,
+            name: true,
+            username: true,
+            avatar: true,
+            image: true,
+            isVerified: true
+          }
+        });
+
+        const activeStories = await prisma.story.findMany({
+          where: {
+            authorId: { in: otherUserIds },
+            expiresAt: { gt: new Date() }
+          },
+          select: { authorId: true }
+        });
+        const activeStorySet = new Set(activeStories.map(s => s.authorId));
+
+        const userMap = new Map(users.map(u => [u.id, u]));
+
+        // Keep order of most recently active
+        for (const uid of otherUserIds) {
+          const u = userMap.get(uid);
+          if (u) {
+            recipients.push({
+              id: u.id,
+              name: u.name || u.username || 'User',
+              username: u.username || '',
+              avatar: u.avatar || u.image || '/default-user-avatar.svg',
+              isGroup: false,
+              hasStory: activeStorySet.has(u.id),
+              isVerified: u.isVerified || false
+            });
+          }
+        }
+      }
+
+      // B. User's joined Tolee groups
+      const userTolees = await prisma.toleeMember.findMany({
+        where: { userId, status: 'approved' },
+        include: {
+          tolee: {
+            select: { id: true, name: true, slug: true, avatar: true }
+          }
+        },
+        take: 6
+      });
+
+      for (const tm of userTolees) {
+        recipients.push({
+          id: `group:${tm.tolee.id}`,
+          name: tm.tolee.name,
+          username: tm.tolee.slug,
+          avatar: tm.tolee.avatar || '/default-tolee-avatar.svg',
+          isGroup: true,
+          hasStory: false,
+          isVerified: false
+        });
+      }
+
+      // C. If user has few contacts (< 9), fill with people they follow
+      if (recipients.length < 9) {
+        const follows = await prisma.follow.findMany({
+          where: { followerId: userId },
+          include: {
+            following: {
+              select: {
+                id: true,
+                name: true,
+                username: true,
+                avatar: true,
+                image: true,
+                isVerified: true
+              }
+            }
+          },
+          take: 12
+        });
+
+        for (const f of follows) {
+          if (f.following && !seenUserIds.has(f.following.id)) {
+            seenUserIds.add(f.following.id);
+            recipients.push({
+              id: f.following.id,
+              name: f.following.name || f.following.username || 'User',
+              username: f.following.username || '',
+              avatar: f.following.avatar || f.following.image || '/default-user-avatar.svg',
+              isGroup: false,
+              hasStory: false,
+              isVerified: f.following.isVerified || false
+            });
+          }
+        }
+      }
+    }
+
+    // Fallback: If still few or unauthenticated, show active verified creators / official profiles
+    if (recipients.length < 6) {
+      const publicUsers = await prisma.user.findMany({
+        where: {
+          isVerified: true,
+          ...(userId ? { id: { not: userId } } : {})
+        },
+        select: {
+          id: true,
+          name: true,
+          username: true,
+          avatar: true,
+          image: true,
+          isVerified: true
+        },
+        take: 6
+      });
+
+      for (const pu of publicUsers) {
+        if (!seenUserIds.has(pu.id)) {
+          seenUserIds.add(pu.id);
+          recipients.push({
+            id: pu.id,
+            name: pu.name || pu.username || 'User',
+            username: pu.username || '',
+            avatar: pu.avatar || pu.image || '/default-user-avatar.svg',
+            isGroup: false,
+            hasStory: false,
+            isVerified: pu.isVerified || false
+          });
+        }
+      }
+    }
+
+    return { success: true, recipients };
+  } catch (error) {
+    console.error("Error fetching recent share recipients:", error);
+    return { success: false, error: 'Failed to load recipients.' };
+  }
+}
+
 export async function sharePostToFriends(
   postId: string, 
   friendIds: string[], 
@@ -2356,55 +2632,96 @@ export async function sharePostToFriends(
       }
     }
 
-    // Deliver content to each selected friend
+    // Deliver content to each selected friend or group
     for (const friendId of friendIds) {
-      // 1. Get or create DM (inlined to avoid circular dependency)
       let chatId = null;
-      try {
-        const existingDms = await prisma.chat.findMany({
-          where: {
-            isGroupChat: false,
-            participants: {
-              some: { userId }
-            }
-          },
-          include: {
-            participants: true
-          }
-        });
+      let isGroup = false;
 
-        const targetChat = (existingDms as any[]).find((chat: any) => 
-          chat.participants.some((p: any) => p.userId === friendId)
-        );
-
-        if (targetChat) {
-          if (targetChat.status === 'declined') {
-            await prisma.chat.update({
-              where: { id: targetChat.id },
-              data: { status: 'pending', requestSenderId: null }
-            });
-          }
-          chatId = targetChat.id;
-        } else {
-          const newChat = await prisma.chat.create({
-            data: {
-              isGroupChat: false,
-              status: 'pending',
-              requestSenderId: null,
-              participants: {
-                create: [
-                  { userId },
-                  { userId: friendId }
-                ]
-              }
+      if (friendId.startsWith('group:')) {
+        const toleeIdOrChatId = friendId.replace('group:', '');
+        isGroup = true;
+        try {
+          let groupChat = await prisma.chat.findFirst({
+            where: {
+              OR: [
+                { id: toleeIdOrChatId },
+                { toleeId: toleeIdOrChatId },
+                { tolee: { id: toleeIdOrChatId } }
+              ],
+              isGroupChat: true
             }
           });
-          chatId = newChat.id;
+
+          if (!groupChat) {
+            const tolee = await prisma.tolee.findUnique({ where: { id: toleeIdOrChatId } });
+            if (tolee) {
+              groupChat = await prisma.chat.create({
+                data: {
+                  name: tolee.name,
+                  isGroupChat: true,
+                  toleeId: tolee.id
+                }
+              });
+            }
+          }
+
+          if (groupChat) {
+            chatId = groupChat.id;
+          }
+        } catch (err) {
+          console.error("Error resolving group chat in sharePostToFriends:", err);
+          continue;
         }
-      } catch (err) {
-        console.error("Error inline creating personal chat in sharePostToFriends:", err);
-        continue;
+      } else {
+        // 1. Get or create DM (inlined to avoid circular dependency)
+        try {
+          const existingDms = await prisma.chat.findMany({
+            where: {
+              isGroupChat: false,
+              participants: {
+                some: { userId }
+              }
+            },
+            include: {
+              participants: true
+            }
+          });
+
+          const targetChat = (existingDms as any[]).find((chat: any) => 
+            chat.participants.some((p: any) => p.userId === friendId)
+          );
+
+          if (targetChat) {
+            if (targetChat.status === 'declined') {
+              await prisma.chat.update({
+                where: { id: targetChat.id },
+                data: { status: 'pending', requestSenderId: null }
+              });
+            }
+            chatId = targetChat.id;
+          } else {
+            const newChat = await prisma.chat.create({
+              data: {
+                isGroupChat: false,
+                status: 'pending',
+                requestSenderId: null,
+                participants: {
+                  create: [
+                    { userId },
+                    { userId: friendId }
+                  ]
+                }
+              }
+            });
+            chatId = newChat.id;
+          }
+        } catch (err) {
+          console.error("Error inline creating personal chat in sharePostToFriends:", err);
+          continue;
+        }
       }
+
+      if (!chatId) continue;
 
       // 2. Format a message that recipient will receive
       let msgContent;
@@ -2470,46 +2787,74 @@ export async function sharePostToFriends(
         }
       });
 
-      // 4. Send a notification to the friend
-      await createSystemNotification({
-        userId: friendId,
-        type: 'chat',
-        message: `${senderName} shared a post with you: "${previewText.substring(0, 30)}${previewText.length > 30 ? '...' : ''}"`,
-        link: `/chat?chatId=${chatId}&msgId=${createdSharedMsg.id}`,
-        data: {
+      // 4. Send a notification to the friend if personal chat
+      if (!isGroup) {
+        await createSystemNotification({
+          userId: friendId,
           type: 'chat',
-          target_type: 'message',
-          target_id: createdSharedMsg.id,
-          chat_id: chatId,
-          message_id: createdSharedMsg.id
-        }
-      });
+          message: `${senderName} shared a post with you: "${previewText.substring(0, 30)}${previewText.length > 30 ? '...' : ''}"`,
+          link: `/chat?chatId=${chatId}&msgId=${createdSharedMsg.id}`,
+          data: {
+            type: 'chat',
+            target_type: 'message',
+            target_id: createdSharedMsg.id,
+            chat_id: chatId,
+            message_id: createdSharedMsg.id
+          }
+        }).catch(() => null);
+      }
     }
 
-    // 5. Increment Post share count by friendIds.length
-    const updatedPost = await prisma.post.update({
-      where: { id: postId },
-      data: {
-        shareCount: {
-          increment: friendIds.length
+    // 5. Increment share count
+    let updatedShareCount = 1;
+    try {
+      const updatedPost = await prisma.post.update({
+        where: { id: postId },
+        data: {
+          shareCount: {
+            increment: friendIds.length
+          }
+        },
+        select: {
+          id: true,
+          shareCount: true
         }
-      },
-      select: {
-        id: true,
-        shareCount: true
+      });
+      if (updatedPost?.shareCount !== undefined) {
+        updatedShareCount = updatedPost.shareCount;
       }
-    });
+    } catch (_) {
+      // If it's a ScreenVideo reel
+      try {
+        const updatedScreen = await prisma.screenVideo.update({
+          where: { id: postId },
+          data: {
+            sharesCount: {
+              increment: friendIds.length
+            }
+          },
+          select: { sharesCount: true }
+        });
+        if (updatedScreen?.sharesCount !== undefined) {
+          updatedShareCount = updatedScreen.sharesCount;
+        }
+      } catch (_) {}
+    }
 
-    revalidatePath('/feed');
-    const postTolees = await prisma.postTolee.findMany({
-      where: { postId },
-      include: { tolee: { select: { slug: true } } }
-    });
-    postTolees.forEach((pt: any) => {
-      revalidatePath(`/t/${pt.tolee.slug}`);
-    });
+    try {
+      revalidatePath('/feed');
+      const postTolees = await prisma.postTolee.findMany({
+        where: { postId },
+        include: { tolee: { select: { slug: true } } }
+      });
+      postTolees.forEach((pt: any) => {
+        if (pt.tolee?.slug) {
+          revalidatePath(`/t/${pt.tolee.slug}`);
+        }
+      });
+    } catch (_) {}
 
-    return { success: true, shareCount: updatedPost.shareCount };
+    return { success: true, shareCount: updatedShareCount };
   } catch (error) {
     console.error("Error sharing post to friends:", error);
     return { success: false, error: 'Failed to share post with friends.' };
