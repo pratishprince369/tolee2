@@ -74,7 +74,7 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
     };
 
     fetchCounts();
-    const interval = setInterval(fetchCounts, 30000); // 30s throttled polling
+    const interval = setInterval(fetchCounts, 60000); // 🛡️ Bandwidth Safeguard: 60s instead of 30s
     window.addEventListener('tolee_notification_refresh', fetchCounts);
     document.addEventListener('visibilitychange', fetchCounts);
 

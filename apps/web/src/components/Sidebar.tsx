@@ -159,7 +159,7 @@ export function Sidebar() {
     };
 
     fetchSidebar();
-    const interval = setInterval(fetchSidebar, 30000);
+    const interval = setInterval(fetchSidebar, 60000); // 🛡️ Bandwidth Safeguard: 60s instead of 30s
     window.addEventListener('tolee_notification_refresh', fetchSidebar);
     document.addEventListener('visibilitychange', fetchSidebar);
 

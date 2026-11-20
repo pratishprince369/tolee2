@@ -1019,10 +1019,14 @@ export default function ChatPage() {
     '🌈','☀️','🌙','⚡','❄️','🌊','🍕','🎵','🎶','🏆'
   ];
 
-  // 1. User Active Heartbeat Loop
+  // 1. User Active Heartbeat Loop (🛡️ Bandwidth Safeguard: 60s & paused when tab is inactive)
   useEffect(() => {
-    updateUserPresence();
-    const presenceId = setInterval(updateUserPresence, 15000);
+    const runPresence = () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      updateUserPresence();
+    };
+    runPresence();
+    const presenceId = setInterval(runPresence, 60000);
     return () => clearInterval(presenceId);
   }, []);
 
@@ -1326,7 +1330,7 @@ export default function ChatPage() {
       }
     };
 
-    const interval = setInterval(pingHeartbeat, 15000);
+    const interval = setInterval(pingHeartbeat, 45000); // 🛡️ Bandwidth Safeguard: 45s instead of 15s
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', handleVisibilityChange);
       window.addEventListener('focus', handleVisibilityChange);
@@ -1487,7 +1491,11 @@ export default function ChatPage() {
 
   useEffect(() => {
     fetchChats();
-    const intervalId = setInterval(fetchChats, 5000);
+    // 🛡️ Bandwidth Safeguard: 30s instead of 5s, paused when tab is inactive
+    const intervalId = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetchChats();
+    }, 30000);
     return () => clearInterval(intervalId);
   }, [activeChat, queryChatId]);
 
@@ -1498,6 +1506,8 @@ export default function ChatPage() {
       return;
     }
     const pollTyping = async () => {
+      // 🛡️ Bandwidth Safeguard: Do not poll when tab is inactive
+      if (typeof document !== 'undefined' && document.hidden) return;
       try {
         const res = await fetch(`/api/chat/typing?chatId=${activeChat}`, { credentials: 'include' });
         if (res.ok) {
@@ -1507,7 +1517,8 @@ export default function ChatPage() {
       } catch (_) {}
     };
     pollTyping();
-    const id = setInterval(pollTyping, 1500);
+    // 🛡️ Bandwidth Safeguard: 8s instead of 1.5s
+    const id = setInterval(pollTyping, 8000);
     return () => clearInterval(id);
   }, [activeChat]);
 

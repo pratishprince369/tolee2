@@ -136,7 +136,11 @@ export default function SuperAdminCreatorsPage() {
     };
 
     loadChat();
-    const interval = setInterval(loadChat, 3000);
+    // 🛡️ Bandwidth Safeguard: 15s instead of 3s, paused when tab is inactive
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      loadChat();
+    }, 15000);
     return () => clearInterval(interval);
   }, [activeChatCreator?.userId]);
 

@@ -6,8 +6,8 @@ let pendingPromise: Promise<any> | null = null;
 
 export async function getSidebarDataCached(forceRefresh = false) {
   const now = Date.now();
-  // Cache for 20 seconds to prevent duplicate simultaneous fetches on mount/route changes
-  if (!forceRefresh && cache && (now - cacheTime < 20000)) {
+  // Cache for 45 seconds to prevent duplicate simultaneous fetches on mount/route changes
+  if (!forceRefresh && cache && (now - cacheTime < 45000)) {
     return cache;
   }
   if (pendingPromise) {

@@ -64,6 +64,7 @@ export function BottomNav() {
         }
       });
       const interval = setInterval(() => {
+        if (typeof document !== 'undefined' && document.hidden) return;
         getSidebarDataCached().then(res => {
           if (res.success) {
             setUnreadChats(res.unreadMessages || 0);
@@ -71,7 +72,7 @@ export function BottomNav() {
             setFranchiseStatus((res as any).franchiseStatus || null);
           }
         });
-      }, 30000); // 🛡️ Bandwidth Safeguard: 30s instead of 5s
+      }, 60000); // 🛡️ Bandwidth Safeguard: 60s instead of 30s
       return () => clearInterval(interval);
     }
   }, [session, pathname]);

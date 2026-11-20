@@ -98,7 +98,11 @@ export default function CreatorDashboardPage() {
   useEffect(() => {
     if (session?.user) {
       fetchCreatorChat();
-      const interval = setInterval(fetchCreatorChat, 3000);
+      // 🛡️ Bandwidth Safeguard: 15s instead of 3s, paused when tab is inactive
+      const interval = setInterval(() => {
+        if (typeof document !== 'undefined' && document.hidden) return;
+        fetchCreatorChat();
+      }, 15000);
       return () => clearInterval(interval);
     }
   }, [session]);

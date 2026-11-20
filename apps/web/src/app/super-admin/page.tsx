@@ -634,7 +634,10 @@ export default function SuperAdminOverview() {
       }
     };
     poll(); // immediate first fetch
-    const t = setInterval(poll, 15000); // 🛡️ Bandwidth Safeguard: 15s instead of 5s
+    const t = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      poll();
+    }, 30000); // 🛡️ Bandwidth Safeguard: 30s instead of 15s, paused when tab is inactive
     return () => clearInterval(t);
   }, []);
 
