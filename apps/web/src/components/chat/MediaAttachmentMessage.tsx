@@ -8,6 +8,7 @@ import {
   Clock, CheckCheck, Video as VideoIcon, Loader2
 } from 'lucide-react';
 import { UploadProgressOverlay } from './UploadProgressOverlay';
+import { ClickableMessageText } from './ClickableMessageText';
 
 export type MediaKind = 'image' | 'video' | 'audio' | 'pdf' | 'document';
 
@@ -456,7 +457,7 @@ export function ImageMessage({
 
       {mediaInfo.caption && (
         <p className="mt-1.5 px-1 pb-0.5 text-[14px] sm:text-[15px] leading-relaxed select-text whitespace-pre-wrap break-words text-gray-900 dark:text-gray-100">
-          {mediaInfo.caption}
+          <ClickableMessageText text={mediaInfo.caption} isMe={isMe} />
         </p>
       )}
     </div>
@@ -635,7 +636,7 @@ export function VideoMessage({
 
       {mediaInfo.caption && (
         <p className="mt-1.5 px-0.5 text-[14px] sm:text-[15px] leading-relaxed select-text whitespace-pre-wrap break-words">
-          {mediaInfo.caption}
+          <ClickableMessageText text={mediaInfo.caption} isMe={isMe} />
         </p>
       )}
     </div>
@@ -752,7 +753,7 @@ export function AudioMessage({ mediaInfo, isMe }: AudioMessageProps) {
 
       {mediaInfo.caption && (
         <p className="mt-2 text-[13px] sm:text-[14px] leading-relaxed select-text whitespace-pre-wrap break-words pt-2 border-t border-black/5 dark:border-white/10">
-          {mediaInfo.caption}
+          <ClickableMessageText text={mediaInfo.caption} isMe={isMe} />
         </p>
       )}
     </div>
@@ -957,7 +958,7 @@ export function DocumentMessage({ mediaInfo, isMe, onOpenViewer }: DocumentMessa
 
       {mediaInfo.caption && (
         <p className="mt-2 text-[14px] sm:text-[15px] leading-relaxed select-text whitespace-pre-wrap break-words px-1">
-          {mediaInfo.caption}
+          <ClickableMessageText text={mediaInfo.caption} isMe={isMe} />
         </p>
       )}
     </div>

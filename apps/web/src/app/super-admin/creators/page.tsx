@@ -7,6 +7,7 @@ import {
   AlertCircle, ExternalLink, RefreshCw, Send, ChevronDown, Eye, DollarSign,
   TrendingUp, Award, Phone, Mail, MapPin, Sparkles, X
 } from 'lucide-react';
+import { ClickableMessageText } from '@/components/chat/ClickableMessageText';
 
 interface Creator {
   id: string;
@@ -614,7 +615,9 @@ export default function SuperAdminCreatorsPage() {
                       <div style={{ fontSize: 10, fontWeight: 700, color: isAdmin ? '#d8b4fe' : '#38bdf8', marginBottom: 2 }}>
                         {isAdmin ? 'Super Admin / Tolee Team' : activeChatCreator.fullName}
                       </div>
-                      <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{m.message}</div>
+                      <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                        <ClickableMessageText text={m.message} />
+                      </div>
                       <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', marginTop: 4, textAlign: 'right' }}>
                         {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </div>

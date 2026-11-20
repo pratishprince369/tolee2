@@ -69,6 +69,7 @@ import { ContactPickerModal, ContactInfo } from '@/components/chat/ContactPicker
 import { PollCreationModal, PollCard, PollData } from '@/components/chat/PollModalAndCard';
 import { EventCreationModal, EventCard, EventData } from '@/components/chat/EventModalAndCard';
 import { StickerPickerModal } from '@/components/chat/StickerPickerModal';
+import { ClickableMessageText } from '@/components/chat/ClickableMessageText';
 import { voteChatMessagePoll, respondToChatMessageEvent } from '@/actions/chat';
 import { uploadFile } from '@/lib/upload';
 import { 
@@ -3973,7 +3974,9 @@ export default function ChatPage() {
                                     isMe={msg.isMe} 
                                   />
                                   {msg.text && msg.text !== '📍 Location' && !msg.text.startsWith('📍') && (
-                                    <p className="text-[14px] sm:text-[15px] leading-relaxed whitespace-pre-wrap break-words">{msg.text}</p>
+                                    <p className="text-[14px] sm:text-[15px] leading-relaxed whitespace-pre-wrap break-words">
+                                      <ClickableMessageText text={msg.text} isMe={msg.isMe} />
+                                    </p>
                                   )}
                                   <div className="flex flex-wrap items-end justify-between gap-x-4 min-w-0 w-full">
                                     <div className={`inline-flex items-center gap-1 text-[10px] select-none ml-auto mt-0.5 shrink-0 ${msg.isMe ? 'text-gray-500 dark:text-zinc-400' : 'text-gray-400 dark:text-zinc-500'}`}>
@@ -4163,7 +4166,7 @@ export default function ChatPage() {
                                   } catch (e) {
                                     return (
                                       <p className="text-[14px] sm:text-[15px] leading-relaxed whitespace-pre-wrap break-words [word-break:break-word] [overflow-wrap:anywhere] flex-1 select-text">
-                                        {msg.text}
+                                        <ClickableMessageText text={msg.text} isMe={msg.isMe} />
                                       </p>
                                     );
                                   }
@@ -4221,7 +4224,7 @@ export default function ChatPage() {
                                 return (
                                   <>
                                     <p className="text-[14px] sm:text-[15px] leading-relaxed whitespace-pre-wrap break-words [word-break:break-word] [overflow-wrap:anywhere] flex-1 select-text">
-                                      {msg.text}
+                                      <ClickableMessageText text={msg.text} isMe={msg.isMe} />
                                     </p>
                                     <div className="flex flex-wrap items-end justify-between gap-x-4 min-w-0 w-full">
                                       <div className={`inline-flex items-center gap-1 text-[10px] select-none ml-auto mt-0.5 shrink-0 ${msg.isMe ? 'text-gray-500 dark:text-zinc-400' : 'text-gray-400 dark:text-zinc-500'}`}>

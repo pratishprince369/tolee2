@@ -10,6 +10,7 @@ import {
   Calendar, Clock, Trash2, Archive, Play, BarChart2, Eye, MapPin, Plus,
   MessageSquare, Send
 } from 'lucide-react';
+import { ClickableMessageText } from '@/components/chat/ClickableMessageText';
 import { getEventsForDashboardAction, deleteEventAction, duplicateEventAction, keepEventInHistoryAction } from '@/actions/event';
 import { getCreatorVideoAnalytics } from '@/actions/creator';
 
@@ -497,7 +498,9 @@ export default function CreatorDashboardPage() {
                     <div className="text-[10px] font-bold mb-1 opacity-75">
                       {isAdmin ? '🛡️ Tolee Super Admin / Team' : 'You'}
                     </div>
-                    <div className="whitespace-pre-wrap leading-relaxed text-xs sm:text-sm">{m.message}</div>
+                    <div className="whitespace-pre-wrap leading-relaxed text-xs sm:text-sm">
+                      <ClickableMessageText text={m.message} />
+                    </div>
                     <div className="text-[9px] text-right mt-1 opacity-60">
                       {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </div>
