@@ -9,27 +9,39 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const purgeAndReload = () => {
+    if (typeof window !== 'undefined') {
+      try {
+        if ('caches' in window) {
+          caches.keys().then((keys) => keys.forEach((k) => caches.delete(k)));
+        }
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then((regs) => regs.forEach((r) => r.unregister()));
+        }
+      } catch (e) {}
+      window.location.href = '/feed?_fresh=' + Date.now();
+    } else {
+      reset();
+    }
+  };
+
   useEffect(() => {
     const errorMsg = error?.message || '';
     console.error('[Tolee Global Error Caught]:', errorMsg);
 
-    // If it's a React #482 or router chunk mismatch error, smoothly recover to feed
-    if (
+    // Auto-recover from chunk mismatches, build transitions, or React hydration errors
+    const isChunkOrVersionMismatch =
       errorMsg.includes('482') ||
       errorMsg.includes('Minified React error #482') ||
       errorMsg.includes('ChunkLoadError') ||
-      errorMsg.includes('Loading chunk')
-    ) {
-      if (typeof window !== 'undefined') {
-        try {
-          if ('caches' in window) {
-            caches.keys().then((keys) => keys.forEach((k) => caches.delete(k)));
-          }
-        } catch (e) {}
-        setTimeout(() => {
-          window.location.replace('/feed');
-        }, 100);
-      }
+      errorMsg.includes('Loading chunk') ||
+      errorMsg.includes('Unexpected token') ||
+      errorMsg.includes('is not valid JSON');
+
+    if (isChunkOrVersionMismatch && typeof window !== 'undefined') {
+      setTimeout(() => {
+        purgeAndReload();
+      }, 300);
     }
   }, [error]);
 
@@ -48,14 +60,8 @@ export default function GlobalError({
           </div>
           <div className="pt-2 flex items-center justify-center gap-3">
             <button
-              onClick={() => {
-                if (typeof window !== 'undefined') {
-                  window.location.replace('/feed');
-                } else {
-                  reset();
-                }
-              }}
-              className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm transition-colors shadow-md cursor-pointer"
+              onClick={purgeAndReload}
+              className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm transition-colors shadow-md cursor-pointer active:scale-95"
             >
               Back to Home Feed
             </button>
