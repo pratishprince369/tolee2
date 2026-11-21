@@ -156,13 +156,9 @@ export function PushNotificationManager() {
           battery: (isBatteryIgnored ? 'granted' : (batPerm || 'prompt')) as any
         });
 
-        // If native OS hasn't asked yet (prompt), or user hasn't completed flow, open the pre-prompt modal!
-        if (notifStatus.receive === 'prompt' || onboarded !== 'true') {
-          setShowModal(true);
-        } else {
-          // Already onboarded, activate FCM directly
-          setupPushNotificationsDirectly();
-        }
+        // Native OS already handles all system permissions on install/launch.
+        // Silently activate push notifications without any intrusive modal popup!
+        setupPushNotificationsDirectly();
       } catch (err) {
         console.error('[PermissionsManager] Initialization check failed:', err);
       }
@@ -757,9 +753,8 @@ export function PushNotificationManager() {
     setShowModal(false);
   };
 
-  if (!isNative || !showModal) return null;
-
-  const activeStep = steps[currentStep];
+  // Disable the colorful 5-step modal completely as OS handles permissions natively
+  return null;
 
   return (
     <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-955/80 backdrop-blur-md select-none animate-in fade-in duration-350">
