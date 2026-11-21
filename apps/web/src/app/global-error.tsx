@@ -29,19 +29,19 @@ export default function GlobalError({
     const errorMsg = error?.message || '';
     console.error('[Tolee Global Error Caught]:', errorMsg);
 
-    // Auto-recover from chunk mismatches, build transitions, or React hydration errors
-    const isChunkOrVersionMismatch =
-      errorMsg.includes('482') ||
-      errorMsg.includes('Minified React error #482') ||
-      errorMsg.includes('ChunkLoadError') ||
-      errorMsg.includes('Loading chunk') ||
-      errorMsg.includes('Unexpected token') ||
-      errorMsg.includes('is not valid JSON');
-
-    if (isChunkOrVersionMismatch && typeof window !== 'undefined') {
-      setTimeout(() => {
-        purgeAndReload();
-      }, 300);
+    // Auto-recover immediately without requiring the user to tap "Back to Home Feed"
+    if (typeof window !== 'undefined') {
+      try {
+        const retries = parseInt(sessionStorage.getItem('tolee_ge_retries') || '0', 10);
+        if (retries < 2) {
+          sessionStorage.setItem('tolee_ge_retries', String(retries + 1));
+          setTimeout(() => {
+            purgeAndReload();
+          }, 150);
+        }
+      } catch (e) {
+        setTimeout(purgeAndReload, 150);
+      }
     }
   }, [error]);
 

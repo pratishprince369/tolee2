@@ -63,7 +63,10 @@ export function setupNativeGoogleCallbacks(
         if (onSuccess) {
           onSuccess();
         }
-        window.location.href = callbackUrl;
+        // Small delay ensures Android WebView commits session cookies before page navigation
+        setTimeout(() => {
+          window.location.replace(callbackUrl);
+        }, 150);
       }
     } catch (err: any) {
       console.error("[Native Auth] Error logging in via Credentials Provider:", err);

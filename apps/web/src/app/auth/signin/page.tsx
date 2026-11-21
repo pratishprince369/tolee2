@@ -94,9 +94,9 @@ export default function SigninPage() {
 
   useEffect(() => {
     if (status === 'authenticated') {
-      router.push('/feed');
+      window.location.replace('/feed');
     }
-  }, [status, router]);
+  }, [status]);
 
   useEffect(() => {
     const cleanup = setupNativeGoogleCallbacks();
@@ -128,7 +128,9 @@ export default function SigninPage() {
         setError('Invalid email or password.');
       }
     } else {
-      window.location.href = '/feed';
+      setTimeout(() => {
+        window.location.replace('/feed');
+      }, 150);
     }
   };
 

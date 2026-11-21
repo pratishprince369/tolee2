@@ -69,9 +69,9 @@ export function ToleeLandingHome() {
   // Redirect if user logs in
   useEffect(() => {
     if (status === 'authenticated') {
-      router.push('/feed');
+      window.location.replace('/feed');
     }
-  }, [status, router]);
+  }, [status]);
 
   // Setup Google native callbacks
   useEffect(() => {

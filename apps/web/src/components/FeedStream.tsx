@@ -59,6 +59,11 @@ export function FeedStream({ initialPosts }: { initialPosts: any[] }) {
 
   useEffect(() => {
     setMounted(true);
+    try {
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('tolee_ge_retries');
+      }
+    } catch (e) {}
   }, []);
 
   // Save scroll position throttled for seamless back navigation restoration
