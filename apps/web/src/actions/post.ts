@@ -2290,11 +2290,11 @@ export async function getRecentShareRecipients(searchQuery?: string): Promise<{
         });
         const activeStorySet = new Set(activeStories.map(s => s.authorId));
 
-        const userMap = new Map(users.map(u => [u.id, u]));
+        const userMap = new Map<string, any>(users.map((u: any) => [u.id, u]));
 
         // Keep order of most recently active
         for (const uid of otherUserIds) {
-          const u = userMap.get(uid);
+          const u = userMap.get(uid) as any;
           if (u) {
             recipients.push({
               id: u.id,

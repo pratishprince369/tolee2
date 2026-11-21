@@ -565,17 +565,20 @@ export function ReelsStream({ initialReels }: { initialReels: any[] }) {
   const consecutiveFailuresRef = useRef<number>(0);
   const [feedRecoveryMode, setFeedRecoveryMode] = useState(false);
 
-  // Sync active reel to browser URL
+  // Sync active reel to browser URL only when viewing individual reel pages (/reel/[id])
   useEffect(() => {
     const activeIdx = isDesktop ? desktopActiveIndex : mobileActiveIndex;
     const activeItem = itemsToRender[activeIdx];
     const activeId = activeItem?.type === 'reel' ? activeItem.data?.id : (activeItem?.data?.id || activeItem?.id);
     if (activeItem && activeId && typeof window !== 'undefined') {
       const currentPath = window.location.pathname;
-      if (currentPath.startsWith('/reel/') || currentPath.startsWith('/reels')) {
+      // Do not replace URL when browsing the general /reels stream to prevent Next.js router state corruption
+      if (currentPath.startsWith('/reel/')) {
         const targetUrl = `/reel/${activeId}`;
         if (currentPath !== targetUrl) {
-          window.history.replaceState(null, '', targetUrl);
+          try {
+            window.history.replaceState(window.history.state, '', targetUrl);
+          } catch (e) {}
         }
       }
     }

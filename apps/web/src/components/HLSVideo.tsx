@@ -291,17 +291,6 @@ export const HLSVideo = forwardRef<HTMLVideoElement, HLSVideoProps>(
       const video = videoRef.current;
       if (!video) return;
 
-      // Resolve Google Drive URLs to internal proxy stream to guarantee CORS, range requests & bypass virus scan warning
-      let resolvedSrc = src;
-      if (src.includes('drive.usercontent.google.com') || src.includes('drive.google.com')) {
-        const fileId = src.match(/[?&]id=([a-zA-Z0-9_-]+)/)?.[1] ||
-                       src.match(/\/file\/d\/([a-zA-Z0-9_-]+)/)?.[1] ||
-                       src.match(/\/d\/([a-zA-Z0-9_-]+)/)?.[1];
-        if (fileId) {
-          resolvedSrc = `/api/video/drive-stream?id=${fileId}`;
-        }
-      }
-
       const teardown = () => {
         loadedRef.current = false;
         if (hlsRef.current) {
@@ -315,9 +304,20 @@ export const HLSVideo = forwardRef<HTMLVideoElement, HLSVideoProps>(
         try { video.load(); } catch {}
       };
 
-      if (!shouldLoad || !resolvedSrc) {
+      if (!shouldLoad || !src) {
         teardown();
         return teardown;
+      }
+
+      // Resolve Google Drive URLs to internal proxy stream to guarantee CORS, range requests & bypass virus scan warning
+      let resolvedSrc = src || '';
+      if (resolvedSrc.includes('drive.usercontent.google.com') || resolvedSrc.includes('drive.google.com')) {
+        const fileId = resolvedSrc.match(/[?&]id=([a-zA-Z0-9_-]+)/)?.[1] ||
+                       resolvedSrc.match(/\/file\/d\/([a-zA-Z0-9_-]+)/)?.[1] ||
+                       resolvedSrc.match(/\/d\/([a-zA-Z0-9_-]+)/)?.[1];
+        if (fileId) {
+          resolvedSrc = `/api/video/drive-stream?id=${fileId}`;
+        }
       }
 
       teardown();
