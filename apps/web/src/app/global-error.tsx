@@ -12,6 +12,8 @@ export default function GlobalError({
   const purgeAndReload = () => {
     if (typeof window !== 'undefined') {
       try {
+        sessionStorage.clear();
+        localStorage.removeItem('tolee_explore_cache');
         if ('caches' in window) {
           caches.keys().then((keys) => keys.forEach((k) => caches.delete(k)));
         }
@@ -19,7 +21,7 @@ export default function GlobalError({
           navigator.serviceWorker.getRegistrations().then((regs) => regs.forEach((r) => r.unregister()));
         }
       } catch (e) {}
-      window.location.href = '/feed?_fresh=' + Date.now();
+      window.location.replace('/');
     } else {
       reset();
     }
@@ -29,20 +31,11 @@ export default function GlobalError({
     const errorMsg = error?.message || '';
     console.error('[Tolee Global Error Caught]:', errorMsg);
 
-    // Auto-recover immediately without requiring the user to tap "Back to Home Feed"
-    if (typeof window !== 'undefined') {
-      try {
-        const retries = parseInt(sessionStorage.getItem('tolee_ge_retries') || '0', 10);
-        if (retries < 2) {
-          sessionStorage.setItem('tolee_ge_retries', String(retries + 1));
-          setTimeout(() => {
-            purgeAndReload();
-          }, 150);
-        }
-      } catch (e) {
-        setTimeout(purgeAndReload, 150);
-      }
-    }
+    // Auto-recover immediately without leaving user stuck
+    const timer = setTimeout(() => {
+      purgeAndReload();
+    }, 150);
+    return () => clearTimeout(timer);
   }, [error]);
 
   return (

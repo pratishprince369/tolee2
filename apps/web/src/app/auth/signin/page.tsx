@@ -128,6 +128,11 @@ export default function SigninPage() {
         setError('Invalid email or password.');
       }
     } else {
+      try {
+        if (typeof window !== 'undefined') {
+          sessionStorage.clear();
+        }
+      } catch (e) {}
       setTimeout(() => {
         window.location.replace('/feed');
       }, 150);

@@ -112,7 +112,7 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
         ...(viewedReelIds.size > 0 ? { id: { notIn: Array.from(viewedReelIds).slice(0, 300) } } : {})
       },
       orderBy: { createdAt: 'desc' },
-      take: 200,
+      take: 35,
       include: {
         author: {
           select: {
@@ -163,7 +163,7 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
           ]
         },
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-        take: 60,
+        take: 20,
         include: {
           author: { select: { id: true, name: true, username: true, avatar: true, isPrivate: true, isVerified: true } },
           tolees: { include: { tolee: { select: { id: true, name: true, slug: true, ownerId: true } } } },
@@ -233,37 +233,28 @@ export default async function ReelsPage({ searchParams }: { searchParams: { vide
 
     const authorIds = selectedPosts.map(p => p.author?.id).filter(Boolean);
 
-    // Query follow statuses of these authors for the current user
-    let followedAuthorIds: string[] = [];
-    let pendingFollowAuthorIds: string[] = [];
-    if (currentUserId && authorIds.length > 0) {
-      const follows = await prisma.follow.findMany({
-        where: {
-          followerId: currentUserId,
-          followingId: { in: authorIds }
-        },
-        select: { followingId: true, status: true }
-      });
-      followedAuthorIds = follows.filter((f: any) => f.status === 'approved').map((f: any) => f.followingId);
-      pendingFollowAuthorIds = follows.filter((f: any) => f.status === 'pending').map((f: any) => f.followingId);
-    }
-
-    // Query active stories for these authors
-    let authorsWithActiveStories: string[] = [];
-    if (authorIds.length > 0) {
-      const activeStories = await prisma.story.findMany({
-        where: {
-          authorId: { in: authorIds },
-          expiresAt: { gte: new Date() }
-        },
-        select: { authorId: true }
-      });
-      authorsWithActiveStories = activeStories.map((s: any) => s.authorId);
-    }
-
-    const reelPostIds = selectedPosts.map(p => p.id);
-    const distributionStatsMap = await batchGetPostDistributionStats(reelPostIds, currentUserId);
-
+    // Query follow statuses, active stories, and stats in parallel for speed
+    const reelPostIds = selectedPosts.map(p => p.id);
+    const [follows, activeStories, distributionStatsMap] = await Promise.all([
+      (currentUserId && authorIds.length > 0)
+        ? prisma.follow.findMany({
+            where: { followerId: currentUserId, followingId: { in: authorIds } },
+            select: { followingId: true, status: true }
+          }).catch(() => [])
+        : Promise.resolve([]),
+      authorIds.length > 0
+        ? prisma.story.findMany({
+            where: { authorId: { in: authorIds }, expiresAt: { gte: new Date() } },
+            select: { authorId: true }
+          }).catch(() => [])
+        : Promise.resolve([]),
+      batchGetPostDistributionStats(reelPostIds, currentUserId).catch(() => new Map())
+    ]);
+
+    const followedAuthorIds = (follows || []).filter((f: any) => f.status === 'approved').map((f: any) => f.followingId);
+    const pendingFollowAuthorIds = (follows || []).filter((f: any) => f.status === 'pending').map((f: any) => f.followingId);
+    const authorsWithActiveStories = (activeStories || []).map((s: any) => s.authorId);
+
     dbReels = selectedPosts.map(post => {
       const dStats = distributionStatsMap.get(post.id);
       const viralCount = post.viralCount ?? dStats?.viral_count ?? 0;

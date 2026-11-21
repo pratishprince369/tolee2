@@ -564,7 +564,7 @@ export function Header({ initialBranding }: { initialBranding?: BrandingData }) 
                     </DropdownMenuItem>
                   )}
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => signOut({ callbackUrl: '/' })} className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/50">
+                  <DropdownMenuItem onClick={() => { try { sessionStorage.clear(); } catch(e) {} signOut({ callbackUrl: '/' }); }} className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/50">
                     <LogOut className="mr-2 h-4 w-4" />
                     <span>Log out</span>
                   </DropdownMenuItem>

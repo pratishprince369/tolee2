@@ -76,6 +76,28 @@ function useActiveReelIndex(
     const container = containerRef.current;
     if (!container) return;
 
+    const muteAndPauseInactiveSlides = (activeIdx: number) => {
+      try {
+        container.querySelectorAll('.reel-container').forEach((slide) => {
+          const idx = Number(slide.getAttribute('data-index'));
+          if (idx !== activeIdx) {
+            slide.querySelectorAll('video').forEach((v) => {
+              try {
+                v.pause();
+                v.muted = true;
+                v.volume = 0;
+              } catch (e) {}
+            });
+            slide.querySelectorAll('iframe').forEach((f) => {
+              try {
+                f.contentWindow?.postMessage('{"event":"command","func":"pauseVideo","args":""}', '*');
+              } catch (e) {}
+            });
+          }
+        });
+      } catch (e) {}
+    };
+
     // 1. Smooth RAF-throttled scroll handler (zero DOM layout thrashing)
     let rafId: number | null = null;
     const handleScroll = () => {
@@ -85,7 +107,16 @@ function useActiveReelIndex(
         const h = container.clientHeight;
         if (!h) return;
         const dominantIndex = Math.round(container.scrollTop / h);
+        const currentActiveY = activeIndexRef.current * h;
+        const diffY = Math.abs(container.scrollTop - currentActiveY);
+
+        // Immediate audio cutoff when user swipes away (>15% screen height)
+        if (diffY > h * 0.15) {
+          muteAndPauseInactiveSlides(dominantIndex);
+        }
+
         if (dominantIndex !== activeIndexRef.current && dominantIndex >= 0 && dominantIndex < reelCount) {
+          muteAndPauseInactiveSlides(dominantIndex);
           activeIndexRef.current = dominantIndex;
           setActiveIndex(dominantIndex);
         }
@@ -108,6 +139,7 @@ function useActiveReelIndex(
         if (best) {
           const idx = Number((best.target as HTMLElement).getAttribute('data-index'));
           if (!isNaN(idx) && idx !== activeIndexRef.current && idx >= 0 && idx < reelCount) {
+            muteAndPauseInactiveSlides(idx);
             activeIndexRef.current = idx;
             setActiveIndex(idx);
           }

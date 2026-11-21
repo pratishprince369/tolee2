@@ -60,6 +60,11 @@ export function setupNativeGoogleCallbacks(
         }
       } else {
         console.log("[Native Auth] NextAuth Login successful, redirecting to:", callbackUrl);
+        try {
+          if (typeof window !== 'undefined') {
+            sessionStorage.clear();
+          }
+        } catch (e) {}
         if (onSuccess) {
           onSuccess();
         }
