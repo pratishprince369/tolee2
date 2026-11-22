@@ -9,13 +9,153 @@ import { autoJoinDefaultTolees } from "./autoJoinTolees";
 import { attributeReferralOnSignup } from "./referralService";
 
 
-// Ensure prisma is defined before passing to adapter
-const adapter = PrismaAdapter(prisma);
+// Base adapter with bulletproof overrides for OAuth user creation & account linking
+const baseAdapter = PrismaAdapter(prisma);
+const customAdapter = {
+  ...baseAdapter,
+  async createUser(data: any) {
+    try {
+      const email = data.email?.toLowerCase().trim();
+      const safeName = (data.name && String(data.name).trim())
+        ? String(data.name).trim()
+        : (email ? email.split('@')[0] : 'Tolee User');
+
+      // Generate a collision-free username
+      let baseUsername = (email ? email.split('@')[0] : safeName)
+        .toLowerCase()
+        .replace(/[^a-z0-9_]/g, '');
+      if (!baseUsername || baseUsername.length < 3) {
+        baseUsername = 'user_' + Math.random().toString(36).slice(-6);
+      }
+      let candidate = baseUsername;
+      let counter = 1;
+      while (await prisma.user.findUnique({ where: { username: candidate } })) {
+        candidate = `${baseUsername}${counter++}`;
+      }
+
+      const createdUser = await prisma.user.create({
+        data: {
+          email,
+          name: safeName,
+          username: candidate,
+          image: data.image || null,
+          email_verified: true,
+          emailVerified: data.emailVerified || new Date(),
+          email_verified_at: new Date(),
+          lastLoginAt: new Date(),
+          lastActiveAt: new Date(),
+          lastLoginIp: "OAuth Direct",
+          lastLoginDevice: "Google OAuth",
+        }
+      });
+
+      try {
+        await autoJoinDefaultTolees(createdUser.id, 5);
+      } catch (joinErr) {
+        console.error("[Auth] Auto-join default tolees failed:", joinErr);
+      }
+
+      try {
+        await prisma.notification.create({
+          data: {
+            userId: createdUser.id,
+            type: 'welcome',
+            message: 'Welcome to Tolee! We have automatically joined you to 5 top communities so you can immediately create and share posts, reels, and updates.',
+            link: '/feed'
+          }
+        });
+      } catch (notifErr) {
+        console.error("[Auth] Welcome notification failed:", notifErr);
+      }
+
+      return createdUser;
+    } catch (err) {
+      console.error("[Auth Adapter] Error in createUser, attempting fallback:", err);
+      return await prisma.user.create({
+        data: {
+          email: data.email,
+          name: data.name || (data.email ? data.email.split('@')[0] : 'Tolee User'),
+          image: data.image || null,
+          email_verified: true,
+          emailVerified: new Date(),
+        }
+      });
+    }
+  },
+  async linkAccount(data: any) {
+    try {
+      const accountData: any = {
+        userId: data.userId,
+        type: data.type,
+        provider: data.provider,
+        providerAccountId: String(data.providerAccountId),
+      };
+
+      if (data.refresh_token !== undefined) accountData.refresh_token = data.refresh_token;
+      if (data.access_token !== undefined) accountData.access_token = data.access_token;
+      if (data.expires_at !== undefined && data.expires_at !== null) {
+        accountData.expires_at = typeof data.expires_at === 'number' ? data.expires_at : parseInt(String(data.expires_at), 10);
+      } else if (data.expires_in !== undefined && data.expires_in !== null) {
+        accountData.expires_at = Math.floor(Date.now() / 1000) + parseInt(String(data.expires_in), 10);
+      }
+      if (data.token_type !== undefined) accountData.token_type = data.token_type;
+      if (data.scope !== undefined) accountData.scope = data.scope;
+      if (data.id_token !== undefined) accountData.id_token = data.id_token;
+      if (data.session_state !== undefined) accountData.session_state = data.session_state;
+
+      return await prisma.account.create({
+        data: accountData
+      });
+    } catch (err: any) {
+      if (err?.code === 'P2002') {
+        const existing = await prisma.account.findUnique({
+          where: {
+            provider_providerAccountId: {
+              provider: data.provider,
+              providerAccountId: String(data.providerAccountId),
+            }
+          }
+        });
+        if (existing) return existing;
+      }
+      console.error("[Auth Adapter] Error in linkAccount:", err);
+      throw err;
+    }
+  },
+  async getUserByAccount(provider_providerAccountId: { provider: string; providerAccountId: string }) {
+    try {
+      const account = await prisma.account.findUnique({
+        where: {
+          provider_providerAccountId: {
+            provider: provider_providerAccountId.provider,
+            providerAccountId: String(provider_providerAccountId.providerAccountId),
+          }
+        },
+        include: { user: true },
+      });
+      return account?.user ?? null;
+    } catch (err) {
+      console.error("[Auth Adapter] Error in getUserByAccount:", err);
+      return null;
+    }
+  },
+  async getUserByEmail(email: string) {
+    if (!email) return null;
+    try {
+      return await prisma.user.findUnique({
+        where: { email: email.toLowerCase().trim() }
+      });
+    } catch (err) {
+      console.error("[Auth Adapter] Error in getUserByEmail:", err);
+      return null;
+    }
+  }
+};
 
 export const authOptions: NextAuthOptions = {
-  adapter: adapter as any,
+  adapter: customAdapter as any,
   secret: process.env.NEXTAUTH_SECRET,
-  debug: process.env.NODE_ENV === "development",
+  debug: true,
   session: {
     strategy: "jwt",
   },
@@ -28,6 +168,16 @@ export const authOptions: NextAuthOptions = {
       clientId: process.env.GOOGLE_CLIENT_ID || "",
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
       allowDangerousEmailAccountLinking: true,
+      profile(profile) {
+        const email = profile.email?.toLowerCase().trim();
+        const safeName = profile.name || profile.given_name || (email ? email.split("@")[0] : "Tolee User");
+        return {
+          id: profile.sub,
+          name: safeName,
+          email: email,
+          image: profile.picture || null,
+        };
+      },
     }),
     CredentialsProvider({
       name: "credentials",
@@ -353,7 +503,7 @@ export const authOptions: NextAuthOptions = {
           await prisma.visitorSession.update({
             where: { sessionId },
             data: { userId: user.id }
-          });
+          }).catch(() => {});
           // Log login analytics event
           await prisma.analyticsEvent.create({
             data: {
@@ -362,7 +512,7 @@ export const authOptions: NextAuthOptions = {
               path: '/auth/signin',
               details: JSON.stringify({ userId: user.id })
             }
-          });
+          }).catch(() => {});
         }
       } catch (trackErr) {
         console.error("Failed to track login conversion:", trackErr);
