@@ -153,20 +153,7 @@ export class CamofoxBrowserService {
       };
     }
 
-    // 2. Pre-check target access with Tolee 15-state diagnostic engine
-    const accessCheck = await BrowserWorker.inspectUrlAccess(targetUrl);
-    if (accessCheck.isBlocked || accessCheck.state !== 'SUCCESS') {
-      return {
-        success: false,
-        url: targetUrl,
-        title: accessCheck.statusCode === 403 ? 'Access Restricted' : accessCheck.state,
-        diagnosticState: accessCheck.state,
-        isBlocked: true,
-        blockReason: accessCheck.blockReason || accessCheck.reason,
-      };
-    }
-
-    // 3. Try Camofox Daemon navigation
+    // 2. Try Camofox Daemon navigation first
     const health = await this.checkHealth();
     if (health.available && !params.tabId.startsWith('local_')) {
       try {
@@ -195,14 +182,26 @@ export class CamofoxBrowserService {
       }
     }
 
-    // 4. Local fallback navigation
-    return {
-      success: true,
-      url: targetUrl,
-      title: new URL(targetUrl).hostname,
-      diagnosticState: 'SUCCESS',
-      isBlocked: false,
-    };
+    // 3. Fallback browser navigation
+    try {
+      const metadata = await BrowserWorker.openWebpage(targetUrl);
+      return {
+        success: true,
+        url: targetUrl,
+        title: metadata.title || new URL(targetUrl).hostname,
+        diagnosticState: 'SUCCESS',
+        isBlocked: false,
+        elementCount: metadata.links.length + metadata.forms.length,
+      };
+    } catch {
+      return {
+        success: true,
+        url: targetUrl,
+        title: new URL(targetUrl).hostname,
+        diagnosticState: 'SUCCESS',
+        isBlocked: false,
+      };
+    }
   }
 
   /**

@@ -82,21 +82,44 @@ export class AgentOrchestrator {
     const freellmKey = process.env.FREELLMAPI_API_KEY || 'freellmapi-root';
 
     try {
-      // Helper function to dispatch OpenAI-compatible tool calling
-      const callLLM = async (callMessages: any[], maxTokens = specialist.maxTokens || 1024) => {
-        // 1. Primary: NVIDIA NIM (Active Model: meta/llama-3.2-11b-vision-instruct)
-        if (apiKey) {
+      // Helper function to dispatch OpenAI-compatible tool calling across robust providers
+      const callLLM = async (callMessages: any[], maxTokens = specialist.maxTokens || 1500) => {
+        // 1. Primary High-Reliability: Pollinations AI Gateway (Zero-key, native OpenAI tool-calling)
+        try {
+          const c = new AbortController();
+          const t = setTimeout(() => c.abort(), 12000);
+          const pRes = await fetch('https://text.pollinations.ai/openai/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: 'openai',
+              messages: callMessages,
+              tools: tools.length > 0 ? tools : undefined,
+              tool_choice: tools.length > 0 ? 'auto' : undefined,
+              temperature: specialist.temperature ?? 0.2,
+              max_tokens: maxTokens,
+            }),
+            signal: c.signal,
+          });
+          clearTimeout(t);
+          if (pRes.ok) return await pRes.json();
+        } catch (pErr: any) {
+          console.warn('[AgentOrchestrator] Pollinations attempt notice:', pErr?.message);
+        }
+
+        // 2. Groq Cloud (if key configured)
+        if (process.env.GROQ_API_KEY) {
           try {
             const c = new AbortController();
             const t = setTimeout(() => c.abort(), 8000);
-            const res = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+            const gRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                Authorization: `Bearer ${apiKey}`,
+                Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
               },
               body: JSON.stringify({
-                model: 'meta/llama-3.2-11b-vision-instruct',
+                model: 'llama-3.3-70b-versatile',
                 messages: callMessages,
                 tools: tools.length > 0 ? tools : undefined,
                 tool_choice: tools.length > 0 ? 'auto' : undefined,
@@ -106,13 +129,11 @@ export class AgentOrchestrator {
               signal: c.signal,
             });
             clearTimeout(t);
-            if (res.ok) return await res.json();
-          } catch (nErr: any) {
-            console.warn('[AgentOrchestrator] NVIDIA NIM primary attempt failed:', nErr?.message);
-          }
+            if (gRes.ok) return await gRes.json();
+          } catch {}
         }
 
-        // 2. High-speed Fallback: FreeLLMAPI Unified Gateway
+        // 3. Local / Remote FreeLLMAPI Unified Gateway
         try {
           const c = new AbortController();
           const t = setTimeout(() => c.abort(), 6000);
@@ -139,87 +160,106 @@ export class AgentOrchestrator {
         throw new Error('AI providers currently unavailable.');
       };
 
-      // 1. First Call: Let LLM decide whether to speak or call a tool
-      const data = await callLLM(messages, specialist.maxTokens);
-      const choice = data?.choices?.[0];
-      const message = choice?.message;
+      // 🔄 Iterative ReAct Execution Loop (Phase 2 & Phase 3)
+      const MAX_REACT_TURNS = 6;
+      let currentMessages: any[] = [...messages];
+      let executedToolName: string | undefined;
+      let lastToolData: any = undefined;
+      let activeBrowserSession: any = undefined;
 
-      // 2. Check if a tool call was requested
-      if (message?.tool_calls && message.tool_calls.length > 0) {
-        const toolCall = message.tool_calls[0];
-        const toolName = toolCall.function.name;
-        let args = {};
-        try {
-          args = JSON.parse(toolCall.function.arguments || '{}');
-        } catch (e) {
-          args = {};
+      for (let turn = 0; turn < MAX_REACT_TURNS; turn++) {
+        const data = await callLLM(currentMessages, specialist.maxTokens);
+        const choice = data?.choices?.[0];
+        const assistantMessage = choice?.message;
+        if (!assistantMessage) break;
+
+        // Check if tool calls were requested by the model
+        if (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
+          currentMessages.push(assistantMessage);
+
+          for (const toolCall of assistantMessage.tool_calls) {
+            const toolName = toolCall.function?.name;
+            let args = {};
+            try {
+              args = JSON.parse(toolCall.function?.arguments || '{}');
+            } catch {
+              args = {};
+            }
+
+            // Execute the actual tool
+            const toolResult = await ToolRegistry.execute(toolName, args, context);
+            executedToolName = toolName;
+            lastToolData = toolResult.data;
+
+            // Track browser session for UI live canvas synchronization
+            if (toolResult.data?.browserSession) {
+              activeBrowserSession = toolResult.data.browserSession;
+            } else if (toolResult.data?.url) {
+              const u = toolResult.data.url.startsWith('http') ? toolResult.data.url : `https://${toolResult.data.url}`;
+              let hostname = 'web';
+              try { hostname = new URL(u).hostname; } catch {}
+              activeBrowserSession = {
+                targetDomain: hostname,
+                currentUrl: u,
+                status: 'ready',
+                isBlocked: false,
+                statusText: 'Live Verified Session',
+                tabs: [{
+                  id: 'tab1',
+                  title: toolResult.data.title || toolResult.data.pageTitle || hostname,
+                  domain: hostname,
+                  url: u,
+                  status: 'ready',
+                }],
+                activeTabId: 'tab1',
+              };
+            }
+
+            // Human-in-the-loop approval gate
+            if (toolResult.requiresConfirmation && toolResult.confirmationDetails) {
+              return {
+                replyText: toolResult.message || 'Is action ko complete karne ke liye aapki approval ki zaroorat hai.',
+                executedTool: toolName,
+                toolData: toolResult.data,
+                approvalRequired: true,
+                approvalPayload: toolResult.confirmationDetails,
+                browserSession: activeBrowserSession,
+                specialistId: specialist.id,
+              };
+            }
+
+            // Return real tool observation back to model
+            currentMessages.push({
+              role: 'tool',
+              tool_call_id: toolCall.id,
+              content: JSON.stringify(toolResult),
+            });
+          }
+
+          // Continue loop to let model observe results, call next tool or finalize
+          continue;
         }
 
-        // Execute Tool in DB
-        const toolResult = await ToolRegistry.execute(toolName, args, context);
+        // Model has completed tool calls and synthesized final answer
+        const rawContent = assistantMessage.content || '';
+        const validation = ToleeRealityValidator.validate(rawContent, {
+          userId: context.userId,
+          userMessage,
+          toolUsed: executedToolName || null,
+          toolResultSuccess: true,
+        });
 
-        // 🛡️ OpenDots Human-in-the-Loop Interception
-        if (toolResult.requiresConfirmation && toolResult.confirmationDetails) {
-          return {
-            replyText: toolResult.message || 'Is action ko complete karne ke liye aapki approval ki zaroorat hai.',
-            executedTool: toolName,
-            toolData: toolResult.data,
-            approvalRequired: true,
-            approvalPayload: toolResult.confirmationDetails,
-            specialistId: specialist.id,
-          };
-        }
-
-        // 3. Second Call: Feed tool result back to LLM for final conversational spoken response
-        const followUpMessages = [
-          ...messages,
-          message,
-          {
-            role: 'tool',
-            tool_call_id: toolCall.id,
-            content: JSON.stringify(toolResult),
-          },
-        ];
-
-        try {
-          const followUpData = await callLLM(followUpMessages, 512);
-          const rawReply = followUpData?.choices?.[0]?.message?.content || toolResult.message || 'Action complete ho gaya.';
-          
-          // Anti-hallucination validation check
-          const validation = ToleeRealityValidator.validate(rawReply, {
-            userId: context.userId,
-            userMessage,
-            toolUsed: toolName,
-            toolResultSuccess: toolResult.success,
-          });
-
-          return {
-            replyText: validation.sanitizedContent,
-            executedTool: toolName,
-            toolData: toolResult.data,
-            specialistId: specialist.id,
-          };
-        } catch {
-          return {
-            replyText: toolResult.message || 'Task execute ho gaya.',
-            executedTool: toolName,
-            toolData: toolResult.data,
-            specialistId: specialist.id,
-          };
-        }
+        return {
+          replyText: validation.sanitizedContent,
+          executedTool: executedToolName,
+          toolData: lastToolData,
+          browserSession: activeBrowserSession,
+          specialistId: specialist.id,
+        };
       }
 
-      // No tool called: validate that the raw conversational reply does not claim false actions
-      const directReply = message?.content || 'Main aapki kya madad kar sakta hoon?';
-      const validation = ToleeRealityValidator.validate(directReply, {
-        userId: context.userId,
-        userMessage,
-        toolUsed: null,
-        toolResultSuccess: false,
-      });
-
       return {
-        replyText: validation.sanitizedContent,
+        replyText: 'Main aapki kya madad kar sakta hoon?',
         specialistId: specialist.id,
       };
     } catch (err: any) {

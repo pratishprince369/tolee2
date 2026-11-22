@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 import { searchAndGroundQuery } from '@/lib/web-search';
 import { BacklinkOperatorEngine } from '../browser/backlink-engine';
 import { ToleeStagehandEngine } from '../browser/stagehand-engine';
+import { CamofoxBrowserService } from '../browser/camofox-service';
 
 /**
  * 🌐 V4 Browsing, Browser Automation, Job Search & Task Automation Tools
@@ -74,10 +75,33 @@ export const V4_BROWSING_TOOLS: ToolDefinition[] = [
     execute: async (args: { url: string }) => {
       try {
         const metadata = await BrowserWorker.openWebpage(args.url);
+        const u = args.url.startsWith('http') ? args.url : `https://${args.url}`;
+        let hostname = 'web';
+        try { hostname = new URL(u).hostname; } catch {}
+
+        const browserSession = {
+          targetDomain: hostname,
+          currentUrl: u,
+          status: 'ready',
+          isBlocked: false,
+          statusText: 'Live Verified Session',
+          tabs: [{
+            id: 'tab1',
+            title: metadata.title || hostname,
+            domain: hostname,
+            url: u,
+            status: 'ready',
+          }],
+          activeTabId: 'tab1',
+        };
+
         return {
           success: true,
           message: `Successfully opened and extracted content from "${metadata.title}".`,
-          data: metadata,
+          data: {
+            ...metadata,
+            browserSession,
+          },
         };
       } catch (err: any) {
         return {
@@ -834,22 +858,44 @@ export const V4_BROWSING_TOOLS: ToolDefinition[] = [
       },
       required: ['url'],
     },
-    execute: async (args: { url: string }) => {
+    execute: async (args: { url: string }, context?: ToolExecutionContext) => {
       try {
-        const diag = await BrowserWorker.inspectUrlAccess(args.url);
+        const u = args.url.startsWith('http') ? args.url : `https://${args.url}`;
+        let hostname = 'web';
+        try { hostname = new URL(u).hostname; } catch {}
+
+        const navResult = await CamofoxBrowserService.navigate({
+          tabId: `tab_${context?.userId || 'user'}`,
+          url: u,
+          userId: context?.userId || 'anonymous',
+        });
+
+        const browserSession = {
+          targetDomain: hostname,
+          currentUrl: u,
+          status: navResult.isBlocked ? 'blocked' : 'ready',
+          isBlocked: navResult.isBlocked,
+          statusText: navResult.isBlocked ? (navResult.blockReason || 'Access Blocked') : 'Live Verified Session',
+          tabs: [{
+            id: 'tab1',
+            title: navResult.title || hostname,
+            domain: hostname,
+            url: u,
+            status: navResult.isBlocked ? 'blocked' : 'ready',
+          }],
+          activeTabId: 'tab1',
+        };
+
         return {
           success: true,
-          message: diag.isBlocked
-            ? `Security restriction detected on ${args.url}: ${diag.blockReason || diag.state}`
-            : `Navigated to ${args.url} (Status: ${diag.statusCode}).`,
+          message: navResult.isBlocked
+            ? `Security restriction detected on ${u}: ${navResult.blockReason || navResult.diagnosticState}`
+            : `Navigated to ${u}.`,
           data: {
-            url: args.url,
-            accessible: diag.accessible,
-            isBlocked: diag.isBlocked,
-            state: diag.state,
-            statusCode: diag.statusCode,
-            blockReason: diag.blockReason,
-            suggestedAction: diag.suggestedAction,
+            url: u,
+            title: navResult.title,
+            isBlocked: navResult.isBlocked,
+            browserSession,
           },
         };
       } catch (err: any) {

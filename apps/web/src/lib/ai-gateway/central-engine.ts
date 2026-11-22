@@ -761,46 +761,68 @@ export class CentralAIEngine {
       };
     }
 
-    // 🧠 2. OpenMuse Multi-Step Task Planning & Execution (Section 4)
-    if (options.userId && OpenMuseTaskOrchestrator.isMultiStepTask(rawMessage)) {
+    // 🧠 2. Autonomous Multi-Step ReAct Agent Loop (Phase 2, 3 & 4)
+    if (options.userId && (
+      rawLower.includes('search') ||
+      rawLower.includes('research') ||
+      rawLower.includes('compare') ||
+      rawLower.includes('visit') ||
+      rawLower.includes('website') ||
+      rawLower.includes('real estate') ||
+      rawLower.includes('project') ||
+      rawLower.includes('hotel') ||
+      rawLower.includes('flight') ||
+      rawLower.includes('book') ||
+      rawLower.includes('find') ||
+      rawLower.includes('check') ||
+      rawLower.includes('kholo') ||
+      rawLower.includes('batao') ||
+      OpenMuseTaskOrchestrator.isMultiStepTask(rawMessage)
+    )) {
       try {
-        const taskResult = await OpenMuseTaskOrchestrator.executeMultiStepTask({
-          message: rawMessage,
-          userId: options.userId,
-          userName: options.userName || 'User',
-          userEmail: options.userEmail,
+        const agentResult = await AgentOrchestrator.process({
+          userMessage: rawMessage,
+          conversationHistory: history as any,
+          context: {
+            userId: options.userId,
+            userName: options.userName || 'User',
+            userEmail: options.userEmail,
+          },
         });
 
-        return {
-          success: true,
-          type: 'tool_result',
-          content: taskResult.summary,
-          model: 'openmuse-task-orchestrator',
-          provider: 'tolee-core',
-          toolUsed: 'execute_multi_step_task',
-          image: null,
-          files: [],
-          interactiveAction: taskResult.approvalRequired
-            ? {
-                type: 'APPROVAL_REQUEST',
-                label: taskResult.approvalPayload?.title || 'Review & Publish Generated Content',
-                payload: taskResult.approvalPayload,
-              }
-            : {
-                type: 'OPENMUSE_TASK',
-                label: `Task: ${taskResult.task.title}`,
-                payload: taskResult.task,
-              },
-          taskRecord: taskResult.task,
-          browserSession: taskResult.browserSession,
-          metadata: {
-            latencyMs: Date.now() - startTime,
-            intent: 'multi_step_task',
-            fallbackUsed: false,
-          },
-        };
-      } catch (taskErr: any) {
-        console.warn('[CentralAIEngine] OpenMuse task orchestrator notice:', taskErr?.message);
+        if (agentResult.executedTool || (agentResult.replyText && agentResult.replyText.length > 20)) {
+          return {
+            success: true,
+            type: agentResult.executedTool ? 'tool_result' : 'text',
+            content: agentResult.replyText,
+            model: 'tolee-agent-orchestrator',
+            provider: 'autonomous-react',
+            toolUsed: agentResult.executedTool || null,
+            image: null,
+            files: [],
+            interactiveAction: agentResult.approvalPayload
+              ? {
+                  type: 'APPROVAL_REQUEST',
+                  label: agentResult.approvalPayload.title || 'Review & Approve',
+                  payload: agentResult.approvalPayload,
+                }
+              : agentResult.browserSession
+              ? {
+                  type: 'BROWSER_SESSION',
+                  label: `Live Browser: ${agentResult.browserSession.targetDomain}`,
+                  payload: agentResult.browserSession,
+                }
+              : undefined,
+            browserSession: agentResult.browserSession,
+            metadata: {
+              latencyMs: Date.now() - startTime,
+              intent: 'autonomous_react_task',
+              fallbackUsed: false,
+            },
+          };
+        }
+      } catch (agentErr: any) {
+        console.warn('[CentralAIEngine] AgentOrchestrator notice:', agentErr?.message);
       }
     }
 

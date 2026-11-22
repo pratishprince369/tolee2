@@ -53,8 +53,8 @@ export function LiveBrowserOperatorCanvas({
   onResumeTask,
   onVerifyLink,
   session,
-  targetDomain = 'linkedin.com',
-  initialUrl,
+  targetDomain = 'google.com',
+  initialUrl = 'https://www.google.com',
   isStopped = false,
 }: LiveBrowserOperatorCanvasProps) {
   // Build initial tabs from session or defaults
@@ -62,32 +62,15 @@ export function LiveBrowserOperatorCanvas({
     if (session?.tabs && Array.isArray(session.tabs) && session.tabs.length > 0) {
       return session.tabs;
     }
-    const domain = targetDomain || 'linkedin.com';
-    if (domain.includes('linkedin')) {
-      return [
-        {
-          id: 'linkedin',
-          title: 'linkedin.com',
-          domain: 'linkedin.com',
-          url: initialUrl || 'https://www.linkedin.com/company/setup/new/',
-          status: 'action_required',
-        },
-        {
-          id: 'tolee',
-          title: 'tolee.in',
-          domain: 'tolee.in',
-          url: 'https://tolee.in',
-          status: 'ready',
-        },
-      ];
-    }
+    const domain = targetDomain && targetDomain !== 'linkedin.com' ? targetDomain : 'google.com';
+    const startUrl = initialUrl && !initialUrl.includes('linkedin.com/company') ? initialUrl : `https://${domain}`;
     return [
       {
         id: domain.replace(/[^a-z0-9]/g, '_'),
         title: domain,
         domain: domain,
-        url: initialUrl || `https://${domain}`,
-        status: 'action_required',
+        url: startUrl,
+        status: 'ready',
       },
       {
         id: 'tolee',
@@ -101,7 +84,7 @@ export function LiveBrowserOperatorCanvas({
 
   const [tabs, setTabs] = useState<BrowserTab[]>(getInitialTabs);
   const [activeTabId, setActiveTabId] = useState<string>(() => {
-    return session?.activeTabId || (tabs[0]?.id || 'linkedin');
+    return session?.activeTabId || (tabs[0]?.id || 'google_com');
   });
 
   const [isUserControl, setIsUserControl] = useState<boolean>(false);
@@ -536,7 +519,8 @@ export function LiveBrowserOperatorCanvas({
 
 
         {/* VIEW 1: LinkedIn Target Platform (Backlinks & Company) */}
-        {activeTab.domain.includes('linkedin') &&
+        {Boolean(session?.isBacklinkMode) &&
+          activeTab.domain.includes('linkedin') &&
           !activeTab.url.includes('/jobs') &&
           !session?.jobData && (
           <div className="space-y-4 max-w-xl mx-auto w-full">
@@ -670,7 +654,7 @@ export function LiveBrowserOperatorCanvas({
         )}
 
         {/* VIEW 2: AlternativeTo */}
-        {activeTab.domain.includes('alternativeto') && (
+        {Boolean(session?.isBacklinkMode) && activeTab.domain.includes('alternativeto') && (
           <div className="space-y-4 max-w-xl mx-auto w-full">
             <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3 shadow-md">
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -747,7 +731,7 @@ export function LiveBrowserOperatorCanvas({
         )}
 
         {/* VIEW 3: Crunchbase */}
-        {activeTab.domain.includes('crunchbase') && (
+        {Boolean(session?.isBacklinkMode) && activeTab.domain.includes('crunchbase') && (
           <div className="space-y-4 max-w-xl mx-auto w-full">
             <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3 shadow-md">
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -803,7 +787,7 @@ export function LiveBrowserOperatorCanvas({
         )}
 
         {/* VIEW 4: Gmail Verification */}
-        {activeTab.domain.includes('mail.google') && (
+        {Boolean(session?.isBacklinkMode) && activeTab.domain.includes('mail.google') && (
           <div className="space-y-3 max-w-xl mx-auto w-full">
             <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3 shadow-md">
               <div className="flex items-center gap-2 text-xs font-bold text-slate-300 border-b border-slate-800 pb-2">
@@ -831,10 +815,11 @@ export function LiveBrowserOperatorCanvas({
         )}
 
         {/* VIEW 5: Real Live Browser Viewport (Active for all websites) */}
-        {!activeTab.domain.includes('linkedin') &&
-          !activeTab.domain.includes('alternativeto') &&
-          !activeTab.domain.includes('crunchbase') &&
-          !activeTab.domain.includes('mail.google') && (
+        {(!session?.isBacklinkMode ||
+          (!activeTab.domain.includes('linkedin') &&
+            !activeTab.domain.includes('alternativeto') &&
+            !activeTab.domain.includes('crunchbase') &&
+            !activeTab.domain.includes('mail.google'))) && (
             <div className="flex-1 w-full h-full flex flex-col min-h-[460px] bg-slate-950 rounded-xl overflow-hidden border border-slate-800 shadow-inner relative">
               {/* Live Webpage Action Header */}
               <div className="px-3 py-2 bg-slate-900 border-b border-slate-800 flex items-center justify-between text-xs shrink-0">
