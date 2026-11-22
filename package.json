@@ -2,14 +2,9 @@
   "name": "tolee-monorepo",
   "version": "0.1.0",
   "private": true,
-  "bin": {
-    "prisma": "prisma.js",
-    "tsc": "tsc.js"
-  },
   "scripts": {
     "dev": "npm --prefix apps/web run dev",
-    "build": "npm --prefix apps/web run build",
-    "start": "npm --prefix apps/web run start",
-    "postinstall": "npm --prefix apps/web run postinstall"
+    "build": "cd apps/web && npm install && npx prisma generate && npm run build",
+    "start": "npm --prefix apps/web run start"
   }
 }
