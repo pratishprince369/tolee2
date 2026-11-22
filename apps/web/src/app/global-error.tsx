@@ -31,11 +31,18 @@ export default function GlobalError({
     const errorMsg = error?.message || '';
     console.error('[Tolee Global Error Caught]:', errorMsg);
 
-    // Auto-recover immediately without leaving user stuck
-    const timer = setTimeout(() => {
-      purgeAndReload();
-    }, 150);
-    return () => clearTimeout(timer);
+    // Prevent infinite reload loops: only attempt 1 auto-reload per 15s
+    if (typeof window !== 'undefined') {
+      const lastAttempt = sessionStorage.getItem('tolee_global_err_ts');
+      const now = Date.now();
+      if (!lastAttempt || now - parseInt(lastAttempt, 10) > 15000) {
+        sessionStorage.setItem('tolee_global_err_ts', String(now));
+        const timer = setTimeout(() => {
+          purgeAndReload();
+        }, 1200);
+        return () => clearTimeout(timer);
+      }
+    }
   }, [error]);
 
   return (
