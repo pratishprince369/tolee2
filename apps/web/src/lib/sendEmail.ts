@@ -55,16 +55,34 @@ export async function sendOTPEmail(to: string, otp: string): Promise<boolean> {
   if (resendKey && resendKey !== 'YOUR_RESEND_API_KEY' && resendKey.trim() !== '') {
     try {
       const resend = new Resend(resendKey);
-      await resend.emails.send({
-        from: process.env.EMAIL_FROM || 'Tolee <onboarding@resend.dev>',
+      const preferredFrom = process.env.EMAIL_FROM || 'Tolee <onboarding@resend.dev>';
+
+      let res = await resend.emails.send({
+        from: preferredFrom,
         to,
         subject: '🔐 Your Tolee Super Admin OTP',
         html: emailHtml,
       });
-      console.log(`[EMAIL] OTP sent successfully via Resend to ${to}`);
-      return true;
+
+      // If domain verification failed with preferred sender, retry with verified onboarding sender
+      if (res.error) {
+        console.warn(`[EMAIL] Resend failed with sender "${preferredFrom}": ${res.error.message}. Retrying with verified fallback onboarding@resend.dev...`);
+        res = await resend.emails.send({
+          from: 'Tolee <onboarding@resend.dev>',
+          to,
+          subject: '🔐 Your Tolee Super Admin OTP',
+          html: emailHtml,
+        });
+      }
+
+      if (!res.error && res.data?.id) {
+        console.log(`[EMAIL] OTP sent successfully via Resend to ${to} (Message ID: ${res.data.id})`);
+        return true;
+      } else if (res.error) {
+        console.error('[EMAIL] Resend send error after fallback:', res.error);
+      }
     } catch (resendErr) {
-      console.error('[EMAIL] Resend send failed:', resendErr);
+      console.error('[EMAIL] Resend send exception:', resendErr);
     }
   }
 
